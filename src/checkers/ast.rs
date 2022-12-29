@@ -1086,7 +1086,9 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP024) {
-                    pyupgrade::plugins::os_error_alias(self, exc);
+                    if let Some(item) = exc {
+                        pyupgrade::plugins::os_error_alias(self, item);
+                    }
                 }
             }
             StmtKind::AugAssign { target, .. } => {
@@ -1687,6 +1689,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP022) {
                     pyupgrade::plugins::replace_stdout_stderr(self, expr, keywords);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, expr);
                 }
 
                 // flake8-print

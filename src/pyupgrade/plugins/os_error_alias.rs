@@ -117,11 +117,8 @@ fn handle_making_changes(checker: &mut Checker, target: &Located<ExprKind>, befo
         // ignored. Let me know if you want me to go with a more
         // complicated solution that avoids this.
         if contents.contains(").") {
-            println!("GOT TRIGGERED");
             return;
         }
-        println!("Before: {:?}", before_replace);
-        println!("Replacements: {:?}\n", replacements);
         let mut final_str: String;
         if replacements.len() == 1 {
             final_str = replacements.get(0).unwrap().to_string();
@@ -159,17 +156,13 @@ impl OSErrorAliasChecker for &Vec<Excepthandler> {
     }
 }
 
-impl OSErrorAliasChecker for &Option<Box<Located<ExprKind>>> {
+impl OSErrorAliasChecker for &Box<Located<ExprKind>> {
     fn check_error(&self, checker: &mut Checker) {
-        let target = match self {
-            Some(expr) => expr,
-            None => return,
-        };
         let mut replacements: Vec<String>;
         let mut before_replace: Vec<String>;
-        match &target.node {
+        match &self.node {
             ExprKind::Name { id, .. } => {
-                (replacements, before_replace) = check_module(checker, &target);
+                (replacements, before_replace) = check_module(checker, &self);
                 if replacements.is_empty() {
                     let new_name = get_correct_name(&id);
                     replacements.push(new_name);
@@ -177,11 +170,54 @@ impl OSErrorAliasChecker for &Option<Box<Located<ExprKind>>> {
                 }
             }
             ExprKind::Attribute { .. } => {
-                (replacements, before_replace) = check_module(checker, &target);
+                (replacements, before_replace) = check_module(checker, &self);
             },
             _ => return        
         }
-        handle_making_changes(checker, target, before_replace, replacements);
+        handle_making_changes(checker, self, before_replace, replacements);
+    }
+}
+
+impl OSErrorAliasChecker for &Located<ExprKind> {
+    fn check_error(&self, checker: &mut Checker) {
+        let mut replacements: Vec<String>;
+        let mut before_replace: Vec<String>;
+        let change_target: &Located<ExprKind>;
+        match &self.node {
+            ExprKind::Name { id, .. } => {
+                change_target = &self;
+                (replacements, before_replace) = check_module(checker, &self);
+                if replacements.is_empty() {
+                    let new_name = get_correct_name(&id);
+                    replacements.push(new_name);
+                    before_replace.push(id.to_string());
+                }
+            }
+            ExprKind::Attribute { .. } => {
+                change_target = &self;
+                (replacements, before_replace) = check_module(checker, &self);
+            },
+            ExprKind::Call { func, args, keywords } => {
+                change_target = &func;
+                match &func.node {
+                    ExprKind::Name { id, .. } => {
+                        (replacements, before_replace) = check_module(checker, &func);
+                        if replacements.is_empty() {
+                            let new_name = get_correct_name(&id);
+                            replacements.push(new_name);
+                            before_replace.push(id.to_string());
+                        }
+                    }
+                    ExprKind::Attribute { .. } => {
+                        (replacements, before_replace) = check_module(checker, &func);
+                    },
+                    _ => return
+                }
+                println!("{:?}", func);
+            }
+            _ => return        
+        }
+        handle_making_changes(checker, change_target, before_replace, replacements);
     }
 }
 
