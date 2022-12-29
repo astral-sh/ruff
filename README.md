@@ -167,7 +167,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.199'
+  rev: 'v0.0.200'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
