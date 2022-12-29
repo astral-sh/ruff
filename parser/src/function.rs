@@ -31,16 +31,16 @@ pub fn validate_arguments(
     let mut all_arg_names =
         FxHashSet::with_hasher(Default::default());
     for arg in all_args {
-        let arg_name = arg.node.arg.clone();
+        let arg_name = &arg.node.arg;
         if !all_arg_names.insert(arg_name) {
             return Err(LexicalError {
-                error: LexicalErrorType::DuplicateArgumentError,
+                error: LexicalErrorType::DuplicateArgumentError(arg_name.to_string()),
                 location: arg.location,
             });
         }
     }
 
-    return Ok(arguments);
+    Ok(arguments)
 }
 
 pub fn parse_params(
