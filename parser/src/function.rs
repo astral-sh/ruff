@@ -10,9 +10,7 @@ pub struct ArgumentList {
 type ParameterDefs = (Vec<ast::Arg>, Vec<ast::Arg>, Vec<ast::Expr>);
 type ParameterDef = (ast::Arg, Option<ast::Expr>);
 
-pub fn validate_arguments(
-    arguments: ast::Arguments
-) -> Result<ast::Arguments, LexicalError> {
+pub fn validate_arguments(arguments: ast::Arguments) -> Result<ast::Arguments, LexicalError> {
     let mut all_args: Vec<&ast::Located<ast::ArgData>> = vec![];
 
     all_args.extend(arguments.posonlyargs.iter());
@@ -28,8 +26,7 @@ pub fn validate_arguments(
         all_args.push(a);
     }
 
-    let mut all_arg_names =
-        FxHashSet::with_hasher(Default::default());
+    let mut all_arg_names = FxHashSet::with_hasher(Default::default());
     for arg in all_args {
         let arg_name = &arg.node.arg;
         if !all_arg_names.insert(arg_name) {
