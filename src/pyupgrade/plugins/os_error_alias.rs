@@ -1,5 +1,5 @@
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind, Located};
 use itertools::Itertools;
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind, Located};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
@@ -79,13 +79,13 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
                     ExprKind::Name { id, .. } => {
                         let new_name = get_correct_name(id);
                         replacements.push(new_name);
-                    },
+                    }
                     ExprKind::Attribute { .. } => {
                         let (new_replacements, new_before_replace) = check_module(checker, elt);
                         replacements.extend(new_replacements);
                         before_replace.extend(new_before_replace);
-                    },
-                    _ => ()
+                    }
+                    _ => (),
                 }
             }
         }
@@ -96,19 +96,25 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
         .unique()
         .map(|x| x.to_string())
         .collect();
-    before_replace = before_replace.iter().filter(|x| !x.is_empty()).map(|x| x.to_string()).collect();
+    before_replace = before_replace
+        .iter()
+        .filter(|x| !x.is_empty())
+        .map(|x| x.to_string())
+        .collect();
 
     // This part checks if there are differences between what there is and
     // what there should be. Where differences, the changes are applied
     handle_making_changes(checker, error_handlers, before_replace, replacements);
 }
 
-fn handle_making_changes(checker: &mut Checker, target: &Located<ExprKind>, before_replace: Vec<String>, replacements: Vec<String>)  {
+fn handle_making_changes(
+    checker: &mut Checker,
+    target: &Located<ExprKind>,
+    before_replace: Vec<String>,
+    replacements: Vec<String>,
+) {
     if before_replace != replacements && replacements.len() > 0 {
-        let range = Range::new(
-            target.location,
-            target.end_location.unwrap(),
-        );
+        let range = Range::new(target.location, target.end_location.unwrap());
         let contents = checker.locator.slice_source_code_range(&range);
         // Pyyupgrade does not want imports changed if a module only is
         // surrounded by parentheses. For example: `except mmap.error:`
@@ -149,7 +155,7 @@ pub trait OSErrorAliasChecker {
 
 impl OSErrorAliasChecker for &Vec<Excepthandler> {
     fn check_error(&self, checker: &mut Checker) {
-    // Each separate except block is a separate error and fix
+        // Each separate except block is a separate error and fix
         for handler in self.clone().iter() {
             handle_except_block(checker, handler);
         }
@@ -162,7 +168,7 @@ impl OSErrorAliasChecker for &Box<Located<ExprKind>> {
         let mut before_replace: Vec<String>;
         match &self.node {
             ExprKind::Name { id, .. } => {
-                (replacements, before_replace) = check_module(checker, &self);
+                (replacements, before_replace) = check_module(checker, self);
                 if replacements.is_empty() {
                     let new_name = get_correct_name(&id);
                     replacements.push(new_name);
@@ -170,9 +176,9 @@ impl OSErrorAliasChecker for &Box<Located<ExprKind>> {
                 }
             }
             ExprKind::Attribute { .. } => {
-                (replacements, before_replace) = check_module(checker, &self);
-            },
-            _ => return        
+                (replacements, before_replace) = check_module(checker, self);
+            }
+            _ => return,
         }
         handle_making_changes(checker, self, before_replace, replacements);
     }
@@ -185,8 +191,8 @@ impl OSErrorAliasChecker for &Located<ExprKind> {
         let change_target: &Located<ExprKind>;
         match &self.node {
             ExprKind::Name { id, .. } => {
-                change_target = &self;
-                (replacements, before_replace) = check_module(checker, &self);
+                change_target = self;
+                (replacements, before_replace) = check_module(checker, self);
                 if replacements.is_empty() {
                     let new_name = get_correct_name(&id);
                     replacements.push(new_name);
@@ -194,10 +200,10 @@ impl OSErrorAliasChecker for &Located<ExprKind> {
                 }
             }
             ExprKind::Attribute { .. } => {
-                change_target = &self;
-                (replacements, before_replace) = check_module(checker, &self);
-            },
-            ExprKind::Call { func, args, keywords } => {
+                change_target = self;
+                (replacements, before_replace) = check_module(checker, self);
+            }
+            ExprKind::Call { func, .. } => {
                 change_target = &func;
                 match &func.node {
                     ExprKind::Name { id, .. } => {
@@ -210,12 +216,11 @@ impl OSErrorAliasChecker for &Located<ExprKind> {
                     }
                     ExprKind::Attribute { .. } => {
                         (replacements, before_replace) = check_module(checker, &func);
-                    },
-                    _ => return
+                    }
+                    _ => return,
                 }
-                println!("{:?}", func);
             }
-            _ => return        
+            _ => return,
         }
         handle_making_changes(checker, change_target, before_replace, replacements);
     }
