@@ -53,6 +53,7 @@ fn check_module(checker: &Checker, expr: &Box<Located<ExprKind>>) -> (Vec<String
 pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
     // Each separate except block is a separate error and fix
     for handler in handlers {
+        // println!("{:?}", handler);
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         let error_handlers = match type_.as_ref() {
             None => return,
@@ -94,6 +95,20 @@ pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
         // This part checks if there are differences between what there is and
         // what there should be. Where differences, the changes are applied
         if before_replace != replacements && replacements.len() > 0 {
+            let range = Range::new(
+                error_handlers.location,
+                error_handlers.end_location.unwrap(),
+            );
+            let contents = checker.locator.slice_source_code_range(&range);
+            // Pyyupgrade does not want imports changed if a module only is
+            // surrounded by parentheses. For example: `except mmap.error:`
+            // would be changed, but: `(mmap).error:` would not. One issue with
+            // this implementation is that any valid changes will also be
+            // ignored. Let me know if you want me to go with a more
+            // complicated solution that avoids this.
+            if contents.contains(").") {
+                return;
+            }
             println!("Before: {:?}", before_replace);
             println!("Replacements: {:?}\n", replacements);
             let mut final_str: String;
@@ -104,10 +119,6 @@ pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
                 final_str.insert(0, '(');
                 final_str.push(')');
             }
-            let range = Range::new(
-                error_handlers.location,
-                error_handlers.end_location.unwrap(),
-            );
             let mut check = Check::new(CheckKind::OSErrorAlias, range);
             if checker.patch(check.kind.code()) {
                 check.amend(Fix::replacement(

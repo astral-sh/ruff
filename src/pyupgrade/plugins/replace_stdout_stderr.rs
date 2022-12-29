@@ -87,10 +87,8 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
                 stderr
             };
             let mut contents = String::from("capture_output=True");
-            if let Some(middle) = extract_middle(&checker.locator.slice_source_code_range(&Range {
-                location: first.end_location.unwrap(),
-                end_location: last.location,
-            })) {
+            if let Some(middle) = extract_middle(&checker.locator.slice_source_code_range(&Range::new(first.end_location.unwrap(), last.location)))
+            {
                 if middle.multi_line {
                     contents.push(',');
                     contents.push('\n');
