@@ -31,6 +31,22 @@ pub struct Options {
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     pub allowed_confusables: Option<Vec<char>>,
     #[option(
+        default = ".ruff_cache",
+        value_type = "PathBuf",
+        example = r#"cache-dir = "~/.cache/ruff""#
+    )]
+    /// A path to the cache directory.
+    ///
+    /// By default, Ruff stores cache results in a `.ruff_cache` directory in
+    /// the current project root.
+    ///
+    /// However, Ruff will also respect the `RUFF_CACHE_DIR` environment
+    /// variable, which takes precedence over that default.
+    ///
+    /// This setting will override even the `RUFF_CACHE_DIR` environment
+    /// variable, if set.
+    pub cache_dir: Option<String>,
+    #[option(
         default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
         value_type = "Regex",
         example = r#"
@@ -324,21 +340,13 @@ pub struct Options {
     /// A list of check code prefixes to consider un-autofix-able.
     pub unfixable: Option<Vec<CheckCodePrefix>>,
     #[option(
-        default = ".ruff_cache",
-        value_type = "PathBuf",
-        example = r#"cache-dir = "~/.cache/ruff""#
+        default = "true",
+        value_type = "bool",
+        example = "update-check = false"
     )]
-    /// A path to the cache directory.
-    ///
-    /// By default, Ruff stores cache results in a `.ruff_cache` directory in
-    /// the current project root.
-    ///
-    /// However, Ruff will also respect the `RUFF_CACHE_DIR` environment
-    /// variable, which takes precedence over that default.
-    ///
-    /// This setting will override even the `RUFF_CACHE_DIR` environment
-    /// variable, if set.
-    pub cache_dir: Option<String>,
+    /// Enable or disable automatic update checks (overridden by the
+    /// `--update-check` and `--no-update-check` command-line flags).
+    pub update_check: Option<bool>,
     #[option_group]
     /// Options for the `flake8-annotations` plugin.
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
