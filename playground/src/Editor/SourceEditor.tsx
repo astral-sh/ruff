@@ -7,8 +7,6 @@ import { MarkerSeverity, MarkerTag } from "monaco-editor";
 import { useCallback, useEffect } from "react";
 import { Check } from "../pkg";
 
-export type Mode = "JSON" | "Python";
-
 export default function SourceEditor({
   visible,
   source,

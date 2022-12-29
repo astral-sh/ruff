@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { persist, restore } from "./config";
-import { DEFAULT_CONFIG_SOURCE, DEFAULT_PYTHON_SOURCE } from "../constants";
+import { persist, restore } from "./settings";
+import { DEFAULT_SETTINGS_SOURCE, DEFAULT_PYTHON_SOURCE } from "../constants";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
 import init, { check, current_version, Check } from "../pkg";
@@ -15,7 +15,7 @@ export default function Editor() {
   const [version, setVersion] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("Source");
   const [edit, setEdit] = useState<number>(0);
-  const [configSource, setConfigSource] = useState<string | null>(null);
+  const [settingsSource, setSettingsSource] = useState<string | null>(null);
   const [pythonSource, setPythonSource] = useState<string | null>(null);
   const [checks, setChecks] = useState<Check[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export default function Editor() {
   }, []);
 
   useEffect(() => {
-    if (!initialized || configSource == null || pythonSource == null) {
+    if (!initialized || settingsSource == null || pythonSource == null) {
       return;
     }
 
@@ -33,7 +33,7 @@ export default function Editor() {
     let checks: Check[];
 
     try {
-      config = JSON.parse(configSource);
+      config = JSON.parse(settingsSource);
     } catch (e) {
       setChecks([]);
       setError((e as Error).message);
@@ -49,21 +49,21 @@ export default function Editor() {
 
     setError(null);
     setChecks(checks);
-  }, [initialized, configSource, pythonSource]);
+  }, [initialized, settingsSource, pythonSource]);
 
   useEffect(() => {
-    if (configSource == null || pythonSource == null) {
+    if (settingsSource == null || pythonSource == null) {
       const payload = restore();
       if (payload) {
-        const [configSource, pythonSource] = payload;
-        setConfigSource(configSource);
+        const [settingsSource, pythonSource] = payload;
+        setSettingsSource(settingsSource);
         setPythonSource(pythonSource);
       } else {
-        setConfigSource(DEFAULT_CONFIG_SOURCE);
+        setSettingsSource(DEFAULT_SETTINGS_SOURCE);
         setPythonSource(DEFAULT_PYTHON_SOURCE);
       }
     }
-  }, [configSource, pythonSource]);
+  }, [settingsSource, pythonSource]);
 
   useEffect(() => {
     if (!initialized) {
@@ -74,21 +74,21 @@ export default function Editor() {
   }, [initialized]);
 
   const handleShare = useCallback(() => {
-    if (!initialized || configSource == null || pythonSource == null) {
+    if (!initialized || settingsSource == null || pythonSource == null) {
       return;
     }
 
-    persist(configSource, pythonSource);
-  }, [initialized, configSource, pythonSource]);
+    persist(settingsSource, pythonSource);
+  }, [initialized, settingsSource, pythonSource]);
 
   const handlePythonSourceChange = useCallback((pythonSource: string) => {
     setEdit((edit) => edit + 1);
     setPythonSource(pythonSource);
   }, []);
 
-  const handleConfigSourceChange = useCallback((configSource: string) => {
+  const handleSettingsSourceChange = useCallback((settingsSource: string) => {
     setEdit((edit) => edit + 1);
-    setConfigSource(configSource);
+    setSettingsSource(settingsSource);
   }, []);
 
   return (
@@ -104,7 +104,7 @@ export default function Editor() {
       <Themes />
 
       <div className={"mt-12 relative flex-auto"}>
-        {initialized && configSource != null && pythonSource != null ? (
+        {initialized && settingsSource != null && pythonSource != null ? (
           <>
             <SourceEditor
               visible={tab === "Source"}
@@ -114,8 +114,8 @@ export default function Editor() {
             />
             <SettingsEditor
               visible={tab === "Settings"}
-              source={configSource}
-              onChange={handleConfigSourceChange}
+              source={settingsSource}
+              onChange={handleSettingsSourceChange}
             />
           </>
         ) : null}
