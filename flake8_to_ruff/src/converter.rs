@@ -164,17 +164,17 @@ pub fn convert(
                 // flake8-quotes
                 "quotes" | "inline-quotes" | "inline_quotes" => match value.trim() {
                     "'" | "single" => flake8_quotes.inline_quotes = Some(Quote::Single),
-                    "\"" | "double" => flake8_quotes.inline_quotes = Some(Quote::Single),
+                    "\"" | "double" => flake8_quotes.inline_quotes = Some(Quote::Double),
                     _ => eprintln!("Unexpected '{key}' value: {value}"),
                 },
                 "multiline-quotes" | "multiline_quotes" => match value.trim() {
                     "'" | "single" => flake8_quotes.multiline_quotes = Some(Quote::Single),
-                    "\"" | "double" => flake8_quotes.multiline_quotes = Some(Quote::Single),
+                    "\"" | "double" => flake8_quotes.multiline_quotes = Some(Quote::Double),
                     _ => eprintln!("Unexpected '{key}' value: {value}"),
                 },
                 "docstring-quotes" | "docstring_quotes" => match value.trim() {
                     "'" | "single" => flake8_quotes.docstring_quotes = Some(Quote::Single),
-                    "\"" | "double" => flake8_quotes.docstring_quotes = Some(Quote::Single),
+                    "\"" | "double" => flake8_quotes.docstring_quotes = Some(Quote::Double),
                     _ => eprintln!("Unexpected '{key}' value: {value}"),
                 },
                 "avoid-escape" | "avoid_escape" => match parser::parse_bool(value.as_ref()) {

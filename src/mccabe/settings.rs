@@ -30,16 +30,24 @@ pub struct Settings {
     pub max_complexity: usize,
 }
 
-impl Settings {
-    pub fn from_options(options: &Options) -> Self {
+impl Default for Settings {
+    fn default() -> Self {
+        Self { max_complexity: 10 }
+    }
+}
+
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             max_complexity: options.max_complexity.unwrap_or_default(),
         }
     }
 }
 
-impl Default for Settings {
-    fn default() -> Self {
-        Self { max_complexity: 10 }
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
+        Self {
+            max_complexity: Some(settings.max_complexity),
+        }
     }
 }

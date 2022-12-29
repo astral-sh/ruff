@@ -13,6 +13,12 @@ pub enum Quote {
     Double,
 }
 
+impl Default for Quote {
+    fn default() -> Self {
+        Self::Double
+    }
+}
+
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
@@ -74,24 +80,35 @@ pub struct Settings {
     pub avoid_escape: bool,
 }
 
-impl Settings {
-    pub fn from_options(options: Options) -> Self {
+impl Default for Settings {
+    fn default() -> Self {
         Self {
-            inline_quotes: options.inline_quotes.unwrap_or(Quote::Double),
-            multiline_quotes: options.multiline_quotes.unwrap_or(Quote::Double),
-            docstring_quotes: options.docstring_quotes.unwrap_or(Quote::Double),
+            inline_quotes: Quote::default(),
+            multiline_quotes: Quote::default(),
+            docstring_quotes: Quote::default(),
+            avoid_escape: true,
+        }
+    }
+}
+
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
+        Self {
+            inline_quotes: options.inline_quotes.unwrap_or_default(),
+            multiline_quotes: options.multiline_quotes.unwrap_or_default(),
+            docstring_quotes: options.docstring_quotes.unwrap_or_default(),
             avoid_escape: options.avoid_escape.unwrap_or(true),
         }
     }
 }
 
-impl Default for Settings {
-    fn default() -> Self {
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
         Self {
-            inline_quotes: Quote::Double,
-            multiline_quotes: Quote::Double,
-            docstring_quotes: Quote::Double,
-            avoid_escape: true,
+            inline_quotes: Some(settings.inline_quotes),
+            multiline_quotes: Some(settings.multiline_quotes),
+            docstring_quotes: Some(settings.docstring_quotes),
+            avoid_escape: Some(settings.avoid_escape),
         }
     }
 }

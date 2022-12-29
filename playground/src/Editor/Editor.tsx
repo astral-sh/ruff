@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { persist, restore } from "./settings";
-import { DEFAULT_SETTINGS_SOURCE, DEFAULT_PYTHON_SOURCE } from "../constants";
+import { DEFAULT_PYTHON_SOURCE } from "../constants";
+import init, { check, Check, currentVersion, defaultSettings } from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
-import init, { check, current_version, Check } from "../pkg";
+import { persist, restore, stringify } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
 import Themes from "./Themes";
@@ -52,6 +52,10 @@ export default function Editor() {
   }, [initialized, settingsSource, pythonSource]);
 
   useEffect(() => {
+    if (!initialized) {
+      return;
+    }
+
     if (settingsSource == null || pythonSource == null) {
       const payload = restore();
       if (payload) {
@@ -59,18 +63,18 @@ export default function Editor() {
         setSettingsSource(settingsSource);
         setPythonSource(pythonSource);
       } else {
-        setSettingsSource(DEFAULT_SETTINGS_SOURCE);
+        setSettingsSource(stringify(defaultSettings()));
         setPythonSource(DEFAULT_PYTHON_SOURCE);
       }
     }
-  }, [settingsSource, pythonSource]);
+  }, [initialized, settingsSource, pythonSource]);
 
   useEffect(() => {
     if (!initialized) {
       return;
     }
 
-    setVersion(current_version());
+    setVersion(currentVersion());
   }, [initialized]);
 
   const handleShare = useCallback(() => {
