@@ -49,6 +49,9 @@ pub fn check_noqa(
         while let Some((index, check)) =
             checks_iter.next_if(|(_index, check)| check.location.row() <= *lineno)
         {
+            if check.kind == CheckKind::BlanketNOQA {
+                continue;
+            }
             // Grab the noqa (logical) line number for the current (physical) line.
             // If there are newlines at the end of the file, they won't be represented in
             // `noqa_line_for`, so fallback to the current line.
