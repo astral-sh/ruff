@@ -932,7 +932,7 @@ pub enum CheckKind {
     NoEval,
     DeprecatedLogWarn,
     BlanketTypeIgnore,
-    BlanketNoqa,
+    BlanketNOQA,
     // flake8-unused-arguments
     UnusedFunctionArgument(String),
     UnusedMethodArgument(String),
@@ -1331,7 +1331,7 @@ impl CheckCode {
             CheckCode::PGH001 => CheckKind::NoEval,
             CheckCode::PGH002 => CheckKind::DeprecatedLogWarn,
             CheckCode::PGH003 => CheckKind::BlanketTypeIgnore,
-            CheckCode::PGH004 => CheckKind::BlanketNoqa,
+            CheckCode::PGH004 => CheckKind::BlanketNOQA,
             // flake8-unused-arguments
             CheckCode::ARG001 => CheckKind::UnusedFunctionArgument("...".to_string()),
             CheckCode::ARG002 => CheckKind::UnusedMethodArgument("...".to_string()),
@@ -1961,7 +1961,7 @@ impl CheckKind {
             CheckKind::NoEval => &CheckCode::PGH001,
             CheckKind::DeprecatedLogWarn => &CheckCode::PGH002,
             CheckKind::BlanketTypeIgnore => &CheckCode::PGH003,
-            CheckKind::BlanketNoqa => &CheckCode::PGH004,
+            CheckKind::BlanketNOQA => &CheckCode::PGH004,
             // flake8-unused-arguments
             CheckKind::UnusedFunctionArgument(..) => &CheckCode::ARG001,
             CheckKind::UnusedMethodArgument(..) => &CheckCode::ARG002,
@@ -2823,14 +2823,14 @@ impl CheckKind {
                 "Boolean positional value in function call".to_string()
             }
             // pygrep-hooks
-            CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
-            CheckKind::DeprecatedLogWarn => {
-                "`warn` is deprecated in favor of `warning`".to_string()
-            }
+            CheckKind::BlanketNOQA => "Use specific error codes when using `noqa`".to_string(),
             CheckKind::BlanketTypeIgnore => {
                 "Use specific error codes when ignoring type issues".to_string()
             }
-            CheckKind::BlanketNoqa => "Use specific error codes when using noqa".to_string(),
+            CheckKind::DeprecatedLogWarn => {
+                "`warn` is deprecated in favor of `warning`".to_string()
+            }
+            CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
             // flake8-unused-arguments
             CheckKind::UnusedFunctionArgument(name) => {
                 format!("Unused function argument: `{name}`")

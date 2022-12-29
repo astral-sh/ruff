@@ -12,7 +12,7 @@ static BLANKET_NOQA_REGEX: Lazy<Regex> =
 pub fn blanket_noqa(lineno: usize, line: &str) -> Option<Check> {
     BLANKET_NOQA_REGEX.find(line).map(|m| {
         Check::new(
-            CheckKind::BlanketNoqa,
+            CheckKind::BlanketNOQA,
             Range {
                 location: Location::new(lineno + 1, m.start()),
                 end_location: Location::new(lineno + 1, m.end()),

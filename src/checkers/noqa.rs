@@ -49,7 +49,7 @@ pub fn check_noqa(
         while let Some((index, check)) =
             checks_iter.next_if(|(_index, check)| check.location.row() <= *lineno)
         {
-            if check.kind == CheckKind::BlanketNoqa {
+            if check.kind == CheckKind::BlanketNOQA {
                 continue;
             }
             // Grab the noqa (logical) line number for the current (physical) line.
