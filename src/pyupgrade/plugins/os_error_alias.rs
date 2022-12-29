@@ -1,6 +1,7 @@
-use rustpython_ast::{Expr, Located, Excepthandler, ExcepthandlerKind, ExprKind};
+use itertools::Itertools;
 
-use crate::ast::helpers::match_module_member;
+use rustpython_ast::{Located, Excepthandler, ExcepthandlerKind, ExprKind};
+
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
@@ -19,9 +20,10 @@ fn get_correct_name(original: &str) -> String {
 
 fn get_before_replace(elts: &Vec<Located<ExprKind>>) -> Vec<String> {
     elts.iter().map(|elt| {
-        match &elt.node {
-            ExprKind::Name{ id, .. } => id.as_str().to_string(),
-            _ => "".to_string(),
+        if let ExprKind::Name{ id, .. } = &elt.node {
+            id.to_string()
+        } else {
+            "".to_string()
         }
     }).collect()
 }
@@ -44,31 +46,40 @@ pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
             },
             ExprKind::Tuple { elts, .. } => {
                 before_replace = get_before_replace(elts);
-                println!("Before: {:?}", before_replace);
-                for id in elts {
-                    let new_name = get_correct_name(id);
-                    replacements.push(new_name);
+                for elt in elts {
+                    if let ExprKind::Name{ id, .. } = &elt.node {
+                        let new_name = get_correct_name(id);
+                        replacements.push(new_name);
+                    }
                 }
             },
             _ => return,
         }
+        replacements = replacements.iter().unique().map(|x| x.to_string()).collect();
+        if before_replace != replacements {
+            println!("Before: {:?}", before_replace);
+            println!("Replacements: {:?}\n", replacements);
+            let mut final_str: String;
+            let message_str: String;
+            if replacements.len() == 1 {
+                final_str = replacements.get(0).unwrap().to_string();
+                message_str = final_str.clone();
+            } else {
+                final_str = replacements.join(", ");
+                message_str = final_str.clone();
+                final_str.insert(0, '(');
+                final_str.push(')');
+            }
+            let range = Range::new(error_handlers.location, error_handlers.end_location.unwrap());
+            let mut check = Check::new(CheckKind::OSErrorAlias(message_str), range);
+            if checker.patch(check.kind.code()) {
+                check.amend(Fix::replacement(
+                    final_str,
+                    range.location,
+                    range.end_location,
+                ));
+            }
+            checker.add_check(check);
+        }
     }
-    /*
-    if match_module_member(
-        expr,
-        "typing",
-        "Text",
-        &checker.from_imports,
-        &checker.import_aliases,
-    ) 
-    let mut check = Check::new(CheckKind::TypingTextStrAlias, Range::from_located(expr));
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
-            "str".to_string(),
-            expr.location,
-            expr.end_location.unwrap(),
-        ));
-    }
-    checker.add_check(check);
-    */
 }

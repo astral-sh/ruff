@@ -22,6 +22,13 @@ pub struct Range {
 }
 
 impl Range {
+    pub fn new(location: Location, end_location: Location) -> Self {
+        Self {
+            location,
+            end_location,
+        }
+    }
+
     pub fn from_located<T>(located: &Located<T>) -> Self {
         Range {
             location: located.location,
