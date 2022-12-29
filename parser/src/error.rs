@@ -55,7 +55,7 @@ impl fmt::Display for LexicalErrorType {
                 write!(f, "duplicate argument '{arg_name}' in function definition")
             }
             LexicalErrorType::DuplicateKeywordArgumentError(arg_name) => {
-                write!(f, "keyword argument '{arg_name}' repeated")
+                write!(f, "keyword argument repeated: {arg_name}")
             }
             LexicalErrorType::PositionalArgumentError => {
                 write!(f, "positional argument follows keyword argument")
