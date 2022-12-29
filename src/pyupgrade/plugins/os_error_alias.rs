@@ -30,7 +30,7 @@ fn get_before_replace(elts: &Vec<Located<ExprKind>>) -> Vec<String> {
         .collect()
 }
 
-fn check_module(checker: &Checker, expr: &Box<Located<ExprKind>>) -> (Vec<String>, Vec<String>) {
+fn check_module(checker: &Checker, expr: &Located<ExprKind>) -> (Vec<String>, Vec<String>) {
     let mut replacements: Vec<String> = vec![];
     let mut before_replace: Vec<String> = vec![];
     for module in ERROR_MODULES.iter() {
@@ -53,7 +53,6 @@ fn check_module(checker: &Checker, expr: &Box<Located<ExprKind>>) -> (Vec<String
 pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
     // Each separate except block is a separate error and fix
     for handler in handlers {
-        println!("LOOP");
         // println!("{:?}", handler);
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         let error_handlers = match type_.as_ref() {
@@ -79,9 +78,15 @@ pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
             ExprKind::Tuple { elts, .. } => {
                 before_replace = get_before_replace(elts);
                 for elt in elts {
-                    if let ExprKind::Name { id, .. } = &elt.node {
-                        let new_name = get_correct_name(id);
-                        replacements.push(new_name);
+                    match &elt.node {
+                        ExprKind::Name { id, .. } => {
+                            let new_name = get_correct_name(id);
+                            replacements.push(new_name);
+                        },
+                        ExprKind::Attribute { .. } => {
+                            (replacements, before_replace) = check_module(checker, elt);
+                        },
+                        _ => ()
                     }
                 }
             }
@@ -108,6 +113,7 @@ pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
             // ignored. Let me know if you want me to go with a more
             // complicated solution that avoids this.
             if contents.contains(").") {
+                println!("GOT TRIGGERED");
                 return;
             }
             println!("Before: {:?}", before_replace);

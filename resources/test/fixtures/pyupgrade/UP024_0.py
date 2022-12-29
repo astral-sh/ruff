@@ -42,10 +42,13 @@ try:
     pass
 except (IOError,):
     pass
-
 try:
     pass
-except (EnvironmentError, IOError, OSError):
+except (mmap.error,):
+    pass
+try:
+    pass
+except (EnvironmentError, IOError, OSError, select.error):
     pass
 
 # Should be kept in parentheses (because multiple)
@@ -67,7 +70,7 @@ from foo import error
 
 try:
     pass
-except (IOError, error):
+except (OSError, error):
     pass
 
 try:
@@ -93,4 +96,3 @@ try:
     pass
 except (OSError, KeyError):
     pass
-
