@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::fs::write;
 use std::io;
 use std::io::Write;
@@ -185,36 +184,47 @@ pub fn lint_path(
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
-    let metadata = path.metadata()?;
-
     // Check the cache.
-    if let Some(messages) = cache::get(path, &metadata, settings, autofix, cache) {
-        debug!("Cache hit for: {}", path.to_string_lossy());
-        return Ok(Diagnostics::new(messages));
-    }
+    let metadata = if matches!(cache, flags::Cache::Enabled) {
+        let metadata = path.metadata()?;
+        if let Some(messages) = cache::get(path, &metadata, settings, autofix.into()) {
+            debug!("Cache hit for: {}", path.to_string_lossy());
+            return Ok(Diagnostics::new(messages));
+        }
+        Some(metadata)
+    } else {
+        None
+    };
 
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
     // Lint the file.
-    let (transformed, fixed, messages) = lint(&contents, path, package, settings, autofix)?;
+    let (messages, fixed) = if matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff) {
+        let (transformed, fixed, messages) = lint_fix(&contents, path, package, settings)?;
+        if fixed > 0 {
+            if matches!(autofix, fixer::Mode::Apply) {
+                write(path, transformed)?;
+            } else if matches!(autofix, fixer::Mode::Diff) {
+                let mut stdout = io::stdout().lock();
+                TextDiff::from_lines(&contents, &transformed)
+                    .unified_diff()
+                    .header(&fs::relativize_path(path), &fs::relativize_path(path))
+                    .to_writer(&mut stdout)?;
+                stdout.write_all(b"\n")?;
+                stdout.flush()?;
+            }
+        }
+        (messages, fixed)
+    } else {
+        let messages = lint_only(&contents, path, package, settings, autofix.into())?;
+        let fixed = 0;
+        (messages, fixed)
+    };
 
     // Re-populate the cache.
-    cache::set(path, &metadata, settings, autofix, &messages, cache);
-
-    // If we applied any fixes, write the contents back to disk.
-    if fixed > 0 {
-        if matches!(autofix, fixer::Mode::Apply) {
-            write(path, transformed)?;
-        } else if matches!(autofix, fixer::Mode::Diff) {
-            let mut stdout = io::stdout().lock();
-            TextDiff::from_lines(&contents, &transformed)
-                .unified_diff()
-                .header(&fs::relativize_path(path), &fs::relativize_path(path))
-                .to_writer(&mut stdout)?;
-            stdout.write_all(b"\n")?;
-            stdout.flush()?;
-        }
+    if let Some(metadata) = metadata {
+        cache::set(path, &metadata, settings, autofix.into(), &messages);
     }
 
     Ok(Diagnostics { messages, fixed })
@@ -305,38 +315,111 @@ pub fn lint_stdin(
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
-    // Lint the file.
-    let (transformed, fixed, messages) = lint(
-        contents,
-        path.unwrap_or_else(|| Path::new("-")),
-        package,
-        settings,
-        autofix,
-    )?;
+    // Lint the inputs.
+    let (messages, fixed) = if matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff) {
+        let (transformed, fixed, messages) = lint_fix(
+            contents,
+            path.unwrap_or_else(|| Path::new("-")),
+            package,
+            settings,
+        )?;
 
-    // Write the fixed contents to stdout.
-    if matches!(autofix, fixer::Mode::Apply) {
-        io::stdout().write_all(transformed.as_bytes())?;
-    } else if matches!(autofix, fixer::Mode::Diff) {
-        let header = path.map_or_else(|| Cow::from("stdin"), fs::relativize_path);
-        let mut stdout = io::stdout().lock();
-        TextDiff::from_lines(contents, &transformed)
-            .unified_diff()
-            .header(&header, &header)
-            .to_writer(&mut stdout)?;
-        stdout.write_all(b"\n")?;
-        stdout.flush()?;
-    }
+        if matches!(autofix, fixer::Mode::Apply) {
+            // Write the contents to stdout, regardless of whether any errors were fixed.
+            io::stdout().write_all(transformed.as_bytes())?;
+        } else if matches!(autofix, fixer::Mode::Diff) {
+            // But only write a diff if it's non-empty.
+            if fixed > 0 {
+                let text_diff = TextDiff::from_lines(contents, &transformed);
+                let mut unified_diff = text_diff.unified_diff();
+                if let Some(path) = path {
+                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                }
+
+                let mut stdout = io::stdout().lock();
+                unified_diff.to_writer(&mut stdout)?;
+                stdout.write_all(b"\n")?;
+                stdout.flush()?;
+            }
+        }
+
+        (messages, fixed)
+    } else {
+        let messages = lint_only(
+            contents,
+            path.unwrap_or_else(|| Path::new("-")),
+            package,
+            settings,
+            autofix.into(),
+        )?;
+        let fixed = 0;
+        (messages, fixed)
+    };
 
     Ok(Diagnostics { messages, fixed })
 }
 
-fn lint(
+/// Generate a list of `Check` violations (optionally including any autofix
+/// patches) from source code content.
+fn lint_only(
     contents: &str,
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
-    autofix: fixer::Mode,
+    autofix: flags::Autofix,
+) -> Result<Vec<Message>> {
+    // Tokenize once.
+    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
+
+    // Map row and column locations to byte slices (lazily).
+    let locator = SourceCodeLocator::new(contents);
+
+    // Detect the current code style (lazily).
+    let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
+
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        directives::Flags::from_settings(settings),
+    );
+
+    // Generate checks.
+    let checks = check_path(
+        path,
+        package,
+        contents,
+        tokens,
+        &locator,
+        &stylist,
+        &directives,
+        settings,
+        autofix,
+        flags::Noqa::Enabled,
+    )?;
+
+    // Convert from checks to messages.
+    let path_lossy = path.to_string_lossy();
+    Ok(checks
+        .into_iter()
+        .map(|check| {
+            let source = if settings.show_source {
+                Some(Source::from_check(&check, &locator))
+            } else {
+                None
+            };
+            Message::from_check(check, path_lossy.to_string(), source)
+        })
+        .collect())
+}
+
+/// Generate a list of `Check` violations from source code content, iteratively
+/// autofixing any violations until stable.
+fn lint_fix(
+    contents: &str,
+    path: &Path,
+    package: Option<&Path>,
+    settings: &Settings,
 ) -> Result<(String, usize, Vec<Message>)> {
     let mut contents = contents.to_string();
 
@@ -347,7 +430,7 @@ fn lint(
     let mut iterations = 0;
 
     // Continuously autofix until the source code stabilizes.
-    let messages = loop {
+    loop {
         // Tokenize once.
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
 
@@ -374,13 +457,12 @@ fn lint(
             &stylist,
             &directives,
             settings,
-            autofix.into(),
+            flags::Autofix::Enabled,
             flags::Noqa::Enabled,
         )?;
 
         // Apply autofix.
-        if matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff) && iterations < MAX_ITERATIONS
-        {
+        if iterations < MAX_ITERATIONS {
             if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
                 // Count the number of fixed errors.
                 fixed += applied;
@@ -397,8 +479,8 @@ fn lint(
         }
 
         // Convert to messages.
-        let path = path.to_string_lossy();
-        break checks
+        let path_lossy = path.to_string_lossy();
+        let messages = checks
             .into_iter()
             .map(|check| {
                 let source = if settings.show_source {
@@ -406,12 +488,11 @@ fn lint(
                 } else {
                     None
                 };
-                Message::from_check(check, path.to_string(), source)
+                Message::from_check(check, path_lossy.to_string(), source)
             })
             .collect();
-    };
-
-    Ok((contents, fixed, messages))
+        return Ok((contents, fixed, messages));
+    }
 }
 
 #[cfg(test)]
