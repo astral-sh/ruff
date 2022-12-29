@@ -4,7 +4,7 @@ use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Convention {
     /// Use Google-style docstrings.
@@ -37,10 +37,18 @@ pub struct Settings {
     pub convention: Option<Convention>,
 }
 
-impl Settings {
-    pub fn from_options(options: Options) -> Self {
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             convention: options.convention,
+        }
+    }
+}
+
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
+        Self {
+            convention: settings.convention,
         }
     }
 }

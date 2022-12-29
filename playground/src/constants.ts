@@ -1,4 +1,3 @@
-import { defaultSettings } from "./Editor/settings";
 import { AVAILABLE_OPTIONS } from "./ruff_options";
 
 export const DEFAULT_PYTHON_SOURCE =
@@ -32,9 +31,3 @@ export const DEFAULT_PYTHON_SOURCE =
   "# 13\n" +
   "# 21\n" +
   "# 34\n";
-
-export const DEFAULT_SETTINGS_SOURCE = JSON.stringify(
-  defaultSettings(AVAILABLE_OPTIONS),
-  null,
-  2
-);

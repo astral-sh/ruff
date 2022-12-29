@@ -1,38 +1,22 @@
 import lzstring from "lz-string";
-import { OptionGroup } from "../ruff_options";
 
 export type Settings = { [K: string]: any };
 
 /**
- * Parse an encoded value from the options export.
- *
- * TODO(charlie): Use JSON for the default values.
+ * Stringify a settings object to JSON.
  */
-function parse(value: any): any {
-  if (value == "None") {
-    return null;
-  }
-  return JSON.parse(value);
-}
-
-/**
- * The default settings for the playground.
- */
-export function defaultSettings(availableOptions: OptionGroup[]): Settings {
-  const settings: Settings = {};
-  for (const group of availableOptions) {
-    if (group.name == "globals") {
-      for (const field of group.fields) {
-        settings[field.name] = parse(field.default);
+export function stringify(settings: Settings): string {
+  return JSON.stringify(
+    settings,
+    (k, v) => {
+      if (v instanceof Map) {
+        return Object.fromEntries(v.entries());
+      } else {
+        return v;
       }
-    } else {
-      settings[group.name] = {};
-      for (const field of group.fields) {
-        settings[group.name][field.name] = parse(field.default);
-      }
-    }
-  }
-  return settings;
+    },
+    2
+  );
 }
 
 /**
