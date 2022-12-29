@@ -1,6 +1,5 @@
 import sys
 
-import os
 from setuptools import setup
 
 sys.stderr.write(
