@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Convention {
+    /// Use Google-style docstrings.
     Google,
+    /// Use NumPy-style docstrings.
     Numpy,
 }
 
@@ -17,7 +19,7 @@ pub enum Convention {
 #[serde(deny_unknown_fields, rename_all = "kebab-case", rename = "Pydocstyle")]
 pub struct Options {
     #[option(
-        default = r#""convention""#,
+        default = r#"None"#,
         value_type = "Convention",
         example = r#"
             # Use Google-style docstrings.

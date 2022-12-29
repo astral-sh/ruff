@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body,
+html,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.shadow-copied {
+  --tw-shadow: 0 0 0 1px #f07171, inset 0 0 0 1px #f07171;
+  --tw-shadow-colored: 0 0 0 1px var(--tw-shadow-color),
+    inset 0 0 0 1px var(--tw-shadow-color);
+
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
+    var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}

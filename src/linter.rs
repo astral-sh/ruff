@@ -5,8 +5,10 @@ use std::ops::AddAssign;
 use std::path::Path;
 
 use anyhow::Result;
+use colored::Colorize;
 use log::debug;
 use rustpython_parser::lexer::LexResult;
+use similar::TextDiff;
 
 use crate::ast::types::Range;
 use crate::autofix::fixer;
@@ -25,6 +27,9 @@ use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{cache, directives, fs, rustpython_helpers};
+
+const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
+const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
 #[derive(Debug, Default)]
 pub struct Diagnostics {
@@ -183,26 +188,54 @@ pub fn lint_path(
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
-    let metadata = path.metadata()?;
-
     // Check the cache.
-    if let Some(messages) = cache::get(path, &metadata, settings, autofix, cache) {
-        debug!("Cache hit for: {}", path.to_string_lossy());
-        return Ok(Diagnostics::new(messages));
-    }
+    // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
+    // side-effects that aren't captured in the cache. (In practice, it's fine
+    // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
+    // write the fixes to disk, thus invalidating the cache. But it's a bit hard
+    // to reason about. We need to come up with a better solution here.)
+    let metadata = if matches!(cache, flags::Cache::Enabled)
+        && matches!(autofix, fixer::Mode::None | fixer::Mode::Generate)
+    {
+        let metadata = path.metadata()?;
+        if let Some(messages) = cache::get(path, &metadata, settings, autofix.into()) {
+            debug!("Cache hit for: {}", path.to_string_lossy());
+            return Ok(Diagnostics::new(messages));
+        }
+        Some(metadata)
+    } else {
+        None
+    };
 
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
     // Lint the file.
-    let (contents, fixed, messages) = lint(contents, path, package, settings, autofix)?;
+    let (messages, fixed) = if matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff) {
+        let (transformed, fixed, messages) = lint_fix(&contents, path, package, settings)?;
+        if fixed > 0 {
+            if matches!(autofix, fixer::Mode::Apply) {
+                write(path, transformed)?;
+            } else if matches!(autofix, fixer::Mode::Diff) {
+                let mut stdout = io::stdout().lock();
+                TextDiff::from_lines(&contents, &transformed)
+                    .unified_diff()
+                    .header(&fs::relativize_path(path), &fs::relativize_path(path))
+                    .to_writer(&mut stdout)?;
+                stdout.write_all(b"\n")?;
+                stdout.flush()?;
+            }
+        }
+        (messages, fixed)
+    } else {
+        let messages = lint_only(&contents, path, package, settings, autofix.into())?;
+        let fixed = 0;
+        (messages, fixed)
+    };
 
     // Re-populate the cache.
-    cache::set(path, &metadata, settings, autofix, &messages, cache);
-
-    // If we applied any fixes, write the contents back to disk.
-    if fixed > 0 {
-        write(path, contents)?;
+    if let Some(metadata) = metadata {
+        cache::set(path, &metadata, settings, autofix.into(), &messages);
     }
 
     Ok(Diagnostics { messages, fixed })
@@ -286,40 +319,121 @@ pub fn autoformat_path(path: &Path, settings: &Settings) -> Result<()> {
 pub fn lint_stdin(
     path: Option<&Path>,
     package: Option<&Path>,
-    stdin: &str,
+    contents: &str,
     settings: &Settings,
     autofix: fixer::Mode,
 ) -> Result<Diagnostics> {
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
-    // Read the file from disk.
-    let contents = stdin.to_string();
+    // Lint the inputs.
+    let (messages, fixed) = if matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff) {
+        let (transformed, fixed, messages) = lint_fix(
+            contents,
+            path.unwrap_or_else(|| Path::new("-")),
+            package,
+            settings,
+        )?;
 
-    // Lint the file.
-    let (contents, fixed, messages) = lint(
-        contents,
-        path.unwrap_or_else(|| Path::new("-")),
-        package,
-        settings,
-        autofix,
-    )?;
+        if matches!(autofix, fixer::Mode::Apply) {
+            // Write the contents to stdout, regardless of whether any errors were fixed.
+            io::stdout().write_all(transformed.as_bytes())?;
+        } else if matches!(autofix, fixer::Mode::Diff) {
+            // But only write a diff if it's non-empty.
+            if fixed > 0 {
+                let text_diff = TextDiff::from_lines(contents, &transformed);
+                let mut unified_diff = text_diff.unified_diff();
+                if let Some(path) = path {
+                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                }
 
-    // Write the fixed contents to stdout.
-    if matches!(autofix, fixer::Mode::Apply) {
-        io::stdout().write_all(contents.as_bytes())?;
-    }
+                let mut stdout = io::stdout().lock();
+                unified_diff.to_writer(&mut stdout)?;
+                stdout.write_all(b"\n")?;
+                stdout.flush()?;
+            }
+        }
+
+        (messages, fixed)
+    } else {
+        let messages = lint_only(
+            contents,
+            path.unwrap_or_else(|| Path::new("-")),
+            package,
+            settings,
+            autofix.into(),
+        )?;
+        let fixed = 0;
+        (messages, fixed)
+    };
 
     Ok(Diagnostics { messages, fixed })
 }
 
-fn lint(
-    mut contents: String,
+/// Generate a list of `Check` violations (optionally including any autofix
+/// patches) from source code content.
+fn lint_only(
+    contents: &str,
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
-    autofix: fixer::Mode,
+    autofix: flags::Autofix,
+) -> Result<Vec<Message>> {
+    // Tokenize once.
+    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
+
+    // Map row and column locations to byte slices (lazily).
+    let locator = SourceCodeLocator::new(contents);
+
+    // Detect the current code style (lazily).
+    let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
+
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = directives::extract_directives(
+        &tokens,
+        &locator,
+        directives::Flags::from_settings(settings),
+    );
+
+    // Generate checks.
+    let checks = check_path(
+        path,
+        package,
+        contents,
+        tokens,
+        &locator,
+        &stylist,
+        &directives,
+        settings,
+        autofix,
+        flags::Noqa::Enabled,
+    )?;
+
+    // Convert from checks to messages.
+    let path_lossy = path.to_string_lossy();
+    Ok(checks
+        .into_iter()
+        .map(|check| {
+            let source = if settings.show_source {
+                Some(Source::from_check(&check, &locator))
+            } else {
+                None
+            };
+            Message::from_check(check, path_lossy.to_string(), source)
+        })
+        .collect())
+}
+
+/// Generate a list of `Check` violations from source code content, iteratively
+/// autofixing any violations until stable.
+fn lint_fix(
+    contents: &str,
+    path: &Path,
+    package: Option<&Path>,
+    settings: &Settings,
 ) -> Result<(String, usize, Vec<Message>)> {
+    let mut contents = contents.to_string();
+
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
 
@@ -327,7 +441,7 @@ fn lint(
     let mut iterations = 0;
 
     // Continuously autofix until the source code stabilizes.
-    let messages = loop {
+    loop {
         // Tokenize once.
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
 
@@ -354,13 +468,13 @@ fn lint(
             &stylist,
             &directives,
             settings,
-            autofix.into(),
+            flags::Autofix::Enabled,
             flags::Noqa::Enabled,
         )?;
 
         // Apply autofix.
-        if matches!(autofix, fixer::Mode::Apply) && iterations < MAX_ITERATIONS {
-            if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
+        if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
+            if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 fixed += applied;
 
@@ -373,11 +487,29 @@ fn lint(
                 // Re-run the linter pass (by avoiding the break).
                 continue;
             }
+
+            eprintln!(
+                "
+{}: Failed to converge after {} iterations.
+
+This likely indicates a bug in `{}`. If you could open an issue at:
+
+{}/issues
+
+quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd \
+                 be very appreciative!
+",
+                "warning".yellow().bold(),
+                MAX_ITERATIONS,
+                CARGO_PKG_NAME,
+                CARGO_PKG_REPOSITORY,
+                fs::relativize_path(path),
+            );
         }
 
         // Convert to messages.
-        let filename = path.to_string_lossy().to_string();
-        break checks
+        let path_lossy = path.to_string_lossy();
+        let messages = checks
             .into_iter()
             .map(|check| {
                 let source = if settings.show_source {
@@ -385,12 +517,11 @@ fn lint(
                 } else {
                     None
                 };
-                Message::from_check(check, filename.clone(), source)
+                Message::from_check(check, path_lossy.to_string(), source)
             })
             .collect();
-    };
-
-    Ok((contents, fixed, messages))
+        return Ok((contents, fixed, messages));
+    }
 }
 
 #[cfg(test)]

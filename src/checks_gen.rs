@@ -377,6 +377,7 @@ pub enum CheckCodePrefix {
     PGH001,
     PGH002,
     PGH003,
+    PGH004,
     PLC,
     PLC0,
     PLC04,
@@ -859,6 +860,7 @@ impl CheckCodePrefix {
                 CheckCode::PGH001,
                 CheckCode::PGH002,
                 CheckCode::PGH003,
+                CheckCode::PGH004,
                 CheckCode::PD002,
                 CheckCode::PD003,
                 CheckCode::PD004,
@@ -2075,12 +2077,28 @@ impl CheckCodePrefix {
                 );
                 vec![CheckCode::PD901]
             }
-            CheckCodePrefix::PGH => vec![CheckCode::PGH001, CheckCode::PGH002, CheckCode::PGH003],
-            CheckCodePrefix::PGH0 => vec![CheckCode::PGH001, CheckCode::PGH002, CheckCode::PGH003],
-            CheckCodePrefix::PGH00 => vec![CheckCode::PGH001, CheckCode::PGH002, CheckCode::PGH003],
+            CheckCodePrefix::PGH => vec![
+                CheckCode::PGH001,
+                CheckCode::PGH002,
+                CheckCode::PGH003,
+                CheckCode::PGH004,
+            ],
+            CheckCodePrefix::PGH0 => vec![
+                CheckCode::PGH001,
+                CheckCode::PGH002,
+                CheckCode::PGH003,
+                CheckCode::PGH004,
+            ],
+            CheckCodePrefix::PGH00 => vec![
+                CheckCode::PGH001,
+                CheckCode::PGH002,
+                CheckCode::PGH003,
+                CheckCode::PGH004,
+            ],
             CheckCodePrefix::PGH001 => vec![CheckCode::PGH001],
             CheckCodePrefix::PGH002 => vec![CheckCode::PGH002],
             CheckCodePrefix::PGH003 => vec![CheckCode::PGH003],
+            CheckCodePrefix::PGH004 => vec![CheckCode::PGH004],
             CheckCodePrefix::PLC => {
                 vec![CheckCode::PLC0414, CheckCode::PLC2201, CheckCode::PLC3002]
             }
@@ -3160,6 +3178,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::PGH001 => SuffixLength::Three,
             CheckCodePrefix::PGH002 => SuffixLength::Three,
             CheckCodePrefix::PGH003 => SuffixLength::Three,
+            CheckCodePrefix::PGH004 => SuffixLength::Three,
             CheckCodePrefix::PLC => SuffixLength::Zero,
             CheckCodePrefix::PLC0 => SuffixLength::One,
             CheckCodePrefix::PLC04 => SuffixLength::Two,

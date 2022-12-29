@@ -50,6 +50,10 @@ pub struct Cli {
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
     no_fix_only: bool,
+    /// Avoid writing any fixed files back; instead, output a diff for each
+    /// changed file to stdout.
+    #[arg(long)]
+    pub diff: bool,
     /// Disable cache reads.
     #[arg(short, long)]
     pub no_cache: bool,
@@ -101,10 +105,15 @@ pub struct Cli {
     no_respect_gitignore: bool,
     /// Enforce exclusions, even for paths passed to Ruff directly on the
     /// command-line.
-    #[arg(long, overrides_with("no_show_source"))]
+    #[arg(long, overrides_with("no_force_exclude"))]
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
+    /// Enable or disable automatic update checks.
+    #[arg(long, overrides_with("no_update_check"))]
+    update_check: bool,
+    #[clap(long, overrides_with("update_check"), hide = true)]
+    no_update_check: bool,
     /// See the files Ruff will be run against with the current settings.
     #[arg(long)]
     pub show_files: bool,
@@ -154,6 +163,7 @@ impl Cli {
                 add_noqa: self.add_noqa,
                 autoformat: self.autoformat,
                 config: self.config,
+                diff: self.diff,
                 exit_zero: self.exit_zero,
                 explain: self.explain,
                 files: self.files,
@@ -187,11 +197,12 @@ impl Cli {
                 target_version: self.target_version,
                 unfixable: self.unfixable,
                 // TODO(charlie): Included in `pyproject.toml`, but not inherited.
+                cache_dir: self.cache_dir,
                 fix: resolve_bool_arg(self.fix, self.no_fix),
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
-                format: self.format,
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                cache_dir: self.cache_dir,
+                format: self.format,
+                update_check: resolve_bool_arg(self.update_check, self.no_update_check),
             },
         )
     }
@@ -213,6 +224,7 @@ pub struct Arguments {
     pub add_noqa: bool,
     pub autoformat: bool,
     pub config: Option<PathBuf>,
+    pub diff: bool,
     pub exit_zero: bool,
     pub explain: Option<CheckCode>,
     pub files: Vec<PathBuf>,
@@ -247,11 +259,12 @@ pub struct Overrides {
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<CheckCodePrefix>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
+    pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
-    pub format: Option<SerializationFormat>,
     pub force_exclude: Option<bool>,
-    pub cache_dir: Option<PathBuf>,
+    pub format: Option<SerializationFormat>,
+    pub update_check: Option<bool>,
 }
 
 /// Map the CLI settings to a `LogLevel`.

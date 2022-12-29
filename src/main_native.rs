@@ -117,33 +117,20 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
             PyprojectDiscovery::Hierarchical(settings) => settings.respect_gitignore,
         },
     };
-    let (fix, fix_only, format) = match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => (settings.fix, settings.fix_only, settings.format),
-        PyprojectDiscovery::Hierarchical(settings) => {
-            (settings.fix, settings.fix_only, settings.format)
-        }
+    let (fix, fix_only, format, update_check) = match &pyproject_strategy {
+        PyprojectDiscovery::Fixed(settings) => (
+            settings.fix,
+            settings.fix_only,
+            settings.format,
+            settings.update_check,
+        ),
+        PyprojectDiscovery::Hierarchical(settings) => (
+            settings.fix,
+            settings.fix_only,
+            settings.format,
+            settings.update_check,
+        ),
     };
-    // Autofix rules are as follows:
-    // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
-    //   print them to stdout, if we're reading from stdin).
-    // - Otherwise, if `--format json` is set, generate the fixes (so we print them
-    //   out as part of the JSON payload), but don't write them to disk.
-    // TODO(charlie): Consider adding ESLint's `--fix-dry-run`, which would generate
-    // but not apply fixes. That would allow us to avoid special-casing JSON
-    // here.
-    let autofix = if fix || fix_only {
-        fixer::Mode::Apply
-    } else if matches!(format, SerializationFormat::Json) {
-        fixer::Mode::Generate
-    } else {
-        fixer::Mode::None
-    };
-    let violations = if fix_only {
-        Violations::Hide
-    } else {
-        Violations::Show
-    };
-    let cache = !cli.no_cache;
 
     if let Some(code) = cli.explain {
         commands::explain(&code, &format)?;
@@ -158,9 +145,35 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
+    // Autofix rules are as follows:
+    // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
+    //   print them to stdout, if we're reading from stdin).
+    // - Otherwise, if `--format json` is set, generate the fixes (so we print them
+    //   out as part of the JSON payload), but don't write them to disk.
+    // - If `--diff` or `--fix-only` are set, don't print any violations (only
+    //   fixes).
+    // TODO(charlie): Consider adding ESLint's `--fix-dry-run`, which would generate
+    // but not apply fixes. That would allow us to avoid special-casing JSON
+    // here.
+    let autofix = if cli.diff {
+        fixer::Mode::Diff
+    } else if fix || fix_only {
+        fixer::Mode::Apply
+    } else if matches!(format, SerializationFormat::Json) {
+        fixer::Mode::Generate
+    } else {
+        fixer::Mode::None
+    };
+    let violations = if cli.diff || fix_only {
+        Violations::Hide
+    } else {
+        Violations::Show
+    };
+    let cache = !cli.no_cache;
+
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
     if cli.watch {
-        if matches!(autofix, fixer::Mode::Generate | fixer::Mode::Apply) {
+        if !matches!(autofix, fixer::Mode::None) {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
         if cli.add_noqa {
@@ -259,18 +272,28 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, fixer::Mode::Apply)) {
+        if !(is_stdin && matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff)) {
             printer.write_once(&diagnostics)?;
         }
 
         // Check for updates if we're in a non-silent log level.
         #[cfg(feature = "update-informer")]
-        if !is_stdin && log_level >= LogLevel::Default && atty::is(atty::Stream::Stdout) {
+        if update_check
+            && !is_stdin
+            && log_level >= LogLevel::Default
+            && atty::is(atty::Stream::Stdout)
+        {
             drop(updates::check_for_updates());
         }
 
-        if !diagnostics.messages.is_empty() && !cli.exit_zero && !fix_only {
-            return Ok(ExitCode::FAILURE);
+        if !cli.exit_zero {
+            if cli.diff || fix_only {
+                if diagnostics.fixed > 0 {
+                    return Ok(ExitCode::FAILURE);
+                }
+            } else if !diagnostics.messages.is_empty() {
+                return Ok(ExitCode::FAILURE);
+            }
         }
     }
 

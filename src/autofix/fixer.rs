@@ -14,6 +14,7 @@ use crate::source_code_locator::SourceCodeLocator;
 pub enum Mode {
     Generate,
     Apply,
+    Diff,
     None,
 }
 

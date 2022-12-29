@@ -12,7 +12,6 @@ use once_cell::sync::Lazy;
 use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 
-use crate::autofix::fixer;
 use crate::message::Message;
 use crate::settings::{flags, Settings};
 
@@ -48,7 +47,7 @@ fn content_dir() -> &'static Path {
     Path::new("content")
 }
 
-fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: fixer::Mode) -> u64 {
+fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: flags::Autofix) -> u64 {
     let mut hasher = DefaultHasher::new();
     CARGO_PKG_VERSION.hash(&mut hasher);
     path.as_ref().absolutize().unwrap().hash(&mut hasher);
@@ -93,13 +92,8 @@ pub fn get<P: AsRef<Path>>(
     path: P,
     metadata: &Metadata,
     settings: &Settings,
-    autofix: fixer::Mode,
-    cache: flags::Cache,
+    autofix: flags::Autofix,
 ) -> Option<Vec<Message>> {
-    if matches!(cache, flags::Cache::Disabled) {
-        return None;
-    };
-
     let encoded = read_sync(&settings.cache_dir, cache_key(path, settings, autofix)).ok()?;
     let (mtime, messages) = match bincode::deserialize::<CheckResult>(&encoded[..]) {
         Ok(CheckResult {
@@ -122,14 +116,9 @@ pub fn set<P: AsRef<Path>>(
     path: P,
     metadata: &Metadata,
     settings: &Settings,
-    autofix: fixer::Mode,
+    autofix: flags::Autofix,
     messages: &[Message],
-    cache: flags::Cache,
 ) {
-    if matches!(cache, flags::Cache::Disabled) {
-        return;
-    };
-
     let check_result = CheckResultRef {
         metadata: &CacheMetadata {
             mtime: FileTime::from_last_modification_time(metadata).unix_seconds(),

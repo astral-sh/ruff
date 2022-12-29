@@ -167,7 +167,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.198'
+  rev: 'v0.0.199'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -323,6 +323,8 @@ Options:
           Attempt to automatically fix lint errors
       --fix-only
           Fix any fixable lint errors, but don't report on leftover violations. Implies `--fix`
+      --diff
+          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
   -n, --no-cache
           Disable cache reads
       --select <SELECT>
@@ -344,13 +346,15 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [possible values: text, json, junit, grouped, github]
+          Output serialization format for error messages [possible values: text, json, junit, grouped, github, gitlab]
       --show-source
           Show violations with source code
       --respect-gitignore
           Respect file exclusions via `.gitignore` and other standard ignore files
       --force-exclude
           Enforce exclusions, even for paths passed to Ruff directly on the command-line
+      --update-check
+          Enable or disable automatic update checks
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
@@ -969,6 +973,7 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 | PGH001 | NoEval | No builtin `eval()` allowed |  |
 | PGH002 | DeprecatedLogWarn | `warn` is deprecated in favor of `warning` |  |
 | PGH003 | BlanketTypeIgnore | Use specific error codes when ignoring type issues |  |
+| PGH004 | BlanketNOQA | Use specific error codes when using `noqa` |  |
 
 ### Pylint (PLC, PLE, PLR, PLW)
 
@@ -2195,6 +2200,24 @@ unfixable = ["F401"]
 
 ---
 
+#### [`update-check`](#update-check)
+
+Enable or disable automatic update checks (overridden by the
+`--update-check` and `--no-update-check` command-line flags).
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+update-check = false
+```
+
+---
+
 ### `flake8-annotations`
 
 #### [`allow-star-arg-any`](#allow-star-arg-any)
@@ -2438,7 +2461,7 @@ multiline-quotes = "single"
 #### [`ban-relative-imports`](#ban-relative-imports)
 
 Whether to ban all relative imports (`"all"`), or only those imports
-that extend into the parent module and beyond (`"parents"`).
+that extend into the parent module or beyond (`"parents"`).
 
 **Default value**: `"parents"`
 
@@ -2723,7 +2746,7 @@ Whether to use Google-style or Numpy-style conventions when detecting
 docstring sections. By default, conventions will be inferred from
 the available sections.
 
-**Default value**: `"convention"`
+**Default value**: `None`
 
 **Type**: `Convention`
 

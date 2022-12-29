@@ -2,7 +2,7 @@
 
 use crate::checks::{Check, CheckCode};
 use crate::pycodestyle::checks::{line_too_long, no_newline_at_end_of_file};
-use crate::pygrep_hooks::plugins::blanket_type_ignore;
+use crate::pygrep_hooks::plugins::{blanket_noqa, blanket_type_ignore};
 use crate::pyupgrade::checks::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
 
@@ -18,6 +18,7 @@ pub fn check_lines(
     let enforce_line_too_long = settings.enabled.contains(&CheckCode::E501);
     let enforce_no_newline_at_end_of_file = settings.enabled.contains(&CheckCode::W292);
     let enforce_blanket_type_ignore = settings.enabled.contains(&CheckCode::PGH003);
+    let enforce_blanket_noqa = settings.enabled.contains(&CheckCode::PGH004);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     for (index, line) in contents.lines().enumerate() {
@@ -41,6 +42,14 @@ pub fn check_lines(
             if enforce_blanket_type_ignore {
                 if commented_lines.contains(&(index + 1)) {
                     if let Some(check) = blanket_type_ignore(index, line) {
+                        checks.push(check);
+                    }
+                }
+            }
+
+            if enforce_blanket_noqa {
+                if commented_lines.contains(&(index + 1)) {
+                    if let Some(check) = blanket_noqa(index, line) {
                         checks.push(check);
                     }
                 }
