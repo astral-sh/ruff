@@ -92,7 +92,7 @@ pub fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, Lexi
                 if let Some(keyword_name) = &name {
                     if keyword_names.contains(keyword_name) {
                         return Err(LexicalError {
-                            error: LexicalErrorType::DuplicateKeywordArgumentError,
+                            error: LexicalErrorType::DuplicateKeywordArgumentError(keyword_name.to_string()),
                             location: start,
                         });
                     }

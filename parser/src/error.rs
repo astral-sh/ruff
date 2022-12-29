@@ -24,7 +24,7 @@ pub enum LexicalErrorType {
     DuplicateArgumentError(String),
     PositionalArgumentError,
     UnpackedArgumentError,
-    DuplicateKeywordArgumentError,
+    DuplicateKeywordArgumentError(String),
     UnrecognizedToken { tok: char },
     FStringError(FStringErrorType),
     LineContinuationError,
@@ -54,8 +54,8 @@ impl fmt::Display for LexicalErrorType {
             LexicalErrorType::DuplicateArgumentError(arg_name) => {
                 write!(f, "duplicate argument '{arg_name}' in function definition")
             }
-            LexicalErrorType::DuplicateKeywordArgumentError => {
-                write!(f, "keyword argument repeated")
+            LexicalErrorType::DuplicateKeywordArgumentError(arg_name) => {
+                write!(f, "keyword argument '{arg_name}' repeated")
             }
             LexicalErrorType::PositionalArgumentError => {
                 write!(f, "positional argument follows keyword argument")
