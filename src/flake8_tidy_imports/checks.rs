@@ -74,13 +74,13 @@ pub fn name_or_parent_is_banned<T>(
 
 pub fn banned_attribute_access(
     checker: &mut Checker,
-    call_path: Vec<&str>,
+    call_path: &[&str],
     expr: &Expr,
     banned_apis: &FxHashMap<String, BannedApi>,
 ) -> Option<Check> {
     for (banned_path, ban) in banned_apis {
         if let Some((module, member)) = banned_path.rsplit_once('.') {
-            if match_call_path(&call_path, module, member, &checker.from_imports) {
+            if match_call_path(call_path, module, member, &checker.from_imports) {
                 return Some(Check::new(
                     CheckKind::BannedApi {
                         name: banned_path.to_string(),

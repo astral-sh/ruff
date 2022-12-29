@@ -1624,11 +1624,11 @@ where
                 if self.settings.enabled.contains(&CheckCode::TID251) {
                     if let Some(check) = flake8_tidy_imports::checks::banned_attribute_access(
                         self,
-                        dealias_call_path(collect_call_paths(expr), &self.import_aliases),
+                        &dealias_call_path(collect_call_paths(expr), &self.import_aliases),
                         expr,
                         &self.settings.flake8_tidy_imports.banned_api,
                     ) {
-                        self.add_check(check)
+                        self.add_check(check);
                     }
                 }
             }
