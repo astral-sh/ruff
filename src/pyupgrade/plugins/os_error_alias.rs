@@ -30,6 +30,25 @@ fn get_before_replace(elts: &Vec<Located<ExprKind>>) -> Vec<String> {
         .collect()
 }
 
+fn check_module(checker: &Checker, expr: &Box<Located<ExprKind>>) -> (Vec<String>, Vec<String>) {
+    let mut replacements: Vec<String> = vec![];
+    let mut before_replace: Vec<String> = vec![];
+    for module in ERROR_MODULES.iter() {
+        if match_module_member(
+            &expr,
+            module,
+            "error",
+            &checker.from_imports,
+            &checker.import_aliases,
+        ) {
+            replacements.push("OSError".to_string());
+            before_replace.push(format!("{}.error", module));
+            break;
+        }
+    }
+    (replacements, before_replace)
+}
+
 /// UP024
 pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
     // Each separate except block is a separate error and fix
@@ -42,27 +61,18 @@ pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
         // The first part creates list of all the exceptions being caught, and
         // what they should be changed to
         let mut replacements: Vec<String> = vec![];
-        let mut before_replace: Vec<String> = vec![];
+        let mut before_replace: Vec<String>;
         match &error_handlers.node {
             ExprKind::Name { id, .. } => {
-                let new_name = get_correct_name(id);
-                replacements.push(new_name);
-                before_replace.push(id.to_string());
+                (replacements, before_replace) = check_module(checker, error_handlers);
+                if replacements.is_empty() {
+                    let new_name = get_correct_name(id);
+                    replacements.push(new_name);
+                    before_replace.push(id.to_string());
+                }
             }
             ExprKind::Attribute { .. } => {
-                for module in ERROR_MODULES.iter() {
-                    if match_module_member(
-                        &error_handlers,
-                        module,
-                        "error",
-                        &checker.from_imports,
-                        &checker.import_aliases,
-                    ) {
-                        replacements.push("OSError".to_string());
-                        before_replace.push(format!("{}.error", module));
-                        break;
-                    }
-                }
+                (replacements, before_replace) = check_module(checker, error_handlers);
             }
             ExprKind::Tuple { elts, .. } => {
                 before_replace = get_before_replace(elts);

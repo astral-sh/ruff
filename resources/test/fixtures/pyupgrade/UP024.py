@@ -55,6 +55,12 @@ try:
 except (IOError, KeyError, OSError):
     pass
 
+# First should change, second should not
+from .mmap import error
+try:
+    pass
+except (IOError, error):
+    pass
 # These should not change
 
 from foo import error
@@ -89,8 +95,3 @@ try:
 except (OSError, KeyError):
     pass
 
-from .mmap import error
-try:
-    pass
-except (IOError, error):
-    pass
