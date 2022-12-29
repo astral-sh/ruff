@@ -2,7 +2,7 @@
 source: src/pygrep_hooks/mod.rs
 expression: checks
 ---
-- kind: BlanketNoqa
+- kind: BlanketNOQA
   location:
     row: 1
     column: 7
@@ -10,7 +10,7 @@ expression: checks
     row: 1
     column: 13
   fix: ~
-- kind: BlanketNoqa
+- kind: BlanketNOQA
   location:
     row: 2
     column: 7
@@ -18,7 +18,7 @@ expression: checks
     row: 2
     column: 15
   fix: ~
-- kind: BlanketNoqa
+- kind: BlanketNOQA
   location:
     row: 3
     column: 0
@@ -26,7 +26,7 @@ expression: checks
     row: 3
     column: 6
   fix: ~
-- kind: BlanketNoqa
+- kind: BlanketNOQA
   location:
     row: 4
     column: 0
@@ -34,7 +34,7 @@ expression: checks
     row: 4
     column: 6
   fix: ~
-- kind: BlanketNoqa
+- kind: BlanketNOQA
   location:
     row: 5
     column: 0
@@ -42,7 +42,7 @@ expression: checks
     row: 5
     column: 8
   fix: ~
-- kind: BlanketNoqa
+- kind: BlanketNOQA
   location:
     row: 6
     column: 0
