@@ -225,7 +225,7 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
     {"name": "pydocstyle", "fields": [
         {
             "name": "convention",
-            "default": '"convention"',
+            "default": 'None',
             "type": 'Convention',
         },
     ]},

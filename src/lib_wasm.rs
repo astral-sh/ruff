@@ -16,6 +16,8 @@ use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
 export interface Check {
@@ -57,6 +59,11 @@ pub fn run() {
     use log::Level;
     console_error_panic_hook::set_once();
     console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+}
+
+#[wasm_bindgen]
+pub fn current_version() -> JsValue {
+    JsValue::from(VERSION)
 }
 
 #[wasm_bindgen]

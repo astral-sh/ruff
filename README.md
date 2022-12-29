@@ -2725,7 +2725,7 @@ Whether to use Google-style or Numpy-style conventions when detecting
 docstring sections. By default, conventions will be inferred from
 the available sections.
 
-**Default value**: `"convention"`
+**Default value**: `None`
 
 **Type**: `Convention`
 
