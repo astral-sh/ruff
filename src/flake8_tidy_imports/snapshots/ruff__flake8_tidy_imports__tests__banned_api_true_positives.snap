@@ -6,7 +6,6 @@ expression: checks
     BannedApi:
       name: cgi
       message: The cgi module is deprecated.
-      attribute_access: false
   location:
     row: 2
     column: 7
@@ -18,7 +17,6 @@ expression: checks
     BannedApi:
       name: cgi
       message: The cgi module is deprecated.
-      attribute_access: false
   location:
     row: 4
     column: 0
@@ -30,7 +28,6 @@ expression: checks
     BannedApi:
       name: cgi
       message: The cgi module is deprecated.
-      attribute_access: false
   location:
     row: 6
     column: 0
@@ -42,7 +39,6 @@ expression: checks
     BannedApi:
       name: cgi
       message: The cgi module is deprecated.
-      attribute_access: false
   location:
     row: 9
     column: 7
@@ -54,7 +50,6 @@ expression: checks
     BannedApi:
       name: cgi
       message: The cgi module is deprecated.
-      attribute_access: false
   location:
     row: 11
     column: 0
@@ -66,7 +61,6 @@ expression: checks
     BannedApi:
       name: cgi
       message: The cgi module is deprecated.
-      attribute_access: false
   location:
     row: 13
     column: 0
@@ -78,7 +72,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: false
   location:
     row: 17
     column: 19
@@ -90,7 +83,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: true
   location:
     row: 22
     column: 0
@@ -102,7 +94,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: true
   location:
     row: 24
     column: 0
@@ -114,7 +105,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: true
   location:
     row: 27
     column: 0
@@ -126,7 +116,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: true
   location:
     row: 29
     column: 0
@@ -138,7 +127,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: true
   location:
     row: 33
     column: 0

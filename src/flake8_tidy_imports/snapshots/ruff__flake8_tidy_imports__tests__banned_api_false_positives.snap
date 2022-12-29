@@ -6,7 +6,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: false
   location:
     row: 2
     column: 7
@@ -18,7 +17,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: true
   location:
     row: 7
     column: 0
@@ -30,7 +28,6 @@ expression: checks
     BannedApi:
       name: typing.TypedDict
       message: Use typing_extensions.TypedDict instead.
-      attribute_access: true
   location:
     row: 11
     column: 4

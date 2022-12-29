@@ -37,7 +37,6 @@ pub fn name_is_banned<T>(
             CheckKind::BannedApi {
                 name,
                 message: ban.msg.to_string(),
-                attribute_access: false,
             },
             Range::from_located(located),
         ));
@@ -56,7 +55,6 @@ pub fn name_or_parent_is_banned<T>(
                 CheckKind::BannedApi {
                     name: name.to_string(),
                     message: ban.msg.to_string(),
-                    attribute_access: false,
                 },
                 Range::from_located(located),
             ));
@@ -85,7 +83,6 @@ pub fn banned_attribute_access(
                     CheckKind::BannedApi {
                         name: banned_path.to_string(),
                         message: ban.msg.to_string(),
-                        attribute_access: true,
                     },
                     Range::from_located(expr),
                 ));

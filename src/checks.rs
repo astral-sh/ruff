@@ -783,11 +783,7 @@ pub enum CheckKind {
     // flake8-debugger
     Debugger(DebuggerUsingType),
     // flake8-tidy-imports
-    BannedApi {
-        name: String,
-        message: String,
-        attribute_access: bool,
-    },
+    BannedApi { name: String, message: String },
     BannedRelativeImport(Strictness),
     // flake8-return
     UnnecessaryReturnNone,
@@ -1167,7 +1163,6 @@ impl CheckCode {
             CheckCode::TID251 => CheckKind::BannedApi {
                 name: "...".to_string(),
                 message: "...".to_string(),
-                attribute_access: false,
             },
             CheckCode::TID252 => CheckKind::BannedRelativeImport(Strictness::All),
             // flake8-return
@@ -2445,17 +2440,7 @@ impl CheckKind {
                 DebuggerUsingType::Import(name) => format!("Import for `{name}` found"),
             },
             // flake8-tidy-imports
-            CheckKind::BannedApi {
-                name,
-                message,
-                attribute_access,
-            } => {
-                if *attribute_access {
-                    format!("`{name}` is banned: {message} (this may be a false positive)")
-                } else {
-                    format!("`{name}` is banned: {message}")
-                }
-            }
+            CheckKind::BannedApi { name, message } => format!("`{name}` is banned: {message}"),
             CheckKind::BannedRelativeImport(strictness) => match strictness {
                 Strictness::Parents => {
                     "Relative imports from parent modules are banned".to_string()
