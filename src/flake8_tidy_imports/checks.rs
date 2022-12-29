@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Expr, Located, Stmt};
+use rustpython_ast::{AliasData, Expr, Located, Stmt};
 
 use super::settings::BannedApi;
 use crate::ast::helpers::match_call_path;
@@ -27,18 +27,20 @@ pub fn banned_relative_import(
     }
 }
 
-pub fn name_is_banned<T>(
-    located: &Located<T>,
-    name: String,
+pub fn name_is_banned(
+    module: &str,
+    name: &Located<AliasData>,
     banned_apis: &FxHashMap<String, BannedApi>,
 ) -> Option<Check> {
-    if let Some(ban) = banned_apis.get(&name) {
+    let name_str = &name.node.name;
+    let full_name = format!("{module}.{name_str}");
+    if let Some(ban) = banned_apis.get(&full_name) {
         return Some(Check::new(
             CheckKind::BannedApi {
-                name,
+                name: full_name,
                 message: ban.msg.to_string(),
             },
-            Range::from_located(located),
+            Range::from_located(name),
         ));
     }
     None

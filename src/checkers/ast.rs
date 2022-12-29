@@ -868,10 +868,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::TID251) {
                     if let Some(module) = module {
                         for loc_name in names {
-                            let name = &loc_name.node.name;
                             if let Some(check) = flake8_tidy_imports::checks::name_is_banned(
+                                module,
                                 loc_name,
-                                format!("{module}.{name}"),
                                 &self.settings.flake8_tidy_imports.banned_api,
                             ) {
                                 self.add_check(check);
