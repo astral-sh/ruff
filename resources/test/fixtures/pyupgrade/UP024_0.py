@@ -3,63 +3,63 @@ from mmap import error
 # These should be fixed
 try:
     pass
-except OSError:
+except EnvironmentError:
     pass
 
 try:
     pass
-except OSError:
+except IOError:
     pass
 
 try:
     pass
-except OSError:
+except WindowsError:
     pass
 
 try:
     pass
-except OSError:
+except mmap.error:
     pass
 
 try:
     pass
-except OSError:
+except select.error:
     pass
 
 try:
     pass
-except OSError:
+except socket.error:
     pass
 
 try:
     pass
-except OSError:
+except error:
     pass
 
 # Should NOT be in parentheses when replaced
 
 try:
     pass
-except OSError:
+except (IOError,):
     pass
 
 try:
     pass
-except OSError:
+except (EnvironmentError, IOError, OSError):
     pass
 
 # Should be kept in parentheses (because multiple)
 
 try:
     pass
-except (OSError, KeyError):
+except (IOError, KeyError, OSError):
     pass
 
 # First should change, second should not
 from .mmap import error
 try:
     pass
-except (OSError, error):
+except (IOError, error):
     pass
 # These should not change
 
@@ -67,7 +67,7 @@ from foo import error
 
 try:
     pass
-except (OSError, error):
+except (IOError, error):
     pass
 
 try:

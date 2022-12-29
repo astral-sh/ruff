@@ -53,6 +53,7 @@ fn check_module(checker: &Checker, expr: &Box<Located<ExprKind>>) -> (Vec<String
 pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
     // Each separate except block is a separate error and fix
     for handler in handlers {
+        println!("LOOP");
         // println!("{:?}", handler);
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         let error_handlers = match type_.as_ref() {
