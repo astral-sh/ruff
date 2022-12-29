@@ -1930,6 +1930,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "shellexpand",
+ "similar",
  "strum",
  "strum_macros",
  "test-case",

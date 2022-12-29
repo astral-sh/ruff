@@ -90,7 +90,11 @@ impl<'a> Printer<'a> {
                 Violations::Hide => {
                     let fixed = diagnostics.fixed;
                     if fixed > 0 {
-                        println!("Fixed {fixed} error(s).");
+                        if matches!(self.autofix, fixer::Mode::Apply) {
+                            println!("Fixed {fixed} error(s).");
+                        } else if matches!(self.autofix, fixer::Mode::Diff) {
+                            println!("Would fix {fixed} error(s).");
+                        }
                     }
                 }
             }
