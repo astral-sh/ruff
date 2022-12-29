@@ -5,6 +5,7 @@ use std::ops::AddAssign;
 use std::path::Path;
 
 use anyhow::Result;
+use colored::Colorize;
 use log::debug;
 use rustpython_parser::lexer::LexResult;
 use similar::TextDiff;
@@ -26,6 +27,9 @@ use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{cache, directives, fs, rustpython_helpers};
+
+const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
+const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
 #[derive(Debug, Default)]
 pub struct Diagnostics {
@@ -462,8 +466,8 @@ fn lint_fix(
         )?;
 
         // Apply autofix.
-        if iterations < MAX_ITERATIONS {
-            if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
+        if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
+            if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 fixed += applied;
 
@@ -476,6 +480,24 @@ fn lint_fix(
                 // Re-run the linter pass (by avoiding the break).
                 continue;
             }
+
+            eprintln!(
+                "
+{}: Failed to converge after {} iterations.
+
+This likely indicates a bug in `{}`. If you could open an issue at:
+
+{}/issues
+
+quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd \
+                 be very appreciative!
+",
+                "warning".yellow().bold(),
+                MAX_ITERATIONS,
+                CARGO_PKG_NAME,
+                CARGO_PKG_REPOSITORY,
+                fs::relativize_path(path),
+            );
         }
 
         // Convert to messages.
