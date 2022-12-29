@@ -84,7 +84,9 @@ pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
                             replacements.push(new_name);
                         },
                         ExprKind::Attribute { .. } => {
-                            (replacements, before_replace) = check_module(checker, elt);
+                            let (new_replacements, new_before_replace) = check_module(checker, elt);
+                            replacements.extend(new_replacements);
+                            before_replace.extend(new_before_replace);
                         },
                         _ => ()
                     }
@@ -97,6 +99,7 @@ pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
             .unique()
             .map(|x| x.to_string())
             .collect();
+        before_replace = before_replace.iter().filter(|x| !x.is_empty()).map(|x| x.to_string()).collect();
 
         // This part checks if there are differences between what there is and
         // what there should be. Where differences, the changes are applied
