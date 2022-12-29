@@ -148,6 +148,11 @@ export const AVAILABLE_OPTIONS: OptionGroup[] = [
             "default": '"parents"',
             "type": 'Strictness',
         },
+        {
+            "name": "banned-api",
+            "default": '{}',
+            "type": 'HashMap<String, BannedApi>',
+        },
     ]},
     {"name": "flake8-unused-arguments", "fields": [
         {

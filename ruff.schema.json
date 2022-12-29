@@ -368,6 +368,18 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "BannedApi": {
+      "type": "object",
+      "required": [
+        "msg"
+      ],
+      "properties": {
+        "msg": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "CheckCodePrefix": {
       "type": "string",
       "enum": [
@@ -834,6 +846,7 @@
         "TID",
         "TID2",
         "TID25",
+        "TID251",
         "TID252",
         "U",
         "U0",
@@ -1055,6 +1068,9 @@
     },
     "Flake8TidyImportsOptions": {
       "type": "object",
+      "required": [
+        "banned-api"
+      ],
       "properties": {
         "ban-relative-imports": {
           "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module and beyond (`\"parents\"`).",
@@ -1066,6 +1082,13 @@
               "type": "null"
             }
           ]
+        },
+        "banned-api": {
+          "description": "Specific modules or module members that may not be imported/accessed.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/BannedApi"
+          }
         }
       },
       "additionalProperties": false

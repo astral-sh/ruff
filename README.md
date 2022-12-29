@@ -905,6 +905,7 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| TID251 | BannedApi | `...` is banned: ... |  |
 | TID252 | BannedRelativeImport | Relative imports are banned |  |
 
 ### flake8-unused-arguments (ARG)
@@ -2452,6 +2453,25 @@ that extend into the parent module and beyond (`"parents"`).
 [tool.ruff.flake8-tidy-imports]
 # Disallow all relative imports.
 ban-relative-imports = "all"
+```
+
+---
+
+#### [`banned-api`](#banned-api)
+
+Specific modules or module members that may not be imported/accessed.
+
+**Default value**: `{}`
+
+**Type**: `HashMap<String, BannedApi>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-tidy-imports]
+[tool.ruff.flake8-tidy-imports.banned-api]
+"cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
 ```
 
 ---
