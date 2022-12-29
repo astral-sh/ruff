@@ -682,15 +682,15 @@ ParameterListStarArgs<ArgType>: (Option<Box<ast::Arg>>, Vec<ast::Arg>, Vec<ast::
         }
         kwargs.extend(kwonlyargs.into_iter());
 
-        let kwarg = kwarg.map(|n| n.1).flatten();
-        let va = va.map(Box::new);
-
-        if va==None && kwargs.is_empty() && kwarg==None {
+        if va.is_none() && kwargs.is_empty() && kwarg.is_none() {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
                 location: location,
             })?
         }
+
+        let kwarg = kwarg.map(|n| n.1).flatten();
+        let va = va.map(Box::new);
 
         Ok((va, kwargs, kw_defaults, kwarg))
     }
