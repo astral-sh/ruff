@@ -1,5 +1,5 @@
-use itertools::Itertools;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind, Located};
+use itertools::Itertools;
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
@@ -142,11 +142,50 @@ fn handle_making_changes(checker: &mut Checker, target: &Located<ExprKind>, befo
     }
 }
 
-/// UP024
-pub fn os_error_alias(checker: &mut Checker, handlers: &Vec<Excepthandler>) {
+// This is a hacky way to handle the different variable types we get since
+// raise and try are very different. Would love input on a cleaner way
+pub trait OSErrorAliasChecker {
+    fn check_error(&self, checker: &mut Checker)
+    where
+        Self: Sized;
+}
+
+impl OSErrorAliasChecker for &Vec<Excepthandler> {
+    fn check_error(&self, checker: &mut Checker) {
     // Each separate except block is a separate error and fix
-    for handler in handlers {
-        // println!("{:?}", handler);
-        handle_except_block(checker, handler);
+        for handler in self.clone().iter() {
+            handle_except_block(checker, handler);
+        }
     }
+}
+
+impl OSErrorAliasChecker for &Option<Box<Located<ExprKind>>> {
+    fn check_error(&self, checker: &mut Checker) {
+        let target = match self {
+            Some(expr) => expr,
+            None => return,
+        };
+        let mut replacements: Vec<String>;
+        let mut before_replace: Vec<String>;
+        match &target.node {
+            ExprKind::Name { id, .. } => {
+                (replacements, before_replace) = check_module(checker, &target);
+                if replacements.is_empty() {
+                    let new_name = get_correct_name(&id);
+                    replacements.push(new_name);
+                    before_replace.push(id.to_string());
+                }
+            }
+            ExprKind::Attribute { .. } => {
+                (replacements, before_replace) = check_module(checker, &target);
+            },
+            _ => return        
+        }
+        handle_making_changes(checker, target, before_replace, replacements);
+    }
+}
+
+/// UP024
+pub fn os_error_alias<U: OSErrorAliasChecker>(checker: &mut Checker, handlers: U) {
+    handlers.check_error(checker);
 }

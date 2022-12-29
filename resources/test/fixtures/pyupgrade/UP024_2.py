@@ -2,11 +2,11 @@ import socket, mmap, select
 
 # Testing the modules
 raise socket.error
-"""
 raise mmap.error
 raise select.error
 
 raise socket.error()
+"""
 raise mmap.error(1)
 raise select.error(1, 2)
 

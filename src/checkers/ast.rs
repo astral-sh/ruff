@@ -1085,6 +1085,9 @@ where
                         flake8_errmsg::plugins::string_in_exception(self, exc);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, exc);
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
