@@ -1,15 +1,15 @@
 # These should change
-x = u"Hello"
+x = "Hello"
 
-u'world'
+"world"
 
-print(u"Hello")
+print("Hello")
 
-print(u'world')
+print("world")
 
 import foo
 
-foo(u"Hello", u"world", a=u"Hello", b=u"world")
+foo("Hello", "world", a="Hello", b="world")
 
 # These should not change
 u = "Hello"

@@ -12,7 +12,7 @@ pub fn rewrite_unicode_literal(
     kind: &Option<String>,
 ) {
     if let Some(const_kind) = kind {
-        if const_kind == "u" {
+        if const_kind.to_lowercase() == "u" {
             let mut check = Check::new(CheckKind::RewriteUnicodeLiteral, Range::from_located(expr));
             if checker.patch(check.kind.code()) {
                 let mut new_str = value.to_string();
