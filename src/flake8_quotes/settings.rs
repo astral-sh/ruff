@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Quote {
+    /// Use single quotes (`'`).
     Single,
+    /// Use double quotes (`"`).
     Double,
 }
 

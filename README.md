@@ -2461,7 +2461,7 @@ multiline-quotes = "single"
 #### [`ban-relative-imports`](#ban-relative-imports)
 
 Whether to ban all relative imports (`"all"`), or only those imports
-that extend into the parent module and beyond (`"parents"`).
+that extend into the parent module or beyond (`"parents"`).
 
 **Default value**: `"parents"`
 

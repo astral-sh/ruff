@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Strictness {
+    /// Ban imports that extend into the parent module or beyond.
     Parents,
+    /// Ban all relative imports.
     All,
 }
 
@@ -29,7 +31,7 @@ pub struct Options {
         "#
     )]
     /// Whether to ban all relative imports (`"all"`), or only those imports
-    /// that extend into the parent module and beyond (`"parents"`).
+    /// that extend into the parent module or beyond (`"parents"`).
     pub ban_relative_imports: Option<Strictness>,
 }
 
