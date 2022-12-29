@@ -231,6 +231,7 @@ pub enum CheckCode {
     UP021,
     UP022,
     UP023,
+    UP026,
     // pydocstyle
     D100,
     D101,
@@ -849,6 +850,7 @@ pub enum CheckKind {
     ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
     RewriteCElementTree,
+    RewriteMockImport,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1233,6 +1235,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
             CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
+            CheckCode::UP026 => CheckKind::RewriteMockImport,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1661,6 +1664,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckCategory::Pyupgrade,
             CheckCode::UP022 => CheckCategory::Pyupgrade,
             CheckCode::UP023 => CheckCategory::Pyupgrade,
+            CheckCode::UP026 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1878,6 +1882,7 @@ impl CheckKind {
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
+            CheckKind::RewriteMockImport => &CheckCode::UP026,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2618,6 +2623,9 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
+            CheckKind::RewriteMockImport => {
+                "`mock` is deprecated, use `unittest.mock`".to_string()
+            }
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
@@ -3066,6 +3074,7 @@ impl CheckKind {
                 | CheckKind::ReplaceUniversalNewlines
                 | CheckKind::ReplaceStdoutStderr
                 | CheckKind::RewriteCElementTree
+                | CheckKind::RewriteMockImport
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
                 | CheckKind::NoBlankLineBeforeClass(..)
