@@ -80,18 +80,10 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
     // The first part creates list of all the exceptions being caught, and
     // what they should be changed to
     let mut replacements: Vec<String> = vec![];
-    let mut before_replace: Vec<String>;
+    let mut before_replace: Vec<String> = vec![];
     match &error_handlers.node {
-        ExprKind::Name { id, .. } => {
-            (replacements, before_replace) = check_module(checker, error_handlers);
-            if replacements.is_empty() {
-                let new_name = get_correct_name(id);
-                replacements.push(new_name);
-                before_replace.push(id.to_string());
-            }
-        }
-        ExprKind::Attribute { .. } => {
-            (replacements, before_replace) = check_module(checker, error_handlers);
+        ExprKind::Name{ .. } | ExprKind::Attribute{ .. } => {
+            handle_name_or_attribute(checker, &error_handlers, &mut replacements, &mut before_replace);
         }
         ExprKind::Tuple { elts, .. } => {
             before_replace = get_before_replace(elts);
