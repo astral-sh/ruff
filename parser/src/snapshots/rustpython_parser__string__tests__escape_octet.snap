@@ -1,0 +1,46 @@
+---
+source: compiler/parser/src/string.rs
+expression: parse_ast
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 14,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 14,
+                    },
+                ),
+                custom: (),
+                node: Constant {
+                    value: Bytes(
+                        [
+                            35,
+                            97,
+                            4,
+                            83,
+                            52,
+                        ],
+                    ),
+                    kind: None,
+                },
+            },
+        },
+    },
+]

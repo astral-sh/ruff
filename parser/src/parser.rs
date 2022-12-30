@@ -8,6 +8,7 @@
 use crate::lexer::{LexResult, Tok};
 pub use crate::mode::Mode;
 use crate::{ast, error::ParseError, lexer, python};
+use ast::Location;
 use itertools::Itertools;
 use std::iter;
 
@@ -65,7 +66,15 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 ///
 /// ```
 pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseError> {
-    parse(source, Mode::Expression, path).map(|top| match top {
+    parse_expression_located(source, path, Location::new(1, 0))
+}
+
+pub fn parse_expression_located(
+    source: &str,
+    path: &str,
+    location: Location,
+) -> Result<ast::Expr, ParseError> {
+    parse_located(source, Mode::Expression, path, location).map(|top| match top {
         ast::Mod::Expression { body } => *body,
         _ => unreachable!(),
     })
@@ -73,7 +82,17 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 
 // Parse a given source code
 pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
-    let lxr = lexer::make_tokenizer(source);
+    parse_located(source, mode, source_path, Location::new(1, 0))
+}
+
+// Parse a given source code from a given location
+pub fn parse_located(
+    source: &str,
+    mode: Mode,
+    source_path: &str,
+    location: Location,
+) -> Result<ast::Mod, ParseError> {
+    let lxr = lexer::make_tokenizer_located(source, location);
     let marker_token = (Default::default(), mode.to_marker(), Default::default());
     let tokenizer = iter::once(Ok(marker_token))
         .chain(lxr)

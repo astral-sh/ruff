@@ -10,8 +10,8 @@ expression: parse_ast
         },
         end_location: Some(
             Location {
-                row: 1,
-                column: 22,
+                row: 2,
+                column: 4,
             },
         ),
         custom: (),
@@ -23,8 +23,8 @@ expression: parse_ast
                 },
                 end_location: Some(
                     Location {
-                        row: 1,
-                        column: 22,
+                        row: 2,
+                        column: 4,
                     },
                 ),
                 custom: (),
@@ -37,14 +37,14 @@ expression: parse_ast
                             },
                             end_location: Some(
                                 Location {
-                                    row: 1,
-                                    column: 22,
+                                    row: 2,
+                                    column: 4,
                                 },
                             ),
                             custom: (),
                             node: Constant {
                                 value: Str(
-                                    "Hello world",
+                                    "\\\n",
                                 ),
                                 kind: None,
                             },
@@ -52,33 +52,31 @@ expression: parse_ast
                         Located {
                             location: Location {
                                 row: 1,
-                                column: 9,
+                                column: 0,
                             },
                             end_location: Some(
                                 Location {
-                                    row: 1,
-                                    column: 22,
+                                    row: 2,
+                                    column: 4,
                                 },
                             ),
                             custom: (),
                             node: FormattedValue {
                                 value: Located {
                                     location: Location {
-                                        row: 1,
-                                        column: 17,
+                                        row: 2,
+                                        column: 1,
                                     },
                                     end_location: Some(
                                         Location {
-                                            row: 1,
-                                            column: 20,
+                                            row: 2,
+                                            column: 2,
                                         },
                                     ),
                                     custom: (),
-                                    node: Constant {
-                                        value: Str(
-                                            "!",
-                                        ),
-                                        kind: None,
+                                    node: Name {
+                                        id: "x",
+                                        ctx: Load,
                                     },
                                 },
                                 conversion: 0,
