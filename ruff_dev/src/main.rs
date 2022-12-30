@@ -15,8 +15,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use ruff_dev::{
     generate_all, generate_check_code_prefix, generate_json_schema, generate_options,
-    generate_playground_options, generate_rules_table, print_ast, print_cst, print_tokens,
-    round_trip,
+    generate_rules_table, print_ast, print_cst, print_tokens, round_trip,
 };
 
 #[derive(Parser)]
@@ -39,9 +38,6 @@ enum Commands {
     GenerateRulesTable(generate_rules_table::Cli),
     /// Generate a Markdown-compatible listing of configuration options.
     GenerateOptions(generate_options::Cli),
-    /// Generate typescript file defining options to be used by the web
-    /// playground.
-    GeneratePlaygroundOptions(generate_playground_options::Cli),
     /// Print the AST for a given Python file.
     PrintAST(print_ast::Cli),
     /// Print the LibCST CST for a given Python file.
@@ -60,7 +56,6 @@ fn main() -> Result<()> {
         Commands::GenerateJSONSchema(args) => generate_json_schema::main(args)?,
         Commands::GenerateRulesTable(args) => generate_rules_table::main(args)?,
         Commands::GenerateOptions(args) => generate_options::main(args)?,
-        Commands::GeneratePlaygroundOptions(args) => generate_playground_options::main(args)?,
         Commands::PrintAST(args) => print_ast::main(args)?,
         Commands::PrintCST(args) => print_cst::main(args)?,
         Commands::PrintTokens(args) => print_tokens::main(args)?,
