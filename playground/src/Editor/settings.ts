@@ -22,9 +22,12 @@ export function stringify(settings: Settings): string {
 /**
  * Persist the configuration to a URL.
  */
-export function persist(settingsSource: string, pythonSource: string) {
-  window.location.hash = lzstring.compressToEncodedURIComponent(
+export async function persist(settingsSource: string, pythonSource: string) {
+  const hash = lzstring.compressToEncodedURIComponent(
     settingsSource + "$$$" + pythonSource,
+  );
+  await navigator.clipboard.writeText(
+    window.location.href.split("#")[0] + "#" + hash,
   );
 }
 
