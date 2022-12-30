@@ -680,6 +680,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP022 | ReplaceStdoutStderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
 | UP023 | RewriteCElementTree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
 | UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
+| UP026 | RewriteMockImport | `mock` is deprecated, use `unittest.mock` | 🛠 |
 
 ### pep8-naming (N)
 
@@ -2800,6 +2801,28 @@ convention = "google"
 ---
 
 ### `pyupgrade`
+
+#### [`keep-mock`](#keep-mock)
+
+Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604
+(`Optional[str]` -> `str | None`) rewrites even if a file imports `from
+__future__ import annotations`. Note that this setting is only
+applicable when the target Python version is below 3.9 and 3.10
+respectively.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pyupgrade]
+# Does not replace `mock` imports with `from unittest import mock`.
+keep-mock = true
+```
+
+---
 
 #### [`keep-runtime-typing`](#keep-runtime-typing)
 

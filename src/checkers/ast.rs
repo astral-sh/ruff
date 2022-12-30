@@ -652,7 +652,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP023) {
                     pyupgrade::plugins::replace_c_element_tree(self, stmt);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP026) && !self.settings.pyupgrade.keep_mock {
+                if self.settings.enabled.contains(&CheckCode::UP026)
+                    && !self.settings.pyupgrade.keep_mock
+                {
                     pyupgrade::plugins::rewrite_mock_import(self, stmt);
                 }
 
@@ -1100,7 +1102,6 @@ where
                         if self.settings.enabled.contains(&CheckCode::PLC0414) {
                             pylint::plugins::useless_import_alias(self, alias);
                         }
-
                     }
                 }
             }

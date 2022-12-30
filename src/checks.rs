@@ -2676,9 +2676,7 @@ impl CheckKind {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
-            CheckKind::RewriteMockImport => {
-                "`mock` is deprecated, use `unittest.mock`".to_string()
-            }
+            CheckKind::RewriteMockImport => "`mock` is deprecated, use `unittest.mock`".to_string(),
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
