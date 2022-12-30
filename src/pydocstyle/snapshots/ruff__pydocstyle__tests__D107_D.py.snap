@@ -5,17 +5,17 @@ expression: checks
 - kind: PublicInit
   location:
     row: 60
-    column: 4
+    column: 8
   end_location:
-    row: 61
-    column: 12
+    row: 60
+    column: 16
   fix: ~
 - kind: PublicInit
   location:
     row: 534
-    column: 4
+    column: 8
   end_location:
-    row: 535
-    column: 12
+    row: 534
+    column: 16
   fix: ~
 

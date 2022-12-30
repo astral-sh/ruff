@@ -5,9 +5,9 @@ expression: checks
 - kind: PublicClass
   location:
     row: 15
-    column: 0
+    column: 6
   end_location:
-    row: 69
+    row: 15
     column: 12
   fix: ~
 

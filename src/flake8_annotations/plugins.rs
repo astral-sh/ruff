@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
-use crate::ast::{cast, visitor};
+use crate::ast::{cast, helpers, visitor};
 use crate::checkers::ast::Checker;
 use crate::checks::{CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind};
@@ -167,7 +167,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         if checker.settings.enabled.contains(&CheckCode::ANN201) {
                             checker.add_check(Check::new(
                                 CheckKind::MissingReturnTypePublicFunction(name.to_string()),
-                                Range::from_located(stmt),
+                                helpers::identifier_range(stmt, checker.locator),
                             ));
                         }
                     }
@@ -175,7 +175,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         if checker.settings.enabled.contains(&CheckCode::ANN202) {
                             checker.add_check(Check::new(
                                 CheckKind::MissingReturnTypePrivateFunction(name.to_string()),
-                                Range::from_located(stmt),
+                                helpers::identifier_range(stmt, checker.locator),
                             ));
                         }
                     }
@@ -309,14 +309,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if checker.settings.enabled.contains(&CheckCode::ANN206) {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeClassMethod(name.to_string()),
-                            Range::from_located(stmt),
+                            helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
                 } else if visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
                     if checker.settings.enabled.contains(&CheckCode::ANN205) {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeStaticMethod(name.to_string()),
-                            Range::from_located(stmt),
+                            helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
                 } else if visibility::is_init(stmt) {
@@ -328,7 +328,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         {
                             let mut check = Check::new(
                                 CheckKind::MissingReturnTypeSpecialMethod(name.to_string()),
-                                Range::from_located(stmt),
+                                helpers::identifier_range(stmt, checker.locator),
                             );
                             if checker.patch(check.kind.code()) {
                                 match fixes::add_return_none_annotation(checker.locator, stmt) {
@@ -343,7 +343,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if checker.settings.enabled.contains(&CheckCode::ANN204) {
                         checker.add_check(Check::new(
                             CheckKind::MissingReturnTypeSpecialMethod(name.to_string()),
-                            Range::from_located(stmt),
+                            helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
                 } else {
@@ -352,7 +352,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             if checker.settings.enabled.contains(&CheckCode::ANN201) {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingReturnTypePublicFunction(name.to_string()),
-                                    Range::from_located(stmt),
+                                    helpers::identifier_range(stmt, checker.locator),
                                 ));
                             }
                         }
@@ -360,7 +360,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             if checker.settings.enabled.contains(&CheckCode::ANN202) {
                                 checker.add_check(Check::new(
                                     CheckKind::MissingReturnTypePrivateFunction(name.to_string()),
-                                    Range::from_located(stmt),
+                                    helpers::identifier_range(stmt, checker.locator),
                                 ));
                             }
                         }
