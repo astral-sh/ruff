@@ -34,5 +34,15 @@ from mock import (
     c
 )
 
+if True:
+    if False:
+        from mock import (
+            mock,
+            a,
+            b,
+            c
+        )
+
+
 # These should not change:
 import os, io
