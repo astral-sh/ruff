@@ -20,7 +20,7 @@ use crate::cache::DEFAULT_CACHE_DIR_NAME;
 use crate::checks::{CheckCode, CheckKind};
 use crate::cli::Overrides;
 use crate::iterators::par_iter;
-use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
+use crate::linter::{add_noqa_to_path, lint_path, lint_stdin, Diagnostics};
 use crate::logging::LogLevel;
 use crate::message::Message;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
@@ -206,45 +206,6 @@ pub fn add_noqa(
 
     let duration = start.elapsed();
     debug!("Added noqa to files in: {:?}", duration);
-
-    Ok(modifications)
-}
-
-/// Automatically format a collection of files.
-pub fn autoformat(
-    files: &[PathBuf],
-    pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
-    overrides: &Overrides,
-) -> Result<usize> {
-    // Collect all the files to format.
-    let start = Instant::now();
-    let (paths, resolver) =
-        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
-    let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
-
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
-
-    let start = Instant::now();
-    let modifications = par_iter(&paths)
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            let settings = resolver.resolve(path, pyproject_strategy);
-            match autoformat_path(path, settings) {
-                Ok(()) => Some(()),
-                Err(e) => {
-                    error!("Failed to autoformat {}: {e}", path.to_string_lossy());
-                    None
-                }
-            }
-        })
-        .count();
-
-    let duration = start.elapsed();
-    debug!("Auto-formatted files in: {:?}", duration);
 
     Ok(modifications)
 }

@@ -350,6 +350,10 @@ Options:
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
           Output serialization format for error messages [possible values: text, json, junit, grouped, github, gitlab]
+      --stdin-filename <STDIN_FILENAME>
+          The name of the file when passing it through stdin
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory
       --show-source
           Show violations with source code
       --respect-gitignore
@@ -358,12 +362,6 @@ Options:
           Enforce exclusions, even for paths passed to Ruff directly on the command-line
       --update-check
           Enable or disable automatic update checks
-      --show-files
-          See the files Ruff will be run against with the current settings
-      --show-settings
-          See the settings Ruff will use to check a given Python file
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
           Regular expression matching the name of dummy variables
       --target-version <TARGET_VERSION>
@@ -372,12 +370,16 @@ Options:
           Set the line-length for length-associated checks and automatic formatting
       --max-complexity <MAX_COMPLEXITY>
           Maximum McCabe complexity allowed for a given function
-      --stdin-filename <STDIN_FILENAME>
-          The name of the file when passing it through stdin
+      --add-noqa
+          Enable automatic additions of `noqa` directives to failing lines
+      --clean
+          Clear any caches in the current directory or any subdirectories
       --explain <EXPLAIN>
           Explain a rule
-      --cache-dir <CACHE_DIR>
-          Path to the cache directory
+      --show-files
+          See the files Ruff will be run against with the current settings
+      --show-settings
+          See the settings Ruff will use to check a given Python file
   -h, --help
           Print help information
   -V, --version
