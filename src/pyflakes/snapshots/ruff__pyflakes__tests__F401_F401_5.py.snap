@@ -20,9 +20,7 @@ expression: checks
     end_location:
       row: 3
       column: 0
-  parent:
-    row: 2
-    column: 0
+  parent: ~
 - kind:
     UnusedImport:
       - d.e.f
@@ -41,9 +39,7 @@ expression: checks
     end_location:
       row: 4
       column: 0
-  parent:
-    row: 3
-    column: 0
+  parent: ~
 - kind:
     UnusedImport:
       - h.i

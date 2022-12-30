@@ -3676,7 +3676,9 @@ impl<'a> Checker<'a> {
                     let child = defined_by.0;
 
                     let check_lineno = binding.range.location.row();
-                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. }) {
+                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
+                        && child.location.row() != check_lineno
+                    {
                         Some(child.location.row())
                     } else {
                         None
@@ -3738,7 +3740,9 @@ impl<'a> Checker<'a> {
                             CheckKind::UnusedImport(full_name.clone(), ignore_init),
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
+                        if matches!(child.node, StmtKind::ImportFrom { .. })
+                            && child.location.row() != range.location.row()
+                        {
                             check.parent(child.location);
                         }
                         if let Some(fix) = fix.as_ref() {
@@ -3757,7 +3761,9 @@ impl<'a> Checker<'a> {
                             CheckKind::UnusedImport(full_name.clone(), ignore_init),
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
+                        if matches!(child.node, StmtKind::ImportFrom { .. })
+                            && child.location.row() != range.location.row()
+                        {
                             check.parent(child.location);
                         }
                         checks.push(check);
