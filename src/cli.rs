@@ -93,6 +93,12 @@ pub struct Cli {
     /// Output serialization format for error messages.
     #[arg(long, value_enum)]
     pub format: Option<SerializationFormat>,
+    /// The name of the file when passing it through stdin.
+    #[arg(long)]
+    pub stdin_filename: Option<PathBuf>,
+    /// Path to the cache directory.
+    #[arg(long)]
+    pub cache_dir: Option<PathBuf>,
     /// Show violations with source code.
     #[arg(long, overrides_with("no_show_source"))]
     show_source: bool,
@@ -115,15 +121,6 @@ pub struct Cli {
     update_check: bool,
     #[clap(long, overrides_with("update_check"), hide = true)]
     no_update_check: bool,
-    /// See the files Ruff will be run against with the current settings.
-    #[arg(long)]
-    pub show_files: bool,
-    /// See the settings Ruff will use to check a given Python file.
-    #[arg(long)]
-    pub show_settings: bool,
-    /// Enable automatic additions of `noqa` directives to failing lines.
-    #[arg(long)]
-    pub add_noqa: bool,
     /// Regular expression matching the name of dummy variables.
     #[arg(long)]
     pub dummy_variable_rgx: Option<Regex>,
@@ -137,25 +134,120 @@ pub struct Cli {
     /// Maximum McCabe complexity allowed for a given function.
     #[arg(long)]
     pub max_complexity: Option<usize>,
+    /// Enable automatic additions of `noqa` directives to failing lines.
+    #[arg(
+        long,
+        // conflicts_with = "add_noqa",
+        conflicts_with = "autoformat",
+        conflicts_with = "clean",
+        conflicts_with = "explain",
+        conflicts_with = "generate_shell_completion",
+        conflicts_with = "show_files",
+        conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+    )]
+    pub add_noqa: bool,
     /// Round-trip auto-formatting.
-    // TODO(charlie): This should be a sub-command.
-    #[arg(long, hide = true)]
+    #[arg(
+        long,
+        hide = true,
+        // Fake subcommands.
+        conflicts_with = "add_noqa",
+        // conflicts_with = "autoformat",
+        conflicts_with = "clean",
+        conflicts_with = "explain",
+        conflicts_with = "generate_shell_completion",
+        conflicts_with = "show_files",
+        conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+    )]
     pub autoformat: bool,
-    /// The name of the file when passing it through stdin.
-    #[arg(long)]
-    pub stdin_filename: Option<PathBuf>,
+    /// Clear any caches in the current directory or any subdirectories.
+    #[arg(
+        long,
+        // Fake subcommands.
+        conflicts_with = "add_noqa",
+        conflicts_with = "autoformat",
+        // conflicts_with = "clean",
+        conflicts_with = "explain",
+        conflicts_with = "generate_shell_completion",
+        conflicts_with = "show_files",
+        conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+    )]
+    pub clean: bool,
     /// Explain a rule.
-    #[arg(long)]
+    #[arg(
+        long,
+        // Fake subcommands.
+        conflicts_with = "add_noqa",
+        conflicts_with = "autoformat",
+        conflicts_with = "clean",
+        // conflicts_with = "explain",
+        conflicts_with = "generate_shell_completion",
+        conflicts_with = "show_files",
+        conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+    )]
     pub explain: Option<CheckCode>,
     /// Generate shell completion
-    #[arg(long, hide = true, value_name = "SHELL")]
+    #[arg(
+        long,
+        hide = true,
+        value_name = "SHELL",
+        // Fake subcommands.
+        conflicts_with = "add_noqa",
+        conflicts_with = "autoformat",
+        conflicts_with = "clean",
+        conflicts_with = "explain",
+        // conflicts_with = "generate_shell_completion",
+        conflicts_with = "show_files",
+        conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+    )]
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
-    /// Clear any caches in the current directory or any subdirectories.
-    #[arg(long)]
-    pub clean: bool,
-    /// Path to the cache directory.
-    #[arg(long)]
-    pub cache_dir: Option<PathBuf>,
+    /// See the files Ruff will be run against with the current settings.
+    #[arg(
+        long,
+        // Fake subcommands.
+        conflicts_with = "add_noqa",
+        conflicts_with = "autoformat",
+        conflicts_with = "clean",
+        conflicts_with = "explain",
+        conflicts_with = "generate_shell_completion",
+        // conflicts_with = "show_files",
+        conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+    )]
+    pub show_files: bool,
+    /// See the settings Ruff will use to check a given Python file.
+    #[arg(
+        long,
+        // Fake subcommands.
+        conflicts_with = "add_noqa",
+        conflicts_with = "autoformat",
+        conflicts_with = "clean",
+        conflicts_with = "explain",
+        conflicts_with = "generate_shell_completion",
+        conflicts_with = "show_files",
+        // conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+    )]
+    pub show_settings: bool,
 }
 
 impl Cli {
