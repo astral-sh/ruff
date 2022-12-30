@@ -1,0 +1,21 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 2
+    column: 0
+  fix:
+    content: "from long_module_name import (\r\n    member_five,\r\n    member_four,\r\n    member_one,\r\n    member_three,\r\n    member_two,\r\n)\r\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 2
+      column: 0
+  parent: ~
+
