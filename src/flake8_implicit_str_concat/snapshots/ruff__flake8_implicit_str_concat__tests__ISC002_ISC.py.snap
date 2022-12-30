@@ -1,0 +1,13 @@
+---
+source: src/flake8_implicit_str_concat/mod.rs
+expression: checks
+---
+- kind: MultiLineImplicitStringConcatenation
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 6
+    column: 9
+  fix: ~
+

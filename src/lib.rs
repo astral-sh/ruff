@@ -39,6 +39,7 @@ mod flake8_comprehensions;
 mod flake8_datetimez;
 mod flake8_debugger;
 pub mod flake8_errmsg;
+mod flake8_implicit_str_concat;
 mod flake8_import_conventions;
 mod flake8_print;
 pub mod flake8_quotes;
