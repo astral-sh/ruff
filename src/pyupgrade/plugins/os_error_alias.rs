@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind, Located, Expr};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
@@ -49,7 +49,12 @@ fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
     (replacements, before_replace)
 }
 
-fn handle_name_or_attribute(checker: &Checker, item: &Expr, replacements: &mut Vec<String>, before_replace: &mut Vec<String>)  {
+fn handle_name_or_attribute(
+    checker: &Checker,
+    item: &Expr,
+    replacements: &mut Vec<String>,
+    before_replace: &mut Vec<String>,
+) {
     match &item.node {
         ExprKind::Name { id, .. } => {
             let (temp_replacements, temp_before_replace) = check_module(checker, item);
@@ -66,7 +71,7 @@ fn handle_name_or_attribute(checker: &Checker, item: &Expr, replacements: &mut V
             replacements.extend(temp_replacements);
             before_replace.extend(temp_before_replace);
         }
-        _ => return
+        _ => return,
     }
 }
 
@@ -82,8 +87,13 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
     let mut replacements: Vec<String> = vec![];
     let mut before_replace: Vec<String> = vec![];
     match &error_handlers.node {
-        ExprKind::Name{ .. } | ExprKind::Attribute{ .. } => {
-            handle_name_or_attribute(checker, &error_handlers, &mut replacements, &mut before_replace);
+        ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
+            handle_name_or_attribute(
+                checker,
+                &error_handlers,
+                &mut replacements,
+                &mut before_replace,
+            );
         }
         ExprKind::Tuple { elts, .. } => {
             before_replace = get_before_replace(elts);
@@ -180,7 +190,7 @@ impl OSErrorAliasChecker for &Box<Expr> {
         let mut replacements: Vec<String> = vec![];
         let mut before_replace: Vec<String> = vec![];
         match &self.node {
-            ExprKind::Name{ .. } | ExprKind::Attribute{ .. } => {
+            ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
                 handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
             }
             _ => return,
@@ -195,17 +205,22 @@ impl OSErrorAliasChecker for &Expr {
         let mut before_replace: Vec<String> = vec![];
         let change_target: &Expr;
         match &self.node {
-            ExprKind::Name{ .. } | ExprKind::Attribute{ .. } => {
+            ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
                 change_target = self;
                 handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
             }
             ExprKind::Call { func, .. } => {
                 change_target = &func;
                 match &func.node {
-                    ExprKind::Name{ .. } | ExprKind::Attribute{ .. } => {
-                        handle_name_or_attribute(checker, &func, &mut replacements, &mut before_replace);
+                    ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
+                        handle_name_or_attribute(
+                            checker,
+                            &func,
+                            &mut replacements,
+                            &mut before_replace,
+                        );
                     }
-                        _ => return,
+                    _ => return,
                 }
             }
             _ => return,
