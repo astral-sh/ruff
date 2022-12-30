@@ -1,3 +1,5 @@
+#![allow(clippy::len_zero)]
+
 use itertools::Itertools;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
@@ -7,18 +9,18 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-const ERROR_NAMES: &'static [&'static str] = &["EnvironmentError", "IOError", "WindowsError"];
-const ERROR_MODULES: &'static [&'static str] = &["mmap", "select", "socket"];
+const ERROR_NAMES: &[&str] = &["EnvironmentError", "IOError", "WindowsError"];
+const ERROR_MODULES: &[&str] = &["mmap", "select", "socket"];
 
 fn get_correct_name(original: &str) -> String {
     if ERROR_NAMES.contains(&original) {
-        return "OSError".to_string();
+        "OSError".to_string()
     } else {
-        return original.to_string();
+        original.to_string()
     }
 }
 
-fn get_before_replace(elts: &Vec<Expr>) -> Vec<String> {
+fn get_before_replace(elts: &[Expr]) -> Vec<String> {
     elts.iter()
         .map(|elt| {
             if let ExprKind::Name { id, .. } = &elt.node {
@@ -35,14 +37,14 @@ fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
     let mut before_replace: Vec<String> = vec![];
     for module in ERROR_MODULES.iter() {
         if match_module_member(
-            &expr,
+            expr,
             module,
             "error",
             &checker.from_imports,
             &checker.import_aliases,
         ) {
             replacements.push("OSError".to_string());
-            before_replace.push(format!("{}.error", module));
+            before_replace.push(format!("{module}.error"));
             break;
         }
     }
@@ -61,7 +63,7 @@ fn handle_name_or_attribute(
             replacements.extend(temp_replacements);
             before_replace.extend(temp_before_replace);
             if replacements.is_empty() {
-                let new_name = get_correct_name(&id);
+                let new_name = get_correct_name(id);
                 replacements.push(new_name);
                 before_replace.push(id.to_string());
             }
@@ -71,7 +73,7 @@ fn handle_name_or_attribute(
             replacements.extend(temp_replacements);
             before_replace.extend(temp_before_replace);
         }
-        _ => return,
+        _ => (),
     }
 }
 
@@ -90,7 +92,7 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
         ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
             handle_name_or_attribute(
                 checker,
-                &error_handlers,
+                error_handlers,
                 &mut replacements,
                 &mut before_replace,
             );
@@ -179,7 +181,7 @@ pub trait OSErrorAliasChecker {
 impl OSErrorAliasChecker for &Vec<Excepthandler> {
     fn check_error(&self, checker: &mut Checker) {
         // Each separate except block is a separate error and fix
-        for handler in self.clone().iter() {
+        for handler in self.iter() {
             handle_except_block(checker, handler);
         }
     }
@@ -210,12 +212,12 @@ impl OSErrorAliasChecker for &Expr {
                 handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
             }
             ExprKind::Call { func, .. } => {
-                change_target = &func;
+                change_target = func;
                 match &func.node {
                     ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
                         handle_name_or_attribute(
                             checker,
-                            &func,
+                            func,
                             &mut replacements,
                             &mut before_replace,
                         );
