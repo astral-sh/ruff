@@ -1,4 +1,5 @@
 use crate::isort::types::{AliasData, CommentSet, ImportFromData, Importable};
+use crate::source_code_style::SourceCodeStyleDetector;
 
 // Hard-code four-space indentation for the imports themselves, to match Black.
 const INDENT: &str = "    ";
@@ -7,14 +8,19 @@ const INDENT: &str = "    ";
 const CAPACITY: usize = 200;
 
 /// Add a plain import statement to the `RopeBuilder`.
-pub fn format_import(alias: &AliasData, comments: &CommentSet, is_first: bool) -> String {
+pub fn format_import(
+    alias: &AliasData,
+    comments: &CommentSet,
+    is_first: bool,
+    stylist: &SourceCodeStyleDetector,
+) -> String {
     let mut output = String::with_capacity(CAPACITY);
     if !is_first && !comments.atop.is_empty() {
-        output.push('\n');
+        output.push_str(stylist.line_ending());
     }
     for comment in &comments.atop {
         output.push_str(comment);
-        output.push('\n');
+        output.push_str(stylist.line_ending());
     }
     if let Some(asname) = alias.asname {
         output.push_str("import ");
@@ -29,16 +35,18 @@ pub fn format_import(alias: &AliasData, comments: &CommentSet, is_first: bool) -
         output.push_str("  ");
         output.push_str(comment);
     }
-    output.push('\n');
+    output.push_str(stylist.line_ending());
     output
 }
 
 /// Add an import-from statement to the `RopeBuilder`.
+#[allow(clippy::too_many_arguments)]
 pub fn format_import_from(
     import_from: &ImportFromData,
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
     line_length: usize,
+    stylist: &SourceCodeStyleDetector,
     force_wrap_aliases: bool,
     is_first: bool,
     trailing_comma: bool,
@@ -48,7 +56,8 @@ pub fn format_import_from(
             .iter()
             .all(|(alias, _)| alias.name == "*" && alias.asname.is_none())
     {
-        let (single_line, ..) = format_single_line(import_from, comments, aliases, is_first);
+        let (single_line, ..) =
+            format_single_line(import_from, comments, aliases, is_first, stylist);
         return single_line;
     }
 
@@ -68,13 +77,13 @@ pub fn format_import_from(
             || aliases.iter().all(|(alias, _)| alias.asname.is_none()))
     {
         let (single_line, import_length) =
-            format_single_line(import_from, comments, aliases, is_first);
+            format_single_line(import_from, comments, aliases, is_first, stylist);
         if import_length <= line_length || aliases.iter().any(|(alias, _)| alias.name == "*") {
             return single_line;
         }
     }
 
-    format_multi_line(import_from, comments, aliases, is_first)
+    format_multi_line(import_from, comments, aliases, is_first, stylist)
 }
 
 /// Format an import-from statement in single-line format.
@@ -85,16 +94,17 @@ fn format_single_line(
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
+    stylist: &SourceCodeStyleDetector,
 ) -> (String, usize) {
     let mut output = String::with_capacity(CAPACITY);
     let mut line_length = 0;
 
     if !is_first && !comments.atop.is_empty() {
-        output.push('\n');
+        output.push_str(stylist.line_ending());
     }
     for comment in &comments.atop {
         output.push_str(comment);
-        output.push('\n');
+        output.push_str(stylist.line_ending());
     }
 
     let module_name = import_from.module_name();
@@ -133,7 +143,7 @@ fn format_single_line(
         line_length += 2 + comment.len();
     }
 
-    output.push('\n');
+    output.push_str(stylist.line_ending());
 
     (output, line_length)
 }
@@ -144,15 +154,16 @@ fn format_multi_line(
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
+    stylist: &SourceCodeStyleDetector,
 ) -> String {
     let mut output = String::with_capacity(CAPACITY);
 
     if !is_first && !comments.atop.is_empty() {
-        output.push('\n');
+        output.push_str(stylist.line_ending());
     }
     for comment in &comments.atop {
         output.push_str(comment);
-        output.push('\n');
+        output.push_str(stylist.line_ending());
     }
 
     output.push_str("from ");
@@ -164,13 +175,13 @@ fn format_multi_line(
         output.push(' ');
         output.push_str(comment);
     }
-    output.push('\n');
+    output.push_str(stylist.line_ending());
 
     for (AliasData { name, asname }, comments) in aliases {
         for comment in &comments.atop {
             output.push_str(INDENT);
             output.push_str(comment);
-            output.push('\n');
+            output.push_str(stylist.line_ending());
         }
         output.push_str(INDENT);
         if let Some(asname) = asname {
@@ -187,11 +198,11 @@ fn format_multi_line(
             output.push(' ');
             output.push_str(comment);
         }
-        output.push('\n');
+        output.push_str(stylist.line_ending());
     }
 
     output.push(')');
-    output.push('\n');
+    output.push_str(stylist.line_ending());
 
     output
 }
