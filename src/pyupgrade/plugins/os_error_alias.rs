@@ -177,19 +177,11 @@ impl OSErrorAliasChecker for &Vec<Excepthandler> {
 
 impl OSErrorAliasChecker for &Box<Located<ExprKind>> {
     fn check_error(&self, checker: &mut Checker) {
-        let mut replacements: Vec<String>;
-        let mut before_replace: Vec<String>;
+        let mut replacements: Vec<String> = vec![];
+        let mut before_replace: Vec<String> = vec![];
         match &self.node {
-            ExprKind::Name { id, .. } => {
-                (replacements, before_replace) = check_module(checker, self);
-                if replacements.is_empty() {
-                    let new_name = get_correct_name(&id);
-                    replacements.push(new_name);
-                    before_replace.push(id.to_string());
-                }
-            }
-            ExprKind::Attribute { .. } => {
-                (replacements, before_replace) = check_module(checker, self);
+            ExprKind::Name{ .. } | ExprKind::Attribute{ .. } => {
+                handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
             }
             _ => return,
         }
