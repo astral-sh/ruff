@@ -678,7 +678,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
 | UP022 | ReplaceStdoutStderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
 | UP023 | RewriteCElementTree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
-| UP024 | OSErrorAlias | Replacing deprecated errors with `OSError` | 🛠 |
+| UP024 | OSErrorAlias | Replace aliased errors with `OSError` | 🛠 |
 | UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
 
 ### pep8-naming (N)

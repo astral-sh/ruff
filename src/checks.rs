@@ -2628,7 +2628,7 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
-            CheckKind::OSErrorAlias => "Replacing deprecated errors with `OSError`".to_string(),
+            CheckKind::OSErrorAlias => "Replace aliased errors with `OSError`".to_string(),
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
