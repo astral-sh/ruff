@@ -17,7 +17,7 @@ export default function VersionTag({ children }: { children: ReactNode }) {
         "items-center",
         "dark:bg-gray-800",
         "dark:text-gray-400",
-        "dark:shadow-highlight/4"
+        "dark:shadow-highlight/4",
       )}
     >
       {children}

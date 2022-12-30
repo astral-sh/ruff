@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,
 )]
 #[serde(
     deny_unknown_fields,
@@ -26,15 +26,23 @@ pub struct Options {
     pub extend_immutable_calls: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash, Default)]
+#[derive(Debug, Default, Hash)]
 pub struct Settings {
     pub extend_immutable_calls: Vec<String>,
 }
 
-impl Settings {
-    pub fn from_options(options: Options) -> Self {
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             extend_immutable_calls: options.extend_immutable_calls.unwrap_or_default(),
+        }
+    }
+}
+
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
+        Self {
+            extend_immutable_calls: Some(settings.extend_immutable_calls),
         }
     }
 }

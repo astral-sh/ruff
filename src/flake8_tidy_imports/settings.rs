@@ -40,18 +40,26 @@ pub struct Settings {
     pub ban_relative_imports: Strictness,
 }
 
-impl Settings {
-    pub fn from_options(options: Options) -> Self {
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            ban_relative_imports: Strictness::Parents,
+        }
+    }
+}
+
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             ban_relative_imports: options.ban_relative_imports.unwrap_or(Strictness::Parents),
         }
     }
 }
 
-impl Default for Settings {
-    fn default() -> Self {
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
         Self {
-            ban_relative_imports: Strictness::Parents,
+            ban_relative_imports: Some(settings.ban_relative_imports),
         }
     }
 }

@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,
 )]
 #[serde(
     deny_unknown_fields,
@@ -51,7 +51,7 @@ pub struct Options {
     pub allow_star_arg_any: Option<bool>,
 }
 
-#[derive(Debug, Hash, Default)]
+#[derive(Debug, Default, Hash)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub mypy_init_return: bool,
@@ -60,14 +60,24 @@ pub struct Settings {
     pub allow_star_arg_any: bool,
 }
 
-impl Settings {
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: Options) -> Self {
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
-            mypy_init_return: options.mypy_init_return.unwrap_or_default(),
-            suppress_dummy_args: options.suppress_dummy_args.unwrap_or_default(),
-            suppress_none_returning: options.suppress_none_returning.unwrap_or_default(),
-            allow_star_arg_any: options.allow_star_arg_any.unwrap_or_default(),
+            mypy_init_return: options.mypy_init_return.unwrap_or(false),
+            suppress_dummy_args: options.suppress_dummy_args.unwrap_or(false),
+            suppress_none_returning: options.suppress_none_returning.unwrap_or(false),
+            allow_star_arg_any: options.allow_star_arg_any.unwrap_or(false),
+        }
+    }
+}
+
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
+        Self {
+            mypy_init_return: Some(settings.mypy_init_return),
+            suppress_dummy_args: Some(settings.suppress_dummy_args),
+            suppress_none_returning: Some(settings.suppress_none_returning),
+            allow_star_arg_any: Some(settings.allow_star_arg_any),
         }
     }
 }

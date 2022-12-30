@@ -153,58 +153,56 @@ impl Settings {
             src: config
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
-            target_version: config.target_version.unwrap_or(PythonVersion::Py310),
+            target_version: config.target_version.unwrap_or_default(),
             update_check: config.update_check.unwrap_or(true),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
-                .map(flake8_annotations::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_bugbear: config
                 .flake8_bugbear
-                .map(flake8_bugbear::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_errmsg: config
                 .flake8_errmsg
-                .map(flake8_errmsg::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_import_conventions: config
                 .flake8_import_conventions
-                .map(flake8_import_conventions::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_quotes: config
                 .flake8_quotes
-                .map(flake8_quotes::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_tidy_imports: config
                 .flake8_tidy_imports
-                .map(flake8_tidy_imports::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_unused_arguments: config
                 .flake8_unused_arguments
-                .map(flake8_unused_arguments::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             isort: config
                 .isort
-                .map(isort::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             mccabe: config
                 .mccabe
-                .as_ref()
-                .map(mccabe::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             pep8_naming: config
                 .pep8_naming
-                .map(pep8_naming::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             pydocstyle: config
                 .pydocstyle
-                .map(pydocstyle::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             pyupgrade: config
                 .pyupgrade
-                .as_ref()
-                .map(pyupgrade::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
         })
     }

@@ -232,6 +232,7 @@ pub enum CheckCode {
     UP022,
     UP023,
     UP024,
+    UP025,
     // pydocstyle
     D100,
     D101,
@@ -851,6 +852,7 @@ pub enum CheckKind {
     ReplaceStdoutStderr,
     RewriteCElementTree,
     OSErrorAlias,
+    RewriteUnicodeLiteral,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1236,6 +1238,7 @@ impl CheckCode {
             CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
             CheckCode::UP024 => CheckKind::OSErrorAlias,
+            CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1665,6 +1668,7 @@ impl CheckCode {
             CheckCode::UP022 => CheckCategory::Pyupgrade,
             CheckCode::UP023 => CheckCategory::Pyupgrade,
             CheckCode::UP024 => CheckCategory::Pyupgrade,
+            CheckCode::UP025 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1883,6 +1887,7 @@ impl CheckKind {
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
             CheckKind::OSErrorAlias => &CheckCode::UP024,
+            CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2623,7 +2628,8 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
-            CheckKind::OSErrorAlias => "`Replacing deprecated errors with `OSError`".to_string(),
+            CheckKind::OSErrorAlias => "Replace aliased errors with `OSError`".to_string(),
+            CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
@@ -3067,12 +3073,7 @@ impl CheckKind {
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::MissingReturnTypeSpecialMethod(..)
                 | CheckKind::NativeLiterals
-                | CheckKind::OpenAlias
                 | CheckKind::NewLineAfterLastParagraph
-                | CheckKind::ReplaceUniversalNewlines
-                | CheckKind::ReplaceStdoutStderr
-                | CheckKind::RewriteCElementTree
-                | CheckKind::OSErrorAlias
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
                 | CheckKind::NoBlankLineBeforeClass(..)
@@ -3085,8 +3086,10 @@ impl CheckKind {
                 | CheckKind::NoneComparison(..)
                 | CheckKind::NotInTest
                 | CheckKind::NotIsTest
+                | CheckKind::OSErrorAlias
                 | CheckKind::OneBlankLineAfterClass(..)
                 | CheckKind::OneBlankLineBeforeClass(..)
+                | CheckKind::OpenAlias
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
                 | CheckKind::PercentFormatExtraNamedArguments(..)
@@ -3095,6 +3098,10 @@ impl CheckKind {
                 | CheckKind::RedundantOpenModes
                 | CheckKind::RedundantTupleInExceptionHandler(..)
                 | CheckKind::RemoveSixCompat
+                | CheckKind::ReplaceStdoutStderr
+                | CheckKind::ReplaceUniversalNewlines
+                | CheckKind::RewriteCElementTree
+                | CheckKind::RewriteUnicodeLiteral
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
                 | CheckKind::SectionUnderlineAfterName(..)

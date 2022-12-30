@@ -44,6 +44,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
 - [Pydantic](https://github.com/pydantic/pydantic)
+- [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [Synapse](https://github.com/matrix-org/synapse)
@@ -167,7 +168,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.199'
+  rev: 'v0.0.200'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -677,6 +678,8 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
 | UP022 | ReplaceStdoutStderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
 | UP023 | RewriteCElementTree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
+| UP024 | OSErrorAlias | Replace aliased errors with `OSError` | 🛠 |
+| UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
 
 ### pep8-naming (N)
 
@@ -1275,6 +1278,7 @@ natively, including:
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
+- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (1/37)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`isort`](https://pypi.org/project/isort/)
@@ -1330,6 +1334,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
+- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (1/37)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { persist, restore } from "./config";
-import { DEFAULT_CONFIG_SOURCE, DEFAULT_PYTHON_SOURCE } from "../constants";
+import { DEFAULT_PYTHON_SOURCE } from "../constants";
+import init, { check, Check, currentVersion, defaultSettings } from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
-import init, { check, current_version, Check } from "../pkg";
+import { useTheme } from "./theme";
+import { persist, restore, stringify } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
-import Themes from "./Themes";
+import MonacoThemes from "./MonacoThemes";
 
 type Tab = "Source" | "Settings";
 
@@ -15,17 +16,18 @@ export default function Editor() {
   const [version, setVersion] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("Source");
   const [edit, setEdit] = useState<number>(0);
-  const [configSource, setConfigSource] = useState<string | null>(null);
+  const [settingsSource, setSettingsSource] = useState<string | null>(null);
   const [pythonSource, setPythonSource] = useState<string | null>(null);
   const [checks, setChecks] = useState<Check[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useTheme();
 
   useEffect(() => {
     init().then(() => setInitialized(true));
   }, []);
 
   useEffect(() => {
-    if (!initialized || configSource == null || pythonSource == null) {
+    if (!initialized || settingsSource == null || pythonSource == null) {
       return;
     }
 
@@ -33,7 +35,7 @@ export default function Editor() {
     let checks: Check[];
 
     try {
-      config = JSON.parse(configSource);
+      config = JSON.parse(settingsSource);
     } catch (e) {
       setChecks([]);
       setError((e as Error).message);
@@ -49,73 +51,81 @@ export default function Editor() {
 
     setError(null);
     setChecks(checks);
-  }, [initialized, configSource, pythonSource]);
-
-  useEffect(() => {
-    if (configSource == null || pythonSource == null) {
-      const payload = restore();
-      if (payload) {
-        const [configSource, pythonSource] = payload;
-        setConfigSource(configSource);
-        setPythonSource(pythonSource);
-      } else {
-        setConfigSource(DEFAULT_CONFIG_SOURCE);
-        setPythonSource(DEFAULT_PYTHON_SOURCE);
-      }
-    }
-  }, [configSource, pythonSource]);
+  }, [initialized, settingsSource, pythonSource]);
 
   useEffect(() => {
     if (!initialized) {
       return;
     }
 
-    setVersion(current_version());
-  }, [initialized]);
+    if (settingsSource == null || pythonSource == null) {
+      const payload = restore();
+      if (payload) {
+        const [settingsSource, pythonSource] = payload;
+        setSettingsSource(settingsSource);
+        setPythonSource(pythonSource);
+      } else {
+        setSettingsSource(stringify(defaultSettings()));
+        setPythonSource(DEFAULT_PYTHON_SOURCE);
+      }
+    }
+  }, [initialized, settingsSource, pythonSource]);
 
-  const handleShare = useCallback(() => {
-    if (!initialized || configSource == null || pythonSource == null) {
+  useEffect(() => {
+    if (!initialized) {
       return;
     }
 
-    persist(configSource, pythonSource);
-  }, [initialized, configSource, pythonSource]);
+    setVersion(currentVersion());
+  }, [initialized]);
+
+  const handleShare = useCallback(() => {
+    if (!initialized || settingsSource == null || pythonSource == null) {
+      return;
+    }
+
+    persist(settingsSource, pythonSource);
+  }, [initialized, settingsSource, pythonSource]);
 
   const handlePythonSourceChange = useCallback((pythonSource: string) => {
     setEdit((edit) => edit + 1);
     setPythonSource(pythonSource);
   }, []);
 
-  const handleConfigSourceChange = useCallback((configSource: string) => {
+  const handleSettingsSourceChange = useCallback((settingsSource: string) => {
     setEdit((edit) => edit + 1);
-    setConfigSource(configSource);
+    setSettingsSource(settingsSource);
   }, []);
 
   return (
     <main className={"h-full w-full flex flex-auto"}>
       <Header
         edit={edit}
-        version={version}
         tab={tab}
-        onChange={setTab}
+        theme={theme}
+        version={version}
+        onChangeTab={setTab}
+        onChangeTheme={setTheme}
         onShare={initialized ? handleShare : undefined}
       />
 
-      <Themes />
+      <MonacoThemes />
 
       <div className={"mt-12 relative flex-auto"}>
-        {initialized && configSource != null && pythonSource != null ? (
+        {initialized && settingsSource != null && pythonSource != null ? (
           <>
             <SourceEditor
               visible={tab === "Source"}
               source={pythonSource}
+              theme={theme}
               checks={checks}
               onChange={handlePythonSourceChange}
             />
             <SettingsEditor
               visible={tab === "Settings"}
-              source={configSource}
-              onChange={handleConfigSourceChange}
+              source={settingsSource}
+              theme={theme}
+              onChange={handleSettingsSourceChange}
             />
           </>
         ) : null}
