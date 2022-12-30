@@ -56,7 +56,7 @@ pub struct Options {
     /// Specific modules or module members that may not be imported or accessed.
     /// Note that this check is only meant to flag accidental uses,
     /// and can be circumvented via `eval` or `importlib`.
-    pub banned_api: FxHashMap<String, BannedApi>,
+    pub banned_api: Option<FxHashMap<String, BannedApi>>,
 }
 
 #[derive(Debug)]
@@ -78,7 +78,7 @@ impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
             ban_relative_imports: options.ban_relative_imports.unwrap_or(Strictness::Parents),
-            banned_api: options.banned_api,
+            banned_api: options.banned_api.unwrap_or_default(),
         }
     }
 }
@@ -87,7 +87,7 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             ban_relative_imports: Some(settings.ban_relative_imports),
-            banned_api: settings.banned_api,
+            banned_api: Some(settings.banned_api),
         }
     }
 }

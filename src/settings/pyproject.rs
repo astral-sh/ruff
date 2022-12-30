@@ -515,7 +515,7 @@ other-attribute = 1
                 }),
                 flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
                     ban_relative_imports: Some(Strictness::Parents),
-                    banned_api: FxHashMap::from_iter([
+                    banned_api: Some(FxHashMap::from_iter([
                         (
                             "cgi".to_string(),
                             BannedApi {
@@ -528,7 +528,7 @@ other-attribute = 1
                                 msg: "Use typing_extensions.TypedDict instead.".to_string()
                             }
                         )
-                    ])
+                    ]))
                 }),
                 flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
                     aliases: Some(FxHashMap::from_iter([(
