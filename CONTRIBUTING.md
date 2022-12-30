@@ -66,7 +66,7 @@ understand how other, similar rules are implemented.
 To add a test fixture, create a file under `resources/test/fixtures`, named to match the `CheckCode`
 you defined earlier (e.g., `E402.py`). This file should contain a variety of violations and
 non-violations designed to evaluate and demonstrate the behavior of your lint rule. Run Ruff locally
-with (e.g.) `cargo run resources/test/fixtures/E402.py --no-cache`. Once you're satisfied with the
+with (e.g.) `cargo run resources/test/fixtures/E402.py --no-cache --select E402`. Once you're satisfied with the
 output, codify the behavior as a snapshot test by adding a new `testcase` macro to the `mod tests`
 section of `src/linter.rs`, like so:
 
