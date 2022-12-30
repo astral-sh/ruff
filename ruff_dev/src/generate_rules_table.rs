@@ -1,15 +1,12 @@
 //! Generate a Markdown-compatible table of supported lint rules.
 
-use std::fs;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::PathBuf;
-
 use anyhow::Result;
 use clap::Args;
 use itertools::Itertools;
 use ruff::checks::{CheckCategory, CheckCode};
 use strum::IntoEnumIterator;
+
+use crate::utils::replace_readme_section;
 
 const TABLE_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->";
 const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
@@ -82,35 +79,6 @@ pub fn main(cli: &Cli) -> Result<()> {
         replace_readme_section(toc_out.trim_end(), TOC_BEGIN_PRAGMA, TOC_END_PRAGMA)?;
         replace_readme_section(&table_out, TABLE_BEGIN_PRAGMA, TABLE_END_PRAGMA)?;
     }
-
-    Ok(())
-}
-
-fn replace_readme_section(content: &str, begin_pragma: &str, end_pragma: &str) -> Result<()> {
-    // Read the existing file.
-    let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("Failed to find root directory")
-        .join("README.md");
-    let existing = fs::read_to_string(&file)?;
-
-    // Extract the prefix.
-    let index = existing
-        .find(begin_pragma)
-        .expect("Unable to find begin pragma");
-    let prefix = &existing[..index + begin_pragma.len()];
-
-    // Extract the suffix.
-    let index = existing
-        .find(end_pragma)
-        .expect("Unable to find end pragma");
-    let suffix = &existing[index..];
-
-    // Write the prefix, new contents, and suffix.
-    let mut f = OpenOptions::new().write(true).truncate(true).open(&file)?;
-    writeln!(f, "{prefix}")?;
-    write!(f, "{content}")?;
-    write!(f, "{suffix}")?;
 
     Ok(())
 }
