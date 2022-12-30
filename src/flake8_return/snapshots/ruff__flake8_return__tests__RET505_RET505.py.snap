@@ -11,6 +11,7 @@ expression: checks
     row: 13
     column: 16
   fix: ~
+  parent: ~
 - kind:
     SuperfluousElseReturn: Elif
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 26
     column: 13
   fix: ~
+  parent: ~
 - kind:
     SuperfluousElseReturn: Elif
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 46
     column: 16
   fix: ~
+  parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 55
     column: 16
   fix: ~
+  parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 66
     column: 20
   fix: ~
+  parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 80
     column: 13
   fix: ~
+  parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 90
     column: 17
   fix: ~
+  parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
@@ -74,4 +81,5 @@ expression: checks
     row: 103
     column: 23
   fix: ~
+  parent: ~
 

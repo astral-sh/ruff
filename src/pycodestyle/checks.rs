@@ -118,11 +118,14 @@ pub fn ambiguous_variable_name<T>(name: &str, located: &Located<T>) -> Option<Ch
 }
 
 /// E742
-pub fn ambiguous_class_name(name: &str, location: Range) -> Option<Check> {
+pub fn ambiguous_class_name<F>(name: &str, locate: F) -> Option<Check>
+where
+    F: FnOnce() -> Range,
+{
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousClassName(name.to_string()),
-            location,
+            locate(),
         ))
     } else {
         None
@@ -130,11 +133,14 @@ pub fn ambiguous_class_name(name: &str, location: Range) -> Option<Check> {
 }
 
 /// E743
-pub fn ambiguous_function_name(name: &str, location: Range) -> Option<Check> {
+pub fn ambiguous_function_name<F>(name: &str, locate: F) -> Option<Check>
+where
+    F: FnOnce() -> Range,
+{
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousFunctionName(name.to_string()),
-            location,
+            locate(),
         ))
     } else {
         None

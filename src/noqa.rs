@@ -105,19 +105,23 @@ fn add_noqa_inner(
 
         let mut codes: FxHashSet<&CheckCode> = FxHashSet::default();
         for check in checks {
+            // TODO(charlie): Consider respecting parent `noqa` directives. For now, we'll
+            // add a `noqa` for every check, on its own line. This could lead to
+            // duplication, whereby some parent `noqa` directives become
+            // redundant.
             if check.location.row() == lineno + 1 {
                 codes.insert(check.kind.code());
             }
         }
 
         // Grab the noqa (logical) line number for the current (physical) line.
-        // If there are newlines at the end of the file, they won't be represented in
-        // `noqa_line_for`, so fallback to the current line.
         let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
 
         if !codes.is_empty() {
-            let matches = matches_by_line.entry(noqa_lineno).or_default();
-            matches.extend(codes);
+            matches_by_line
+                .entry(noqa_lineno)
+                .or_default()
+                .extend(codes);
         }
     }
 

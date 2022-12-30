@@ -10,6 +10,7 @@ expression: checks
     row: 15
     column: 11
   fix: ~
+  parent: ~
 - kind: UnaryPrefixIncrement
   location:
     row: 20
@@ -18,4 +19,5 @@ expression: checks
     row: 20
     column: 14
   fix: ~
+  parent: ~
 

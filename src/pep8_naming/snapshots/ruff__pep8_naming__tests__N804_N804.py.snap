@@ -10,6 +10,7 @@ expression: checks
     row: 30
     column: 30
   fix: ~
+  parent: ~
 - kind: InvalidFirstArgumentNameForClassMethod
   location:
     row: 38
@@ -18,6 +19,7 @@ expression: checks
     row: 38
     column: 59
   fix: ~
+  parent: ~
 - kind: InvalidFirstArgumentNameForClassMethod
   location:
     row: 43
@@ -26,4 +28,5 @@ expression: checks
     row: 43
     column: 23
   fix: ~
+  parent: ~
 

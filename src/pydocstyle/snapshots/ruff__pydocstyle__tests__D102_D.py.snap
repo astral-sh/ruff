@@ -5,25 +5,28 @@ expression: checks
 - kind: PublicMethod
   location:
     row: 23
-    column: 4
+    column: 8
   end_location:
-    row: 24
-    column: 12
+    row: 23
+    column: 14
   fix: ~
+  parent: ~
 - kind: PublicMethod
   location:
     row: 56
-    column: 4
+    column: 8
   end_location:
-    row: 57
-    column: 12
+    row: 56
+    column: 15
   fix: ~
+  parent: ~
 - kind: PublicMethod
   location:
     row: 68
-    column: 4
+    column: 8
   end_location:
-    row: 69
-    column: 12
+    row: 68
+    column: 16
   fix: ~
+  parent: ~
 

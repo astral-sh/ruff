@@ -4,6 +4,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Location, StmtKind};
 
+use crate::ast::helpers::identifier_range;
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
@@ -51,7 +52,7 @@ pub fn not_missing(
             if checker.settings.enabled.contains(&CheckCode::D101) {
                 checker.add_check(Check::new(
                     CheckKind::PublicClass,
-                    Range::from_located(stmt),
+                    identifier_range(stmt, checker.locator),
                 ));
             }
             false
@@ -60,7 +61,7 @@ pub fn not_missing(
             if checker.settings.enabled.contains(&CheckCode::D106) {
                 checker.add_check(Check::new(
                     CheckKind::PublicNestedClass,
-                    Range::from_located(stmt),
+                    identifier_range(stmt, checker.locator),
                 ));
             }
             false
@@ -72,7 +73,7 @@ pub fn not_missing(
                 if checker.settings.enabled.contains(&CheckCode::D103) {
                     checker.add_check(Check::new(
                         CheckKind::PublicFunction,
-                        Range::from_located(stmt),
+                        identifier_range(stmt, checker.locator),
                     ));
                 }
                 false
@@ -87,20 +88,23 @@ pub fn not_missing(
                 if checker.settings.enabled.contains(&CheckCode::D105) {
                     checker.add_check(Check::new(
                         CheckKind::MagicMethod,
-                        Range::from_located(stmt),
+                        identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
             } else if is_init(stmt) {
                 if checker.settings.enabled.contains(&CheckCode::D107) {
-                    checker.add_check(Check::new(CheckKind::PublicInit, Range::from_located(stmt)));
+                    checker.add_check(Check::new(
+                        CheckKind::PublicInit,
+                        identifier_range(stmt, checker.locator),
+                    ));
                 }
                 true
             } else {
                 if checker.settings.enabled.contains(&CheckCode::D102) {
                     checker.add_check(Check::new(
                         CheckKind::PublicMethod,
-                        Range::from_located(stmt),
+                        identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
@@ -829,7 +833,7 @@ pub fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     }
     checker.add_check(Check::new(
         CheckKind::SkipDocstring,
-        Range::from_located(stmt),
+        identifier_range(stmt, checker.locator),
     ));
 }
 

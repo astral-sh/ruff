@@ -18,6 +18,7 @@ expression: checks
     end_location:
       row: 32
       column: 12
+  parent: ~
 - kind:
     NewLineAfterSectionName: Raises
   location:
@@ -34,6 +35,7 @@ expression: checks
     end_location:
       row: 218
       column: 11
+  parent: ~
 - kind:
     NewLineAfterSectionName: Returns
   location:
@@ -50,6 +52,7 @@ expression: checks
     end_location:
       row: 257
       column: 12
+  parent: ~
 - kind:
     NewLineAfterSectionName: Raises
   location:
@@ -66,4 +69,5 @@ expression: checks
     end_location:
       row: 259
       column: 11
+  parent: ~
 

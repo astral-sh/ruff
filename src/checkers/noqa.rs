@@ -25,12 +25,6 @@ pub fn check_noqa(
 
     let enforce_noqa = settings.enabled.contains(&CheckCode::RUF100);
 
-    checks.sort_by_key(|check| check.location);
-    let mut checks_iter = checks.iter().enumerate().peekable();
-    if let Some((_index, check)) = checks_iter.peek() {
-        assert!(check.location.row() >= 1);
-    }
-
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {
         // If we hit an exemption for the entire file, bail.
@@ -44,20 +38,18 @@ pub fn check_noqa(
                 .entry(lineno - 1)
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno - 1]), vec![]));
         }
+    }
 
-        // Remove any ignored checks.
-        while let Some((index, check)) =
-            checks_iter.next_if(|(_index, check)| check.location.row() <= *lineno)
-        {
-            if check.kind == CheckKind::BlanketNOQA {
-                continue;
-            }
-            // Grab the noqa (logical) line number for the current (physical) line.
-            // If there are newlines at the end of the file, they won't be represented in
-            // `noqa_line_for`, so fallback to the current line.
-            let check_lineno = check.location.row();
-            let noqa_lineno = noqa_line_for.get(&check_lineno).unwrap_or(&check_lineno);
-            if noqa_lineno == lineno {
+    // Remove any ignored checks.
+    for (index, check) in checks.iter().enumerate() {
+        if check.kind == CheckKind::BlanketNOQA {
+            continue;
+        }
+
+        // Is the check ignored by a `noqa` directive on the parent line?
+        if let Some(parent_lineno) = check.parent.map(|location| location.row()) {
+            let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
+            if commented_lines.contains(noqa_lineno) {
                 let noqa = noqa_directives.entry(noqa_lineno - 1).or_insert_with(|| {
                     (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![])
                 });
@@ -65,15 +57,39 @@ pub fn check_noqa(
                     (Directive::All(..), matches) => {
                         matches.push(check.kind.code().as_ref());
                         ignored.push(index);
+                        continue;
                     }
                     (Directive::Codes(.., codes), matches) => {
                         if noqa::includes(check.kind.code(), codes) {
                             matches.push(check.kind.code().as_ref());
                             ignored.push(index);
+                            continue;
                         }
                     }
                     (Directive::None, ..) => {}
                 }
+            }
+        }
+
+        // Is the check ignored by a `noqa` directive on the same line?
+        let check_lineno = check.location.row();
+        let noqa_lineno = noqa_line_for.get(&check_lineno).unwrap_or(&check_lineno);
+        if commented_lines.contains(noqa_lineno) {
+            let noqa = noqa_directives
+                .entry(noqa_lineno - 1)
+                .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![]));
+            match noqa {
+                (Directive::All(..), matches) => {
+                    matches.push(check.kind.code().as_ref());
+                    ignored.push(index);
+                }
+                (Directive::Codes(.., codes), matches) => {
+                    if noqa::includes(check.kind.code(), codes) {
+                        matches.push(check.kind.code().as_ref());
+                        ignored.push(index);
+                    }
+                }
+                (Directive::None, ..) => {}
             }
         }
     }

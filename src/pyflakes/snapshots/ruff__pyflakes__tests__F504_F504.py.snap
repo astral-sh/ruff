@@ -19,6 +19,7 @@ expression: checks
     end_location:
       row: 3
       column: 34
+  parent: ~
 - kind:
     PercentFormatExtraNamedArguments:
       - b
@@ -36,6 +37,7 @@ expression: checks
     end_location:
       row: 8
       column: 29
+  parent: ~
 - kind:
     PercentFormatExtraNamedArguments:
       - b
@@ -53,4 +55,5 @@ expression: checks
     end_location:
       row: 9
       column: 29
+  parent: ~
 

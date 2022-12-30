@@ -11,6 +11,7 @@ expression: checks
     row: 3
     column: 26
   fix: ~
+  parent: ~
 - kind:
     BadQuotesMultilineString: double
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 11
     column: 26
   fix: ~
+  parent: ~
 - kind:
     BadQuotesMultilineString: double
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 17
     column: 3
   fix: ~
+  parent: ~
 - kind:
     BadQuotesMultilineString: double
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 17
     column: 19
   fix: ~
+  parent: ~
 - kind:
     BadQuotesMultilineString: double
   location:
@@ -47,4 +51,5 @@ expression: checks
     row: 21
     column: 27
   fix: ~
+  parent: ~
 

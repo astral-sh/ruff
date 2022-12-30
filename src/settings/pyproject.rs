@@ -131,7 +131,7 @@ mod tests {
 
     use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes::settings::Quote;
-    use crate::flake8_tidy_imports::settings::Strictness;
+    use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
@@ -514,7 +514,21 @@ other-attribute = 1
                     avoid_escape: Some(true),
                 }),
                 flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
-                    ban_relative_imports: Some(Strictness::Parents)
+                    ban_relative_imports: Some(Strictness::Parents),
+                    banned_api: Some(FxHashMap::from_iter([
+                        (
+                            "cgi".to_string(),
+                            BannedApi {
+                                msg: "The cgi module is deprecated.".to_string()
+                            }
+                        ),
+                        (
+                            "typing.TypedDict".to_string(),
+                            BannedApi {
+                                msg: "Use typing_extensions.TypedDict instead.".to_string()
+                            }
+                        )
+                    ]))
                 }),
                 flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
                     aliases: Some(FxHashMap::from_iter([(

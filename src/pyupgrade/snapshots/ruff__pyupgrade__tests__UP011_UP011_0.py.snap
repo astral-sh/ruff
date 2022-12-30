@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 5
       column: 12
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 11
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 11
       column: 22
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 16
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 16
       column: 24
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 21
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 21
       column: 34
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 27
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 28
       column: 1
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 33
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 35
       column: 1
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 40
@@ -107,6 +113,7 @@ expression: checks
     end_location:
       row: 42
       column: 19
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 47
@@ -122,6 +129,7 @@ expression: checks
     end_location:
       row: 51
       column: 1
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 56
@@ -137,6 +145,7 @@ expression: checks
     end_location:
       row: 62
       column: 1
+  parent: ~
 - kind: UnnecessaryLRUCacheParams
   location:
     row: 67
@@ -152,4 +161,5 @@ expression: checks
     end_location:
       row: 72
       column: 1
+  parent: ~
 

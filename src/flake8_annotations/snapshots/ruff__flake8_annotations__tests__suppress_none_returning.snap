@@ -6,18 +6,20 @@ expression: checks
     MissingReturnTypePublicFunction: foo
   location:
     row: 45
-    column: 0
+    column: 4
   end_location:
-    row: 46
-    column: 15
+    row: 45
+    column: 7
   fix: ~
+  parent: ~
 - kind:
     MissingReturnTypePublicFunction: foo
   location:
     row: 50
-    column: 0
+    column: 4
   end_location:
-    row: 55
-    column: 14
+    row: 50
+    column: 7
   fix: ~
+  parent: ~
 

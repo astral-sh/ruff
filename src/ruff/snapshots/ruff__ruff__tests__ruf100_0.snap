@@ -18,6 +18,7 @@ expression: checks
     end_location:
       row: 9
       column: 17
+  parent: ~
 - kind:
     UnusedNOQA:
       unknown: []
@@ -38,6 +39,7 @@ expression: checks
     end_location:
       row: 13
       column: 23
+  parent: ~
 - kind:
     UnusedNOQA:
       unknown: []
@@ -59,6 +61,7 @@ expression: checks
     end_location:
       row: 16
       column: 29
+  parent: ~
 - kind:
     UnusedNOQA:
       unknown:
@@ -81,6 +84,7 @@ expression: checks
     end_location:
       row: 19
       column: 35
+  parent: ~
 - kind:
     UnusedNOQA:
       unknown:
@@ -102,6 +106,7 @@ expression: checks
     end_location:
       row: 22
       column: 29
+  parent: ~
 - kind:
     UnusedNOQA:
       unknown: []
@@ -122,6 +127,7 @@ expression: checks
     end_location:
       row: 26
       column: 21
+  parent: ~
 - kind:
     UnusedVariable: d
   location:
@@ -131,6 +137,7 @@ expression: checks
     row: 29
     column: 5
   fix: ~
+  parent: ~
 - kind:
     UnusedNOQA:
       unknown: []
@@ -151,6 +158,7 @@ expression: checks
     end_location:
       row: 29
       column: 44
+  parent: ~
 - kind:
     UnusedNOQA:
       unknown: []
@@ -171,6 +179,7 @@ expression: checks
     end_location:
       row: 55
       column: 23
+  parent: ~
 - kind:
     UnusedNOQA:
       unknown: []
@@ -191,6 +200,7 @@ expression: checks
     end_location:
       row: 63
       column: 17
+  parent: ~
 - kind:
     UnusedNOQA: ~
   location:
@@ -207,6 +217,7 @@ expression: checks
     end_location:
       row: 71
       column: 11
+  parent: ~
 - kind:
     UnusedImport:
       - shelve
@@ -225,4 +236,5 @@ expression: checks
     end_location:
       row: 86
       column: 0
+  parent: ~
 

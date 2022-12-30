@@ -10,6 +10,7 @@ expression: checks
     row: 2
     column: 29
   fix: ~
+  parent: ~
 - kind: PercentFormatMixedPositionalAndNamed
   location:
     row: 3
@@ -18,6 +19,7 @@ expression: checks
     row: 3
     column: 29
   fix: ~
+  parent: ~
 - kind: PercentFormatMixedPositionalAndNamed
   location:
     row: 11
@@ -26,4 +28,5 @@ expression: checks
     row: 11
     column: 27
   fix: ~
+  parent: ~
 

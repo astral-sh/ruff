@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 2
       column: 21
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 3
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 3
       column: 18
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 4
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 4
       column: 14
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 5
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 5
       column: 20
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 6
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 6
       column: 22
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 7
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 7
       column: 30
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 8
@@ -107,6 +113,7 @@ expression: checks
     end_location:
       row: 14
       column: 1
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 26
@@ -122,6 +129,7 @@ expression: checks
     end_location:
       row: 26
       column: 26
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 44
@@ -137,6 +145,7 @@ expression: checks
     end_location:
       row: 44
       column: 30
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 46
@@ -152,6 +161,7 @@ expression: checks
     end_location:
       row: 46
       column: 38
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 48
@@ -167,6 +177,7 @@ expression: checks
     end_location:
       row: 48
       column: 23
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 49
@@ -182,6 +193,7 @@ expression: checks
     end_location:
       row: 49
       column: 22
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 50
@@ -197,6 +209,7 @@ expression: checks
     end_location:
       row: 50
       column: 23
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 51
@@ -212,6 +225,7 @@ expression: checks
     end_location:
       row: 51
       column: 22
+  parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
     row: 52
@@ -227,4 +241,5 @@ expression: checks
     end_location:
       row: 52
       column: 20
+  parent: ~
 

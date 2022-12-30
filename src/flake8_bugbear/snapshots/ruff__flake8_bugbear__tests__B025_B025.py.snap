@@ -11,6 +11,7 @@ expression: checks
     row: 19
     column: 17
   fix: ~
+  parent: ~
 - kind:
     DuplicateTryBlockException: pickle.PickleError
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 28
     column: 25
   fix: ~
+  parent: ~
 - kind:
     DuplicateTryBlockException: ValueError
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 35
     column: 17
   fix: ~
+  parent: ~
 - kind:
     DuplicateTryBlockException: TypeError
   location:
@@ -38,4 +41,5 @@ expression: checks
     row: 37
     column: 26
   fix: ~
+  parent: ~
 

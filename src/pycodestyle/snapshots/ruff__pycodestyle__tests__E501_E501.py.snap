@@ -13,6 +13,7 @@ expression: checks
     row: 5
     column: 123
   fix: ~
+  parent: ~
 - kind:
     LineTooLong:
       - 127
@@ -24,6 +25,7 @@ expression: checks
     row: 25
     column: 127
   fix: ~
+  parent: ~
 - kind:
     LineTooLong:
       - 132
@@ -35,6 +37,7 @@ expression: checks
     row: 40
     column: 132
   fix: ~
+  parent: ~
 - kind:
     LineTooLong:
       - 105
@@ -46,6 +49,7 @@ expression: checks
     row: 43
     column: 105
   fix: ~
+  parent: ~
 - kind:
     LineTooLong:
       - 129
@@ -57,4 +61,5 @@ expression: checks
     row: 61
     column: 129
   fix: ~
+  parent: ~
 

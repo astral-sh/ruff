@@ -39,10 +39,10 @@ use crate::visibility::{module_visibility, transition_scope, Modifier, Visibilit
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
-    flake8_debugger, flake8_errmsg, flake8_import_conventions, flake8_print, flake8_return,
-    flake8_simplify, flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet,
-    pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff,
-    visibility,
+    flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
+    flake8_print, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_unused_arguments,
+    mccabe, noqa, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
+    pyupgrade, ruff, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -397,10 +397,9 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::E743) {
-                    if let Some(check) = pycodestyle::checks::ambiguous_function_name(
-                        name,
-                        Range::from_located(stmt),
-                    ) {
+                    if let Some(check) = pycodestyle::checks::ambiguous_function_name(name, || {
+                        helpers::identifier_range(stmt, self.locator)
+                    }) {
                         self.add_check(check);
                     }
                 }
@@ -585,9 +584,9 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E742) {
-                    if let Some(check) =
-                        pycodestyle::checks::ambiguous_class_name(name, Range::from_located(stmt))
-                    {
+                    if let Some(check) = pycodestyle::checks::ambiguous_class_name(name, || {
+                        helpers::identifier_range(stmt, self.locator)
+                    }) {
                         self.add_check(check);
                     }
                 }
@@ -723,6 +722,17 @@ where
                         }
                     }
 
+                    // flake8_tidy_imports
+                    if self.settings.enabled.contains(&CheckCode::TID251) {
+                        if let Some(check) = flake8_tidy_imports::checks::name_or_parent_is_banned(
+                            alias,
+                            &alias.node.name,
+                            &self.settings.flake8_tidy_imports.banned_api,
+                        ) {
+                            self.add_check(check);
+                        }
+                    }
+
                     // pylint
                     if self.settings.enabled.contains(&CheckCode::PLC0414) {
                         pylint::plugins::useless_import_alias(self, alias);
@@ -851,6 +861,27 @@ where
                 if let Some("__future__") = module.as_deref() {
                     if self.settings.enabled.contains(&CheckCode::UP010) {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::TID251) {
+                    if let Some(module) = module {
+                        for name in names {
+                            if let Some(check) = flake8_tidy_imports::checks::name_is_banned(
+                                module,
+                                name,
+                                &self.settings.flake8_tidy_imports.banned_api,
+                            ) {
+                                self.add_check(check);
+                            }
+                        }
+                        if let Some(check) = flake8_tidy_imports::checks::name_or_parent_is_banned(
+                            stmt,
+                            module,
+                            &self.settings.flake8_tidy_imports.banned_api,
+                        ) {
+                            self.add_check(check);
+                        }
                     }
                 }
 
@@ -1594,6 +1625,15 @@ where
                         };
                     }
                 }
+
+                if self.settings.enabled.contains(&CheckCode::TID251) {
+                    flake8_tidy_imports::checks::banned_attribute_access(
+                        self,
+                        &dealias_call_path(collect_call_paths(expr), &self.import_aliases),
+                        expr,
+                        &self.settings.flake8_tidy_imports.banned_api,
+                    );
+                }
             }
             ExprKind::Call {
                 func,
@@ -2241,6 +2281,15 @@ where
                     }
                 }
             }
+            ExprKind::BinOp {
+                op: Operator::Add, ..
+            } => {
+                if self.settings.enabled.contains(&CheckCode::ISC003) {
+                    if let Some(check) = flake8_implicit_str_concat::checks::explicit(expr) {
+                        self.add_check(check);
+                    }
+                }
+            }
             ExprKind::UnaryOp { op, operand } => {
                 let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
                 let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
@@ -2359,7 +2408,7 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP025) {
-                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, value, kind);
+                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind);
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
@@ -3635,7 +3684,22 @@ impl<'a> Checker<'a> {
 
                     let defined_by = binding.source.as_ref().unwrap();
                     let defined_in = self.child_to_parent.get(defined_by);
-                    if self.is_ignored(&CheckCode::F401, binding.range.location.row()) {
+                    let child = defined_by.0;
+
+                    let check_lineno = binding.range.location.row();
+                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
+                        && child.location.row() != check_lineno
+                    {
+                        Some(child.location.row())
+                    } else {
+                        None
+                    };
+
+                    if self.is_ignored(&CheckCode::F401, check_lineno)
+                        || parent_lineno.map_or(false, |parent_lineno| {
+                            self.is_ignored(&CheckCode::F401, parent_lineno)
+                        })
+                    {
                         ignored
                             .entry((defined_by, defined_in))
                             .or_default()
@@ -3687,21 +3751,33 @@ impl<'a> Checker<'a> {
                             CheckKind::UnusedImport(full_name.clone(), ignore_init),
                             *range,
                         );
+                        if matches!(child.node, StmtKind::ImportFrom { .. })
+                            && child.location.row() != range.location.row()
+                        {
+                            check.parent(child.location);
+                        }
                         if let Some(fix) = fix.as_ref() {
                             check.amend(fix.clone());
                         }
                         checks.push(check);
                     }
                 }
-                for (_, unused_imports) in ignored
+                for ((defined_by, ..), unused_imports) in ignored
                     .into_iter()
                     .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
                 {
+                    let child = defined_by.0;
                     for (full_name, range) in unused_imports {
-                        checks.push(Check::new(
+                        let mut check = Check::new(
                             CheckKind::UnusedImport(full_name.clone(), ignore_init),
                             *range,
-                        ));
+                        );
+                        if matches!(child.node, StmtKind::ImportFrom { .. })
+                            && child.location.row() != range.location.row()
+                        {
+                            check.parent(child.location);
+                        }
+                        checks.push(check);
                     }
                 }
             }

@@ -11,6 +11,7 @@ expression: checks
     row: 13
     column: 6
   fix: ~
+  parent: ~
 - kind:
     KeywordArgumentBeforeStarArgument: kw
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 14
     column: 6
   fix: ~
+  parent: ~
 - kind:
     KeywordArgumentBeforeStarArgument: kw
   location:
@@ -29,4 +31,5 @@ expression: checks
     row: 15
     column: 10
   fix: ~
+  parent: ~
 

@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 1
       column: 7
+  parent: ~
 - kind: IsLiteral
   location:
     row: 4
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 4
       column: 13
+  parent: ~
 - kind: IsLiteral
   location:
     row: 7
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 8
       column: 11
+  parent: ~
 - kind: IsLiteral
   location:
     row: 11
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 11
       column: 11
+  parent: ~
 - kind: IsLiteral
   location:
     row: 14
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 14
       column: 16
+  parent: ~
 - kind: IsLiteral
   location:
     row: 17
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 17
       column: 18
+  parent: ~
 - kind: IsLiteral
   location:
     row: 20
@@ -107,4 +113,5 @@ expression: checks
     end_location:
       row: 20
       column: 17
+  parent: ~
 

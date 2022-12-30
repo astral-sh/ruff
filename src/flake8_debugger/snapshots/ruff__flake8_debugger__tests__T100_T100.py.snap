@@ -12,6 +12,7 @@ expression: checks
     row: 1
     column: 12
   fix: ~
+  parent: ~
 - kind:
     Debugger:
       Import: pdb
@@ -22,6 +23,7 @@ expression: checks
     row: 3
     column: 10
   fix: ~
+  parent: ~
 - kind:
     Debugger:
       Import: builtins.breakpoint
@@ -32,6 +34,7 @@ expression: checks
     row: 5
     column: 31
   fix: ~
+  parent: ~
 - kind:
     Debugger:
       Import: pdb.set_trace
@@ -42,6 +45,7 @@ expression: checks
     row: 6
     column: 31
   fix: ~
+  parent: ~
 - kind:
     Debugger:
       Import: celery.contrib.rdb.set_trace
@@ -52,6 +56,7 @@ expression: checks
     row: 7
     column: 40
   fix: ~
+  parent: ~
 - kind:
     Debugger:
       Import: celery.contrib.rdb
@@ -62,6 +67,7 @@ expression: checks
     row: 9
     column: 25
   fix: ~
+  parent: ~
 - kind:
     Debugger:
       Call: breakpoint
@@ -72,6 +78,7 @@ expression: checks
     row: 11
     column: 12
   fix: ~
+  parent: ~
 - kind:
     Debugger:
       Call: set_trace
@@ -82,6 +89,7 @@ expression: checks
     row: 12
     column: 4
   fix: ~
+  parent: ~
 - kind:
     Debugger:
       Call: set_trace
@@ -92,4 +100,5 @@ expression: checks
     row: 13
     column: 11
   fix: ~
+  parent: ~
 

@@ -5,25 +5,28 @@ expression: checks
 - kind: SkipDocstring
   location:
     row: 34
-    column: 4
+    column: 8
   end_location:
-    row: 36
-    column: 11
+    row: 34
+    column: 25
   fix: ~
+  parent: ~
 - kind: SkipDocstring
   location:
     row: 90
-    column: 4
+    column: 8
   end_location:
-    row: 92
-    column: 11
+    row: 90
+    column: 30
   fix: ~
+  parent: ~
 - kind: SkipDocstring
   location:
     row: 110
-    column: 0
+    column: 4
   end_location:
-    row: 112
-    column: 7
+    row: 110
+    column: 19
   fix: ~
+  parent: ~
 

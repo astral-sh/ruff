@@ -13,6 +13,7 @@ expression: checks
     row: 5
     column: 11
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -24,6 +25,7 @@ expression: checks
     row: 15
     column: 11
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -35,6 +37,7 @@ expression: checks
     row: 23
     column: 11
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -46,6 +49,7 @@ expression: checks
     row: 33
     column: 11
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -57,6 +61,7 @@ expression: checks
     row: 41
     column: 5
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -68,6 +73,7 @@ expression: checks
     row: 51
     column: 5
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -79,6 +85,7 @@ expression: checks
     row: 59
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -90,6 +97,7 @@ expression: checks
     row: 69
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -101,6 +109,7 @@ expression: checks
     row: 77
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -112,6 +121,7 @@ expression: checks
     row: 87
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -123,6 +133,7 @@ expression: checks
     row: 95
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -134,6 +145,7 @@ expression: checks
     row: 105
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
       - x
@@ -145,4 +157,5 @@ expression: checks
     row: 113
     column: 17
   fix: ~
+  parent: ~
 

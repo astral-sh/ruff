@@ -10,6 +10,7 @@ expression: checks
     row: 203
     column: 7
   fix: ~
+  parent: ~
 - kind: BlankLineAfterSummary
   location:
     row: 210
@@ -25,4 +26,5 @@ expression: checks
     end_location:
       row: 213
       column: 0
+  parent: ~
 

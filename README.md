@@ -95,6 +95,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-comprehensions (C4)](#flake8-comprehensions-c4)
    1. [flake8-debugger (T10)](#flake8-debugger-t10)
    1. [flake8-errmsg (EM)](#flake8-errmsg-em)
+   1. [flake8-implicit-str-concat (ISC)](#flake8-implicit-str-concat-isc)
    1. [flake8-import-conventions (ICN)](#flake8-import-conventions-icn)
    1. [flake8-print (T20)](#flake8-print-t20)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
@@ -168,7 +169,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.200'
+  rev: 'v0.0.202'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -329,11 +330,11 @@ Options:
   -n, --no-cache
           Disable cache reads
       --select <SELECT>
-          List of error codes to enable
+          Comma-separated list of error codes to enable (or ALL, to enable all checks)
       --extend-select <EXTEND_SELECT>
           Like --select, but adds additional error codes on top of the selected ones
       --ignore <IGNORE>
-          List of error codes to ignore
+          Comma-separated list of error codes to disable
       --extend-ignore <EXTEND_IGNORE>
           Like --ignore, but adds additional error codes on top of the ignored ones
       --exclude <EXCLUDE>
@@ -361,7 +362,7 @@ Options:
       --show-settings
           See the settings Ruff will use to check a given Python file
       --add-noqa
-          Enable automatic additions of noqa directives to failing lines
+          Enable automatic additions of `noqa` directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
           Regular expression matching the name of dummy variables
       --target-version <TARGET_VERSION>
@@ -369,7 +370,7 @@ Options:
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated checks and automatic formatting
       --max-complexity <MAX_COMPLEXITY>
-          Max McCabe complexity allowed for a function
+          Maximum McCabe complexity allowed for a given function
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
       --explain <EXPLAIN>
@@ -855,6 +856,16 @@ For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/0.4.0/) on 
 | EM102 | FStringInException | Exception must not use an f-string literal, assign to variable first |  |
 | EM103 | DotFormatInException | Exception must not use a `.format()` string directly, assign to variable first |  |
 
+### flake8-implicit-str-concat (ISC)
+
+For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/0.3.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ISC001 | SingleLineImplicitStringConcatenation | Implicitly concatenated string literals on one line |  |
+| ISC002 | MultiLineImplicitStringConcatenation | Implicitly concatenated string literals over continuation line |  |
+| ISC003 | ExplicitStringConcatenation | Explicitly concatenated string should be implicitly concatenated |  |
+
 ### flake8-import-conventions (ICN)
 
 | Code | Name | Message | Fix |
@@ -910,6 +921,7 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| TID251 | BannedApi | `...` is banned: ... |  |
 | TID252 | BannedRelativeImport | Relative imports are banned |  |
 
 ### flake8-unused-arguments (ARG)
@@ -1274,6 +1286,7 @@ natively, including:
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
+- [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
@@ -1330,6 +1343,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
+- [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
@@ -2478,6 +2492,27 @@ that extend into the parent module or beyond (`"parents"`).
 [tool.ruff.flake8-tidy-imports]
 # Disallow all relative imports.
 ban-relative-imports = "all"
+```
+
+---
+
+#### [`banned-api`](#banned-api)
+
+Specific modules or module members that may not be imported or accessed.
+Note that this check is only meant to flag accidental uses,
+and can be circumvented via `eval` or `importlib`.
+
+**Default value**: `{}`
+
+**Type**: `HashMap<String, BannedApi>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-tidy-imports]
+[tool.ruff.flake8-tidy-imports.banned-api]
+"cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
 ```
 
 ---

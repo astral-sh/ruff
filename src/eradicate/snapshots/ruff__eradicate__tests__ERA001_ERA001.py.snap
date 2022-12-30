@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 2
       column: 0
+  parent: ~
 - kind: CommentedOutCode
   location:
     row: 2
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 3
       column: 0
+  parent: ~
 - kind: CommentedOutCode
   location:
     row: 3
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 4
       column: 0
+  parent: ~
 - kind: CommentedOutCode
   location:
     row: 5
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 6
       column: 0
+  parent: ~
 - kind: CommentedOutCode
   location:
     row: 12
@@ -77,4 +81,5 @@ expression: checks
     end_location:
       row: 13
       column: 0
+  parent: ~
 

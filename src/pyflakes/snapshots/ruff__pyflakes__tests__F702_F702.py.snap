@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 12
   fix: ~
+  parent: ~
 - kind: ContinueOutsideLoop
   location:
     row: 16
@@ -18,6 +19,7 @@ expression: checks
     row: 16
     column: 12
   fix: ~
+  parent: ~
 - kind: ContinueOutsideLoop
   location:
     row: 20
@@ -26,6 +28,7 @@ expression: checks
     row: 20
     column: 12
   fix: ~
+  parent: ~
 - kind: ContinueOutsideLoop
   location:
     row: 23
@@ -34,4 +37,5 @@ expression: checks
     row: 23
     column: 8
   fix: ~
+  parent: ~
 

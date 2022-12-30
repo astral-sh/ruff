@@ -11,6 +11,7 @@ expression: checks
     row: 1
     column: 9
   fix: ~
+  parent: ~
 - kind:
     InvalidClassName: _bad
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 5
     column: 10
   fix: ~
+  parent: ~
 - kind:
     InvalidClassName: bad_class
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 9
     column: 15
   fix: ~
+  parent: ~
 - kind:
     InvalidClassName: Bad_Class
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 13
     column: 15
   fix: ~
+  parent: ~
 - kind:
     InvalidClassName: BAD_CLASS
   location:
@@ -47,4 +51,5 @@ expression: checks
     row: 17
     column: 15
   fix: ~
+  parent: ~
 

@@ -11,6 +11,7 @@ expression: checks
     row: 6
     column: 3
   fix: ~
+  parent: ~
 - kind:
     BadQuotesMultilineString: single
   location:
@@ -20,4 +21,5 @@ expression: checks
     row: 11
     column: 3
   fix: ~
+  parent: ~
 

@@ -42,6 +42,10 @@ staticmethod-decorators = ["staticmethod"]
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "parents"
 
+[tool.ruff.flake8-tidy-imports.banned-api]
+"cgi".msg = "The cgi module is deprecated."
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+
 [tool.ruff.flake8-errmsg]
 max-string-length = 20
 

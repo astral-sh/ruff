@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 7
       column: 13
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 8
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 8
       column: 15
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 9
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 9
       column: 15
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 10
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 10
       column: 16
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 11
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 11
       column: 17
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 12
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 12
       column: 10
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 13
@@ -107,6 +113,7 @@ expression: checks
     end_location:
       row: 13
       column: 13
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 14
@@ -122,6 +129,7 @@ expression: checks
     end_location:
       row: 14
       column: 10
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 15
@@ -137,6 +145,7 @@ expression: checks
     end_location:
       row: 15
       column: 9
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 16
@@ -152,6 +161,7 @@ expression: checks
     end_location:
       row: 16
       column: 20
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 17
@@ -167,6 +177,7 @@ expression: checks
     end_location:
       row: 17
       column: 8
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 18
@@ -182,6 +193,7 @@ expression: checks
     end_location:
       row: 18
       column: 12
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 19
@@ -197,6 +209,7 @@ expression: checks
     end_location:
       row: 19
       column: 15
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 20
@@ -212,6 +225,7 @@ expression: checks
     end_location:
       row: 20
       column: 16
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 21
@@ -227,6 +241,7 @@ expression: checks
     end_location:
       row: 21
       column: 31
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 22
@@ -242,6 +257,7 @@ expression: checks
     end_location:
       row: 22
       column: 33
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 23
@@ -257,6 +273,7 @@ expression: checks
     end_location:
       row: 23
       column: 32
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 26
@@ -272,6 +289,7 @@ expression: checks
     end_location:
       row: 26
       column: 18
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 27
@@ -287,6 +305,7 @@ expression: checks
     end_location:
       row: 27
       column: 17
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 28
@@ -302,6 +321,7 @@ expression: checks
     end_location:
       row: 28
       column: 19
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 29
@@ -317,6 +337,7 @@ expression: checks
     end_location:
       row: 29
       column: 18
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 30
@@ -332,6 +353,7 @@ expression: checks
     end_location:
       row: 30
       column: 17
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 31
@@ -347,6 +369,7 @@ expression: checks
     end_location:
       row: 31
       column: 19
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 32
@@ -362,6 +385,7 @@ expression: checks
     end_location:
       row: 32
       column: 34
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 33
@@ -377,6 +401,7 @@ expression: checks
     end_location:
       row: 33
       column: 37
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 34
@@ -392,6 +417,7 @@ expression: checks
     end_location:
       row: 34
       column: 27
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 37
@@ -407,6 +433,7 @@ expression: checks
     end_location:
       row: 37
       column: 29
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 38
@@ -422,6 +449,7 @@ expression: checks
     end_location:
       row: 38
       column: 25
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 39
@@ -437,6 +465,7 @@ expression: checks
     end_location:
       row: 39
       column: 28
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 40
@@ -452,6 +481,7 @@ expression: checks
     end_location:
       row: 40
       column: 25
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 41
@@ -467,6 +497,7 @@ expression: checks
     end_location:
       row: 41
       column: 29
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 42
@@ -482,6 +513,7 @@ expression: checks
     end_location:
       row: 42
       column: 28
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 45
@@ -497,6 +529,7 @@ expression: checks
     end_location:
       row: 45
       column: 12
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 46
@@ -512,6 +545,7 @@ expression: checks
     end_location:
       row: 46
       column: 12
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 47
@@ -527,6 +561,7 @@ expression: checks
     end_location:
       row: 47
       column: 24
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 48
@@ -542,6 +577,7 @@ expression: checks
     end_location:
       row: 48
       column: 21
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 49
@@ -557,6 +593,7 @@ expression: checks
     end_location:
       row: 49
       column: 22
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 53
@@ -572,6 +609,7 @@ expression: checks
     end_location:
       row: 53
       column: 30
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 54
@@ -587,6 +625,7 @@ expression: checks
     end_location:
       row: 54
       column: 34
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 57
@@ -602,6 +641,7 @@ expression: checks
     end_location:
       row: 57
       column: 29
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 58
@@ -617,6 +657,7 @@ expression: checks
     end_location:
       row: 58
       column: 24
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 59
@@ -632,6 +673,7 @@ expression: checks
     end_location:
       row: 59
       column: 28
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 62
@@ -647,6 +689,7 @@ expression: checks
     end_location:
       row: 62
       column: 16
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 63
@@ -662,6 +705,7 @@ expression: checks
     end_location:
       row: 63
       column: 21
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 64
@@ -677,6 +721,7 @@ expression: checks
     end_location:
       row: 64
       column: 15
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 67
@@ -692,6 +737,7 @@ expression: checks
     end_location:
       row: 67
       column: 23
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 67
@@ -707,6 +753,7 @@ expression: checks
     end_location:
       row: 67
       column: 23
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 68
@@ -722,6 +769,7 @@ expression: checks
     end_location:
       row: 68
       column: 22
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 68
@@ -737,6 +785,7 @@ expression: checks
     end_location:
       row: 68
       column: 22
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 69
@@ -752,6 +801,7 @@ expression: checks
     end_location:
       row: 69
       column: 24
+  parent: ~
 - kind: RemoveSixCompat
   location:
     row: 69
@@ -767,4 +817,5 @@ expression: checks
     end_location:
       row: 69
       column: 24
+  parent: ~
 

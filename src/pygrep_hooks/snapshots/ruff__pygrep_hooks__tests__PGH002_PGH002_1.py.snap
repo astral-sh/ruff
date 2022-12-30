@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 12
   fix: ~
+  parent: ~
 - kind: DeprecatedLogWarn
   location:
     row: 5
@@ -18,6 +19,7 @@ expression: checks
     row: 5
     column: 8
   fix: ~
+  parent: ~
 - kind: DeprecatedLogWarn
   location:
     row: 6
@@ -26,6 +28,7 @@ expression: checks
     row: 6
     column: 4
   fix: ~
+  parent: ~
 - kind: DeprecatedLogWarn
   location:
     row: 15
@@ -34,4 +37,5 @@ expression: checks
     row: 15
     column: 8
   fix: ~
+  parent: ~
 

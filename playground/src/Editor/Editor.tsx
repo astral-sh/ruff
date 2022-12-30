@@ -98,7 +98,11 @@ export default function Editor() {
   }, []);
 
   return (
-    <main className={"h-full w-full flex flex-auto"}>
+    <main
+      className={
+        "h-full w-full flex flex-auto bg-ayu-background dark:bg-ayu-background-dark"
+      }
+    >
       <Header
         edit={edit}
         tab={tab}

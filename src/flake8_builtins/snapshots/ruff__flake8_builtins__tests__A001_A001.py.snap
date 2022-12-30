@@ -11,6 +11,7 @@ expression: checks
     row: 1
     column: 18
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: int
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 2
     column: 29
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: print
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 4
     column: 5
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: copyright
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 5
     column: 9
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: complex
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 6
     column: 13
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: float
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 7
     column: 5
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: object
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 7
     column: 14
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: min
   location:
@@ -74,6 +81,7 @@ expression: checks
     row: 8
     column: 3
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: max
   location:
@@ -83,6 +91,7 @@ expression: checks
     row: 8
     column: 8
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: bytes
   location:
@@ -92,6 +101,7 @@ expression: checks
     row: 11
     column: 8
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: slice
   location:
@@ -101,6 +111,7 @@ expression: checks
     row: 14
     column: 8
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: ValueError
   location:
@@ -110,6 +121,7 @@ expression: checks
     row: 19
     column: 7
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: memoryview
   location:
@@ -119,6 +131,7 @@ expression: checks
     row: 21
     column: 14
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: bytearray
   location:
@@ -128,6 +141,7 @@ expression: checks
     row: 21
     column: 26
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: str
   location:
@@ -137,6 +151,7 @@ expression: checks
     row: 24
     column: 24
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: all
   location:
@@ -146,6 +161,7 @@ expression: checks
     row: 24
     column: 47
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: any
   location:
@@ -155,6 +171,7 @@ expression: checks
     row: 24
     column: 52
   fix: ~
+  parent: ~
 - kind:
     BuiltinVariableShadowing: sum
   location:
@@ -164,4 +181,5 @@ expression: checks
     row: 27
     column: 10
   fix: ~
+  parent: ~
 

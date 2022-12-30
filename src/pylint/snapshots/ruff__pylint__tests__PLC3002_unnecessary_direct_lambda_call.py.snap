@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 33
   fix: ~
+  parent: ~
 - kind: UnnecessaryDirectLambdaCall
   location:
     row: 5
@@ -18,6 +19,7 @@ expression: checks
     row: 5
     column: 27
   fix: ~
+  parent: ~
 - kind: UnnecessaryDirectLambdaCall
   location:
     row: 5
@@ -26,4 +28,5 @@ expression: checks
     row: 5
     column: 47
   fix: ~
+  parent: ~
 
