@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind, Located, Expr};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
@@ -30,7 +30,7 @@ fn get_before_replace(elts: &Vec<Expr>) -> Vec<String> {
         .collect()
 }
 
-fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
+fn check_module(checker: &Checker, expr: &Located<ExprKind>) -> (Vec<String>, Vec<String>) {
     let mut replacements: Vec<String> = vec![];
     let mut before_replace: Vec<String> = vec![];
     for module in ERROR_MODULES.iter() {
@@ -47,6 +47,27 @@ fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
         }
     }
     (replacements, before_replace)
+}
+
+fn handle_name_or_attribute(checker: &Checker, item: &Expr, replacements: &mut Vec<String>, before_replace: &mut Vec<String>)  {
+    match &item.node {
+        ExprKind::Name { id, .. } => {
+            let (temp_replacements, temp_before_replace) = check_module(checker, item);
+            replacements.extend(temp_replacements);
+            before_replace.extend(temp_before_replace);
+            if replacements.is_empty() {
+                let new_name = get_correct_name(&id);
+                replacements.push(new_name);
+                before_replace.push(id.to_string());
+            }
+        }
+        ExprKind::Attribute { .. } => {
+            let (temp_replacements, temp_before_replace) = check_module(checker, item);
+            replacements.extend(temp_replacements);
+            before_replace.extend(temp_before_replace);
+        }
+        _ => return
+    }
 }
 
 /// Handles one block of an except (use a loop if there are multile blocks)
@@ -109,7 +130,7 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
 
 fn handle_making_changes(
     checker: &mut Checker,
-    target: &Expr,
+    target: &Located<ExprKind>,
     before_replace: Vec<String>,
     replacements: Vec<String>,
 ) {
@@ -162,7 +183,7 @@ impl OSErrorAliasChecker for &Vec<Excepthandler> {
     }
 }
 
-impl OSErrorAliasChecker for &Box<Expr> {
+impl OSErrorAliasChecker for &Box<Located<ExprKind>> {
     fn check_error(&self, checker: &mut Checker) {
         let mut replacements: Vec<String>;
         let mut before_replace: Vec<String>;
@@ -184,40 +205,23 @@ impl OSErrorAliasChecker for &Box<Expr> {
     }
 }
 
-impl OSErrorAliasChecker for Expr {
+impl OSErrorAliasChecker for &Located<ExprKind> {
     fn check_error(&self, checker: &mut Checker) {
-        let mut replacements: Vec<String>;
-        let mut before_replace: Vec<String>;
+        let mut replacements: Vec<String> = vec![];
+        let mut before_replace: Vec<String> = vec![];
         let change_target: &Expr;
         match &self.node {
-            ExprKind::Name { id, .. } => {
+            ExprKind::Name{ .. } | ExprKind::Attribute{ .. } => {
                 change_target = self;
-                (replacements, before_replace) = check_module(checker, self);
-                if replacements.is_empty() {
-                    let new_name = get_correct_name(&id);
-                    replacements.push(new_name);
-                    before_replace.push(id.to_string());
-                }
-            }
-            ExprKind::Attribute { .. } => {
-                change_target = self;
-                (replacements, before_replace) = check_module(checker, self);
+                handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
             }
             ExprKind::Call { func, .. } => {
                 change_target = &func;
                 match &func.node {
-                    ExprKind::Name { id, .. } => {
-                        (replacements, before_replace) = check_module(checker, &func);
-                        if replacements.is_empty() {
-                            let new_name = get_correct_name(&id);
-                            replacements.push(new_name);
-                            before_replace.push(id.to_string());
-                        }
+                    ExprKind::Name{ .. } | ExprKind::Attribute{ .. } => {
+                        handle_name_or_attribute(checker, &func, &mut replacements, &mut before_replace);
                     }
-                    ExprKind::Attribute { .. } => {
-                        (replacements, before_replace) = check_module(checker, &func);
-                    }
-                    _ => return,
+                        _ => return,
                 }
             }
             _ => return,
@@ -227,6 +231,6 @@ impl OSErrorAliasChecker for Expr {
 }
 
 /// UP024
-pub fn os_error_alias(checker: &mut Checker, handlers: &Stmt) {
+pub fn os_error_alias<U: OSErrorAliasChecker>(checker: &mut Checker, handlers: U) {
     handlers.check_error(checker);
 }
