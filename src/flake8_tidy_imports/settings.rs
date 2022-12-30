@@ -20,8 +20,8 @@ pub enum Strictness {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct BannedApi {
+    /// The message to display when the API is used.
     pub msg: String,
-    // we may add a `fix_to: String` here in the future to support --fix
 }
 
 #[derive(
@@ -44,7 +44,6 @@ pub struct Options {
     /// Whether to ban all relative imports (`"all"`), or only those imports
     /// that extend into the parent module or beyond (`"parents"`).
     pub ban_relative_imports: Option<Strictness>,
-
     #[option(
         default = r#"{}"#,
         value_type = "HashMap<String, BannedApi>",
@@ -54,11 +53,9 @@ pub struct Options {
             "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
         "#
     )]
-    /// Specific modules or module members that may not be imported/accessed.
-    ///
+    /// Specific modules or module members that may not be imported or accessed.
     /// Note that this check is only meant to flag accidental uses,
-    /// it can be easily circumvented via `eval` or `importlib` and
-    /// attempting to ban those via this setting is a futile endeavor.
+    /// and can be circumvented via `eval` or `importlib`.
     pub banned_api: FxHashMap<String, BannedApi>,
 }
 
@@ -72,6 +69,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             ban_relative_imports: Strictness::Parents,
+            banned_api: FxHashMap::default(),
         }
     }
 }
@@ -97,9 +95,9 @@ impl From<Settings> for Options {
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.ban_relative_imports.hash(state);
-        for (key, value) in self.banned_api.iter().sorted() {
+        for key in self.banned_api.keys().sorted() {
             key.hash(state);
-            value.hash(state);
+            self.banned_api[key].hash(state);
         }
     }
 }

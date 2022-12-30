@@ -2484,11 +2484,9 @@ ban-relative-imports = "all"
 
 #### [`banned-api`](#banned-api)
 
-Specific modules or module members that may not be imported/accessed.
-
+Specific modules or module members that may not be imported or accessed.
 Note that this check is only meant to flag accidental uses,
-it can be easily circumvented via `eval` or `importlib` and
-attempting to ban those via this setting is a futile endeavor.
+and can be circumvented via `eval` or `importlib`.
 
 **Default value**: `{}`
 
