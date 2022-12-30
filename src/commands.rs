@@ -1,26 +1,32 @@
+use std::fs::remove_dir_all;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{bail, Result};
+use colored::Colorize;
 use ignore::Error;
 use itertools::Itertools;
 use log::{debug, error};
+use path_absolutize::path_dedot;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use rustpython_ast::Location;
 use serde::Serialize;
+use walkdir::WalkDir;
 
 use crate::autofix::fixer;
+use crate::cache::DEFAULT_CACHE_DIR_NAME;
 use crate::checks::{CheckCode, CheckKind};
 use crate::cli::Overrides;
 use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
+use crate::logging::LogLevel;
 use crate::message::Message;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{cache, packages, resolver};
+use crate::{cache, fs, packages, resolver};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -336,5 +342,23 @@ pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
             bail!("`--explain` does not support GitLab format")
         }
     };
+    Ok(())
+}
+
+/// Clear any caches in the current directory or any subdirectories.
+pub fn clean(level: &LogLevel) -> Result<()> {
+    for entry in WalkDir::new(&*path_dedot::CWD)
+        .into_iter()
+        .filter_map(std::result::Result::ok)
+        .filter(|entry| entry.file_type().is_dir())
+    {
+        let cache = entry.path().join(DEFAULT_CACHE_DIR_NAME);
+        if cache.is_dir() {
+            if level >= &LogLevel::Default {
+                eprintln!("Removing cache at: {}", fs::relativize_path(&cache).bold());
+            }
+            remove_dir_all(&cache)?;
+        }
+    }
     Ok(())
 }
