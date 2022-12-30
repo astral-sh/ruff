@@ -10,7 +10,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checks::{Check, CheckCode, CODE_REDIRECTS};
 
-static NO_QA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
+static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)",
     )
@@ -39,7 +39,7 @@ pub enum Directive<'a> {
 
 /// Extract the noqa `Directive` from a line of Python source code.
 pub fn extract_noqa_directive(line: &str) -> Directive {
-    match NO_QA_LINE_REGEX.captures(line) {
+    match NOQA_LINE_REGEX.captures(line) {
         Some(caps) => match caps.name("spaces") {
             Some(spaces) => match caps.name("noqa") {
                 Some(noqa) => match caps.name("codes") {
@@ -206,20 +206,20 @@ mod tests {
 
     use crate::ast::types::Range;
     use crate::checks::{Check, CheckKind};
-    use crate::noqa::{add_noqa_inner, NO_QA_LINE_REGEX};
+    use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
 
     #[test]
     fn regex() {
-        assert!(NO_QA_LINE_REGEX.is_match("# noqa"));
-        assert!(NO_QA_LINE_REGEX.is_match("# NoQA"));
+        assert!(NOQA_LINE_REGEX.is_match("# noqa"));
+        assert!(NOQA_LINE_REGEX.is_match("# NoQA"));
 
-        assert!(NO_QA_LINE_REGEX.is_match("# noqa: F401"));
-        assert!(NO_QA_LINE_REGEX.is_match("# NoQA: F401"));
-        assert!(NO_QA_LINE_REGEX.is_match("# noqa: F401, E501"));
+        assert!(NOQA_LINE_REGEX.is_match("# noqa: F401"));
+        assert!(NOQA_LINE_REGEX.is_match("# NoQA: F401"));
+        assert!(NOQA_LINE_REGEX.is_match("# noqa: F401, E501"));
 
-        assert!(NO_QA_LINE_REGEX.is_match("# noqa:F401"));
-        assert!(NO_QA_LINE_REGEX.is_match("# NoQA:F401"));
-        assert!(NO_QA_LINE_REGEX.is_match("# noqa:F401, E501"));
+        assert!(NOQA_LINE_REGEX.is_match("# noqa:F401"));
+        assert!(NOQA_LINE_REGEX.is_match("# NoQA:F401"));
+        assert!(NOQA_LINE_REGEX.is_match("# noqa:F401, E501"));
     }
 
     #[test]

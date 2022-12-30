@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Strictness {
+    /// Ban imports that extend into the parent module or beyond.
     Parents,
+    /// Ban all relative imports.
     All,
 }
 
@@ -40,7 +42,7 @@ pub struct Options {
         "#
     )]
     /// Whether to ban all relative imports (`"all"`), or only those imports
-    /// that extend into the parent module and beyond (`"parents"`).
+    /// that extend into the parent module or beyond (`"parents"`).
     pub ban_relative_imports: Option<Strictness>,
 
     #[option(
@@ -66,8 +68,16 @@ pub struct Settings {
     pub banned_api: FxHashMap<String, BannedApi>,
 }
 
-impl Settings {
-    pub fn from_options(options: Options) -> Self {
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            ban_relative_imports: Strictness::Parents,
+        }
+    }
+}
+
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             ban_relative_imports: options.ban_relative_imports.unwrap_or(Strictness::Parents),
             banned_api: options.banned_api,
@@ -75,11 +85,11 @@ impl Settings {
     }
 }
 
-impl Default for Settings {
-    fn default() -> Self {
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
         Self {
-            ban_relative_imports: Strictness::Parents,
-            banned_api: FxHashMap::default(),
+            ban_relative_imports: Some(settings.ban_relative_imports),
+            banned_api: settings.banned_api,
         }
     }
 }
@@ -87,9 +97,9 @@ impl Default for Settings {
 impl Hash for Settings {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.ban_relative_imports.hash(state);
-        for key in self.banned_api.keys().sorted() {
+        for (key, value) in self.banned_api.iter().sorted() {
             key.hash(state);
-            self.banned_api[key].hash(state);
+            value.hash(state);
         }
     }
 }

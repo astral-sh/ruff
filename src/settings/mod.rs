@@ -39,6 +39,7 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub allowed_confusables: FxHashSet<char>,
+    pub cache_dir: PathBuf,
     pub dummy_variable_rgx: Regex,
     pub enabled: FxHashSet<CheckCode>,
     pub exclude: GlobSet,
@@ -47,8 +48,8 @@ pub struct Settings {
     pub fix: bool,
     pub fix_only: bool,
     pub fixable: FxHashSet<CheckCode>,
-    pub format: SerializationFormat,
     pub force_exclude: bool,
+    pub format: SerializationFormat,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>,
@@ -57,7 +58,7 @@ pub struct Settings {
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
-    pub cache_dir: PathBuf,
+    pub update_check: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
@@ -107,6 +108,7 @@ impl Settings {
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
                 .unwrap_or_default(),
+            cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
                 .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
@@ -147,62 +149,60 @@ impl Settings {
             )?,
             respect_gitignore: config.respect_gitignore.unwrap_or(true),
             required_version: config.required_version,
+            show_source: config.show_source.unwrap_or_default(),
             src: config
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
-            target_version: config.target_version.unwrap_or(PythonVersion::Py310),
-            show_source: config.show_source.unwrap_or_default(),
-            cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
+            target_version: config.target_version.unwrap_or_default(),
+            update_check: config.update_check.unwrap_or(true),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
-                .map(flake8_annotations::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_bugbear: config
                 .flake8_bugbear
-                .map(flake8_bugbear::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_errmsg: config
                 .flake8_errmsg
-                .map(flake8_errmsg::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_import_conventions: config
                 .flake8_import_conventions
-                .map(flake8_import_conventions::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_quotes: config
                 .flake8_quotes
-                .map(flake8_quotes::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_tidy_imports: config
                 .flake8_tidy_imports
-                .map(flake8_tidy_imports::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_unused_arguments: config
                 .flake8_unused_arguments
-                .map(flake8_unused_arguments::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             isort: config
                 .isort
-                .map(isort::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             mccabe: config
                 .mccabe
-                .as_ref()
-                .map(mccabe::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             pep8_naming: config
                 .pep8_naming
-                .map(pep8_naming::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             pydocstyle: config
                 .pydocstyle
-                .map(pydocstyle::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
             pyupgrade: config
                 .pyupgrade
-                .as_ref()
-                .map(pyupgrade::settings::Settings::from_options)
+                .map(std::convert::Into::into)
                 .unwrap_or_default(),
         })
     }
@@ -210,6 +210,7 @@ impl Settings {
     pub fn for_rule(check_code: CheckCode) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
+            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([check_code.clone()]),
             exclude: GlobSet::empty(),
@@ -218,8 +219,8 @@ impl Settings {
             fix: false,
             fix_only: false,
             fixable: FxHashSet::from_iter([check_code]),
-            format: SerializationFormat::Text,
             force_exclude: false,
+            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
@@ -228,7 +229,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
-            cache_dir: cache_dir(path_dedot::CWD.as_path()),
+            update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
@@ -247,6 +248,7 @@ impl Settings {
     pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
+            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(check_codes.clone()),
             exclude: GlobSet::empty(),
@@ -255,8 +257,8 @@ impl Settings {
             fix: false,
             fix_only: false,
             fixable: FxHashSet::from_iter(check_codes),
-            format: SerializationFormat::Text,
             force_exclude: false,
+            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             per_file_ignores: vec![],
@@ -265,7 +267,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
-            cache_dir: cache_dir(path_dedot::CWD.as_path()),
+            update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),

@@ -189,7 +189,14 @@ pub fn lint_path(
     settings.validate()?;
 
     // Check the cache.
-    let metadata = if matches!(cache, flags::Cache::Enabled) {
+    // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
+    // side-effects that aren't captured in the cache. (In practice, it's fine
+    // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
+    // write the fixes to disk, thus invalidating the cache. But it's a bit hard
+    // to reason about. We need to come up with a better solution here.)
+    let metadata = if matches!(cache, flags::Cache::Enabled)
+        && matches!(autofix, fixer::Mode::None | fixer::Mode::Generate)
+    {
         let metadata = path.metadata()?;
         if let Some(messages) = cache::get(path, &metadata, settings, autofix.into()) {
             debug!("Cache hit for: {}", path.to_string_lossy());

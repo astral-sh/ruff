@@ -2371,7 +2371,7 @@ where
             }
             ExprKind::Constant {
                 value: Constant::Str(value),
-                ..
+                kind,
             } => {
                 if self.in_type_definition && !self.in_literal {
                     self.deferred_string_type_definitions.push((
@@ -2388,6 +2388,9 @@ where
                     ) {
                         self.add_check(check);
                     }
+                }
+                if self.settings.enabled.contains(&CheckCode::UP025) {
+                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, value, kind);
                 }
             }
             ExprKind::Lambda { args, body, .. } => {

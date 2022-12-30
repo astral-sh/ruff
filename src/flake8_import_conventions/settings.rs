@@ -84,18 +84,27 @@ fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
     aliases
 }
 
-impl Settings {
-    pub fn from_options(options: Options) -> Self {
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            aliases: default_aliases(),
+        }
+    }
+}
+
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             aliases: resolve_aliases(options),
         }
     }
 }
 
-impl Default for Settings {
-    fn default() -> Self {
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
         Self {
-            aliases: default_aliases(),
+            aliases: Some(settings.aliases),
+            extend_aliases: None,
         }
     }
 }

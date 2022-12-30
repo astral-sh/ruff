@@ -8,3 +8,7 @@ In-browser playground for Ruff. Available [https://ruff.pages.dev/](https://ruff
   root directory.
 - Install TypeScript dependencies with: `npm install`.
 - Start the development server with: `npm run dev`.
+
+## Implementation
+
+Design based on [Tailwind Play](https://play.tailwindcss.com/). Themed with [`ayu`](https://github.com/dempfi/ayu).

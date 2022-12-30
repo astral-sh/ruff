@@ -29,16 +29,14 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/custom.py"),
             &Settings {
-                flake8_import_conventions:
-                    flake8_import_conventions::settings::Settings::from_options(
-                        flake8_import_conventions::settings::Options {
-                            aliases: None,
-                            extend_aliases: Some(FxHashMap::from_iter([
-                                ("dask.array".to_string(), "da".to_string()),
-                                ("dask.dataframe".to_string(), "dd".to_string()),
-                            ])),
-                        },
-                    ),
+                flake8_import_conventions: flake8_import_conventions::settings::Options {
+                    aliases: None,
+                    extend_aliases: Some(FxHashMap::from_iter([
+                        ("dask.array".to_string(), "da".to_string()),
+                        ("dask.dataframe".to_string(), "dd".to_string()),
+                    ])),
+                }
+                .into(),
                 ..Settings::for_rule(CheckCode::ICN001)
             },
         )?;
@@ -52,18 +50,16 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/remove_default.py"),
             &Settings {
-                flake8_import_conventions:
-                    flake8_import_conventions::settings::Settings::from_options(
-                        flake8_import_conventions::settings::Options {
-                            aliases: Some(FxHashMap::from_iter([
-                                ("altair".to_string(), "alt".to_string()),
-                                ("matplotlib.pyplot".to_string(), "plt".to_string()),
-                                ("pandas".to_string(), "pd".to_string()),
-                                ("seaborn".to_string(), "sns".to_string()),
-                            ])),
-                            extend_aliases: None,
-                        },
-                    ),
+                flake8_import_conventions: flake8_import_conventions::settings::Options {
+                    aliases: Some(FxHashMap::from_iter([
+                        ("altair".to_string(), "alt".to_string()),
+                        ("matplotlib.pyplot".to_string(), "plt".to_string()),
+                        ("pandas".to_string(), "pd".to_string()),
+                        ("seaborn".to_string(), "sns".to_string()),
+                    ])),
+                    extend_aliases: None,
+                }
+                .into(),
                 ..Settings::for_rule(CheckCode::ICN001)
             },
         )?;
@@ -77,16 +73,14 @@ mod tests {
         let mut checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/override_default.py"),
             &Settings {
-                flake8_import_conventions:
-                    flake8_import_conventions::settings::Settings::from_options(
-                        flake8_import_conventions::settings::Options {
-                            aliases: None,
-                            extend_aliases: Some(FxHashMap::from_iter([(
-                                "numpy".to_string(),
-                                "nmp".to_string(),
-                            )])),
-                        },
-                    ),
+                flake8_import_conventions: flake8_import_conventions::settings::Options {
+                    aliases: None,
+                    extend_aliases: Some(FxHashMap::from_iter([(
+                        "numpy".to_string(),
+                        "nmp".to_string(),
+                    )])),
+                }
+                .into(),
                 ..Settings::for_rule(CheckCode::ICN001)
             },
         )?;

@@ -34,6 +34,7 @@ bindings = "bin"
 strip = true
 
 [tool.ruff]
+update-check = true
 
 [tool.ruff.isort]
 force-wrap-aliases = true

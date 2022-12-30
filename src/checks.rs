@@ -232,6 +232,7 @@ pub enum CheckCode {
     UP021,
     UP022,
     UP023,
+    UP025,
     // pydocstyle
     D100,
     D101,
@@ -337,6 +338,7 @@ pub enum CheckCode {
     PGH001,
     PGH002,
     PGH003,
+    PGH004,
     // pandas-vet
     PD002,
     PD003,
@@ -850,6 +852,7 @@ pub enum CheckKind {
     ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
     RewriteCElementTree,
+    RewriteUnicodeLiteral,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -933,6 +936,7 @@ pub enum CheckKind {
     NoEval,
     DeprecatedLogWarn,
     BlanketTypeIgnore,
+    BlanketNOQA,
     // flake8-unused-arguments
     UnusedFunctionArgument(String),
     UnusedMethodArgument(String),
@@ -982,9 +986,11 @@ impl CheckCode {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             CheckCode::RUF100 => &LintSource::NoQA,
-            CheckCode::E501 | CheckCode::W292 | CheckCode::UP009 | CheckCode::PGH003 => {
-                &LintSource::Lines
-            }
+            CheckCode::E501
+            | CheckCode::W292
+            | CheckCode::UP009
+            | CheckCode::PGH003
+            | CheckCode::PGH004 => &LintSource::Lines,
             CheckCode::ERA001
             | CheckCode::Q000
             | CheckCode::Q001
@@ -1235,6 +1241,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
             CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
+            CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1333,6 +1340,7 @@ impl CheckCode {
             CheckCode::PGH001 => CheckKind::NoEval,
             CheckCode::PGH002 => CheckKind::DeprecatedLogWarn,
             CheckCode::PGH003 => CheckKind::BlanketTypeIgnore,
+            CheckCode::PGH004 => CheckKind::BlanketNOQA,
             // flake8-unused-arguments
             CheckCode::ARG001 => CheckKind::UnusedFunctionArgument("...".to_string()),
             CheckCode::ARG002 => CheckKind::UnusedMethodArgument("...".to_string()),
@@ -1601,6 +1609,7 @@ impl CheckCode {
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
             CheckCode::PGH002 => CheckCategory::PygrepHooks,
             CheckCode::PGH003 => CheckCategory::PygrepHooks,
+            CheckCode::PGH004 => CheckCategory::PygrepHooks,
             CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
@@ -1662,6 +1671,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckCategory::Pyupgrade,
             CheckCode::UP022 => CheckCategory::Pyupgrade,
             CheckCode::UP023 => CheckCategory::Pyupgrade,
+            CheckCode::UP025 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1880,6 +1890,7 @@ impl CheckKind {
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
+            CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -1963,6 +1974,7 @@ impl CheckKind {
             CheckKind::NoEval => &CheckCode::PGH001,
             CheckKind::DeprecatedLogWarn => &CheckCode::PGH002,
             CheckKind::BlanketTypeIgnore => &CheckCode::PGH003,
+            CheckKind::BlanketNOQA => &CheckCode::PGH004,
             // flake8-unused-arguments
             CheckKind::UnusedFunctionArgument(..) => &CheckCode::ARG001,
             CheckKind::UnusedMethodArgument(..) => &CheckCode::ARG002,
@@ -2620,6 +2632,7 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
+            CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
@@ -2825,13 +2838,14 @@ impl CheckKind {
                 "Boolean positional value in function call".to_string()
             }
             // pygrep-hooks
-            CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
-            CheckKind::DeprecatedLogWarn => {
-                "`warn` is deprecated in favor of `warning`".to_string()
-            }
+            CheckKind::BlanketNOQA => "Use specific error codes when using `noqa`".to_string(),
             CheckKind::BlanketTypeIgnore => {
                 "Use specific error codes when ignoring type issues".to_string()
             }
+            CheckKind::DeprecatedLogWarn => {
+                "`warn` is deprecated in favor of `warning`".to_string()
+            }
+            CheckKind::NoEval => "No builtin `eval()` allowed".to_string(),
             // flake8-unused-arguments
             CheckKind::UnusedFunctionArgument(name) => {
                 format!("Unused function argument: `{name}`")
@@ -3067,6 +3081,7 @@ impl CheckKind {
                 | CheckKind::ReplaceUniversalNewlines
                 | CheckKind::ReplaceStdoutStderr
                 | CheckKind::RewriteCElementTree
+                | CheckKind::RewriteUnicodeLiteral
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
                 | CheckKind::NoBlankLineBeforeClass(..)

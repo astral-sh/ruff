@@ -27,11 +27,18 @@ pub struct Settings {
     pub max_string_length: usize,
 }
 
-impl Settings {
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: Options) -> Self {
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             max_string_length: options.max_string_length.unwrap_or_default(),
+        }
+    }
+}
+
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
+        Self {
+            max_string_length: Some(settings.max_string_length),
         }
     }
 }

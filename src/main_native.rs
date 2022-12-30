@@ -117,11 +117,19 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
             PyprojectDiscovery::Hierarchical(settings) => settings.respect_gitignore,
         },
     };
-    let (fix, fix_only, format) = match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => (settings.fix, settings.fix_only, settings.format),
-        PyprojectDiscovery::Hierarchical(settings) => {
-            (settings.fix, settings.fix_only, settings.format)
-        }
+    let (fix, fix_only, format, update_check) = match &pyproject_strategy {
+        PyprojectDiscovery::Fixed(settings) => (
+            settings.fix,
+            settings.fix_only,
+            settings.format,
+            settings.update_check,
+        ),
+        PyprojectDiscovery::Hierarchical(settings) => (
+            settings.fix,
+            settings.fix_only,
+            settings.format,
+            settings.update_check,
+        ),
     };
 
     if let Some(code) = cli.explain {
@@ -270,7 +278,11 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
 
         // Check for updates if we're in a non-silent log level.
         #[cfg(feature = "update-informer")]
-        if !is_stdin && log_level >= LogLevel::Default && atty::is(atty::Stream::Stdout) {
+        if update_check
+            && !is_stdin
+            && log_level >= LogLevel::Default
+            && atty::is(atty::Stream::Stdout)
+        {
             drop(updates::check_for_updates());
         }
 
