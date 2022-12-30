@@ -83,12 +83,10 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         extend_ignore: Some(Vec::default()),
         extend_select: Some(Vec::default()),
         external: Some(Vec::default()),
-        fixable: Some(Vec::default()),
         ignore: Some(Vec::default()),
         line_length: Some(88),
         select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
         target_version: Some(PythonVersion::default()),
-        unfixable: Some(Vec::default()),
         // Ignore a bunch of options that don't make sense in a single-file editor.
         cache_dir: None,
         exclude: None,
@@ -96,6 +94,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         extend_exclude: None,
         fix: None,
         fix_only: None,
+        fixable: None,
         force_exclude: None,
         format: None,
         ignore_init_module_imports: None,
@@ -104,6 +103,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         respect_gitignore: None,
         show_source: None,
         src: None,
+        unfixable: None,
         update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
