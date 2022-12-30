@@ -3,10 +3,11 @@ import { DEFAULT_PYTHON_SOURCE } from "../constants";
 import init, { check, Check, currentVersion, defaultSettings } from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
+import { useTheme } from "./theme";
 import { persist, restore, stringify } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
-import Themes from "./Themes";
+import MonacoThemes from "./MonacoThemes";
 
 type Tab = "Source" | "Settings";
 
@@ -19,6 +20,7 @@ export default function Editor() {
   const [pythonSource, setPythonSource] = useState<string | null>(null);
   const [checks, setChecks] = useState<Check[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useTheme();
 
   useEffect(() => {
     init().then(() => setInitialized(true));
@@ -99,13 +101,15 @@ export default function Editor() {
     <main className={"h-full w-full flex flex-auto"}>
       <Header
         edit={edit}
-        version={version}
         tab={tab}
-        onChange={setTab}
+        theme={theme}
+        version={version}
+        onChangeTab={setTab}
+        onChangeTheme={setTheme}
         onShare={initialized ? handleShare : undefined}
       />
 
-      <Themes />
+      <MonacoThemes />
 
       <div className={"mt-12 relative flex-auto"}>
         {initialized && settingsSource != null && pythonSource != null ? (
@@ -113,12 +117,14 @@ export default function Editor() {
             <SourceEditor
               visible={tab === "Source"}
               source={pythonSource}
+              theme={theme}
               checks={checks}
               onChange={handlePythonSourceChange}
             />
             <SettingsEditor
               visible={tab === "Settings"}
               source={settingsSource}
+              theme={theme}
               onChange={handleSettingsSourceChange}
             />
           </>
