@@ -34,7 +34,7 @@ pub fn name_is_banned(
     name: &Alias,
     banned_apis: &FxHashMap<String, BannedApi>,
 ) -> Option<Check> {
-    let full_name = format!("{}.{}", module, &name.node.name);
+    let full_name = format!("{module}.{}", &name.node.name);
     if let Some(ban) = banned_apis.get(&full_name) {
         return Some(Check::new(
             CheckKind::BannedApi {

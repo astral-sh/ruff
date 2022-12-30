@@ -1,5 +1,3 @@
-import { AVAILABLE_OPTIONS } from "./ruff_options";
-
 export const DEFAULT_PYTHON_SOURCE =
   "import os\n" +
   "\n" +
