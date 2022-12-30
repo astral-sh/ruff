@@ -10,13 +10,14 @@ expression: checks
     row: 1
     column: 10
   fix:
-    content: ""
     location:
       row: 1
       column: 0
     end_location:
       row: 2
       column: 0
+    content: ""
+    message: ~
   parent: ~
 - kind: CommentedOutCode
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 2
     column: 22
   fix:
-    content: ""
     location:
       row: 2
       column: 0
     end_location:
       row: 3
       column: 0
+    content: ""
+    message: ~
   parent: ~
 - kind: CommentedOutCode
   location:
@@ -42,13 +44,14 @@ expression: checks
     row: 3
     column: 6
   fix:
-    content: ""
     location:
       row: 3
       column: 0
     end_location:
       row: 4
       column: 0
+    content: ""
+    message: ~
   parent: ~
 - kind: CommentedOutCode
   location:
@@ -58,13 +61,14 @@ expression: checks
     row: 5
     column: 13
   fix:
-    content: ""
     location:
       row: 5
       column: 0
     end_location:
       row: 6
       column: 0
+    content: ""
+    message: ~
   parent: ~
 - kind: CommentedOutCode
   location:
@@ -74,12 +78,13 @@ expression: checks
     row: 12
     column: 16
   fix:
-    content: ""
     location:
       row: 12
       column: 0
     end_location:
       row: 13
       column: 0
+    content: ""
+    message: ~
   parent: ~
 

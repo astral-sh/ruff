@@ -10,13 +10,14 @@ expression: checks
     row: 2
     column: 21
   fix:
-    content: "b\"foo\""
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 21
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 3
     column: 18
   fix:
-    content: "b\"foo\""
     location:
       row: 3
       column: 0
     end_location:
       row: 3
       column: 18
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -42,13 +44,14 @@ expression: checks
     row: 4
     column: 14
   fix:
-    content: "b\"foo\""
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 14
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -58,13 +61,14 @@ expression: checks
     row: 5
     column: 20
   fix:
-    content: "b\"foo\""
     location:
       row: 5
       column: 0
     end_location:
       row: 5
       column: 20
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -74,13 +78,14 @@ expression: checks
     row: 6
     column: 22
   fix:
-    content: "b\"foo\""
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 22
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -90,13 +95,14 @@ expression: checks
     row: 7
     column: 30
   fix:
-    content: "b\"foo\""
     location:
       row: 7
       column: 0
     end_location:
       row: 7
       column: 30
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -106,13 +112,14 @@ expression: checks
     row: 14
     column: 1
   fix:
-    content: "b\"\"\"\nLorem\n\nIpsum\n\"\"\""
     location:
       row: 8
       column: 0
     end_location:
       row: 14
       column: 1
+    content: "b\"\"\"\nLorem\n\nIpsum\n\"\"\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -122,13 +129,14 @@ expression: checks
     row: 26
     column: 27
   fix:
-    content: ""
     location:
       row: 26
       column: 19
     end_location:
       row: 26
       column: 26
+    content: ""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -138,13 +146,14 @@ expression: checks
     row: 44
     column: 31
   fix:
-    content: ""
     location:
       row: 44
       column: 23
     end_location:
       row: 44
       column: 30
+    content: ""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -154,13 +163,14 @@ expression: checks
     row: 46
     column: 39
   fix:
-    content: ""
     location:
       row: 46
       column: 23
     end_location:
       row: 46
       column: 38
+    content: ""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -170,13 +180,14 @@ expression: checks
     row: 48
     column: 23
   fix:
+    location:
+      row: 48
+      column: 0
+    end_location:
+      row: 48
+      column: 23
     content: "br\"fo\\o\""
-    location:
-      row: 48
-      column: 0
-    end_location:
-      row: 48
-      column: 23
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -186,13 +197,14 @@ expression: checks
     row: 49
     column: 22
   fix:
-    content: "b\"foo\""
     location:
       row: 49
       column: 0
     end_location:
       row: 49
       column: 22
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -202,13 +214,14 @@ expression: checks
     row: 50
     column: 23
   fix:
-    content: "bR\"fo\\o\""
     location:
       row: 50
       column: 0
     end_location:
       row: 50
       column: 23
+    content: "bR\"fo\\o\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -218,13 +231,14 @@ expression: checks
     row: 51
     column: 22
   fix:
-    content: "b\"foo\""
     location:
       row: 51
       column: 0
     end_location:
       row: 51
       column: 22
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: UnnecessaryEncodeUTF8
   location:
@@ -234,12 +248,13 @@ expression: checks
     row: 52
     column: 20
   fix:
-    content: "b\"foo\""
     location:
       row: 52
       column: 6
     end_location:
       row: 52
       column: 20
+    content: "b\"foo\""
+    message: ~
   parent: ~
 

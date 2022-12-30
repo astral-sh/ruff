@@ -10,13 +10,14 @@ expression: checks
     row: 40
     column: 16
   fix:
-    content: int | None
     location:
       row: 40
       column: 3
     end_location:
       row: 40
       column: 16
+    content: int | None
+    message: ~
   parent: ~
 - kind: UsePEP604Annotation
   location:
@@ -26,12 +27,13 @@ expression: checks
     row: 42
     column: 47
   fix:
-    content: "List[int] | List[str]"
     location:
       row: 42
       column: 20
     end_location:
       row: 42
       column: 47
+    content: "List[int] | List[str]"
+    message: ~
   parent: ~
 

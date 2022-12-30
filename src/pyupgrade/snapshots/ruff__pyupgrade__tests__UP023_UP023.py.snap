@@ -10,13 +10,14 @@ expression: checks
     row: 2
     column: 59
   fix:
-    content: "from xml.etree.ElementTree import XML, Element, SubElement"
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 59
+    content: "from xml.etree.ElementTree import XML, Element, SubElement"
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 3
     column: 35
   fix:
-    content: xml.etree.ElementTree as ET
     location:
       row: 3
       column: 7
     end_location:
       row: 3
       column: 35
+    content: xml.etree.ElementTree as ET
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -42,13 +44,14 @@ expression: checks
     row: 6
     column: 44
   fix:
-    content: from   xml.etree.ElementTree    import  XML
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 44
+    content: from   xml.etree.ElementTree    import  XML
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -58,13 +61,14 @@ expression: checks
     row: 7
     column: 49
   fix:
-    content: xml.etree.ElementTree       as      ET
     location:
       row: 7
       column: 10
     end_location:
       row: 7
       column: 49
+    content: xml.etree.ElementTree       as      ET
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -74,13 +78,14 @@ expression: checks
     row: 14
     column: 1
   fix:
-    content: "from xml.etree.ElementTree import (\n    XML,\n    Element,\n    SubElement,\n)"
     location:
       row: 10
       column: 0
     end_location:
       row: 14
       column: 1
+    content: "from xml.etree.ElementTree import (\n    XML,\n    Element,\n    SubElement,\n)"
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -90,13 +95,14 @@ expression: checks
     row: 16
     column: 39
   fix:
-    content: xml.etree.ElementTree as ET
     location:
       row: 16
       column: 11
     end_location:
       row: 16
       column: 39
+    content: xml.etree.ElementTree as ET
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -106,13 +112,14 @@ expression: checks
     row: 17
     column: 45
   fix:
-    content: ElementTree as CET
     location:
       row: 17
       column: 26
     end_location:
       row: 17
       column: 45
+    content: ElementTree as CET
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -122,13 +129,14 @@ expression: checks
     row: 19
     column: 40
   fix:
-    content: ElementTree as ET
     location:
       row: 19
       column: 22
     end_location:
       row: 19
       column: 40
+    content: ElementTree as ET
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -138,13 +146,14 @@ expression: checks
     row: 21
     column: 47
   fix:
-    content: xml.etree.ElementTree as ET
     location:
       row: 21
       column: 19
     end_location:
       row: 21
       column: 47
+    content: xml.etree.ElementTree as ET
+    message: ~
   parent: ~
 - kind: RewriteCElementTree
   location:
@@ -154,12 +163,13 @@ expression: checks
     row: 24
     column: 59
   fix:
-    content: xml.etree.ElementTree as ET
     location:
       row: 24
       column: 31
     end_location:
       row: 24
       column: 59
+    content: xml.etree.ElementTree as ET
+    message: ~
   parent: ~
 

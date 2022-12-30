@@ -13,13 +13,14 @@ expression: checks
     row: 2
     column: 17
   fix:
-    content: ""
     location:
       row: 2
       column: 0
     end_location:
       row: 3
       column: 0
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedImport:
@@ -32,13 +33,14 @@ expression: checks
     row: 3
     column: 22
   fix:
-    content: ""
     location:
       row: 3
       column: 0
     end_location:
       row: 4
       column: 0
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedImport:
@@ -51,13 +53,14 @@ expression: checks
     row: 4
     column: 10
   fix:
-    content: ""
     location:
       row: 4
       column: 0
     end_location:
       row: 5
       column: 0
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedImport:
@@ -70,12 +73,13 @@ expression: checks
     row: 5
     column: 15
   fix:
-    content: ""
     location:
       row: 5
       column: 0
     end_location:
       row: 6
       column: 0
+    content: ""
+    message: ~
   parent: ~
 

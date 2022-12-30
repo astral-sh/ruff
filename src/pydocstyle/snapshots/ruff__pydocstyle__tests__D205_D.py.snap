@@ -19,12 +19,13 @@ expression: checks
     row: 215
     column: 7
   fix:
-    content: "\n"
     location:
       row: 211
       column: 0
     end_location:
       row: 213
       column: 0
+    content: "\n"
+    message: ~
   parent: ~
 

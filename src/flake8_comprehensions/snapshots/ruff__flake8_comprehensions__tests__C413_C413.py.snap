@@ -11,13 +11,14 @@ expression: checks
     row: 3
     column: 15
   fix:
-    content: sorted(x)
     location:
       row: 3
       column: 0
     end_location:
       row: 3
       column: 15
+    content: sorted(x)
+    message: ~
   parent: ~
 - kind:
     UnnecessaryCallAroundSorted: reversed
@@ -28,13 +29,14 @@ expression: checks
     row: 4
     column: 19
   fix:
-    content: "sorted(x, reverse=True)"
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 19
+    content: "sorted(x, reverse=True)"
+    message: ~
   parent: ~
 - kind:
     UnnecessaryCallAroundSorted: reversed
@@ -45,13 +47,14 @@ expression: checks
     row: 5
     column: 36
   fix:
-    content: "sorted(x, key=lambda e: e, reverse=True)"
     location:
       row: 5
       column: 0
     end_location:
       row: 5
       column: 36
+    content: "sorted(x, key=lambda e: e, reverse=True)"
+    message: ~
   parent: ~
 - kind:
     UnnecessaryCallAroundSorted: reversed
@@ -62,12 +65,13 @@ expression: checks
     row: 6
     column: 33
   fix:
-    content: "sorted(x, reverse=True)"
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 33
+    content: "sorted(x, reverse=True)"
+    message: ~
   parent: ~
 

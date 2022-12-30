@@ -10,12 +10,13 @@ expression: checks
     row: 3
     column: 0
   fix:
-    content: "import os\nimport sys\n"
     location:
       row: 1
       column: 0
     end_location:
       row: 3
       column: 0
+    content: "import os\nimport sys\n"
+    message: Organize imports
   parent: ~
 

@@ -11,13 +11,14 @@ expression: checks
     row: 2
     column: 14
   fix:
-    content: res is None
     location:
       row: 2
       column: 3
     end_location:
       row: 2
       column: 14
+    content: res is None
+    message: ~
   parent: ~
 - kind:
     NoneComparison: NotEq
@@ -28,13 +29,14 @@ expression: checks
     row: 5
     column: 14
   fix:
+    location:
+      row: 5
+      column: 3
+    end_location:
+      row: 5
+      column: 14
     content: res is not None
-    location:
-      row: 5
-      column: 3
-    end_location:
-      row: 5
-      column: 14
+    message: ~
   parent: ~
 - kind:
     NoneComparison: Eq
@@ -45,13 +47,14 @@ expression: checks
     row: 8
     column: 7
   fix:
+    location:
+      row: 8
+      column: 3
+    end_location:
+      row: 8
+      column: 14
     content: None is res
-    location:
-      row: 8
-      column: 3
-    end_location:
-      row: 8
-      column: 14
+    message: ~
   parent: ~
 - kind:
     NoneComparison: NotEq
@@ -62,13 +65,14 @@ expression: checks
     row: 11
     column: 7
   fix:
+    location:
+      row: 11
+      column: 3
+    end_location:
+      row: 11
+      column: 14
     content: None is not res
-    location:
-      row: 11
-      column: 3
-    end_location:
-      row: 11
-      column: 14
+    message: ~
   parent: ~
 - kind:
     NoneComparison: Eq
@@ -79,13 +83,14 @@ expression: checks
     row: 14
     column: 17
   fix:
+    location:
+      row: 14
+      column: 3
+    end_location:
+      row: 14
+      column: 17
     content: "res[1] is None"
-    location:
-      row: 14
-      column: 3
-    end_location:
-      row: 14
-      column: 17
+    message: ~
   parent: ~
 - kind:
     NoneComparison: NotEq
@@ -96,13 +101,14 @@ expression: checks
     row: 17
     column: 17
   fix:
-    content: "res[1] is not None"
     location:
       row: 17
       column: 3
     end_location:
       row: 17
       column: 17
+    content: "res[1] is not None"
+    message: ~
   parent: ~
 - kind:
     NoneComparison: NotEq
@@ -113,13 +119,14 @@ expression: checks
     row: 20
     column: 7
   fix:
-    content: "None is not res[1]"
     location:
       row: 20
       column: 3
     end_location:
       row: 20
       column: 17
+    content: "None is not res[1]"
+    message: ~
   parent: ~
 - kind:
     NoneComparison: Eq
@@ -130,13 +137,14 @@ expression: checks
     row: 23
     column: 7
   fix:
-    content: "None is res[1]"
     location:
       row: 23
       column: 3
     end_location:
       row: 23
       column: 17
+    content: "None is res[1]"
+    message: ~
   parent: ~
 - kind:
     NoneComparison: Eq
@@ -147,13 +155,14 @@ expression: checks
     row: 26
     column: 12
   fix:
-    content: x is None is not None
     location:
       row: 26
       column: 3
     end_location:
       row: 26
       column: 20
+    content: x is None is not None
+    message: ~
   parent: ~
 - kind:
     NoneComparison: NotEq
@@ -164,12 +173,13 @@ expression: checks
     row: 26
     column: 20
   fix:
-    content: x is None is not None
     location:
       row: 26
       column: 3
     end_location:
       row: 26
       column: 20
+    content: x is None is not None
+    message: ~
   parent: ~
 

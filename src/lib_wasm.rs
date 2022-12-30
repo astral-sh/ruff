@@ -39,6 +39,7 @@ export interface Check {
     };
     fix: {
         content: string;
+        message: string | null;
         location: {
             row: number;
             column: number;

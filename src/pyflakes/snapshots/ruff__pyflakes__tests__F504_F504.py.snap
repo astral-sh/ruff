@@ -12,13 +12,14 @@ expression: checks
     row: 3
     column: 34
   fix:
-    content: "{a: \"?\", }"
     location:
       row: 3
       column: 16
     end_location:
       row: 3
       column: 34
+    content: "{a: \"?\", }"
+    message: ~
   parent: ~
 - kind:
     PercentFormatExtraNamedArguments:
@@ -30,13 +31,14 @@ expression: checks
     row: 8
     column: 29
   fix:
+    location:
+      row: 8
+      column: 10
+    end_location:
+      row: 8
+      column: 29
     content: "{\"a\": 1, }"
-    location:
-      row: 8
-      column: 10
-    end_location:
-      row: 8
-      column: 29
+    message: ~
   parent: ~
 - kind:
     PercentFormatExtraNamedArguments:
@@ -48,12 +50,13 @@ expression: checks
     row: 9
     column: 29
   fix:
-    content: "{'a': 1, }"
     location:
       row: 9
       column: 10
     end_location:
       row: 9
       column: 29
+    content: "{'a': 1, }"
+    message: ~
   parent: ~
 

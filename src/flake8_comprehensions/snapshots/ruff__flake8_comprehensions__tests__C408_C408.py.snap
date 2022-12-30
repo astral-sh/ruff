@@ -11,13 +11,14 @@ expression: checks
     row: 1
     column: 11
   fix:
-    content: ()
     location:
       row: 1
       column: 4
     end_location:
       row: 1
       column: 11
+    content: ()
+    message: ~
   parent: ~
 - kind:
     UnnecessaryCollectionCall: list
@@ -28,13 +29,14 @@ expression: checks
     row: 2
     column: 10
   fix:
-    content: "[]"
     location:
       row: 2
       column: 4
     end_location:
       row: 2
       column: 10
+    content: "[]"
+    message: ~
   parent: ~
 - kind:
     UnnecessaryCollectionCall: dict
@@ -45,13 +47,14 @@ expression: checks
     row: 3
     column: 11
   fix:
-    content: "{}"
     location:
       row: 3
       column: 5
     end_location:
       row: 3
       column: 11
+    content: "{}"
+    message: ~
   parent: ~
 - kind:
     UnnecessaryCollectionCall: dict
@@ -62,12 +65,13 @@ expression: checks
     row: 4
     column: 14
   fix:
-    content: "{\"a\": 1}"
     location:
       row: 4
       column: 5
     end_location:
       row: 4
       column: 14
+    content: "{\"a\": 1}"
+    message: ~
   parent: ~
 

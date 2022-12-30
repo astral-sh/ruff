@@ -10,13 +10,14 @@ expression: checks
     row: 8
     column: 0
   fix:
-    content: "import sys\n\n"
     location:
       row: 7
       column: 0
     end_location:
       row: 8
       column: 0
+    content: "import sys\n\n"
+    message: Organize imports
   parent: ~
 - kind: UnsortedImports
   location:
@@ -26,12 +27,13 @@ expression: checks
     row: 11
     column: 0
   fix:
-    content: "import abc\nimport collections\n"
     location:
       row: 9
       column: 0
     end_location:
       row: 11
       column: 0
+    content: "import abc\nimport collections\n"
+    message: Organize imports
   parent: ~
 

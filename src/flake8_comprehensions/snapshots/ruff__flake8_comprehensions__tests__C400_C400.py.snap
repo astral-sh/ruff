@@ -10,13 +10,14 @@ expression: checks
     row: 1
     column: 29
   fix:
-    content: "[x for x in range(3)]"
     location:
       row: 1
       column: 4
     end_location:
       row: 1
       column: 29
+    content: "[x for x in range(3)]"
+    message: ~
   parent: ~
 - kind: UnnecessaryGeneratorList
   location:
@@ -26,12 +27,13 @@ expression: checks
     row: 4
     column: 1
   fix:
-    content: "[\n    x for x in range(3)\n]"
     location:
       row: 2
       column: 4
     end_location:
       row: 4
       column: 1
+    content: "[\n    x for x in range(3)\n]"
+    message: ~
   parent: ~
 

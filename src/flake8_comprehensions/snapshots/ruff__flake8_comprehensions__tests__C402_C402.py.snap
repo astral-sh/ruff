@@ -10,13 +10,14 @@ expression: checks
     row: 1
     column: 30
   fix:
-    content: "{x: x for x in range(3)}"
     location:
       row: 1
       column: 0
     end_location:
       row: 1
       column: 30
+    content: "{x: x for x in range(3)}"
+    message: ~
   parent: ~
 - kind: UnnecessaryGeneratorDict
   location:
@@ -26,12 +27,13 @@ expression: checks
     row: 4
     column: 1
   fix:
-    content: "{\n    x: x for x in range(3)\n}"
     location:
       row: 2
       column: 0
     end_location:
       row: 4
       column: 1
+    content: "{\n    x: x for x in range(3)\n}"
+    message: ~
   parent: ~
 

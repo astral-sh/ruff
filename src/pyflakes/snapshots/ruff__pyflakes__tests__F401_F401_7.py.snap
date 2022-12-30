@@ -13,13 +13,14 @@ expression: checks
     row: 30
     column: 9
   fix:
-    content: "from typing import (\n    Mapping,  # noqa: F401\n    )"
     location:
       row: 28
       column: 0
     end_location:
       row: 31
       column: 1
+    content: "from typing import (\n    Mapping,  # noqa: F401\n    )"
+    message: ~
   parent:
     row: 28
     column: 0
@@ -34,13 +35,14 @@ expression: checks
     row: 66
     column: 28
   fix:
-    content: ""
     location:
       row: 66
       column: 0
     end_location:
       row: 67
       column: 0
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedImport:
@@ -53,12 +55,13 @@ expression: checks
     row: 66
     column: 48
   fix:
-    content: ""
     location:
       row: 66
       column: 0
     end_location:
       row: 67
       column: 0
+    content: ""
+    message: ~
   parent: ~
 

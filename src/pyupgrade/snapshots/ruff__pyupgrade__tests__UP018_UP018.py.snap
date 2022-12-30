@@ -10,13 +10,14 @@ expression: checks
     row: 18
     column: 5
   fix:
-    content: "\"\""
     location:
       row: 18
       column: 0
     end_location:
       row: 18
       column: 5
+    content: "\"\""
+    message: ~
   parent: ~
 - kind: NativeLiterals
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 19
     column: 10
   fix:
-    content: "\"foo\""
     location:
       row: 19
       column: 0
     end_location:
       row: 19
       column: 10
+    content: "\"foo\""
+    message: ~
   parent: ~
 - kind: NativeLiterals
   location:
@@ -42,13 +44,14 @@ expression: checks
     row: 21
     column: 7
   fix:
-    content: "\"\"\"\nfoo\"\"\""
     location:
       row: 20
       column: 0
     end_location:
       row: 21
       column: 7
+    content: "\"\"\"\nfoo\"\"\""
+    message: ~
   parent: ~
 - kind: NativeLiterals
   location:
@@ -58,13 +61,14 @@ expression: checks
     row: 22
     column: 7
   fix:
-    content: "b\"\""
     location:
       row: 22
       column: 0
     end_location:
       row: 22
       column: 7
+    content: "b\"\""
+    message: ~
   parent: ~
 - kind: NativeLiterals
   location:
@@ -74,13 +78,14 @@ expression: checks
     row: 23
     column: 13
   fix:
-    content: "b\"foo\""
     location:
       row: 23
       column: 0
     end_location:
       row: 23
       column: 13
+    content: "b\"foo\""
+    message: ~
   parent: ~
 - kind: NativeLiterals
   location:
@@ -90,12 +95,13 @@ expression: checks
     row: 25
     column: 7
   fix:
-    content: "b\"\"\"\nfoo\"\"\""
     location:
       row: 24
       column: 0
     end_location:
       row: 25
       column: 7
+    content: "b\"\"\"\nfoo\"\"\""
+    message: ~
   parent: ~
 

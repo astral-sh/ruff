@@ -11,13 +11,14 @@ expression: checks
     row: 9
     column: 17
   fix:
-    content: ""
     location:
       row: 9
       column: 9
     end_location:
       row: 9
       column: 17
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -32,13 +33,14 @@ expression: checks
     row: 13
     column: 23
   fix:
-    content: ""
     location:
       row: 13
       column: 9
     end_location:
       row: 13
       column: 23
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -54,13 +56,14 @@ expression: checks
     row: 16
     column: 29
   fix:
-    content: ""
     location:
       row: 16
       column: 9
     end_location:
       row: 16
       column: 29
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -77,13 +80,14 @@ expression: checks
     row: 19
     column: 35
   fix:
-    content: ""
     location:
       row: 19
       column: 9
     end_location:
       row: 19
       column: 35
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -99,13 +103,14 @@ expression: checks
     row: 22
     column: 29
   fix:
-    content: ""
     location:
       row: 22
       column: 9
     end_location:
       row: 22
       column: 29
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -120,13 +125,14 @@ expression: checks
     row: 26
     column: 21
   fix:
-    content: ""
     location:
       row: 26
       column: 9
     end_location:
       row: 26
       column: 21
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedVariable: d
@@ -151,13 +157,14 @@ expression: checks
     row: 29
     column: 44
   fix:
-    content: ""
     location:
       row: 29
       column: 9
     end_location:
       row: 29
       column: 44
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -172,13 +179,14 @@ expression: checks
     row: 55
     column: 23
   fix:
-    content: "# noqa: E501"
     location:
       row: 55
       column: 5
     end_location:
       row: 55
       column: 23
+    content: "# noqa: E501"
+    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -193,13 +201,14 @@ expression: checks
     row: 63
     column: 17
   fix:
-    content: ""
     location:
       row: 63
       column: 3
     end_location:
       row: 63
       column: 17
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedNOQA: ~
@@ -210,13 +219,14 @@ expression: checks
     row: 71
     column: 11
   fix:
-    content: ""
     location:
       row: 71
       column: 3
     end_location:
       row: 71
       column: 11
+    content: ""
+    message: ~
   parent: ~
 - kind:
     UnusedImport:
@@ -229,12 +239,13 @@ expression: checks
     row: 85
     column: 13
   fix:
-    content: ""
     location:
       row: 85
       column: 0
     end_location:
       row: 86
       column: 0
+    content: ""
+    message: ~
   parent: ~
 

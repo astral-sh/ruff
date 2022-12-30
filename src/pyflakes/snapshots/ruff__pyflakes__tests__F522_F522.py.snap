@@ -12,13 +12,14 @@ expression: checks
     row: 1
     column: 21
   fix:
-    content: "\"{}\".format(1, )"
     location:
       row: 1
       column: 0
     end_location:
       row: 1
       column: 21
+    content: "\"{}\".format(1, )"
+    message: ~
   parent: ~
 - kind:
     StringDotFormatExtraNamedArguments:
@@ -30,13 +31,14 @@ expression: checks
     row: 2
     column: 34
   fix:
-    content: "\"{bar}{}\".format(1, bar=2, )"
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 34
+    content: "\"{bar}{}\".format(1, bar=2, )"
+    message: ~
   parent: ~
 - kind:
     StringDotFormatExtraNamedArguments:
@@ -49,12 +51,13 @@ expression: checks
     row: 4
     column: 51
   fix:
-    content: "\"{bar:{spam}}\".format(bar=2, spam=3, )"
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 51
+    content: "\"{bar:{spam}}\".format(bar=2, spam=3, )"
+    message: ~
   parent: ~
 

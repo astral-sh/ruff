@@ -11,13 +11,14 @@ expression: checks
     row: 2
     column: 11
   fix:
-    content: "\\"
     location:
       row: 2
       column: 9
     end_location:
       row: 2
       column: 9
+    content: "\\"
+    message: ~
   parent: ~
 - kind:
     InvalidEscapeSequence: "."
@@ -28,13 +29,14 @@ expression: checks
     row: 6
     column: 2
   fix:
-    content: "\\"
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 0
+    content: "\\"
+    message: ~
   parent: ~
 - kind:
     InvalidEscapeSequence: _
@@ -45,13 +47,14 @@ expression: checks
     row: 11
     column: 7
   fix:
-    content: "\\"
     location:
       row: 11
       column: 5
     end_location:
       row: 11
       column: 5
+    content: "\\"
+    message: ~
   parent: ~
 - kind:
     InvalidEscapeSequence: _
@@ -62,12 +65,13 @@ expression: checks
     row: 18
     column: 7
   fix:
-    content: "\\"
     location:
       row: 18
       column: 5
     end_location:
       row: 18
       column: 5
+    content: "\\"
+    message: ~
   parent: ~
 

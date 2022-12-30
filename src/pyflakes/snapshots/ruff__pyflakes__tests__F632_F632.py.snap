@@ -10,13 +10,14 @@ expression: checks
     row: 1
     column: 13
   fix:
-    content: "=="
     location:
       row: 1
       column: 5
     end_location:
       row: 1
       column: 7
+    content: "=="
+    message: ~
   parent: ~
 - kind: IsLiteral
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 4
     column: 15
   fix:
-    content: "!="
     location:
       row: 4
       column: 7
     end_location:
       row: 4
       column: 13
+    content: "!="
+    message: ~
   parent: ~
 - kind: IsLiteral
   location:
@@ -42,13 +44,14 @@ expression: checks
     row: 8
     column: 13
   fix:
-    content: "!="
     location:
       row: 7
       column: 7
     end_location:
       row: 8
       column: 11
+    content: "!="
+    message: ~
   parent: ~
 - kind: IsLiteral
   location:
@@ -58,13 +61,14 @@ expression: checks
     row: 11
     column: 17
   fix:
-    content: "=="
     location:
       row: 11
       column: 9
     end_location:
       row: 11
       column: 11
+    content: "=="
+    message: ~
   parent: ~
 - kind: IsLiteral
   location:
@@ -74,13 +78,14 @@ expression: checks
     row: 14
     column: 18
   fix:
-    content: "=="
     location:
       row: 14
       column: 14
     end_location:
       row: 14
       column: 16
+    content: "=="
+    message: ~
   parent: ~
 - kind: IsLiteral
   location:
@@ -90,13 +95,14 @@ expression: checks
     row: 17
     column: 20
   fix:
-    content: "=="
     location:
       row: 17
       column: 16
     end_location:
       row: 17
       column: 18
+    content: "=="
+    message: ~
   parent: ~
 - kind: IsLiteral
   location:
@@ -106,12 +112,13 @@ expression: checks
     row: 20
     column: 19
   fix:
-    content: "=="
     location:
       row: 20
       column: 15
     end_location:
       row: 20
       column: 17
+    content: "=="
+    message: ~
   parent: ~
 

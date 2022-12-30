@@ -111,6 +111,7 @@ mod tests {
     fn apply_single_replacement() {
         let fixes = vec![Fix {
             content: "Bar".to_string(),
+            message: None,
             location: Location::new(1, 8),
             end_location: Location::new(1, 14),
         }];
@@ -137,6 +138,7 @@ class A(Bar):
     fn apply_single_removal() {
         let fixes = vec![Fix {
             content: String::new(),
+            message: None,
             location: Location::new(1, 7),
             end_location: Location::new(1, 15),
         }];
@@ -164,11 +166,13 @@ class A:
         let fixes = vec![
             Fix {
                 content: String::new(),
+                message: None,
                 location: Location::new(1, 7),
                 end_location: Location::new(1, 16),
             },
             Fix {
                 content: String::new(),
+                message: None,
                 location: Location::new(1, 16),
                 end_location: Location::new(1, 23),
             },
@@ -198,11 +202,13 @@ class A:
         let fixes = vec![
             Fix {
                 content: String::new(),
+                message: None,
                 location: Location::new(1, 7),
                 end_location: Location::new(1, 15),
             },
             Fix {
                 content: "ignored".to_string(),
+                message: None,
                 location: Location::new(1, 9),
                 end_location: Location::new(1, 11),
             },

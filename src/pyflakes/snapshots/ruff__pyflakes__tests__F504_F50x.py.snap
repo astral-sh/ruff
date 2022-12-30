@@ -12,12 +12,13 @@ expression: checks
     row: 8
     column: 32
   fix:
-    content: "{'bar': 1, }"
     location:
       row: 8
       column: 12
     end_location:
       row: 8
       column: 32
+    content: "{'bar': 1, }"
+    message: ~
   parent: ~
 

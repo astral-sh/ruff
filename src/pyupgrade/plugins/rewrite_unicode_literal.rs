@@ -10,10 +10,13 @@ pub fn rewrite_unicode_literal(checker: &mut Checker, expr: &Expr, kind: &Option
         if const_kind.to_lowercase() == "u" {
             let mut check = Check::new(CheckKind::RewriteUnicodeLiteral, Range::from_located(expr));
             if checker.patch(check.kind.code()) {
-                check.amend(Fix::deletion(
-                    expr.location,
-                    Location::new(expr.location.row(), expr.location.column() + 1),
-                ));
+                check.amend(
+                    Fix::deletion(
+                        expr.location,
+                        Location::new(expr.location.row(), expr.location.column() + 1),
+                    )
+                    .with_message("Remove unicode literal".to_string()),
+                );
             }
             checker.add_check(check);
         }

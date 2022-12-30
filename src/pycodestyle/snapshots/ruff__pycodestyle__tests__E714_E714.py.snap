@@ -10,13 +10,14 @@ expression: checks
     row: 2
     column: 13
   fix:
-    content: X is not Y
     location:
       row: 2
       column: 3
     end_location:
       row: 2
       column: 13
+    content: X is not Y
+    message: ~
   parent: ~
 - kind: NotIsTest
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 5
     column: 15
   fix:
-    content: X.B is not Y
     location:
       row: 5
       column: 3
     end_location:
       row: 5
       column: 15
+    content: X.B is not Y
+    message: ~
   parent: ~
 - kind: NotIsTest
   location:

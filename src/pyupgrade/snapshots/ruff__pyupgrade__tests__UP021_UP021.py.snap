@@ -10,13 +10,14 @@ expression: checks
     row: 6
     column: 42
   fix:
-    content: text
     location:
       row: 6
       column: 24
     end_location:
       row: 6
       column: 42
+    content: text
+    message: ~
   parent: ~
 - kind: ReplaceUniversalNewlines
   location:
@@ -26,13 +27,14 @@ expression: checks
     row: 7
     column: 40
   fix:
-    content: text
     location:
       row: 7
       column: 22
     end_location:
       row: 7
       column: 40
+    content: text
+    message: ~
   parent: ~
 - kind: ReplaceUniversalNewlines
   location:
@@ -42,13 +44,14 @@ expression: checks
     row: 9
     column: 31
   fix:
-    content: text
     location:
       row: 9
       column: 13
     end_location:
       row: 9
       column: 31
+    content: text
+    message: ~
   parent: ~
 - kind: ReplaceUniversalNewlines
   location:
@@ -58,12 +61,13 @@ expression: checks
     row: 10
     column: 39
   fix:
-    content: text
     location:
       row: 10
       column: 21
     end_location:
       row: 10
       column: 39
+    content: text
+    message: ~
   parent: ~
 
