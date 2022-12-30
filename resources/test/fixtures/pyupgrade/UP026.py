@@ -18,22 +18,11 @@ x = "This code should be preserved one line below the mock"
 # Mock should go on a new line as `from unittest import mock`
 from mock import mock
 
-import mock, sys, os, io
-
-from foo import (
-    sys,
-    os,
-    io,
-    math,
-    random,
-    datetime,
-    calendar,
-    functools,
-    itertools,
-    copy,
-    graphlib,
-    collections,
-    mock
+from mock import (
+    mock,
+    a,
+    b,
+    c
 )
 
 

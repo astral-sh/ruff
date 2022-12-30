@@ -1,9 +1,10 @@
-use rustpython_ast::{Stmt, StmtKind};
+use rustpython_ast::{Stmt, StmtKind, Located, AliasData};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
@@ -35,7 +36,7 @@ fn new_line_count(checker: &Checker, stmt: &Stmt) -> usize {
 }
 
 /// Create the new string for the import
-fn create_new_statement(needed_imports: Vec<String>, multi_line: bool) -> String {
+fn create_new_statement(needed_imports: Vec<String>, beginning: &str, indent: &str, multi_line: bool) -> String {
     let mut new_stmt = String::new();
     for (i, import) in needed_imports.iter().enumerate() {
         if i != 0 {
@@ -45,35 +46,51 @@ fn create_new_statement(needed_imports: Vec<String>, multi_line: bool) -> String
     }
     // We only want to add a new line before if there is an import above
     if !needed_imports.is_empty() {
-        new_stmt.insert_str(0, "import");
+        new_stmt.insert_str(0, beginning);
         new_stmt.push('\n');
+        new_stmt.push_str(indent);
     }
     new_stmt.push_str("from unittest import mock\n");
     new_stmt
 }
 
-pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
+/// Adds needed imports to the given vector, and returns whether a mock was imported
+fn filter_names(names: &Vec<Located<AliasData>>) -> (Vec<String>, bool) {
     let mut needed_imports: Vec<String> = vec![];
     let mut needs_updated = false;
+    for item in names {
+        let name = &item.node.name;
+        if name == "mock" || name == "mock.mock" {
+            needs_updated = true;
+        } else {
+            needed_imports.push(name.to_string());
+        }
+    }
+    (needed_imports, needs_updated)
+}
+
+pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::Import { names } => {
-            for item in names {
-                let name = &item.node.name;
-                if name == "mock" || name == "mock.mock" {
-                    needs_updated = true;
-                } else {
-                    needed_imports.push(name.to_string());
-                }
-            }
+            let (needed_imports, needs_updated) = filter_names(names);
             if needs_updated {
-                let new_stmt = create_new_statement(needed_imports, false);
+                let indent = indentation(checker, stmt);
+                let new_stmt = create_new_statement(needed_imports, "import", &indent, false);
                 update_import(checker, stmt, new_stmt);
             }
         },
-        StmtKind::ImportFrom { module, names, level } => {
-            println!("module: {:?}, names: {:?}, level: {:?}\n", module, names, level);
-            let is_multi_line = new_line_count(checker, stmt) > 1;
-            println!("=============NL Is Multi: {}", is_multi_line);
+        StmtKind::ImportFrom { module, names, .. } => {
+            if let Some(name) = module {
+                if name == "mock" {
+                    let (needed_imports, needs_updated) = filter_names(names);
+                    if needs_updated  {
+                        let indent = indentation(checker, stmt);
+                        let beginning = format!("from {} import", name);
+                        let new_stmt = create_new_statement(needed_imports, &beginning, &indent, false);
+                        update_import(checker, stmt, new_stmt);
+                    }
+                }
+            }
         },
         _ => return
     }
