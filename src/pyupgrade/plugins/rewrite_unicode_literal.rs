@@ -1,4 +1,4 @@
-use rustpython_ast::Expr;
+use rustpython_ast::{Expr, Location};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -10,11 +10,9 @@ pub fn rewrite_unicode_literal(checker: &mut Checker, expr: &Expr, kind: &Option
         if const_kind.to_lowercase() == "u" {
             let mut check = Check::new(CheckKind::RewriteUnicodeLiteral, Range::from_located(expr));
             if checker.patch(check.kind.code()) {
-                let mut new_location = expr.location.clone();
-                new_location.go_right();
                 check.amend(Fix::deletion(
                     expr.location,
-                    new_location,
+                    Location::new(expr.location.row(), expr.location.column() + 1),
                 ));
             }
             checker.add_check(check);
