@@ -7,7 +7,7 @@ use crate::lex::docstring_detection::StateMachine;
 use crate::ruff::checks::Context;
 use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::{eradicate, flake8_quotes, pycodestyle, ruff, Settings};
+use crate::{eradicate, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff, Settings};
 
 pub fn check_tokens(
     locator: &SourceCodeLocator,
@@ -26,6 +26,8 @@ pub fn check_tokens(
         || settings.enabled.contains(&CheckCode::Q003);
     let enforce_commented_out_code = settings.enabled.contains(&CheckCode::ERA001);
     let enforce_invalid_escape_sequence = settings.enabled.contains(&CheckCode::W605);
+    let enforce_implicit_string_concatenation = settings.enabled.contains(&CheckCode::ISC001)
+        || settings.enabled.contains(&CheckCode::ISC002);
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {
@@ -97,6 +99,15 @@ pub fn check_tokens(
                 ));
             }
         }
+    }
+
+    // ISC001, ISC002
+    if enforce_implicit_string_concatenation {
+        checks.extend(
+            flake8_implicit_str_concat::checks::implicit(tokens, locator)
+                .into_iter()
+                .filter(|check| settings.enabled.contains(check.kind.code())),
+        );
     }
 
     checks

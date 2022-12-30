@@ -95,6 +95,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-comprehensions (C4)](#flake8-comprehensions-c4)
    1. [flake8-debugger (T10)](#flake8-debugger-t10)
    1. [flake8-errmsg (EM)](#flake8-errmsg-em)
+   1. [flake8-implicit-str-concat (ISC)](#flake8-implicit-str-concat-isc)
    1. [flake8-import-conventions (ICN)](#flake8-import-conventions-icn)
    1. [flake8-print (T20)](#flake8-print-t20)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
@@ -854,6 +855,16 @@ For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/0.4.0/) on 
 | EM102 | FStringInException | Exception must not use an f-string literal, assign to variable first |  |
 | EM103 | DotFormatInException | Exception must not use a `.format()` string directly, assign to variable first |  |
 
+### flake8-implicit-str-concat (ISC)
+
+For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/0.3.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| ISC001 | SingleLineImplicitStringConcatenation | Implicitly concatenated string literals on one line |  |
+| ISC002 | MultiLineImplicitStringConcatenation | Implicitly concatenated string literals over continuation line |  |
+| ISC003 | ExplicitStringConcatenation | Explicitly concatenated string should be implicitly concatenated |  |
+
 ### flake8-import-conventions (ICN)
 
 | Code | Name | Message | Fix |
@@ -1274,6 +1285,7 @@ natively, including:
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
+- [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
@@ -1330,6 +1342,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
+- [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
