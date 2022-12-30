@@ -57,7 +57,7 @@ pub struct Cli {
     /// Disable cache reads.
     #[arg(short, long)]
     pub no_cache: bool,
-    /// List of error codes to enable.
+    /// Comma-separated list of error codes to enable.
     #[arg(long, value_delimiter = ',')]
     pub select: Option<Vec<CheckCodePrefix>>,
     /// Like --select, but adds additional error codes on top of the selected
