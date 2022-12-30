@@ -71,6 +71,8 @@ output, codify the behavior as a snapshot test by adding a new `testcase` macro 
 section of `src/linter.rs`, like so:
 
 ```rust
+use test_case::test_case;
+
 #[test_case(CheckCode::A001, Path::new("A001.py"); "A001")]
 ...
 ```
