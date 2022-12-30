@@ -15,7 +15,7 @@ export function stringify(settings: Settings): string {
         return v;
       }
     },
-    2
+    2,
   );
 }
 
@@ -24,7 +24,7 @@ export function stringify(settings: Settings): string {
  */
 export function persist(settingsSource: string, pythonSource: string) {
   window.location.hash = lzstring.compressToEncodedURIComponent(
-    settingsSource + "$$$" + pythonSource
+    settingsSource + "$$$" + pythonSource,
   );
 }
 
@@ -33,7 +33,7 @@ export function persist(settingsSource: string, pythonSource: string) {
  */
 export function restore(): [string, string] | null {
   const value = lzstring.decompressFromEncodedURIComponent(
-    window.location.hash.slice(1)
+    window.location.hash.slice(1),
   );
 
   if (value) {
