@@ -16,6 +16,7 @@ foo(u"Hello", U"world", a=u"Hello", b=u"world")
 x = u'hello'
 x = u"""hello"""
 x = u'''hello'''
+x = u'Hello "World"'
 
 # These should not change
 u = "Hello"

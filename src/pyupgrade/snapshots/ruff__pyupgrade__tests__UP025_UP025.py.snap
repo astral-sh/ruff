@@ -167,4 +167,19 @@ expression: checks
     end_location:
       row: 18
       column: 16
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 20
+  fix:
+    content: "'Hello \"World\"'"
+    location:
+      row: 19
+      column: 4
+    end_location:
+      row: 19
+      column: 20
 
