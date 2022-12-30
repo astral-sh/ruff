@@ -169,7 +169,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.202'
+  rev: 'v0.0.203'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -307,7 +307,7 @@ Ruff: An extremely fast Python linter.
 Usage: ruff [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  
+  [FILES]...
 
 Options:
       --config <CONFIG>
