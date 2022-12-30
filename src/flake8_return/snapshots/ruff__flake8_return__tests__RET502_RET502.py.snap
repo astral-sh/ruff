@@ -10,13 +10,12 @@ expression: checks
     row: 3
     column: 14
   fix:
+    content: return None
     location:
       row: 3
       column: 8
     end_location:
       row: 3
       column: 14
-    content: return None
-    message: ~
   parent: ~
 

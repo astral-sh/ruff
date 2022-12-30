@@ -5,7 +5,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind, LiteralType};
 
 /// UP018
 pub fn native_literals(
@@ -23,7 +23,12 @@ pub fn native_literals(
         && checker.is_builtin(id)
     {
         let Some(arg) = args.get(0) else {
-            let mut check = Check::new(CheckKind::NativeLiterals, Range::from_located(expr));
+            let literal_type = if id == "str" {
+                LiteralType::Str
+            } else {
+                LiteralType::Bytes
+            };
+             let mut check = Check::new(CheckKind::NativeLiterals(literal_type), Range::from_located(expr));
             if checker.patch(&CheckCode::UP018) {
                 check.amend(Fix::replacement(
                     format!("{}\"\"", if id == "bytes" { "b" } else { "" }),
@@ -35,15 +40,14 @@ pub fn native_literals(
             return;
         };
 
-        if !matches!(
-            &arg.node,
-            ExprKind::Constant {
-                value: Constant::Str(_) | Constant::Bytes(_),
-                ..
-            }
-        ) {
+        let ExprKind::Constant { value, ..} = &arg.node else {
             return;
-        }
+        };
+        let literal_type = match value {
+            Constant::Str { .. } => LiteralType::Str,
+            Constant::Bytes { .. } => LiteralType::Bytes,
+            _ => return,
+        };
 
         // rust-python merges adjacent string/bytes literals into one node, but we can't
         // safely remove the outer call in this situation. We're following pyupgrade
@@ -60,7 +64,10 @@ pub fn native_literals(
             return;
         }
 
-        let mut check = Check::new(CheckKind::NativeLiterals, Range::from_located(expr));
+        let mut check = Check::new(
+            CheckKind::NativeLiterals(literal_type),
+            Range::from_located(expr),
+        );
         if checker.patch(&CheckCode::UP018) {
             check.amend(Fix::replacement(
                 arg_code.to_string(),

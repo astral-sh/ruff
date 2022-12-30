@@ -11,14 +11,13 @@ expression: checks
     row: 137
     column: 24
   fix:
+    content: ""
     location:
       row: 136
       column: 0
     end_location:
       row: 137
       column: 0
-    content: ""
-    message: ~
   parent: ~
 - kind:
     NoBlankLineBeforeFunction: 1
@@ -29,14 +28,13 @@ expression: checks
     row: 151
     column: 37
   fix:
+    content: ""
     location:
       row: 150
       column: 0
     end_location:
       row: 151
       column: 0
-    content: ""
-    message: ~
   parent: ~
 - kind:
     NoBlankLineBeforeFunction: 1
@@ -47,14 +45,13 @@ expression: checks
     row: 549
     column: 7
   fix:
+    content: ""
     location:
       row: 545
       column: 0
     end_location:
       row: 546
       column: 0
-    content: ""
-    message: ~
   parent: ~
 - kind:
     NoBlankLineBeforeFunction: 1
@@ -65,13 +62,12 @@ expression: checks
     row: 571
     column: 7
   fix:
+    content: ""
     location:
       row: 567
       column: 0
     end_location:
       row: 568
       column: 0
-    content: ""
-    message: ~
   parent: ~
 

@@ -10,13 +10,12 @@ expression: checks
     row: 2
     column: 8
   fix:
+    content: "\n"
     location:
       row: 2
       column: 8
     end_location:
       row: 2
       column: 8
-    content: "\n"
-    message: ~
   parent: ~
 

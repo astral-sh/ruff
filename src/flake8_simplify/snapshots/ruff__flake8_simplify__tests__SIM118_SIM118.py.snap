@@ -13,14 +13,13 @@ expression: checks
     row: 1
     column: 18
   fix:
+    content: dict
     location:
       row: 1
       column: 7
     end_location:
       row: 1
       column: 18
-    content: dict
-    message: ~
   parent: ~
 - kind:
     KeyInDict:
@@ -33,14 +32,13 @@ expression: checks
     row: 3
     column: 25
   fix:
+    content: dict
     location:
       row: 3
       column: 14
     end_location:
       row: 3
       column: 25
-    content: dict
-    message: ~
   parent: ~
 - kind:
     KeyInDict:
@@ -53,14 +51,13 @@ expression: checks
     row: 5
     column: 20
   fix:
+    content: dict
     location:
       row: 5
       column: 9
     end_location:
       row: 5
       column: 20
-    content: dict
-    message: ~
   parent: ~
 - kind:
     KeyInDict:
@@ -73,13 +70,12 @@ expression: checks
     row: 7
     column: 22
   fix:
+    content: dict
     location:
       row: 7
       column: 11
     end_location:
       row: 7
       column: 22
-    content: dict
-    message: ~
   parent: ~
 

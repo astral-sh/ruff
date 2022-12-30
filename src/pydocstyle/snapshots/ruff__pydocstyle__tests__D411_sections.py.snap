@@ -11,14 +11,13 @@ expression: checks
     row: 78
     column: 7
   fix:
+    content: "\n"
     location:
       row: 71
       column: 0
     end_location:
       row: 71
       column: 0
-    content: "\n"
-    message: ~
   parent: ~
 - kind:
     BlankLineBeforeSection: Returns
@@ -29,14 +28,13 @@ expression: checks
     row: 129
     column: 7
   fix:
+    content: "\n"
     location:
       row: 125
       column: 0
     end_location:
       row: 125
       column: 0
-    content: "\n"
-    message: ~
   parent: ~
 - kind:
     BlankLineBeforeSection: Raises
@@ -47,13 +45,12 @@ expression: checks
     row: 221
     column: 7
   fix:
+    content: "\n"
     location:
       row: 218
       column: 0
     end_location:
       row: 218
       column: 0
-    content: "\n"
-    message: ~
   parent: ~
 

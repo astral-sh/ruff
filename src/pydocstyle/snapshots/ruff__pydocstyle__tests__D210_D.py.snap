@@ -10,14 +10,13 @@ expression: checks
     row: 288
     column: 33
   fix:
+    content: Whitespace at the end.
     location:
       row: 288
       column: 7
     end_location:
       row: 288
       column: 30
-    content: Whitespace at the end.
-    message: ~
   parent: ~
 - kind: NoSurroundingWhitespace
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 293
     column: 37
   fix:
+    content: Whitespace at everywhere.
     location:
       row: 293
       column: 7
     end_location:
       row: 293
       column: 34
-    content: Whitespace at everywhere.
-    message: ~
   parent: ~
 - kind: NoSurroundingWhitespace
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 302
     column: 7
   fix:
+    content: Whitespace at the beginning.
     location:
       row: 299
       column: 7
     end_location:
       row: 299
       column: 36
-    content: Whitespace at the beginning.
-    message: ~
   parent: ~
 - kind: NoSurroundingWhitespace
   location:

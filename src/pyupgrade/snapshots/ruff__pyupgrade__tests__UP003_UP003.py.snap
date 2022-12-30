@@ -11,14 +11,13 @@ expression: checks
     row: 1
     column: 8
   fix:
+    content: str
     location:
       row: 1
       column: 0
     end_location:
       row: 1
       column: 8
-    content: str
-    message: ~
   parent: ~
 - kind:
     TypeOfPrimitive: Bytes
@@ -29,14 +28,13 @@ expression: checks
     row: 2
     column: 9
   fix:
+    content: bytes
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 9
-    content: bytes
-    message: ~
   parent: ~
 - kind:
     TypeOfPrimitive: Int
@@ -47,14 +45,13 @@ expression: checks
     row: 3
     column: 7
   fix:
+    content: int
     location:
       row: 3
       column: 0
     end_location:
       row: 3
       column: 7
-    content: int
-    message: ~
   parent: ~
 - kind:
     TypeOfPrimitive: Float
@@ -65,14 +62,13 @@ expression: checks
     row: 4
     column: 8
   fix:
+    content: float
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 8
-    content: float
-    message: ~
   parent: ~
 - kind:
     TypeOfPrimitive: Complex
@@ -83,13 +79,12 @@ expression: checks
     row: 5
     column: 8
   fix:
+    content: complex
     location:
       row: 5
       column: 0
     end_location:
       row: 5
       column: 8
-    content: complex
-    message: ~
   parent: ~
 

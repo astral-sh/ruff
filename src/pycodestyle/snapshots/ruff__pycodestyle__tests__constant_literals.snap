@@ -2,7 +2,8 @@
 source: src/pycodestyle/mod.rs
 expression: checks
 ---
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 4
     column: 3
@@ -10,16 +11,16 @@ expression: checks
     row: 4
     column: 17
   fix:
+    content: "=="
     location:
       row: 4
       column: 9
     end_location:
       row: 4
       column: 11
-    content: "=="
-    message: ~
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 6
     column: 3
@@ -27,16 +28,16 @@ expression: checks
     row: 6
     column: 16
   fix:
+    content: "=="
     location:
       row: 6
       column: 9
     end_location:
       row: 6
       column: 11
-    content: "=="
-    message: ~
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 8
     column: 3
@@ -44,16 +45,16 @@ expression: checks
     row: 8
     column: 16
   fix:
+    content: "=="
     location:
       row: 8
       column: 8
     end_location:
       row: 8
       column: 10
-    content: "=="
-    message: ~
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 10
     column: 3
@@ -61,16 +62,16 @@ expression: checks
     row: 10
     column: 17
   fix:
+    content: "=="
     location:
       row: 10
       column: 9
     end_location:
       row: 10
       column: 11
-    content: "=="
-    message: ~
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 12
     column: 3
@@ -78,14 +79,13 @@ expression: checks
     row: 12
     column: 17
   fix:
+    content: "=="
     location:
       row: 12
       column: 9
     end_location:
       row: 12
       column: 11
-    content: "=="
-    message: ~
   parent: ~
 - kind:
     TrueFalseComparison:
@@ -98,14 +98,13 @@ expression: checks
     row: 14
     column: 8
   fix:
+    content: False is None
     location:
       row: 14
       column: 3
     end_location:
       row: 14
       column: 16
-    content: False is None
-    message: ~
   parent: ~
 - kind:
     NoneComparison: Eq
@@ -116,14 +115,13 @@ expression: checks
     row: 14
     column: 16
   fix:
+    content: False is None
     location:
       row: 14
       column: 3
     end_location:
       row: 14
       column: 16
-    content: False is None
-    message: ~
   parent: ~
 - kind:
     NoneComparison: Eq
@@ -134,14 +132,13 @@ expression: checks
     row: 16
     column: 7
   fix:
+    content: None is False
     location:
       row: 16
       column: 3
     end_location:
       row: 16
       column: 16
-    content: None is False
-    message: ~
   parent: ~
 - kind:
     TrueFalseComparison:
@@ -154,14 +151,13 @@ expression: checks
     row: 16
     column: 16
   fix:
+    content: None is False
     location:
       row: 16
       column: 3
     end_location:
       row: 16
       column: 16
-    content: None is False
-    message: ~
   parent: ~
 - kind:
     NoneComparison: Eq

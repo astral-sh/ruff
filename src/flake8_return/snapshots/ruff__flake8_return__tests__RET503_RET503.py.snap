@@ -19,14 +19,13 @@ expression: checks
     row: 14
     column: 15
   fix:
+    content: "        return None\n"
     location:
       row: 15
       column: 0
     end_location:
       row: 15
       column: 0
-    content: "        return None\n"
-    message: ~
   parent: ~
 - kind: ImplicitReturn
   location:
@@ -36,14 +35,13 @@ expression: checks
     row: 23
     column: 11
   fix:
+    content: "    return None\n"
     location:
       row: 24
       column: 0
     end_location:
       row: 24
       column: 0
-    content: "    return None\n"
-    message: ~
   parent: ~
 - kind: ImplicitReturn
   location:
@@ -62,13 +60,12 @@ expression: checks
     row: 39
     column: 15
   fix:
+    content: "        return None\n"
     location:
       row: 40
       column: 0
     end_location:
       row: 40
       column: 0
-    content: "        return None\n"
-    message: ~
   parent: ~
 

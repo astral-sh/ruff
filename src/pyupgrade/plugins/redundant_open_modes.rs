@@ -2,10 +2,11 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use log::error;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword, KeywordData, Location};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 
+use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
@@ -78,7 +79,10 @@ fn create_check(
     locator: &SourceCodeLocator,
     patch: bool,
 ) -> Check {
-    let mut check = Check::new(CheckKind::RedundantOpenModes, Range::from_located(expr));
+    let mut check = Check::new(
+        CheckKind::RedundantOpenModes(replacement_value.clone()),
+        Range::from_located(expr),
+    );
     if patch {
         if let Some(content) = replacement_value {
             check.amend(Fix::replacement(
@@ -153,27 +157,16 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     }
     let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
     if mode_param.is_none() && !keywords.is_empty() {
-        if let Some(value) = keywords.iter().find_map(|keyword| {
-            let KeywordData { arg, value } = &keyword.node;
-            if arg
-                .as_ref()
-                .map(|arg| arg == MODE_KEYWORD_ARGUMENT)
-                .unwrap_or_default()
-            {
-                Some(value)
-            } else {
-                None
-            }
-        }) {
+        if let Some(keyword) = find_keyword(&keywords, MODE_KEYWORD_ARGUMENT) {
             if let ExprKind::Constant {
                 value: Constant::Str(mode_param_value),
                 ..
-            } = &value.node
+            } = &keyword.node.value.node
             {
                 if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                     checker.add_check(create_check(
                         expr,
-                        value,
+                        &keyword.node.value,
                         mode.replacement_value(),
                         checker.locator,
                         checker.patch(&CheckCode::UP015),

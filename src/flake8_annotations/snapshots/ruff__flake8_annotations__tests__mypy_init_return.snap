@@ -11,14 +11,13 @@ expression: checks
     row: 5
     column: 16
   fix:
+    content: " -> None"
     location:
       row: 5
       column: 22
     end_location:
       row: 5
       column: 22
-    content: " -> None"
-    message: ~
   parent: ~
 - kind:
     MissingReturnTypeSpecialMethod: __init__
@@ -29,14 +28,13 @@ expression: checks
     row: 11
     column: 16
   fix:
+    content: " -> None"
     location:
       row: 11
       column: 27
     end_location:
       row: 11
       column: 27
-    content: " -> None"
-    message: ~
   parent: ~
 - kind:
     MissingReturnTypePrivateFunction: __init__

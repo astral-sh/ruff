@@ -110,13 +110,10 @@ pub fn check_noqa(
                         if matches!(autofix, flags::Autofix::Enabled)
                             && settings.fixable.contains(check.kind.code())
                         {
-                            check.amend(
-                                Fix::deletion(
-                                    Location::new(row + 1, start - spaces),
-                                    Location::new(row + 1, lines[row].chars().count()),
-                                )
-                                .with_message("Remove unused `noqa` directive".to_string()),
-                            );
+                            check.amend(Fix::deletion(
+                                Location::new(row + 1, start - spaces),
+                                Location::new(row + 1, lines[row].chars().count()),
+                            ));
                         }
                         checks.push(check);
                     }

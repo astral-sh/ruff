@@ -11,14 +11,13 @@ expression: checks
     row: 2
     column: 14
   fix:
+    content: list(x)
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 14
-    content: list(x)
-    message: ~
   parent: ~
 - kind:
     UnnecessaryComprehension: set
@@ -29,13 +28,12 @@ expression: checks
     row: 3
     column: 14
   fix:
+    content: set(x)
     location:
       row: 3
       column: 0
     end_location:
       row: 3
       column: 14
-    content: set(x)
-    message: ~
   parent: ~
 

@@ -10,14 +10,13 @@ expression: checks
     row: 7
     column: 13
   fix:
+    content: str
     location:
       row: 7
       column: 0
     end_location:
       row: 7
       column: 13
-    content: str
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 8
     column: 15
   fix:
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 15
     content: bytes
-    message: ~
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 15
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 9
     column: 15
   fix:
+    content: "(type,)"
     location:
       row: 9
       column: 0
     end_location:
       row: 9
       column: 15
-    content: "(type,)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -61,14 +58,13 @@ expression: checks
     row: 10
     column: 16
   fix:
+    content: "(str,)"
     location:
       row: 10
       column: 0
     end_location:
       row: 10
       column: 16
-    content: "(str,)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -78,14 +74,13 @@ expression: checks
     row: 11
     column: 17
   fix:
+    content: "(int,)"
     location:
       row: 11
       column: 0
     end_location:
       row: 11
       column: 17
-    content: "(int,)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -95,14 +90,13 @@ expression: checks
     row: 12
     column: 10
   fix:
+    content: chr
     location:
       row: 12
       column: 0
     end_location:
       row: 12
       column: 10
-    content: chr
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -112,14 +106,13 @@ expression: checks
     row: 13
     column: 13
   fix:
+    content: iter
     location:
       row: 13
       column: 0
     end_location:
       row: 13
       column: 13
-    content: iter
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -129,14 +122,13 @@ expression: checks
     row: 14
     column: 10
   fix:
+    content: print
     location:
       row: 14
       column: 0
     end_location:
       row: 14
       column: 10
-    content: print
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -146,14 +138,13 @@ expression: checks
     row: 15
     column: 9
   fix:
+    content: exec
     location:
       row: 15
       column: 0
     end_location:
       row: 15
       column: 9
-    content: exec
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -163,14 +154,13 @@ expression: checks
     row: 16
     column: 20
   fix:
+    content: next
     location:
       row: 16
       column: 0
     end_location:
       row: 16
       column: 20
-    content: next
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -180,14 +170,13 @@ expression: checks
     row: 17
     column: 8
   fix:
+    content: next
     location:
       row: 17
       column: 0
     end_location:
       row: 17
       column: 8
-    content: next
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -197,14 +186,13 @@ expression: checks
     row: 18
     column: 12
   fix:
+    content: callable
     location:
       row: 18
       column: 0
     end_location:
       row: 18
       column: 12
-    content: callable
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -214,14 +202,13 @@ expression: checks
     row: 19
     column: 15
   fix:
+    content: range
     location:
       row: 19
       column: 0
     end_location:
       row: 19
       column: 15
-    content: range
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -231,14 +218,13 @@ expression: checks
     row: 20
     column: 16
   fix:
+    content: range
     location:
       row: 20
       column: 0
     end_location:
       row: 20
       column: 16
-    content: range
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -248,14 +234,13 @@ expression: checks
     row: 21
     column: 31
   fix:
+    content: "(type,)"
     location:
       row: 21
       column: 16
     end_location:
       row: 21
       column: 31
-    content: "(type,)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -265,14 +250,13 @@ expression: checks
     row: 22
     column: 33
   fix:
+    content: "(int,)"
     location:
       row: 22
       column: 16
     end_location:
       row: 22
       column: 33
-    content: "(int,)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -282,14 +266,13 @@ expression: checks
     row: 23
     column: 32
   fix:
+    content: "(str,)"
     location:
       row: 23
       column: 16
     end_location:
       row: 23
       column: 32
-    content: "(str,)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -299,14 +282,13 @@ expression: checks
     row: 26
     column: 18
   fix:
+    content: dct.items()
     location:
       row: 26
       column: 0
     end_location:
       row: 26
       column: 18
-    content: dct.items()
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -316,14 +298,13 @@ expression: checks
     row: 27
     column: 17
   fix:
+    content: dct.keys()
     location:
       row: 27
       column: 0
     end_location:
       row: 27
       column: 17
-    content: dct.keys()
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -333,14 +314,13 @@ expression: checks
     row: 28
     column: 19
   fix:
+    content: dct.values()
     location:
       row: 28
       column: 0
     end_location:
       row: 28
       column: 19
-    content: dct.values()
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -350,14 +330,13 @@ expression: checks
     row: 29
     column: 18
   fix:
+    content: dct.items()
     location:
       row: 29
       column: 0
     end_location:
       row: 29
       column: 18
-    content: dct.items()
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -367,14 +346,13 @@ expression: checks
     row: 30
     column: 17
   fix:
+    content: dct.keys()
     location:
       row: 30
       column: 0
     end_location:
       row: 30
       column: 17
-    content: dct.keys()
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -384,14 +362,13 @@ expression: checks
     row: 31
     column: 19
   fix:
+    content: dct.values()
     location:
       row: 31
       column: 0
     end_location:
       row: 31
       column: 19
-    content: dct.values()
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -401,14 +378,13 @@ expression: checks
     row: 32
     column: 34
   fix:
+    content: "self.assertCountEqual(a1, a2)"
     location:
       row: 32
       column: 0
     end_location:
       row: 32
       column: 34
-    content: "self.assertCountEqual(a1, a2)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -418,14 +394,13 @@ expression: checks
     row: 33
     column: 37
   fix:
+    content: "self.assertRaisesRegex(e, r, fn)"
     location:
       row: 33
       column: 0
     end_location:
       row: 33
       column: 37
-    content: "self.assertRaisesRegex(e, r, fn)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -435,14 +410,13 @@ expression: checks
     row: 34
     column: 27
   fix:
+    content: "self.assertRegex(s, r)"
     location:
       row: 34
       column: 0
     end_location:
       row: 34
       column: 27
-    content: "self.assertRegex(s, r)"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -452,14 +426,13 @@ expression: checks
     row: 37
     column: 29
   fix:
-    location:
-      row: 37
-      column: 0
-    end_location:
-      row: 37
-      column: 29
     content: meth.__func__
-    message: ~
+    location:
+      row: 37
+      column: 0
+    end_location:
+      row: 37
+      column: 29
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -469,14 +442,13 @@ expression: checks
     row: 38
     column: 25
   fix:
+    content: meth.__self__
     location:
       row: 38
       column: 0
     end_location:
       row: 38
       column: 25
-    content: meth.__self__
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -486,14 +458,13 @@ expression: checks
     row: 39
     column: 28
   fix:
+    content: fn.__closure__
     location:
       row: 39
       column: 0
     end_location:
       row: 39
       column: 28
-    content: fn.__closure__
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -503,14 +474,13 @@ expression: checks
     row: 40
     column: 25
   fix:
+    content: fn.__code__
     location:
       row: 40
       column: 0
     end_location:
       row: 40
       column: 25
-    content: fn.__code__
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -520,14 +490,13 @@ expression: checks
     row: 41
     column: 29
   fix:
+    content: fn.__defaults__
     location:
       row: 41
       column: 0
     end_location:
       row: 41
       column: 29
-    content: fn.__defaults__
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -537,14 +506,13 @@ expression: checks
     row: 42
     column: 28
   fix:
+    content: fn.__globals__
     location:
       row: 42
       column: 0
     end_location:
       row: 42
       column: 28
-    content: fn.__globals__
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -554,14 +522,13 @@ expression: checks
     row: 45
     column: 12
   fix:
-    location:
-      row: 45
-      column: 0
-    end_location:
-      row: 45
-      column: 12
     content: "b\"...\""
-    message: ~
+    location:
+      row: 45
+      column: 0
+    end_location:
+      row: 45
+      column: 12
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -571,14 +538,13 @@ expression: checks
     row: 46
     column: 12
   fix:
+    content: "\"...\""
     location:
       row: 46
       column: 0
     end_location:
       row: 46
       column: 12
-    content: "\"...\""
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -588,14 +554,13 @@ expression: checks
     row: 47
     column: 24
   fix:
+    content: "b\"...\""
     location:
       row: 47
       column: 0
     end_location:
       row: 47
       column: 24
-    content: "b\"...\""
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -605,14 +570,13 @@ expression: checks
     row: 48
     column: 21
   fix:
+    content: "\"...\""
     location:
       row: 48
       column: 0
     end_location:
       row: 48
       column: 21
-    content: "\"...\""
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -622,14 +586,13 @@ expression: checks
     row: 49
     column: 22
   fix:
+    content: "\"...\""
     location:
       row: 49
       column: 0
     end_location:
       row: 49
       column: 22
-    content: "\"...\""
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -639,14 +602,13 @@ expression: checks
     row: 53
     column: 30
   fix:
+    content: meth
     location:
       row: 53
       column: 0
     end_location:
       row: 53
       column: 30
-    content: meth
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -656,14 +618,13 @@ expression: checks
     row: 54
     column: 34
   fix:
+    content: fn
     location:
       row: 54
       column: 0
     end_location:
       row: 54
       column: 34
-    content: fn
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -673,14 +634,13 @@ expression: checks
     row: 57
     column: 29
   fix:
+    content: raise exc from exc_from
     location:
       row: 57
       column: 0
     end_location:
       row: 57
       column: 29
-    content: raise exc from exc_from
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -690,14 +650,13 @@ expression: checks
     row: 58
     column: 24
   fix:
+    content: raise exc.with_traceback(tb)
     location:
       row: 58
       column: 0
     end_location:
       row: 58
       column: 24
-    content: raise exc.with_traceback(tb)
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -707,14 +666,13 @@ expression: checks
     row: 59
     column: 28
   fix:
+    content: raise
     location:
       row: 59
       column: 0
     end_location:
       row: 59
       column: 28
-    content: raise
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -724,14 +682,13 @@ expression: checks
     row: 62
     column: 16
   fix:
+    content: "bs[0]"
     location:
       row: 62
       column: 0
     end_location:
       row: 62
       column: 16
-    content: "bs[0]"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -741,14 +698,13 @@ expression: checks
     row: 63
     column: 21
   fix:
+    content: "bs[i]"
     location:
       row: 63
       column: 0
     end_location:
       row: 63
       column: 21
-    content: "bs[i]"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -758,14 +714,13 @@ expression: checks
     row: 64
     column: 15
   fix:
+    content: "bytes((i,))"
     location:
       row: 64
       column: 0
     end_location:
       row: 64
       column: 15
-    content: "bytes((i,))"
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -775,14 +730,13 @@ expression: checks
     row: 67
     column: 23
   fix:
-    location:
-      row: 67
-      column: 5
-    end_location:
-      row: 67
-      column: 23
     content: iter(dct.items())
-    message: ~
+    location:
+      row: 67
+      column: 5
+    end_location:
+      row: 67
+      column: 23
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -792,14 +746,13 @@ expression: checks
     row: 67
     column: 23
   fix:
+    content: dct.items()
     location:
       row: 67
       column: 5
     end_location:
       row: 67
       column: 23
-    content: dct.items()
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -809,14 +762,13 @@ expression: checks
     row: 68
     column: 22
   fix:
-    location:
-      row: 68
-      column: 5
-    end_location:
-      row: 68
-      column: 22
     content: iter(dct.keys())
-    message: ~
+    location:
+      row: 68
+      column: 5
+    end_location:
+      row: 68
+      column: 22
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -826,14 +778,13 @@ expression: checks
     row: 68
     column: 22
   fix:
+    content: dct.keys()
     location:
       row: 68
       column: 5
     end_location:
       row: 68
       column: 22
-    content: dct.keys()
-    message: ~
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -843,14 +794,13 @@ expression: checks
     row: 69
     column: 24
   fix:
-    location:
-      row: 69
-      column: 5
-    end_location:
-      row: 69
-      column: 24
     content: iter(dct.values())
-    message: ~
+    location:
+      row: 69
+      column: 5
+    end_location:
+      row: 69
+      column: 24
   parent: ~
 - kind: RemoveSixCompat
   location:
@@ -860,13 +810,12 @@ expression: checks
     row: 69
     column: 24
   fix:
+    content: dct.values()
     location:
       row: 69
       column: 5
     end_location:
       row: 69
       column: 24
-    content: dct.values()
-    message: ~
   parent: ~
 

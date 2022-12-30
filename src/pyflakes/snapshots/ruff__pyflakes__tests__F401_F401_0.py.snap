@@ -6,6 +6,7 @@ expression: checks
     UnusedImport:
       - functools
       - false
+      - false
   location:
     row: 2
     column: 7
@@ -13,18 +14,18 @@ expression: checks
     row: 2
     column: 16
   fix:
+    content: import os
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 20
-    content: import os
-    message: ~
   parent: ~
 - kind:
     UnusedImport:
       - collections.OrderedDict
+      - false
       - false
   location:
     row: 6
@@ -33,20 +34,20 @@ expression: checks
     row: 6
     column: 15
   fix:
+    content: "from collections import (\n    Counter,\n    namedtuple,\n)"
     location:
       row: 4
       column: 0
     end_location:
       row: 8
       column: 1
-    content: "from collections import (\n    Counter,\n    namedtuple,\n)"
-    message: ~
   parent:
     row: 4
     column: 0
 - kind:
     UnusedImport:
       - logging.handlers
+      - false
       - false
   location:
     row: 12
@@ -55,18 +56,18 @@ expression: checks
     row: 12
     column: 23
   fix:
+    content: ""
     location:
       row: 12
       column: 0
     end_location:
       row: 13
       column: 0
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedImport:
       - shelve
+      - false
       - false
   location:
     row: 32
@@ -75,18 +76,18 @@ expression: checks
     row: 32
     column: 17
   fix:
+    content: ""
     location:
       row: 32
       column: 0
     end_location:
       row: 33
       column: 0
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedImport:
       - importlib
+      - false
       - false
   location:
     row: 33
@@ -95,18 +96,18 @@ expression: checks
     row: 33
     column: 20
   fix:
+    content: pass
     location:
       row: 33
       column: 4
     end_location:
       row: 33
       column: 20
-    content: pass
-    message: ~
   parent: ~
 - kind:
     UnusedImport:
       - pathlib
+      - false
       - false
   location:
     row: 37
@@ -115,18 +116,18 @@ expression: checks
     row: 37
     column: 18
   fix:
+    content: ""
     location:
       row: 37
       column: 0
     end_location:
       row: 38
       column: 0
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedImport:
       - pickle
+      - false
       - false
   location:
     row: 52
@@ -135,13 +136,12 @@ expression: checks
     row: 52
     column: 21
   fix:
+    content: pass
     location:
       row: 52
       column: 8
     end_location:
       row: 52
       column: 21
-    content: pass
-    message: ~
   parent: ~
 

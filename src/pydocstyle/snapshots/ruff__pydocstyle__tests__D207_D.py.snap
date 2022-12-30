@@ -10,14 +10,13 @@ expression: checks
     row: 232
     column: 0
   fix:
+    content: "    "
     location:
       row: 232
       column: 0
     end_location:
       row: 232
       column: 0
-    content: "    "
-    message: ~
   parent: ~
 - kind: NoUnderIndentation
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 244
     column: 0
   fix:
-    location:
-      row: 244
-      column: 0
-    end_location:
-      row: 244
-      column: 0
     content: "    "
-    message: ~
+    location:
+      row: 244
+      column: 0
+    end_location:
+      row: 244
+      column: 0
   parent: ~
 - kind: NoUnderIndentation
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 440
     column: 0
   fix:
+    content: "                                    "
     location:
       row: 440
       column: 0
     end_location:
       row: 440
       column: 4
-    content: "                                    "
-    message: ~
   parent: ~
 - kind: NoUnderIndentation
   location:
@@ -61,13 +58,12 @@ expression: checks
     row: 441
     column: 0
   fix:
+    content: "                                    "
     location:
       row: 441
       column: 0
     end_location:
       row: 441
       column: 4
-    content: "                                    "
-    message: ~
   parent: ~
 

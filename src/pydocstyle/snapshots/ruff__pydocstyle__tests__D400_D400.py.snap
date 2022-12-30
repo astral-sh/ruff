@@ -10,14 +10,13 @@ expression: checks
     row: 2
     column: 36
   fix:
+    content: "."
     location:
       row: 2
       column: 35
     end_location:
       row: 2
       column: 35
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 7
     column: 40
   fix:
+    content: "."
     location:
       row: 7
       column: 37
     end_location:
       row: 7
       column: 37
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 15
     column: 7
   fix:
+    content: "."
     location:
       row: 14
       column: 28
     end_location:
       row: 14
       column: 28
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -61,14 +58,13 @@ expression: checks
     row: 20
     column: 40
   fix:
+    content: "."
     location:
       row: 20
       column: 37
     end_location:
       row: 20
       column: 37
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -78,14 +74,13 @@ expression: checks
     row: 27
     column: 31
   fix:
+    content: "."
     location:
       row: 27
       column: 28
     end_location:
       row: 27
       column: 28
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -95,14 +90,13 @@ expression: checks
     row: 34
     column: 52
   fix:
+    content: "."
     location:
       row: 34
       column: 48
     end_location:
       row: 34
       column: 48
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -112,14 +106,13 @@ expression: checks
     row: 40
     column: 37
   fix:
+    content: "."
     location:
       row: 40
       column: 36
     end_location:
       row: 40
       column: 36
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -129,14 +122,13 @@ expression: checks
     row: 45
     column: 41
   fix:
+    content: "."
     location:
       row: 45
       column: 38
     end_location:
       row: 45
       column: 38
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -146,14 +138,13 @@ expression: checks
     row: 53
     column: 7
   fix:
+    content: "."
     location:
       row: 52
       column: 28
     end_location:
       row: 52
       column: 28
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -163,14 +154,13 @@ expression: checks
     row: 58
     column: 41
   fix:
+    content: "."
     location:
       row: 58
       column: 38
     end_location:
       row: 58
       column: 38
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -180,14 +170,13 @@ expression: checks
     row: 65
     column: 31
   fix:
+    content: "."
     location:
       row: 65
       column: 28
     end_location:
       row: 65
       column: 28
-    content: "."
-    message: ~
   parent: ~
 - kind: EndsInPeriod
   location:
@@ -197,13 +186,12 @@ expression: checks
     row: 72
     column: 52
   fix:
+    content: "."
     location:
       row: 72
       column: 48
     end_location:
       row: 72
       column: 48
-    content: "."
-    message: ~
   parent: ~
 

@@ -10,14 +10,13 @@ expression: checks
     row: 37
     column: 25
   fix:
+    content: foo.bar = None
     location:
       row: 37
       column: 0
     end_location:
       row: 37
       column: 25
-    content: foo.bar = None
-    message: ~
   parent: ~
 - kind: SetAttrWithConstant
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 38
     column: 29
   fix:
+    content: foo._123abc = None
     location:
       row: 38
       column: 0
     end_location:
       row: 38
       column: 29
-    content: foo._123abc = None
-    message: ~
   parent: ~
 - kind: SetAttrWithConstant
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 39
     column: 28
   fix:
+    content: foo.abc123 = None
     location:
       row: 39
       column: 0
     end_location:
       row: 39
       column: 28
-    content: foo.abc123 = None
-    message: ~
   parent: ~
 - kind: SetAttrWithConstant
   location:
@@ -61,14 +58,13 @@ expression: checks
     row: 40
     column: 29
   fix:
+    content: foo.abc123 = None
     location:
       row: 40
       column: 0
     end_location:
       row: 40
       column: 29
-    content: foo.abc123 = None
-    message: ~
   parent: ~
 - kind: SetAttrWithConstant
   location:
@@ -78,13 +74,12 @@ expression: checks
     row: 41
     column: 30
   fix:
+    content: foo.bar.baz = None
     location:
       row: 41
       column: 0
     end_location:
       row: 41
       column: 30
-    content: foo.bar.baz = None
-    message: ~
   parent: ~
 

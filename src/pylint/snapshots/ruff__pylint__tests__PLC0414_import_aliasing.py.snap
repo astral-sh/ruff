@@ -10,14 +10,13 @@ expression: checks
     row: 6
     column: 33
   fix:
+    content: collections
     location:
       row: 6
       column: 7
     end_location:
       row: 6
       column: 33
-    content: collections
-    message: ~
   parent: ~
 - kind: UselessImportAlias
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 7
     column: 50
   fix:
+    content: OrderedDict
     location:
       row: 7
       column: 24
     end_location:
       row: 7
       column: 50
-    content: OrderedDict
-    message: ~
   parent: ~
 - kind: UselessImportAlias
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 15
     column: 24
   fix:
+    content: bar
     location:
       row: 15
       column: 14
     end_location:
       row: 15
       column: 24
-    content: bar
-    message: ~
   parent: ~
 - kind: UselessImportAlias
   location:
@@ -61,14 +58,13 @@ expression: checks
     row: 18
     column: 28
   fix:
+    content: bar
     location:
       row: 18
       column: 18
     end_location:
       row: 18
       column: 28
-    content: bar
-    message: ~
   parent: ~
 - kind: UselessImportAlias
   location:
@@ -78,14 +74,13 @@ expression: checks
     row: 19
     column: 38
   fix:
+    content: foobar
     location:
       row: 19
       column: 22
     end_location:
       row: 19
       column: 38
-    content: foobar
-    message: ~
   parent: ~
 - kind: UselessImportAlias
   location:
@@ -95,14 +90,13 @@ expression: checks
     row: 21
     column: 24
   fix:
+    content: foo
     location:
       row: 21
       column: 14
     end_location:
       row: 21
       column: 24
-    content: foo
-    message: ~
   parent: ~
 - kind: UselessImportAlias
   location:
@@ -112,14 +106,13 @@ expression: checks
     row: 22
     column: 38
   fix:
+    content: foo2
     location:
       row: 22
       column: 26
     end_location:
       row: 22
       column: 38
-    content: foo2
-    message: ~
   parent: ~
 - kind: UselessImportAlias
   location:
@@ -129,13 +122,12 @@ expression: checks
     row: 24
     column: 36
   fix:
+    content: foobar
     location:
       row: 24
       column: 20
     end_location:
       row: 24
       column: 36
-    content: foobar
-    message: ~
   parent: ~
 

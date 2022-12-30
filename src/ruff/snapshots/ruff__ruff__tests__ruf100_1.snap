@@ -6,6 +6,7 @@ expression: checks
     UnusedImport:
       - typing.Union
       - false
+      - false
   location:
     row: 28
     column: 4
@@ -13,14 +14,13 @@ expression: checks
     row: 28
     column: 9
   fix:
+    content: "from typing import (\n    Mapping,  # noqa: F401\n    )"
     location:
       row: 26
       column: 0
     end_location:
       row: 29
       column: 1
-    content: "from typing import (\n    Mapping,  # noqa: F401\n    )"
-    message: ~
   parent:
     row: 26
     column: 0
@@ -37,14 +37,13 @@ expression: checks
     row: 39
     column: 27
   fix:
+    content: ""
     location:
       row: 39
       column: 13
     end_location:
       row: 39
       column: 27
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -59,14 +58,13 @@ expression: checks
     row: 44
     column: 27
   fix:
+    content: ""
     location:
       row: 44
       column: 13
     end_location:
       row: 44
       column: 27
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -81,14 +79,13 @@ expression: checks
     row: 49
     column: 23
   fix:
+    content: ""
     location:
       row: 49
       column: 9
     end_location:
       row: 49
       column: 23
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -103,19 +100,19 @@ expression: checks
     row: 53
     column: 34
   fix:
+    content: ""
     location:
       row: 53
       column: 20
     end_location:
       row: 53
       column: 34
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedImport:
       - typing.Awaitable
       - false
+      - true
   location:
     row: 64
     column: 19
@@ -123,19 +120,19 @@ expression: checks
     row: 64
     column: 28
   fix:
+    content: ""
     location:
       row: 64
       column: 0
     end_location:
       row: 65
       column: 0
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedImport:
       - typing.AwaitableGenerator
       - false
+      - true
   location:
     row: 64
     column: 30
@@ -143,14 +140,13 @@ expression: checks
     row: 64
     column: 48
   fix:
+    content: ""
     location:
       row: 64
       column: 0
     end_location:
       row: 65
       column: 0
-    content: ""
-    message: ~
   parent: ~
 - kind:
     UnusedNOQA:
@@ -165,13 +161,12 @@ expression: checks
     row: 64
     column: 62
   fix:
+    content: ""
     location:
       row: 64
       column: 48
     end_location:
       row: 64
       column: 62
-    content: ""
-    message: ~
   parent: ~
 

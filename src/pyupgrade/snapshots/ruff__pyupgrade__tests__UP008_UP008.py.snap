@@ -10,14 +10,13 @@ expression: checks
     row: 17
     column: 35
   fix:
+    content: super()
     location:
       row: 17
       column: 17
     end_location:
       row: 17
       column: 35
-    content: super()
-    message: ~
   parent: ~
 - kind: SuperCallWithParameters
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 18
     column: 26
   fix:
+    content: super()
     location:
       row: 18
       column: 8
     end_location:
       row: 18
       column: 26
-    content: super()
-    message: ~
   parent: ~
 - kind: SuperCallWithParameters
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 22
     column: 9
   fix:
+    content: super()
     location:
       row: 19
       column: 8
     end_location:
       row: 22
       column: 9
-    content: super()
-    message: ~
   parent: ~
 - kind: SuperCallWithParameters
   location:
@@ -61,14 +58,13 @@ expression: checks
     row: 36
     column: 28
   fix:
+    content: super()
     location:
       row: 36
       column: 8
     end_location:
       row: 36
       column: 28
-    content: super()
-    message: ~
   parent: ~
 - kind: SuperCallWithParameters
   location:
@@ -78,13 +74,12 @@ expression: checks
     row: 50
     column: 32
   fix:
+    content: super()
     location:
       row: 50
       column: 12
     end_location:
       row: 50
       column: 32
-    content: super()
-    message: ~
   parent: ~
 

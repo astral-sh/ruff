@@ -102,14 +102,11 @@ pub fn check_imports(
         if matches!(autofix, flags::Autofix::Enabled)
             && settings.fixable.contains(check.kind.code())
         {
-            check.amend(
-                Fix::replacement(
-                    indent(&expected, indentation),
-                    range.location,
-                    range.end_location,
-                )
-                .with_message("Organize imports".to_string()),
-            );
+            check.amend(Fix::replacement(
+                indent(&expected, indentation),
+                range.location,
+                range.end_location,
+            ));
         }
         Some(check)
     }

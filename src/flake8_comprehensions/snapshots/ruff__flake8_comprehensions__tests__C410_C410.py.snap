@@ -11,14 +11,13 @@ expression: checks
     row: 1
     column: 17
   fix:
+    content: "[1, 2]"
     location:
       row: 1
       column: 5
     end_location:
       row: 1
       column: 17
-    content: "[1, 2]"
-    message: ~
   parent: ~
 - kind:
     UnnecessaryLiteralWithinListCall: tuple
@@ -29,14 +28,13 @@ expression: checks
     row: 2
     column: 17
   fix:
+    content: "[1, 2]"
     location:
       row: 2
       column: 5
     end_location:
       row: 2
       column: 17
-    content: "[1, 2]"
-    message: ~
   parent: ~
 - kind:
     UnnecessaryLiteralWithinListCall: list
@@ -47,14 +45,13 @@ expression: checks
     row: 3
     column: 13
   fix:
+    content: "[]"
     location:
       row: 3
       column: 5
     end_location:
       row: 3
       column: 13
-    content: "[]"
-    message: ~
   parent: ~
 - kind:
     UnnecessaryLiteralWithinListCall: tuple
@@ -65,13 +62,12 @@ expression: checks
     row: 4
     column: 13
   fix:
+    content: "[]"
     location:
       row: 4
       column: 5
     end_location:
       row: 4
       column: 13
-    content: "[]"
-    message: ~
   parent: ~
 

@@ -10,14 +10,13 @@ expression: checks
     row: 4
     column: 69
   fix:
+    content: capture_output=True
     location:
       row: 4
       column: 22
     end_location:
       row: 4
       column: 68
-    content: capture_output=True
-    message: ~
   parent: ~
 - kind: ReplaceStdoutStderr
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 6
     column: 80
   fix:
+    content: capture_output=True
     location:
       row: 6
       column: 33
     end_location:
       row: 6
       column: 79
-    content: capture_output=True
-    message: ~
   parent: ~
 - kind: ReplaceStdoutStderr
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 8
     column: 86
   fix:
+    content: "capture_output=True, args=[\"foo\"]"
     location:
       row: 8
       column: 24
     end_location:
       row: 8
       column: 85
-    content: "capture_output=True, args=[\"foo\"]"
-    message: ~
   parent: ~
 - kind: ReplaceStdoutStderr
   location:
@@ -61,14 +58,13 @@ expression: checks
     row: 12
     column: 1
   fix:
+    content: "capture_output=True, check=True"
     location:
       row: 11
       column: 13
     end_location:
       row: 11
       column: 71
-    content: "capture_output=True, check=True"
-    message: ~
   parent: ~
 - kind: ReplaceStdoutStderr
   location:
@@ -78,14 +74,13 @@ expression: checks
     row: 16
     column: 1
   fix:
+    content: "capture_output=True, check=True"
     location:
       row: 15
       column: 13
     end_location:
       row: 15
       column: 71
-    content: "capture_output=True, check=True"
-    message: ~
   parent: ~
 - kind: ReplaceStdoutStderr
   location:
@@ -95,14 +90,13 @@ expression: checks
     row: 26
     column: 1
   fix:
+    content: "capture_output=True,\n    check=True"
     location:
       row: 20
       column: 4
     end_location:
       row: 22
       column: 26
-    content: "capture_output=True,\n    check=True"
-    message: ~
   parent: ~
 - kind: ReplaceStdoutStderr
   location:
@@ -112,13 +106,12 @@ expression: checks
     row: 36
     column: 5
   fix:
+    content: "capture_output=True,\n        check=True"
     location:
       row: 31
       column: 8
     end_location:
       row: 33
       column: 30
-    content: "capture_output=True,\n        check=True"
-    message: ~
   parent: ~
 

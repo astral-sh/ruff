@@ -11,14 +11,13 @@ expression: checks
     row: 3
     column: 4
   fix:
+    content: exit2
     location:
       row: 3
       column: 0
     end_location:
       row: 3
       column: 4
-    content: exit2
-    message: ~
   parent: ~
 - kind:
     UseSysExit: quit
@@ -29,14 +28,13 @@ expression: checks
     row: 4
     column: 4
   fix:
+    content: exit2
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 4
-    content: exit2
-    message: ~
   parent: ~
 - kind:
     UseSysExit: exit
@@ -47,14 +45,13 @@ expression: checks
     row: 8
     column: 8
   fix:
+    content: exit2
     location:
       row: 8
       column: 4
     end_location:
       row: 8
       column: 8
-    content: exit2
-    message: ~
   parent: ~
 - kind:
     UseSysExit: quit
@@ -65,13 +62,12 @@ expression: checks
     row: 9
     column: 8
   fix:
+    content: exit2
     location:
       row: 9
       column: 4
     end_location:
       row: 9
       column: 8
-    content: exit2
-    message: ~
   parent: ~
 

@@ -11,14 +11,13 @@ expression: checks
     row: 105
     column: 7
   fix:
+    content: "    -------\n"
     location:
       row: 102
       column: 0
     end_location:
       row: 103
       column: 0
-    content: "    -------\n"
-    message: ~
   parent: ~
 - kind:
     SectionUnderlineMatchesSectionLength: Returns
@@ -29,13 +28,12 @@ expression: checks
     row: 221
     column: 7
   fix:
+    content: "    -------\n"
     location:
       row: 216
       column: 0
     end_location:
       row: 217
       column: 0
-    content: "    -------\n"
-    message: ~
   parent: ~
 

@@ -56,7 +56,9 @@ export default function SourceEditor({
             .filter((check) => position.startLineNumber === check.location.row)
             .filter((check) => check.fix)
             .map((check) => ({
-              title: `Fix ${check.code}`,
+              title: check.fix
+                ? check.fix.message ?? `Fix ${check.code}`
+                : "Autofix",
               id: `fix-${check.code}`,
               kind: "quickfix",
               edit: check.fix

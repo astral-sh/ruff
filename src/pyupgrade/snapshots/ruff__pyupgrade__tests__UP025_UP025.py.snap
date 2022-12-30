@@ -10,14 +10,13 @@ expression: checks
     row: 2
     column: 12
   fix:
+    content: ""
     location:
       row: 2
       column: 4
     end_location:
       row: 2
       column: 5
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -27,14 +26,13 @@ expression: checks
     row: 4
     column: 8
   fix:
+    content: ""
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 1
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -44,14 +42,13 @@ expression: checks
     row: 6
     column: 14
   fix:
+    content: ""
     location:
       row: 6
       column: 6
     end_location:
       row: 6
       column: 7
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -61,14 +58,13 @@ expression: checks
     row: 8
     column: 14
   fix:
+    content: ""
     location:
       row: 8
       column: 6
     end_location:
       row: 8
       column: 7
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -78,14 +74,13 @@ expression: checks
     row: 12
     column: 12
   fix:
+    content: ""
     location:
       row: 12
       column: 4
     end_location:
       row: 12
       column: 5
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -95,14 +90,13 @@ expression: checks
     row: 12
     column: 22
   fix:
+    content: ""
     location:
       row: 12
       column: 14
     end_location:
       row: 12
       column: 15
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -112,14 +106,13 @@ expression: checks
     row: 12
     column: 34
   fix:
+    content: ""
     location:
       row: 12
       column: 26
     end_location:
       row: 12
       column: 27
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -129,14 +122,13 @@ expression: checks
     row: 12
     column: 46
   fix:
+    content: ""
     location:
       row: 12
       column: 38
     end_location:
       row: 12
       column: 39
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -146,14 +138,13 @@ expression: checks
     row: 16
     column: 12
   fix:
+    content: ""
     location:
       row: 16
       column: 4
     end_location:
       row: 16
       column: 5
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -163,14 +154,13 @@ expression: checks
     row: 17
     column: 16
   fix:
+    content: ""
     location:
       row: 17
       column: 4
     end_location:
       row: 17
       column: 5
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -180,14 +170,13 @@ expression: checks
     row: 18
     column: 16
   fix:
+    content: ""
     location:
       row: 18
       column: 4
     end_location:
       row: 18
       column: 5
-    content: ""
-    message: ~
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -197,13 +186,12 @@ expression: checks
     row: 19
     column: 20
   fix:
+    content: ""
     location:
       row: 19
       column: 4
     end_location:
       row: 19
       column: 5
-    content: ""
-    message: ~
   parent: ~
 

@@ -3735,9 +3735,10 @@ impl<'a> Checker<'a> {
                         None
                     };
 
+                    let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init),
+                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -3756,9 +3757,10 @@ impl<'a> Checker<'a> {
                     .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
                 {
                     let child = defined_by.0;
+                    let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init),
+                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })

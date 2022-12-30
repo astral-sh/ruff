@@ -11,14 +11,13 @@ expression: checks
     row: 4
     column: 20
   fix:
+    content: list
     location:
       row: 4
       column: 9
     end_location:
       row: 4
       column: 20
-    content: list
-    message: ~
   parent: ~
 - kind:
     UsePEP585Annotation: List
@@ -29,14 +28,13 @@ expression: checks
     row: 11
     column: 13
   fix:
+    content: list
     location:
       row: 11
       column: 9
     end_location:
       row: 11
       column: 13
-    content: list
-    message: ~
   parent: ~
 - kind:
     UsePEP585Annotation: List
@@ -47,14 +45,13 @@ expression: checks
     row: 18
     column: 15
   fix:
+    content: list
     location:
       row: 18
       column: 9
     end_location:
       row: 18
       column: 15
-    content: list
-    message: ~
   parent: ~
 - kind:
     UsePEP585Annotation: List
@@ -65,13 +62,12 @@ expression: checks
     row: 25
     column: 14
   fix:
+    content: list
     location:
       row: 25
       column: 9
     end_location:
       row: 25
       column: 14
-    content: list
-    message: ~
   parent: ~
 

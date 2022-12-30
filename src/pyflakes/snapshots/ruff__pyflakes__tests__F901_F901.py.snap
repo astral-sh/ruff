@@ -10,14 +10,13 @@ expression: checks
     row: 2
     column: 24
   fix:
+    content: NotImplementedError
     location:
       row: 2
       column: 10
     end_location:
       row: 2
       column: 24
-    content: NotImplementedError
-    message: ~
   parent: ~
 - kind: RaiseNotImplemented
   location:
@@ -27,13 +26,12 @@ expression: checks
     row: 6
     column: 24
   fix:
+    content: NotImplementedError
     location:
       row: 6
       column: 10
     end_location:
       row: 6
       column: 24
-    content: NotImplementedError
-    message: ~
   parent: ~
 
