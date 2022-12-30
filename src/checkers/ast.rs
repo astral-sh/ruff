@@ -2397,7 +2397,7 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP025) {
-                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, value, kind);
+                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind);
                 }
             }
             ExprKind::Lambda { args, body, .. } => {

@@ -10,13 +10,13 @@ expression: checks
     row: 2
     column: 12
   fix:
-    content: "\"Hello\""
+    content: ""
     location:
       row: 2
       column: 4
     end_location:
       row: 2
-      column: 12
+      column: 5
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -26,13 +26,13 @@ expression: checks
     row: 4
     column: 8
   fix:
-    content: "'world'"
+    content: ""
     location:
       row: 4
       column: 0
     end_location:
       row: 4
-      column: 8
+      column: 1
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -42,13 +42,13 @@ expression: checks
     row: 6
     column: 14
   fix:
-    content: "\"Hello\""
+    content: ""
     location:
       row: 6
       column: 6
     end_location:
       row: 6
-      column: 14
+      column: 7
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -58,13 +58,13 @@ expression: checks
     row: 8
     column: 14
   fix:
-    content: "'world'"
+    content: ""
     location:
       row: 8
       column: 6
     end_location:
       row: 8
-      column: 14
+      column: 7
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -74,13 +74,13 @@ expression: checks
     row: 12
     column: 12
   fix:
-    content: "\"Hello\""
+    content: ""
     location:
       row: 12
       column: 4
     end_location:
       row: 12
-      column: 12
+      column: 5
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -90,13 +90,13 @@ expression: checks
     row: 12
     column: 22
   fix:
-    content: "\"world\""
+    content: ""
     location:
       row: 12
       column: 14
     end_location:
       row: 12
-      column: 22
+      column: 15
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -106,13 +106,13 @@ expression: checks
     row: 12
     column: 34
   fix:
-    content: "\"Hello\""
+    content: ""
     location:
       row: 12
       column: 26
     end_location:
       row: 12
-      column: 34
+      column: 27
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -122,13 +122,13 @@ expression: checks
     row: 12
     column: 46
   fix:
-    content: "\"world\""
+    content: ""
     location:
       row: 12
       column: 38
     end_location:
       row: 12
-      column: 46
+      column: 39
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -138,13 +138,13 @@ expression: checks
     row: 16
     column: 12
   fix:
-    content: "'hello'"
+    content: ""
     location:
       row: 16
       column: 4
     end_location:
       row: 16
-      column: 12
+      column: 5
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -154,13 +154,13 @@ expression: checks
     row: 17
     column: 16
   fix:
-    content: "\"\"\"hello\"\"\""
+    content: ""
     location:
       row: 17
       column: 4
     end_location:
       row: 17
-      column: 16
+      column: 5
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -170,13 +170,13 @@ expression: checks
     row: 18
     column: 16
   fix:
-    content: "'''hello'''"
+    content: ""
     location:
       row: 18
       column: 4
     end_location:
       row: 18
-      column: 16
+      column: 5
   parent: ~
 - kind: RewriteUnicodeLiteral
   location:
@@ -186,12 +186,12 @@ expression: checks
     row: 19
     column: 20
   fix:
-    content: "'Hello \"World\"'"
+    content: ""
     location:
       row: 19
       column: 4
     end_location:
       row: 19
-      column: 20
+      column: 5
   parent: ~
 
