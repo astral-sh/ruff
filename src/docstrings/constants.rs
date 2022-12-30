@@ -1,9 +1,9 @@
+/// See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals.
+
 pub const TRIPLE_QUOTE_PREFIXES: &[&str] = &[
-    "ur\"\"\"", "ur'''", "u\"\"\"", "u'''", "r\"\"\"", "r'''", "UR\"\"\"", "UR'''", "Ur\"\"\"",
-    "Ur'''", "U\"\"\"", "U'''", "uR\"\"\"", "uR'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
+    "u\"\"\"", "u'''", "r\"\"\"", "r'''", "U\"\"\"", "U'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
 ];
 
 pub const SINGLE_QUOTE_PREFIXES: &[&str] = &[
-    "ur\"", "ur'", "u\"", "u'", "r\"", "r'", "ur\"", "ur'", "u\"", "u'", "r\"", "r'", "UR\"",
-    "UR'", "Ur\"", "Ur'", "U\"", "U'", "uR\"", "uR'", "R\"", "R'", "\"", "'",
+    "u\"", "u'", "r\"", "r'", "u\"", "u'", "r\"", "r'", "U\"", "U'", "R\"", "R'", "\"", "'",
 ];
