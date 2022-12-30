@@ -44,7 +44,7 @@ export default function SourceEditor({
           check.code === "F401" || check.code === "F841"
             ? [MarkerTag.Unnecessary]
             : [],
-      }))
+      })),
     );
 
     const codeActionProvider = monaco?.languages.registerCodeActionProvider(
@@ -81,7 +81,7 @@ export default function SourceEditor({
             }));
           return { actions, dispose: () => {} };
         },
-      }
+      },
     );
 
     return () => {
@@ -93,7 +93,7 @@ export default function SourceEditor({
     (value: string | undefined) => {
       onChange(value ?? "");
     },
-    [onChange]
+    [onChange],
   );
 
   return (

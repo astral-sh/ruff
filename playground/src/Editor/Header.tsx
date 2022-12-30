@@ -45,7 +45,7 @@ export default function Header({
         "border-gray-200",
         "dark:border-gray-800",
         "bg-ayu-background",
-        "dark:bg-ayu-background-dark"
+        "dark:bg-ayu-background-dark",
       )}
     >
       <div className="flex space-x-5">
@@ -55,14 +55,14 @@ export default function Header({
             "relative flex py-3 text-sm leading-6 font-semibold focus:outline-none",
             tab === "Source"
               ? "text-ayu-accent"
-              : "text-gray-700 hover:text-gray-900 focus:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+              : "text-gray-700 hover:text-gray-900 focus:text-gray-900 dark:text-gray-300 dark:hover:text-white",
           )}
           onClick={() => onChangeTab("Source")}
         >
           <span
             className={classNames(
               "absolute bottom-0 inset-x-0 bg-ayu-accent h-0.5 rounded-full transition-opacity duration-150",
-              tab === "Source" ? "opacity-100" : "opacity-0"
+              tab === "Source" ? "opacity-100" : "opacity-0",
             )}
           />
           Source
@@ -73,14 +73,14 @@ export default function Header({
             "relative flex py-3 text-sm leading-6 font-semibold focus:outline-none",
             tab === "Settings"
               ? "text-ayu-accent"
-              : "text-gray-700 hover:text-gray-900 focus:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+              : "text-gray-700 hover:text-gray-900 focus:text-gray-900 dark:text-gray-300 dark:hover:text-white",
           )}
           onClick={() => onChangeTab("Settings")}
         >
           <span
             className={classNames(
               "absolute bottom-0 inset-x-0 bg-ayu-accent h-0.5 rounded-full transition-opacity duration-150",
-              tab === "Settings" ? "opacity-100" : "opacity-0"
+              tab === "Settings" ? "opacity-100" : "opacity-0",
             )}
           />
           Settings

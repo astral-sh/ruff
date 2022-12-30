@@ -36,7 +36,7 @@ export default function SettingsEditor({
     (value: string | undefined) => {
       onChange(value ?? "");
     },
-    [onChange]
+    [onChange],
   );
   return (
     <Editor
