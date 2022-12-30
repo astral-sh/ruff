@@ -1,0 +1,38 @@
+---
+source: src/flake8_tidy_imports/mod.rs
+expression: checks
+---
+- kind:
+    BannedApi:
+      name: typing.TypedDict
+      message: Use typing_extensions.TypedDict instead.
+  location:
+    row: 2
+    column: 7
+  end_location:
+    row: 2
+    column: 23
+  fix: ~
+- kind:
+    BannedApi:
+      name: typing.TypedDict
+      message: Use typing_extensions.TypedDict instead.
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 16
+  fix: ~
+- kind:
+    BannedApi:
+      name: typing.TypedDict
+      message: Use typing_extensions.TypedDict instead.
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 20
+  fix: ~
+

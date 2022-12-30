@@ -486,6 +486,7 @@ pub enum CheckCodePrefix {
     TID,
     TID2,
     TID25,
+    TID251,
     TID252,
     U,
     U0,
@@ -706,6 +707,7 @@ impl CheckCodePrefix {
                 CheckCode::C417,
                 CheckCode::T100,
                 CheckCode::C901,
+                CheckCode::TID251,
                 CheckCode::TID252,
                 CheckCode::RET501,
                 CheckCode::RET502,
@@ -1664,7 +1666,7 @@ impl CheckCodePrefix {
                     ":".bold(),
                     "`I2` has been remapped to `TID2`".bold()
                 );
-                vec![CheckCode::TID252]
+                vec![CheckCode::TID251, CheckCode::TID252]
             }
             CheckCodePrefix::I25 => {
                 one_time_warning!(
@@ -1673,7 +1675,7 @@ impl CheckCodePrefix {
                     ":".bold(),
                     "`I25` has been remapped to `TID25`".bold()
                 );
-                vec![CheckCode::TID252]
+                vec![CheckCode::TID251, CheckCode::TID252]
             }
             CheckCodePrefix::I252 => {
                 one_time_warning!(
@@ -2407,9 +2409,10 @@ impl CheckCodePrefix {
             CheckCodePrefix::T20 => vec![CheckCode::T201, CheckCode::T203],
             CheckCodePrefix::T201 => vec![CheckCode::T201],
             CheckCodePrefix::T203 => vec![CheckCode::T203],
-            CheckCodePrefix::TID => vec![CheckCode::TID252],
-            CheckCodePrefix::TID2 => vec![CheckCode::TID252],
-            CheckCodePrefix::TID25 => vec![CheckCode::TID252],
+            CheckCodePrefix::TID => vec![CheckCode::TID251, CheckCode::TID252],
+            CheckCodePrefix::TID2 => vec![CheckCode::TID251, CheckCode::TID252],
+            CheckCodePrefix::TID25 => vec![CheckCode::TID251, CheckCode::TID252],
+            CheckCodePrefix::TID251 => vec![CheckCode::TID251],
             CheckCodePrefix::TID252 => vec![CheckCode::TID252],
             CheckCodePrefix::U => {
                 one_time_warning!(
@@ -3287,6 +3290,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::TID => SuffixLength::Zero,
             CheckCodePrefix::TID2 => SuffixLength::One,
             CheckCodePrefix::TID25 => SuffixLength::Two,
+            CheckCodePrefix::TID251 => SuffixLength::Three,
             CheckCodePrefix::TID252 => SuffixLength::Three,
             CheckCodePrefix::U => SuffixLength::Zero,
             CheckCodePrefix::U0 => SuffixLength::One,
