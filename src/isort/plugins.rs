@@ -13,6 +13,7 @@ use crate::checks::CheckKind;
 use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
 use crate::settings::flags;
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{Check, Settings, SourceCodeLocator};
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -31,6 +32,7 @@ pub fn check_imports(
     block: &Block,
     locator: &SourceCodeLocator,
     settings: &Settings,
+    stylist: &SourceCodeStyleDetector,
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Check> {
@@ -68,6 +70,7 @@ pub fn check_imports(
         comments,
         locator,
         settings.line_length - indentation.len(),
+        stylist,
         &settings.src,
         package,
         &settings.isort.known_first_party,

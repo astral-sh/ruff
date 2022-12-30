@@ -110,6 +110,7 @@ pub(crate) fn check_path(
                         locator,
                         &directives.isort,
                         settings,
+                        stylist,
                         autofix,
                         path,
                         package,
@@ -282,6 +283,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &contents,
         &directives.noqa_line_for,
         &settings.external,
+        stylist.line_ending(),
     )
 }
 

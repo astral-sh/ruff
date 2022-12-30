@@ -9,6 +9,7 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checks::{Check, CheckCode, CODE_REDIRECTS};
+use crate::source_code_style::LineEnding;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -84,8 +85,9 @@ pub fn add_noqa(
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
     external: &FxHashSet<String>,
+    line_ending: &LineEnding,
 ) -> Result<usize> {
-    let (count, output) = add_noqa_inner(checks, contents, noqa_line_for, external);
+    let (count, output) = add_noqa_inner(checks, contents, noqa_line_for, external, line_ending);
     fs::write(path, output)?;
     Ok(count)
 }
@@ -95,6 +97,7 @@ fn add_noqa_inner(
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
     external: &FxHashSet<String>,
+    line_ending: &LineEnding,
 ) -> (usize, String) {
     let mut matches_by_line: FxHashMap<usize, FxHashSet<&CheckCode>> = FxHashMap::default();
     for (lineno, line) in contents.lines().enumerate() {
@@ -131,7 +134,7 @@ fn add_noqa_inner(
         match matches_by_line.get(&lineno) {
             None => {
                 output.push_str(line);
-                output.push('\n');
+                output.push_str(line_ending);
             }
             Some(codes) => {
                 match extract_noqa_directive(line) {
@@ -146,7 +149,7 @@ fn add_noqa_inner(
                         let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
                         let suffix = codes.join(", ");
                         output.push_str(&suffix);
-                        output.push('\n');
+                        output.push_str(line_ending);
                         count += 1;
                     }
                     Directive::All(_, start, _) => {
@@ -161,7 +164,7 @@ fn add_noqa_inner(
                             codes.iter().map(AsRef::as_ref).sorted_unstable().collect();
                         let suffix = codes.join(", ");
                         output.push_str(&suffix);
-                        output.push('\n');
+                        output.push_str(line_ending);
                         count += 1;
                     }
                     Directive::Codes(_, start, _, existing) => {
@@ -186,7 +189,7 @@ fn add_noqa_inner(
                         formatted.push_str(&suffix);
 
                         output.push_str(&formatted);
-                        output.push('\n');
+                        output.push_str(line_ending);
 
                         // Only count if the new line is an actual edit.
                         if formatted != line {
@@ -211,6 +214,7 @@ mod tests {
     use crate::ast::types::Range;
     use crate::checks::{Check, CheckKind};
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
+    use crate::source_code_style::LineEnding;
 
     #[test]
     fn regex() {
@@ -232,9 +236,15 @@ mod tests {
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
         let external = FxHashSet::default();
-        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for, &external);
+        let (count, output) = add_noqa_inner(
+            &checks,
+            contents,
+            &noqa_line_for,
+            &external,
+            &LineEnding::Lf,
+        );
         assert_eq!(count, 0);
-        assert_eq!(output.trim(), contents.trim());
+        assert_eq!(output, format!("{contents}\n"));
 
         let checks = vec![Check::new(
             CheckKind::UnusedVariable("x".to_string()),
@@ -243,9 +253,15 @@ mod tests {
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
         let external = FxHashSet::default();
-        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for, &external);
+        let (count, output) = add_noqa_inner(
+            &checks,
+            contents,
+            &noqa_line_for,
+            &external,
+            &LineEnding::Lf,
+        );
         assert_eq!(count, 1);
-        assert_eq!(output.trim(), "x = 1  # noqa: F841".trim());
+        assert_eq!(output, "x = 1  # noqa: F841\n");
 
         let checks = vec![
             Check::new(
@@ -257,12 +273,18 @@ mod tests {
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];
-        let contents = "x = 1  # noqa: E741";
+        let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = IntMap::default();
         let external = FxHashSet::default();
-        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for, &external);
+        let (count, output) = add_noqa_inner(
+            &checks,
+            contents,
+            &noqa_line_for,
+            &external,
+            &LineEnding::Lf,
+        );
         assert_eq!(count, 1);
-        assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());
+        assert_eq!(output, "x = 1  # noqa: E741, F841\n");
 
         let checks = vec![
             Check::new(
@@ -277,8 +299,14 @@ mod tests {
         let contents = "x = 1  # noqa";
         let noqa_line_for = IntMap::default();
         let external = FxHashSet::default();
-        let (count, output) = add_noqa_inner(&checks, contents, &noqa_line_for, &external);
+        let (count, output) = add_noqa_inner(
+            &checks,
+            contents,
+            &noqa_line_for,
+            &external,
+            &LineEnding::Lf,
+        );
         assert_eq!(count, 1);
-        assert_eq!(output.trim(), "x = 1  # noqa: E741, F841".trim());
+        assert_eq!(output, "x = 1  # noqa: E741, F841\n");
     }
 }

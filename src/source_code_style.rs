@@ -17,6 +17,7 @@ pub struct SourceCodeStyleDetector<'a> {
     locator: &'a SourceCodeLocator<'a>,
     indentation: OnceCell<Indentation>,
     quote: OnceCell<Quote>,
+    line_ending: OnceCell<LineEnding>,
 }
 
 impl<'a> SourceCodeStyleDetector<'a> {
@@ -30,12 +31,18 @@ impl<'a> SourceCodeStyleDetector<'a> {
             .get_or_init(|| detect_quote(self.contents, self.locator).unwrap_or_default())
     }
 
+    pub fn line_ending(&'a self) -> &'a LineEnding {
+        self.line_ending
+            .get_or_init(|| detect_line_ending(self.contents).unwrap_or_default())
+    }
+
     pub fn from_contents(contents: &'a str, locator: &'a SourceCodeLocator<'a>) -> Self {
         Self {
             contents,
             locator,
             indentation: OnceCell::default(),
             quote: OnceCell::default(),
+            line_ending: OnceCell::default(),
         }
     }
 }
@@ -86,6 +93,33 @@ impl Deref for Indentation {
     }
 }
 
+/// The line ending style used in Python source code.
+/// See <https://docs.python.org/3/reference/lexical_analysis.html#physical-lines>
+#[derive(Debug, PartialEq, Eq)]
+pub enum LineEnding {
+    Lf,
+    Cr,
+    CrLf,
+}
+
+impl Default for LineEnding {
+    fn default() -> Self {
+        LineEnding::Lf
+    }
+}
+
+impl Deref for LineEnding {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        match &self {
+            LineEnding::CrLf => "\r\n",
+            LineEnding::Lf => "\n",
+            LineEnding::Cr => "\r",
+        }
+    }
+}
+
 /// Detect the indentation style of the given tokens.
 fn detect_indentation(contents: &str, locator: &SourceCodeLocator) -> Option<Indentation> {
     for (_start, tok, end) in lexer::make_tokenizer(contents).flatten() {
@@ -116,9 +150,26 @@ fn detect_quote(contents: &str, locator: &SourceCodeLocator) -> Option<Quote> {
     None
 }
 
+/// Detect the line ending style of the given contents.
+fn detect_line_ending(contents: &str) -> Option<LineEnding> {
+    if let Some(position) = contents.find('\n') {
+        let position = position.saturating_sub(1);
+        return if let Some('\r') = contents.chars().nth(position) {
+            Some(LineEnding::CrLf)
+        } else {
+            Some(LineEnding::Lf)
+        };
+    } else if contents.find('\r').is_some() {
+        return Some(LineEnding::Cr);
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::source_code_style::{detect_indentation, detect_quote, Indentation, Quote};
+    use crate::source_code_style::{
+        detect_indentation, detect_line_ending, detect_quote, Indentation, LineEnding, Quote,
+    };
     use crate::SourceCodeLocator;
 
     #[test]
@@ -190,5 +241,20 @@ def f():
 "#;
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(detect_quote(contents, &locator), Some(Quote::Double));
+    }
+
+    #[test]
+    fn line_ending() {
+        let contents = "x = 1";
+        assert_eq!(detect_line_ending(contents), None);
+
+        let contents = "x = 1\n";
+        assert_eq!(detect_line_ending(contents), Some(LineEnding::Lf));
+
+        let contents = "x = 1\r";
+        assert_eq!(detect_line_ending(contents), Some(LineEnding::Cr));
+
+        let contents = "x = 1\r\n";
+        assert_eq!(detect_line_ending(contents), Some(LineEnding::CrLf));
     }
 }
