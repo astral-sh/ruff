@@ -17,7 +17,7 @@ use crate::settings::types::{
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Cli {
-    #[arg(required_unless_present_any = ["explain", "generate_shell_completion"])]
+    #[arg(required_unless_present_any = ["clean", "explain", "generate_shell_completion"])]
     pub files: Vec<PathBuf>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for
     /// configuration.
@@ -150,6 +150,9 @@ pub struct Cli {
     /// Generate shell completion
     #[arg(long, hide = true, value_name = "SHELL")]
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
+    /// Clear any caches in the current directory or any subdirectories.
+    #[arg(long)]
+    pub clean: bool,
     /// Path to the cache directory.
     #[arg(long)]
     pub cache_dir: Option<PathBuf>,
@@ -163,6 +166,7 @@ impl Cli {
             Arguments {
                 add_noqa: self.add_noqa,
                 autoformat: self.autoformat,
+                clean: self.clean,
                 config: self.config,
                 diff: self.diff,
                 exit_zero: self.exit_zero,
@@ -224,6 +228,7 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 pub struct Arguments {
     pub add_noqa: bool,
     pub autoformat: bool,
+    pub clean: bool,
     pub config: Option<PathBuf>,
     pub diff: bool,
     pub exit_zero: bool,

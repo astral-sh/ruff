@@ -83,12 +83,18 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
 
-    if cli.show_settings && cli.show_files {
-        anyhow::bail!("specify --show-settings or show-files (not both)")
-    }
     if let Some(shell) = cli.generate_shell_completion {
         shell.generate(&mut Cli::command(), &mut io::stdout());
         return Ok(ExitCode::SUCCESS);
+    }
+    if cli.show_settings && cli.show_files {
+        anyhow::bail!("specify --show-settings or show-files (not both)")
+    }
+    if cli.clean {
+        commands::clean(&log_level)?;
+        if cli.files.is_empty() {
+            return Ok(ExitCode::SUCCESS);
+        }
     }
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
