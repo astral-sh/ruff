@@ -4,6 +4,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
+use crate::pydocstyle::helpers::leading_quote;
 
 pub fn rewrite_unicode_literal(
     checker: &mut Checker,
@@ -13,13 +14,18 @@ pub fn rewrite_unicode_literal(
 ) {
     if let Some(const_kind) = kind {
         if const_kind.to_lowercase() == "u" {
-            let mut check = Check::new(CheckKind::RewriteUnicodeLiteral, Range::from_located(expr));
+            let range = Range::from_located(expr);
+            let content = checker.locator.slice_source_code_range(&range);
+            // We need to skip the first item since it is always a u
+            let quotes = leading_quote(&content).unwrap_or("u\"")[1..].to_string();
+            let mut check = Check::new(CheckKind::RewriteUnicodeLiteral, range);
             if checker.patch(check.kind.code()) {
-                let mut new_str = value.to_string();
-                new_str.insert(0, '"');
-                new_str.push('"');
+                let mut contents = String::new();
+                contents.push_str(&quotes);
+                contents.push_str(value);
+                contents.push_str(&quotes);
                 check.amend(Fix::replacement(
-                    new_str,
+                    contents,
                     expr.location,
                     expr.end_location.unwrap(),
                 ));

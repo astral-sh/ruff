@@ -25,7 +25,7 @@ expression: checks
     row: 4
     column: 8
   fix:
-    content: "\"world\""
+    content: "'world'"
     location:
       row: 4
       column: 0
@@ -55,7 +55,7 @@ expression: checks
     row: 8
     column: 14
   fix:
-    content: "\"world\""
+    content: "'world'"
     location:
       row: 8
       column: 6
@@ -122,4 +122,49 @@ expression: checks
     end_location:
       row: 12
       column: 46
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 12
+  fix:
+    content: "'hello'"
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 16
+      column: 12
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 16
+  fix:
+    content: "\"\"\"hello\"\"\""
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 17
+      column: 16
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 18
+    column: 16
+  fix:
+    content: "'''hello'''"
+    location:
+      row: 18
+      column: 4
+    end_location:
+      row: 18
+      column: 16
 

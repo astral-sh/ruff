@@ -11,6 +11,12 @@ import foo
 
 foo(u"Hello", U"world", a=u"Hello", b=u"world")
 
+# These should stay quoted they way they are
+
+x = u'hello'
+x = u"""hello"""
+x = u'''hello'''
+
 # These should not change
 u = "Hello"
 
