@@ -235,12 +235,6 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
-    } else if cli.autoformat {
-        let modifications =
-            commands::autoformat(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
-        if modifications > 0 && log_level >= LogLevel::Default {
-            println!("Formatted {modifications} files.");
-        }
     } else {
         let is_stdin = cli.files == vec![PathBuf::from("-")];
 

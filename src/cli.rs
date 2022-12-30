@@ -138,7 +138,6 @@ pub struct Cli {
     #[arg(
         long,
         // conflicts_with = "add_noqa",
-        conflicts_with = "autoformat",
         conflicts_with = "clean",
         conflicts_with = "explain",
         conflicts_with = "generate_shell_completion",
@@ -149,29 +148,11 @@ pub struct Cli {
         conflicts_with = "watch",
     )]
     pub add_noqa: bool,
-    /// Round-trip auto-formatting.
-    #[arg(
-        long,
-        hide = true,
-        // Fake subcommands.
-        conflicts_with = "add_noqa",
-        // conflicts_with = "autoformat",
-        conflicts_with = "clean",
-        conflicts_with = "explain",
-        conflicts_with = "generate_shell_completion",
-        conflicts_with = "show_files",
-        conflicts_with = "show_settings",
-        // Unsupported default-command arguments.
-        conflicts_with = "stdin_filename",
-        conflicts_with = "watch",
-    )]
-    pub autoformat: bool,
     /// Clear any caches in the current directory or any subdirectories.
     #[arg(
         long,
         // Fake subcommands.
         conflicts_with = "add_noqa",
-        conflicts_with = "autoformat",
         // conflicts_with = "clean",
         conflicts_with = "explain",
         conflicts_with = "generate_shell_completion",
@@ -187,7 +168,6 @@ pub struct Cli {
         long,
         // Fake subcommands.
         conflicts_with = "add_noqa",
-        conflicts_with = "autoformat",
         conflicts_with = "clean",
         // conflicts_with = "explain",
         conflicts_with = "generate_shell_completion",
@@ -205,7 +185,6 @@ pub struct Cli {
         value_name = "SHELL",
         // Fake subcommands.
         conflicts_with = "add_noqa",
-        conflicts_with = "autoformat",
         conflicts_with = "clean",
         conflicts_with = "explain",
         // conflicts_with = "generate_shell_completion",
@@ -221,7 +200,6 @@ pub struct Cli {
         long,
         // Fake subcommands.
         conflicts_with = "add_noqa",
-        conflicts_with = "autoformat",
         conflicts_with = "clean",
         conflicts_with = "explain",
         conflicts_with = "generate_shell_completion",
@@ -237,7 +215,6 @@ pub struct Cli {
         long,
         // Fake subcommands.
         conflicts_with = "add_noqa",
-        conflicts_with = "autoformat",
         conflicts_with = "clean",
         conflicts_with = "explain",
         conflicts_with = "generate_shell_completion",
@@ -257,7 +234,6 @@ impl Cli {
         (
             Arguments {
                 add_noqa: self.add_noqa,
-                autoformat: self.autoformat,
                 clean: self.clean,
                 config: self.config,
                 diff: self.diff,
@@ -319,7 +295,6 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 #[allow(clippy::struct_excessive_bools)]
 pub struct Arguments {
     pub add_noqa: bool,
-    pub autoformat: bool,
     pub clean: bool,
     pub config: Option<PathBuf>,
     pub diff: bool,

@@ -23,7 +23,6 @@ use crate::directives::Directives;
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::settings::{flags, Settings};
-use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{cache, directives, fs, rustpython_helpers};
@@ -288,32 +287,6 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &settings.external,
         stylist.line_ending(),
     )
-}
-
-/// Apply autoformatting to the source code at the given `Path`.
-pub fn autoformat_path(path: &Path, settings: &Settings) -> Result<()> {
-    // Validate the `Settings` and return any errors.
-    settings.validate()?;
-
-    // Read the file from disk.
-    let contents = fs::read_file(path)?;
-
-    // Tokenize once.
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
-
-    // Map row and column locations to byte slices (lazily).
-    let locator = SourceCodeLocator::new(&contents);
-
-    // Detect the current code style (lazily).
-    let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
-
-    // Generate the AST.
-    let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
-    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
-    generator.unparse_suite(&python_ast);
-    write(path, generator.generate()?)?;
-
-    Ok(())
 }
 
 /// Generate a list of `Check` violations from source code content derived from
