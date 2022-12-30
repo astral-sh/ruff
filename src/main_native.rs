@@ -87,9 +87,6 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         shell.generate(&mut Cli::command(), &mut io::stdout());
         return Ok(ExitCode::SUCCESS);
     }
-    if cli.show_settings && cli.show_files {
-        anyhow::bail!("specify --show-settings or show-files (not both)")
-    }
     if cli.clean {
         commands::clean(&log_level)?;
         return Ok(ExitCode::SUCCESS);
@@ -179,12 +176,6 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     if cli.watch {
         if !matches!(autofix, fixer::Mode::None) {
             eprintln!("Warning: --fix is not enabled in watch mode.");
-        }
-        if cli.add_noqa {
-            eprintln!("Warning: --add-noqa is not enabled in watch mode.");
-        }
-        if cli.autoformat {
-            eprintln!("Warning: --autoformat is not enabled in watch mode.");
         }
         if format != SerializationFormat::Text {
             eprintln!("Warning: --format 'text' is used in watch mode.");
