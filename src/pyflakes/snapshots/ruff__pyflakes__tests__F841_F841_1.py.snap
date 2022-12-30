@@ -11,6 +11,7 @@ expression: checks
     row: 6
     column: 5
   fix: ~
+  parent: ~
 - kind:
     UnusedVariable: y
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 6
     column: 8
   fix: ~
+  parent: ~
 - kind:
     UnusedVariable: coords
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 16
     column: 19
   fix: ~
+  parent: ~
 - kind:
     UnusedVariable: coords
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 20
     column: 10
   fix: ~
+  parent: ~
 - kind:
     UnusedVariable: a
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 24
     column: 6
   fix: ~
+  parent: ~
 - kind:
     UnusedVariable: b
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 24
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UnusedVariable: x
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 24
     column: 15
   fix: ~
+  parent: ~
 - kind:
     UnusedVariable: y
   location:
@@ -74,4 +81,5 @@ expression: checks
     row: 24
     column: 18
   fix: ~
+  parent: ~
 

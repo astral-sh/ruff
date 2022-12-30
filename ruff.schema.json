@@ -375,6 +375,19 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "BannedApi": {
+      "type": "object",
+      "required": [
+        "msg"
+      ],
+      "properties": {
+        "msg": {
+          "description": "The message to display when the API is used.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "CheckCodePrefix": {
       "type": "string",
       "enum": [
@@ -670,6 +683,12 @@
         "ICN0",
         "ICN00",
         "ICN001",
+        "ISC",
+        "ISC0",
+        "ISC00",
+        "ISC001",
+        "ISC002",
+        "ISC003",
         "M",
         "M0",
         "M001",
@@ -842,6 +861,7 @@
         "TID",
         "TID2",
         "TID25",
+        "TID251",
         "TID252",
         "U",
         "U0",
@@ -891,6 +911,7 @@
         "UP021",
         "UP022",
         "UP023",
+        "UP025",
         "W",
         "W2",
         "W29",
@@ -1085,6 +1106,16 @@
               "type": "null"
             }
           ]
+        },
+        "banned-api": {
+          "description": "Specific modules or module members that may not be imported or accessed. Note that this check is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/BannedApi"
+          }
         }
       },
       "additionalProperties": false

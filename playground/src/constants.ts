@@ -1,6 +1,3 @@
-import { defaultConfig } from "./Editor/config";
-import { AVAILABLE_OPTIONS } from "./ruff_options";
-
 export const DEFAULT_PYTHON_SOURCE =
   "import os\n" +
   "\n" +
@@ -32,9 +29,3 @@ export const DEFAULT_PYTHON_SOURCE =
   "# 13\n" +
   "# 21\n" +
   "# 34\n";
-
-export const DEFAULT_CONFIG_SOURCE = JSON.stringify(
-  defaultConfig(AVAILABLE_OPTIONS),
-  null,
-  2
-);

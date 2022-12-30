@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 17
       column: 35
+  parent: ~
 - kind: SuperCallWithParameters
   location:
     row: 18
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 18
       column: 26
+  parent: ~
 - kind: SuperCallWithParameters
   location:
     row: 19
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 22
       column: 9
+  parent: ~
 - kind: SuperCallWithParameters
   location:
     row: 36
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 36
       column: 28
+  parent: ~
 - kind: SuperCallWithParameters
   location:
     row: 50
@@ -77,4 +81,5 @@ expression: checks
     end_location:
       row: 50
       column: 32
+  parent: ~
 

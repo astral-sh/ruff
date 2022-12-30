@@ -19,6 +19,7 @@ expression: checks
     end_location:
       row: 1
       column: 21
+  parent: ~
 - kind:
     StringDotFormatExtraNamedArguments:
       - spam
@@ -36,6 +37,7 @@ expression: checks
     end_location:
       row: 2
       column: 34
+  parent: ~
 - kind:
     StringDotFormatExtraNamedArguments:
       - eggs
@@ -54,4 +56,5 @@ expression: checks
     end_location:
       row: 4
       column: 51
+  parent: ~
 

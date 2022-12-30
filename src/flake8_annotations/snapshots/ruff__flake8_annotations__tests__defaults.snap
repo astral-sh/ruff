@@ -6,11 +6,12 @@ expression: checks
     MissingReturnTypePublicFunction: foo
   location:
     row: 4
-    column: 0
+    column: 4
   end_location:
-    row: 5
-    column: 8
+    row: 4
+    column: 7
   fix: ~
+  parent: ~
 - kind:
     MissingTypeFunctionArgument: a
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 4
     column: 9
   fix: ~
+  parent: ~
 - kind:
     MissingTypeFunctionArgument: b
   location:
@@ -29,15 +31,17 @@ expression: checks
     row: 4
     column: 12
   fix: ~
+  parent: ~
 - kind:
     MissingReturnTypePublicFunction: foo
   location:
     row: 9
-    column: 0
+    column: 4
   end_location:
-    row: 10
-    column: 8
+    row: 9
+    column: 7
   fix: ~
+  parent: ~
 - kind:
     MissingTypeFunctionArgument: b
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 9
     column: 17
   fix: ~
+  parent: ~
 - kind:
     MissingTypeFunctionArgument: b
   location:
@@ -56,24 +61,27 @@ expression: checks
     row: 14
     column: 17
   fix: ~
+  parent: ~
 - kind:
     MissingReturnTypePublicFunction: foo
   location:
     row: 19
-    column: 0
+    column: 4
   end_location:
-    row: 20
-    column: 8
+    row: 19
+    column: 7
   fix: ~
+  parent: ~
 - kind:
     MissingReturnTypePublicFunction: foo
   location:
     row: 24
-    column: 0
+    column: 4
   end_location:
-    row: 25
-    column: 8
+    row: 24
+    column: 7
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: a
   location:
@@ -83,6 +91,7 @@ expression: checks
     row: 44
     column: 14
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: foo
   location:
@@ -92,6 +101,7 @@ expression: checks
     row: 49
     column: 49
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: "*args"
   location:
@@ -101,6 +111,7 @@ expression: checks
     row: 54
     column: 26
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: "**kwargs"
   location:
@@ -110,6 +121,7 @@ expression: checks
     row: 54
     column: 41
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: "*args"
   location:
@@ -119,6 +131,7 @@ expression: checks
     row: 59
     column: 26
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: "**kwargs"
   location:
@@ -128,6 +141,7 @@ expression: checks
     row: 64
     column: 41
   fix: ~
+  parent: ~
 - kind:
     MissingTypeSelf: self
   location:
@@ -137,6 +151,7 @@ expression: checks
     row: 74
     column: 16
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: a
   location:
@@ -146,6 +161,7 @@ expression: checks
     row: 78
     column: 31
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: foo
   location:
@@ -155,6 +171,7 @@ expression: checks
     row: 82
     column: 69
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: "*params"
   location:
@@ -164,6 +181,7 @@ expression: checks
     row: 86
     column: 45
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: "**options"
   location:
@@ -173,6 +191,7 @@ expression: checks
     row: 86
     column: 61
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: "*params"
   location:
@@ -182,6 +201,7 @@ expression: checks
     row: 90
     column: 45
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: "**options"
   location:
@@ -191,6 +211,7 @@ expression: checks
     row: 94
     column: 61
   fix: ~
+  parent: ~
 - kind:
     MissingTypeCls: cls
   location:
@@ -200,4 +221,5 @@ expression: checks
     row: 104
     column: 15
   fix: ~
+  parent: ~
 

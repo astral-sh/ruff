@@ -123,8 +123,23 @@ pub struct Settings {
     pub extra_standard_library: BTreeSet<String>,
 }
 
-impl Settings {
-    pub fn from_options(options: Options) -> Self {
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            combine_as_imports: false,
+            force_wrap_aliases: false,
+            split_on_trailing_comma: true,
+            force_single_line: false,
+            single_line_exclusions: BTreeSet::new(),
+            known_first_party: BTreeSet::new(),
+            known_third_party: BTreeSet::new(),
+            extra_standard_library: BTreeSet::new(),
+        }
+    }
+}
+
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             combine_as_imports: options.combine_as_imports.unwrap_or(false),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
@@ -142,17 +157,17 @@ impl Settings {
     }
 }
 
-impl Default for Settings {
-    fn default() -> Self {
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
         Self {
-            combine_as_imports: false,
-            force_wrap_aliases: false,
-            split_on_trailing_comma: true,
-            force_single_line: false,
-            single_line_exclusions: BTreeSet::new(),
-            known_first_party: BTreeSet::new(),
-            known_third_party: BTreeSet::new(),
-            extra_standard_library: BTreeSet::new(),
+            combine_as_imports: Some(settings.combine_as_imports),
+            force_wrap_aliases: Some(settings.force_wrap_aliases),
+            split_on_trailing_comma: Some(settings.split_on_trailing_comma),
+            force_single_line: Some(settings.force_single_line),
+            single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
+            known_first_party: Some(settings.known_first_party.into_iter().collect()),
+            known_third_party: Some(settings.known_third_party.into_iter().collect()),
+            extra_standard_library: Some(settings.extra_standard_library.into_iter().collect()),
         }
     }
 }

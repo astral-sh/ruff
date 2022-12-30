@@ -13,6 +13,7 @@ expression: checks
     row: 1
     column: 25
   fix: ~
+  parent: ~
 - kind:
     CamelcaseImportedAsConstant:
       - CamelCase
@@ -24,6 +25,7 @@ expression: checks
     row: 2
     column: 38
   fix: ~
+  parent: ~
 - kind:
     CamelcaseImportedAsConstant:
       - AnotherCamelCase
@@ -35,4 +37,5 @@ expression: checks
     row: 3
     column: 53
   fix: ~
+  parent: ~
 

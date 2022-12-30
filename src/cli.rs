@@ -57,14 +57,15 @@ pub struct Cli {
     /// Disable cache reads.
     #[arg(short, long)]
     pub no_cache: bool,
-    /// List of error codes to enable.
+    /// Comma-separated list of error codes to enable (or ALL, to enable all
+    /// checks).
     #[arg(long, value_delimiter = ',')]
     pub select: Option<Vec<CheckCodePrefix>>,
     /// Like --select, but adds additional error codes on top of the selected
     /// ones.
     #[arg(long, value_delimiter = ',')]
     pub extend_select: Option<Vec<CheckCodePrefix>>,
-    /// List of error codes to ignore.
+    /// Comma-separated list of error codes to disable.
     #[arg(long, value_delimiter = ',')]
     pub ignore: Option<Vec<CheckCodePrefix>>,
     /// Like --ignore, but adds additional error codes on top of the ignored
@@ -120,7 +121,7 @@ pub struct Cli {
     /// See the settings Ruff will use to check a given Python file.
     #[arg(long)]
     pub show_settings: bool,
-    /// Enable automatic additions of noqa directives to failing lines.
+    /// Enable automatic additions of `noqa` directives to failing lines.
     #[arg(long)]
     pub add_noqa: bool,
     /// Regular expression matching the name of dummy variables.
@@ -133,7 +134,7 @@ pub struct Cli {
     /// formatting.
     #[arg(long)]
     pub line_length: Option<usize>,
-    /// Max McCabe complexity allowed for a function.
+    /// Maximum McCabe complexity allowed for a given function.
     #[arg(long)]
     pub max_complexity: Option<usize>,
     /// Round-trip auto-formatting.

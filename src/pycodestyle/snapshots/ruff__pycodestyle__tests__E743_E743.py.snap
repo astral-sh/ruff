@@ -6,27 +6,30 @@ expression: checks
     AmbiguousFunctionName: l
   location:
     row: 1
-    column: 0
+    column: 4
   end_location:
-    row: 2
-    column: 8
+    row: 1
+    column: 5
   fix: ~
+  parent: ~
 - kind:
     AmbiguousFunctionName: I
   location:
     row: 5
-    column: 0
+    column: 4
   end_location:
-    row: 6
-    column: 8
+    row: 5
+    column: 5
   fix: ~
+  parent: ~
 - kind:
     AmbiguousFunctionName: O
   location:
     row: 10
-    column: 4
+    column: 8
   end_location:
-    row: 11
-    column: 12
+    row: 10
+    column: 9
   fix: ~
+  parent: ~
 

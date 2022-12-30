@@ -165,6 +165,7 @@ pub enum CheckCode {
     // mccabe
     C901,
     // flake8-tidy-imports
+    TID251,
     TID252,
     // flake8-return
     RET501,
@@ -175,6 +176,10 @@ pub enum CheckCode {
     RET506,
     RET507,
     RET508,
+    // flake8-implicit-str-concat
+    ISC001,
+    ISC002,
+    ISC003,
     // flake8-print
     T201,
     T203,
@@ -231,6 +236,7 @@ pub enum CheckCode {
     UP021,
     UP022,
     UP023,
+    UP025,
     UP026,
     // pydocstyle
     D100,
@@ -376,6 +382,7 @@ pub enum CheckCategory {
     Flake8Comprehensions,
     Flake8Debugger,
     Flake8ErrMsg,
+    Flake8ImplicitStrConcat,
     Flake8ImportConventions,
     Flake8Print,
     Flake8Quotes,
@@ -419,6 +426,7 @@ impl CheckCategory {
             CheckCategory::Flake8Comprehensions => "flake8-comprehensions",
             CheckCategory::Flake8Debugger => "flake8-debugger",
             CheckCategory::Flake8ErrMsg => "flake8-errmsg",
+            CheckCategory::Flake8ImplicitStrConcat => "flake8-implicit-str-concat",
             CheckCategory::Flake8ImportConventions => "flake8-import-conventions",
             CheckCategory::Flake8Print => "flake8-print",
             CheckCategory::Flake8Quotes => "flake8-quotes",
@@ -452,19 +460,21 @@ impl CheckCategory {
             CheckCategory::Flake8Bugbear => vec![CheckCodePrefix::B],
             CheckCategory::Flake8Builtins => vec![CheckCodePrefix::A],
             CheckCategory::Flake8Comprehensions => vec![CheckCodePrefix::C4],
+            CheckCategory::Flake8Datetimez => vec![CheckCodePrefix::DTZ],
             CheckCategory::Flake8Debugger => vec![CheckCodePrefix::T10],
             CheckCategory::Flake8ErrMsg => vec![CheckCodePrefix::EM],
+            CheckCategory::Flake8ImplicitStrConcat => vec![CheckCodePrefix::ISC],
+            CheckCategory::Flake8ImportConventions => vec![CheckCodePrefix::ICN],
             CheckCategory::Flake8Print => vec![CheckCodePrefix::T20],
             CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
             CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
             CheckCategory::Flake8Simplify => vec![CheckCodePrefix::SIM],
             CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::TID],
             CheckCategory::Flake8UnusedArguments => vec![CheckCodePrefix::ARG],
-            CheckCategory::Flake8Datetimez => vec![CheckCodePrefix::DTZ],
             CheckCategory::Isort => vec![CheckCodePrefix::I],
             CheckCategory::McCabe => vec![CheckCodePrefix::C90],
-            CheckCategory::PandasVet => vec![CheckCodePrefix::PD],
             CheckCategory::PEP8Naming => vec![CheckCodePrefix::N],
+            CheckCategory::PandasVet => vec![CheckCodePrefix::PD],
             CheckCategory::Pycodestyle => vec![CheckCodePrefix::E, CheckCodePrefix::W],
             CheckCategory::Pydocstyle => vec![CheckCodePrefix::D],
             CheckCategory::Pyflakes => vec![CheckCodePrefix::F],
@@ -476,7 +486,6 @@ impl CheckCategory {
                 CheckCodePrefix::PLW,
             ],
             CheckCategory::Pyupgrade => vec![CheckCodePrefix::UP],
-            CheckCategory::Flake8ImportConventions => vec![CheckCodePrefix::ICN],
             CheckCategory::Ruff => vec![CheckCodePrefix::RUF],
         }
     }
@@ -524,6 +533,10 @@ impl CheckCategory {
             )),
             CheckCategory::Flake8ErrMsg => Some((
                 "https://pypi.org/project/flake8-errmsg/0.4.0/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8ImplicitStrConcat => Some((
+                "https://pypi.org/project/flake8-implicit-str-concat/0.3.0/",
                 &Platform::PyPI,
             )),
             CheckCategory::Flake8ImportConventions => None,
@@ -784,6 +797,7 @@ pub enum CheckKind {
     // flake8-debugger
     Debugger(DebuggerUsingType),
     // flake8-tidy-imports
+    BannedApi { name: String, message: String },
     BannedRelativeImport(Strictness),
     // flake8-return
     UnnecessaryReturnNone,
@@ -794,6 +808,10 @@ pub enum CheckKind {
     SuperfluousElseRaise(Branch),
     SuperfluousElseContinue(Branch),
     SuperfluousElseBreak(Branch),
+    // flake8-implicit-str-concat
+    SingleLineImplicitStringConcatenation,
+    MultiLineImplicitStringConcatenation,
+    ExplicitStringConcatenation,
     // flake8-print
     PrintFound,
     PPrintFound,
@@ -850,6 +868,7 @@ pub enum CheckKind {
     ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
     RewriteCElementTree,
+    RewriteUnicodeLiteral,
     RewriteMockImport,
     // pydocstyle
     BlankLineAfterLastSection(String),
@@ -990,6 +1009,8 @@ impl CheckCode {
             | CheckCode::PGH003
             | CheckCode::PGH004 => &LintSource::Lines,
             CheckCode::ERA001
+            | CheckCode::ISC001
+            | CheckCode::ISC002
             | CheckCode::Q000
             | CheckCode::Q001
             | CheckCode::Q002
@@ -1164,6 +1185,10 @@ impl CheckCode {
             // flake8-debugger
             CheckCode::T100 => CheckKind::Debugger(DebuggerUsingType::Import("...".to_string())),
             // flake8-tidy-imports
+            CheckCode::TID251 => CheckKind::BannedApi {
+                name: "...".to_string(),
+                message: "...".to_string(),
+            },
             CheckCode::TID252 => CheckKind::BannedRelativeImport(Strictness::All),
             // flake8-return
             CheckCode::RET501 => CheckKind::UnnecessaryReturnNone,
@@ -1174,6 +1199,10 @@ impl CheckCode {
             CheckCode::RET506 => CheckKind::SuperfluousElseRaise(Branch::Else),
             CheckCode::RET507 => CheckKind::SuperfluousElseContinue(Branch::Else),
             CheckCode::RET508 => CheckKind::SuperfluousElseBreak(Branch::Else),
+            // flake8-implicit-str-concat
+            CheckCode::ISC001 => CheckKind::SingleLineImplicitStringConcatenation,
+            CheckCode::ISC002 => CheckKind::MultiLineImplicitStringConcatenation,
+            CheckCode::ISC003 => CheckKind::ExplicitStringConcatenation,
             // flake8-print
             CheckCode::T201 => CheckKind::PrintFound,
             CheckCode::T203 => CheckKind::PPrintFound,
@@ -1235,6 +1264,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
             CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
+            CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
             CheckCode::UP026 => CheckKind::RewriteMockImport,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
@@ -1570,8 +1600,10 @@ impl CheckCode {
             CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
             CheckCode::I001 => CheckCategory::Isort,
-            CheckCode::TID252 => CheckCategory::Flake8TidyImports,
             CheckCode::ICN001 => CheckCategory::Flake8ImportConventions,
+            CheckCode::ISC001 => CheckCategory::Flake8ImplicitStrConcat,
+            CheckCode::ISC002 => CheckCategory::Flake8ImplicitStrConcat,
+            CheckCode::ISC003 => CheckCategory::Flake8ImplicitStrConcat,
             CheckCode::N801 => CheckCategory::PEP8Naming,
             CheckCode::N802 => CheckCategory::PEP8Naming,
             CheckCode::N803 => CheckCategory::PEP8Naming,
@@ -1642,6 +1674,8 @@ impl CheckCode {
             CheckCode::T100 => CheckCategory::Flake8Debugger,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
+            CheckCode::TID251 => CheckCategory::Flake8TidyImports,
+            CheckCode::TID252 => CheckCategory::Flake8TidyImports,
             CheckCode::UP001 => CheckCategory::Pyupgrade,
             CheckCode::UP003 => CheckCategory::Pyupgrade,
             CheckCode::UP004 => CheckCategory::Pyupgrade,
@@ -1664,6 +1698,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckCategory::Pyupgrade,
             CheckCode::UP022 => CheckCategory::Pyupgrade,
             CheckCode::UP023 => CheckCategory::Pyupgrade,
+            CheckCode::UP025 => CheckCategory::Pyupgrade,
             CheckCode::UP026 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
@@ -1816,6 +1851,7 @@ impl CheckKind {
             // flake8-debugger
             CheckKind::Debugger(..) => &CheckCode::T100,
             // flake8-tidy-imports
+            CheckKind::BannedApi { .. } => &CheckCode::TID251,
             CheckKind::BannedRelativeImport(..) => &CheckCode::TID252,
             // flake8-return
             CheckKind::UnnecessaryReturnNone => &CheckCode::RET501,
@@ -1826,6 +1862,10 @@ impl CheckKind {
             CheckKind::SuperfluousElseRaise(..) => &CheckCode::RET506,
             CheckKind::SuperfluousElseContinue(..) => &CheckCode::RET507,
             CheckKind::SuperfluousElseBreak(..) => &CheckCode::RET508,
+            // flake8-implicit-str-concat
+            CheckKind::SingleLineImplicitStringConcatenation => &CheckCode::ISC001,
+            CheckKind::MultiLineImplicitStringConcatenation => &CheckCode::ISC002,
+            CheckKind::ExplicitStringConcatenation => &CheckCode::ISC003,
             // flake8-print
             CheckKind::PrintFound => &CheckCode::T201,
             CheckKind::PPrintFound => &CheckCode::T203,
@@ -1882,6 +1922,7 @@ impl CheckKind {
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
+            CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             CheckKind::RewriteMockImport => &CheckCode::UP026,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
@@ -2444,6 +2485,7 @@ impl CheckKind {
                 DebuggerUsingType::Import(name) => format!("Import for `{name}` found"),
             },
             // flake8-tidy-imports
+            CheckKind::BannedApi { name, message } => format!("`{name}` is banned: {message}"),
             CheckKind::BannedRelativeImport(strictness) => match strictness {
                 Strictness::Parents => {
                     "Relative imports from parent modules are banned".to_string()
@@ -2474,6 +2516,16 @@ impl CheckKind {
             }
             CheckKind::SuperfluousElseBreak(branch) => {
                 format!("Unnecessary `{branch}` after `break` statement")
+            }
+            // flake8-implicit-str-concat
+            CheckKind::SingleLineImplicitStringConcatenation => {
+                "Implicitly concatenated string literals on one line".to_string()
+            }
+            CheckKind::MultiLineImplicitStringConcatenation => {
+                "Implicitly concatenated string literals over continuation line".to_string()
+            }
+            CheckKind::ExplicitStringConcatenation => {
+                "Explicitly concatenated string should be implicitly concatenated".to_string()
             }
             // flake8-print
             CheckKind::PrintFound => "`print` found".to_string(),
@@ -2623,6 +2675,7 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
+            CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             CheckKind::RewriteMockImport => {
                 "`mock` is deprecated, use `unittest.mock`".to_string()
             }
@@ -3074,6 +3127,7 @@ impl CheckKind {
                 | CheckKind::ReplaceUniversalNewlines
                 | CheckKind::ReplaceStdoutStderr
                 | CheckKind::RewriteCElementTree
+                | CheckKind::RewriteUnicodeLiteral
                 | CheckKind::RewriteMockImport
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
@@ -3145,6 +3199,7 @@ pub struct Check {
     pub location: Location,
     pub end_location: Location,
     pub fix: Option<Fix>,
+    pub parent: Option<Location>,
 }
 
 impl Check {
@@ -3154,11 +3209,18 @@ impl Check {
             location: range.location,
             end_location: range.end_location,
             fix: None,
+            parent: None,
         }
     }
 
-    pub fn amend(&mut self, fix: Fix) {
+    pub fn amend(&mut self, fix: Fix) -> &mut Self {
         self.fix = Some(fix);
+        self
+    }
+
+    pub fn parent(&mut self, parent: Location) -> &mut Self {
+        self.parent = Some(parent);
+        self
     }
 }
 

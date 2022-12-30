@@ -19,6 +19,7 @@ expression: checks
     end_location:
       row: 17
       column: 25
+  parent: ~
 - kind:
     DuplicateHandlerException:
       - MyError
@@ -36,6 +37,7 @@ expression: checks
     end_location:
       row: 28
       column: 25
+  parent: ~
 - kind:
     DuplicateHandlerException:
       - re.error
@@ -53,4 +55,5 @@ expression: checks
     end_location:
       row: 49
       column: 27
+  parent: ~
 

@@ -20,6 +20,7 @@ expression: checks
     end_location:
       row: 2
       column: 14
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -38,6 +39,7 @@ expression: checks
     end_location:
       row: 5
       column: 15
+  parent: ~
 - kind:
     TrueFalseComparison:
       - true
@@ -56,6 +58,7 @@ expression: checks
     end_location:
       row: 8
       column: 14
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -74,6 +77,7 @@ expression: checks
     end_location:
       row: 11
       column: 15
+  parent: ~
 - kind:
     TrueFalseComparison:
       - true
@@ -92,6 +96,7 @@ expression: checks
     end_location:
       row: 14
       column: 17
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -110,6 +115,7 @@ expression: checks
     end_location:
       row: 17
       column: 18
+  parent: ~
 - kind:
     TrueFalseComparison:
       - true
@@ -128,6 +134,7 @@ expression: checks
     end_location:
       row: 20
       column: 23
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -146,6 +153,7 @@ expression: checks
     end_location:
       row: 20
       column: 48
+  parent: ~
 - kind:
     TrueFalseComparison:
       - true
@@ -164,6 +172,7 @@ expression: checks
     end_location:
       row: 22
       column: 24
+  parent: ~
 - kind:
     TrueFalseComparison:
       - true
@@ -182,6 +191,7 @@ expression: checks
     end_location:
       row: 25
       column: 23
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -200,4 +210,5 @@ expression: checks
     end_location:
       row: 25
       column: 23
+  parent: ~
 

@@ -10,6 +10,7 @@ expression: checks
     row: 78
     column: 20
   fix: ~
+  parent: ~
 - kind: CachedInstanceMethod
   location:
     row: 82
@@ -18,6 +19,7 @@ expression: checks
     row: 82
     column: 10
   fix: ~
+  parent: ~
 - kind: CachedInstanceMethod
   location:
     row: 86
@@ -26,6 +28,7 @@ expression: checks
     row: 86
     column: 22
   fix: ~
+  parent: ~
 - kind: CachedInstanceMethod
   location:
     row: 90
@@ -34,6 +37,7 @@ expression: checks
     row: 90
     column: 12
   fix: ~
+  parent: ~
 - kind: CachedInstanceMethod
   location:
     row: 94
@@ -42,6 +46,7 @@ expression: checks
     row: 94
     column: 24
   fix: ~
+  parent: ~
 - kind: CachedInstanceMethod
   location:
     row: 98
@@ -50,6 +55,7 @@ expression: checks
     row: 98
     column: 14
   fix: ~
+  parent: ~
 - kind: CachedInstanceMethod
   location:
     row: 102
@@ -58,6 +64,7 @@ expression: checks
     row: 102
     column: 26
   fix: ~
+  parent: ~
 - kind: CachedInstanceMethod
   location:
     row: 106
@@ -66,4 +73,5 @@ expression: checks
     row: 106
     column: 16
   fix: ~
+  parent: ~
 

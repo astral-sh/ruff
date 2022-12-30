@@ -31,6 +31,12 @@ pub enum PythonVersion {
     Py311,
 }
 
+impl Default for PythonVersion {
+    fn default() -> Self {
+        Self::Py310
+    }
+}
+
 impl FromStr for PythonVersion {
     type Err = anyhow::Error;
 

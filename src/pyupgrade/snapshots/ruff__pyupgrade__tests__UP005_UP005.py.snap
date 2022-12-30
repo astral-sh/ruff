@@ -20,6 +20,7 @@ expression: checks
     end_location:
       row: 6
       column: 25
+  parent: ~
 - kind:
     DeprecatedUnittestAlias:
       - assertEquals
@@ -38,6 +39,7 @@ expression: checks
     end_location:
       row: 7
       column: 25
+  parent: ~
 - kind:
     DeprecatedUnittestAlias:
       - failUnlessAlmostEqual
@@ -56,6 +58,7 @@ expression: checks
     end_location:
       row: 9
       column: 34
+  parent: ~
 - kind:
     DeprecatedUnittestAlias:
       - assertNotRegexpMatches
@@ -74,4 +77,5 @@ expression: checks
     end_location:
       row: 10
       column: 35
+  parent: ~
 

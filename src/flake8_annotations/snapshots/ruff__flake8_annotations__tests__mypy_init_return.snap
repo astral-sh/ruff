@@ -6,10 +6,10 @@ expression: checks
     MissingReturnTypeSpecialMethod: __init__
   location:
     row: 5
-    column: 4
+    column: 8
   end_location:
-    row: 6
-    column: 11
+    row: 5
+    column: 16
   fix:
     content: " -> None"
     location:
@@ -18,14 +18,15 @@ expression: checks
     end_location:
       row: 5
       column: 22
+  parent: ~
 - kind:
     MissingReturnTypeSpecialMethod: __init__
   location:
     row: 11
-    column: 4
+    column: 8
   end_location:
-    row: 12
-    column: 11
+    row: 11
+    column: 16
   fix:
     content: " -> None"
     location:
@@ -34,13 +35,15 @@ expression: checks
     end_location:
       row: 11
       column: 27
+  parent: ~
 - kind:
     MissingReturnTypePrivateFunction: __init__
   location:
     row: 40
-    column: 0
+    column: 4
   end_location:
-    row: 41
-    column: 7
+    row: 40
+    column: 12
   fix: ~
+  parent: ~
 

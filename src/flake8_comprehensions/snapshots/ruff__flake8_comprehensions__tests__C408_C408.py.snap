@@ -18,6 +18,7 @@ expression: checks
     end_location:
       row: 1
       column: 11
+  parent: ~
 - kind:
     UnnecessaryCollectionCall: list
   location:
@@ -34,6 +35,7 @@ expression: checks
     end_location:
       row: 2
       column: 10
+  parent: ~
 - kind:
     UnnecessaryCollectionCall: dict
   location:
@@ -50,6 +52,7 @@ expression: checks
     end_location:
       row: 3
       column: 11
+  parent: ~
 - kind:
     UnnecessaryCollectionCall: dict
   location:
@@ -66,4 +69,5 @@ expression: checks
     end_location:
       row: 4
       column: 14
+  parent: ~
 

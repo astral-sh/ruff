@@ -10,6 +10,7 @@ expression: checks
     row: 1
     column: 19
   fix: ~
+  parent: ~
 - kind: AssertTuple
   location:
     row: 2
@@ -18,4 +19,5 @@ expression: checks
     row: 2
     column: 15
   fix: ~
+  parent: ~
 

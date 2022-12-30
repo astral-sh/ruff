@@ -5,9 +5,10 @@ expression: checks
 - kind: PublicFunction
   location:
     row: 400
-    column: 0
+    column: 4
   end_location:
     row: 400
-    column: 27
+    column: 17
   fix: ~
+  parent: ~
 

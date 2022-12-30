@@ -18,6 +18,7 @@ expression: checks
     end_location:
       row: 4
       column: 4
+  parent: ~
 - kind:
     UseSysExit: quit
   location:
@@ -34,4 +35,5 @@ expression: checks
     end_location:
       row: 9
       column: 8
+  parent: ~
 

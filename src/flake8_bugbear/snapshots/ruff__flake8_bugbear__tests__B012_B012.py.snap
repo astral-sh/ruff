@@ -11,6 +11,7 @@ expression: checks
     row: 5
     column: 14
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: return
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 13
     column: 18
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: return
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 21
     column: 18
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: return
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 31
     column: 18
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: return
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 44
     column: 26
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: break
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 66
     column: 17
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: continue
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 78
     column: 20
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: return
   location:
@@ -74,6 +81,7 @@ expression: checks
     row: 94
     column: 18
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: continue
   location:
@@ -83,6 +91,7 @@ expression: checks
     row: 101
     column: 16
   fix: ~
+  parent: ~
 - kind:
     JumpStatementInFinally: break
   location:
@@ -92,4 +101,5 @@ expression: checks
     row: 107
     column: 13
   fix: ~
+  parent: ~
 

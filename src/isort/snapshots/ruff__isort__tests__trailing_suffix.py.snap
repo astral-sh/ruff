@@ -10,6 +10,7 @@ expression: checks
     row: 2
     column: 9
   fix: ~
+  parent: ~
 - kind: UnsortedImports
   location:
     row: 5
@@ -18,4 +19,5 @@ expression: checks
     row: 6
     column: 13
   fix: ~
+  parent: ~
 

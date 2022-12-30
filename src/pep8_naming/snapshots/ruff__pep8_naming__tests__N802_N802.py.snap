@@ -11,6 +11,7 @@ expression: checks
     row: 4
     column: 7
   fix: ~
+  parent: ~
 - kind:
     InvalidFunctionName: _Bad
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 8
     column: 8
   fix: ~
+  parent: ~
 - kind:
     InvalidFunctionName: BAD
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 12
     column: 7
   fix: ~
+  parent: ~
 - kind:
     InvalidFunctionName: BAD_FUNC
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 16
     column: 12
   fix: ~
+  parent: ~
 - kind:
     InvalidFunctionName: testTest
   location:
@@ -47,4 +51,5 @@ expression: checks
     row: 40
     column: 16
   fix: ~
+  parent: ~
 

@@ -13,6 +13,7 @@ expression: checks
     row: 73
     column: 12
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - handle
@@ -24,4 +25,5 @@ expression: checks
     row: 113
     column: 14
   fix: ~
+  parent: ~
 

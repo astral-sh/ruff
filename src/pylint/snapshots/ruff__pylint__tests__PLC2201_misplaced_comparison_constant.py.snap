@@ -18,6 +18,7 @@ expression: checks
     end_location:
       row: 20
       column: 17
+  parent: ~
 - kind:
     MisplacedComparisonConstant: i == 1
   location:
@@ -34,6 +35,7 @@ expression: checks
     end_location:
       row: 22
       column: 17
+  parent: ~
 - kind:
     MisplacedComparisonConstant: dummy_return() > 3
   location:
@@ -50,6 +52,7 @@ expression: checks
     end_location:
       row: 24
       column: 29
+  parent: ~
 - kind:
     MisplacedComparisonConstant: instance.dummy_return() != 4
   location:
@@ -66,6 +69,7 @@ expression: checks
     end_location:
       row: 26
       column: 39
+  parent: ~
 - kind:
     MisplacedComparisonConstant: instance.attr == 1
   location:
@@ -82,6 +86,7 @@ expression: checks
     end_location:
       row: 28
       column: 29
+  parent: ~
 - kind:
     MisplacedComparisonConstant: "instance.attr == 'aaa'"
   location:
@@ -98,4 +103,5 @@ expression: checks
     end_location:
       row: 30
       column: 33
+  parent: ~
 

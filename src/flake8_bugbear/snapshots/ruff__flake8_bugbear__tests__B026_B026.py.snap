@@ -10,6 +10,7 @@ expression: checks
     row: 16
     column: 30
   fix: ~
+  parent: ~
 - kind: StarArgUnpackingAfterKeywordArg
   location:
     row: 17
@@ -18,6 +19,7 @@ expression: checks
     row: 17
     column: 23
   fix: ~
+  parent: ~
 - kind: StarArgUnpackingAfterKeywordArg
   location:
     row: 18
@@ -26,6 +28,7 @@ expression: checks
     row: 18
     column: 34
   fix: ~
+  parent: ~
 - kind: StarArgUnpackingAfterKeywordArg
   location:
     row: 19
@@ -34,6 +37,7 @@ expression: checks
     row: 19
     column: 40
   fix: ~
+  parent: ~
 - kind: StarArgUnpackingAfterKeywordArg
   location:
     row: 20
@@ -42,6 +46,7 @@ expression: checks
     row: 20
     column: 23
   fix: ~
+  parent: ~
 - kind: StarArgUnpackingAfterKeywordArg
   location:
     row: 20
@@ -50,6 +55,7 @@ expression: checks
     row: 20
     column: 33
   fix: ~
+  parent: ~
 - kind: StarArgUnpackingAfterKeywordArg
   location:
     row: 21
@@ -58,4 +64,5 @@ expression: checks
     row: 21
     column: 33
   fix: ~
+  parent: ~
 

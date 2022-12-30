@@ -6,5 +6,5 @@ import "./index.css";
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <Editor />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

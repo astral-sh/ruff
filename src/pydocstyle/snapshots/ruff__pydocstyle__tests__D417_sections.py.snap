@@ -12,6 +12,7 @@ expression: checks
     row: 293
     column: 16
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - y
@@ -22,6 +23,7 @@ expression: checks
     row: 306
     column: 7
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - test
@@ -34,6 +36,7 @@ expression: checks
     row: 330
     column: 11
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - test
@@ -46,6 +49,7 @@ expression: checks
     row: 343
     column: 11
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - a
@@ -58,6 +62,7 @@ expression: checks
     row: 355
     column: 11
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - a
@@ -69,6 +74,7 @@ expression: checks
     row: 367
     column: 11
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - skip
@@ -80,6 +86,7 @@ expression: checks
     row: 382
     column: 11
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - y
@@ -90,6 +97,7 @@ expression: checks
     row: 398
     column: 7
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - test
@@ -102,6 +110,7 @@ expression: checks
     row: 434
     column: 11
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - test
@@ -114,6 +123,7 @@ expression: checks
     row: 453
     column: 11
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - a
@@ -125,6 +135,7 @@ expression: checks
     row: 469
     column: 11
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - y
@@ -135,4 +146,5 @@ expression: checks
     row: 497
     column: 11
   fix: ~
+  parent: ~
 

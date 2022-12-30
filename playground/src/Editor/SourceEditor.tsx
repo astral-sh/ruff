@@ -6,18 +6,19 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import { MarkerSeverity, MarkerTag } from "monaco-editor";
 import { useCallback, useEffect } from "react";
 import { Check } from "../pkg";
-
-export type Mode = "JSON" | "Python";
+import { Theme } from "./theme";
 
 export default function SourceEditor({
   visible,
   source,
+  theme,
   checks,
   onChange,
 }: {
   visible: boolean;
   source: string;
   checks: Check[];
+  theme: Theme;
   onChange: (pythonSource: string) => void;
 }) {
   const monaco = useMonaco();
@@ -43,7 +44,7 @@ export default function SourceEditor({
           check.code === "F401" || check.code === "F841"
             ? [MarkerTag.Unnecessary]
             : [],
-      }))
+      })),
     );
 
     const codeActionProvider = monaco?.languages.registerCodeActionProvider(
@@ -80,7 +81,7 @@ export default function SourceEditor({
             }));
           return { actions, dispose: () => {} };
         },
-      }
+      },
     );
 
     return () => {
@@ -92,7 +93,7 @@ export default function SourceEditor({
     (value: string | undefined) => {
       onChange(value ?? "");
     },
-    [onChange]
+    [onChange],
   );
 
   return (
@@ -104,9 +105,9 @@ export default function SourceEditor({
         roundedSelection: false,
         scrollBeyondLastLine: false,
       }}
-      wrapperProps={visible ? {} : { style: { display: "none" } }}
-      theme={"Ayu-Light"}
       language={"python"}
+      wrapperProps={visible ? {} : { style: { display: "none" } }}
+      theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
       value={source}
       onChange={handleChange}
     />
