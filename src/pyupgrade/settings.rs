@@ -29,15 +29,23 @@ pub struct Options {
     pub keep_runtime_typing: Option<bool>,
 }
 
-#[derive(Debug, Hash, Default)]
+#[derive(Debug, Default, Hash)]
 pub struct Settings {
     pub keep_runtime_typing: bool,
 }
 
-impl Settings {
-    pub fn from_options(options: &Options) -> Self {
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             keep_runtime_typing: options.keep_runtime_typing.unwrap_or_default(),
+        }
+    }
+}
+
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
+        Self {
+            keep_runtime_typing: Some(settings.keep_runtime_typing),
         }
     }
 }

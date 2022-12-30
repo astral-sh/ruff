@@ -5,14 +5,17 @@
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { useCallback, useEffect } from "react";
 import schema from "../../../ruff.schema.json";
+import { Theme } from "./theme";
 
 export default function SettingsEditor({
   visible,
   source,
+  theme,
   onChange,
 }: {
   visible: boolean;
   source: string;
+  theme: Theme;
   onChange: (source: string) => void;
 }) {
   const monaco = useMonaco();
@@ -33,7 +36,7 @@ export default function SettingsEditor({
     (value: string | undefined) => {
       onChange(value ?? "");
     },
-    [onChange]
+    [onChange],
   );
   return (
     <Editor
@@ -47,7 +50,7 @@ export default function SettingsEditor({
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       language={"json"}
       value={source}
-      theme={"Ayu-Light"}
+      theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
       onChange={handleChange}
     />
   );

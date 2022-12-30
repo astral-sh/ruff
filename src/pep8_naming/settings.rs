@@ -76,8 +76,18 @@ pub struct Settings {
     pub staticmethod_decorators: Vec<String>,
 }
 
-impl Settings {
-    pub fn from_options(options: Options) -> Self {
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            ignore_names: IGNORE_NAMES.map(String::from).to_vec(),
+            classmethod_decorators: CLASSMETHOD_DECORATORS.map(String::from).to_vec(),
+            staticmethod_decorators: STATICMETHOD_DECORATORS.map(String::from).to_vec(),
+        }
+    }
+}
+
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             ignore_names: options
                 .ignore_names
@@ -92,12 +102,12 @@ impl Settings {
     }
 }
 
-impl Default for Settings {
-    fn default() -> Self {
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
         Self {
-            ignore_names: IGNORE_NAMES.map(String::from).to_vec(),
-            classmethod_decorators: CLASSMETHOD_DECORATORS.map(String::from).to_vec(),
-            staticmethod_decorators: STATICMETHOD_DECORATORS.map(String::from).to_vec(),
+            ignore_names: Some(settings.ignore_names),
+            classmethod_decorators: Some(settings.classmethod_decorators),
+            staticmethod_decorators: Some(settings.staticmethod_decorators),
         }
     }
 }

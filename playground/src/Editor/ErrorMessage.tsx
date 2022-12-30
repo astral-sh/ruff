@@ -18,7 +18,7 @@ export function ErrorMessage({ children }: { children: string }) {
           children.startsWith("Error: ")
             ? children.slice("Error: ".length)
             : children,
-          120
+          120,
         )}
       </p>
     </div>

@@ -22,16 +22,23 @@ pub struct Options {
     pub ignore_variadic_names: Option<bool>,
 }
 
-#[derive(Debug, Hash, Default)]
+#[derive(Debug, Default, Hash)]
 pub struct Settings {
     pub ignore_variadic_names: bool,
 }
 
-impl Settings {
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: Options) -> Self {
+impl From<Options> for Settings {
+    fn from(options: Options) -> Self {
         Self {
             ignore_variadic_names: options.ignore_variadic_names.unwrap_or_default(),
+        }
+    }
+}
+
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
+        Self {
+            ignore_variadic_names: Some(settings.ignore_variadic_names),
         }
     }
 }

@@ -1,0 +1,185 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 12
+  fix:
+    content: "\"Hello\""
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 12
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 8
+  fix:
+    content: "'world'"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 8
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 6
+    column: 6
+  end_location:
+    row: 6
+    column: 14
+  fix:
+    content: "\"Hello\""
+    location:
+      row: 6
+      column: 6
+    end_location:
+      row: 6
+      column: 14
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 14
+  fix:
+    content: "'world'"
+    location:
+      row: 8
+      column: 6
+    end_location:
+      row: 8
+      column: 14
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 12
+  fix:
+    content: "\"Hello\""
+    location:
+      row: 12
+      column: 4
+    end_location:
+      row: 12
+      column: 12
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 12
+    column: 14
+  end_location:
+    row: 12
+    column: 22
+  fix:
+    content: "\"world\""
+    location:
+      row: 12
+      column: 14
+    end_location:
+      row: 12
+      column: 22
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 12
+    column: 26
+  end_location:
+    row: 12
+    column: 34
+  fix:
+    content: "\"Hello\""
+    location:
+      row: 12
+      column: 26
+    end_location:
+      row: 12
+      column: 34
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 12
+    column: 38
+  end_location:
+    row: 12
+    column: 46
+  fix:
+    content: "\"world\""
+    location:
+      row: 12
+      column: 38
+    end_location:
+      row: 12
+      column: 46
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 12
+  fix:
+    content: "'hello'"
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 16
+      column: 12
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 16
+  fix:
+    content: "\"\"\"hello\"\"\""
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 17
+      column: 16
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 18
+    column: 16
+  fix:
+    content: "'''hello'''"
+    location:
+      row: 18
+      column: 4
+    end_location:
+      row: 18
+      column: 16
+- kind: RewriteUnicodeLiteral
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 20
+  fix:
+    content: "'Hello \"World\"'"
+    location:
+      row: 19
+      column: 4
+    end_location:
+      row: 19
+      column: 20
+
