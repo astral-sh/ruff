@@ -1,4 +1,4 @@
-#![allow(clippy::len_zero)]
+#![allow(clippy::len_zero, clippy::needless_pass_by_value)]
 
 use itertools::Itertools;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
@@ -26,7 +26,7 @@ fn get_before_replace(elts: &[Expr]) -> Vec<String> {
             if let ExprKind::Name { id, .. } = &elt.node {
                 id.to_string()
             } else {
-                "".to_string()
+                String::new()
             }
         })
         .collect()
@@ -119,24 +119,24 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
     replacements = replacements
         .iter()
         .unique()
-        .map(|x| x.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
     before_replace = before_replace
         .iter()
         .filter(|x| !x.is_empty())
-        .map(|x| x.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
 
     // This part checks if there are differences between what there is and
     // what there should be. Where differences, the changes are applied
-    handle_making_changes(checker, error_handlers, before_replace, replacements);
+    handle_making_changes(checker, error_handlers, &before_replace, &replacements);
 }
 
 fn handle_making_changes(
     checker: &mut Checker,
     target: &Expr,
-    before_replace: Vec<String>,
-    replacements: Vec<String>,
+    before_replace: &[String],
+    replacements: &[String],
 ) {
     if before_replace != replacements && replacements.len() > 0 {
         let range = Range::new(target.location, target.end_location.unwrap());
@@ -197,7 +197,7 @@ impl OSErrorAliasChecker for &Box<Expr> {
             }
             _ => return,
         }
-        handle_making_changes(checker, self, before_replace, replacements);
+        handle_making_changes(checker, self, &before_replace, &replacements);
     }
 }
 
@@ -227,7 +227,7 @@ impl OSErrorAliasChecker for &Expr {
             }
             _ => return,
         }
-        handle_making_changes(checker, change_target, before_replace, replacements);
+        handle_making_changes(checker, change_target, &before_replace, &replacements);
     }
 }
 

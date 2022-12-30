@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 6
       column: 23
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 11
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 11
       column: 14
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 16
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 16
       column: 19
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 21
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 21
       column: 17
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 26
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 26
       column: 19
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 31
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 31
       column: 19
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 36
@@ -107,6 +113,7 @@ expression: checks
     end_location:
       row: 36
       column: 12
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 43
@@ -122,6 +129,7 @@ expression: checks
     end_location:
       row: 43
       column: 17
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 47
@@ -137,6 +145,7 @@ expression: checks
     end_location:
       row: 47
       column: 20
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 51
@@ -152,6 +161,7 @@ expression: checks
     end_location:
       row: 51
       column: 57
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 58
@@ -167,6 +177,7 @@ expression: checks
     end_location:
       row: 58
       column: 35
+  parent: ~
 - kind: OSErrorAlias
   location:
     row: 65
@@ -182,4 +193,5 @@ expression: checks
     end_location:
       row: 65
       column: 23
+  parent: ~
 
