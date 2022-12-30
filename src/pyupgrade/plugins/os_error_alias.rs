@@ -184,7 +184,7 @@ impl OSErrorAliasChecker for &Box<Expr> {
     }
 }
 
-impl OSErrorAliasChecker for &Expr {
+impl OSErrorAliasChecker for Expr {
     fn check_error(&self, checker: &mut Checker) {
         let mut replacements: Vec<String>;
         let mut before_replace: Vec<String>;
@@ -227,6 +227,6 @@ impl OSErrorAliasChecker for &Expr {
 }
 
 /// UP024
-pub fn os_error_alias<U: OSErrorAliasChecker>(checker: &mut Checker, handlers: U) {
+pub fn os_error_alias(checker: &mut Checker, handlers: &Stmt) {
     handlers.check_error(checker);
 }

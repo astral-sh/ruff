@@ -1087,7 +1087,7 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP024) {
                     if let Some(item) = exc {
-                        pyupgrade::plugins::os_error_alias(self, item);
+                        pyupgrade::plugins::os_error_alias(self, stmt);
                     }
                 }
             }
