@@ -330,11 +330,11 @@ Options:
   -n, --no-cache
           Disable cache reads
       --select <SELECT>
-          List of error codes to enable
+          Comma-separated list of error codes to enable (or ALL, to enable all checks)
       --extend-select <EXTEND_SELECT>
           Like --select, but adds additional error codes on top of the selected ones
       --ignore <IGNORE>
-          List of error codes to ignore
+          Comma-separated list of error codes to disable
       --extend-ignore <EXTEND_IGNORE>
           Like --ignore, but adds additional error codes on top of the ignored ones
       --exclude <EXCLUDE>
@@ -362,7 +362,7 @@ Options:
       --show-settings
           See the settings Ruff will use to check a given Python file
       --add-noqa
-          Enable automatic additions of noqa directives to failing lines
+          Enable automatic additions of `noqa` directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
           Regular expression matching the name of dummy variables
       --target-version <TARGET_VERSION>
@@ -370,7 +370,7 @@ Options:
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated checks and automatic formatting
       --max-complexity <MAX_COMPLEXITY>
-          Max McCabe complexity allowed for a function
+          Maximum McCabe complexity allowed for a given function
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
       --explain <EXPLAIN>
