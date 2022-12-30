@@ -1,15 +1,12 @@
 //! Generate a Markdown-compatible listing of configuration options.
 
-use std::fs;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::PathBuf;
-
 use anyhow::Result;
 use clap::Args;
 use itertools::Itertools;
 use ruff::settings::options::Options;
 use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionField};
+
+use crate::utils::replace_readme_section;
 
 const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated options sections. -->";
 const END_PRAGMA: &str = "<!-- End auto-generated options sections. -->";
@@ -95,30 +92,7 @@ pub fn main(cli: &Cli) -> Result<()> {
     if cli.dry_run {
         print!("{output}");
     } else {
-        // Read the existing file.
-        let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("Failed to find root directory")
-            .join("README.md");
-        let existing = fs::read_to_string(&file)?;
-
-        // Extract the prefix.
-        let index = existing
-            .find(BEGIN_PRAGMA)
-            .expect("Unable to find begin pragma");
-        let prefix = &existing[..index + BEGIN_PRAGMA.len()];
-
-        // Extract the suffix.
-        let index = existing
-            .find(END_PRAGMA)
-            .expect("Unable to find end pragma");
-        let suffix = &existing[index..];
-
-        // Write the prefix, new contents, and suffix.
-        let mut f = OpenOptions::new().write(true).truncate(true).open(&file)?;
-        write!(f, "{prefix}\n\n")?;
-        write!(f, "{output}")?;
-        write!(f, "{suffix}")?;
+        replace_readme_section(&output, BEGIN_PRAGMA, END_PRAGMA)?;
     }
 
     Ok(())

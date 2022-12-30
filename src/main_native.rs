@@ -83,11 +83,12 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
 
-    if cli.show_settings && cli.show_files {
-        anyhow::bail!("specify --show-settings or show-files (not both)")
-    }
     if let Some(shell) = cli.generate_shell_completion {
         shell.generate(&mut Cli::command(), &mut io::stdout());
+        return Ok(ExitCode::SUCCESS);
+    }
+    if cli.clean {
+        commands::clean(&log_level)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -176,12 +177,6 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         if !matches!(autofix, fixer::Mode::None) {
             eprintln!("Warning: --fix is not enabled in watch mode.");
         }
-        if cli.add_noqa {
-            eprintln!("Warning: --add-noqa is not enabled in watch mode.");
-        }
-        if cli.autoformat {
-            eprintln!("Warning: --autoformat is not enabled in watch mode.");
-        }
         if format != SerializationFormat::Text {
             eprintln!("Warning: --format 'text' is used in watch mode.");
         }
@@ -239,12 +234,6 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
             commands::add_noqa(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
-        }
-    } else if cli.autoformat {
-        let modifications =
-            commands::autoformat(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
-        if modifications > 0 && log_level >= LogLevel::Default {
-            println!("Formatted {modifications} files.");
         }
     } else {
         let is_stdin = cli.files == vec![PathBuf::from("-")];
