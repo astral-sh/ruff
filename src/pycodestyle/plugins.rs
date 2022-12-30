@@ -30,7 +30,11 @@ fn compare(
             comparators: comparators.to_vec(),
         },
     );
-    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
+    let mut generator = SourceCodeGenerator::new(
+        stylist.indentation(),
+        stylist.quote(),
+        stylist.line_ending(),
+    );
     generator.unparse_expr(&cmp, 0);
     generator.generate().ok()
 }
@@ -302,7 +306,11 @@ fn function(
             type_comment: None,
         },
     );
-    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
+    let mut generator = SourceCodeGenerator::new(
+        stylist.indentation(),
+        stylist.quote(),
+        stylist.line_ending(),
+    );
     generator.unparse_stmt(&func);
     Ok(generator.generate()?)
 }
