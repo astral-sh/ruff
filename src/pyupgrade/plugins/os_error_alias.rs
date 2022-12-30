@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind, Located};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
@@ -18,7 +18,7 @@ fn get_correct_name(original: &str) -> String {
     }
 }
 
-fn get_before_replace(elts: &Vec<Located<ExprKind>>) -> Vec<String> {
+fn get_before_replace(elts: &Vec<Expr>) -> Vec<String> {
     elts.iter()
         .map(|elt| {
             if let ExprKind::Name { id, .. } = &elt.node {
@@ -30,7 +30,7 @@ fn get_before_replace(elts: &Vec<Located<ExprKind>>) -> Vec<String> {
         .collect()
 }
 
-fn check_module(checker: &Checker, expr: &Located<ExprKind>) -> (Vec<String>, Vec<String>) {
+fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
     let mut replacements: Vec<String> = vec![];
     let mut before_replace: Vec<String> = vec![];
     for module in ERROR_MODULES.iter() {
@@ -109,7 +109,7 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
 
 fn handle_making_changes(
     checker: &mut Checker,
-    target: &Located<ExprKind>,
+    target: &Expr,
     before_replace: Vec<String>,
     replacements: Vec<String>,
 ) {
@@ -162,7 +162,7 @@ impl OSErrorAliasChecker for &Vec<Excepthandler> {
     }
 }
 
-impl OSErrorAliasChecker for &Box<Located<ExprKind>> {
+impl OSErrorAliasChecker for &Box<Expr> {
     fn check_error(&self, checker: &mut Checker) {
         let mut replacements: Vec<String>;
         let mut before_replace: Vec<String>;
@@ -184,11 +184,11 @@ impl OSErrorAliasChecker for &Box<Located<ExprKind>> {
     }
 }
 
-impl OSErrorAliasChecker for &Located<ExprKind> {
+impl OSErrorAliasChecker for &Expr {
     fn check_error(&self, checker: &mut Checker) {
         let mut replacements: Vec<String>;
         let mut before_replace: Vec<String>;
-        let change_target: &Located<ExprKind>;
+        let change_target: &Expr;
         match &self.node {
             ExprKind::Name { id, .. } => {
                 change_target = self;
