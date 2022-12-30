@@ -6,16 +6,19 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import { MarkerSeverity, MarkerTag } from "monaco-editor";
 import { useCallback, useEffect } from "react";
 import { Check } from "../pkg";
+import { Theme } from "./theme";
 
 export default function SourceEditor({
   visible,
   source,
+  theme,
   checks,
   onChange,
 }: {
   visible: boolean;
   source: string;
   checks: Check[];
+  theme: Theme;
   onChange: (pythonSource: string) => void;
 }) {
   const monaco = useMonaco();
@@ -102,9 +105,9 @@ export default function SourceEditor({
         roundedSelection: false,
         scrollBeyondLastLine: false,
       }}
-      wrapperProps={visible ? {} : { style: { display: "none" } }}
-      theme={"Ayu-Light"}
       language={"python"}
+      wrapperProps={visible ? {} : { style: { display: "none" } }}
+      theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
       value={source}
       onChange={handleChange}
     />
