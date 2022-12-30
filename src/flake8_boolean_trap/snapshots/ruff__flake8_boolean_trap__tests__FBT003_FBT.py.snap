@@ -10,6 +10,7 @@ expression: checks
     row: 42
     column: 14
   fix: ~
+  parent: ~
 - kind: BooleanPositionalValueInFunctionCall
   location:
     row: 57
@@ -18,6 +19,7 @@ expression: checks
     row: 57
     column: 14
   fix: ~
+  parent: ~
 - kind: BooleanPositionalValueInFunctionCall
   location:
     row: 57
@@ -26,4 +28,5 @@ expression: checks
     row: 57
     column: 21
   fix: ~
+  parent: ~
 

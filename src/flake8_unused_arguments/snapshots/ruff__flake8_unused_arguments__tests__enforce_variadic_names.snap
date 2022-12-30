@@ -11,6 +11,7 @@ expression: checks
     row: 1
     column: 7
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: b
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 1
     column: 10
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: a
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 5
     column: 7
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: b
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 5
     column: 10
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: args
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 5
     column: 17
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: kwargs
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 5
     column: 27
   fix: ~
+  parent: ~
 - kind:
     UnusedMethodArgument: a
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 10
     column: 17
   fix: ~
+  parent: ~
 - kind:
     UnusedMethodArgument: b
   location:
@@ -74,6 +81,7 @@ expression: checks
     row: 10
     column: 20
   fix: ~
+  parent: ~
 - kind:
     UnusedMethodArgument: a
   location:
@@ -83,6 +91,7 @@ expression: checks
     row: 13
     column: 17
   fix: ~
+  parent: ~
 - kind:
     UnusedMethodArgument: b
   location:
@@ -92,6 +101,7 @@ expression: checks
     row: 13
     column: 20
   fix: ~
+  parent: ~
 - kind:
     UnusedMethodArgument: args
   location:
@@ -101,6 +111,7 @@ expression: checks
     row: 13
     column: 27
   fix: ~
+  parent: ~
 - kind:
     UnusedMethodArgument: kwargs
   location:
@@ -110,4 +121,5 @@ expression: checks
     row: 13
     column: 37
   fix: ~
+  parent: ~
 

@@ -10,6 +10,7 @@ expression: checks
     row: 1
     column: 13
   fix: ~
+  parent: ~
 - kind: BlanketNOQA
   location:
     row: 2
@@ -18,6 +19,7 @@ expression: checks
     row: 2
     column: 15
   fix: ~
+  parent: ~
 - kind: BlanketNOQA
   location:
     row: 3
@@ -26,6 +28,7 @@ expression: checks
     row: 3
     column: 6
   fix: ~
+  parent: ~
 - kind: BlanketNOQA
   location:
     row: 4
@@ -34,6 +37,7 @@ expression: checks
     row: 4
     column: 6
   fix: ~
+  parent: ~
 - kind: BlanketNOQA
   location:
     row: 5
@@ -42,6 +46,7 @@ expression: checks
     row: 5
     column: 8
   fix: ~
+  parent: ~
 - kind: BlanketNOQA
   location:
     row: 6
@@ -50,4 +55,5 @@ expression: checks
     row: 6
     column: 8
   fix: ~
+  parent: ~
 

@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 7
       column: 25
+  parent: ~
 - kind: TypingTextStrAlias
   location:
     row: 11
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 11
       column: 39
+  parent: ~
 - kind: TypingTextStrAlias
   location:
     row: 15
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 15
       column: 37
+  parent: ~
 - kind: TypingTextStrAlias
   location:
     row: 19
@@ -62,4 +65,5 @@ expression: checks
     end_location:
       row: 19
       column: 35
+  parent: ~
 

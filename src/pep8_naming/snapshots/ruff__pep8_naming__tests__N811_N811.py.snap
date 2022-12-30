@@ -13,6 +13,7 @@ expression: checks
     row: 1
     column: 25
   fix: ~
+  parent: ~
 - kind:
     ConstantImportedAsNonConstant:
       - CONSTANT
@@ -24,6 +25,7 @@ expression: checks
     row: 2
     column: 36
   fix: ~
+  parent: ~
 - kind:
     ConstantImportedAsNonConstant:
       - ANOTHER_CONSTANT
@@ -35,4 +37,5 @@ expression: checks
     row: 3
     column: 52
   fix: ~
+  parent: ~
 

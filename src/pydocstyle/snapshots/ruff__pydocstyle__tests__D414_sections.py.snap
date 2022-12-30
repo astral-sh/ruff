@@ -11,6 +11,7 @@ expression: checks
     row: 58
     column: 7
   fix: ~
+  parent: ~
 - kind:
     NonEmptySection: Returns
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 78
     column: 7
   fix: ~
+  parent: ~
 - kind:
     NonEmptySection: Yields
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 78
     column: 7
   fix: ~
+  parent: ~
 - kind:
     NonEmptySection: Returns
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 165
     column: 7
   fix: ~
+  parent: ~
 - kind:
     NonEmptySection: Returns
   location:
@@ -47,4 +51,5 @@ expression: checks
     row: 262
     column: 7
   fix: ~
+  parent: ~
 

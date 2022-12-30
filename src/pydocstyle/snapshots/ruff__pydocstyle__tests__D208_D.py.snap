@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 252
       column: 7
+  parent: ~
 - kind: NoOverIndentation
   location:
     row: 264
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 264
       column: 8
+  parent: ~
 - kind: NoOverIndentation
   location:
     row: 272
@@ -47,4 +49,5 @@ expression: checks
     end_location:
       row: 272
       column: 8
+  parent: ~
 

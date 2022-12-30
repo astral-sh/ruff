@@ -10,6 +10,7 @@ expression: checks
     row: 8
     column: 16
   fix: ~
+  parent: ~
 - kind: ImplicitReturn
   location:
     row: 14
@@ -25,6 +26,7 @@ expression: checks
     end_location:
       row: 15
       column: 0
+  parent: ~
 - kind: ImplicitReturn
   location:
     row: 23
@@ -40,6 +42,7 @@ expression: checks
     end_location:
       row: 24
       column: 0
+  parent: ~
 - kind: ImplicitReturn
   location:
     row: 29
@@ -48,6 +51,7 @@ expression: checks
     row: 30
     column: 20
   fix: ~
+  parent: ~
 - kind: ImplicitReturn
   location:
     row: 39
@@ -63,4 +67,5 @@ expression: checks
     end_location:
       row: 40
       column: 0
+  parent: ~
 

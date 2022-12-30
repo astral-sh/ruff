@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 4
       column: 11
+  parent: ~
 - kind: IsLiteral
   location:
     row: 6
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 6
       column: 11
+  parent: ~
 - kind: IsLiteral
   location:
     row: 8
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 8
       column: 10
+  parent: ~
 - kind: IsLiteral
   location:
     row: 10
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 10
       column: 11
+  parent: ~
 - kind: IsLiteral
   location:
     row: 12
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 12
       column: 11
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -95,6 +100,7 @@ expression: checks
     end_location:
       row: 14
       column: 16
+  parent: ~
 - kind:
     NoneComparison: Eq
   location:
@@ -111,6 +117,7 @@ expression: checks
     end_location:
       row: 14
       column: 16
+  parent: ~
 - kind:
     NoneComparison: Eq
   location:
@@ -127,6 +134,7 @@ expression: checks
     end_location:
       row: 16
       column: 16
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -145,6 +153,7 @@ expression: checks
     end_location:
       row: 16
       column: 16
+  parent: ~
 - kind:
     NoneComparison: Eq
   location:
@@ -154,6 +163,7 @@ expression: checks
     row: 22
     column: 16
   fix: ~
+  parent: ~
 - kind:
     NoneComparison: Eq
   location:
@@ -163,6 +173,7 @@ expression: checks
     row: 24
     column: 7
   fix: ~
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -174,6 +185,7 @@ expression: checks
     row: 26
     column: 17
   fix: ~
+  parent: ~
 - kind:
     TrueFalseComparison:
       - false
@@ -185,4 +197,5 @@ expression: checks
     row: 28
     column: 8
   fix: ~
+  parent: ~
 

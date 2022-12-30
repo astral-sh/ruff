@@ -10,6 +10,7 @@ expression: checks
     row: 203
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 210
@@ -18,6 +19,7 @@ expression: checks
     row: 215
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 220
@@ -26,6 +28,7 @@ expression: checks
     row: 224
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 230
@@ -34,6 +37,7 @@ expression: checks
     row: 234
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 240
@@ -42,6 +46,7 @@ expression: checks
     row: 244
     column: 3
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 250
@@ -50,6 +55,7 @@ expression: checks
     row: 254
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 260
@@ -58,6 +64,7 @@ expression: checks
     row: 264
     column: 11
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 270
@@ -66,6 +73,7 @@ expression: checks
     row: 274
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 281
@@ -74,6 +82,7 @@ expression: checks
     row: 283
     column: 19
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 299
@@ -82,6 +91,7 @@ expression: checks
     row: 302
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 343
@@ -90,6 +100,7 @@ expression: checks
     row: 348
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 383
@@ -98,6 +109,7 @@ expression: checks
     row: 386
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 392
@@ -106,6 +118,7 @@ expression: checks
     row: 396
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 438
@@ -114,6 +127,7 @@ expression: checks
     row: 441
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 450
@@ -122,6 +136,7 @@ expression: checks
     row: 454
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 526
@@ -130,6 +145,7 @@ expression: checks
     row: 532
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 546
@@ -138,6 +154,7 @@ expression: checks
     row: 549
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 555
@@ -146,6 +163,7 @@ expression: checks
     row: 558
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiLineSummarySecondLine
   location:
     row: 568
@@ -154,4 +172,5 @@ expression: checks
     row: 571
     column: 7
   fix: ~
+  parent: ~
 

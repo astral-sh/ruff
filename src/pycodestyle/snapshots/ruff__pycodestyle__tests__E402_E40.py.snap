@@ -10,6 +10,7 @@ expression: checks
     row: 55
     column: 10
   fix: ~
+  parent: ~
 - kind: ModuleImportNotAtTopOfFile
   location:
     row: 57
@@ -18,6 +19,7 @@ expression: checks
     row: 57
     column: 10
   fix: ~
+  parent: ~
 - kind: ModuleImportNotAtTopOfFile
   location:
     row: 61
@@ -26,4 +28,5 @@ expression: checks
     row: 61
     column: 10
   fix: ~
+  parent: ~
 

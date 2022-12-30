@@ -13,6 +13,7 @@ expression: checks
     row: 2
     column: 10
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: cgi
@@ -24,6 +25,7 @@ expression: checks
     row: 4
     column: 17
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: cgi
@@ -35,6 +37,7 @@ expression: checks
     row: 6
     column: 23
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: cgi
@@ -46,6 +49,7 @@ expression: checks
     row: 9
     column: 18
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: cgi
@@ -57,6 +61,7 @@ expression: checks
     row: 11
     column: 23
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: cgi
@@ -68,6 +73,7 @@ expression: checks
     row: 13
     column: 25
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: typing.TypedDict
@@ -79,6 +85,7 @@ expression: checks
     row: 17
     column: 28
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: typing.TypedDict
@@ -90,6 +97,7 @@ expression: checks
     row: 22
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: typing.TypedDict
@@ -101,6 +109,7 @@ expression: checks
     row: 24
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: typing.TypedDict
@@ -112,6 +121,7 @@ expression: checks
     row: 27
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: typing.TypedDict
@@ -123,6 +133,7 @@ expression: checks
     row: 29
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: typing.TypedDict
@@ -134,4 +145,5 @@ expression: checks
     row: 33
     column: 28
   fix: ~
+  parent: ~
 

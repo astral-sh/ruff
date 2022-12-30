@@ -10,6 +10,7 @@ expression: checks
     row: 3
     column: 17
   fix: ~
+  parent: ~
 - kind: ExplicitStringConcatenation
   location:
     row: 9
@@ -18,6 +19,7 @@ expression: checks
     row: 10
     column: 7
   fix: ~
+  parent: ~
 - kind: ExplicitStringConcatenation
   location:
     row: 14
@@ -26,6 +28,7 @@ expression: checks
     row: 15
     column: 7
   fix: ~
+  parent: ~
 - kind: ExplicitStringConcatenation
   location:
     row: 19
@@ -34,4 +37,5 @@ expression: checks
     row: 20
     column: 8
   fix: ~
+  parent: ~
 

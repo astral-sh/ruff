@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 23
   fix: ~
+  parent: ~
 - kind: CallDatetimeNowWithoutTzinfo
   location:
     row: 7
@@ -18,6 +19,7 @@ expression: checks
     row: 7
     column: 48
   fix: ~
+  parent: ~
 - kind: CallDatetimeNowWithoutTzinfo
   location:
     row: 10
@@ -26,6 +28,7 @@ expression: checks
     row: 10
     column: 27
   fix: ~
+  parent: ~
 - kind: CallDatetimeNowWithoutTzinfo
   location:
     row: 13
@@ -34,6 +37,7 @@ expression: checks
     row: 13
     column: 30
   fix: ~
+  parent: ~
 - kind: CallDatetimeNowWithoutTzinfo
   location:
     row: 18
@@ -42,4 +46,5 @@ expression: checks
     row: 18
     column: 14
   fix: ~
+  parent: ~
 

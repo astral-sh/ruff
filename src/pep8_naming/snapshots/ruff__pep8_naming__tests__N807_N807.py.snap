@@ -10,6 +10,7 @@ expression: checks
     row: 1
     column: 11
   fix: ~
+  parent: ~
 - kind: DunderFunctionName
   location:
     row: 14
@@ -18,4 +19,5 @@ expression: checks
     row: 14
     column: 15
   fix: ~
+  parent: ~
 

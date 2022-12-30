@@ -13,6 +13,7 @@ expression: checks
     row: 5
     column: 14
   fix: ~
+  parent: ~
 - kind:
     ImportStarUsage:
       - a
@@ -24,4 +25,5 @@ expression: checks
     row: 11
     column: 7
   fix: ~
+  parent: ~
 

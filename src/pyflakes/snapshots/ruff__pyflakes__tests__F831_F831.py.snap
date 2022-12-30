@@ -10,6 +10,7 @@ expression: checks
     row: 1
     column: 30
   fix: ~
+  parent: ~
 - kind: DuplicateArgumentName
   location:
     row: 5
@@ -18,6 +19,7 @@ expression: checks
     row: 5
     column: 33
   fix: ~
+  parent: ~
 - kind: DuplicateArgumentName
   location:
     row: 9
@@ -26,4 +28,5 @@ expression: checks
     row: 9
     column: 32
   fix: ~
+  parent: ~
 

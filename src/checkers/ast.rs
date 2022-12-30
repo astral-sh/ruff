@@ -3673,7 +3673,20 @@ impl<'a> Checker<'a> {
 
                     let defined_by = binding.source.as_ref().unwrap();
                     let defined_in = self.child_to_parent.get(defined_by);
-                    if self.is_ignored(&CheckCode::F401, binding.range.location.row()) {
+                    let child = defined_by.0;
+
+                    let check_lineno = binding.range.location.row();
+                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. }) {
+                        Some(child.location.row())
+                    } else {
+                        None
+                    };
+
+                    if self.is_ignored(&CheckCode::F401, check_lineno)
+                        || parent_lineno.map_or(false, |parent_lineno| {
+                            self.is_ignored(&CheckCode::F401, parent_lineno)
+                        })
+                    {
                         ignored
                             .entry((defined_by, defined_in))
                             .or_default()
@@ -3725,21 +3738,29 @@ impl<'a> Checker<'a> {
                             CheckKind::UnusedImport(full_name.clone(), ignore_init),
                             *range,
                         );
+                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
+                            check.parent(child.location);
+                        }
                         if let Some(fix) = fix.as_ref() {
                             check.amend(fix.clone());
                         }
                         checks.push(check);
                     }
                 }
-                for (_, unused_imports) in ignored
+                for ((defined_by, ..), unused_imports) in ignored
                     .into_iter()
                     .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
                 {
+                    let child = defined_by.0;
                     for (full_name, range) in unused_imports {
-                        checks.push(Check::new(
+                        let mut check = Check::new(
                             CheckKind::UnusedImport(full_name.clone(), ignore_init),
                             *range,
-                        ));
+                        );
+                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
+                            check.parent(child.location);
+                        }
+                        checks.push(check);
                     }
                 }
             }

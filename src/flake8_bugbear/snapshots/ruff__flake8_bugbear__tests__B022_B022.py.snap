@@ -10,6 +10,7 @@ expression: checks
     row: 9
     column: 26
   fix: ~
+  parent: ~
 - kind: UselessContextlibSuppress
   location:
     row: 12
@@ -18,4 +19,5 @@ expression: checks
     row: 12
     column: 15
   fix: ~
+  parent: ~
 

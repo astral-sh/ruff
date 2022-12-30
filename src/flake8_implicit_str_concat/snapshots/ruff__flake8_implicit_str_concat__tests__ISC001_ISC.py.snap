@@ -10,6 +10,7 @@ expression: checks
     row: 1
     column: 11
   fix: ~
+  parent: ~
 - kind: SingleLineImplicitStringConcatenation
   location:
     row: 1
@@ -18,4 +19,5 @@ expression: checks
     row: 1
     column: 15
   fix: ~
+  parent: ~
 

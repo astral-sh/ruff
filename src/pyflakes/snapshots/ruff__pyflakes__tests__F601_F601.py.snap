@@ -10,6 +10,7 @@ expression: checks
     row: 3
     column: 7
   fix: ~
+  parent: ~
 - kind: MultiValueRepeatedKeyLiteral
   location:
     row: 9
@@ -18,6 +19,7 @@ expression: checks
     row: 9
     column: 5
   fix: ~
+  parent: ~
 - kind: MultiValueRepeatedKeyLiteral
   location:
     row: 11
@@ -26,4 +28,5 @@ expression: checks
     row: 11
     column: 10
   fix: ~
+  parent: ~
 

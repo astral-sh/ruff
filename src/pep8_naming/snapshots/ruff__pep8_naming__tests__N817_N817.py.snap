@@ -13,6 +13,7 @@ expression: checks
     row: 1
     column: 22
   fix: ~
+  parent: ~
 - kind:
     CamelcaseImportedAsAcronym:
       - CamelCase
@@ -24,4 +25,5 @@ expression: checks
     row: 2
     column: 31
   fix: ~
+  parent: ~
 

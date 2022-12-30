@@ -11,6 +11,7 @@ expression: checks
     row: 5
     column: 37
   fix: ~
+  parent: ~
 - kind:
     HardcodedPasswordDefault: posonly
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 13
     column: 53
   fix: ~
+  parent: ~
 - kind:
     HardcodedPasswordDefault: kwonly
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 21
     column: 46
   fix: ~
+  parent: ~
 - kind:
     HardcodedPasswordDefault: posonly
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 29
     column: 47
   fix: ~
+  parent: ~
 - kind:
     HardcodedPasswordDefault: kwonly
   location:
@@ -47,4 +51,5 @@ expression: checks
     row: 29
     column: 69
   fix: ~
+  parent: ~
 

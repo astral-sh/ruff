@@ -11,6 +11,7 @@ expression: checks
     row: 3
     column: 1
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: I
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 4
     column: 1
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: O
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 5
     column: 1
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 6
     column: 1
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 8
     column: 4
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 9
     column: 5
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 10
     column: 5
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -74,6 +81,7 @@ expression: checks
     row: 11
     column: 5
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -83,6 +91,7 @@ expression: checks
     row: 16
     column: 5
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -92,6 +101,7 @@ expression: checks
     row: 20
     column: 8
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -101,6 +111,7 @@ expression: checks
     row: 25
     column: 12
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -110,6 +121,7 @@ expression: checks
     row: 26
     column: 5
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -119,6 +131,7 @@ expression: checks
     row: 30
     column: 5
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -128,6 +141,7 @@ expression: checks
     row: 33
     column: 18
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -137,6 +151,7 @@ expression: checks
     row: 34
     column: 9
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -146,6 +161,7 @@ expression: checks
     row: 40
     column: 8
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: I
   location:
@@ -155,6 +171,7 @@ expression: checks
     row: 40
     column: 14
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -164,6 +181,7 @@ expression: checks
     row: 44
     column: 8
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: I
   location:
@@ -173,6 +191,7 @@ expression: checks
     row: 44
     column: 16
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -182,6 +201,7 @@ expression: checks
     row: 48
     column: 9
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: I
   location:
@@ -191,6 +211,7 @@ expression: checks
     row: 48
     column: 14
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -200,6 +221,7 @@ expression: checks
     row: 57
     column: 16
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -209,6 +231,7 @@ expression: checks
     row: 66
     column: 20
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -218,6 +241,7 @@ expression: checks
     row: 72
     column: 8
   fix: ~
+  parent: ~
 - kind:
     AmbiguousVariableName: l
   location:
@@ -227,4 +251,5 @@ expression: checks
     row: 74
     column: 10
   fix: ~
+  parent: ~
 

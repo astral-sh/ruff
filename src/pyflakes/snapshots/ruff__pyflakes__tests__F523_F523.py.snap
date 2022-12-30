@@ -12,6 +12,7 @@ expression: checks
     row: 2
     column: 18
   fix: ~
+  parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
       - "0"
@@ -23,6 +24,7 @@ expression: checks
     row: 3
     column: 21
   fix: ~
+  parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
       - "2"
@@ -33,6 +35,7 @@ expression: checks
     row: 5
     column: 25
   fix: ~
+  parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
       - "1"
@@ -43,6 +46,7 @@ expression: checks
     row: 6
     column: 21
   fix: ~
+  parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
       - "1"
@@ -53,6 +57,7 @@ expression: checks
     row: 9
     column: 17
   fix: ~
+  parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
       - "1"
@@ -64,6 +69,7 @@ expression: checks
     row: 10
     column: 20
   fix: ~
+  parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
       - "2"
@@ -74,4 +80,5 @@ expression: checks
     row: 12
     column: 23
   fix: ~
+  parent: ~
 

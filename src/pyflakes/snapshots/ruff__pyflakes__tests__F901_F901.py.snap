@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 2
       column: 24
+  parent: ~
 - kind: RaiseNotImplemented
   location:
     row: 6
@@ -32,4 +33,5 @@ expression: checks
     end_location:
       row: 6
       column: 24
+  parent: ~
 

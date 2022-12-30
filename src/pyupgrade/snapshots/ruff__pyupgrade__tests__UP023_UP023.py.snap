@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 2
       column: 59
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 3
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 3
       column: 35
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 6
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 6
       column: 44
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 7
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 7
       column: 49
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 10
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 14
       column: 1
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 16
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 16
       column: 39
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 17
@@ -107,6 +113,7 @@ expression: checks
     end_location:
       row: 17
       column: 45
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 19
@@ -122,6 +129,7 @@ expression: checks
     end_location:
       row: 19
       column: 40
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 21
@@ -137,6 +145,7 @@ expression: checks
     end_location:
       row: 21
       column: 47
+  parent: ~
 - kind: RewriteCElementTree
   location:
     row: 24
@@ -152,4 +161,5 @@ expression: checks
     end_location:
       row: 24
       column: 59
+  parent: ~
 

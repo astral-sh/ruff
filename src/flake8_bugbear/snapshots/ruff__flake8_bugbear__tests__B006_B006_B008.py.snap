@@ -10,6 +10,7 @@ expression: checks
     row: 60
     column: 33
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 64
@@ -18,6 +19,7 @@ expression: checks
     row: 64
     column: 31
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 68
@@ -26,6 +28,7 @@ expression: checks
     row: 68
     column: 24
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 72
@@ -34,6 +37,7 @@ expression: checks
     row: 72
     column: 44
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 76
@@ -42,6 +46,7 @@ expression: checks
     row: 76
     column: 56
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 80
@@ -50,6 +55,7 @@ expression: checks
     row: 80
     column: 44
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 85
@@ -58,6 +64,7 @@ expression: checks
     row: 85
     column: 69
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 89
@@ -66,6 +73,7 @@ expression: checks
     row: 89
     column: 72
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 93
@@ -74,6 +82,7 @@ expression: checks
     row: 93
     column: 68
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 97
@@ -82,6 +91,7 @@ expression: checks
     row: 97
     column: 34
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 170
@@ -90,6 +100,7 @@ expression: checks
     row: 170
     column: 48
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 203
@@ -98,6 +109,7 @@ expression: checks
     row: 203
     column: 28
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 204
@@ -106,6 +118,7 @@ expression: checks
     row: 204
     column: 36
   fix: ~
+  parent: ~
 - kind: MutableArgumentDefault
   location:
     row: 205
@@ -114,4 +127,5 @@ expression: checks
     row: 205
     column: 66
   fix: ~
+  parent: ~
 

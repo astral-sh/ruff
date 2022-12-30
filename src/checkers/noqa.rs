@@ -46,15 +46,43 @@ pub fn check_noqa(
         }
 
         // Remove any ignored checks.
-        while let Some((index, check)) =
-            checks_iter.next_if(|(_index, check)| check.location.row() <= *lineno)
-        {
+        while let Some((index, check)) = checks_iter.next_if(|(_index, check)| {
+            check.location.row() <= *lineno
+                || check
+                    .parent
+                    .map(|location| location.row() <= *lineno)
+                    .unwrap_or(false)
+        }) {
             if check.kind == CheckKind::BlanketNOQA {
                 continue;
             }
-            // Grab the noqa (logical) line number for the current (physical) line.
-            // If there are newlines at the end of the file, they won't be represented in
-            // `noqa_line_for`, so fallback to the current line.
+
+            // Is the check ignored by a `noqa` directive on the parent line?
+            if let Some(parent_lineno) = check.parent.map(|location| location.row()) {
+                let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
+                if noqa_lineno == lineno {
+                    let noqa = noqa_directives.entry(noqa_lineno - 1).or_insert_with(|| {
+                        (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![])
+                    });
+                    match noqa {
+                        (Directive::All(..), matches) => {
+                            matches.push(check.kind.code().as_ref());
+                            ignored.push(index);
+                            continue;
+                        }
+                        (Directive::Codes(.., codes), matches) => {
+                            if noqa::includes(check.kind.code(), codes) {
+                                matches.push(check.kind.code().as_ref());
+                                ignored.push(index);
+                                continue;
+                            }
+                        }
+                        (Directive::None, ..) => {}
+                    }
+                }
+            }
+
+            // Is the check ignored by a `noqa` directive on the same line?
             let check_lineno = check.location.row();
             let noqa_lineno = noqa_line_for.get(&check_lineno).unwrap_or(&check_lineno);
             if noqa_lineno == lineno {

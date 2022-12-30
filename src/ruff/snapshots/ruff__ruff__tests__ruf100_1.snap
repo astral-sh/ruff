@@ -1,0 +1,26 @@
+---
+source: src/ruff/mod.rs
+expression: checks
+---
+- kind:
+    UnusedNOQA:
+      unknown: []
+      disabled: []
+      unmatched:
+        - F401
+  location:
+    row: 2
+    column: 15
+  end_location:
+    row: 2
+    column: 27
+  fix:
+    content: ""
+    location:
+      row: 2
+      column: 13
+    end_location:
+      row: 2
+      column: 27
+  parent: ~
+

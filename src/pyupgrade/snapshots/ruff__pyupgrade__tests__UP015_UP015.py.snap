@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 1
       column: 15
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 2
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 2
       column: 16
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 3
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 3
       column: 16
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 4
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 4
       column: 17
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 5
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 5
       column: 15
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 6
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 6
       column: 16
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 7
@@ -107,6 +113,7 @@ expression: checks
     end_location:
       row: 7
       column: 13
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 8
@@ -122,6 +129,7 @@ expression: checks
     end_location:
       row: 8
       column: 14
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 10
@@ -137,6 +145,7 @@ expression: checks
     end_location:
       row: 10
       column: 20
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 12
@@ -152,6 +161,7 @@ expression: checks
     end_location:
       row: 12
       column: 21
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 14
@@ -167,6 +177,7 @@ expression: checks
     end_location:
       row: 14
       column: 21
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 16
@@ -182,6 +193,7 @@ expression: checks
     end_location:
       row: 16
       column: 22
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 18
@@ -197,6 +209,7 @@ expression: checks
     end_location:
       row: 18
       column: 20
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 20
@@ -212,6 +225,7 @@ expression: checks
     end_location:
       row: 20
       column: 21
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 22
@@ -227,6 +241,7 @@ expression: checks
     end_location:
       row: 22
       column: 20
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 24
@@ -242,6 +257,7 @@ expression: checks
     end_location:
       row: 24
       column: 21
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 27
@@ -257,6 +273,7 @@ expression: checks
     end_location:
       row: 27
       column: 26
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 28
@@ -272,6 +289,7 @@ expression: checks
     end_location:
       row: 28
       column: 27
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 30
@@ -287,6 +305,7 @@ expression: checks
     end_location:
       row: 30
       column: 31
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 32
@@ -302,6 +321,7 @@ expression: checks
     end_location:
       row: 32
       column: 32
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 35
@@ -317,6 +337,7 @@ expression: checks
     end_location:
       row: 35
       column: 20
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 35
@@ -332,6 +353,7 @@ expression: checks
     end_location:
       row: 35
       column: 44
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 37
@@ -347,6 +369,7 @@ expression: checks
     end_location:
       row: 37
       column: 21
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 37
@@ -362,6 +385,7 @@ expression: checks
     end_location:
       row: 37
       column: 46
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 40
@@ -377,6 +401,7 @@ expression: checks
     end_location:
       row: 40
       column: 20
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 41
@@ -392,6 +417,7 @@ expression: checks
     end_location:
       row: 41
       column: 25
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 42
@@ -407,6 +433,7 @@ expression: checks
     end_location:
       row: 42
       column: 15
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 44
@@ -422,6 +449,7 @@ expression: checks
     end_location:
       row: 44
       column: 25
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 46
@@ -437,6 +465,7 @@ expression: checks
     end_location:
       row: 46
       column: 30
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 48
@@ -452,6 +481,7 @@ expression: checks
     end_location:
       row: 48
       column: 20
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 51
@@ -467,6 +497,7 @@ expression: checks
     end_location:
       row: 51
       column: 21
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 52
@@ -482,6 +513,7 @@ expression: checks
     end_location:
       row: 52
       column: 26
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 53
@@ -497,6 +529,7 @@ expression: checks
     end_location:
       row: 53
       column: 14
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 55
@@ -512,6 +545,7 @@ expression: checks
     end_location:
       row: 55
       column: 26
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 57
@@ -527,6 +561,7 @@ expression: checks
     end_location:
       row: 57
       column: 31
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 59
@@ -542,6 +577,7 @@ expression: checks
     end_location:
       row: 59
       column: 19
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 62
@@ -557,6 +593,7 @@ expression: checks
     end_location:
       row: 62
       column: 25
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 63
@@ -572,6 +609,7 @@ expression: checks
     end_location:
       row: 63
       column: 109
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 64
@@ -587,6 +625,7 @@ expression: checks
     end_location:
       row: 64
       column: 68
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 65
@@ -602,6 +641,7 @@ expression: checks
     end_location:
       row: 65
       column: 15
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 67
@@ -617,6 +657,7 @@ expression: checks
     end_location:
       row: 67
       column: 26
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 68
@@ -632,6 +673,7 @@ expression: checks
     end_location:
       row: 68
       column: 110
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 69
@@ -647,6 +689,7 @@ expression: checks
     end_location:
       row: 69
       column: 69
+  parent: ~
 - kind: RedundantOpenModes
   location:
     row: 70
@@ -662,4 +705,5 @@ expression: checks
     end_location:
       row: 70
       column: 14
+  parent: ~
 

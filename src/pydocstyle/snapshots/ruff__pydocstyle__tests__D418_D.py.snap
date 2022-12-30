@@ -10,6 +10,7 @@ expression: checks
     row: 34
     column: 25
   fix: ~
+  parent: ~
 - kind: SkipDocstring
   location:
     row: 90
@@ -18,6 +19,7 @@ expression: checks
     row: 90
     column: 30
   fix: ~
+  parent: ~
 - kind: SkipDocstring
   location:
     row: 110
@@ -26,4 +28,5 @@ expression: checks
     row: 110
     column: 19
   fix: ~
+  parent: ~
 

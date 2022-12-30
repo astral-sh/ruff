@@ -11,6 +11,7 @@ expression: checks
     row: 1
     column: 21
   fix: ~
+  parent: ~
 - kind:
     BannedRelativeImport: all
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 2
     column: 28
   fix: ~
+  parent: ~
 - kind:
     BannedRelativeImport: all
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 4
     column: 21
   fix: ~
+  parent: ~
 - kind:
     BannedRelativeImport: all
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 5
     column: 28
   fix: ~
+  parent: ~
 - kind:
     BannedRelativeImport: all
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 7
     column: 27
   fix: ~
+  parent: ~
 - kind:
     BannedRelativeImport: all
   location:
@@ -56,4 +61,5 @@ expression: checks
     row: 8
     column: 34
   fix: ~
+  parent: ~
 

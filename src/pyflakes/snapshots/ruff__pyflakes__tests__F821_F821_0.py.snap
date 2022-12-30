@@ -11,6 +11,7 @@ expression: checks
     row: 2
     column: 15
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: self
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 6
     column: 16
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: self
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 10
     column: 12
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: numeric_string
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 21
     column: 25
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: Bar
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 58
     column: 8
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: TOMATO
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 83
     column: 16
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: B
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 87
     column: 10
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: B
   location:
@@ -74,6 +81,7 @@ expression: checks
     row: 90
     column: 10
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: PEP593Test123
   location:
@@ -83,6 +91,7 @@ expression: checks
     row: 114
     column: 23
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: foo
   location:
@@ -92,6 +101,7 @@ expression: checks
     row: 122
     column: 18
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: bar
   location:
@@ -101,4 +111,5 @@ expression: checks
     row: 122
     column: 25
   fix: ~
+  parent: ~
 

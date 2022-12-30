@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 2
       column: 19
+  parent: ~
 - kind: DoNotAssignLambda
   location:
     row: 4
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 4
       column: 19
+  parent: ~
 - kind: DoNotAssignLambda
   location:
     row: 7
@@ -47,4 +49,5 @@ expression: checks
     end_location:
       row: 7
       column: 29
+  parent: ~
 

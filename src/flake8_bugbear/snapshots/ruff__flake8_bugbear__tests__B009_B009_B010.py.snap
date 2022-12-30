@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 18
       column: 19
+  parent: ~
 - kind: GetAttrWithConstant
   location:
     row: 19
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 19
       column: 23
+  parent: ~
 - kind: GetAttrWithConstant
   location:
     row: 20
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 20
       column: 22
+  parent: ~
 - kind: GetAttrWithConstant
   location:
     row: 21
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 21
       column: 23
+  parent: ~
 - kind: GetAttrWithConstant
   location:
     row: 22
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 22
       column: 31
+  parent: ~
 - kind: GetAttrWithConstant
   location:
     row: 23
@@ -92,4 +97,5 @@ expression: checks
     end_location:
       row: 23
       column: 20
+  parent: ~
 

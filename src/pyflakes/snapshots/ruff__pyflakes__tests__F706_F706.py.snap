@@ -10,6 +10,7 @@ expression: checks
     row: 6
     column: 12
   fix: ~
+  parent: ~
 - kind: ReturnOutsideFunction
   location:
     row: 9
@@ -18,4 +19,5 @@ expression: checks
     row: 9
     column: 8
   fix: ~
+  parent: ~
 

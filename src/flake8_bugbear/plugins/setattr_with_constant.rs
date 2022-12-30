@@ -70,11 +70,13 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
             let mut check = Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
             if checker.patch(check.kind.code()) {
                 match assignment(obj, name, value, checker.style) {
-                    Ok(content) => check.amend(Fix::replacement(
-                        content,
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    )),
+                    Ok(content) => {
+                        check.amend(Fix::replacement(
+                            content,
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
+                    }
                     Err(e) => error!("Failed to fix invalid comparison: {e}"),
                 };
             }
