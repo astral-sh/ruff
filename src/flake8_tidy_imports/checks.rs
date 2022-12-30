@@ -1,13 +1,12 @@
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Alias, Expr, Located, Stmt};
 
+use super::settings::BannedApi;
 use crate::ast::helpers::match_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::flake8_tidy_imports::settings::Strictness;
-
-use super::settings::BannedApi;
 
 /// TID252
 pub fn banned_relative_import(
