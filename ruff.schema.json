@@ -1095,9 +1095,6 @@
     },
     "Flake8TidyImportsOptions": {
       "type": "object",
-      "required": [
-        "banned-api"
-      ],
       "properties": {
         "ban-relative-imports": {
           "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module or beyond (`\"parents\"`).",
@@ -1112,7 +1109,10 @@
         },
         "banned-api": {
           "description": "Specific modules or module members that may not be imported or accessed. Note that this check is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "additionalProperties": {
             "$ref": "#/definitions/BannedApi"
           }
