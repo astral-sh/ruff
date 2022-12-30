@@ -7,6 +7,7 @@ use crate::autofix::Fix;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
+use crate::isort::helpers::trailing_comma;
 
 /// Replaces a given statement with a string
 fn update_import(checker: &mut Checker, stmt: &Stmt, new_stmt: String) {
@@ -26,9 +27,11 @@ fn new_line_count(checker: &Checker, stmt: &Stmt) -> usize {
     let contents = checker
         .locator
         .slice_source_code_range(&Range::from_located(stmt));
+    println!("stmt: {:?}", contents);
     let mut count: usize = 0;
-    for (_, tok, _) in lexer::make_tokenizer(&contents).flatten() {
-        if tok == Tok::Newline {
+    // I tried using tokens here, but the count didnt work
+    for character in contents.as_ref().chars() {
+        if character == '\n' {
             count += 1;
         }
     }
@@ -38,9 +41,17 @@ fn new_line_count(checker: &Checker, stmt: &Stmt) -> usize {
 /// Create the new string for the import
 fn create_new_statement(needed_imports: Vec<String>, beginning: &str, indent: &str, multi_line: bool) -> String {
     let mut new_stmt = String::new();
+    // If this is a mulit line import, we need to add the beginning
+    if multi_line {
+        new_stmt.push_str(" (\n")
+    }
     for (i, import) in needed_imports.iter().enumerate() {
         if i != 0 {
             new_stmt.push(',');
+            if multi_line {
+                new_stmt.push_str("\n");
+                new_stmt.push_str(indent);
+            }
         }
         new_stmt.push_str(&format!(" {}", import));
     }
@@ -86,7 +97,8 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     if needs_updated  {
                         let indent = indentation(checker, stmt);
                         let beginning = format!("from {} import", name);
-                        let new_stmt = create_new_statement(needed_imports, &beginning, &indent, false);
+                        let is_multi_line = new_line_count(checker, stmt) > 1;
+                        let new_stmt = create_new_statement(needed_imports, &beginning, &indent, is_multi_line);
                         update_import(checker, stmt, new_stmt);
                     }
                 }
