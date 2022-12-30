@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 2
       column: 13
+  parent: ~
 - kind: NotIsTest
   location:
     row: 5
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 5
       column: 15
+  parent: ~
 - kind: NotIsTest
   location:
     row: 8
@@ -40,4 +42,5 @@ expression: checks
     row: 8
     column: 22
   fix: ~
+  parent: ~
 

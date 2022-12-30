@@ -14,6 +14,7 @@ expression: checks
     row: 15
     column: 96
   fix: ~
+  parent: ~
 - kind:
     ConsiderMergingIsinstance:
       - "var[4]"
@@ -26,6 +27,7 @@ expression: checks
     row: 17
     column: 103
   fix: ~
+  parent: ~
 - kind:
     ConsiderMergingIsinstance:
       - "var[5]"
@@ -38,6 +40,7 @@ expression: checks
     row: 19
     column: 73
   fix: ~
+  parent: ~
 - kind:
     ConsiderMergingIsinstance:
       - "var[10]"
@@ -50,6 +53,7 @@ expression: checks
     row: 23
     column: 158
   fix: ~
+  parent: ~
 - kind:
     ConsiderMergingIsinstance:
       - "var[11]"
@@ -62,6 +66,7 @@ expression: checks
     row: 24
     column: 95
   fix: ~
+  parent: ~
 - kind:
     ConsiderMergingIsinstance:
       - "var[12]"
@@ -75,4 +80,5 @@ expression: checks
     row: 30
     column: 75
   fix: ~
+  parent: ~
 

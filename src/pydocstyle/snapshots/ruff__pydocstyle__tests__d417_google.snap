@@ -13,6 +13,7 @@ expression: checks
     row: 11
     column: 12
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - x
@@ -25,6 +26,7 @@ expression: checks
     row: 24
     column: 12
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - x
@@ -37,6 +39,7 @@ expression: checks
     row: 36
     column: 12
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - y
@@ -48,6 +51,7 @@ expression: checks
     row: 49
     column: 12
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - y
@@ -58,6 +62,7 @@ expression: checks
     row: 62
     column: 12
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - y
@@ -68,6 +73,7 @@ expression: checks
     row: 74
     column: 12
   fix: ~
+  parent: ~
 - kind:
     DocumentAllArguments:
       - y
@@ -78,4 +84,5 @@ expression: checks
     row: 84
     column: 12
   fix: ~
+  parent: ~
 

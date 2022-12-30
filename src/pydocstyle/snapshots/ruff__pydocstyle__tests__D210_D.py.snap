@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 288
       column: 30
+  parent: ~
 - kind: NoSurroundingWhitespace
   location:
     row: 293
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 293
       column: 34
+  parent: ~
 - kind: NoSurroundingWhitespace
   location:
     row: 299
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 299
       column: 36
+  parent: ~
 - kind: NoSurroundingWhitespace
   location:
     row: 581
@@ -55,4 +58,5 @@ expression: checks
     row: 581
     column: 51
   fix: ~
+  parent: ~
 

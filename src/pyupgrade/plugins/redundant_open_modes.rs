@@ -88,7 +88,9 @@ fn create_check(
             ));
         } else {
             match create_remove_param_fix(locator, expr, mode_param) {
-                Ok(fix) => check.amend(fix),
+                Ok(fix) => {
+                    check.amend(fix);
+                }
                 Err(e) => error!("Failed to remove parameter: {e}"),
             }
         }

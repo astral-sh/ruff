@@ -13,6 +13,7 @@ expression: checks
     row: 2
     column: 13
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - tuple
@@ -24,6 +25,7 @@ expression: checks
     row: 3
     column: 14
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - list
@@ -35,6 +37,7 @@ expression: checks
     row: 4
     column: 14
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - tuple
@@ -46,6 +49,7 @@ expression: checks
     row: 5
     column: 15
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - set
@@ -57,6 +61,7 @@ expression: checks
     row: 6
     column: 11
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - list
@@ -68,6 +73,7 @@ expression: checks
     row: 7
     column: 12
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - tuple
@@ -79,6 +85,7 @@ expression: checks
     row: 8
     column: 13
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - sorted
@@ -90,6 +97,7 @@ expression: checks
     row: 9
     column: 14
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - reversed
@@ -101,6 +109,7 @@ expression: checks
     row: 10
     column: 16
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - list
@@ -112,6 +121,7 @@ expression: checks
     row: 11
     column: 15
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - tuple
@@ -123,6 +133,7 @@ expression: checks
     row: 12
     column: 16
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - sorted
@@ -134,6 +145,7 @@ expression: checks
     row: 13
     column: 17
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
       - reversed
@@ -145,4 +157,5 @@ expression: checks
     row: 14
     column: 19
   fix: ~
+  parent: ~
 

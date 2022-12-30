@@ -11,6 +11,7 @@ expression: checks
     row: 8
     column: 9
   fix: ~
+  parent: ~
 - kind:
     LoopVariableOverridesIterator: values
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 21
     column: 15
   fix: ~
+  parent: ~
 - kind:
     LoopVariableOverridesIterator: vars
   location:
@@ -29,4 +31,5 @@ expression: checks
     row: 36
     column: 8
   fix: ~
+  parent: ~
 

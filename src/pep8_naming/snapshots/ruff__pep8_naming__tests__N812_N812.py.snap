@@ -13,6 +13,7 @@ expression: checks
     row: 1
     column: 30
   fix: ~
+  parent: ~
 - kind:
     LowercaseImportedAsNonLowercase:
       - lowercase
@@ -24,6 +25,7 @@ expression: checks
     row: 2
     column: 38
   fix: ~
+  parent: ~
 - kind:
     LowercaseImportedAsNonLowercase:
       - another_lowercase
@@ -35,4 +37,5 @@ expression: checks
     row: 3
     column: 53
   fix: ~
+  parent: ~
 

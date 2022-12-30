@@ -10,6 +10,7 @@ expression: checks
     row: 2
     column: 11
   fix: ~
+  parent: ~
 - kind: AssertUsed
   location:
     row: 8
@@ -18,6 +19,7 @@ expression: checks
     row: 8
     column: 17
   fix: ~
+  parent: ~
 - kind: AssertUsed
   location:
     row: 11
@@ -26,4 +28,5 @@ expression: checks
     row: 11
     column: 17
   fix: ~
+  parent: ~
 

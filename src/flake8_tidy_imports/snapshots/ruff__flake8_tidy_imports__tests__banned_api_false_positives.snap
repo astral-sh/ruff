@@ -13,6 +13,7 @@ expression: checks
     row: 2
     column: 23
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: typing.TypedDict
@@ -24,6 +25,7 @@ expression: checks
     row: 7
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BannedApi:
       name: typing.TypedDict
@@ -35,4 +37,5 @@ expression: checks
     row: 11
     column: 20
   fix: ~
+  parent: ~
 

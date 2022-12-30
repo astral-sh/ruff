@@ -10,6 +10,7 @@ expression: checks
     row: 6
     column: 12
   fix: ~
+  parent: ~
 - kind: UnnecessaryAssign
   location:
     row: 13
@@ -18,6 +19,7 @@ expression: checks
     row: 13
     column: 12
   fix: ~
+  parent: ~
 - kind: UnnecessaryAssign
   location:
     row: 19
@@ -26,6 +28,7 @@ expression: checks
     row: 19
     column: 16
   fix: ~
+  parent: ~
 - kind: UnnecessaryAssign
   location:
     row: 31
@@ -34,6 +37,7 @@ expression: checks
     row: 31
     column: 17
   fix: ~
+  parent: ~
 - kind: UnnecessaryAssign
   location:
     row: 39
@@ -42,4 +46,5 @@ expression: checks
     row: 39
     column: 20
   fix: ~
+  parent: ~
 

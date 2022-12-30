@@ -332,7 +332,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             );
                             if checker.patch(check.kind.code()) {
                                 match fixes::add_return_none_annotation(checker.locator, stmt) {
-                                    Ok(fix) => check.amend(fix),
+                                    Ok(fix) => {
+                                        check.amend(fix);
+                                    }
                                     Err(e) => error!("Failed to generate fix: {e}"),
                                 }
                             }

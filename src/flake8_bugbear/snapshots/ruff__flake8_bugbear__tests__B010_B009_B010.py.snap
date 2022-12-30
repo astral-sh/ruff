@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 37
       column: 25
+  parent: ~
 - kind: SetAttrWithConstant
   location:
     row: 38
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 38
       column: 29
+  parent: ~
 - kind: SetAttrWithConstant
   location:
     row: 39
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 39
       column: 28
+  parent: ~
 - kind: SetAttrWithConstant
   location:
     row: 40
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 40
       column: 29
+  parent: ~
 - kind: SetAttrWithConstant
   location:
     row: 41
@@ -77,4 +81,5 @@ expression: checks
     end_location:
       row: 41
       column: 30
+  parent: ~
 

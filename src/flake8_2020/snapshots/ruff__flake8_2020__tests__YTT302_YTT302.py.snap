@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 7
   fix: ~
+  parent: ~
 - kind: SysVersionCmpStr10
   location:
     row: 5
@@ -18,6 +19,7 @@ expression: checks
     row: 5
     column: 11
   fix: ~
+  parent: ~
 - kind: SysVersionCmpStr10
   location:
     row: 6
@@ -26,6 +28,7 @@ expression: checks
     row: 6
     column: 11
   fix: ~
+  parent: ~
 - kind: SysVersionCmpStr10
   location:
     row: 7
@@ -34,6 +37,7 @@ expression: checks
     row: 7
     column: 11
   fix: ~
+  parent: ~
 - kind: SysVersionCmpStr10
   location:
     row: 8
@@ -42,4 +46,5 @@ expression: checks
     row: 8
     column: 11
   fix: ~
+  parent: ~
 

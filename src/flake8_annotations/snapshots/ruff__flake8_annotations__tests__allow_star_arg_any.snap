@@ -11,6 +11,7 @@ expression: checks
     row: 10
     column: 14
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: foo
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 15
     column: 49
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: a
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 40
     column: 31
   fix: ~
+  parent: ~
 - kind:
     DynamicallyTypedExpression: foo_method
   location:
@@ -38,4 +41,5 @@ expression: checks
     row: 44
     column: 69
   fix: ~
+  parent: ~
 

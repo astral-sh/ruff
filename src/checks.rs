@@ -3190,6 +3190,7 @@ pub struct Check {
     pub location: Location,
     pub end_location: Location,
     pub fix: Option<Fix>,
+    pub parent: Option<Location>,
 }
 
 impl Check {
@@ -3199,11 +3200,18 @@ impl Check {
             location: range.location,
             end_location: range.end_location,
             fix: None,
+            parent: None,
         }
     }
 
-    pub fn amend(&mut self, fix: Fix) {
+    pub fn amend(&mut self, fix: Fix) -> &mut Self {
         self.fix = Some(fix);
+        self
+    }
+
+    pub fn parent(&mut self, parent: Location) -> &mut Self {
+        self.parent = Some(parent);
+        self
     }
 }
 

@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 18
       column: 5
+  parent: ~
 - kind: NativeLiterals
   location:
     row: 19
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 19
       column: 10
+  parent: ~
 - kind: NativeLiterals
   location:
     row: 20
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 21
       column: 7
+  parent: ~
 - kind: NativeLiterals
   location:
     row: 22
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 22
       column: 7
+  parent: ~
 - kind: NativeLiterals
   location:
     row: 23
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 23
       column: 13
+  parent: ~
 - kind: NativeLiterals
   location:
     row: 24
@@ -92,4 +97,5 @@ expression: checks
     end_location:
       row: 25
       column: 7
+  parent: ~
 

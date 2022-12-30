@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 40
       column: 16
+  parent: ~
 - kind: UsePEP604Annotation
   location:
     row: 42
@@ -32,4 +33,5 @@ expression: checks
     end_location:
       row: 42
       column: 47
+  parent: ~
 

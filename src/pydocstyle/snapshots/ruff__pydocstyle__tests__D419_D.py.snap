@@ -10,6 +10,7 @@ expression: checks
     row: 20
     column: 14
   fix: ~
+  parent: ~
 - kind: NonEmpty
   location:
     row: 74
@@ -18,6 +19,7 @@ expression: checks
     row: 74
     column: 11
   fix: ~
+  parent: ~
 - kind: NonEmpty
   location:
     row: 80
@@ -26,4 +28,5 @@ expression: checks
     row: 80
     column: 10
   fix: ~
+  parent: ~
 

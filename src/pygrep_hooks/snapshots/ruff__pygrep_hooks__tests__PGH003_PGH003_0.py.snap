@@ -10,6 +10,7 @@ expression: checks
     row: 1
     column: 21
   fix: ~
+  parent: ~
 - kind: BlanketTypeIgnore
   location:
     row: 2
@@ -18,6 +19,7 @@ expression: checks
     row: 2
     column: 20
   fix: ~
+  parent: ~
 - kind: BlanketTypeIgnore
   location:
     row: 3
@@ -26,4 +28,5 @@ expression: checks
     row: 3
     column: 20
   fix: ~
+  parent: ~
 

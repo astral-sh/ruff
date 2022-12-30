@@ -20,6 +20,7 @@ expression: checks
     end_location:
       row: 1
       column: 18
+  parent: ~
 - kind:
     KeyInDict:
       - "foo['bar']"
@@ -38,6 +39,7 @@ expression: checks
     end_location:
       row: 3
       column: 25
+  parent: ~
 - kind:
     KeyInDict:
       - foo()
@@ -56,6 +58,7 @@ expression: checks
     end_location:
       row: 5
       column: 20
+  parent: ~
 - kind:
     KeyInDict:
       - key
@@ -74,4 +77,5 @@ expression: checks
     end_location:
       row: 7
       column: 22
+  parent: ~
 

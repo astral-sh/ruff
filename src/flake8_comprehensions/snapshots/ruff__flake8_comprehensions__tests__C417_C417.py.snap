@@ -11,6 +11,7 @@ expression: checks
     row: 2
     column: 26
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryMap: generator
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 3
     column: 27
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryMap: list
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 4
     column: 32
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryMap: generator
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 4
     column: 31
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryMap: set
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 5
     column: 36
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryMap: generator
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 5
     column: 35
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryMap: dict
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 6
     column: 36
   fix: ~
+  parent: ~
 - kind:
     UnnecessaryMap: generator
   location:
@@ -74,4 +81,5 @@ expression: checks
     row: 6
     column: 35
   fix: ~
+  parent: ~
 

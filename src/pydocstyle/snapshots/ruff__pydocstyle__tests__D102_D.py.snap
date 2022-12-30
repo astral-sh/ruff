@@ -10,6 +10,7 @@ expression: checks
     row: 23
     column: 14
   fix: ~
+  parent: ~
 - kind: PublicMethod
   location:
     row: 56
@@ -18,6 +19,7 @@ expression: checks
     row: 56
     column: 15
   fix: ~
+  parent: ~
 - kind: PublicMethod
   location:
     row: 68
@@ -26,4 +28,5 @@ expression: checks
     row: 68
     column: 16
   fix: ~
+  parent: ~
 

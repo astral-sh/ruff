@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 2
       column: 12
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 4
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 4
       column: 8
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 6
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 6
       column: 14
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 8
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 8
       column: 14
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 12
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 12
       column: 12
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 12
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 12
       column: 22
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 12
@@ -107,6 +113,7 @@ expression: checks
     end_location:
       row: 12
       column: 34
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 12
@@ -122,6 +129,7 @@ expression: checks
     end_location:
       row: 12
       column: 46
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 16
@@ -137,6 +145,7 @@ expression: checks
     end_location:
       row: 16
       column: 12
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 17
@@ -152,6 +161,7 @@ expression: checks
     end_location:
       row: 17
       column: 16
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 18
@@ -167,6 +177,7 @@ expression: checks
     end_location:
       row: 18
       column: 16
+  parent: ~
 - kind: RewriteUnicodeLiteral
   location:
     row: 19
@@ -182,4 +193,5 @@ expression: checks
     end_location:
       row: 19
       column: 20
+  parent: ~
 

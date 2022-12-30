@@ -20,6 +20,7 @@ expression: checks
     end_location:
       row: 1
       column: 6
+  parent: ~
 - kind:
     AmbiguousUnicodeCharacterDocstring:
       - ）
@@ -38,6 +39,7 @@ expression: checks
     end_location:
       row: 6
       column: 56
+  parent: ~
 - kind:
     AmbiguousUnicodeCharacterComment:
       - ᜵
@@ -56,4 +58,5 @@ expression: checks
     end_location:
       row: 7
       column: 62
+  parent: ~
 

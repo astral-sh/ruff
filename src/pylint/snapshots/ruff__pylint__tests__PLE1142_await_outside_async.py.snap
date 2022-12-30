@@ -10,6 +10,7 @@ expression: checks
     row: 12
     column: 24
   fix: ~
+  parent: ~
 - kind: AwaitOutsideAsync
   location:
     row: 25
@@ -18,4 +19,5 @@ expression: checks
     row: 25
     column: 30
   fix: ~
+  parent: ~
 

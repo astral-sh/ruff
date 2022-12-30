@@ -61,7 +61,9 @@ pub fn unnecessary_generator_list(
         let mut check = Check::new(CheckKind::UnnecessaryGeneratorList, location);
         if fix {
             match fixes::fix_unnecessary_generator_list(locator, expr) {
-                Ok(fix) => check.amend(fix),
+                Ok(fix) => {
+                    check.amend(fix);
+                }
                 Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
@@ -85,7 +87,9 @@ pub fn unnecessary_generator_set(
         let mut check = Check::new(CheckKind::UnnecessaryGeneratorSet, location);
         if fix {
             match fixes::fix_unnecessary_generator_set(locator, expr) {
-                Ok(fix) => check.amend(fix),
+                Ok(fix) => {
+                    check.amend(fix);
+                }
                 Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
@@ -111,7 +115,9 @@ pub fn unnecessary_generator_dict(
                 let mut check = Check::new(CheckKind::UnnecessaryGeneratorDict, location);
                 if fix {
                     match fixes::fix_unnecessary_generator_dict(locator, expr) {
-                        Ok(fix) => check.amend(fix),
+                        Ok(fix) => {
+                            check.amend(fix);
+                        }
                         Err(e) => error!("Failed to generate fix: {e}"),
                     }
                 }
@@ -138,7 +144,9 @@ pub fn unnecessary_list_comprehension_set(
         let mut check = Check::new(CheckKind::UnnecessaryListComprehensionSet, location);
         if fix {
             match fixes::fix_unnecessary_list_comprehension_set(locator, expr) {
-                Ok(fix) => check.amend(fix),
+                Ok(fix) => {
+                    check.amend(fix);
+                }
                 Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
@@ -170,7 +178,9 @@ pub fn unnecessary_list_comprehension_dict(
     let mut check = Check::new(CheckKind::UnnecessaryListComprehensionDict, location);
     if fix {
         match fixes::fix_unnecessary_list_comprehension_dict(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
@@ -196,7 +206,9 @@ pub fn unnecessary_literal_set(
     let mut check = Check::new(CheckKind::UnnecessaryLiteralSet(kind.to_string()), location);
     if fix {
         match fixes::fix_unnecessary_literal_set(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
@@ -232,7 +244,9 @@ pub fn unnecessary_literal_dict(
     );
     if fix {
         match fixes::fix_unnecessary_literal_dict(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
@@ -268,7 +282,9 @@ pub fn unnecessary_collection_call(
     );
     if fix {
         match fixes::fix_unnecessary_collection_call(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
@@ -296,7 +312,9 @@ pub fn unnecessary_literal_within_tuple_call(
     );
     if fix {
         match fixes::fix_unnecessary_literal_within_tuple_call(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
@@ -324,7 +342,9 @@ pub fn unnecessary_literal_within_list_call(
     );
     if fix {
         match fixes::fix_unnecessary_literal_within_list_call(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
@@ -347,7 +367,9 @@ pub fn unnecessary_list_call(
     let mut check = Check::new(CheckKind::UnnecessaryListCall, location);
     if fix {
         match fixes::fix_unnecessary_list_call(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
@@ -380,7 +402,9 @@ pub fn unnecessary_call_around_sorted(
     );
     if fix {
         match fixes::fix_unnecessary_call_around_sorted(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
@@ -503,7 +527,9 @@ pub fn unnecessary_comprehension(
     );
     if fix {
         match fixes::fix_unnecessary_comprehension(locator, expr) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }

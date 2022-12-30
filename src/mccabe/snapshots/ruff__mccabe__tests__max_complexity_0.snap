@@ -13,6 +13,7 @@ expression: checks
     row: 2
     column: 11
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - expr_as_statement
@@ -24,6 +25,7 @@ expression: checks
     row: 7
     column: 21
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - sequential
@@ -35,6 +37,7 @@ expression: checks
     row: 12
     column: 14
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - if_elif_else_dead_path
@@ -46,6 +49,7 @@ expression: checks
     row: 19
     column: 26
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - nested_ifs
@@ -57,6 +61,7 @@ expression: checks
     row: 29
     column: 14
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - for_loop
@@ -68,6 +73,7 @@ expression: checks
     row: 40
     column: 12
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - for_else
@@ -79,6 +85,7 @@ expression: checks
     row: 46
     column: 12
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - recursive
@@ -90,6 +97,7 @@ expression: checks
     row: 54
     column: 13
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - nested_functions
@@ -101,6 +109,7 @@ expression: checks
     row: 62
     column: 20
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - a
@@ -112,6 +121,7 @@ expression: checks
     row: 63
     column: 9
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - b
@@ -123,6 +133,7 @@ expression: checks
     row: 64
     column: 13
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - try_else
@@ -134,6 +145,7 @@ expression: checks
     row: 73
     column: 12
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - nested_try_finally
@@ -145,6 +157,7 @@ expression: checks
     row: 85
     column: 22
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - foobar
@@ -156,6 +169,7 @@ expression: checks
     row: 96
     column: 16
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - annotated_assign
@@ -167,6 +181,7 @@ expression: checks
     row: 107
     column: 20
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - handle
@@ -178,6 +193,7 @@ expression: checks
     row: 113
     column: 14
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - a
@@ -189,6 +205,7 @@ expression: checks
     row: 118
     column: 17
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - b
@@ -200,6 +217,7 @@ expression: checks
     row: 121
     column: 17
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - c
@@ -211,6 +229,7 @@ expression: checks
     row: 126
     column: 17
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - error
@@ -222,6 +241,7 @@ expression: checks
     row: 129
     column: 21
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - info
@@ -233,6 +253,7 @@ expression: checks
     row: 132
     column: 20
   fix: ~
+  parent: ~
 - kind:
     FunctionIsTooComplex:
       - exception
@@ -244,4 +265,5 @@ expression: checks
     row: 135
     column: 25
   fix: ~
+  parent: ~
 

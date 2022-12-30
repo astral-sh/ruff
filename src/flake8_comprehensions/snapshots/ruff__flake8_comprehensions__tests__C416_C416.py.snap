@@ -18,6 +18,7 @@ expression: checks
     end_location:
       row: 2
       column: 14
+  parent: ~
 - kind:
     UnnecessaryComprehension: set
   location:
@@ -34,4 +35,5 @@ expression: checks
     end_location:
       row: 3
       column: 14
+  parent: ~
 

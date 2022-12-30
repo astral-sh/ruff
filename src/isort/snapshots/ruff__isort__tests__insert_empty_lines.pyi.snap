@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 3
       column: 0
+  parent: ~
 - kind: UnsortedImports
   location:
     row: 4
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 6
       column: 0
+  parent: ~
 - kind: UnsortedImports
   location:
     row: 14
@@ -47,4 +49,5 @@ expression: checks
     end_location:
       row: 16
       column: 0
+  parent: ~
 
