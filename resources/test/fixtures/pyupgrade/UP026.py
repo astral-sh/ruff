@@ -2,6 +2,9 @@
 if True:
     import mock
 
+if True:
+    import mock, sys
+
 # This goes to from unitest import mock
 import mock.mock
 
@@ -15,19 +18,14 @@ x = "This code should be preserved one line below the mock"
 # Mock should go on a new line as `from unittest import mock`
 from mock import mock
 
-import (
-    mock,
+import mock, sys, os, io
+
+from foo import (
     sys,
     os,
     io,
-)
-
-import (
-    sys,
-    os.
-    io,
     math,
-    random.
+    random,
     datetime,
     calendar,
     functools,
@@ -37,3 +35,7 @@ import (
     collections,
     mock
 )
+
+
+# These should not change:
+import os, io

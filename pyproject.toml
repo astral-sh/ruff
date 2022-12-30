@@ -35,6 +35,7 @@ strip = true
 
 [tool.ruff]
 update-check = true
+select = ["E", "F", "UP"]
 
 [tool.ruff.isort]
 force-wrap-aliases = true
