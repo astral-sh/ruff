@@ -11,6 +11,7 @@ expression: checks
     row: 25
     column: 20
   fix: ~
+  parent: ~
 - kind:
     BlindExcept: Exception
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 31
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BlindExcept: Exception
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 42
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BlindExcept: BaseException
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 45
     column: 24
   fix: ~
+  parent: ~
 - kind:
     BlindExcept: Exception
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 54
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BlindExcept: Exception
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 60
     column: 16
   fix: ~
+  parent: ~
 - kind:
     BlindExcept: BaseException
   location:
@@ -65,4 +71,5 @@ expression: checks
     row: 62
     column: 20
   fix: ~
+  parent: ~
 

@@ -6,9 +6,10 @@ expression: checks
     MissingReturnTypePublicFunction: bar
   location:
     row: 29
-    column: 4
+    column: 8
   end_location:
-    row: 30
-    column: 16
+    row: 29
+    column: 11
   fix: ~
+  parent: ~
 

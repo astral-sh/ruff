@@ -5,9 +5,10 @@ expression: checks
 - kind: MagicMethod
   location:
     row: 64
-    column: 4
+    column: 8
   end_location:
-    row: 65
-    column: 12
+    row: 64
+    column: 15
   fix: ~
+  parent: ~
 

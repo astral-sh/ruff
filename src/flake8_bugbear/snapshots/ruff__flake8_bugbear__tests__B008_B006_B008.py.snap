@@ -11,6 +11,7 @@ expression: checks
     row: 85
     column: 68
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: range
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 89
     column: 71
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: range
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 93
     column: 67
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: time.time
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 109
     column: 49
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: dt.datetime.now
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 113
     column: 28
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: dt.timedelta
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 113
     column: 51
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: ~
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 117
     column: 44
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: float
   location:
@@ -74,6 +81,7 @@ expression: checks
     row: 155
     column: 47
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: float
   location:
@@ -83,6 +91,7 @@ expression: checks
     row: 160
     column: 37
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: float
   location:
@@ -92,6 +101,7 @@ expression: checks
     row: 164
     column: 57
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: float
   location:
@@ -101,6 +111,7 @@ expression: checks
     row: 170
     column: 28
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: dt.datetime.now
   location:
@@ -110,6 +121,7 @@ expression: checks
     row: 170
     column: 47
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: map
   location:
@@ -119,6 +131,7 @@ expression: checks
     row: 176
     column: 62
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: random.randint
   location:
@@ -128,6 +141,7 @@ expression: checks
     row: 181
     column: 59
   fix: ~
+  parent: ~
 - kind:
     FunctionCallArgumentDefault: dt.datetime.now
   location:
@@ -137,4 +151,5 @@ expression: checks
     row: 181
     column: 53
   fix: ~
+  parent: ~
 

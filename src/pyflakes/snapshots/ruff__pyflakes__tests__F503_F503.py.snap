@@ -10,6 +10,7 @@ expression: checks
     row: 17
     column: 24
   fix: ~
+  parent: ~
 - kind: PercentFormatExpectedSequence
   location:
     row: 18
@@ -18,6 +19,7 @@ expression: checks
     row: 18
     column: 28
   fix: ~
+  parent: ~
 - kind: PercentFormatExpectedSequence
   location:
     row: 23
@@ -26,4 +28,5 @@ expression: checks
     row: 23
     column: 42
   fix: ~
+  parent: ~
 

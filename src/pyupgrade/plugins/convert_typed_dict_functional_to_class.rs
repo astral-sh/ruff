@@ -246,7 +246,9 @@ pub fn convert_typed_dict_functional_to_class(
             base_class,
             checker.style,
         ) {
-            Ok(fix) => check.amend(fix),
+            Ok(fix) => {
+                check.amend(fix);
+            }
             Err(err) => error!("Failed to convert TypedDict: {err}"),
         };
     }

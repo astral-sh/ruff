@@ -11,6 +11,7 @@ expression: checks
     row: 9
     column: 10
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: x
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 9
     column: 13
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: cls
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 13
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: x
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 13
     column: 12
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: self
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 17
     column: 10
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: x
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 17
     column: 13
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: cls
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 21
     column: 9
   fix: ~
+  parent: ~
 - kind:
     UnusedFunctionArgument: x
   location:
@@ -74,4 +81,5 @@ expression: checks
     row: 21
     column: 12
   fix: ~
+  parent: ~
 

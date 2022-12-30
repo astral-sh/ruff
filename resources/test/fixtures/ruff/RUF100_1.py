@@ -1,5 +1,3 @@
-"""Test: noqa directives."""
-
 # This should ignore both errors.
 from typing import (  # noqa: F401
     List,

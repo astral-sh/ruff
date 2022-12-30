@@ -11,6 +11,7 @@ expression: checks
     row: 12
     column: 30
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: y
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 13
     column: 30
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: x
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 16
     column: 16
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: x
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 28
     column: 19
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: x
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 29
     column: 19
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: x
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 30
     column: 19
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: x
   location:
@@ -65,6 +71,7 @@ expression: checks
     row: 31
     column: 22
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: x
   location:
@@ -74,6 +81,7 @@ expression: checks
     row: 40
     column: 34
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: x
   location:
@@ -83,6 +91,7 @@ expression: checks
     row: 42
     column: 14
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: a
   location:
@@ -92,6 +101,7 @@ expression: checks
     row: 50
     column: 30
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: a_
   location:
@@ -101,6 +111,7 @@ expression: checks
     row: 51
     column: 31
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: b
   location:
@@ -110,6 +121,7 @@ expression: checks
     row: 52
     column: 30
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: c
   location:
@@ -119,6 +131,7 @@ expression: checks
     row: 53
     column: 30
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: j
   location:
@@ -128,6 +141,7 @@ expression: checks
     row: 61
     column: 17
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: k
   location:
@@ -137,6 +151,7 @@ expression: checks
     row: 61
     column: 21
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: l
   location:
@@ -146,6 +161,7 @@ expression: checks
     row: 68
     column: 10
   fix: ~
+  parent: ~
 - kind:
     FunctionUsesLoopVariable: i
   location:
@@ -155,4 +171,5 @@ expression: checks
     row: 82
     column: 18
   fix: ~
+  parent: ~
 

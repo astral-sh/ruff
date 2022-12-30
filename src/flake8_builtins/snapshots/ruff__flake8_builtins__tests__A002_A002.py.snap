@@ -11,6 +11,7 @@ expression: checks
     row: 1
     column: 13
   fix: ~
+  parent: ~
 - kind:
     BuiltinArgumentShadowing: type
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 1
     column: 22
   fix: ~
+  parent: ~
 - kind:
     BuiltinArgumentShadowing: complex
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 1
     column: 32
   fix: ~
+  parent: ~
 - kind:
     BuiltinArgumentShadowing: Exception
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 1
     column: 43
   fix: ~
+  parent: ~
 - kind:
     BuiltinArgumentShadowing: getattr
   location:
@@ -47,6 +51,7 @@ expression: checks
     row: 1
     column: 54
   fix: ~
+  parent: ~
 - kind:
     BuiltinArgumentShadowing: bytes
   location:
@@ -56,6 +61,7 @@ expression: checks
     row: 5
     column: 21
   fix: ~
+  parent: ~
 - kind:
     BuiltinArgumentShadowing: float
   location:
@@ -65,4 +71,5 @@ expression: checks
     row: 9
     column: 20
   fix: ~
+  parent: ~
 

@@ -44,8 +44,6 @@ export default function Header({
         "border-b",
         "border-gray-200",
         "dark:border-gray-800",
-        "bg-ayu-background",
-        "dark:bg-ayu-background-dark",
       )}
     >
       <div className="flex space-x-5">

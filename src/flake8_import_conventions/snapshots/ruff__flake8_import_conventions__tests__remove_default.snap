@@ -13,6 +13,7 @@ expression: checks
     row: 3
     column: 13
   fix: ~
+  parent: ~
 - kind:
     ImportAliasIsNotConventional:
       - matplotlib.pyplot
@@ -24,6 +25,7 @@ expression: checks
     row: 4
     column: 24
   fix: ~
+  parent: ~
 - kind:
     ImportAliasIsNotConventional:
       - pandas
@@ -35,6 +37,7 @@ expression: checks
     row: 6
     column: 13
   fix: ~
+  parent: ~
 - kind:
     ImportAliasIsNotConventional:
       - seaborn
@@ -46,6 +49,7 @@ expression: checks
     row: 7
     column: 14
   fix: ~
+  parent: ~
 - kind:
     ImportAliasIsNotConventional:
       - altair
@@ -57,6 +61,7 @@ expression: checks
     row: 9
     column: 21
   fix: ~
+  parent: ~
 - kind:
     ImportAliasIsNotConventional:
       - matplotlib.pyplot
@@ -68,6 +73,7 @@ expression: checks
     row: 10
     column: 32
   fix: ~
+  parent: ~
 - kind:
     ImportAliasIsNotConventional:
       - pandas
@@ -79,6 +85,7 @@ expression: checks
     row: 12
     column: 21
   fix: ~
+  parent: ~
 - kind:
     ImportAliasIsNotConventional:
       - seaborn
@@ -90,4 +97,5 @@ expression: checks
     row: 13
     column: 22
   fix: ~
+  parent: ~
 

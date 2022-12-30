@@ -46,15 +46,26 @@ mod tests {
     }
 
     #[test]
-    fn ruf100() -> Result<()> {
+    fn ruf100_0() -> Result<()> {
         let mut checks = test_path(
-            Path::new("./resources/test/fixtures/ruff/RUF100.py"),
+            Path::new("./resources/test/fixtures/ruff/RUF100_0.py"),
             &settings::Settings::for_rules(vec![
                 CheckCode::RUF100,
                 CheckCode::E501,
                 CheckCode::F401,
                 CheckCode::F841,
             ]),
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test]
+    fn ruf100_1() -> Result<()> {
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/ruff/RUF100_1.py"),
+            &settings::Settings::for_rules(vec![CheckCode::RUF100, CheckCode::F401]),
         )?;
         checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);

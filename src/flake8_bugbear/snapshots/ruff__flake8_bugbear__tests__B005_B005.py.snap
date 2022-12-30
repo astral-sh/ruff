@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 24
   fix: ~
+  parent: ~
 - kind: StripWithMultiCharacters
   location:
     row: 7
@@ -18,6 +19,7 @@ expression: checks
     row: 7
     column: 17
   fix: ~
+  parent: ~
 - kind: StripWithMultiCharacters
   location:
     row: 10
@@ -26,6 +28,7 @@ expression: checks
     row: 10
     column: 25
   fix: ~
+  parent: ~
 - kind: StripWithMultiCharacters
   location:
     row: 13
@@ -34,6 +37,7 @@ expression: checks
     row: 13
     column: 18
   fix: ~
+  parent: ~
 - kind: StripWithMultiCharacters
   location:
     row: 16
@@ -42,6 +46,7 @@ expression: checks
     row: 16
     column: 25
   fix: ~
+  parent: ~
 - kind: StripWithMultiCharacters
   location:
     row: 19
@@ -50,4 +55,5 @@ expression: checks
     row: 19
     column: 18
   fix: ~
+  parent: ~
 

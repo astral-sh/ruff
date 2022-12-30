@@ -17,6 +17,7 @@ expression: checks
     end_location:
       row: 4
       column: 68
+  parent: ~
 - kind: ReplaceStdoutStderr
   location:
     row: 6
@@ -32,6 +33,7 @@ expression: checks
     end_location:
       row: 6
       column: 79
+  parent: ~
 - kind: ReplaceStdoutStderr
   location:
     row: 8
@@ -47,6 +49,7 @@ expression: checks
     end_location:
       row: 8
       column: 85
+  parent: ~
 - kind: ReplaceStdoutStderr
   location:
     row: 10
@@ -62,6 +65,7 @@ expression: checks
     end_location:
       row: 11
       column: 71
+  parent: ~
 - kind: ReplaceStdoutStderr
   location:
     row: 14
@@ -77,6 +81,7 @@ expression: checks
     end_location:
       row: 15
       column: 71
+  parent: ~
 - kind: ReplaceStdoutStderr
   location:
     row: 18
@@ -92,6 +97,7 @@ expression: checks
     end_location:
       row: 22
       column: 26
+  parent: ~
 - kind: ReplaceStdoutStderr
   location:
     row: 29
@@ -107,4 +113,5 @@ expression: checks
     end_location:
       row: 33
       column: 30
+  parent: ~
 

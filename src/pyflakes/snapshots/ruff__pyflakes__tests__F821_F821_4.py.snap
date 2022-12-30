@@ -11,6 +11,7 @@ expression: checks
     row: 4
     column: 16
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: Model
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 9
     column: 17
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: Model
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 14
     column: 21
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: Model
   location:
@@ -38,6 +41,7 @@ expression: checks
     row: 19
     column: 37
   fix: ~
+  parent: ~
 - kind:
     UndefinedName: Model
   location:
@@ -47,4 +51,5 @@ expression: checks
     row: 24
     column: 25
   fix: ~
+  parent: ~
 

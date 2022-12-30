@@ -11,6 +11,7 @@ expression: checks
     row: 11
     column: 9
   fix: ~
+  parent: ~
 - kind:
     NonLowercaseVariableInFunction: CONSTANT
   location:
@@ -20,4 +21,5 @@ expression: checks
     row: 12
     column: 12
   fix: ~
+  parent: ~
 

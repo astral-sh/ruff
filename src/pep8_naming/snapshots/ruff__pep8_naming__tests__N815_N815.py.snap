@@ -11,6 +11,7 @@ expression: checks
     row: 8
     column: 13
   fix: ~
+  parent: ~
 - kind:
     MixedCaseVariableInClassScope: _mixedCase
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 9
     column: 14
   fix: ~
+  parent: ~
 - kind:
     MixedCaseVariableInClassScope: mixed_Case
   location:
@@ -29,4 +31,5 @@ expression: checks
     row: 10
     column: 14
   fix: ~
+  parent: ~
 

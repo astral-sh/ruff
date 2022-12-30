@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 10
   fix: ~
+  parent: ~
 - kind: SixPY3Referenced
   location:
     row: 6
@@ -18,4 +19,5 @@ expression: checks
     row: 6
     column: 6
   fix: ~
+  parent: ~
 

@@ -20,6 +20,7 @@ expression: checks
     end_location:
       row: 8
       column: 0
+  parent: ~
 - kind:
     UnusedImport:
       - datastructures.UploadFile
@@ -38,6 +39,7 @@ expression: checks
     end_location:
       row: 11
       column: 0
+  parent: ~
 - kind:
     UnusedImport:
       - background
@@ -56,6 +58,7 @@ expression: checks
     end_location:
       row: 18
       column: 0
+  parent: ~
 - kind:
     UnusedImport:
       - datastructures
@@ -74,4 +77,5 @@ expression: checks
     end_location:
       row: 21
       column: 0
+  parent: ~
 

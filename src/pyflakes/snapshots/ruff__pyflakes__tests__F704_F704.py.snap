@@ -11,6 +11,7 @@ expression: checks
     row: 6
     column: 11
   fix: ~
+  parent: ~
 - kind:
     YieldOutsideFunction: Yield
   location:
@@ -20,6 +21,7 @@ expression: checks
     row: 9
     column: 7
   fix: ~
+  parent: ~
 - kind:
     YieldOutsideFunction: YieldFrom
   location:
@@ -29,6 +31,7 @@ expression: checks
     row: 10
     column: 12
   fix: ~
+  parent: ~
 - kind:
     YieldOutsideFunction: Await
   location:
@@ -38,4 +41,5 @@ expression: checks
     row: 11
     column: 9
   fix: ~
+  parent: ~
 

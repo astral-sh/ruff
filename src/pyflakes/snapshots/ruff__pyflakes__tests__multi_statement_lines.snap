@@ -20,6 +20,7 @@ expression: checks
     end_location:
       row: 3
       column: 16
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -38,6 +39,7 @@ expression: checks
     end_location:
       row: 4
       column: 20
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -56,6 +58,7 @@ expression: checks
     end_location:
       row: 8
       column: 0
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -74,6 +77,7 @@ expression: checks
     end_location:
       row: 12
       column: 10
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -92,6 +96,7 @@ expression: checks
     end_location:
       row: 16
       column: 21
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -110,6 +115,7 @@ expression: checks
     end_location:
       row: 21
       column: 19
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -128,6 +134,7 @@ expression: checks
     end_location:
       row: 26
       column: 20
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -146,6 +153,7 @@ expression: checks
     end_location:
       row: 30
       column: 23
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -164,6 +172,7 @@ expression: checks
     end_location:
       row: 31
       column: 31
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -182,6 +191,7 @@ expression: checks
     end_location:
       row: 36
       column: 4
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -200,6 +210,7 @@ expression: checks
     end_location:
       row: 41
       column: 9
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -218,6 +229,7 @@ expression: checks
     end_location:
       row: 46
       column: 10
+  parent: ~
 - kind:
     UnusedImport:
       - foo
@@ -236,4 +248,5 @@ expression: checks
     end_location:
       row: 51
       column: 10
+  parent: ~
 

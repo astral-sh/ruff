@@ -11,6 +11,7 @@ expression: checks
     row: 2
     column: 15
   fix: ~
+  parent: ~
 - kind:
     BuiltinAttributeShadowing: str
   location:
@@ -20,4 +21,5 @@ expression: checks
     row: 8
     column: 12
   fix: ~
+  parent: ~
 

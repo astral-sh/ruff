@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 10
   fix: ~
+  parent: ~
 - kind: FStringMissingPlaceholders
   location:
     row: 5
@@ -18,6 +19,7 @@ expression: checks
     row: 5
     column: 10
   fix: ~
+  parent: ~
 - kind: FStringMissingPlaceholders
   location:
     row: 7
@@ -26,6 +28,7 @@ expression: checks
     row: 7
     column: 10
   fix: ~
+  parent: ~
 - kind: FStringMissingPlaceholders
   location:
     row: 12
@@ -34,4 +37,5 @@ expression: checks
     row: 12
     column: 16
   fix: ~
+  parent: ~
 

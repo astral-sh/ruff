@@ -10,6 +10,7 @@ expression: checks
     row: 4
     column: 53
   fix: ~
+  parent: ~
 - kind: CallDatetimeStrptimeWithoutZone
   location:
     row: 7
@@ -18,6 +19,7 @@ expression: checks
     row: 7
     column: 52
   fix: ~
+  parent: ~
 - kind: CallDatetimeStrptimeWithoutZone
   location:
     row: 10
@@ -26,6 +28,7 @@ expression: checks
     row: 10
     column: 52
   fix: ~
+  parent: ~
 - kind: CallDatetimeStrptimeWithoutZone
   location:
     row: 13
@@ -34,6 +37,7 @@ expression: checks
     row: 13
     column: 52
   fix: ~
+  parent: ~
 - kind: CallDatetimeStrptimeWithoutZone
   location:
     row: 35
@@ -42,4 +46,5 @@ expression: checks
     row: 35
     column: 43
   fix: ~
+  parent: ~
 

@@ -13,6 +13,7 @@ expression: checks
     row: 9
     column: 22
   fix: ~
+  parent: ~
 - kind:
     ConsiderUsingFromImport:
       - foo.bar
@@ -24,4 +25,5 @@ expression: checks
     row: 11
     column: 31
   fix: ~
+  parent: ~
 

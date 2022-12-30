@@ -13,6 +13,7 @@ expression: checks
     row: 5
     column: 14
   fix: ~
+  parent: ~
 - kind:
     PercentFormatPositionalCountMismatch:
       - 2
@@ -24,4 +25,5 @@ expression: checks
     row: 6
     column: 19
   fix: ~
+  parent: ~
 

@@ -10,6 +10,7 @@ expression: checks
     row: 5
     column: 8
   fix: ~
+  parent: ~
 - kind: DoNotUseBareExcept
   location:
     row: 11
@@ -18,6 +19,7 @@ expression: checks
     row: 12
     column: 8
   fix: ~
+  parent: ~
 - kind: DoNotUseBareExcept
   location:
     row: 16
@@ -26,4 +28,5 @@ expression: checks
     row: 17
     column: 8
   fix: ~
+  parent: ~
 

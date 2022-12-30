@@ -10,6 +10,7 @@ expression: checks
     row: 12
     column: 34
   fix: ~
+  parent: ~
 - kind: BooleanDefaultValueInFunctionDefinition
   location:
     row: 13
@@ -18,6 +19,7 @@ expression: checks
     row: 13
     column: 46
   fix: ~
+  parent: ~
 - kind: BooleanDefaultValueInFunctionDefinition
   location:
     row: 14
@@ -26,6 +28,7 @@ expression: checks
     row: 14
     column: 44
   fix: ~
+  parent: ~
 - kind: BooleanDefaultValueInFunctionDefinition
   location:
     row: 15
@@ -34,4 +37,5 @@ expression: checks
     row: 15
     column: 49
   fix: ~
+  parent: ~
 
