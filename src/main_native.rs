@@ -92,9 +92,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     }
     if cli.clean {
         commands::clean(&log_level)?;
-        if cli.files.is_empty() {
-            return Ok(ExitCode::SUCCESS);
-        }
+        return Ok(ExitCode::SUCCESS);
     }
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
