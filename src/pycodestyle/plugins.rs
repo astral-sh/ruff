@@ -318,10 +318,10 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                 {
                     match function(id, args, body, checker.style) {
                         Ok(content) => {
-                            let first_line = checker.locator.slice_source_code_range(&Range {
-                                location: Location::new(stmt.location.row(), 0),
-                                end_location: Location::new(stmt.location.row() + 1, 0),
-                            });
+                            let first_line = checker.locator.slice_source_code_range(&Range::new(
+                                Location::new(stmt.location.row(), 0),
+                                Location::new(stmt.location.row() + 1, 0),
+                            ));
                             let indentation = &leading_space(&first_line);
                             let mut indented = String::new();
                             for (idx, line) in content.lines().enumerate() {

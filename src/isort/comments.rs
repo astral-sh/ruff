@@ -22,10 +22,7 @@ pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Ve
         .filter_map(|(start, tok, end)| {
             if matches!(tok, Tok::Comment) {
                 Some(Comment {
-                    value: locator.slice_source_code_range(&Range {
-                        location: start,
-                        end_location: end,
-                    }),
+                    value: locator.slice_source_code_range(&Range::new(start, end)),
                     location: start,
                     end_location: end,
                 })

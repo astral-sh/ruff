@@ -101,10 +101,8 @@ fn create_remove_param_fix(
     expr: &Expr,
     mode_param: &Expr,
 ) -> Result<Fix> {
-    let content = locator.slice_source_code_range(&Range {
-        location: expr.location,
-        end_location: expr.end_location.unwrap(),
-    });
+    let content =
+        locator.slice_source_code_range(&Range::new(expr.location, expr.end_location.unwrap()));
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
     let mut fix_start: Option<Location> = None;

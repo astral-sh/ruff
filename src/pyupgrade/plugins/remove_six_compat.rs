@@ -65,10 +65,10 @@ fn replace_by_str_literal(
                 let content = format!(
                     "{}{}",
                     if binary { "b" } else { "" },
-                    locator.slice_source_code_range(&Range {
-                        location: arg.location,
-                        end_location: arg.end_location.unwrap(),
-                    })
+                    locator.slice_source_code_range(&Range::new(
+                        arg.location,
+                        arg.end_location.unwrap(),
+                    ))
                 );
                 check.amend(Fix::replacement(
                     content,

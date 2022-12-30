@@ -47,10 +47,7 @@ pub fn quotes(
     is_docstring: bool,
     settings: &Settings,
 ) -> Option<Check> {
-    let text = locator.slice_source_code_range(&Range {
-        location: start,
-        end_location: end,
-    });
+    let text = locator.slice_source_code_range(&Range::new(start, end));
 
     // Remove any prefixes (e.g., remove `u` from `u"foo"`).
     let last_quote_char = text.chars().last().unwrap();
@@ -76,10 +73,7 @@ pub fn quotes(
 
         Some(Check::new(
             CheckKind::BadQuotesDocstring(settings.docstring_quotes.clone()),
-            Range {
-                location: start,
-                end_location: end,
-            },
+            Range::new(start, end),
         ))
     } else if is_multiline {
         // If our string is or contains a known good string, ignore it.
@@ -94,10 +88,7 @@ pub fn quotes(
 
         Some(Check::new(
             CheckKind::BadQuotesMultilineString(settings.multiline_quotes.clone()),
-            Range {
-                location: start,
-                end_location: end,
-            },
+            Range::new(start, end),
         ))
     } else {
         let string_contents = &raw_text[1..raw_text.len() - 1];
@@ -112,10 +103,7 @@ pub fn quotes(
             {
                 return Some(Check::new(
                     CheckKind::AvoidQuoteEscape,
-                    Range {
-                        location: start,
-                        end_location: end,
-                    },
+                    Range::new(start, end),
                 ));
             }
             return None;
@@ -125,10 +113,7 @@ pub fn quotes(
         if !string_contents.contains(good_single(&settings.inline_quotes)) {
             return Some(Check::new(
                 CheckKind::BadQuotesInlineString(settings.inline_quotes.clone()),
-                Range {
-                    location: start,
-                    end_location: end,
-                },
+                Range::new(start, end),
             ));
         }
 

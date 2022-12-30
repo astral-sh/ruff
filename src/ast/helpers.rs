@@ -335,20 +335,17 @@ pub fn to_absolute(relative: Location, base: Location) -> Location {
 
 /// Return `true` if a `Stmt` has leading content.
 pub fn match_leading_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
-    let range = Range {
-        location: Location::new(stmt.location.row(), 0),
-        end_location: stmt.location,
-    };
+    let range = Range::new(Location::new(stmt.location.row(), 0), stmt.location);
     let prefix = locator.slice_source_code_range(&range);
     prefix.chars().any(|char| !char.is_whitespace())
 }
 
 /// Return `true` if a `Stmt` has trailing content.
 pub fn match_trailing_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
-    let range = Range {
-        location: stmt.end_location.unwrap(),
-        end_location: Location::new(stmt.end_location.unwrap().row() + 1, 0),
-    };
+    let range = Range::new(
+        stmt.end_location.unwrap(),
+        Location::new(stmt.end_location.unwrap().row() + 1, 0),
+    );
     let suffix = locator.slice_source_code_range(&range);
     for char in suffix.chars() {
         if char == '#' {
@@ -384,10 +381,7 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
         let contents = locator.slice_source_code_range(&Range::from_located(stmt));
         for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt.location).flatten() {
             if matches!(tok, Tok::Name { .. }) {
-                return Range {
-                    location: start,
-                    end_location: end,
-                };
+                return Range::new(start, end);
             }
         }
         error!("Failed to find identifier for {:?}", stmt);
@@ -406,20 +400,15 @@ pub fn excepthandler_name_range(
     match (name, type_) {
         (Some(_), Some(type_)) => {
             let type_end_location = type_.end_location.unwrap();
-            let contents = locator.slice_source_code_range(&Range {
-                location: type_end_location,
-                end_location: body[0].location,
-            });
+            let contents =
+                locator.slice_source_code_range(&Range::new(type_end_location, body[0].location));
             let range = lexer::make_tokenizer_located(&contents, type_end_location)
                 .flatten()
                 .tuple_windows()
                 .find(|(tok, next_tok)| {
                     matches!(tok.1, Tok::As) && matches!(next_tok.1, Tok::Name { .. })
                 })
-                .map(|((..), (location, _, end_location))| Range {
-                    location,
-                    end_location,
-                });
+                .map(|((..), (location, _, end_location))| Range::new(location, end_location));
             range
         }
         _ => None,
@@ -435,10 +424,10 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> boo
     // make conservative choices.
     // TODO(charlie): Come up with a more robust strategy.
     if stmt.location.row() > 1 {
-        let range = Range {
-            location: Location::new(stmt.location.row() - 1, 0),
-            end_location: Location::new(stmt.location.row(), 0),
-        };
+        let range = Range::new(
+            Location::new(stmt.location.row() - 1, 0),
+            Location::new(stmt.location.row(), 0),
+        );
         let line = locator.slice_source_code_range(&range);
         if line.trim().ends_with('\\') {
             return true;
@@ -660,10 +649,7 @@ y = 2
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(1, 4),
-                end_location: Location::new(1, 5),
-            }
+            Range::new(Location::new(1, 4), Location::new(1, 5),)
         );
 
         let contents = r#"
@@ -677,10 +663,7 @@ def \
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(2, 2),
-                end_location: Location::new(2, 3),
-            }
+            Range::new(Location::new(2, 2), Location::new(2, 3),)
         );
 
         let contents = "class Class(): pass".trim();
@@ -689,10 +672,7 @@ def \
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(1, 6),
-                end_location: Location::new(1, 11),
-            }
+            Range::new(Location::new(1, 6), Location::new(1, 11),)
         );
 
         let contents = "class Class: pass".trim();
@@ -701,10 +681,7 @@ def \
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(1, 6),
-                end_location: Location::new(1, 11),
-            }
+            Range::new(Location::new(1, 6), Location::new(1, 11),)
         );
 
         let contents = r#"
@@ -718,10 +695,7 @@ class Class():
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(2, 6),
-                end_location: Location::new(2, 11),
-            }
+            Range::new(Location::new(2, 6), Location::new(2, 11),)
         );
 
         let contents = r#"x = y + 1"#.trim();
@@ -730,10 +704,7 @@ class Class():
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(1, 0),
-                end_location: Location::new(1, 9),
-            }
+            Range::new(Location::new(1, 0), Location::new(1, 9),)
         );
 
         Ok(())

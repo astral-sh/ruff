@@ -55,22 +55,18 @@ pub struct Source {
 
 impl Source {
     pub fn from_check(check: &Check, locator: &SourceCodeLocator) -> Self {
-        let source = locator.slice_source_code_range(&Range {
-            location: Location::new(check.location.row(), 0),
-            // Checks can already extend one-past-the-end per Ropey's semantics. If they do, though,
-            // then they'll end at the start of a line. We need to avoid extending by yet another
-            // line past-the-end.
-            end_location: if check.end_location.column() == 0 {
-                check.end_location
-            } else {
-                Location::new(check.end_location.row() + 1, 0)
-            },
-        });
+        let location = Location::new(check.location.row(), 0);
+        // Checks can already extend one-past-the-end per Ropey's semantics. If they do,
+        // though, then they'll end at the start of a line. We need to avoid
+        // extending by yet another line past-the-end.
+        let end_location = if check.end_location.column() == 0 {
+            check.end_location
+        } else {
+            Location::new(check.end_location.row() + 1, 0)
+        };
+        let source = locator.slice_source_code_range(&Range::new(location, end_location));
         let num_chars_in_range = locator
-            .slice_source_code_range(&Range {
-                location: check.location,
-                end_location: check.end_location,
-            })
+            .slice_source_code_range(&Range::new(check.location, check.end_location))
             .chars()
             .count();
         Source {

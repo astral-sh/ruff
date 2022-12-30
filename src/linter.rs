@@ -120,10 +120,7 @@ pub(crate) fn check_path(
                 if settings.enabled.contains(&CheckCode::E999) {
                     checks.push(Check::new(
                         CheckKind::SyntaxError(parse_error.error.to_string()),
-                        Range {
-                            location: parse_error.location,
-                            end_location: parse_error.location,
-                        },
+                        Range::new(parse_error.location, parse_error.location),
                     ));
                 }
             }

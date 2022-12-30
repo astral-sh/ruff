@@ -170,10 +170,7 @@ pub fn unnecessary_coding_comment(lineno: usize, line: &str, autofix: bool) -> O
     if CODING_COMMENT_REGEX.is_match(line) {
         let mut check = Check::new(
             CheckKind::PEP3120UnnecessaryCodingComment,
-            Range {
-                location: Location::new(lineno + 1, 0),
-                end_location: Location::new(lineno + 2, 0),
-            },
+            Range::new(Location::new(lineno + 1, 0), Location::new(lineno + 2, 0)),
         );
         if autofix {
             check.amend(Fix::deletion(
@@ -216,10 +213,7 @@ pub fn unnecessary_lru_cache_params(
             continue;
         }
 
-        let range = Range {
-            location: func.end_location.unwrap(),
-            end_location: expr.end_location.unwrap(),
-        };
+        let range = Range::new(func.end_location.unwrap(), expr.end_location.unwrap());
         // Ex) `functools.lru_cache()`
         if keywords.is_empty() {
             return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));

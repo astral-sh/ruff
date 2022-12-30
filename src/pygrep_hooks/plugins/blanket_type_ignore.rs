@@ -13,10 +13,10 @@ pub fn blanket_type_ignore(lineno: usize, line: &str) -> Option<Check> {
     BLANKET_TYPE_IGNORE_REGEX.find(line).map(|m| {
         Check::new(
             CheckKind::BlanketTypeIgnore,
-            Range {
-                location: Location::new(lineno + 1, m.start()),
-                end_location: Location::new(lineno + 1, m.end()),
-            },
+            Range::new(
+                Location::new(lineno + 1, m.start()),
+                Location::new(lineno + 1, m.end()),
+            ),
         )
     })
 }
