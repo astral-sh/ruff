@@ -1,0 +1,14 @@
+---
+source: src/flake8_pytest_style/mod.rs
+expression: checks
+---
+- kind: ExtraneousScopeFunction
+  location:
+    row: 14
+    column: 16
+  end_location:
+    row: 14
+    column: 32
+  fix: ~
+  parent: ~
+

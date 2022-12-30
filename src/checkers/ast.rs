@@ -40,9 +40,9 @@ use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
     flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_print, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_unused_arguments,
-    mccabe, noqa, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
-    pyupgrade, ruff, visibility,
+    flake8_print, flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports,
+    flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming, pycodestyle, pydocstyle,
+    pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -282,15 +282,9 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    self.add_checks(
-                        names
-                            .iter()
-                            .zip(ranges.iter())
-                            .filter_map(|(name, range)| {
-                                pycodestyle::checks::ambiguous_variable_name(name, *range)
-                            })
-                            .into_iter(),
-                    );
+                    self.add_checks(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                        pycodestyle::checks::ambiguous_variable_name(name, *range)
+                    }));
                 }
             }
             StmtKind::Nonlocal { names } => {
@@ -335,15 +329,9 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    self.add_checks(
-                        names
-                            .iter()
-                            .zip(ranges.iter())
-                            .filter_map(|(name, range)| {
-                                pycodestyle::checks::ambiguous_variable_name(name, *range)
-                            })
-                            .into_iter(),
-                    );
+                    self.add_checks(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                        pycodestyle::checks::ambiguous_variable_name(name, *range)
+                    }));
                 }
             }
             StmtKind::Break => {
@@ -490,6 +478,40 @@ where
                     pylint::plugins::property_with_parameters(self, stmt, decorator_list, args);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::PT001)
+                    || self.settings.enabled.contains(&CheckCode::PT002)
+                    || self.settings.enabled.contains(&CheckCode::PT003)
+                    || self.settings.enabled.contains(&CheckCode::PT004)
+                    || self.settings.enabled.contains(&CheckCode::PT005)
+                    || self.settings.enabled.contains(&CheckCode::PT019)
+                    || self.settings.enabled.contains(&CheckCode::PT020)
+                    || self.settings.enabled.contains(&CheckCode::PT021)
+                    || self.settings.enabled.contains(&CheckCode::PT022)
+                    || self.settings.enabled.contains(&CheckCode::PT024)
+                    || self.settings.enabled.contains(&CheckCode::PT025)
+                {
+                    flake8_pytest_style::plugins::fixture(
+                        self,
+                        stmt,
+                        name,
+                        args,
+                        decorator_list,
+                        body,
+                    );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT006)
+                    || self.settings.enabled.contains(&CheckCode::PT007)
+                {
+                    flake8_pytest_style::plugins::parametrize(self, decorator_list);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT023)
+                    || self.settings.enabled.contains(&CheckCode::PT026)
+                {
+                    flake8_pytest_style::plugins::marks(self, decorator_list);
+                }
+
                 self.check_builtin_shadowing(name, stmt, true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be
@@ -606,6 +628,10 @@ where
                     flake8_bugbear::plugins::abstract_base_class(
                         self, stmt, name, bases, keywords, body,
                     );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT023) {
+                    flake8_pytest_style::plugins::marks(self, decorator_list);
                 }
 
                 self.check_builtin_shadowing(name, stmt, false);
@@ -815,6 +841,16 @@ where
                             self.add_check(check);
                         }
                     }
+
+                    if self.settings.enabled.contains(&CheckCode::PT013) {
+                        if let Some(check) = flake8_pytest_style::plugins::import(
+                            stmt,
+                            &alias.node.name,
+                            alias.node.asname.as_deref(),
+                        ) {
+                            self.add_check(check);
+                        }
+                    }
                 }
             }
             StmtKind::ImportFrom {
@@ -877,6 +913,14 @@ where
                         ) {
                             self.add_check(check);
                         }
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT013) {
+                    if let Some(check) =
+                        flake8_pytest_style::plugins::import_from(stmt, module, level)
+                    {
+                        self.add_check(check);
                     }
                 }
 
@@ -1140,10 +1184,25 @@ where
                 if self.settings.enabled.contains(&CheckCode::S101) {
                     self.add_check(flake8_bandit::plugins::assert_used(stmt));
                 }
+                if self.settings.enabled.contains(&CheckCode::PT015) {
+                    if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::PT018) {
+                    if let Some(check) =
+                        flake8_pytest_style::plugins::composite_condition(stmt, test)
+                    {
+                        self.add_check(check);
+                    }
+                }
             }
-            StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
+            StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
                 if self.settings.enabled.contains(&CheckCode::B017) {
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
+                }
+                if self.settings.enabled.contains(&CheckCode::PT012) {
+                    flake8_pytest_style::plugins::complex_raises(self, stmt, items, body);
                 }
             }
             StmtKind::While { body, orelse, .. } => {
@@ -1202,6 +1261,12 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP024) {
                     pyupgrade::plugins::os_error_alias(self, handlers);
+                }
+                if self.settings.enabled.contains(&CheckCode::PT017) {
+                    self.add_checks(
+                        flake8_pytest_style::plugins::assert_in_exception_handler(handlers)
+                            .into_iter(),
+                    );
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -2116,6 +2181,30 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::PLR1722) {
                     pylint::plugins::use_sys_exit(self, func);
+                }
+
+                // flake8-pytest-style
+                if self.settings.enabled.contains(&CheckCode::PT008) {
+                    if let Some(check) =
+                        flake8_pytest_style::plugins::patch_with_lambda(func, args, keywords)
+                    {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::PT009) {
+                    if let Some(check) = flake8_pytest_style::plugins::unittest_assertion(func) {
+                        self.add_check(check);
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT010)
+                    || self.settings.enabled.contains(&CheckCode::PT011)
+                {
+                    flake8_pytest_style::plugins::raises_call(self, func, args, keywords);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT016) {
+                    flake8_pytest_style::plugins::fail_call(self, func, args, keywords);
                 }
 
                 // ruff

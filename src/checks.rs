@@ -12,6 +12,9 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checks_gen::CheckCodePrefix;
 use crate::flake8_debugger::types::DebuggerUsingType;
+use crate::flake8_pytest_style::types::{
+    ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
+};
 use crate::flake8_quotes::settings::Quote;
 use crate::flake8_tidy_imports::settings::Strictness;
 use crate::pyupgrade::types::Primitive;
@@ -362,6 +365,32 @@ pub enum CheckCode {
     EM101,
     EM102,
     EM103,
+    // flake8-pytest-style
+    PT001,
+    PT002,
+    PT003,
+    PT004,
+    PT005,
+    PT006,
+    PT007,
+    PT008,
+    PT009,
+    PT010,
+    PT011,
+    PT012,
+    PT013,
+    PT015,
+    PT016,
+    PT017,
+    PT018,
+    PT019,
+    PT020,
+    PT021,
+    PT022,
+    PT023,
+    PT024,
+    PT025,
+    PT026,
 }
 
 #[derive(EnumIter, Debug, PartialEq, Eq)]
@@ -386,6 +415,7 @@ pub enum CheckCategory {
     Flake8ImplicitStrConcat,
     Flake8ImportConventions,
     Flake8Print,
+    Flake8PytestStyle,
     Flake8Quotes,
     Flake8Return,
     Flake8Simplify,
@@ -430,6 +460,7 @@ impl CheckCategory {
             CheckCategory::Flake8ImplicitStrConcat => "flake8-implicit-str-concat",
             CheckCategory::Flake8ImportConventions => "flake8-import-conventions",
             CheckCategory::Flake8Print => "flake8-print",
+            CheckCategory::Flake8PytestStyle => "flake8-pytest-style",
             CheckCategory::Flake8Quotes => "flake8-quotes",
             CheckCategory::Flake8Return => "flake8-return",
             CheckCategory::Flake8TidyImports => "flake8-tidy-imports",
@@ -467,6 +498,7 @@ impl CheckCategory {
             CheckCategory::Flake8ImplicitStrConcat => vec![CheckCodePrefix::ISC],
             CheckCategory::Flake8ImportConventions => vec![CheckCodePrefix::ICN],
             CheckCategory::Flake8Print => vec![CheckCodePrefix::T20],
+            CheckCategory::Flake8PytestStyle => vec![CheckCodePrefix::PT],
             CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
             CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
             CheckCategory::Flake8Simplify => vec![CheckCodePrefix::SIM],
@@ -543,6 +575,10 @@ impl CheckCategory {
             CheckCategory::Flake8ImportConventions => None,
             CheckCategory::Flake8Print => Some((
                 "https://pypi.org/project/flake8-print/5.0.0/",
+                &Platform::PyPI,
+            )),
+            CheckCategory::Flake8PytestStyle => Some((
+                "https://pypi.org/project/flake8-pytest-style/1.6.0/",
                 &Platform::PyPI,
             )),
             CheckCategory::Flake8Quotes => Some((
@@ -1043,6 +1079,32 @@ pub enum CheckKind {
     CallDatetimeStrptimeWithoutZone,
     CallDateToday,
     CallDateFromtimestamp,
+    // flake8-pytest-style
+    IncorrectFixtureParenthesesStyle(String, String),
+    FixturePositionalArgs(String),
+    ExtraneousScopeFunction,
+    MissingFixtureNameUnderscore(String),
+    IncorrectFixtureNameUnderscore(String),
+    ParametrizeNamesWrongType(ParametrizeNameType),
+    ParametrizeValuesWrongType(ParametrizeValuesType, ParametrizeValuesRowType),
+    PatchWithLambda,
+    UnittestAssertion(String),
+    RaisesWithoutException,
+    RaisesTooBroad(String),
+    RaisesWithMultipleStatements,
+    IncorrectPytestImport,
+    AssertAlwaysFalse,
+    FailWithoutMessage,
+    AssertInExcept(String),
+    CompositeAssertion,
+    FixtureParamWithoutValue(String),
+    DeprecatedYieldFixture,
+    FixtureFinalizerCallback,
+    UselessYieldFixture(String),
+    IncorrectMarkParenthesesStyle(String, String, String),
+    UnnecessaryAsyncioMarkOnFixture,
+    ErroneousUseFixturesOnFixture,
+    UseFixturesWithoutParameters,
 }
 
 impl CheckCode {
@@ -1450,6 +1512,42 @@ impl CheckCode {
             CheckCode::DTZ007 => CheckKind::CallDatetimeStrptimeWithoutZone,
             CheckCode::DTZ011 => CheckKind::CallDateToday,
             CheckCode::DTZ012 => CheckKind::CallDateFromtimestamp,
+            // flake8-pytest-style
+            CheckCode::PT001 => {
+                CheckKind::IncorrectFixtureParenthesesStyle("()".to_string(), String::new())
+            }
+            CheckCode::PT002 => CheckKind::FixturePositionalArgs("...".to_string()),
+            CheckCode::PT003 => CheckKind::ExtraneousScopeFunction,
+            CheckCode::PT004 => CheckKind::MissingFixtureNameUnderscore("...".to_string()),
+            CheckCode::PT005 => CheckKind::IncorrectFixtureNameUnderscore("...".to_string()),
+            CheckCode::PT006 => CheckKind::ParametrizeNamesWrongType(ParametrizeNameType::Tuple),
+            CheckCode::PT007 => CheckKind::ParametrizeValuesWrongType(
+                ParametrizeValuesType::List,
+                ParametrizeValuesRowType::Tuple,
+            ),
+            CheckCode::PT008 => CheckKind::PatchWithLambda,
+            CheckCode::PT009 => CheckKind::UnittestAssertion("...".to_string()),
+            CheckCode::PT010 => CheckKind::RaisesWithoutException,
+            CheckCode::PT011 => CheckKind::RaisesTooBroad("...".to_string()),
+            CheckCode::PT012 => CheckKind::RaisesWithMultipleStatements,
+            CheckCode::PT013 => CheckKind::IncorrectPytestImport,
+
+            CheckCode::PT015 => CheckKind::AssertAlwaysFalse,
+            CheckCode::PT016 => CheckKind::FailWithoutMessage,
+            CheckCode::PT017 => CheckKind::AssertInExcept("...".to_string()),
+            CheckCode::PT018 => CheckKind::CompositeAssertion,
+            CheckCode::PT019 => CheckKind::FixtureParamWithoutValue("...".to_string()),
+            CheckCode::PT020 => CheckKind::DeprecatedYieldFixture,
+            CheckCode::PT021 => CheckKind::FixtureFinalizerCallback,
+            CheckCode::PT022 => CheckKind::UselessYieldFixture("...".to_string()),
+            CheckCode::PT023 => CheckKind::IncorrectMarkParenthesesStyle(
+                "...".to_string(),
+                String::new(),
+                "()".to_string(),
+            ),
+            CheckCode::PT024 => CheckKind::UnnecessaryAsyncioMarkOnFixture,
+            CheckCode::PT025 => CheckKind::ErroneousUseFixturesOnFixture,
+            CheckCode::PT026 => CheckKind::UseFixturesWithoutParameters,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1694,6 +1792,31 @@ impl CheckCode {
             CheckCode::PLR1722 => CheckCategory::Pylint,
             CheckCode::PLW0120 => CheckCategory::Pylint,
             CheckCode::PLW0602 => CheckCategory::Pylint,
+            CheckCode::PT001 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT002 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT003 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT004 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT005 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT006 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT007 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT008 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT009 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT010 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT011 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT012 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT013 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT015 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT016 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT017 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT018 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT019 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT020 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT021 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT022 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT023 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT024 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT025 => CheckCategory::Flake8PytestStyle,
+            CheckCode::PT026 => CheckCategory::Flake8PytestStyle,
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
@@ -2091,6 +2214,32 @@ impl CheckKind {
             CheckKind::CallDatetimeStrptimeWithoutZone => &CheckCode::DTZ007,
             CheckKind::CallDateToday => &CheckCode::DTZ011,
             CheckKind::CallDateFromtimestamp => &CheckCode::DTZ012,
+            // flake8-pytest-style
+            CheckKind::IncorrectFixtureParenthesesStyle(..) => &CheckCode::PT001,
+            CheckKind::FixturePositionalArgs(..) => &CheckCode::PT002,
+            CheckKind::ExtraneousScopeFunction => &CheckCode::PT003,
+            CheckKind::MissingFixtureNameUnderscore(..) => &CheckCode::PT004,
+            CheckKind::IncorrectFixtureNameUnderscore(..) => &CheckCode::PT005,
+            CheckKind::ParametrizeNamesWrongType(..) => &CheckCode::PT006,
+            CheckKind::ParametrizeValuesWrongType(..) => &CheckCode::PT007,
+            CheckKind::PatchWithLambda => &CheckCode::PT008,
+            CheckKind::UnittestAssertion(..) => &CheckCode::PT009,
+            CheckKind::RaisesWithoutException => &CheckCode::PT010,
+            CheckKind::RaisesTooBroad(..) => &CheckCode::PT011,
+            CheckKind::RaisesWithMultipleStatements => &CheckCode::PT012,
+            CheckKind::IncorrectPytestImport => &CheckCode::PT013,
+            CheckKind::AssertAlwaysFalse => &CheckCode::PT015,
+            CheckKind::FailWithoutMessage => &CheckCode::PT016,
+            CheckKind::AssertInExcept(..) => &CheckCode::PT017,
+            CheckKind::CompositeAssertion => &CheckCode::PT018,
+            CheckKind::FixtureParamWithoutValue(..) => &CheckCode::PT019,
+            CheckKind::DeprecatedYieldFixture => &CheckCode::PT020,
+            CheckKind::FixtureFinalizerCallback => &CheckCode::PT021,
+            CheckKind::UselessYieldFixture(..) => &CheckCode::PT022,
+            CheckKind::IncorrectMarkParenthesesStyle(..) => &CheckCode::PT023,
+            CheckKind::UnnecessaryAsyncioMarkOnFixture => &CheckCode::PT024,
+            CheckKind::ErroneousUseFixturesOnFixture => &CheckCode::PT025,
+            CheckKind::UseFixturesWithoutParameters => &CheckCode::PT026,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -3104,6 +3253,100 @@ impl CheckKind {
                  `datetime.datetime.fromtimestamp(, tz=).date()` instead."
                     .to_string()
             }
+            // flake8-pytest-style
+            CheckKind::IncorrectFixtureParenthesesStyle(expected_parens, actual_parens) => {
+                format!(
+                    "Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}`"
+                )
+            }
+            CheckKind::FixturePositionalArgs(function) => {
+                format!(
+                    "Configuration for fixture `{function}` specified via positional args, use \
+                     kwargs"
+                )
+            }
+            CheckKind::ExtraneousScopeFunction => {
+                "`scope='function'` is implied in `@pytest.fixture()`".to_string()
+            }
+            CheckKind::MissingFixtureNameUnderscore(function) => {
+                format!("Fixture `{function}` does not return anything, add leading underscore")
+            }
+            CheckKind::IncorrectFixtureNameUnderscore(function) => {
+                format!("Fixture `{function}` returns a value, remove leading underscore")
+            }
+            CheckKind::ParametrizeNamesWrongType(expected) => {
+                format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
+            }
+            CheckKind::ParametrizeValuesWrongType(values, row) => {
+                format!(
+                    "Wrong values type in `@pytest.mark.parametrize` expected `{values}` of \
+                     `{row}`"
+                )
+            }
+            CheckKind::PatchWithLambda => {
+                "Use `return_value=` instead of patching with lambda".to_string()
+            }
+            CheckKind::UnittestAssertion(assertion) => {
+                format!("Use a regular assert instead of unittest-style '{assertion}'")
+            }
+            CheckKind::RaisesWithoutException => {
+                "set the expected exception in `pytest.raises()`".to_string()
+            }
+            CheckKind::RaisesTooBroad(exception) => {
+                format!(
+                    "`pytest.raises({exception})` is too broad, set the `match` parameter or use \
+                     a more specific exception"
+                )
+            }
+            CheckKind::RaisesWithMultipleStatements => {
+                "`pytest.raises()` block should contain a single simple statement".to_string()
+            }
+            CheckKind::IncorrectPytestImport => {
+                "Found incorrect import of pytest, use simple `import pytest` instead".to_string()
+            }
+            CheckKind::AssertAlwaysFalse => {
+                "Assertion always fails, replace with `pytest.fail()`".to_string()
+            }
+            CheckKind::FailWithoutMessage => "No message passed to `pytest.fail()`".to_string(),
+            CheckKind::AssertInExcept(name) => {
+                format!(
+                    "Found assertion on exception {name} in except block, use pytest.raises() \
+                     instead"
+                )
+            }
+            CheckKind::CompositeAssertion => {
+                "Assertion should be broken down into multiple parts".to_string()
+            }
+            CheckKind::FixtureParamWithoutValue(name) => {
+                format!(
+                    "Fixture {name} without value is injected as parameter, use \
+                     @pytest.mark.usefixtures instead"
+                )
+            }
+            CheckKind::DeprecatedYieldFixture => {
+                "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`".to_string()
+            }
+            CheckKind::FixtureFinalizerCallback => {
+                "Use `yield` instead of `request.addfinalizer`".to_string()
+            }
+            CheckKind::UselessYieldFixture(name) => {
+                format!("No teardown in fixture {name}, use `return` instead of `yield`")
+            }
+            CheckKind::IncorrectMarkParenthesesStyle(mark_name, expected_parens, actual_parens) => {
+                format!(
+                    "Use `@pytest.mark.{mark_name}{expected_parens}` over \
+                     `@pytest.mark.{mark_name}{actual_parens}`"
+                )
+            }
+            CheckKind::UnnecessaryAsyncioMarkOnFixture => {
+                "`pytest.mark.asyncio` is unnecessary for fixtures".to_string()
+            }
+            CheckKind::ErroneousUseFixturesOnFixture => {
+                "`pytest.mark.usefixtures` has no effect on fixtures".to_string()
+            }
+            CheckKind::UseFixturesWithoutParameters => {
+                "Useless `pytest.mark.usefixtures` without parameters".to_string()
+            }
         }
     }
 
@@ -3170,6 +3413,8 @@ impl CheckKind {
                 | CheckKind::GetAttrWithConstant
                 | CheckKind::ImplicitReturn
                 | CheckKind::ImplicitReturnValue
+                | CheckKind::IncorrectFixtureParenthesesStyle(..)
+                | CheckKind::IncorrectMarkParenthesesStyle(..)
                 | CheckKind::InvalidEscapeSequence(..)
                 | CheckKind::IsLiteral(..)
                 | CheckKind::KeyInDict(..)
@@ -3197,6 +3442,7 @@ impl CheckKind {
                 | CheckKind::PPrintFound
                 | CheckKind::PercentFormatExtraNamedArguments(..)
                 | CheckKind::PrintFound
+                | CheckKind::ParametrizeNamesWrongType(..)
                 | CheckKind::RaiseNotImplemented
                 | CheckKind::RedundantOpenModes(..)
                 | CheckKind::RedundantTupleInExceptionHandler(..)
@@ -3238,6 +3484,7 @@ impl CheckKind {
                 | CheckKind::UnusedImport(_, false, _)
                 | CheckKind::UnusedLoopControlVariable(..)
                 | CheckKind::UnusedNOQA(..)
+                | CheckKind::UseFixturesWithoutParameters
                 | CheckKind::UsePEP585Annotation(..)
                 | CheckKind::UsePEP604Annotation
                 | CheckKind::UseSysExit(..)
@@ -3283,11 +3530,18 @@ impl CheckKind {
             CheckKind::DuplicateHandlerException(..) => Some("De-duplicate exceptions".to_string()),
             CheckKind::EndsInPeriod => Some("Add period".to_string()),
             CheckKind::EndsInPunctuation => Some("Add closing punctuation".to_string()),
+            CheckKind::ExtraneousScopeFunction => Some("Remove `scope=` argument".to_string()),
             CheckKind::GetAttrWithConstant => {
                 Some("Replace `getattr` with attribute access".to_string())
             }
             CheckKind::ImplicitReturnValue => Some("Add explicit `None` return value".to_string()),
             CheckKind::ImplicitReturn => Some("Add explicit `return` statement".to_string()),
+            CheckKind::IncorrectMarkParenthesesStyle(..) => {
+                Some("Add/remove parentheses".to_string())
+            }
+            CheckKind::IncorrectFixtureParenthesesStyle(..) => {
+                Some("Add/remove parentheses".to_string())
+            }
             CheckKind::InvalidEscapeSequence(..) => {
                 Some("Add backslash to escape sequence".to_string())
             }
@@ -3356,6 +3610,9 @@ impl CheckKind {
             }),
             CheckKind::NotInTest => Some("Convert to `not in`".to_string()),
             CheckKind::NotIsTest => Some("Convert to `is not`".to_string()),
+            CheckKind::ParametrizeNamesWrongType(expected) => {
+                Some(format!("Use a `{expected}` for parameter names"))
+            }
             CheckKind::PEP3120UnnecessaryCodingComment => {
                 Some("Remove unnecessary coding comment".to_string())
             }
@@ -3474,6 +3731,9 @@ impl CheckKind {
                 Some(format!("Replace `{name}` with `{}`", name.to_lowercase(),))
             }
             CheckKind::UsePEP604Annotation => Some("Convert to `X | Y`".to_string()),
+            CheckKind::UseFixturesWithoutParameters => {
+                Some("Remove `usefixtures` decorator or pass parameters".to_string())
+            }
             CheckKind::UseSysExit(name) => Some(format!("Replace `{name}` with `sys.exit()`")),
             CheckKind::UselessImportAlias => Some("Remove import alias".to_string()),
             CheckKind::UselessMetaclassType => Some("Remove `__metaclass__ = type`".to_string()),

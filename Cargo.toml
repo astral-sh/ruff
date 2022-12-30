@@ -46,6 +46,7 @@ natord = { version = "1.0.9" }
 nohash-hasher = { version = "0.2.0" }
 notify = { version = "5.0.0" }
 num-bigint = { version = "0.4.3" }
+num-traits = "0.2.15"
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 quick-junit = { version = "0.3.2" }

@@ -2,14 +2,17 @@ use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
 use ruff::checks_gen::CheckCodePrefix;
+use ruff::flake8_pytest_style::types::{
+    ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
+};
 use ruff::flake8_quotes::settings::Quote;
 use ruff::flake8_tidy_imports::settings::Strictness;
 use ruff::pydocstyle::settings::Convention;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_quotes, flake8_tidy_imports, mccabe,
-    pep8_naming, pydocstyle,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
+    flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
 };
 
 use crate::black::Black;
@@ -88,6 +91,7 @@ pub fn convert(
     let mut flake8_annotations = flake8_annotations::settings::Options::default();
     let mut flake8_bugbear = flake8_bugbear::settings::Options::default();
     let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
+    let mut flake8_pytest_style = flake8_pytest_style::settings::Options::default();
     let mut flake8_quotes = flake8_quotes::settings::Options::default();
     let mut flake8_tidy_imports = flake8_tidy_imports::settings::Options::default();
     let mut mccabe = mccabe::settings::Options::default();
@@ -222,6 +226,66 @@ pub fn convert(
                         Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                     }
                 }
+                // flake8-pytest-style
+                "pytest-fixture-no-parentheses" | "pytest_fixture_no_parentheses " => {
+                    match parser::parse_bool(value.as_ref()) {
+                        Ok(bool) => flake8_pytest_style.fixture_parentheses = Some(!bool),
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
+                "pytest-parametrize-names-type" | "pytest_parametrize_names_type" => {
+                    match value.trim() {
+                        "csv" => {
+                            flake8_pytest_style.parametrize_names_type =
+                                Some(ParametrizeNameType::CSV);
+                        }
+                        "tuple" => {
+                            flake8_pytest_style.parametrize_names_type =
+                                Some(ParametrizeNameType::Tuple);
+                        }
+                        "list" => {
+                            flake8_pytest_style.parametrize_names_type =
+                                Some(ParametrizeNameType::List);
+                        }
+                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    }
+                }
+                "pytest-parametrize-values-type" | "pytest_parametrize_values_type" => {
+                    match value.trim() {
+                        "tuple" => {
+                            flake8_pytest_style.parametrize_values_type =
+                                Some(ParametrizeValuesType::Tuple);
+                        }
+                        "list" => {
+                            flake8_pytest_style.parametrize_values_type =
+                                Some(ParametrizeValuesType::List);
+                        }
+                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    }
+                }
+                "pytest-parametrize-values-row-type" | "pytest_parametrize_values_row_type" => {
+                    match value.trim() {
+                        "tuple" => {
+                            flake8_pytest_style.parametrize_values_row_type =
+                                Some(ParametrizeValuesRowType::Tuple);
+                        }
+                        "list" => {
+                            flake8_pytest_style.parametrize_values_row_type =
+                                Some(ParametrizeValuesRowType::List);
+                        }
+                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    }
+                }
+                "pytest-raises-require-match-for" | "pytest_raises_require_match_for" => {
+                    flake8_pytest_style.raises_require_match_for =
+                        Some(parser::parse_strings(value.as_ref()));
+                }
+                "pytest-mark-no-parentheses" | "pytest_mark_no_parentheses" => {
+                    match parser::parse_bool(value.as_ref()) {
+                        Ok(bool) => flake8_pytest_style.mark_parentheses = Some(!bool),
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
                 // Unknown
                 _ => eprintln!("Skipping unsupported property: {key}"),
             }
@@ -239,6 +303,9 @@ pub fn convert(
     }
     if flake8_errmsg != flake8_errmsg::settings::Options::default() {
         options.flake8_errmsg = Some(flake8_errmsg);
+    }
+    if flake8_pytest_style != flake8_pytest_style::settings::Options::default() {
+        options.flake8_pytest_style = Some(flake8_pytest_style);
     }
     if flake8_quotes != flake8_quotes::settings::Options::default() {
         options.flake8_quotes = Some(flake8_quotes);
@@ -328,6 +395,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -387,6 +455,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -446,6 +515,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -505,6 +575,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -564,6 +635,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
@@ -667,6 +739,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -729,6 +802,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
