@@ -397,10 +397,9 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::E743) {
-                    if let Some(check) = pycodestyle::checks::ambiguous_function_name(
-                        name,
-                        Range::from_located(stmt),
-                    ) {
+                    if let Some(check) = pycodestyle::checks::ambiguous_function_name(name, || {
+                        helpers::identifier_range(stmt, self.locator)
+                    }) {
                         self.add_check(check);
                     }
                 }
@@ -585,9 +584,9 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E742) {
-                    if let Some(check) =
-                        pycodestyle::checks::ambiguous_class_name(name, Range::from_located(stmt))
-                    {
+                    if let Some(check) = pycodestyle::checks::ambiguous_class_name(name, || {
+                        helpers::identifier_range(stmt, self.locator)
+                    }) {
                         self.add_check(check);
                     }
                 }

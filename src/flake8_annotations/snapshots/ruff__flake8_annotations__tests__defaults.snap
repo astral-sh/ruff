@@ -6,10 +6,10 @@ expression: checks
     MissingReturnTypePublicFunction: foo
   location:
     row: 4
-    column: 0
+    column: 4
   end_location:
-    row: 5
-    column: 8
+    row: 4
+    column: 7
   fix: ~
 - kind:
     MissingTypeFunctionArgument: a
@@ -33,10 +33,10 @@ expression: checks
     MissingReturnTypePublicFunction: foo
   location:
     row: 9
-    column: 0
+    column: 4
   end_location:
-    row: 10
-    column: 8
+    row: 9
+    column: 7
   fix: ~
 - kind:
     MissingTypeFunctionArgument: b
@@ -60,19 +60,19 @@ expression: checks
     MissingReturnTypePublicFunction: foo
   location:
     row: 19
-    column: 0
+    column: 4
   end_location:
-    row: 20
-    column: 8
+    row: 19
+    column: 7
   fix: ~
 - kind:
     MissingReturnTypePublicFunction: foo
   location:
     row: 24
-    column: 0
+    column: 4
   end_location:
-    row: 25
-    column: 8
+    row: 24
+    column: 7
   fix: ~
 - kind:
     DynamicallyTypedExpression: a
