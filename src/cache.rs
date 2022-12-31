@@ -15,8 +15,9 @@ use serde::{Deserialize, Serialize};
 use crate::message::Message;
 use crate::settings::{flags, Settings};
 
-static CACHE_DIR: Lazy<Option<String>> = Lazy::new(|| std::env::var("RUFF_CACHE_DIR").ok());
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+static CACHE_DIR: Lazy<Option<String>> = Lazy::new(|| std::env::var("RUFF_CACHE_DIR").ok());
+pub const DEFAULT_CACHE_DIR_NAME: &str = ".ruff_cache";
 
 #[derive(Serialize, Deserialize)]
 struct CacheMetadata {
@@ -40,7 +41,7 @@ struct CheckResult {
 pub fn cache_dir(project_root: &Path) -> PathBuf {
     CACHE_DIR
         .as_ref()
-        .map_or_else(|| project_root.join(".ruff_cache"), PathBuf::from)
+        .map_or_else(|| project_root.join(DEFAULT_CACHE_DIR_NAME), PathBuf::from)
 }
 
 fn content_dir() -> &'static Path {

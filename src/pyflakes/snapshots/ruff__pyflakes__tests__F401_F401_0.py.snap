@@ -6,6 +6,7 @@ expression: checks
     UnusedImport:
       - functools
       - false
+      - false
   location:
     row: 2
     column: 7
@@ -24,6 +25,7 @@ expression: checks
 - kind:
     UnusedImport:
       - collections.OrderedDict
+      - false
       - false
   location:
     row: 6
@@ -46,6 +48,7 @@ expression: checks
     UnusedImport:
       - logging.handlers
       - false
+      - false
   location:
     row: 12
     column: 7
@@ -64,6 +67,7 @@ expression: checks
 - kind:
     UnusedImport:
       - shelve
+      - false
       - false
   location:
     row: 32
@@ -84,6 +88,7 @@ expression: checks
     UnusedImport:
       - importlib
       - false
+      - false
   location:
     row: 33
     column: 11
@@ -103,6 +108,7 @@ expression: checks
     UnusedImport:
       - pathlib
       - false
+      - false
   location:
     row: 37
     column: 11
@@ -121,6 +127,7 @@ expression: checks
 - kind:
     UnusedImport:
       - pickle
+      - false
       - false
   location:
     row: 52

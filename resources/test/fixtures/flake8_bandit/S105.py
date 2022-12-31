@@ -51,3 +51,12 @@ secret == "s3cr3t"
 token == "s3cr3t"
 secrete == "s3cr3t"
 password == safe == "s3cr3t"
+
+if token == "1\n2":
+    pass
+
+if token == "3\t4":
+    pass
+
+if token == "5\r6":
+    pass

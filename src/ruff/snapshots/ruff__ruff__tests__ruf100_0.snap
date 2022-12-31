@@ -222,6 +222,7 @@ expression: checks
     UnusedImport:
       - shelve
       - false
+      - false
   location:
     row: 85
     column: 7

@@ -1,13 +1,14 @@
 use std::string::ToString;
 
 use regex::Regex;
-use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
-    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
+    Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
+use crate::ast::helpers::except_range;
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
+use crate::source_code_locator::SourceCodeLocator;
 
 /// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
@@ -111,52 +112,21 @@ pub fn unused_annotation(
 }
 
 /// F707
-pub fn default_except_not_last(handlers: &[Excepthandler]) -> Option<Check> {
+pub fn default_except_not_last(
+    handlers: &[Excepthandler],
+    locator: &SourceCodeLocator,
+) -> Option<Check> {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         if type_.is_none() && idx < handlers.len() - 1 {
             return Some(Check::new(
                 CheckKind::DefaultExceptNotLast,
-                Range::from_located(handler),
+                except_range(handler, locator),
             ));
         }
     }
 
     None
-}
-
-/// F831
-pub fn duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
-
-    // Collect all the arguments into a single vector.
-    let mut all_arguments: Vec<&Arg> = arguments
-        .args
-        .iter()
-        .chain(arguments.posonlyargs.iter())
-        .chain(arguments.kwonlyargs.iter())
-        .collect();
-    if let Some(arg) = &arguments.vararg {
-        all_arguments.push(arg);
-    }
-    if let Some(arg) = &arguments.kwarg {
-        all_arguments.push(arg);
-    }
-
-    // Search for duplicates.
-    let mut idents: FxHashSet<&str> = FxHashSet::default();
-    for arg in all_arguments {
-        let ident = &arg.node.arg;
-        if idents.contains(ident.as_str()) {
-            checks.push(Check::new(
-                CheckKind::DuplicateArgumentName,
-                Range::from_located(arg),
-            ));
-        }
-        idents.insert(ident);
-    }
-
-    checks
 }
 
 #[derive(Debug, PartialEq)]

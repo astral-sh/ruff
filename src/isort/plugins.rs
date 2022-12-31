@@ -13,6 +13,7 @@ use crate::checks::CheckKind;
 use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
 use crate::settings::flags;
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{Check, Settings, SourceCodeLocator};
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -37,6 +38,7 @@ pub fn check_imports(
     block: &Block,
     locator: &SourceCodeLocator,
     settings: &Settings,
+    stylist: &SourceCodeStyleDetector,
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Check> {
@@ -74,6 +76,7 @@ pub fn check_imports(
         comments,
         locator,
         settings.line_length - indentation.len(),
+        stylist,
         &settings.src,
         package,
         &settings.isort.known_first_party,
@@ -92,7 +95,7 @@ pub fn check_imports(
         end_location: Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
     };
     let actual = dedent(&locator.slice_source_code_range(&range));
-    if actual == expected {
+    if actual == dedent(&expected) {
         None
     } else {
         let mut check = Check::new(CheckKind::UnsortedImports, range);

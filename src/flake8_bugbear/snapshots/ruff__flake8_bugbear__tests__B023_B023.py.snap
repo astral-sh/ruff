@@ -166,10 +166,10 @@ expression: checks
     FunctionUsesLoopVariable: i
   location:
     row: 82
-    column: 12
+    column: 15
   end_location:
     row: 82
-    column: 18
+    column: 16
   fix: ~
   parent: ~
 

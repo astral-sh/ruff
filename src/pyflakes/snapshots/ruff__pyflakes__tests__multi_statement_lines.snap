@@ -6,6 +6,7 @@ expression: checks
     UnusedImport:
       - foo
       - false
+      - false
   location:
     row: 3
     column: 11
@@ -25,6 +26,7 @@ expression: checks
     UnusedImport:
       - foo
       - false
+      - false
   location:
     row: 4
     column: 11
@@ -43,6 +45,7 @@ expression: checks
 - kind:
     UnusedImport:
       - foo
+      - false
       - false
   location:
     row: 7
@@ -63,6 +66,7 @@ expression: checks
     UnusedImport:
       - foo
       - false
+      - false
   location:
     row: 11
     column: 11
@@ -81,6 +85,7 @@ expression: checks
 - kind:
     UnusedImport:
       - foo
+      - false
       - false
   location:
     row: 16
@@ -101,6 +106,7 @@ expression: checks
     UnusedImport:
       - foo
       - false
+      - false
   location:
     row: 21
     column: 16
@@ -119,6 +125,7 @@ expression: checks
 - kind:
     UnusedImport:
       - foo
+      - false
       - false
   location:
     row: 26
@@ -139,6 +146,7 @@ expression: checks
     UnusedImport:
       - foo
       - false
+      - false
   location:
     row: 30
     column: 18
@@ -157,6 +165,7 @@ expression: checks
 - kind:
     UnusedImport:
       - foo
+      - false
       - false
   location:
     row: 31
@@ -177,6 +186,7 @@ expression: checks
     UnusedImport:
       - foo
       - false
+      - false
   location:
     row: 35
     column: 15
@@ -195,6 +205,7 @@ expression: checks
 - kind:
     UnusedImport:
       - foo
+      - false
       - false
   location:
     row: 40
@@ -215,6 +226,7 @@ expression: checks
     UnusedImport:
       - foo
       - false
+      - false
   location:
     row: 46
     column: 7
@@ -233,6 +245,7 @@ expression: checks
 - kind:
     UnusedImport:
       - foo
+      - false
       - false
   location:
     row: 51

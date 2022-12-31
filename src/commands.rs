@@ -1,26 +1,32 @@
+use std::fs::remove_dir_all;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{bail, Result};
+use colored::Colorize;
 use ignore::Error;
 use itertools::Itertools;
 use log::{debug, error};
+use path_absolutize::path_dedot;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use rustpython_ast::Location;
 use serde::Serialize;
+use walkdir::WalkDir;
 
 use crate::autofix::fixer;
+use crate::cache::DEFAULT_CACHE_DIR_NAME;
 use crate::checks::{CheckCode, CheckKind};
 use crate::cli::Overrides;
 use crate::iterators::par_iter;
-use crate::linter::{add_noqa_to_path, autoformat_path, lint_path, lint_stdin, Diagnostics};
+use crate::linter::{add_noqa_to_path, lint_path, lint_stdin, Diagnostics};
+use crate::logging::LogLevel;
 use crate::message::Message;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{cache, packages, resolver};
+use crate::{cache, fs, one_time_warning, packages, resolver};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -37,6 +43,15 @@ pub fn run(
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
+
+    if paths.is_empty() {
+        one_time_warning!(
+            "{} {}",
+            "warning:".yellow().bold(),
+            "No Python files found under the given path(s)"
+        );
+        return Ok(Diagnostics::default());
+    }
 
     // Validate the `Settings` and return any errors.
     resolver.validate(pyproject_strategy)?;
@@ -179,6 +194,15 @@ pub fn add_noqa(
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
+    if paths.is_empty() {
+        one_time_warning!(
+            "{} {}",
+            "warning:".yellow().bold(),
+            "No Python files found under the given path(s)"
+        );
+        return Ok(0);
+    }
+
     // Validate the `Settings` and return any errors.
     resolver.validate(pyproject_strategy)?;
 
@@ -200,45 +224,6 @@ pub fn add_noqa(
 
     let duration = start.elapsed();
     debug!("Added noqa to files in: {:?}", duration);
-
-    Ok(modifications)
-}
-
-/// Automatically format a collection of files.
-pub fn autoformat(
-    files: &[PathBuf],
-    pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
-    overrides: &Overrides,
-) -> Result<usize> {
-    // Collect all the files to format.
-    let start = Instant::now();
-    let (paths, resolver) =
-        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
-    let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
-
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
-
-    let start = Instant::now();
-    let modifications = par_iter(&paths)
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            let settings = resolver.resolve(path, pyproject_strategy);
-            match autoformat_path(path, settings) {
-                Ok(()) => Some(()),
-                Err(e) => {
-                    error!("Failed to autoformat {}: {e}", path.to_string_lossy());
-                    None
-                }
-            }
-        })
-        .count();
-
-    let duration = start.elapsed();
-    debug!("Auto-formatted files in: {:?}", duration);
 
     Ok(modifications)
 }
@@ -282,6 +267,15 @@ pub fn show_files(
     // Collect all files in the hierarchy.
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+
+    if paths.is_empty() {
+        one_time_warning!(
+            "{} {}",
+            "warning:".yellow().bold(),
+            "No Python files found under the given path(s)"
+        );
+        return Ok(());
+    }
 
     // Validate the `Settings` and return any errors.
     resolver.validate(pyproject_strategy)?;
@@ -336,5 +330,23 @@ pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
             bail!("`--explain` does not support GitLab format")
         }
     };
+    Ok(())
+}
+
+/// Clear any caches in the current directory or any subdirectories.
+pub fn clean(level: &LogLevel) -> Result<()> {
+    for entry in WalkDir::new(&*path_dedot::CWD)
+        .into_iter()
+        .filter_map(std::result::Result::ok)
+        .filter(|entry| entry.file_type().is_dir())
+    {
+        let cache = entry.path().join(DEFAULT_CACHE_DIR_NAME);
+        if cache.is_dir() {
+            if level >= &LogLevel::Default {
+                eprintln!("Removing cache at: {}", fs::relativize_path(&cache).bold());
+            }
+            remove_dir_all(&cache)?;
+        }
+    }
     Ok(())
 }

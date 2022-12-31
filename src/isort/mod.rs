@@ -17,6 +17,7 @@ use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
     TrailingComma,
 };
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::SourceCodeLocator;
 
 mod categorize;
@@ -549,6 +550,7 @@ pub fn format_imports(
     comments: Vec<Comment>,
     locator: &SourceCodeLocator,
     line_length: usize,
+    stylist: &SourceCodeStyleDetector,
     src: &[PathBuf],
     package: Option<&Path>,
     known_first_party: &BTreeSet<String>,
@@ -590,14 +592,19 @@ pub fn format_imports(
         if is_first_block {
             is_first_block = false;
         } else {
-            output.append("\n");
+            output.append(stylist.line_ending());
         }
 
         let mut is_first_statement = true;
 
         // Format `StmtKind::Import` statements.
         for (alias, comments) in &import_block.import {
-            output.append(&format::format_import(alias, comments, is_first_statement));
+            output.append(&format::format_import(
+                alias,
+                comments,
+                is_first_statement,
+                stylist,
+            ));
             is_first_statement = false;
         }
 
@@ -608,6 +615,7 @@ pub fn format_imports(
                 comments,
                 aliases,
                 line_length,
+                stylist,
                 force_wrap_aliases,
                 is_first_statement,
                 split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
@@ -618,11 +626,11 @@ pub fn format_imports(
     match trailer {
         None => {}
         Some(Trailer::Sibling) => {
-            output.append("\n");
+            output.append(stylist.line_ending());
         }
         Some(Trailer::FunctionDef | Trailer::ClassDef) => {
-            output.append("\n");
-            output.append("\n");
+            output.append(stylist.line_ending());
+            output.append(stylist.line_ending());
         }
     }
     output.finish().to_string()
@@ -672,9 +680,12 @@ mod tests {
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
+    #[test_case(Path::new("line_ending_lf.py"))]
+    #[test_case(Path::new("line_ending_crlf.py"))]
+    #[test_case(Path::new("line_ending_cr.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -683,7 +694,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -691,7 +701,7 @@ mod tests {
     #[test_case(Path::new("combine_as_imports.py"))]
     fn combine_as_imports(path: &Path) -> Result<()> {
         let snapshot = format!("combine_as_imports_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -704,7 +714,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -712,7 +721,7 @@ mod tests {
     #[test_case(Path::new("force_wrap_aliases.py"))]
     fn force_wrap_aliases(path: &Path) -> Result<()> {
         let snapshot = format!("force_wrap_aliases_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -726,7 +735,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -734,7 +742,7 @@ mod tests {
     #[test_case(Path::new("magic_trailing_comma.py"))]
     fn no_split_on_trailing_comma(path: &Path) -> Result<()> {
         let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -747,7 +755,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -755,7 +762,7 @@ mod tests {
     #[test_case(Path::new("force_single_line.py"))]
     fn force_single_line(path: &Path) -> Result<()> {
         let snapshot = format!("force_single_line_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -771,7 +778,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }

@@ -169,7 +169,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.202'
+  rev: 'v0.0.204'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -300,6 +300,7 @@ ruff path/to/code/ --select F401 --select F403
 
 See `ruff --help` for more:
 
+<!-- Begin auto-generated cli help. -->
 ```shell
 Ruff: An extremely fast Python linter.
 
@@ -349,6 +350,10 @@ Options:
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
           Output serialization format for error messages [possible values: text, json, junit, grouped, github, gitlab]
+      --stdin-filename <STDIN_FILENAME>
+          The name of the file when passing it through stdin
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory
       --show-source
           Show violations with source code
       --respect-gitignore
@@ -357,12 +362,6 @@ Options:
           Enforce exclusions, even for paths passed to Ruff directly on the command-line
       --update-check
           Enable or disable automatic update checks
-      --show-files
-          See the files Ruff will be run against with the current settings
-      --show-settings
-          See the settings Ruff will use to check a given Python file
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
       --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
           Regular expression matching the name of dummy variables
       --target-version <TARGET_VERSION>
@@ -371,17 +370,22 @@ Options:
           Set the line-length for length-associated checks and automatic formatting
       --max-complexity <MAX_COMPLEXITY>
           Maximum McCabe complexity allowed for a given function
-      --stdin-filename <STDIN_FILENAME>
-          The name of the file when passing it through stdin
+      --add-noqa
+          Enable automatic additions of `noqa` directives to failing lines
+      --clean
+          Clear any caches in the current directory or any subdirectories
       --explain <EXPLAIN>
           Explain a rule
-      --cache-dir <CACHE_DIR>
-          Path to the cache directory
+      --show-files
+          See the files Ruff will be run against with the current settings
+      --show-settings
+          See the settings Ruff will use to check a given Python file
   -h, --help
           Print help information
   -V, --version
           Print version information
 ```
+<!-- End auto-generated cli help. -->
 
 ### `pyproject.toml` discovery
 
@@ -541,7 +545,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |  |
 | F622 | TwoStarredExpressions | Two starred expressions in assignment |  |
 | F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |  |
-| F632 | IsLiteral | Use `==` and `!=` to compare constant literals | 🛠 |
+| F632 | IsLiteral | Use `==` to compare constant literals | 🛠 |
 | F633 | InvalidPrintSyntax | Use of `>>` is invalid with `print` function |  |
 | F634 | IfTuple | If test is a tuple, which is always `True` |  |
 | F701 | BreakOutsideLoop | `break` outside loop |  |
@@ -554,7 +558,6 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F821 | UndefinedName | Undefined name `...` |  |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |  |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
-| F831 | DuplicateArgumentName | Duplicate argument name in function definition |  |
 | F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
 | F842 | UnusedAnnotation | Local variable `...` is annotated but never used |  |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
@@ -574,7 +577,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E714 | NotIsTest | Test for object identity should be `is not` | 🛠 |
 | E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
 | E722 | DoNotUseBareExcept | Do not use bare `except` |  |
-| E731 | DoNotAssignLambda | Do not assign a lambda expression, use a def | 🛠 |
+| E731 | DoNotAssignLambda | Do not assign a `lambda` expression, use a `def` | 🛠 |
 | E741 | AmbiguousVariableName | Ambiguous variable name: `...` |  |
 | E742 | AmbiguousClassName | Ambiguous class name: `...` |  |
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
@@ -659,7 +662,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | ---- | ---- | ------- | --- |
 | UP001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
 | UP003 | TypeOfPrimitive | Use `str` instead of `type(...)` | 🛠 |
-| UP004 | UselessObjectInheritance | Class `...` inherits from object | 🛠 |
+| UP004 | UselessObjectInheritance | Class `...` inherits from `object` | 🛠 |
 | UP005 | DeprecatedUnittestAlias | `assertEquals` is deprecated, use `assertEqual` | 🛠 |
 | UP006 | UsePEP585Annotation | Use `list` instead of `List` for type annotations | 🛠 |
 | UP007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
@@ -673,7 +676,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
 | UP016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
 | UP017 | DatetimeTimezoneUTC | Use `datetime.UTC` alias | 🛠 |
-| UP018 | NativeLiterals | Unnecessary call to `str` and `bytes` | 🛠 |
+| UP018 | NativeLiterals | Unnecessary call to `str` | 🛠 |
 | UP019 | TypingTextStrAlias | `typing.Text` is deprecated, use `str` | 🛠 |
 | UP020 | OpenAlias | Use builtin `open` | 🛠 |
 | UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
@@ -1015,7 +1018,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | ---- | ---- | ------- | --- |
 | RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
-| RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) |  |
+| RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '𝐁' (did you mean 'B'?) | 🛠 |
 | RUF004 | KeywordArgumentBeforeStarArgument | Keyword argument `...` must come after starred arguments |  |
 | RUF100 | UnusedNOQA | Unused blanket `noqa` directive | 🛠 |
 
@@ -1670,7 +1673,6 @@ Summary
 
 <!-- Sections automatically generated by `cargo dev generate-options`. -->
 <!-- Begin auto-generated options sections. -->
-
 #### [`allowed-confusables`](#allowed-confusables)
 
 A list of allowed "confusable" Unicode characters to ignore when

@@ -15,18 +15,17 @@ mod tests {
 
     #[test]
     fn defaults() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
             &Settings::for_rule(CheckCode::ICN001),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("defaults", checks);
         Ok(())
     }
 
     #[test]
     fn custom() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/custom.py"),
             &Settings {
                 flake8_import_conventions: flake8_import_conventions::settings::Options {
@@ -40,14 +39,13 @@ mod tests {
                 ..Settings::for_rule(CheckCode::ICN001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("custom", checks);
         Ok(())
     }
 
     #[test]
     fn remove_defaults() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/remove_default.py"),
             &Settings {
                 flake8_import_conventions: flake8_import_conventions::settings::Options {
@@ -63,14 +61,13 @@ mod tests {
                 ..Settings::for_rule(CheckCode::ICN001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("remove_default", checks);
         Ok(())
     }
 
     #[test]
     fn override_defaults() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/override_default.py"),
             &Settings {
                 flake8_import_conventions: flake8_import_conventions::settings::Options {
@@ -84,7 +81,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::ICN001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("override_default", checks);
         Ok(())
     }
