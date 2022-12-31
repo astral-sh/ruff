@@ -1037,7 +1037,7 @@ SubscriptList: ast::Expr = {
 };
 
 Subscript: ast::Expr = {
-    Test<"all">,
+    NamedExpressionTest,
     <location:@L> <e1:Test<"all">?> ":" <e2:Test<"all">?> <e3:SliceOp?> <end_location:@R> => {
         let lower = e1.map(Box::new);
         let upper = e2.map(Box::new);
@@ -1199,7 +1199,7 @@ Atom<Goal>: ast::Expr = {
         custom: (),
         node: ast::ExprKind::Set { elts }
     },
-    <location:@L> "{" <elt:Test<"all">> <generators:CompFor> "}" <end_location:@R> => {
+    <location:@L> "{" <elt:NamedExpressionTest> <generators:CompFor> "}" <end_location:@R> => {
         ast::Expr {
             location,
             end_location: Some(end_location),
