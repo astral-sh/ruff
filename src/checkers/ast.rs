@@ -178,12 +178,6 @@ impl<'a> Checker<'a> {
         matches!(self.autofix, flags::Autofix::Enabled) && self.settings.fixable.contains(code)
     }
 
-    /// Return the amended `Range` from a `Located`.
-    pub fn range_for<T>(&self, located: &Located<T>) -> Range {
-        // If we're in an f-string, override the location.
-        Range::from_located(located)
-    }
-
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
         let call_path = dealias_call_path(collect_call_paths(expr), &self.import_aliases);
