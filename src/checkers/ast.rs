@@ -266,16 +266,17 @@ where
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
+                let ranges = helpers::find_names(stmt, self.locator);
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Global,
                             used: usage,
-                            range: Range::from_located(stmt),
+                            range: *range,
                             source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
@@ -286,8 +287,9 @@ where
                     self.add_checks(
                         names
                             .iter()
-                            .filter_map(|name| {
-                                pycodestyle::checks::ambiguous_variable_name(name, stmt)
+                            .zip(ranges.iter())
+                            .filter_map(|(name, range)| {
+                                pycodestyle::checks::ambiguous_variable_name(name, *range)
                             })
                             .into_iter(),
                     );
@@ -295,16 +297,17 @@ where
             }
             StmtKind::Nonlocal { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
+                let ranges = helpers::find_names(stmt, self.locator);
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
                             used: usage,
-                            range: Range::from_located(stmt),
+                            range: *range,
                             source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
@@ -312,7 +315,7 @@ where
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         let mut exists = false;
                         for index in self.scope_stack.iter().skip(1).rev().skip(1) {
                             if let Some(index) = self.scopes[*index].values.get(&name.as_str()) {
@@ -326,7 +329,7 @@ where
                             if self.settings.enabled.contains(&CheckCode::PLE0117) {
                                 self.add_check(Check::new(
                                     CheckKind::NonlocalWithoutBinding(name.to_string()),
-                                    Range::from_located(stmt),
+                                    *range,
                                 ));
                             }
                         }
@@ -337,8 +340,9 @@ where
                     self.add_checks(
                         names
                             .iter()
-                            .filter_map(|name| {
-                                pycodestyle::checks::ambiguous_variable_name(name, stmt)
+                            .zip(ranges.iter())
+                            .filter_map(|(name, range)| {
+                                pycodestyle::checks::ambiguous_variable_name(name, *range)
                             })
                             .into_iter(),
                     );
@@ -1543,9 +1547,10 @@ where
                     }
                     ExprContext::Store => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) =
-                                pycodestyle::checks::ambiguous_variable_name(id, expr)
-                            {
+                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                                id,
+                                Range::from_located(expr),
+                            ) {
                                 self.add_check(check);
                             }
                         }
@@ -2715,9 +2720,11 @@ where
                 match name {
                     Some(name) => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) =
-                                pycodestyle::checks::ambiguous_variable_name(name, excepthandler)
-                            {
+                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                                name,
+                                helpers::excepthandler_name_range(excepthandler, self.locator)
+                                    .expect("Failed to find `name` range"),
+                            ) {
                                 self.add_check(check);
                             }
                         }
@@ -2834,7 +2841,10 @@ where
         );
 
         if self.settings.enabled.contains(&CheckCode::E741) {
-            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(&arg.node.arg, arg) {
+            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                &arg.node.arg,
+                Range::from_located(arg),
+            ) {
                 self.add_check(check);
             }
         }
