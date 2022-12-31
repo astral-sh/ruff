@@ -336,15 +336,15 @@ fn print_message(message: &Message) {
     );
     println!("{label}");
     if let Some(source) = &message.source {
-        let commit = message.kind.commit().unwrap_or_default();
-        let footer = if commit.is_empty() {
-            vec![]
-        } else {
+        let commit = message.kind.commit();
+        let footer = if commit.is_some() {
             vec![Annotation {
                 id: None,
-                label: Some(commit.as_str()),
+                label: commit.as_deref(),
                 annotation_type: AnnotationType::Help,
             }]
+        } else {
+            vec![]
         };
 
         let snippet = Snippet {
@@ -395,6 +395,17 @@ fn print_grouped_message(message: &Message, row_length: usize, column_length: us
     );
     println!("{label}");
     if let Some(source) = &message.source {
+        let commit = message.kind.commit();
+        let footer = if commit.is_some() {
+            vec![Annotation {
+                id: None,
+                label: commit.as_deref(),
+                annotation_type: AnnotationType::Help,
+            }]
+        } else {
+            vec![]
+        };
+
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -402,7 +413,7 @@ fn print_grouped_message(message: &Message, row_length: usize, column_length: us
                 // The ID (error number) is already encoded in the `label`.
                 id: None,
             }),
-            footer: vec![],
+            footer,
             slices: vec![Slice {
                 source: &source.contents,
                 line_start: message.location.row(),
