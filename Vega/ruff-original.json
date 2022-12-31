@@ -1,0 +1,130 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {
+    "values": [
+      { "tool": "ruff", "time": 0.4693, "timeFormat": "0.46s" },
+      { "tool": "autoflake", "time": 8.027, "timeFormat": "8.03s" },
+      { "tool": "flake8 + spawn", "time": 12.794, "timeFormat": "12.80s" },
+      { "tool": "pylint", "time": 27.211, "timeFormat": "27.21" },
+      { "tool": "pyflakes", "time": 27.309, "timeFormat": "27.31" },
+      { "tool": "pycodestyle", "time": 41.166, "timeFormat": "41.17s" },
+      { "tool": "flake8", "time": 75.7, "timeFormat": "75.70s" }
+    ]
+  },
+  "config": {
+    "params": [
+      {
+        "name": "defaultFont",
+        "value": "-apple-system,BlinkMacSystemFont,\"Segoe UI\",Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\""
+      },
+      { "name": "titleColor", "value": "#333333" },
+      { "name": "labelColor", "value": "#333333" }
+    ],
+    "header": {
+      "labelFont": { "expr": "defaultFont" },
+      "titleFont": { "expr": "defaultFont" },
+      "titleFontWeight": 500
+    },
+    "text": {
+      "font": { "expr": "defaultFont" },
+      "color": { "expr": "labelColor" }
+    },
+    "mark": {
+      "font": { "expr": "defaultFont" },
+      "color": { "expr": "labelColor" }
+    },
+    "title": {
+      "font": { "expr": "defaultFont" },
+      "subtitleFont": { "expr": "defaultFont" },
+      "fontWeight": 500
+    },
+    "axis": {
+      "labelColor": { "expr": "labelColor" },
+      "labelFont": { "expr": "defaultFont" },
+      "titleFont": { "expr": "defaultFont" },
+      "titleFontWeight": 500,
+      "titleColor": { "expr": "titleColor" },
+      "titleFontSize": 12
+    },
+    "legend": {
+      "titleFontWeight": 500,
+      "titleColor": { "expr": "titleColor" },
+      "titleFontSize": 12,
+      "labelColor": { "expr": "labelColor" },
+      "labelFont": { "expr": "defaultFont" },
+      "titleFont": { "expr": "defaultFont" }
+    },
+    "view": { "stroke": null },
+    "background": "transparent"
+  },
+  "background": "transparent",
+  "encoding": {
+    "y": {
+      "field": "tool",
+      "type": "nominal",
+      "axis": {
+        "grid": false,
+        "title": null,
+        "labelFontSize": 12,
+        "ticks": false,
+        "labelPadding": 10,
+        "domain": false
+      },
+      "sort": null
+    },
+    "x": {
+      "field": "time",
+      "type": "quantitative",
+      "axis": {
+        "title": null,
+        "labelExpr": "datum.value + 's'",
+        "tickCount": 3,
+        "tickSize": 0,
+        "labelPadding": 6,
+        "labelAlign": "center",
+        "labelFontSize": 12,
+        "tickColor": "rgba(127,127,127,0.25)",
+        "gridColor": "rgba(127,127,127,0.25)",
+        "domain": false
+      }
+    }
+  },
+  "height": 140,
+  "width": "container",
+  "layer": [
+    {
+      "mark": "bar",
+      "encoding": {
+        "size": { "value": 13 },
+        "color": { "value": "#E15759" }
+      }
+    },
+    {
+      "transform": [{ "filter": "datum.tool !== 'ruff'" }],
+      "mark": {
+        "type": "text",
+        "align": "left",
+        "baseline": "middle",
+        "dx": 6,
+        "fontSize": 12
+      },
+      "encoding": {
+        "text": { "field": "timeFormat" }
+      }
+    },
+    {
+      "transform": [{ "filter": "datum.tool === 'ruff'" }],
+      "mark": {
+        "type": "text",
+        "align": "left",
+        "baseline": "middle",
+        "dx": 6,
+        "fontSize": 12,
+        "fontWeight": "bold"
+      },
+      "encoding": {
+        "text": { "field": "timeFormat" }
+      }
+    }
+  ]
+}
