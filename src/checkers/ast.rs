@@ -2767,10 +2767,6 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        if self.settings.enabled.contains(&CheckCode::F831) {
-            self.checks
-                .extend(pyflakes::checks::duplicate_arguments(arguments));
-        }
         if self.settings.enabled.contains(&CheckCode::B006) {
             flake8_bugbear::plugins::mutable_argument_default(self, arguments);
         }

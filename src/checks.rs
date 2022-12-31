@@ -92,7 +92,6 @@ pub enum CheckCode {
     F821,
     F822,
     F823,
-    F831,
     F841,
     F842,
     F901,
@@ -730,7 +729,6 @@ pub enum CheckKind {
     BreakOutsideLoop,
     ContinueOutsideLoop,
     DefaultExceptNotLast,
-    DuplicateArgumentName,
     ExpressionsInStarAssignment,
     FStringMissingPlaceholders,
     ForwardAnnotationSyntaxError(String),
@@ -1134,7 +1132,6 @@ impl CheckCode {
             CheckCode::F821 => CheckKind::UndefinedName("...".to_string()),
             CheckCode::F822 => CheckKind::UndefinedExport("...".to_string()),
             CheckCode::F823 => CheckKind::UndefinedLocal("...".to_string()),
-            CheckCode::F831 => CheckKind::DuplicateArgumentName,
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F842 => CheckKind::UnusedAnnotation("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
@@ -1631,7 +1628,6 @@ impl CheckCode {
             CheckCode::F821 => CheckCategory::Pyflakes,
             CheckCode::F822 => CheckCategory::Pyflakes,
             CheckCode::F823 => CheckCategory::Pyflakes,
-            CheckCode::F831 => CheckCategory::Pyflakes,
             CheckCode::F841 => CheckCategory::Pyflakes,
             CheckCode::F842 => CheckCategory::Pyflakes,
             CheckCode::F901 => CheckCategory::Pyflakes,
@@ -1768,7 +1764,6 @@ impl CheckKind {
             CheckKind::DefaultExceptNotLast => &CheckCode::F707,
             CheckKind::DoNotAssignLambda(..) => &CheckCode::E731,
             CheckKind::DoNotUseBareExcept => &CheckCode::E722,
-            CheckKind::DuplicateArgumentName => &CheckCode::F831,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
             CheckKind::ForwardAnnotationSyntaxError(..) => &CheckCode::F722,
             CheckKind::FutureFeatureNotDefined(..) => &CheckCode::F407,
@@ -2114,9 +2109,6 @@ impl CheckKind {
                 "Do not assign a `lambda` expression, use a `def`".to_string()
             }
             CheckKind::DoNotUseBareExcept => "Do not use bare `except`".to_string(),
-            CheckKind::DuplicateArgumentName => {
-                "Duplicate argument name in function definition".to_string()
-            }
             CheckKind::ForwardAnnotationSyntaxError(body) => {
                 format!("Syntax error in forward annotation: `{body}`")
             }

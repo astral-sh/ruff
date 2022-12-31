@@ -1,9 +1,8 @@
 use std::string::ToString;
 
 use regex::Regex;
-use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
-    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
+    Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
@@ -123,40 +122,6 @@ pub fn default_except_not_last(handlers: &[Excepthandler]) -> Option<Check> {
     }
 
     None
-}
-
-/// F831
-pub fn duplicate_arguments(arguments: &Arguments) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
-
-    // Collect all the arguments into a single vector.
-    let mut all_arguments: Vec<&Arg> = arguments
-        .args
-        .iter()
-        .chain(arguments.posonlyargs.iter())
-        .chain(arguments.kwonlyargs.iter())
-        .collect();
-    if let Some(arg) = &arguments.vararg {
-        all_arguments.push(arg);
-    }
-    if let Some(arg) = &arguments.kwarg {
-        all_arguments.push(arg);
-    }
-
-    // Search for duplicates.
-    let mut idents: FxHashSet<&str> = FxHashSet::default();
-    for arg in all_arguments {
-        let ident = &arg.node.arg;
-        if idents.contains(ident.as_str()) {
-            checks.push(Check::new(
-                CheckKind::DuplicateArgumentName,
-                Range::from_located(arg),
-            ));
-        }
-        idents.insert(ident);
-    }
-
-    checks
 }
 
 #[derive(Debug, PartialEq)]
