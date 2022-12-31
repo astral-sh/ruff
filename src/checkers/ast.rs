@@ -582,9 +582,12 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N818) {
-                    if let Some(check) =
-                        pep8_naming::checks::error_suffix_on_exception_name(stmt, bases, name)
-                    {
+                    if let Some(check) = pep8_naming::checks::error_suffix_on_exception_name(
+                        stmt,
+                        bases,
+                        name,
+                        self.locator,
+                    ) {
                         self.add_check(check);
                     }
                 }
