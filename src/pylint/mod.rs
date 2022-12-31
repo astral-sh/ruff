@@ -31,13 +31,12 @@ mod tests {
     #[test_case(CheckCode::PLW0602, Path::new("global_variable_not_assigned.py"); "PLW0602")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pylint")
                 .join(path)
                 .as_path(),
             &Settings::for_rules(vec![check_code]),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }

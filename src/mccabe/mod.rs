@@ -17,14 +17,13 @@ mod tests {
     #[test_case(10)]
     fn max_complexity_zero(max_complexity: usize) -> Result<()> {
         let snapshot = format!("max_complexity_{max_complexity}");
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/mccabe/C901.py"),
             &Settings {
                 mccabe: mccabe::settings::Settings { max_complexity },
                 ..Settings::for_rules(vec![CheckCode::C901])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }

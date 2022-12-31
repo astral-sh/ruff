@@ -510,7 +510,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
         &locator,
         directives::Flags::from_settings(settings),
     );
-    check_path(
+    let mut checks = check_path(
         path,
         None,
         &contents,
@@ -521,5 +521,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
         settings,
         flags::Autofix::Enabled,
         flags::Noqa::Enabled,
-    )
+    )?;
+    checks.sort_by_key(|check| check.location);
+    Ok(checks)
 }
