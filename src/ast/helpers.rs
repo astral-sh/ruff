@@ -437,7 +437,7 @@ pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
             let body_end = body.last().unwrap().end_location.unwrap();
             let contents = locator.slice_source_code_range(&Range {
                 location: body_end,
-                end_location: orelse.first().unwrap().location,
+                end_location: orelse[0].location,
             });
             let range = lexer::make_tokenizer_located(&contents, body_end)
                 .flatten()
