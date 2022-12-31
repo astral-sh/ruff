@@ -6,20 +6,20 @@ expression: checks
     ErrorSuffixOnExceptionName: C
   location:
     row: 9
-    column: 0
+    column: 6
   end_location:
-    row: 10
-    column: 8
+    row: 9
+    column: 7
   fix: ~
   parent: ~
 - kind:
     ErrorSuffixOnExceptionName: E
   location:
     row: 17
-    column: 0
+    column: 6
   end_location:
-    row: 18
-    column: 8
+    row: 17
+    column: 7
   fix: ~
   parent: ~
 
