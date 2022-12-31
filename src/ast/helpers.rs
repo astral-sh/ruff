@@ -426,7 +426,7 @@ pub fn excepthandler_name_range(
     }
 }
 
-/// Return the range of `else` in For, AsyncFor, or While statements.
+/// Return the range of `else` in `For`, `AsyncFor`, or `While` statements.
 pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
     match &stmt.node {
         StmtKind::For { body, orelse, .. }
