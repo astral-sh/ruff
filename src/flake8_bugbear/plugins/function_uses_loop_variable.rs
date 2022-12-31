@@ -12,8 +12,6 @@ use crate::checks::{Check, CheckKind};
 struct LoadedNamesVisitor<'a> {
     // Tuple of: name, defining expression, and defining range.
     names: Vec<(&'a str, &'a Expr, Range)>,
-    // If we're in an f-string, the range of the defining expression.
-    in_f_string: Option<Range>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -24,18 +22,10 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
             ExprKind::JoinedStr { .. } => {
-                let prev_in_f_string = self.in_f_string;
-                self.in_f_string = Some(Range::from_located(expr));
                 visitor::walk_expr(self, expr);
-                self.in_f_string = prev_in_f_string;
             }
             ExprKind::Name { id, ctx } if matches!(ctx, ExprContext::Load) => {
-                self.names.push((
-                    id,
-                    expr,
-                    self.in_f_string
-                        .unwrap_or_else(|| Range::from_located(expr)),
-                ));
+                self.names.push((id, expr, Range::from_located(expr)));
             }
             _ => visitor::walk_expr(self, expr),
         }

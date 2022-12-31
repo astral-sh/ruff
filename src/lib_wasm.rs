@@ -2,10 +2,9 @@ use std::path::Path;
 
 use rustpython_ast::Location;
 use rustpython_parser::lexer::LexResult;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
-use crate::autofix::Fix;
 use crate::checks::CheckCode;
 use crate::checks_gen::CheckCodePrefix;
 use crate::linter::check_path;
@@ -39,6 +38,7 @@ export interface Check {
     };
     fix: {
         content: string;
+        message: string | null;
         location: {
             row: number;
             column: number;
@@ -51,13 +51,21 @@ export interface Check {
 };
 "#;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Message {
+#[derive(Serialize)]
+struct ExpandedMessage {
     code: CheckCode,
     message: String,
     location: Location,
     end_location: Location,
-    fix: Option<Fix>,
+    fix: Option<ExpandedFix>,
+}
+
+#[derive(Serialize)]
+struct ExpandedFix {
+    content: String,
+    message: Option<String>,
+    location: Location,
+    end_location: Location,
 }
 
 #[wasm_bindgen(start)]
@@ -161,14 +169,19 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     )
     .map_err(|e| e.to_string())?;
 
-    let messages: Vec<Message> = checks
+    let messages: Vec<ExpandedMessage> = checks
         .into_iter()
-        .map(|check| Message {
+        .map(|check| ExpandedMessage {
             code: check.kind.code().clone(),
             message: check.kind.body(),
             location: check.location,
             end_location: check.end_location,
-            fix: check.fix,
+            fix: check.fix.map(|fix| ExpandedFix {
+                content: fix.content,
+                message: check.kind.commit(),
+                location: fix.location,
+                end_location: fix.end_location,
+            }),
         })
         .collect();
 
@@ -200,7 +213,7 @@ mod test {
         check!(
             "if (1, 2): pass",
             r#"{}"#,
-            [Message {
+            [ExpandedMessage {
                 code: CheckCode::F634,
                 message: "If test is a tuple, which is always `True`".to_string(),
                 location: Location::new(1, 0),

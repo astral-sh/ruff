@@ -28,7 +28,7 @@ mod tests {
             &locator,
             directives::Flags::from_settings(&settings),
         );
-        let mut checks = check_path(
+        let checks = check_path(
             Path::new("<filename>"),
             None,
             &contents,
@@ -40,7 +40,6 @@ mod tests {
             flags::Autofix::Enabled,
             flags::Noqa::Enabled,
         )?;
-        checks.sort_by_key(|check| check.location);
         let actual = checks
             .iter()
             .map(|check| check.kind.code().clone())

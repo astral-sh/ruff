@@ -246,6 +246,7 @@ pub fn error_suffix_on_exception_name(
     class_def: &Stmt,
     bases: &[Expr],
     name: &str,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     if !bases.iter().any(|base| {
         if let ExprKind::Name { id, .. } = &base.node {
@@ -262,6 +263,6 @@ pub fn error_suffix_on_exception_name(
     }
     Some(Check::new(
         CheckKind::ErrorSuffixOnExceptionName(name.to_string()),
-        Range::from_located(class_def),
+        identifier_range(class_def, locator),
     ))
 }

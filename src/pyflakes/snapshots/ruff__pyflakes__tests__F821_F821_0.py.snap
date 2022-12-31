@@ -66,20 +66,20 @@ expression: checks
     UndefinedName: B
   location:
     row: 87
-    column: 4
+    column: 7
   end_location:
     row: 87
-    column: 10
+    column: 8
   fix: ~
   parent: ~
 - kind:
     UndefinedName: B
   location:
-    row: 89
-    column: 4
+    row: 90
+    column: 7
   end_location:
     row: 90
-    column: 10
+    column: 8
   fix: ~
   parent: ~
 - kind:

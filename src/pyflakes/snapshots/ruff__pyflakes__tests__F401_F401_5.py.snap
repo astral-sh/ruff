@@ -6,6 +6,7 @@ expression: checks
     UnusedImport:
       - a.b.c
       - false
+      - false
   location:
     row: 2
     column: 16
@@ -24,6 +25,7 @@ expression: checks
 - kind:
     UnusedImport:
       - d.e.f
+      - false
       - false
   location:
     row: 3
@@ -44,6 +46,7 @@ expression: checks
     UnusedImport:
       - h.i
       - false
+      - false
   location:
     row: 4
     column: 7
@@ -62,6 +65,7 @@ expression: checks
 - kind:
     UnusedImport:
       - j.k
+      - false
       - false
   location:
     row: 5

@@ -63,6 +63,7 @@ fn test_stdin_json() -> Result<()> {
     "message": "`os` imported but unused",
     "fix": {
       "content": "",
+      "message": "Remove unused import: `os`",
       "location": {
         "row": 1,
         "column": 0

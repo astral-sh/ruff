@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
 /// T201, T203
-pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr, keywords: &[Keyword]) {
+pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
     let mut check = {
         let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
         if match_call_path(&call_path, "", "print", &checker.from_imports) {
@@ -27,9 +27,9 @@ pub fn print_call(checker: &mut Checker, expr: &Expr, func: &Expr, keywords: &[K
                     }
                 }
             }
-            Check::new(CheckKind::PrintFound, Range::from_located(expr))
+            Check::new(CheckKind::PrintFound, Range::from_located(func))
         } else if match_call_path(&call_path, "pprint", "pprint", &checker.from_imports) {
-            Check::new(CheckKind::PPrintFound, Range::from_located(expr))
+            Check::new(CheckKind::PPrintFound, Range::from_located(func))
         } else {
             return;
         }

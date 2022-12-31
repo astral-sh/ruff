@@ -22,7 +22,11 @@ pub fn main(cli: &Cli) -> Result<()> {
     let python_ast = parser::parse_program(&contents, &cli.file.to_string_lossy())?;
     let locator = SourceCodeLocator::new(&contents);
     let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
-    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
+    let mut generator = SourceCodeGenerator::new(
+        stylist.indentation(),
+        stylist.quote(),
+        stylist.line_ending(),
+    );
     generator.unparse_suite(&python_ast);
     println!("{}", generator.generate()?);
     Ok(())
