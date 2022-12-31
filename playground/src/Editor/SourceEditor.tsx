@@ -57,7 +57,7 @@ export default function SourceEditor({
             .filter((check) => check.fix)
             .map((check) => ({
               title: check.fix
-                ? check.fix.message ?? `Fix ${check.code}`
+                ? `${check.code}: ${check.fix.message}` ?? `Fix ${check.code}`
                 : "Autofix",
               id: `fix-${check.code}`,
               kind: "quickfix",
