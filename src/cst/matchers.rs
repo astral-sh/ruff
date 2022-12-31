@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use libcst_native::{Expr, Module, SmallStatement, Statement, Import, ImportFrom};
+use libcst_native::{Expr, Import, ImportFrom, Module, SmallStatement, Statement};
 
 pub fn match_module(module_text: &str) -> Result<Module> {
     match libcst_native::parse_module(module_text, None) {
