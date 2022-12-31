@@ -7,14 +7,27 @@ use crate::{
 };
 use std::{iter, mem, str};
 
-struct FStringParser {
+struct FStringParser<'a> {
+    chars: iter::Peekable<str::Chars<'a>>,
     str_start: Location,
     str_end: Location,
 }
 
-impl FStringParser {
-    fn new(str_start: Location, str_end: Location) -> Self {
-        Self { str_start, str_end }
+impl<'a> FStringParser<'a> {
+    fn new(source: &'a str, str_start: Location, str_end: Location) -> Self {
+        Self {
+            chars: source.chars().peekable(),
+            str_start,
+            str_end,
+        }
+    }
+
+    fn next_char(&mut self) -> Option<char> {
+        self.chars.next()
+    }
+
+    fn peek(&mut self) -> Option<&char> {
+        self.chars.peek()
     }
 
     #[inline]
@@ -22,11 +35,7 @@ impl FStringParser {
         Expr::new(self.str_start, self.str_end, node)
     }
 
-    fn parse_formatted_value<'a>(
-        &mut self,
-        mut chars: iter::Peekable<str::Chars<'a>>,
-        nested: u8,
-    ) -> Result<(Vec<Expr>, iter::Peekable<str::Chars<'a>>), FStringErrorType> {
+    fn parse_formatted_value(&mut self, nested: u8) -> Result<Vec<Expr>, FStringErrorType> {
         let mut expression = String::new();
         let mut spec = None;
         let mut delims = Vec::new();
@@ -34,36 +43,36 @@ impl FStringParser {
         let mut self_documenting = false;
         let mut trailing_seq = String::new();
 
-        while let Some(ch) = chars.next() {
+        while let Some(ch) = self.next_char() {
             match ch {
                 // can be integrated better with the remainign code, but as a starting point ok
                 // in general I would do here a tokenizing of the fstrings to omit this peeking.
-                '!' if chars.peek() == Some(&'=') => {
+                '!' if self.peek() == Some(&'=') => {
                     expression.push_str("!=");
-                    chars.next();
+                    self.next_char();
                 }
 
-                '=' if chars.peek() == Some(&'=') => {
+                '=' if self.peek() == Some(&'=') => {
                     expression.push_str("==");
-                    chars.next();
+                    self.next_char();
                 }
 
-                '>' if chars.peek() == Some(&'=') => {
+                '>' if self.peek() == Some(&'=') => {
                     expression.push_str(">=");
-                    chars.next();
+                    self.next_char();
                 }
 
-                '<' if chars.peek() == Some(&'=') => {
+                '<' if self.peek() == Some(&'=') => {
                     expression.push_str("<=");
-                    chars.next();
+                    self.next_char();
                 }
 
-                '!' if delims.is_empty() && chars.peek() != Some(&'=') => {
+                '!' if delims.is_empty() && self.peek() != Some(&'=') => {
                     if expression.trim().is_empty() {
                         return Err(EmptyExpression);
                     }
 
-                    conversion = match chars.next() {
+                    conversion = match self.next_char() {
                         Some('s') => ConversionFlag::Str,
                         Some('a') => ConversionFlag::Ascii,
                         Some('r') => ConversionFlag::Repr,
@@ -83,7 +92,7 @@ impl FStringParser {
                         }
                     };
 
-                    if let Some(&peek) = chars.peek() {
+                    if let Some(&peek) = self.peek() {
                         if peek != '}' && peek != ':' {
                             return Err(if expression.trim().is_empty() {
                                 EmptyExpression
@@ -102,17 +111,16 @@ impl FStringParser {
 
                 // match a python 3.8 self documenting expression
                 // format '{' PYTHON_EXPRESSION '=' FORMAT_SPECIFIER? '}'
-                '=' if chars.peek() != Some(&'=') && delims.is_empty() => {
+                '=' if self.peek() != Some(&'=') && delims.is_empty() => {
                     self_documenting = true;
                 }
 
                 ':' if delims.is_empty() => {
-                    let (parsed_spec, remaining_chars) = self.parse_spec(chars, nested)?;
+                    let parsed_spec = self.parse_spec(nested)?;
 
                     spec = Some(Box::new(self.expr(ExprKind::JoinedStr {
                         values: parsed_spec,
                     })));
-                    chars = remaining_chars;
                 }
                 '(' | '{' | '[' => {
                     expression.push(ch);
@@ -195,20 +203,18 @@ impl FStringParser {
                             }),
                         ]
                     };
-                    return Ok((ret, chars));
+                    return Ok(ret);
                 }
                 '"' | '\'' => {
                     expression.push(ch);
-                    let mut string_ended = false;
-                    for next in &mut chars {
-                        expression.push(next);
-                        if next == ch {
-                            string_ended = true;
+                    loop {
+                        let Some(c) = self.next_char() else {
+                            return Err(UnterminatedString);
+                        };
+                        expression.push(c);
+                        if c == ch {
                             break;
                         }
-                    }
-                    if !string_ended {
-                        return Err(UnterminatedString);
                     }
                 }
                 ' ' if self_documenting => {
@@ -231,14 +237,10 @@ impl FStringParser {
         })
     }
 
-    fn parse_spec<'a>(
-        &mut self,
-        mut chars: iter::Peekable<str::Chars<'a>>,
-        nested: u8,
-    ) -> Result<(Vec<Expr>, iter::Peekable<str::Chars<'a>>), FStringErrorType> {
+    fn parse_spec(&mut self, nested: u8) -> Result<Vec<Expr>, FStringErrorType> {
         let mut spec_constructor = Vec::new();
         let mut constant_piece = String::new();
-        while let Some(&next) = chars.peek() {
+        while let Some(&next) = self.peek() {
             match next {
                 '{' => {
                     if !constant_piece.is_empty() {
@@ -248,9 +250,8 @@ impl FStringParser {
                         }));
                         constant_piece.clear();
                     }
-                    let (parsed_expr, remaining_chars) = self.parse(chars, nested + 1)?;
+                    let parsed_expr = self.parse(nested + 1)?;
                     spec_constructor.extend(parsed_expr);
-                    chars = remaining_chars;
                     continue;
                 }
                 '}' => {
@@ -260,7 +261,7 @@ impl FStringParser {
                     constant_piece.push(next);
                 }
             }
-            chars.next();
+            self.next_char();
         }
         if !constant_piece.is_empty() {
             spec_constructor.push(self.expr(ExprKind::Constant {
@@ -269,14 +270,10 @@ impl FStringParser {
             }));
             constant_piece.clear();
         }
-        Ok((spec_constructor, chars))
+        Ok(spec_constructor)
     }
 
-    fn parse<'a>(
-        &mut self,
-        mut chars: iter::Peekable<str::Chars<'a>>,
-        nested: u8,
-    ) -> Result<(Vec<Expr>, iter::Peekable<str::Chars<'a>>), FStringErrorType> {
+    fn parse(&mut self, nested: u8) -> Result<Vec<Expr>, FStringErrorType> {
         if nested >= 2 {
             return Err(ExpressionNestedTooDeeply);
         }
@@ -284,14 +281,14 @@ impl FStringParser {
         let mut content = String::new();
         let mut values = vec![];
 
-        while let Some(&ch) = chars.peek() {
+        while let Some(&ch) = self.peek() {
             match ch {
                 '{' => {
-                    chars.next();
+                    self.next_char();
                     if nested == 0 {
-                        match chars.peek() {
+                        match self.peek() {
                             Some('{') => {
-                                chars.next();
+                                self.next_char();
                                 content.push('{');
                                 continue;
                             }
@@ -306,18 +303,16 @@ impl FStringParser {
                         }));
                     }
 
-                    let (parsed_values, remaining_chars) =
-                        self.parse_formatted_value(chars, nested)?;
+                    let parsed_values = self.parse_formatted_value(nested)?;
                     values.extend(parsed_values);
-                    chars = remaining_chars;
                 }
                 '}' => {
                     if nested > 0 {
                         break;
                     }
-                    chars.next();
-                    if let Some('}') = chars.peek() {
-                        chars.next();
+                    self.next_char();
+                    if let Some('}') = self.peek() {
+                        self.next_char();
                         content.push('}');
                     } else {
                         return Err(SingleRbrace);
@@ -325,7 +320,7 @@ impl FStringParser {
                 }
                 _ => {
                     content.push(ch);
-                    chars.next();
+                    self.next_char();
                 }
             }
         }
@@ -337,7 +332,7 @@ impl FStringParser {
             }))
         }
 
-        Ok((values, chars))
+        Ok(values)
     }
 }
 
@@ -353,9 +348,8 @@ pub fn parse_located_fstring(
     start: Location,
     end: Location,
 ) -> Result<Vec<Expr>, FStringError> {
-    FStringParser::new(start, end)
-        .parse(source.chars().peekable(), 0)
-        .map(|(e, _)| e)
+    FStringParser::new(source, start, end)
+        .parse(0)
         .map_err(|error| FStringError {
             error,
             location: start,
@@ -367,9 +361,7 @@ mod tests {
     use super::*;
 
     fn parse_fstring(source: &str) -> Result<Vec<Expr>, FStringErrorType> {
-        FStringParser::new(Location::default(), Location::default())
-            .parse(source.chars().peekable(), 0)
-            .map(|(e, _)| e)
+        FStringParser::new(source, Location::default(), Location::default()).parse(0)
     }
 
     #[test]
