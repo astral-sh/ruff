@@ -215,7 +215,20 @@ pub fn python_files_in_path(
     overrides: &Overrides,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
-    let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).collect();
+    let mut paths: Vec<PathBuf> = paths
+        .iter()
+        .filter_map(|path| {
+            if path.is_file() && !is_python_path(path) {
+                log::error!(
+                    "`{}` is not supported, Ruff only supports `.py` and `.pyi` files",
+                    path.to_str().unwrap()
+                );
+                None
+            } else {
+                Some(fs::normalize_path(path))
+            }
+        })
+        .collect();
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();

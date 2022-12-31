@@ -26,7 +26,7 @@ use crate::message::Message;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{cache, fs, packages, resolver};
+use crate::{cache, fs, one_time_warning, packages, resolver};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -41,6 +41,16 @@ pub fn run(
     let start = Instant::now();
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+
+    if paths.is_empty() {
+        one_time_warning!(
+            "{} {}",
+            "warning:".yellow().bold(),
+            "No Python files found under the given path(s)"
+        );
+        return Ok(Diagnostics::default());
+    }
+
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -182,6 +192,15 @@ pub fn add_noqa(
     let start = Instant::now();
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+
+    if paths.is_empty() {
+        one_time_warning!(
+            "{} {}",
+            "warning:".yellow().bold(),
+            "No Python files found under the given path(s)"
+        );
+        return Ok(0);
+    }
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -249,6 +268,15 @@ pub fn show_files(
     // Collect all files in the hierarchy.
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+
+    if paths.is_empty() {
+        one_time_warning!(
+            "{} {}",
+            "warning:".yellow().bold(),
+            "No Python files found under the given path(s)"
+        );
+        return Ok(());
+    }
 
     // Validate the `Settings` and return any errors.
     resolver.validate(pyproject_strategy)?;
