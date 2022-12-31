@@ -41,6 +41,8 @@ pub fn run(
     let start = Instant::now();
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+    let duration = start.elapsed();
+    debug!("Identified files to lint in: {:?}", duration);
 
     if paths.is_empty() {
         one_time_warning!(
@@ -50,9 +52,6 @@ pub fn run(
         );
         return Ok(Diagnostics::default());
     }
-
-    let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
 
     // Validate the `Settings` and return any errors.
     resolver.validate(pyproject_strategy)?;
@@ -192,6 +191,8 @@ pub fn add_noqa(
     let start = Instant::now();
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+    let duration = start.elapsed();
+    debug!("Identified files to lint in: {:?}", duration);
 
     if paths.is_empty() {
         one_time_warning!(
@@ -201,8 +202,6 @@ pub fn add_noqa(
         );
         return Ok(0);
     }
-    let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
 
     // Validate the `Settings` and return any errors.
     resolver.validate(pyproject_strategy)?;
