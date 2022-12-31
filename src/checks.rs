@@ -2850,14 +2850,13 @@ impl CheckKind {
             CheckKind::HardcodedBindAllInterfaces => {
                 "Possible binding to all interfaces".to_string()
             }
-            CheckKind::HardcodedPasswordString(string) => {
-                format!("Possible hardcoded password: `\"{string}\"`")
-            }
-            CheckKind::HardcodedPasswordFuncArg(string) => {
-                format!("Possible hardcoded password: `\"{string}\"`")
-            }
-            CheckKind::HardcodedPasswordDefault(string) => {
-                format!("Possible hardcoded password: `\"{string}\"`")
+            CheckKind::HardcodedPasswordString(string)
+            | CheckKind::HardcodedPasswordFuncArg(string)
+            | CheckKind::HardcodedPasswordDefault(string) => {
+                format!(
+                    "Possible hardcoded password: `\"{}\"`",
+                    string.escape_debug()
+                )
             }
             // flake8-blind-except
             CheckKind::BlindExcept(name) => format!("Do not catch blind exception: `{name}`"),
