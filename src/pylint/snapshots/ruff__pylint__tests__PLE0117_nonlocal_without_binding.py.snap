@@ -6,7 +6,7 @@ expression: checks
     NonlocalWithoutBinding: x
   location:
     row: 5
-    column: 4
+    column: 13
   end_location:
     row: 5
     column: 14
@@ -16,7 +16,7 @@ expression: checks
     NonlocalWithoutBinding: y
   location:
     row: 9
-    column: 4
+    column: 13
   end_location:
     row: 9
     column: 14
@@ -26,7 +26,7 @@ expression: checks
     NonlocalWithoutBinding: y
   location:
     row: 19
-    column: 8
+    column: 17
   end_location:
     row: 19
     column: 18

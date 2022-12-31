@@ -1,7 +1,7 @@
 use itertools::izip;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Constant, Excepthandler, Located, Location, Stmt, StmtKind};
+use rustpython_ast::{Constant, Excepthandler, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::helpers::except_range;
@@ -111,11 +111,11 @@ fn is_ambiguous_name(name: &str) -> bool {
 }
 
 /// E741
-pub fn ambiguous_variable_name<T>(name: &str, located: &Located<T>) -> Option<Check> {
+pub fn ambiguous_variable_name(name: &str, range: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousVariableName(name.to_string()),
-            Range::from_located(located),
+            range,
         ))
     } else {
         None

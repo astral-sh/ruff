@@ -106,7 +106,7 @@ expression: checks
     AmbiguousVariableName: l
   location:
     row: 25
-    column: 4
+    column: 11
   end_location:
     row: 25
     column: 12
@@ -136,7 +136,7 @@ expression: checks
     AmbiguousVariableName: l
   location:
     row: 33
-    column: 8
+    column: 17
   end_location:
     row: 33
     column: 18
@@ -236,10 +236,10 @@ expression: checks
     AmbiguousVariableName: l
   location:
     row: 71
-    column: 0
+    column: 21
   end_location:
-    row: 72
-    column: 8
+    row: 71
+    column: 22
   fix: ~
   parent: ~
 - kind:
