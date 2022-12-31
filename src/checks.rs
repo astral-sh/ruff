@@ -2728,9 +2728,6 @@ impl CheckKind {
             CheckKind::OSErrorAlias(..) => "Replace aliased errors with `OSError`".to_string(),
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             CheckKind::RewriteMockImport => "`mock` is deprecated, use `unittest.mock`".to_string(),
-            CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
-                format!("Convert `{name}` from `NamedTuple` functional to class syntax")
-            }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -3197,13 +3194,9 @@ impl CheckKind {
                 | CheckKind::RedundantTupleInExceptionHandler(..)
                 | CheckKind::RemoveSixCompat
                 | CheckKind::ReplaceStdoutStderr
-                | CheckKind::ReplaceStdoutStderr
                 | CheckKind::ReplaceUniversalNewlines
-                | CheckKind::ReplaceUniversalNewlines
-                | CheckKind::RewriteCElementTree
                 | CheckKind::RewriteCElementTree
                 | CheckKind::RewriteMockImport
-                | CheckKind::RewriteUnicodeLiteral
                 | CheckKind::RewriteUnicodeLiteral
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
