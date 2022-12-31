@@ -101,6 +101,15 @@ pub enum FStringErrorType {
     UnterminatedString,
 }
 
+impl FStringErrorType {
+    pub fn to_lexical_error(self, location: Location) -> LexicalError {
+        LexicalError {
+            error: LexicalErrorType::FStringError(self),
+            location,
+        }
+    }
+}
+
 impl fmt::Display for FStringErrorType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

@@ -11,7 +11,7 @@ expression: parse_ast
         end_location: Some(
             Location {
                 row: 1,
-                column: 22,
+                column: 11,
             },
         ),
         custom: (),
@@ -24,7 +24,7 @@ expression: parse_ast
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 22,
+                        column: 11,
                     },
                 ),
                 custom: (),
@@ -38,26 +38,7 @@ expression: parse_ast
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 22,
-                                },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Str(
-                                    "Hello world",
-                                ),
-                                kind: None,
-                            },
-                        },
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 9,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 22,
+                                    column: 11,
                                 },
                             ),
                             custom: (),
@@ -65,20 +46,18 @@ expression: parse_ast
                                 value: Located {
                                     location: Location {
                                         row: 1,
-                                        column: 17,
+                                        column: 6,
                                     },
                                     end_location: Some(
                                         Location {
                                             row: 1,
-                                            column: 20,
+                                            column: 7,
                                         },
                                     ),
                                     custom: (),
-                                    node: Constant {
-                                        value: Str(
-                                            "!",
-                                        ),
-                                        kind: None,
+                                    node: Name {
+                                        id: "x",
+                                        ctx: Load,
                                     },
                                 },
                                 conversion: 0,

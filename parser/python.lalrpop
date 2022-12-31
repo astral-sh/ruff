@@ -1353,16 +1353,9 @@ OneOrMore<T>: Vec<T> = {
 };
 
 Constant: ast::Constant = {
-    <b:bytes+> => ast::Constant::Bytes(b.into_iter().flatten().collect()),
     <value:int> => ast::Constant::Int(value),
     <value:float> => ast::Constant::Float(value),
     <s:complex> => ast::Constant::Complex { real: s.0, imag: s.1 },
-};
-
-Bytes: Vec<u8> = {
-    <s:bytes+> => {
-        s.into_iter().flatten().collect::<Vec<u8>>()
-    },
 };
 
 Identifier: String = <s:name> => s;
@@ -1462,8 +1455,11 @@ extern {
         int => lexer::Tok::Int { value: <BigInt> },
         float => lexer::Tok::Float { value: <f64> },
         complex => lexer::Tok::Complex { real: <f64>, imag: <f64> },
-        string => lexer::Tok::String { value: <String>, kind: <StringKind> },
-        bytes => lexer::Tok::Bytes { value: <Vec<u8>> },
+        string => lexer::Tok::String {
+            value: <String>,
+            kind: <StringKind>,
+            triple_quoted: <bool>
+        },
         name => lexer::Tok::Name { name: <String> },
         "\n" => lexer::Tok::Newline,
         ";" => lexer::Tok::Semi,

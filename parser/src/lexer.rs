@@ -2,8 +2,7 @@
 //!
 //! This means source code is translated into separate tokens.
 
-use super::token::StringKind;
-pub use super::token::Tok;
+pub use super::token::{StringKind, Tok};
 use crate::ast::Location;
 use crate::error::{LexicalError, LexicalErrorType};
 use num_bigint::BigInt;
@@ -217,9 +216,6 @@ where
     }
 }
 
-/// unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
-const MAX_UNICODE_NAME: usize = 88;
-
 impl<T> Lexer<T>
 where
     T: Iterator<Item = char>,
@@ -274,8 +270,26 @@ where
 
             // Check if we have a string:
             if matches!(self.window[0], Some('"' | '\'')) {
+                let kind = if saw_r {
+                    if saw_b {
+                        StringKind::RawBytes
+                    } else if saw_f {
+                        StringKind::RawFString
+                    } else {
+                        StringKind::RawString
+                    }
+                } else if saw_b {
+                    StringKind::Bytes
+                } else if saw_u {
+                    StringKind::Unicode
+                } else if saw_f {
+                    StringKind::FString
+                } else {
+                    StringKind::String
+                };
+
                 return self
-                    .lex_string(saw_b, saw_r, saw_u, saw_f)
+                    .lex_string(kind)
                     .map(|(_, tok, end_pos)| (start_pos, tok, end_pos));
             }
         }
@@ -479,87 +493,7 @@ where
         }
     }
 
-    fn unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
-        let mut p: u32 = 0u32;
-        let unicode_error = LexicalError {
-            error: LexicalErrorType::UnicodeError,
-            location: self.get_pos(),
-        };
-        for i in 1..=literal_number {
-            match self.next_char() {
-                Some(c) => match c.to_digit(16) {
-                    Some(d) => p += d << ((literal_number - i) * 4),
-                    None => return Err(unicode_error),
-                },
-                None => return Err(unicode_error),
-            }
-        }
-        match p {
-            0xD800..=0xDFFF => Ok(std::char::REPLACEMENT_CHARACTER),
-            _ => std::char::from_u32(p).ok_or(unicode_error),
-        }
-    }
-
-    fn parse_octet(&mut self, first: char) -> char {
-        let mut octet_content = String::new();
-        octet_content.push(first);
-        while octet_content.len() < 3 {
-            if let Some('0'..='7') = self.window[0] {
-                octet_content.push(self.next_char().unwrap())
-            } else {
-                break;
-            }
-        }
-        let value = u32::from_str_radix(&octet_content, 8).unwrap();
-        char::from_u32(value).unwrap()
-    }
-
-    fn parse_unicode_name(&mut self) -> Result<char, LexicalError> {
-        let start_pos = self.get_pos();
-        match self.next_char() {
-            Some('{') => {}
-            _ => {
-                return Err(LexicalError {
-                    error: LexicalErrorType::StringError,
-                    location: start_pos,
-                })
-            }
-        }
-        let start_pos = self.get_pos();
-        let mut name = String::new();
-        loop {
-            match self.next_char() {
-                Some('}') => break,
-                Some(c) => name.push(c),
-                None => {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::StringError,
-                        location: self.get_pos(),
-                    })
-                }
-            }
-        }
-
-        if name.len() > MAX_UNICODE_NAME {
-            return Err(LexicalError {
-                error: LexicalErrorType::UnicodeError,
-                location: self.get_pos(),
-            });
-        }
-
-        unicode_names2::character(&name).ok_or(LexicalError {
-            error: LexicalErrorType::UnicodeError,
-            location: start_pos,
-        })
-    }
-
-    fn lex_string(
-        &mut self,
-        is_bytes: bool,
-        is_raw: bool,
-        is_unicode: bool,
-        is_fstring: bool,
-    ) -> LexResult {
+    fn lex_string(&mut self, kind: StringKind) -> LexResult {
         let start_pos = self.get_pos();
         let quote_char = self.next_char().unwrap();
         let mut string_content = String::new();
@@ -577,62 +511,24 @@ where
 
         loop {
             match self.next_char() {
-                Some('\\') => {
-                    if self.window[0] == Some(quote_char) && !is_raw {
-                        string_content.push(quote_char);
-                        self.next_char();
-                    } else if is_raw {
-                        string_content.push('\\');
-                        if let Some(c) = self.next_char() {
-                            string_content.push(c)
-                        } else {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::StringError,
-                                location: self.get_pos(),
-                            });
-                        }
-                    } else {
-                        match self.next_char() {
-                            Some('\\') => {
-                                string_content.push('\\');
-                            }
-                            Some('\'') => string_content.push('\''),
-                            Some('\"') => string_content.push('\"'),
-                            Some('\n') => {
-                                // Ignore Unix EOL character
-                            }
-                            Some('a') => string_content.push('\x07'),
-                            Some('b') => string_content.push('\x08'),
-                            Some('f') => string_content.push('\x0c'),
-                            Some('n') => {
-                                string_content.push('\n');
-                            }
-                            Some('r') => string_content.push('\r'),
-                            Some('t') => {
-                                string_content.push('\t');
-                            }
-                            Some('v') => string_content.push('\x0b'),
-                            Some(o @ '0'..='7') => string_content.push(self.parse_octet(o)),
-                            Some('x') => string_content.push(self.unicode_literal(2)?),
-                            Some('u') if !is_bytes => string_content.push(self.unicode_literal(4)?),
-                            Some('U') if !is_bytes => string_content.push(self.unicode_literal(8)?),
-                            Some('N') if !is_bytes => {
-                                string_content.push(self.parse_unicode_name()?)
-                            }
-                            Some(c) => {
-                                string_content.push('\\');
-                                string_content.push(c);
-                            }
-                            None => {
-                                return Err(LexicalError {
-                                    error: LexicalErrorType::StringError,
-                                    location: self.get_pos(),
-                                });
-                            }
+                Some(c) => {
+                    if c == '\\' {
+                        if let Some(next_c) = self.next_char() {
+                            string_content.push('\\');
+                            string_content.push(next_c);
+                            continue;
                         }
                     }
-                }
-                Some(c) => {
+
+                    if c == '\n' && !triple_quoted {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::OtherError(
+                                "EOL while scanning string literal".to_owned(),
+                            ),
+                            location: self.get_pos(),
+                        });
+                    }
+
                     if c == quote_char {
                         if triple_quoted {
                             // Look ahead at the next two characters; if we have two more
@@ -645,19 +541,11 @@ where
                                 self.next_char();
                                 break;
                             }
-                            string_content.push(c);
                         } else {
                             break;
                         }
-                    } else {
-                        if (c == '\n' && !triple_quoted) || (is_bytes && !c.is_ascii()) {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::Eof,
-                                location: self.get_pos(),
-                            });
-                        }
-                        string_content.push(c);
                     }
+                    string_content.push(c);
                 }
                 None => {
                     return Err(LexicalError {
@@ -672,25 +560,11 @@ where
             }
         }
         let end_pos = self.get_pos();
-
-        let tok = if is_bytes {
-            Tok::Bytes {
-                value: string_content.chars().map(|c| c as u8).collect(),
-            }
-        } else {
-            let kind = if is_fstring {
-                StringKind::F
-            } else if is_unicode {
-                StringKind::U
-            } else {
-                StringKind::Normal
-            };
-            Tok::String {
-                value: string_content,
-                kind,
-            }
+        let tok = Tok::String {
+            value: string_content,
+            kind,
+            triple_quoted,
         };
-
         Ok((start_pos, tok, end_pos))
     }
 
@@ -907,7 +781,7 @@ where
                 self.emit(comment);
             }
             '"' | '\'' => {
-                let string = self.lex_string(false, false, false, false)?;
+                let string = self.lex_string(StringKind::String)?;
                 self.emit(string);
             }
             '=' => {
@@ -1367,15 +1241,17 @@ mod tests {
     fn stok(s: &str) -> Tok {
         Tok::String {
             value: s.to_owned(),
-            kind: StringKind::Normal,
+            kind: StringKind::String,
+            triple_quoted: false,
         }
     }
 
-    #[test]
-    fn test_raw_string() {
-        let source = "r\"\\\\\" \"\\\\\"";
-        let tokens = lex_source(source);
-        assert_eq!(tokens, vec![stok("\\\\"), stok("\\"), Tok::Newline,]);
+    fn raw_stok(s: &str) -> Tok {
+        Tok::String {
+            value: s.to_owned(),
+            kind: StringKind::RawString,
+            triple_quoted: false,
+        }
     }
 
     #[test]
@@ -1677,13 +1553,13 @@ mod tests {
             vec![
                 stok("double"),
                 stok("single"),
-                stok("can't"),
-                stok("\\\""),
-                stok("\t\r\n"),
-                stok("\\g"),
-                stok("raw\\'"),
-                stok("Đ"),
-                stok("\u{80}\u{0}a"),
+                stok(r"can\'t"),
+                stok(r#"\\\""#),
+                stok(r"\t\r\n"),
+                stok(r"\g"),
+                raw_stok(r"raw\'"),
+                stok(r"\420"),
+                stok(r"\200\0a"),
                 Tok::Newline,
             ]
         );
@@ -1699,7 +1575,7 @@ mod tests {
                 assert_eq!(
                     tokens,
                     vec![
-                        stok("abcdef"),
+                        stok("abc\\\ndef"),
                         Tok::Newline,
                     ]
                 )
@@ -1715,77 +1591,9 @@ mod tests {
     }
 
     #[test]
-    fn test_single_quoted_byte() {
-        // single quote
-        let source = r##"b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff'"##;
-        let tokens = lex_source(source);
-        let res = (0..=255).collect::<Vec<u8>>();
-        assert_eq!(tokens, vec![Tok::Bytes { value: res }, Tok::Newline]);
-    }
-
-    #[test]
-    fn test_double_quoted_byte() {
-        // double quote
-        let source = r##"b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff""##;
-        let tokens = lex_source(source);
-        let res = (0..=255).collect::<Vec<u8>>();
-        assert_eq!(tokens, vec![Tok::Bytes { value: res }, Tok::Newline]);
-    }
-
-    #[test]
-    fn test_escape_char_in_byte_literal() {
-        // backslash does not escape
-        let source = r##"b"omkmok\Xaa""##;
-        let tokens = lex_source(source);
-        let res = vec![111, 109, 107, 109, 111, 107, 92, 88, 97, 97];
-        assert_eq!(tokens, vec![Tok::Bytes { value: res }, Tok::Newline]);
-    }
-
-    #[test]
-    fn test_raw_byte_literal() {
-        let source = r"rb'\x1z'";
-        let tokens = lex_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Bytes {
-                    value: b"\\x1z".to_vec()
-                },
-                Tok::Newline
-            ]
-        );
-        let source = r"rb'\\'";
-        let tokens = lex_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Bytes {
-                    value: b"\\\\".to_vec()
-                },
-                Tok::Newline
-            ]
-        )
-    }
-
-    #[test]
-    fn test_escape_octet() {
-        let source = r##"b'\43a\4\1234'"##;
-        let tokens = lex_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Bytes {
-                    value: b"#a\x04S4".to_vec()
-                },
-                Tok::Newline
-            ]
-        )
-    }
-
-    #[test]
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
         let tokens = lex_source(source);
-        assert_eq!(tokens, vec![stok("\u{2002}"), Tok::Newline])
+        assert_eq!(tokens, vec![stok(r"\N{EN SPACE}"), Tok::Newline])
     }
 }
