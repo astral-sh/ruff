@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 1
     column: 0
@@ -18,7 +19,8 @@ expression: checks
       row: 1
       column: 15
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 2
     column: 0
@@ -34,7 +36,8 @@ expression: checks
       row: 2
       column: 16
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 3
     column: 0
@@ -50,7 +53,8 @@ expression: checks
       row: 3
       column: 16
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 4
     column: 0
@@ -66,7 +70,8 @@ expression: checks
       row: 4
       column: 17
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 5
     column: 0
@@ -82,7 +87,8 @@ expression: checks
       row: 5
       column: 15
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 6
     column: 0
@@ -98,7 +104,8 @@ expression: checks
       row: 6
       column: 16
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 7
     column: 0
@@ -114,7 +121,8 @@ expression: checks
       row: 7
       column: 13
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"w\""
   location:
     row: 8
     column: 0
@@ -130,7 +138,8 @@ expression: checks
       row: 8
       column: 14
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 10
     column: 5
@@ -146,7 +155,8 @@ expression: checks
       row: 10
       column: 20
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 12
     column: 5
@@ -162,7 +172,8 @@ expression: checks
       row: 12
       column: 21
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 14
     column: 5
@@ -178,7 +189,8 @@ expression: checks
       row: 14
       column: 21
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 16
     column: 5
@@ -194,7 +206,8 @@ expression: checks
       row: 16
       column: 22
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 18
     column: 5
@@ -210,7 +223,8 @@ expression: checks
       row: 18
       column: 20
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 20
     column: 5
@@ -226,7 +240,8 @@ expression: checks
       row: 20
       column: 21
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 22
     column: 5
@@ -242,7 +257,8 @@ expression: checks
       row: 22
       column: 20
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"w\""
   location:
     row: 24
     column: 5
@@ -258,7 +274,8 @@ expression: checks
       row: 24
       column: 21
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 27
     column: 0
@@ -274,7 +291,8 @@ expression: checks
       row: 27
       column: 26
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 28
     column: 0
@@ -290,7 +308,8 @@ expression: checks
       row: 28
       column: 27
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 30
     column: 5
@@ -306,7 +325,8 @@ expression: checks
       row: 30
       column: 31
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 32
     column: 5
@@ -322,7 +342,8 @@ expression: checks
       row: 32
       column: 32
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 35
     column: 5
@@ -338,7 +359,8 @@ expression: checks
       row: 35
       column: 20
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 35
     column: 29
@@ -354,7 +376,8 @@ expression: checks
       row: 35
       column: 44
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 37
     column: 5
@@ -370,7 +393,8 @@ expression: checks
       row: 37
       column: 21
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 37
     column: 30
@@ -386,7 +410,8 @@ expression: checks
       row: 37
       column: 46
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 40
     column: 0
@@ -402,7 +427,8 @@ expression: checks
       row: 40
       column: 20
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 41
     column: 0
@@ -418,7 +444,8 @@ expression: checks
       row: 41
       column: 25
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 42
     column: 0
@@ -434,7 +461,8 @@ expression: checks
       row: 42
       column: 15
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 44
     column: 5
@@ -450,7 +478,8 @@ expression: checks
       row: 44
       column: 25
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 46
     column: 5
@@ -466,7 +495,8 @@ expression: checks
       row: 46
       column: 30
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 48
     column: 5
@@ -482,7 +512,8 @@ expression: checks
       row: 48
       column: 20
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 51
     column: 0
@@ -498,7 +529,8 @@ expression: checks
       row: 51
       column: 21
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 52
     column: 0
@@ -514,7 +546,8 @@ expression: checks
       row: 52
       column: 26
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 53
     column: 0
@@ -530,7 +563,8 @@ expression: checks
       row: 53
       column: 14
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 55
     column: 5
@@ -546,7 +580,8 @@ expression: checks
       row: 55
       column: 26
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 57
     column: 5
@@ -562,7 +597,8 @@ expression: checks
       row: 57
       column: 31
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 59
     column: 5
@@ -578,7 +614,8 @@ expression: checks
       row: 59
       column: 19
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 62
     column: 0
@@ -594,7 +631,8 @@ expression: checks
       row: 62
       column: 25
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 63
     column: 0
@@ -610,7 +648,8 @@ expression: checks
       row: 63
       column: 109
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 64
     column: 0
@@ -626,7 +665,8 @@ expression: checks
       row: 64
       column: 68
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: ~
   location:
     row: 65
     column: 0
@@ -642,7 +682,8 @@ expression: checks
       row: 65
       column: 15
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 67
     column: 0
@@ -658,7 +699,8 @@ expression: checks
       row: 67
       column: 26
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 68
     column: 0
@@ -674,7 +716,8 @@ expression: checks
       row: 68
       column: 110
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 69
     column: 0
@@ -690,7 +733,8 @@ expression: checks
       row: 69
       column: 69
   parent: ~
-- kind: RedundantOpenModes
+- kind:
+    RedundantOpenModes: "\"rb\""
   location:
     row: 70
     column: 0

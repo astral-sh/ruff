@@ -6,6 +6,7 @@ expression: checks
     UnusedImport:
       - models.Nut
       - false
+      - false
   location:
     row: 8
     column: 4

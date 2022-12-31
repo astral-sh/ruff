@@ -11,7 +11,7 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind, RejectedCmpop};
+use crate::checks::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 
@@ -68,7 +68,7 @@ pub fn literal_comparisons(
     {
         if matches!(op, Cmpop::Eq) {
             let check = Check::new(
-                CheckKind::NoneComparison(RejectedCmpop::Eq),
+                CheckKind::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
             if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
@@ -78,7 +78,7 @@ pub fn literal_comparisons(
         }
         if matches!(op, Cmpop::NotEq) {
             let check = Check::new(
-                CheckKind::NoneComparison(RejectedCmpop::NotEq),
+                CheckKind::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
             if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
@@ -96,7 +96,7 @@ pub fn literal_comparisons(
         {
             if matches!(op, Cmpop::Eq) {
                 let check = Check::new(
-                    CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
+                    CheckKind::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
                 if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
@@ -106,7 +106,7 @@ pub fn literal_comparisons(
             }
             if matches!(op, Cmpop::NotEq) {
                 let check = Check::new(
-                    CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
+                    CheckKind::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
                 if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
@@ -130,7 +130,7 @@ pub fn literal_comparisons(
         {
             if matches!(op, Cmpop::Eq) {
                 let check = Check::new(
-                    CheckKind::NoneComparison(RejectedCmpop::Eq),
+                    CheckKind::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
                 if checker.patch(check.kind.code())
@@ -142,7 +142,7 @@ pub fn literal_comparisons(
             }
             if matches!(op, Cmpop::NotEq) {
                 let check = Check::new(
-                    CheckKind::NoneComparison(RejectedCmpop::NotEq),
+                    CheckKind::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
                 if checker.patch(check.kind.code())
@@ -162,7 +162,7 @@ pub fn literal_comparisons(
             {
                 if matches!(op, Cmpop::Eq) {
                     let check = Check::new(
-                        CheckKind::TrueFalseComparison(value, RejectedCmpop::Eq),
+                        CheckKind::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
                     if checker.patch(check.kind.code())
@@ -174,7 +174,7 @@ pub fn literal_comparisons(
                 }
                 if matches!(op, Cmpop::NotEq) {
                     let check = Check::new(
-                        CheckKind::TrueFalseComparison(value, RejectedCmpop::NotEq),
+                        CheckKind::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
                     if checker.patch(check.kind.code())
@@ -311,7 +311,10 @@ fn function(
 pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
     if let ExprKind::Name { id, .. } = &target.node {
         if let ExprKind::Lambda { args, body } = &value.node {
-            let mut check = Check::new(CheckKind::DoNotAssignLambda, Range::from_located(stmt));
+            let mut check = Check::new(
+                CheckKind::DoNotAssignLambda(id.to_string()),
+                Range::from_located(stmt),
+            );
             if checker.patch(check.kind.code()) {
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)
