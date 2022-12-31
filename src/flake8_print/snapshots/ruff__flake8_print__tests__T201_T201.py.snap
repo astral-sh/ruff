@@ -8,7 +8,7 @@ expression: checks
     column: 0
   end_location:
     row: 4
-    column: 22
+    column: 5
   fix:
     content: ""
     location:
@@ -24,7 +24,7 @@ expression: checks
     column: 0
   end_location:
     row: 5
-    column: 33
+    column: 5
   fix:
     content: ""
     location:
@@ -40,7 +40,7 @@ expression: checks
     column: 0
   end_location:
     row: 6
-    column: 39
+    column: 5
   fix:
     content: ""
     location:
@@ -56,7 +56,7 @@ expression: checks
     column: 0
   end_location:
     row: 7
-    column: 39
+    column: 5
   fix:
     content: ""
     location:

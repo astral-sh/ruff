@@ -449,6 +449,32 @@ pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Ran
     range
 }
 
+/// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
+pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
+    match &stmt.node {
+        StmtKind::For { body, orelse, .. }
+        | StmtKind::AsyncFor { body, orelse, .. }
+        | StmtKind::While { body, orelse, .. }
+            if !orelse.is_empty() =>
+        {
+            let body_end = body.last().unwrap().end_location.unwrap();
+            let contents = locator.slice_source_code_range(&Range {
+                location: body_end,
+                end_location: orelse[0].location,
+            });
+            let range = lexer::make_tokenizer_located(&contents, body_end)
+                .flatten()
+                .find(|(_, kind, _)| matches!(kind, Tok::Else))
+                .map(|(location, _, end_location)| Range {
+                    location,
+                    end_location,
+                });
+            range
+        }
+        _ => None,
+    }
+}
+
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
 pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
@@ -489,7 +515,9 @@ mod tests {
     use rustpython_ast::Location;
     use rustpython_parser::parser;
 
-    use crate::ast::helpers::{identifier_range, match_module_member, match_trailing_content};
+    use crate::ast::helpers::{
+        else_range, identifier_range, match_module_member, match_trailing_content,
+    };
     use crate::ast::types::Range;
     use crate::source_code_locator::SourceCodeLocator;
 
@@ -759,6 +787,26 @@ class Class():
             }
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_else_range() -> Result<()> {
+        let contents = r#"
+for x in y:
+    pass
+else:
+    pass
+"#
+        .trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        let range = else_range(stmt, &locator).unwrap();
+        assert_eq!(range.location.row(), 3);
+        assert_eq!(range.location.column(), 0);
+        assert_eq!(range.end_location.row(), 3);
+        assert_eq!(range.end_location.column(), 4);
         Ok(())
     }
 }
