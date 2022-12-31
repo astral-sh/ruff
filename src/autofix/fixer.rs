@@ -68,10 +68,7 @@ fn apply_fixes<'a>(
         }
 
         // Add all contents from `last_pos` to `fix.location`.
-        let slice = locator.slice_source_code_range(&Range {
-            location: last_pos,
-            end_location: fix.location,
-        });
+        let slice = locator.slice_source_code_range(&Range::new(last_pos, fix.location));
         output.append(&slice);
 
         // Add the patch itself.

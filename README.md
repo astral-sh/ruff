@@ -8,7 +8,11 @@
 An extremely fast Python linter, written in Rust.
 
 <p align="center">
-  <img alt="Bar chart with benchmark results" src="https://user-images.githubusercontent.com/1309177/187504482-6d9df992-a81d-4e86-9f6a-d958741c8182.svg">
+  <picture align="center">
+    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/210156880-a97c2a0d-2c03-4393-8695-36547935a94e.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/210156881-a88fd142-5008-4695-9407-d028cec3eff7.svg">
+    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/210156881-a88fd142-5008-4695-9407-d028cec3eff7.svg">
+  </picture>
 </p>
 
 <p align="center">
@@ -169,7 +173,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.204'
+  rev: 'v0.0.205'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -682,6 +686,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
 | UP022 | ReplaceStdoutStderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
 | UP023 | RewriteCElementTree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
+| UP024 | OSErrorAlias | Replace aliased errors with `OSError` | 🛠 |
 | UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
 | UP026 | RewriteMockImport | `mock` is deprecated, use `unittest.mock` | 🛠 |
 

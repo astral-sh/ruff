@@ -1,7 +1,7 @@
 use itertools::izip;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Constant, Excepthandler, Located, Location, Stmt, StmtKind};
+use rustpython_ast::{Constant, Excepthandler, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::helpers::except_range;
@@ -34,10 +34,10 @@ pub fn line_too_long(lineno: usize, line: &str, max_line_length: usize) -> Optio
 
     Some(Check::new(
         CheckKind::LineTooLong(line_length, max_line_length),
-        Range {
-            location: Location::new(lineno + 1, max_line_length),
-            end_location: Location::new(lineno + 1, line_length),
-        },
+        Range::new(
+            Location::new(lineno + 1, max_line_length),
+            Location::new(lineno + 1, line_length),
+        ),
     ))
 }
 
@@ -111,11 +111,11 @@ fn is_ambiguous_name(name: &str) -> bool {
 }
 
 /// E741
-pub fn ambiguous_variable_name<T>(name: &str, located: &Located<T>) -> Option<Check> {
+pub fn ambiguous_variable_name(name: &str, range: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
             CheckKind::AmbiguousVariableName(name.to_string()),
-            Range::from_located(located),
+            range,
         ))
     } else {
         None
@@ -162,10 +162,7 @@ pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Check>
             let location = Location::new(contents.lines().count(), line.len());
             let mut check = Check::new(
                 CheckKind::NoNewLineAtEndOfFile,
-                Range {
-                    location,
-                    end_location: location,
-                },
+                Range::new(location, location),
             );
             if autofix {
                 check.amend(Fix::insertion("\n".to_string(), location));
@@ -203,10 +200,7 @@ pub fn invalid_escape_sequence(
 ) -> Vec<Check> {
     let mut checks = vec![];
 
-    let text = locator.slice_source_code_range(&Range {
-        location: start,
-        end_location: end,
-    });
+    let text = locator.slice_source_code_range(&Range::new(start, end));
 
     // Determine whether the string is single- or triple-quoted.
     let quote = extract_quote(&text);
@@ -249,10 +243,7 @@ pub fn invalid_escape_sequence(
                 let end_location = Location::new(location.row(), location.column() + 2);
                 let mut check = Check::new(
                     CheckKind::InvalidEscapeSequence(next_char),
-                    Range {
-                        location,
-                        end_location,
-                    },
+                    Range::new(location, end_location),
                 );
                 if autofix {
                     check.amend(Fix::insertion(r"\".to_string(), location));

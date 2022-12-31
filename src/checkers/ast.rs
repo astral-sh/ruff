@@ -91,6 +91,7 @@ pub struct Checker<'a> {
     in_type_definition: bool,
     in_deferred_string_type_definition: bool,
     in_deferred_type_definition: bool,
+    in_f_string: bool,
     in_literal: bool,
     in_subscript: bool,
     seen_import_boundary: bool,
@@ -147,6 +148,7 @@ impl<'a> Checker<'a> {
             in_type_definition: false,
             in_deferred_string_type_definition: false,
             in_deferred_type_definition: false,
+            in_f_string: false,
             in_literal: false,
             in_subscript: false,
             seen_import_boundary: false,
@@ -213,10 +215,10 @@ impl<'a> Checker<'a> {
             return false;
         }
         let noqa_lineno = self.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-        let line = self.locator.slice_source_code_range(&Range {
-            location: Location::new(*noqa_lineno, 0),
-            end_location: Location::new(noqa_lineno + 1, 0),
-        });
+        let line = self.locator.slice_source_code_range(&Range::new(
+            Location::new(*noqa_lineno, 0),
+            Location::new(noqa_lineno + 1, 0),
+        ));
         match noqa::extract_noqa_directive(&line) {
             Directive::None => false,
             Directive::All(..) => true,
@@ -264,16 +266,17 @@ where
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
+                let ranges = helpers::find_names(stmt, self.locator);
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Global,
                             used: usage,
-                            range: Range::from_located(stmt),
+                            range: *range,
                             source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
@@ -284,8 +287,9 @@ where
                     self.add_checks(
                         names
                             .iter()
-                            .filter_map(|name| {
-                                pycodestyle::checks::ambiguous_variable_name(name, stmt)
+                            .zip(ranges.iter())
+                            .filter_map(|(name, range)| {
+                                pycodestyle::checks::ambiguous_variable_name(name, *range)
                             })
                             .into_iter(),
                     );
@@ -293,16 +297,17 @@ where
             }
             StmtKind::Nonlocal { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
+                let ranges = helpers::find_names(stmt, self.locator);
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
                             used: usage,
-                            range: Range::from_located(stmt),
+                            range: *range,
                             source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
@@ -310,7 +315,7 @@ where
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         let mut exists = false;
                         for index in self.scope_stack.iter().skip(1).rev().skip(1) {
                             if let Some(index) = self.scopes[*index].values.get(&name.as_str()) {
@@ -324,7 +329,7 @@ where
                             if self.settings.enabled.contains(&CheckCode::PLE0117) {
                                 self.add_check(Check::new(
                                     CheckKind::NonlocalWithoutBinding(name.to_string()),
-                                    Range::from_located(stmt),
+                                    *range,
                                 ));
                             }
                         }
@@ -335,8 +340,9 @@ where
                     self.add_checks(
                         names
                             .iter()
-                            .filter_map(|name| {
-                                pycodestyle::checks::ambiguous_variable_name(name, stmt)
+                            .zip(ranges.iter())
+                            .filter_map(|(name, range)| {
+                                pycodestyle::checks::ambiguous_variable_name(name, *range)
                             })
                             .into_iter(),
                     );
@@ -1109,6 +1115,11 @@ where
                         flake8_errmsg::plugins::string_in_exception(self, exc);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    if let Some(item) = exc {
+                        pyupgrade::plugins::os_error_alias(self, item);
+                    }
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
@@ -1192,6 +1203,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -1474,6 +1488,7 @@ where
 
         self.push_expr(expr);
 
+        let prev_in_f_string = self.in_f_string;
         let prev_in_literal = self.in_literal;
         let prev_in_type_definition = self.in_type_definition;
 
@@ -1548,9 +1563,10 @@ where
                     }
                     ExprContext::Store => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) =
-                                pycodestyle::checks::ambiguous_variable_name(id, expr)
-                            {
+                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                                id,
+                                Range::from_located(expr),
+                            ) {
                                 self.add_check(check);
                             }
                         }
@@ -1715,6 +1731,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP022) {
                     pyupgrade::plugins::replace_stdout_stderr(self, expr, keywords);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, expr);
                 }
 
                 // flake8-print
@@ -2159,7 +2178,9 @@ where
                 }
             }
             ExprKind::JoinedStr { values } => {
-                if self.settings.enabled.contains(&CheckCode::F541) {
+                // Conversion flags are parsed as f-strings without placeholders, so skip
+                // nested f-strings, which would lead to false positives.
+                if !self.in_f_string && self.settings.enabled.contains(&CheckCode::F541) {
                     if !values
                         .iter()
                         .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
@@ -2662,6 +2683,11 @@ where
                 }
                 self.in_subscript = prev_in_subscript;
             }
+            ExprKind::JoinedStr { .. } => {
+                self.in_f_string = true;
+                visitor::walk_expr(self, expr);
+                self.in_f_string = prev_in_f_string;
+            }
             _ => visitor::walk_expr(self, expr),
         }
 
@@ -2679,6 +2705,7 @@ where
 
         self.in_type_definition = prev_in_type_definition;
         self.in_literal = prev_in_literal;
+        self.in_f_string = prev_in_f_string;
 
         self.pop_expr();
     }
@@ -2712,9 +2739,11 @@ where
                 match name {
                     Some(name) => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) =
-                                pycodestyle::checks::ambiguous_variable_name(name, excepthandler)
-                            {
+                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                                name,
+                                helpers::excepthandler_name_range(excepthandler, self.locator)
+                                    .expect("Failed to find `name` range"),
+                            ) {
                                 self.add_check(check);
                             }
                         }
@@ -2831,7 +2860,10 @@ where
         );
 
         if self.settings.enabled.contains(&CheckCode::E741) {
-            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(&arg.node.arg, arg) {
+            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                &arg.node.arg,
+                Range::from_located(arg),
+            ) {
                 self.add_check(check);
             }
         }
@@ -3856,10 +3888,10 @@ impl<'a> Checker<'a> {
                 let content = self
                     .locator
                     .slice_source_code_range(&Range::from_located(expr));
-                let indentation = self.locator.slice_source_code_range(&Range {
-                    location: Location::new(expr.location.row(), 0),
-                    end_location: Location::new(expr.location.row(), expr.location.column()),
-                });
+                let indentation = self.locator.slice_source_code_range(&Range::new(
+                    Location::new(expr.location.row(), 0),
+                    Location::new(expr.location.row(), expr.location.column()),
+                ));
                 let body = pydocstyle::helpers::raw_contents(&content);
                 let docstring = Docstring {
                     kind: definition.kind,

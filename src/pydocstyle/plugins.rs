@@ -34,10 +34,7 @@ pub fn not_missing(
             if checker.settings.enabled.contains(&CheckCode::D100) {
                 checker.add_check(Check::new(
                     CheckKind::PublicModule,
-                    Range {
-                        location: Location::new(1, 0),
-                        end_location: Location::new(1, 0),
-                    },
+                    Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
             }
             false
@@ -46,10 +43,7 @@ pub fn not_missing(
             if checker.settings.enabled.contains(&CheckCode::D104) {
                 checker.add_check(Check::new(
                     CheckKind::PublicPackage,
-                    Range {
-                        location: Location::new(1, 0),
-                        end_location: Location::new(1, 0),
-                    },
+                    Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
             }
             false
@@ -412,10 +406,10 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             {
                 let mut check = Check::new(
                     CheckKind::NoUnderIndentation,
-                    Range {
-                        location: Location::new(docstring.expr.location.row() + i, 0),
-                        end_location: Location::new(docstring.expr.location.row() + i, 0),
-                    },
+                    Range::new(
+                        Location::new(docstring.expr.location.row() + i, 0),
+                        Location::new(docstring.expr.location.row() + i, 0),
+                    ),
                 );
                 if checker.patch(check.kind.code()) {
                     check.amend(Fix::replacement(
@@ -462,10 +456,10 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                     // enables autofix.
                     let mut check = Check::new(
                         CheckKind::NoOverIndentation,
-                        Range {
-                            location: Location::new(docstring.expr.location.row() + i, 0),
-                            end_location: Location::new(docstring.expr.location.row() + i, 0),
-                        },
+                        Range::new(
+                            Location::new(docstring.expr.location.row() + i, 0),
+                            Location::new(docstring.expr.location.row() + i, 0),
+                        ),
                     );
                     if checker.patch(check.kind.code()) {
                         check.amend(Fix::replacement(
@@ -486,10 +480,10 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             if line_indent.len() > docstring.indentation.len() {
                 let mut check = Check::new(
                     CheckKind::NoOverIndentation,
-                    Range {
-                        location: Location::new(docstring.expr.location.row() + i, 0),
-                        end_location: Location::new(docstring.expr.location.row() + i, 0),
-                    },
+                    Range::new(
+                        Location::new(docstring.expr.location.row() + i, 0),
+                        Location::new(docstring.expr.location.row() + i, 0),
+                    ),
                 );
                 if checker.patch(check.kind.code()) {
                     check.amend(Fix::replacement(
@@ -671,9 +665,35 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
+    if let Some(first_line) = body.trim().lines().next() {
+        let trimmed = first_line.trim();
+
+        // Avoid false-positives: `:param`, etc.
+        for prefix in [":param", ":type", ":raises", ":return", ":rtype"] {
+            if trimmed.starts_with(prefix) {
+                return;
+            }
+        }
+
+        // Avoid false-positives: `Args:`, etc.
+        for style in [SectionStyle::Google, SectionStyle::Numpy] {
+            for section_name in style.section_names().iter() {
+                if let Some(suffix) = trimmed.strip_suffix(section_name) {
+                    if suffix.is_empty() {
+                        return;
+                    }
+                    if suffix == ":" {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     if let Some(index) = logical_line(body) {
         let line = body.lines().nth(index).unwrap();
         let trimmed = line.trim_end();
+
         if !trimmed.ends_with('.') {
             let mut check =
                 Check::new(CheckKind::EndsInPeriod, Range::from_located(docstring.expr));
@@ -718,7 +738,7 @@ pub fn no_signature(checker: &mut Checker, docstring: &Docstring) {
 
     let body = docstring.body;
 
-    let Some(first_line) = body.lines().next() else {
+    let Some(first_line) = body.trim().lines().next() else {
         return;
     };
     if !first_line.contains(&format!("{name}(")) {
@@ -790,6 +810,31 @@ pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
 pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
+
+    if let Some(first_line) = body.trim().lines().next() {
+        let trimmed = first_line.trim();
+
+        // Avoid false-positives: `:param`, etc.
+        for prefix in [":param", ":type", ":raises", ":return", ":rtype"] {
+            if trimmed.starts_with(prefix) {
+                return;
+            }
+        }
+
+        // Avoid false-positives: `Args:`, etc.
+        for style in [SectionStyle::Google, SectionStyle::Numpy] {
+            for section_name in style.section_names().iter() {
+                if let Some(suffix) = trimmed.strip_suffix(section_name) {
+                    if suffix.is_empty() {
+                        return;
+                    }
+                    if suffix == ":" {
+                        return;
+                    }
+                }
+            }
+        }
+    }
 
     if let Some(index) = logical_line(body) {
         let line = body.lines().nth(index).unwrap();
@@ -875,14 +920,14 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             }
         }
         Some(Convention::Numpy) => {
-            for context in &section_contexts(&lines, &SectionStyle::NumPy) {
+            for context in &section_contexts(&lines, &SectionStyle::Numpy) {
                 numpy_section(checker, docstring, context);
             }
         }
         None => {
             // First, interpret as NumPy-style sections.
             let mut found_numpy_section = false;
-            for context in &section_contexts(&lines, &SectionStyle::NumPy) {
+            for context in &section_contexts(&lines, &SectionStyle::Numpy) {
                 found_numpy_section = true;
                 numpy_section(checker, docstring, context);
             }
@@ -1424,7 +1469,7 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
 }
 
 fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
-    common_section(checker, docstring, context, &SectionStyle::NumPy);
+    common_section(checker, docstring, context, &SectionStyle::Numpy);
 
     if checker.settings.enabled.contains(&CheckCode::D406) {
         let suffix = context

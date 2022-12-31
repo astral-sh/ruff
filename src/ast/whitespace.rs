@@ -9,10 +9,10 @@ use crate::checkers::ast::Checker;
 /// Extract the leading indentation from a line.
 pub fn indentation<'a, T>(checker: &'a Checker, located: &'a Located<T>) -> Cow<'a, str> {
     let range = Range::from_located(located);
-    checker.locator.slice_source_code_range(&Range {
-        location: Location::new(range.location.row(), 0),
-        end_location: Location::new(range.location.row(), range.location.column()),
-    })
+    checker.locator.slice_source_code_range(&Range::new(
+        Location::new(range.location.row(), 0),
+        Location::new(range.location.row(), range.location.column()),
+    ))
 }
 
 /// Extract the leading words from a line of text.

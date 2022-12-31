@@ -100,98 +100,98 @@ expression: checks
   parent: ~
 - kind: EndsInPeriod
   location:
-    row: 40
+    row: 39
     column: 4
   end_location:
-    row: 40
+    row: 39
     column: 37
   fix:
     content: "."
     location:
-      row: 40
+      row: 39
       column: 36
     end_location:
-      row: 40
+      row: 39
       column: 36
   parent: ~
 - kind: EndsInPeriod
   location:
-    row: 45
+    row: 44
     column: 4
   end_location:
-    row: 45
+    row: 44
     column: 41
   fix:
     content: "."
     location:
-      row: 45
+      row: 44
       column: 38
     end_location:
-      row: 45
+      row: 44
       column: 38
   parent: ~
 - kind: EndsInPeriod
   location:
-    row: 50
+    row: 49
     column: 4
   end_location:
-    row: 53
+    row: 52
     column: 7
   fix:
     content: "."
     location:
-      row: 52
+      row: 51
       column: 28
     end_location:
-      row: 52
+      row: 51
       column: 28
   parent: ~
 - kind: EndsInPeriod
   location:
-    row: 58
+    row: 57
     column: 4
   end_location:
-    row: 58
+    row: 57
     column: 41
   fix:
     content: "."
     location:
-      row: 58
+      row: 57
       column: 38
     end_location:
-      row: 58
+      row: 57
       column: 38
   parent: ~
 - kind: EndsInPeriod
   location:
-    row: 63
+    row: 62
     column: 4
   end_location:
-    row: 65
+    row: 64
     column: 31
   fix:
     content: "."
     location:
-      row: 65
+      row: 64
       column: 28
     end_location:
-      row: 65
+      row: 64
       column: 28
   parent: ~
 - kind: EndsInPeriod
   location:
-    row: 70
+    row: 69
     column: 4
   end_location:
-    row: 72
+    row: 71
     column: 52
   fix:
     content: "."
     location:
-      row: 72
+      row: 71
       column: 48
     end_location:
-      row: 72
+      row: 71
       column: 48
   parent: ~
 

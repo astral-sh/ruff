@@ -248,10 +248,7 @@ mod tests {
 
         let checks = vec![Check::new(
             CheckKind::UnusedVariable("x".to_string()),
-            Range {
-                location: Location::new(1, 0),
-                end_location: Location::new(1, 0),
-            },
+            Range::new(Location::new(1, 0), Location::new(1, 0)),
         )];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
@@ -269,17 +266,11 @@ mod tests {
         let checks = vec![
             Check::new(
                 CheckKind::AmbiguousVariableName("x".to_string()),
-                Range {
-                    location: Location::new(1, 0),
-                    end_location: Location::new(1, 0),
-                },
+                Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Check::new(
                 CheckKind::UnusedVariable("x".to_string()),
-                Range {
-                    location: Location::new(1, 0),
-                    end_location: Location::new(1, 0),
-                },
+                Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];
         let contents = "x = 1  # noqa: E741\n";
@@ -298,17 +289,11 @@ mod tests {
         let checks = vec![
             Check::new(
                 CheckKind::AmbiguousVariableName("x".to_string()),
-                Range {
-                    location: Location::new(1, 0),
-                    end_location: Location::new(1, 0),
-                },
+                Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Check::new(
                 CheckKind::UnusedVariable("x".to_string()),
-                Range {
-                    location: Location::new(1, 0),
-                    end_location: Location::new(1, 0),
-                },
+                Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];
         let contents = "x = 1  # noqa";
