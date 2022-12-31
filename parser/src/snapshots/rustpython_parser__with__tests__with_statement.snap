@@ -1616,7 +1616,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 end_location: Some(
                                     Location {
                                         row: 19,
-                                        column: 12,
+                                        column: 7,
                                     },
                                 ),
                                 custom: (),
@@ -1704,7 +1704,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 end_location: Some(
                                     Location {
                                         row: 20,
-                                        column: 12,
+                                        column: 7,
                                     },
                                 ),
                                 custom: (),
@@ -1824,7 +1824,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             end_location: Some(
                                                 Location {
                                                     row: 21,
-                                                    column: 12,
+                                                    column: 7,
                                                 },
                                             ),
                                             custom: (),
@@ -1875,7 +1875,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             end_location: Some(
                                                 Location {
                                                     row: 21,
-                                                    column: 20,
+                                                    column: 15,
                                                 },
                                             ),
                                             custom: (),
@@ -1981,7 +1981,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             end_location: Some(
                                                 Location {
                                                     row: 22,
-                                                    column: 12,
+                                                    column: 7,
                                                 },
                                             ),
                                             custom: (),
@@ -2032,7 +2032,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             end_location: Some(
                                                 Location {
                                                     row: 22,
-                                                    column: 20,
+                                                    column: 15,
                                                 },
                                             ),
                                             custom: (),
