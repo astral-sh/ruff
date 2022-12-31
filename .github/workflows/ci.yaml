@@ -121,7 +121,7 @@ jobs:
           INSTA_SNAPSHOT_REFERENCES_FILE="$(mktemp)"
           cargo test --all
           UNUSED_SNAPSHOTS=$(cat <(git ls-files '*.snap' | xargs realpath) <(cat $INSTA_SNAPSHOT_REFERENCES_FILE) | sort | uniq -u)
-          if [ -z "$var" ]; then
+          if [ ! -z "$UNUSED_SNAPSHOTS" ]; then
             echo "Found unused snapshots"
             echo "$UNUSED_SNAPSHOTS"
           fi
