@@ -8,7 +8,7 @@ expression: checks
     column: 0
   end_location:
     row: 3
-    column: 23
+    column: 6
   fix:
     content: ""
     location:
@@ -24,7 +24,7 @@ expression: checks
     column: 0
   end_location:
     row: 7
-    column: 30
+    column: 13
   fix:
     content: ""
     location:
