@@ -1,0 +1,50 @@
+[build-system]
+requires = ["maturin>=0.14,<0.15"]
+build-backend = "maturin"
+
+[project]
+name = "ruff"
+version = "0.0.203"
+description = "An extremely fast Python linter, written in Rust."
+authors = [
+  { name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" },
+]
+maintainers = [
+  { name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" },
+]
+requires-python = ">=3.7"
+license = { file = "LICENSE" }
+keywords = ["automation", "flake8", "pycodestyle", "pyflakes", "pylint", "clippy"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
+]
+urls = { repository = "https://github.com/charliermarsh/ruff-lsp" }
+
+[tool.maturin]
+bindings = "bin"
+strip = true
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.isort]
+force-wrap-aliases = true
+combine-as-imports = true
+force-single-line = true
+single-line-exclusions = ["os", "logging.handlers"]
+
+[tool.ruff.pydocstyle]
+convention = "google"
