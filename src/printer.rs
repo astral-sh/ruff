@@ -336,6 +336,17 @@ fn print_message(message: &Message) {
     );
     println!("{label}");
     if let Some(source) = &message.source {
+        let commit = message.kind.commit().unwrap_or_default();
+        let footer = if commit.is_empty() {
+            vec![]
+        } else {
+            vec![Annotation {
+                id: None,
+                label: Some(commit.as_str()),
+                annotation_type: AnnotationType::Help,
+            }]
+        };
+
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -343,7 +354,7 @@ fn print_message(message: &Message) {
                 // The ID (error number) is already encoded in the `label`.
                 id: None,
             }),
-            footer: vec![],
+            footer,
             slices: vec![Slice {
                 source: &source.contents,
                 line_start: message.location.row(),
@@ -365,7 +376,7 @@ fn print_message(message: &Message) {
         // Skip the first line, since we format the `label` ourselves.
         let message = DisplayList::from(snippet).to_string();
         let (_, message) = message.split_once('\n').unwrap();
-        println!("{message}");
+        println!("{message}\n");
     }
 }
 
