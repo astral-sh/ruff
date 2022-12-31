@@ -426,6 +426,32 @@ pub fn excepthandler_name_range(
     }
 }
 
+/// Return the range of `else` in For, AsyncFor, or While statements.
+pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
+    match &stmt.node {
+        StmtKind::For { body, orelse, .. }
+        | StmtKind::AsyncFor { body, orelse, .. }
+        | StmtKind::While { body, orelse, .. }
+            if !orelse.is_empty() =>
+        {
+            let body_end = body.last().unwrap().end_location.unwrap();
+            let contents = locator.slice_source_code_range(&Range {
+                location: body_end,
+                end_location: orelse.first().unwrap().location,
+            });
+            let range = lexer::make_tokenizer_located(&contents, body_end)
+                .flatten()
+                .find(|(_, kind, _)| matches!(kind, Tok::Else))
+                .map(|(location, _, end_location)| Range {
+                    location,
+                    end_location,
+                });
+            range
+        }
+        _ => None,
+    }
+}
+
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
 pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
