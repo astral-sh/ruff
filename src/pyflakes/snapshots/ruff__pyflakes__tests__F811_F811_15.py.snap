@@ -8,10 +8,10 @@ expression: checks
       - 1
   location:
     row: 4
-    column: 0
+    column: 4
   end_location:
-    row: 5
-    column: 8
+    row: 4
+    column: 6
   fix: ~
   parent: ~
 

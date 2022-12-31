@@ -20,7 +20,7 @@ mod tests {
     #[test_case(Path::new("doubles_wrapped.py"))]
     fn doubles(path: &Path) -> Result<()> {
         let snapshot = format!("doubles_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -39,7 +39,6 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -51,7 +50,7 @@ mod tests {
     #[test_case(Path::new("singles_wrapped.py"))]
     fn singles(path: &Path) -> Result<()> {
         let snapshot = format!("singles_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -70,7 +69,6 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -87,7 +85,7 @@ mod tests {
     #[test_case(Path::new("docstring_singles_function.py"))]
     fn double_docstring(path: &Path) -> Result<()> {
         let snapshot = format!("double_docstring_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -106,7 +104,6 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -123,7 +120,7 @@ mod tests {
     #[test_case(Path::new("docstring_singles_function.py"))]
     fn single_docstring(path: &Path) -> Result<()> {
         let snapshot = format!("single_docstring_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -142,7 +139,6 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }

@@ -37,24 +37,22 @@ mod tests {
     #[test_case(CheckCode::W605, Path::new("W605_1.py"))]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pycodestyle")
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
 
     #[test]
     fn constant_literals() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pycodestyle/constant_literals.py"),
             &settings::Settings::for_rules(vec![CheckCode::E711, CheckCode::E712, CheckCode::F632]),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }

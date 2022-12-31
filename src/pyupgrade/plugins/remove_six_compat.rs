@@ -138,7 +138,11 @@ fn replace_by_expr_kind(
 ) -> Result<Check> {
     let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
     if patch {
-        let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
+        let mut generator = SourceCodeGenerator::new(
+            stylist.indentation(),
+            stylist.quote(),
+            stylist.line_ending(),
+        );
         generator.unparse_expr(&create_expr(node), 0);
         let content = generator.generate()?;
         check.amend(Fix::replacement(
@@ -158,7 +162,11 @@ fn replace_by_stmt_kind(
 ) -> Result<Check> {
     let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
     if patch {
-        let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
+        let mut generator = SourceCodeGenerator::new(
+            stylist.indentation(),
+            stylist.quote(),
+            stylist.line_ending(),
+        );
         generator.unparse_stmt(&create_stmt(node));
         let content = generator.generate()?;
         check.amend(Fix::replacement(

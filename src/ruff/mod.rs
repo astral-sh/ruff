@@ -16,20 +16,19 @@ mod tests {
     #[test_case(CheckCode::RUF004, Path::new("RUF004.py"); "RUF004")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/ruff")
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
 
     #[test]
     fn confusables() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/confusables.py"),
             &settings::Settings {
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
@@ -40,14 +39,13 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn ruf100_0() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/RUF100_0.py"),
             &settings::Settings::for_rules(vec![
                 CheckCode::RUF100,
@@ -56,51 +54,46 @@ mod tests {
                 CheckCode::F841,
             ]),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn ruf100_1() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/RUF100_1.py"),
             &settings::Settings::for_rules(vec![CheckCode::RUF100, CheckCode::F401]),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn flake8_noqa() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/flake8_noqa.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F841]),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn ruff_noqa() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/ruff_noqa.py"),
             &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F841]),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn redirects() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/redirects.py"),
             &settings::Settings::for_rules(vec![CheckCode::UP007]),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }

@@ -532,7 +532,7 @@ where
                     Binding {
                         kind: BindingKind::FunctionDefinition,
                         used: None,
-                        range: Range::from_located(stmt),
+                        range: helpers::identifier_range(stmt, self.locator),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -582,9 +582,12 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N818) {
-                    if let Some(check) =
-                        pep8_naming::checks::error_suffix_on_exception_name(stmt, bases, name)
-                    {
+                    if let Some(check) = pep8_naming::checks::error_suffix_on_exception_name(
+                        stmt,
+                        bases,
+                        name,
+                        self.locator,
+                    ) {
                         self.add_check(check);
                     }
                 }
@@ -1168,7 +1171,9 @@ where
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
-                    if let Some(check) = pyflakes::checks::default_except_not_last(handlers) {
+                    if let Some(check) =
+                        pyflakes::checks::default_except_not_last(handlers, self.locator)
+                    {
                         self.add_check(check);
                     }
                 }
@@ -1412,7 +1417,7 @@ where
                     Binding {
                         kind: BindingKind::ClassDefinition,
                         used: None,
-                        range: Range::from_located(stmt),
+                        range: helpers::identifier_range(stmt, self.locator),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -1708,7 +1713,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::T201)
                     || self.settings.enabled.contains(&CheckCode::T203)
                 {
-                    flake8_print::plugins::print_call(self, expr, func, keywords);
+                    flake8_print::plugins::print_call(self, func, keywords);
                 }
 
                 // flake8-bugbear
@@ -2679,7 +2684,8 @@ where
                     if let Some(check) = pycodestyle::checks::do_not_use_bare_except(
                         type_.as_deref(),
                         body,
-                        Range::from_located(excepthandler),
+                        excepthandler,
+                        self.locator,
                     ) {
                         self.add_check(check);
                     }

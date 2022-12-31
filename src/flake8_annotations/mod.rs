@@ -15,7 +15,7 @@ mod tests {
 
     #[test]
     fn defaults() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_annotations/annotation_presence.py"),
             &Settings {
                 ..Settings::for_rules(vec![
@@ -33,14 +33,13 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn suppress_dummy_args() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_annotations/suppress_dummy_args.py"),
             &Settings {
                 flake8_annotations: flake8_annotations::settings::Settings {
@@ -58,14 +57,13 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn mypy_init_return() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_annotations/mypy_init_return.py"),
             &Settings {
                 flake8_annotations: flake8_annotations::settings::Settings {
@@ -83,14 +81,13 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn suppress_none_returning() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_annotations/suppress_none_returning.py"),
             &Settings {
                 flake8_annotations: flake8_annotations::settings::Settings {
@@ -108,14 +105,13 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn allow_star_arg_any() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py"),
             &Settings {
                 flake8_annotations: flake8_annotations::settings::Settings {
@@ -127,14 +123,13 @@ mod tests {
                 ..Settings::for_rules(vec![CheckCode::ANN401])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn allow_overload() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_annotations/allow_overload.py"),
             &Settings {
                 ..Settings::for_rules(vec![
@@ -146,7 +141,6 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
