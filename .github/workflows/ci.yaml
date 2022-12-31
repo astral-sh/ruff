@@ -122,7 +122,7 @@ jobs:
           cargo test --all
           UNUSED_SNAPSHOTS=$(cat <(git ls-files '*.snap' | xargs realpath) <(cat $INSTA_SNAPSHOT_REFERENCES_FILE) | sort | uniq -u)
           if [ ! -z "$UNUSED_SNAPSHOTS" ]; then
-            echo "Found unused snapshots"
+            echo "Found unused snapshots:"
             echo "$UNUSED_SNAPSHOTS"
             exit 1
           fi
