@@ -1,55 +1,17 @@
 ---
-source: compiler/parser/src/fstring.rs
+source: compiler/parser/src/string_parser.rs
 expression: parse_ast
 ---
 [
     Located {
         location: Location {
-            row: 0,
+            row: 1,
             column: 0,
         },
         end_location: Some(
             Location {
-                row: 0,
-                column: 0,
-            },
-        ),
-        custom: (),
-        node: Constant {
-            value: Str(
-                "user=",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 0,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 0,
-                column: 0,
-            },
-        ),
-        custom: (),
-        node: Constant {
-            value: Str(
-                "",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 0,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 0,
-                column: 0,
+                row: 1,
+                column: 13,
             },
         ),
         custom: (),
@@ -57,17 +19,17 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 1,
+                    column: 3,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 5,
+                        column: 6,
                     },
                 ),
                 custom: (),
                 node: Name {
-                    id: "user",
+                    id: "foo",
                     ctx: Load,
                 },
             },
@@ -75,13 +37,13 @@ expression: parse_ast
             format_spec: Some(
                 Located {
                     location: Location {
-                        row: 0,
+                        row: 1,
                         column: 0,
                     },
                     end_location: Some(
                         Location {
-                            row: 0,
-                            column: 0,
+                            row: 1,
+                            column: 13,
                         },
                     ),
                     custom: (),
@@ -89,19 +51,19 @@ expression: parse_ast
                         values: [
                             Located {
                                 location: Location {
-                                    row: 0,
+                                    row: 1,
                                     column: 0,
                                 },
                                 end_location: Some(
                                     Location {
-                                        row: 0,
-                                        column: 0,
+                                        row: 1,
+                                        column: 13,
                                     },
                                 ),
                                 custom: (),
                                 node: Constant {
                                     value: Str(
-                                        ">10",
+                                        "spec",
                                     ),
                                     kind: None,
                                 },

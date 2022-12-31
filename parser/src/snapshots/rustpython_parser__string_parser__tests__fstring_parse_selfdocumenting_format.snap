@@ -1,17 +1,55 @@
 ---
-source: compiler/parser/src/fstring.rs
+source: compiler/parser/src/string_parser.rs
 expression: parse_ast
 ---
 [
     Located {
         location: Location {
-            row: 0,
+            row: 1,
             column: 0,
         },
         end_location: Some(
             Location {
-                row: 0,
-                column: 0,
+                row: 1,
+                column: 14,
+            },
+        ),
+        custom: (),
+        node: Constant {
+            value: Str(
+                "user=",
+            ),
+            kind: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 14,
+            },
+        ),
+        custom: (),
+        node: Constant {
+            value: Str(
+                "",
+            ),
+            kind: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 14,
             },
         ),
         custom: (),
@@ -19,17 +57,17 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 1,
+                    column: 3,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 4,
+                        column: 7,
                     },
                 ),
                 custom: (),
                 node: Name {
-                    id: "foo",
+                    id: "user",
                     ctx: Load,
                 },
             },
@@ -37,13 +75,13 @@ expression: parse_ast
             format_spec: Some(
                 Located {
                     location: Location {
-                        row: 0,
+                        row: 1,
                         column: 0,
                     },
                     end_location: Some(
                         Location {
-                            row: 0,
-                            column: 0,
+                            row: 1,
+                            column: 14,
                         },
                     ),
                     custom: (),
@@ -51,36 +89,21 @@ expression: parse_ast
                         values: [
                             Located {
                                 location: Location {
-                                    row: 0,
+                                    row: 1,
                                     column: 0,
                                 },
                                 end_location: Some(
                                     Location {
-                                        row: 0,
-                                        column: 0,
+                                        row: 1,
+                                        column: 14,
                                     },
                                 ),
                                 custom: (),
-                                node: FormattedValue {
-                                    value: Located {
-                                        location: Location {
-                                            row: 1,
-                                            column: 1,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 1,
-                                                column: 5,
-                                            },
-                                        ),
-                                        custom: (),
-                                        node: Name {
-                                            id: "spec",
-                                            ctx: Load,
-                                        },
-                                    },
-                                    conversion: 0,
-                                    format_spec: None,
+                                node: Constant {
+                                    value: Str(
+                                        ">10",
+                                    ),
+                                    kind: None,
                                 },
                             },
                         ],

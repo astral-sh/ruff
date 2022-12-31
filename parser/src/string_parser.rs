@@ -36,6 +36,7 @@ impl<'a> StringParser<'a> {
         }
     }
 
+    #[inline]
     fn next_char(&mut self) -> Option<char> {
         let Some(c) = self.chars.next() else {
             return None
@@ -48,10 +49,12 @@ impl<'a> StringParser<'a> {
         Some(c)
     }
 
+    #[inline]
     fn peek(&mut self) -> Option<&char> {
         self.chars.peek()
     }
 
+    #[inline]
     fn get_pos(&self) -> Location {
         self.location
     }
@@ -559,4 +562,137 @@ pub fn parse_string(
     end: Location,
 ) -> Result<Vec<Expr>, LexicalError> {
     StringParser::new(source, kind, triple_quoted, start, end).parse()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_fstring(source: &str) -> Result<Vec<Expr>, FStringErrorType> {
+        StringParser::new(
+            source,
+            StringKind::FString,
+            false,
+            Location::new(1, 0),
+            Location::new(1, source.len() + 3), // 3 for prefix and quotes
+        )
+        .parse()
+        .map_err(|e| match e.error {
+            LexicalErrorType::FStringError(e) => e,
+            e => unreachable!("Unexpected error type {:?}", e),
+        })
+    }
+
+    #[test]
+    fn test_parse_fstring() {
+        let source = "{a}{ b }{{foo}}";
+        let parse_ast = parse_fstring(source).unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_fstring_nested_spec() {
+        let source = "{foo:{spec}}";
+        let parse_ast = parse_fstring(source).unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_fstring_not_nested_spec() {
+        let source = "{foo:spec}";
+        let parse_ast = parse_fstring(source).unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_empty_fstring() {
+        insta::assert_debug_snapshot!(parse_fstring("").unwrap());
+    }
+
+    #[test]
+    fn test_fstring_parse_selfdocumenting_base() {
+        let src = "{user=}";
+        let parse_ast = parse_fstring(src).unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_fstring_parse_selfdocumenting_base_more() {
+        let src = "mix {user=} with text and {second=}";
+        let parse_ast = parse_fstring(src).unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_fstring_parse_selfdocumenting_format() {
+        let src = "{user=:>10}";
+        let parse_ast = parse_fstring(src).unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_invalid_fstring() {
+        assert_eq!(parse_fstring("{5!a"), Err(UnclosedLbrace));
+        assert_eq!(parse_fstring("{5!a1}"), Err(UnclosedLbrace));
+        assert_eq!(parse_fstring("{5!"), Err(UnclosedLbrace));
+        assert_eq!(parse_fstring("abc{!a 'cat'}"), Err(EmptyExpression));
+        assert_eq!(parse_fstring("{!a"), Err(EmptyExpression));
+        assert_eq!(parse_fstring("{ !a}"), Err(EmptyExpression));
+
+        assert_eq!(parse_fstring("{5!}"), Err(InvalidConversionFlag));
+        assert_eq!(parse_fstring("{5!x}"), Err(InvalidConversionFlag));
+
+        assert_eq!(parse_fstring("{a:{a:{b}}}"), Err(ExpressionNestedTooDeeply));
+
+        assert_eq!(parse_fstring("{a:b}}"), Err(SingleRbrace));
+        assert_eq!(parse_fstring("}"), Err(SingleRbrace));
+        assert_eq!(parse_fstring("{a:{b}"), Err(UnclosedLbrace));
+        assert_eq!(parse_fstring("{"), Err(UnclosedLbrace));
+
+        assert_eq!(parse_fstring("{}"), Err(EmptyExpression));
+
+        // TODO: check for InvalidExpression enum?
+        assert!(parse_fstring("{class}").is_err());
+    }
+
+    #[test]
+    fn test_parse_fstring_not_equals() {
+        let source = "{1 != 2}";
+        let parse_ast = parse_fstring(source).unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_fstring_equals() {
+        let source = "{42 == 42}";
+        let parse_ast = parse_fstring(source).unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_fstring_selfdoc_prec_space() {
+        let source = "{x   =}";
+        let parse_ast = parse_fstring(source).unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_fstring_selfdoc_trailing_space() {
+        let source = "{x=   }";
+        let parse_ast = parse_fstring(source).unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_fstring_yield_expr() {
+        let source = "{yield}";
+        let parse_ast = parse_fstring(source).unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }
