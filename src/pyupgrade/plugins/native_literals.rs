@@ -53,7 +53,7 @@ pub fn native_literals(
             .slice_source_code_range(&Range::from_located(arg));
         if lexer::make_tokenizer(&arg_code)
             .flatten()
-            .filter(|(_, tok, _)| matches!(tok, Tok::String { .. } | Tok::Bytes { .. }))
+            .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
             .count()
             > 1
         {

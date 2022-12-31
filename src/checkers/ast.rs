@@ -87,7 +87,6 @@ pub struct Checker<'a> {
     deferred_assignments: Vec<DeferralContext<'a>>,
     // Internal, derivative state.
     visible_scope: VisibleScope,
-    in_f_string: Option<Range>,
     in_annotation: bool,
     in_type_definition: bool,
     in_deferred_string_type_definition: bool,
@@ -144,7 +143,6 @@ impl<'a> Checker<'a> {
                 modifier: Modifier::Module,
                 visibility: module_visibility(path),
             },
-            in_f_string: None,
             in_annotation: false,
             in_type_definition: false,
             in_deferred_string_type_definition: false,
@@ -161,14 +159,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Add a `Check` to the `Checker`.
-    pub(crate) fn add_check(&mut self, mut check: Check) {
-        // If we're in an f-string, override the location. RustPython doesn't produce
-        // reliable locations for expressions within f-strings, so we use the
-        // span of the f-string itself as a best-effort default.
-        if let Some(range) = self.in_f_string {
-            check.location = range.location;
-            check.end_location = range.end_location;
-        }
+    pub(crate) fn add_check(&mut self, check: Check) {
         self.checks.push(check);
     }
 
@@ -184,16 +175,13 @@ impl<'a> Checker<'a> {
     pub fn patch(&self, code: &CheckCode) -> bool {
         // TODO(charlie): We can't fix errors in f-strings until RustPython adds
         // location data.
-        matches!(self.autofix, flags::Autofix::Enabled)
-            && self.in_f_string.is_none()
-            && self.settings.fixable.contains(code)
+        matches!(self.autofix, flags::Autofix::Enabled) && self.settings.fixable.contains(code)
     }
 
     /// Return the amended `Range` from a `Located`.
     pub fn range_for<T>(&self, located: &Located<T>) -> Range {
         // If we're in an f-string, override the location.
-        self.in_f_string
-            .unwrap_or_else(|| Range::from_located(located))
+        Range::from_located(located)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -1479,7 +1467,6 @@ where
 
         self.push_expr(expr);
 
-        let prev_in_f_string = self.in_f_string;
         let prev_in_literal = self.in_literal;
         let prev_in_type_definition = self.in_type_definition;
 
@@ -2166,10 +2153,9 @@ where
             }
             ExprKind::JoinedStr { values } => {
                 if self.settings.enabled.contains(&CheckCode::F541) {
-                    if self.in_f_string.is_none()
-                        && !values
-                            .iter()
-                            .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
+                    if !values
+                        .iter()
+                        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
                     {
                         self.add_check(Check::new(
                             CheckKind::FStringMissingPlaceholders,
@@ -2177,7 +2163,6 @@ where
                         ));
                     }
                 }
-                self.in_f_string = Some(Range::from_located(expr));
             }
             ExprKind::BinOp {
                 left,
@@ -2687,7 +2672,6 @@ where
 
         self.in_type_definition = prev_in_type_definition;
         self.in_literal = prev_in_literal;
-        self.in_f_string = prev_in_f_string;
 
         self.pop_expr();
     }
