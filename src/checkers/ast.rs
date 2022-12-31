@@ -1168,7 +1168,9 @@ where
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
-                    if let Some(check) = pyflakes::checks::default_except_not_last(handlers) {
+                    if let Some(check) =
+                        pyflakes::checks::default_except_not_last(handlers, self.locator)
+                    {
                         self.add_check(check);
                     }
                 }
@@ -2679,7 +2681,8 @@ where
                     if let Some(check) = pycodestyle::checks::do_not_use_bare_except(
                         type_.as_deref(),
                         body,
-                        Range::from_located(excepthandler),
+                        excepthandler,
+                        self.locator,
                     ) {
                         self.add_check(check);
                     }

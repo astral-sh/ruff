@@ -7,8 +7,8 @@ expression: checks
     row: 4
     column: 0
   end_location:
-    row: 5
-    column: 8
+    row: 4
+    column: 6
   fix: ~
   parent: ~
 - kind: DoNotUseBareExcept
@@ -16,8 +16,8 @@ expression: checks
     row: 11
     column: 0
   end_location:
-    row: 12
-    column: 8
+    row: 11
+    column: 6
   fix: ~
   parent: ~
 - kind: DoNotUseBareExcept
@@ -25,8 +25,8 @@ expression: checks
     row: 16
     column: 0
   end_location:
-    row: 17
-    column: 8
+    row: 16
+    column: 6
   fix: ~
   parent: ~
 

@@ -426,6 +426,29 @@ pub fn excepthandler_name_range(
     }
 }
 
+/// Return the `Range` of `except` in `Excepthandler`.
+pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Range {
+    let ExcepthandlerKind::ExceptHandler { body, type_, .. } = &handler.node;
+    let end = if let Some(type_) = type_ {
+        type_.location
+    } else {
+        body[0].location
+    };
+    let contents = locator.slice_source_code_range(&Range {
+        location: handler.location,
+        end_location: end,
+    });
+    let range = lexer::make_tokenizer_located(&contents, handler.location)
+        .flatten()
+        .find(|(_, kind, _)| matches!(kind, Tok::Except { .. }))
+        .map(|(location, _, end_location)| Range {
+            location,
+            end_location,
+        })
+        .unwrap();
+    range
+}
+
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
 pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
