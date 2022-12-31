@@ -522,6 +522,49 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
         flags::Autofix::Enabled,
         flags::Noqa::Enabled,
     )?;
+
+    // Detect auto fixes that don't converge after multiple iterations.
+    if checks.iter().any(|check| check.fix.is_some()) {
+        let mut contents = contents.clone();
+        let mut iterations = 0;
+
+        loop {
+            let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+            let locator = SourceCodeLocator::new(&contents);
+            let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+            let directives = directives::extract_directives(
+                &tokens,
+                &locator,
+                directives::Flags::from_settings(settings),
+            );
+            let checks = check_path(
+                path,
+                None,
+                &contents,
+                tokens,
+                &locator,
+                &stylist,
+                &directives,
+                settings,
+                flags::Autofix::Enabled,
+                flags::Noqa::Enabled,
+            )?;
+            if let Some((fixed_contents, _)) = fix_file(&checks, &locator) {
+                if iterations < 100 {
+                    iterations += 1;
+                    contents = fixed_contents.to_string();
+                } else {
+                    panic!(
+                        "Failed to converge after 100 iterations. This likely indicates a bug in \
+                         the implementation of the fix."
+                    );
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
     checks.sort_by_key(|check| check.location);
     Ok(checks)
 }
