@@ -137,6 +137,14 @@ def x():
     return a
 
 
+# Considered OK, since attribute assignments can have side effects.
+class X:
+    def x(self):
+        a = self.property
+        self.property = None
+        return a
+
+
 # Test cases for using value for assignment then returning it
 # See:https://github.com/afonasev/flake8-return/issues/47
 def resolve_from_url(self, url: str) -> dict:
@@ -238,13 +246,16 @@ def close(self):
             report(traceback.format_exc())
     return any_failed
 
+
 def global_assignment():
     global X
     X = 1
     return X
 
+
 def nonlocal_assignment():
     X = 1
+
     def inner():
         nonlocal X
         X = 1

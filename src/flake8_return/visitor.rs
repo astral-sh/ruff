@@ -38,6 +38,18 @@ impl<'a> ReturnVisitor<'a> {
                     .push(expr.location);
                 return;
             }
+            ExprKind::Attribute { .. } => {
+                // Attribute assignments are often side-effects (e.g., `self.property = value`),
+                // so we conservatively treat them as references to every known
+                // variable.
+                for name in self.stack.assigns.keys() {
+                    self.stack
+                        .refs
+                        .entry(name)
+                        .or_insert_with(Vec::new)
+                        .push(expr.location);
+                }
+            }
             _ => {}
         }
         visitor::walk_expr(self, expr);
