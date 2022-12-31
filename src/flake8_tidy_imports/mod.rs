@@ -15,7 +15,7 @@ mod tests {
 
     #[test]
     fn ban_parent_imports() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_tidy_imports/TID252.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
@@ -25,14 +25,13 @@ mod tests {
                 ..Settings::for_rules(vec![CheckCode::TID252])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn ban_all_imports() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_tidy_imports/TID252.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
@@ -42,14 +41,13 @@ mod tests {
                 ..Settings::for_rules(vec![CheckCode::TID252])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn banned_api_true_positives() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_tidy_imports/TID251.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
@@ -72,14 +70,13 @@ mod tests {
                 ..Settings::for_rules(vec![CheckCode::TID251])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn banned_api_false_positives() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_tidy_imports/TID251_false_positives.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
@@ -94,7 +91,6 @@ mod tests {
                 ..Settings::for_rules(vec![CheckCode::TID251])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }

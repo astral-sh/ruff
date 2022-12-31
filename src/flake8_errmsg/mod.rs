@@ -13,7 +13,7 @@ mod tests {
 
     #[test]
     fn defaults() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_errmsg/EM.py"),
             &settings::Settings::for_rules(vec![
                 CheckCode::EM101,
@@ -21,14 +21,13 @@ mod tests {
                 CheckCode::EM103,
             ]),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("defaults", checks);
         Ok(())
     }
 
     #[test]
     fn custom() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_errmsg/EM.py"),
             &settings::Settings {
                 flake8_errmsg: flake8_errmsg::settings::Settings {
@@ -41,7 +40,6 @@ mod tests {
                 ])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!("custom", checks);
         Ok(())
     }
