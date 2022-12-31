@@ -1,9 +1,10 @@
 use itertools::izip;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Constant, Located, Location, Stmt, StmtKind};
+use rustpython_ast::{Constant, Excepthandler, Located, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
+use crate::ast::helpers::except_range;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checks::{Check, CheckKind};
@@ -88,14 +89,18 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
 pub fn do_not_use_bare_except(
     type_: Option<&Expr>,
     body: &[Stmt],
-    location: Range,
+    handler: &Excepthandler,
+    locator: &SourceCodeLocator,
 ) -> Option<Check> {
     if type_.is_none()
         && !body
             .iter()
             .any(|stmt| matches!(stmt.node, StmtKind::Raise { exc: None, .. }))
     {
-        Some(Check::new(CheckKind::DoNotUseBareExcept, location))
+        Some(Check::new(
+            CheckKind::DoNotUseBareExcept,
+            except_range(handler, locator),
+        ))
     } else {
         None
     }

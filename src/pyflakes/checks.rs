@@ -5,8 +5,10 @@ use rustpython_parser::ast::{
     Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
 };
 
+use crate::ast::helpers::except_range;
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::checks::{Check, CheckKind};
+use crate::source_code_locator::SourceCodeLocator;
 
 /// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
@@ -110,13 +112,16 @@ pub fn unused_annotation(
 }
 
 /// F707
-pub fn default_except_not_last(handlers: &[Excepthandler]) -> Option<Check> {
+pub fn default_except_not_last(
+    handlers: &[Excepthandler],
+    locator: &SourceCodeLocator,
+) -> Option<Check> {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         if type_.is_none() && idx < handlers.len() - 1 {
             return Some(Check::new(
                 CheckKind::DefaultExceptNotLast,
-                Range::from_located(handler),
+                except_range(handler, locator),
             ));
         }
     }
