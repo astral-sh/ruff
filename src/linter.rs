@@ -523,8 +523,10 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
         flags::Noqa::Enabled,
     )?;
 
-    // Detect auto fixes that don't converge after multiple iterations.
+    // Detect autofixes that don't converge after multiple iterations.
     if checks.iter().any(|check| check.fix.is_some()) {
+        let max_iterations = 3;
+
         let mut contents = contents.clone();
         let mut iterations = 0;
 
@@ -550,13 +552,13 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
                 flags::Noqa::Enabled,
             )?;
             if let Some((fixed_contents, _)) = fix_file(&checks, &locator) {
-                if iterations < 100 {
+                if iterations < max_iterations {
                     iterations += 1;
                     contents = fixed_contents.to_string();
                 } else {
                     panic!(
-                        "Failed to converge after 100 iterations. This likely indicates a bug in \
-                         the implementation of the fix."
+                        "Failed to converge after {max_iterations} iterations. This likely \
+                         indicates a bug in the implementation of the fix."
                     );
                 }
             } else {
