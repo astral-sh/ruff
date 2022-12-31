@@ -1,4 +1,5 @@
 use rustpython_ast::{AliasData, Located, Stmt, StmtKind};
+use libcst_native::{Import, ImportFrom, ImportAlias, Name, NameOrAttribute, Expression, CodegenState, Codegen, ImportNames};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
@@ -7,6 +8,8 @@ use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::isort::helpers::trailing_comma;
 use crate::isort::types::TrailingComma;
+use crate::cst::matchers::{match_module, match_import, match_import_from};
+use crate::source_code_locator::SourceCodeLocator;
 
 /// Replaces a given statement with a string
 fn update_import(checker: &mut Checker, stmt: &Stmt, new_stmt: String) {
@@ -35,6 +38,7 @@ fn new_line_count(checker: &Checker, stmt: &Stmt) -> usize {
     }
     count
 }
+
 
 /// Create the new string for the import
 fn create_new_statement(
@@ -106,23 +110,123 @@ fn filter_names(names: &Vec<Located<AliasData>>) -> (Vec<String>, bool) {
     (needed_imports, needs_updated)
 }
 
-pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
-    match &stmt.node {
-        StmtKind::Import { names } => {
-            let (needed_imports, needs_updated) = filter_names(names);
-            if needs_updated {
-                let indent = indentation(checker, stmt);
-                let new_stmt =
-                    create_new_statement(needed_imports, "import", &indent, false, false);
-                update_import(checker, stmt, new_stmt);
+struct CleanImport<'a> {
+    pub aliases: Vec<ImportAlias<'a>>,
+    has_mock: bool
+}
+
+impl<'a> CleanImport<'a> {
+    fn new(aliases: Vec<ImportAlias<'a>>, has_mock: bool) -> Self {
+        Self {
+            aliases,
+            has_mock,
+        }
+    }
+}
+
+impl<'a> Default for CleanImport<'a> {
+    fn default() -> Self {
+        Self {
+            aliases: vec![],
+            has_mock: false,
+        }
+    }
+}
+
+fn clean_import_aliases<'a>(aliases: &'a Vec<ImportAlias>) -> CleanImport<'a> {
+    let mut new_aliases: Vec<ImportAlias<'_>> = vec![];
+    let mut has_mock = false;
+    for alias in aliases {
+        let ImportAlias { name, .. } = alias;
+        match name {
+            NameOrAttribute::N(name_struct) => {
+                if name_struct.value == "mock" {
+                    has_mock = true;
+                } else {
+                    new_aliases.push(alias.clone());
+                }
+            },
+            NameOrAttribute::A(attribute_struct) => {
+                let item = *attribute_struct.clone().value;
+                if let Expression::Name(name_struct) = &item {
+                    let Name { value, .. } = attribute_struct.attr;
+                    if name_struct.value == "mock" && value == "mock" {
+                        has_mock = true;
+                    } else {
+                        new_aliases.push(alias.clone());
+                    }
+                } else {return CleanImport::default()}
+
             }
         }
-        StmtKind::ImportFrom {
-            module: Some(module),
-            names,
-            ..
-        } => {
+    }
+    CleanImport::new(new_aliases, has_mock)
+}
+
+fn format_import(locator: &SourceCodeLocator, stmt: &Stmt, indent: &str) -> Option<String> {
+    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+    let mut tree = match_module(&module_text).unwrap();
+    let mut import = match match_import(&mut tree) {
+        Err(_) => return None,
+        Ok(import_item) => import_item,
+    };
+    let Import { names, .. } = import.clone();
+    let clean_import = clean_import_aliases(&names);
+    if clean_import.has_mock && clean_import.aliases.is_empty() {
+        Some(format!("from unittest import mock"))
+    } else if clean_import.has_mock {
+        import.names = clean_import.aliases;
+        let mut state = CodegenState::default();
+        tree.codegen(&mut state);
+        let mut base_string = state.to_string();
+        base_string.push_str(&format!("\n{indent}from unittest import mock"));
+        Some(base_string)
+    } else {
+        None
+    }
+}
+
+fn format_import_from(locator: &SourceCodeLocator, stmt: &Stmt, indent: &str) -> Option<String> {
+    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+    let mut tree = match_module(&module_text).unwrap();
+    let mut import = match match_import_from(&mut tree) {
+        Err(_) => return None,
+        Ok(import_item) => import_item,
+    };
+    let ImportFrom { names: from_names, .. } = import.clone();
+    if let ImportNames::Aliases(names) = from_names {
+        let clean_import = clean_import_aliases(&names);
+        if clean_import.has_mock && clean_import.aliases.is_empty() {
+            return Some(format!("from unittest import mock"));
+        } else if clean_import.has_mock {
+            import.names = ImportNames::Aliases(clean_import.aliases);
+            let mut state = CodegenState::default();
+            tree.codegen(&mut state);
+            let mut base_string = state.to_string();
+            base_string.push_str(&format!("\n{indent}from unittest import mock"));
+            return Some(base_string)
+        }
+    }
+    None
+}
+
+pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
+    match &stmt.node {
+        StmtKind::Import { .. } => {
+            let indent = indentation(checker, stmt);
+            match format_import(checker.locator, stmt, &indent) {
+                None => return,
+                Some(formatted) => update_import(checker, stmt, formatted)
+            }
+        }
+        StmtKind::ImportFrom {module: Some(module), .. } => {
             if module == "mock" {
+                let indent = indentation(checker, stmt);
+                match format_import_from(checker.locator, stmt, &indent) {
+                    None => return,
+                    Some(formatted) => update_import(checker, stmt, formatted)
+                }
+                /*
                 let (needed_imports, needs_updated) = filter_names(names);
                 if needs_updated {
                     let indent = indentation(checker, stmt);
@@ -143,6 +247,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     );
                     update_import(checker, stmt, new_stmt);
                 }
+                */
             }
         }
         _ => (),
