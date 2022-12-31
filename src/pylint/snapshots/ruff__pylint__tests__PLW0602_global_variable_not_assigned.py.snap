@@ -6,7 +6,7 @@ expression: checks
     GlobalVariableNotAssigned: x
   location:
     row: 5
-    column: 4
+    column: 11
   end_location:
     row: 5
     column: 12
@@ -16,7 +16,7 @@ expression: checks
     GlobalVariableNotAssigned: x
   location:
     row: 9
-    column: 4
+    column: 11
   end_location:
     row: 9
     column: 12

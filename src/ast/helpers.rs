@@ -5,7 +5,7 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
-    Location, Stmt, StmtKind,
+    Located, Location, Stmt, StmtKind,
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -393,6 +393,19 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
         error!("Failed to find identifier for {:?}", stmt);
     }
     Range::from_located(stmt)
+}
+
+// Return the ranges of `Name` tokens within a specified node.
+pub fn find_names<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Vec<Range> {
+    let contents = locator.slice_source_code_range(&Range::from_located(located));
+    lexer::make_tokenizer_located(&contents, located.location)
+        .flatten()
+        .filter(|(_, tok, _)| matches!(tok, Tok::Name { .. }))
+        .map(|(start, _, end)| Range {
+            location: start,
+            end_location: end,
+        })
+        .collect()
 }
 
 /// Return the `Range` of `name` in `Excepthandler`.
