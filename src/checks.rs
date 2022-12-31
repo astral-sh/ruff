@@ -908,7 +908,7 @@ pub enum CheckKind {
     ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
     RewriteCElementTree,
-    OSErrorAlias,
+    OSErrorAlias(Option<String>),
     RewriteUnicodeLiteral,
     // pydocstyle
     BlankLineAfterLastSection(String),
@@ -1303,7 +1303,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
             CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
-            CheckCode::UP024 => CheckKind::OSErrorAlias,
+            CheckCode::UP024 => CheckKind::OSErrorAlias(None),
             CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
@@ -1959,7 +1959,7 @@ impl CheckKind {
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
-            CheckKind::OSErrorAlias => &CheckCode::UP024,
+            CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
             CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
@@ -2720,7 +2720,7 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
-            CheckKind::OSErrorAlias => "Replace aliased errors with `OSError`".to_string(),
+            CheckKind::OSErrorAlias(..) => "Replace aliased errors with `OSError`".to_string(),
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
@@ -3135,8 +3135,8 @@ impl CheckKind {
         matches!(
             self,
             CheckKind::AmbiguousUnicodeCharacterString(..)
-                | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
                 | CheckKind::AmbiguousUnicodeCharacterComment(..)
+                | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
                 | CheckKind::BlankLineAfterSummary
@@ -3162,7 +3162,6 @@ impl CheckKind {
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::MissingReturnTypeSpecialMethod(..)
                 | CheckKind::NativeLiterals(..)
-                | CheckKind::OpenAlias
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
@@ -3176,14 +3175,14 @@ impl CheckKind {
                 | CheckKind::NoneComparison(..)
                 | CheckKind::NotInTest
                 | CheckKind::NotIsTest
-                | CheckKind::OSErrorAlias
+                | CheckKind::OSErrorAlias(..)
                 | CheckKind::OneBlankLineAfterClass(..)
                 | CheckKind::OneBlankLineBeforeClass(..)
                 | CheckKind::OpenAlias
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
-                | CheckKind::PrintFound
                 | CheckKind::PercentFormatExtraNamedArguments(..)
+                | CheckKind::PrintFound
                 | CheckKind::RaiseNotImplemented
                 | CheckKind::RedundantOpenModes(..)
                 | CheckKind::RedundantTupleInExceptionHandler(..)
@@ -3321,6 +3320,10 @@ impl CheckKind {
             CheckKind::OneBlankLineAfterClass(..) => {
                 Some("Insert 1 blank line after class docstring".to_string())
             }
+            CheckKind::OSErrorAlias(name) => Some(match name {
+                None => "Replace with builtin `OSError`".to_string(),
+                Some(name) => format!("Replace `{name}` with builtin `OSError`"),
+            }),
             CheckKind::NoBlankLinesBetweenHeaderAndContent(..) => {
                 Some("Remove blank line(s)".to_string())
             }

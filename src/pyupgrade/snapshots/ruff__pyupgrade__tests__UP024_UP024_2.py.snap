@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: socket.error
   location:
     row: 10
     column: 6
@@ -18,7 +19,8 @@ expression: checks
       row: 10
       column: 18
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: mmap.error
   location:
     row: 11
     column: 6
@@ -34,7 +36,8 @@ expression: checks
       row: 11
       column: 16
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: select.error
   location:
     row: 12
     column: 6
@@ -50,7 +53,8 @@ expression: checks
       row: 12
       column: 18
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: socket.error
   location:
     row: 14
     column: 6
@@ -66,7 +70,8 @@ expression: checks
       row: 14
       column: 18
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: mmap.error
   location:
     row: 15
     column: 6
@@ -82,7 +87,8 @@ expression: checks
       row: 15
       column: 16
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: select.error
   location:
     row: 16
     column: 6
@@ -98,7 +104,8 @@ expression: checks
       row: 16
       column: 18
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: socket.error
   location:
     row: 18
     column: 6
@@ -114,7 +121,8 @@ expression: checks
       row: 18
       column: 18
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: error
   location:
     row: 25
     column: 6
@@ -130,7 +138,8 @@ expression: checks
       row: 25
       column: 11
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: error
   location:
     row: 28
     column: 6
@@ -146,7 +155,8 @@ expression: checks
       row: 28
       column: 11
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: error
   location:
     row: 31
     column: 6
@@ -162,7 +172,8 @@ expression: checks
       row: 31
       column: 11
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: EnvironmentError
   location:
     row: 34
     column: 6
@@ -178,7 +189,8 @@ expression: checks
       row: 34
       column: 22
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: IOError
   location:
     row: 35
     column: 6
@@ -194,7 +206,8 @@ expression: checks
       row: 35
       column: 13
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: WindowsError
   location:
     row: 36
     column: 6
@@ -210,7 +223,8 @@ expression: checks
       row: 36
       column: 18
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: EnvironmentError
   location:
     row: 38
     column: 6
@@ -226,7 +240,8 @@ expression: checks
       row: 38
       column: 22
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: IOError
   location:
     row: 39
     column: 6
@@ -242,7 +257,8 @@ expression: checks
       row: 39
       column: 13
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: WindowsError
   location:
     row: 40
     column: 6
@@ -258,7 +274,8 @@ expression: checks
       row: 40
       column: 18
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: EnvironmentError
   location:
     row: 42
     column: 6
@@ -274,7 +291,8 @@ expression: checks
       row: 42
       column: 22
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: WindowsError
   location:
     row: 48
     column: 6
@@ -290,7 +308,8 @@ expression: checks
       row: 48
       column: 18
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: EnvironmentError
   location:
     row: 49
     column: 6
@@ -306,7 +325,8 @@ expression: checks
       row: 49
       column: 22
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: IOError
   location:
     row: 50
     column: 6

@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: EnvironmentError
   location:
     row: 6
     column: 7
@@ -18,7 +19,8 @@ expression: checks
       row: 6
       column: 23
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: IOError
   location:
     row: 11
     column: 7
@@ -34,7 +36,8 @@ expression: checks
       row: 11
       column: 14
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: WindowsError
   location:
     row: 16
     column: 7
@@ -50,7 +53,8 @@ expression: checks
       row: 16
       column: 19
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: mmap.error
   location:
     row: 21
     column: 7
@@ -66,7 +70,8 @@ expression: checks
       row: 21
       column: 17
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: select.error
   location:
     row: 26
     column: 7
@@ -82,7 +87,8 @@ expression: checks
       row: 26
       column: 19
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: socket.error
   location:
     row: 31
     column: 7
@@ -98,7 +104,8 @@ expression: checks
       row: 31
       column: 19
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: error
   location:
     row: 36
     column: 7
@@ -114,7 +121,8 @@ expression: checks
       row: 36
       column: 12
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: ~
   location:
     row: 43
     column: 7
@@ -130,7 +138,8 @@ expression: checks
       row: 43
       column: 17
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: ~
   location:
     row: 47
     column: 7
@@ -146,7 +155,8 @@ expression: checks
       row: 47
       column: 20
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: ~
   location:
     row: 51
     column: 7
@@ -162,7 +172,8 @@ expression: checks
       row: 51
       column: 57
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: ~
   location:
     row: 58
     column: 7
@@ -178,7 +189,8 @@ expression: checks
       row: 58
       column: 35
   parent: ~
-- kind: OSErrorAlias
+- kind:
+    OSErrorAlias: ~
   location:
     row: 65
     column: 7

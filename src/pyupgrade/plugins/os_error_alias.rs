@@ -3,7 +3,7 @@
 use itertools::Itertools;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
-use crate::ast::helpers::match_module_member;
+use crate::ast::helpers::{compose_call_path, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
@@ -80,9 +80,8 @@ fn handle_name_or_attribute(
 /// Handles one block of an except (use a loop if there are multile blocks)
 fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKind>) {
     let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
-    let error_handlers = match type_.as_ref() {
-        None => return,
-        Some(expr) => expr,
+    let Some(error_handlers) = type_.as_ref() else {
+        return;
     };
     // The first part creates list of all the exceptions being caught, and
     // what they should be changed to
@@ -158,7 +157,7 @@ fn handle_making_changes(
             final_str.insert(0, '(');
             final_str.push(')');
         }
-        let mut check = Check::new(CheckKind::OSErrorAlias, range);
+        let mut check = Check::new(CheckKind::OSErrorAlias(compose_call_path(target)), range);
         if checker.patch(check.kind.code()) {
             check.amend(Fix::replacement(
                 final_str,
