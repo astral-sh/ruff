@@ -492,7 +492,9 @@ mod tests {
     use rustpython_ast::Location;
     use rustpython_parser::parser;
 
-    use crate::ast::helpers::{identifier_range, match_module_member, match_trailing_content};
+    use crate::ast::helpers::{
+        else_range, identifier_range, match_module_member, match_trailing_content,
+    };
     use crate::ast::types::Range;
     use crate::source_code_locator::SourceCodeLocator;
 
@@ -762,6 +764,26 @@ class Class():
             }
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_else_range() -> Result<()> {
+        let contents = r#"
+for x in y:
+    pass
+else:
+    pass
+"#
+        .trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        let range = else_range(stmt, &locator).unwrap();
+        assert_eq!(range.location.row(), 3);
+        assert_eq!(range.location.column(), 0);
+        assert_eq!(range.end_location.row(), 3);
+        assert_eq!(range.end_location.column(), 4);
         Ok(())
     }
 }
