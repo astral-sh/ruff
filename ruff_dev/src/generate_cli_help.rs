@@ -16,9 +16,13 @@ pub struct Cli {
     pub(crate) dry_run: bool,
 }
 
+fn trim_lines(s: &str) -> String {
+    s.lines().map(str::trim_end).collect::<Vec<_>>().join("\n")
+}
+
 pub fn main(cli: &Cli) -> Result<()> {
     let mut cmd = MainCli::command();
-    let output = cmd.render_help().to_string();
+    let output = trim_lines(cmd.render_help().to_string().trim());
 
     if cli.dry_run {
         print!("{output}");

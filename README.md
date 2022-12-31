@@ -384,7 +384,6 @@ Options:
           Print help information
   -V, --version
           Print version information
-
 ```
 <!-- End auto-generated cli help. -->
 
