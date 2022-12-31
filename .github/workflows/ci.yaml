@@ -40,8 +40,7 @@ jobs:
       - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo +nightly dev generate-all'."
       - run: git diff --quiet src/checks_gen.rs || echo "::error file=src/checks_gen.rs::This file is outdated. Run 'cargo +nightly dev generate-all'."
       - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo +nightly dev generate-all'."
-      - run: git diff --quiet playground/src/ruff_options.ts || echo "::error file=playground/src/ruff_options.ts::This file is outdated. Run 'cargo +nightly dev generate-all'."
-      - run: git diff --exit-code -- README.md src/checks_gen.rs ruff.schema.json playground/src/ruff_options.ts
+      - run: git diff --exit-code -- README.md src/checks_gen.rs ruff.schema.json
 
   cargo-fmt:
     name: "cargo fmt"
@@ -118,7 +117,17 @@ jobs:
             ${{ runner.os }}-build-
             ${{ runner.os }}-
       - run: pip install black[d]==22.12.0
-      - run: cargo test --all
+      - name: Run tests
+        run: |
+          export INSTA_SNAPSHOT_REFERENCES_FILE="$(mktemp)"
+          cargo test --all
+          USED_SNAPSHOTS=$(cat $INSTA_SNAPSHOT_REFERENCES_FILE | xargs realpath --relative-to $PWD)
+          UNUSED_SNAPSHOTS=$(cat <(git ls-files '*.snap') <(echo "$USED_SNAPSHOTS") | sort | uniq -u)
+          if [ ! -z "$UNUSED_SNAPSHOTS" ]; then
+            echo "Found unused snapshots:"
+            echo "$UNUSED_SNAPSHOTS"
+            exit 1
+          fi
       - run: cargo test --package ruff --test black_compatibility_test -- --ignored
 
 # TODO(charlie): Re-enable the `wasm-pack` tests.

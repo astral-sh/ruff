@@ -89,7 +89,7 @@ pub fn check_imports(
         Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
     );
     let actual = dedent(&locator.slice_source_code_range(&range));
-    if actual == expected {
+    if actual == dedent(&expected) {
         None
     } else {
         let mut check = Check::new(CheckKind::UnsortedImports, range);

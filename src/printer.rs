@@ -10,7 +10,7 @@ use rustpython_parser::ast::Location;
 use serde::Serialize;
 use serde_json::json;
 
-use crate::autofix::{fixer, Fix};
+use crate::autofix::fixer;
 use crate::checks::CheckCode;
 use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
@@ -26,10 +26,18 @@ pub enum Violations {
 }
 
 #[derive(Serialize)]
+struct ExpandedFix<'a> {
+    content: &'a str,
+    message: Option<String>,
+    location: &'a Location,
+    end_location: &'a Location,
+}
+
+#[derive(Serialize)]
 struct ExpandedMessage<'a> {
     code: &'a CheckCode,
     message: String,
-    fix: Option<&'a Fix>,
+    fix: Option<ExpandedFix<'a>>,
     location: Location,
     end_location: Location,
     filename: &'a str,
@@ -127,7 +135,12 @@ impl<'a> Printer<'a> {
                             .map(|message| ExpandedMessage {
                                 code: message.kind.code(),
                                 message: message.kind.body(),
-                                fix: message.fix.as_ref(),
+                                fix: message.fix.as_ref().map(|fix| ExpandedFix {
+                                    content: &fix.content,
+                                    location: &fix.location,
+                                    end_location: &fix.end_location,
+                                    message: message.kind.commit(),
+                                }),
                                 location: message.location,
                                 end_location: message.end_location,
                                 filename: &message.filename,
@@ -323,6 +336,17 @@ fn print_message(message: &Message) {
     );
     println!("{label}");
     if let Some(source) = &message.source {
+        let commit = message.kind.commit();
+        let footer = if commit.is_some() {
+            vec![Annotation {
+                id: None,
+                label: commit.as_deref(),
+                annotation_type: AnnotationType::Help,
+            }]
+        } else {
+            vec![]
+        };
+
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -330,7 +354,7 @@ fn print_message(message: &Message) {
                 // The ID (error number) is already encoded in the `label`.
                 id: None,
             }),
-            footer: vec![],
+            footer,
             slices: vec![Slice {
                 source: &source.contents,
                 line_start: message.location.row(),
@@ -352,7 +376,7 @@ fn print_message(message: &Message) {
         // Skip the first line, since we format the `label` ourselves.
         let message = DisplayList::from(snippet).to_string();
         let (_, message) = message.split_once('\n').unwrap();
-        println!("{message}");
+        println!("{message}\n");
     }
 }
 
@@ -371,6 +395,17 @@ fn print_grouped_message(message: &Message, row_length: usize, column_length: us
     );
     println!("{label}");
     if let Some(source) = &message.source {
+        let commit = message.kind.commit();
+        let footer = if commit.is_some() {
+            vec![Annotation {
+                id: None,
+                label: commit.as_deref(),
+                annotation_type: AnnotationType::Help,
+            }]
+        } else {
+            vec![]
+        };
+
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -378,7 +413,7 @@ fn print_grouped_message(message: &Message, row_length: usize, column_length: us
                 // The ID (error number) is already encoded in the `label`.
                 id: None,
             }),
-            footer: vec![],
+            footer,
             slices: vec![Slice {
                 source: &source.contents,
                 line_start: message.location.row(),

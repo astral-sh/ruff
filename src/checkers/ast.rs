@@ -87,7 +87,6 @@ pub struct Checker<'a> {
     deferred_assignments: Vec<DeferralContext<'a>>,
     // Internal, derivative state.
     visible_scope: VisibleScope,
-    in_f_string: Option<Range>,
     in_annotation: bool,
     in_type_definition: bool,
     in_deferred_string_type_definition: bool,
@@ -144,7 +143,6 @@ impl<'a> Checker<'a> {
                 modifier: Modifier::Module,
                 visibility: module_visibility(path),
             },
-            in_f_string: None,
             in_annotation: false,
             in_type_definition: false,
             in_deferred_string_type_definition: false,
@@ -161,14 +159,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Add a `Check` to the `Checker`.
-    pub(crate) fn add_check(&mut self, mut check: Check) {
-        // If we're in an f-string, override the location. RustPython doesn't produce
-        // reliable locations for expressions within f-strings, so we use the
-        // span of the f-string itself as a best-effort default.
-        if let Some(range) = self.in_f_string {
-            check.location = range.location;
-            check.end_location = range.end_location;
-        }
+    pub(crate) fn add_check(&mut self, check: Check) {
         self.checks.push(check);
     }
 
@@ -184,16 +175,7 @@ impl<'a> Checker<'a> {
     pub fn patch(&self, code: &CheckCode) -> bool {
         // TODO(charlie): We can't fix errors in f-strings until RustPython adds
         // location data.
-        matches!(self.autofix, flags::Autofix::Enabled)
-            && self.in_f_string.is_none()
-            && self.settings.fixable.contains(code)
-    }
-
-    /// Return the amended `Range` from a `Located`.
-    pub fn range_for<T>(&self, located: &Located<T>) -> Range {
-        // If we're in an f-string, override the location.
-        self.in_f_string
-            .unwrap_or_else(|| Range::from_located(located))
+        matches!(self.autofix, flags::Autofix::Enabled) && self.settings.fixable.contains(code)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -550,7 +532,7 @@ where
                     Binding {
                         kind: BindingKind::FunctionDefinition,
                         used: None,
-                        range: Range::from_located(stmt),
+                        range: helpers::identifier_range(stmt, self.locator),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -600,9 +582,12 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N818) {
-                    if let Some(check) =
-                        pep8_naming::checks::error_suffix_on_exception_name(stmt, bases, name)
-                    {
+                    if let Some(check) = pep8_naming::checks::error_suffix_on_exception_name(
+                        stmt,
+                        bases,
+                        name,
+                        self.locator,
+                    ) {
                         self.add_check(check);
                     }
                 }
@@ -1191,7 +1176,9 @@ where
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
-                    if let Some(check) = pyflakes::checks::default_except_not_last(handlers) {
+                    if let Some(check) =
+                        pyflakes::checks::default_except_not_last(handlers, self.locator)
+                    {
                         self.add_check(check);
                     }
                 }
@@ -1438,7 +1425,7 @@ where
                     Binding {
                         kind: BindingKind::ClassDefinition,
                         used: None,
-                        range: Range::from_located(stmt),
+                        range: helpers::identifier_range(stmt, self.locator),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -1487,7 +1474,6 @@ where
 
         self.push_expr(expr);
 
-        let prev_in_f_string = self.in_f_string;
         let prev_in_literal = self.in_literal;
         let prev_in_type_definition = self.in_type_definition;
 
@@ -1738,7 +1724,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::T201)
                     || self.settings.enabled.contains(&CheckCode::T203)
                 {
-                    flake8_print::plugins::print_call(self, expr, func, keywords);
+                    flake8_print::plugins::print_call(self, func, keywords);
                 }
 
                 // flake8-bugbear
@@ -2177,10 +2163,9 @@ where
             }
             ExprKind::JoinedStr { values } => {
                 if self.settings.enabled.contains(&CheckCode::F541) {
-                    if self.in_f_string.is_none()
-                        && !values
-                            .iter()
-                            .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
+                    if !values
+                        .iter()
+                        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
                     {
                         self.add_check(Check::new(
                             CheckKind::FStringMissingPlaceholders,
@@ -2188,7 +2173,6 @@ where
                         ));
                     }
                 }
-                self.in_f_string = Some(Range::from_located(expr));
             }
             ExprKind::BinOp {
                 left,
@@ -2698,7 +2682,6 @@ where
 
         self.in_type_definition = prev_in_type_definition;
         self.in_literal = prev_in_literal;
-        self.in_f_string = prev_in_f_string;
 
         self.pop_expr();
     }
@@ -2712,7 +2695,8 @@ where
                     if let Some(check) = pycodestyle::checks::do_not_use_bare_except(
                         type_.as_deref(),
                         body,
-                        Range::from_located(excepthandler),
+                        excepthandler,
+                        self.locator,
                     ) {
                         self.add_check(check);
                     }
@@ -2800,10 +2784,6 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        if self.settings.enabled.contains(&CheckCode::F831) {
-            self.checks
-                .extend(pyflakes::checks::duplicate_arguments(arguments));
-        }
         if self.settings.enabled.contains(&CheckCode::B006) {
             flake8_bugbear::plugins::mutable_argument_default(self, arguments);
         }
@@ -3746,9 +3726,10 @@ impl<'a> Checker<'a> {
                         None
                     };
 
+                    let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init),
+                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -3767,9 +3748,10 @@ impl<'a> Checker<'a> {
                     .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
                 {
                     let child = defined_by.0;
+                    let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init),
+                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })

@@ -23,7 +23,6 @@ use crate::directives::Directives;
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::settings::{flags, Settings};
-use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{cache, directives, fs, rustpython_helpers};
@@ -287,32 +286,6 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     )
 }
 
-/// Apply autoformatting to the source code at the given `Path`.
-pub fn autoformat_path(path: &Path, settings: &Settings) -> Result<()> {
-    // Validate the `Settings` and return any errors.
-    settings.validate()?;
-
-    // Read the file from disk.
-    let contents = fs::read_file(path)?;
-
-    // Tokenize once.
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
-
-    // Map row and column locations to byte slices (lazily).
-    let locator = SourceCodeLocator::new(&contents);
-
-    // Detect the current code style (lazily).
-    let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
-
-    // Generate the AST.
-    let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
-    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
-    generator.unparse_suite(&python_ast);
-    write(path, generator.generate()?)?;
-
-    Ok(())
-}
-
 /// Generate a list of `Check` violations from source code content derived from
 /// stdin.
 pub fn lint_stdin(
@@ -534,7 +507,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
         &locator,
         directives::Flags::from_settings(settings),
     );
-    check_path(
+    let mut checks = check_path(
         path,
         None,
         &contents,
@@ -545,5 +518,52 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
         settings,
         flags::Autofix::Enabled,
         flags::Noqa::Enabled,
-    )
+    )?;
+
+    // Detect autofixes that don't converge after multiple iterations.
+    if checks.iter().any(|check| check.fix.is_some()) {
+        let max_iterations = 3;
+
+        let mut contents = contents.clone();
+        let mut iterations = 0;
+
+        loop {
+            let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+            let locator = SourceCodeLocator::new(&contents);
+            let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+            let directives = directives::extract_directives(
+                &tokens,
+                &locator,
+                directives::Flags::from_settings(settings),
+            );
+            let checks = check_path(
+                path,
+                None,
+                &contents,
+                tokens,
+                &locator,
+                &stylist,
+                &directives,
+                settings,
+                flags::Autofix::Enabled,
+                flags::Noqa::Enabled,
+            )?;
+            if let Some((fixed_contents, _)) = fix_file(&checks, &locator) {
+                if iterations < max_iterations {
+                    iterations += 1;
+                    contents = fixed_contents.to_string();
+                } else {
+                    panic!(
+                        "Failed to converge after {max_iterations} iterations. This likely \
+                         indicates a bug in the implementation of the fix."
+                    );
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    checks.sort_by_key(|check| check.location);
+    Ok(checks)
 }

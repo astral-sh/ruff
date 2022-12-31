@@ -6,6 +6,7 @@ expression: checks
     UnusedImport:
       - typing.Union
       - false
+      - false
   location:
     row: 30
     column: 4
@@ -27,6 +28,7 @@ expression: checks
     UnusedImport:
       - typing.Awaitable
       - false
+      - true
   location:
     row: 66
     column: 19
@@ -46,6 +48,7 @@ expression: checks
     UnusedImport:
       - typing.AwaitableGenerator
       - false
+      - true
   location:
     row: 66
     column: 30

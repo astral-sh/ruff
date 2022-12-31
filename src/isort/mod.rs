@@ -685,7 +685,7 @@ mod tests {
     #[test_case(Path::new("line_ending_cr.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -694,7 +694,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -702,7 +701,7 @@ mod tests {
     #[test_case(Path::new("combine_as_imports.py"))]
     fn combine_as_imports(path: &Path) -> Result<()> {
         let snapshot = format!("combine_as_imports_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -715,7 +714,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -723,7 +721,7 @@ mod tests {
     #[test_case(Path::new("force_wrap_aliases.py"))]
     fn force_wrap_aliases(path: &Path) -> Result<()> {
         let snapshot = format!("force_wrap_aliases_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -737,7 +735,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -745,7 +742,7 @@ mod tests {
     #[test_case(Path::new("magic_trailing_comma.py"))]
     fn no_split_on_trailing_comma(path: &Path) -> Result<()> {
         let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -758,7 +755,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -766,7 +762,7 @@ mod tests {
     #[test_case(Path::new("force_single_line.py"))]
     fn force_single_line(path: &Path) -> Result<()> {
         let snapshot = format!("force_single_line_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -782,7 +778,6 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }

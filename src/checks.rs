@@ -3,6 +3,7 @@ use std::fmt;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
+use rustpython_ast::Cmpop;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
@@ -91,7 +92,6 @@ pub enum CheckCode {
     F821,
     F822,
     F823,
-    F831,
     F841,
     F842,
     F901,
@@ -619,9 +619,35 @@ pub enum LintSource {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RejectedCmpop {
+pub enum EqCmpop {
     Eq,
     NotEq,
+}
+
+impl From<&Cmpop> for EqCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Eq => EqCmpop::Eq,
+            Cmpop::NotEq => EqCmpop::NotEq,
+            _ => unreachable!("Expected Cmpop::Eq | Cmpop::NotEq"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IsCmpop {
+    Is,
+    IsNot,
+}
+
+impl From<&Cmpop> for IsCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Is => IsCmpop::Is,
+            Cmpop::IsNot => IsCmpop::IsNot,
+            _ => unreachable!("Expected Cmpop::Is | Cmpop::IsNot"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -657,6 +683,21 @@ impl fmt::Display for Branch {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LiteralType {
+    Str,
+    Bytes,
+}
+
+impl fmt::Display for LiteralType {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LiteralType::Str => fmt.write_str("str"),
+            LiteralType::Bytes => fmt.write_str("bytes"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnusedCodes {
     pub unknown: Vec<String>,
     pub disabled: Vec<String>,
@@ -669,17 +710,17 @@ pub enum CheckKind {
     AmbiguousClassName(String),
     AmbiguousFunctionName(String),
     AmbiguousVariableName(String),
-    DoNotAssignLambda,
+    DoNotAssignLambda(String),
     DoNotUseBareExcept,
     IOError(String),
     LineTooLong(usize, usize),
     ModuleImportNotAtTopOfFile,
     MultipleImportsOnOneLine,
-    NoneComparison(RejectedCmpop),
+    NoneComparison(EqCmpop),
     NotInTest,
     NotIsTest,
     SyntaxError(String),
-    TrueFalseComparison(bool, RejectedCmpop),
+    TrueFalseComparison(bool, EqCmpop),
     TypeComparison,
     // pycodestyle warnings
     NoNewLineAtEndOfFile,
@@ -689,7 +730,6 @@ pub enum CheckKind {
     BreakOutsideLoop,
     ContinueOutsideLoop,
     DefaultExceptNotLast,
-    DuplicateArgumentName,
     ExpressionsInStarAssignment,
     FStringMissingPlaceholders,
     ForwardAnnotationSyntaxError(String),
@@ -700,7 +740,7 @@ pub enum CheckKind {
     ImportStarUsage(String, Vec<String>),
     ImportStarUsed(String),
     InvalidPrintSyntax,
-    IsLiteral,
+    IsLiteral(IsCmpop),
     LateFutureImport,
     MultiValueRepeatedKeyLiteral,
     MultiValueRepeatedKeyVariable(String),
@@ -726,7 +766,7 @@ pub enum CheckKind {
     UndefinedLocal(String),
     UnusedAnnotation(String),
     UndefinedName(String),
-    UnusedImport(String, bool),
+    UnusedImport(String, bool, bool),
     UnusedVariable(String),
     YieldOutsideFunction(DeferralKeyword),
     // pylint
@@ -860,10 +900,10 @@ pub enum CheckKind {
     UnnecessaryEncodeUTF8,
     ConvertTypedDictFunctionalToClass(String),
     ConvertNamedTupleFunctionalToClass(String),
-    RedundantOpenModes,
+    RedundantOpenModes(Option<String>),
     RemoveSixCompat,
     DatetimeTimezoneUTC,
-    NativeLiterals,
+    NativeLiterals(LiteralType),
     OpenAlias,
     ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
@@ -1032,13 +1072,13 @@ impl CheckCode {
             CheckCode::E401 => CheckKind::MultipleImportsOnOneLine,
             CheckCode::E402 => CheckKind::ModuleImportNotAtTopOfFile,
             CheckCode::E501 => CheckKind::LineTooLong(89, 88),
-            CheckCode::E711 => CheckKind::NoneComparison(RejectedCmpop::Eq),
-            CheckCode::E712 => CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq),
+            CheckCode::E711 => CheckKind::NoneComparison(EqCmpop::Eq),
+            CheckCode::E712 => CheckKind::TrueFalseComparison(true, EqCmpop::Eq),
             CheckCode::E713 => CheckKind::NotInTest,
             CheckCode::E714 => CheckKind::NotIsTest,
             CheckCode::E721 => CheckKind::TypeComparison,
             CheckCode::E722 => CheckKind::DoNotUseBareExcept,
-            CheckCode::E731 => CheckKind::DoNotAssignLambda,
+            CheckCode::E731 => CheckKind::DoNotAssignLambda("...".to_string()),
             CheckCode::E741 => CheckKind::AmbiguousVariableName("...".to_string()),
             CheckCode::E742 => CheckKind::AmbiguousClassName("...".to_string()),
             CheckCode::E743 => CheckKind::AmbiguousFunctionName("...".to_string()),
@@ -1048,7 +1088,7 @@ impl CheckCode {
             CheckCode::W292 => CheckKind::NoNewLineAtEndOfFile,
             CheckCode::W605 => CheckKind::InvalidEscapeSequence('c'),
             // pyflakes
-            CheckCode::F401 => CheckKind::UnusedImport("...".to_string(), false),
+            CheckCode::F401 => CheckKind::UnusedImport("...".to_string(), false, false),
             CheckCode::F402 => CheckKind::ImportShadowedByLoopVar("...".to_string(), 1),
             CheckCode::F403 => CheckKind::ImportStarUsed("...".to_string()),
             CheckCode::F404 => CheckKind::LateFutureImport,
@@ -1081,7 +1121,7 @@ impl CheckCode {
             CheckCode::F621 => CheckKind::ExpressionsInStarAssignment,
             CheckCode::F622 => CheckKind::TwoStarredExpressions,
             CheckCode::F631 => CheckKind::AssertTuple,
-            CheckCode::F632 => CheckKind::IsLiteral,
+            CheckCode::F632 => CheckKind::IsLiteral(IsCmpop::Is),
             CheckCode::F633 => CheckKind::InvalidPrintSyntax,
             CheckCode::F634 => CheckKind::IfTuple,
             CheckCode::F701 => CheckKind::BreakOutsideLoop,
@@ -1094,7 +1134,6 @@ impl CheckCode {
             CheckCode::F821 => CheckKind::UndefinedName("...".to_string()),
             CheckCode::F822 => CheckKind::UndefinedExport("...".to_string()),
             CheckCode::F823 => CheckKind::UndefinedLocal("...".to_string()),
-            CheckCode::F831 => CheckKind::DuplicateArgumentName,
             CheckCode::F841 => CheckKind::UnusedVariable("...".to_string()),
             CheckCode::F842 => CheckKind::UnusedAnnotation("...".to_string()),
             CheckCode::F901 => CheckKind::RaiseNotImplemented,
@@ -1255,10 +1294,10 @@ impl CheckCode {
             CheckCode::UP012 => CheckKind::UnnecessaryEncodeUTF8,
             CheckCode::UP013 => CheckKind::ConvertTypedDictFunctionalToClass("...".to_string()),
             CheckCode::UP014 => CheckKind::ConvertNamedTupleFunctionalToClass("...".to_string()),
-            CheckCode::UP015 => CheckKind::RedundantOpenModes,
+            CheckCode::UP015 => CheckKind::RedundantOpenModes(None),
             CheckCode::UP016 => CheckKind::RemoveSixCompat,
             CheckCode::UP017 => CheckKind::DatetimeTimezoneUTC,
-            CheckCode::UP018 => CheckKind::NativeLiterals,
+            CheckCode::UP018 => CheckKind::NativeLiterals(LiteralType::Str),
             CheckCode::UP019 => CheckKind::TypingTextStrAlias,
             CheckCode::UP020 => CheckKind::OpenAlias,
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
@@ -1592,7 +1631,6 @@ impl CheckCode {
             CheckCode::F821 => CheckCategory::Pyflakes,
             CheckCode::F822 => CheckCategory::Pyflakes,
             CheckCode::F823 => CheckCategory::Pyflakes,
-            CheckCode::F831 => CheckCategory::Pyflakes,
             CheckCode::F841 => CheckCategory::Pyflakes,
             CheckCode::F842 => CheckCategory::Pyflakes,
             CheckCode::F901 => CheckCategory::Pyflakes,
@@ -1728,9 +1766,8 @@ impl CheckKind {
             CheckKind::BreakOutsideLoop => &CheckCode::F701,
             CheckKind::ContinueOutsideLoop => &CheckCode::F702,
             CheckKind::DefaultExceptNotLast => &CheckCode::F707,
-            CheckKind::DoNotAssignLambda => &CheckCode::E731,
+            CheckKind::DoNotAssignLambda(..) => &CheckCode::E731,
             CheckKind::DoNotUseBareExcept => &CheckCode::E722,
-            CheckKind::DuplicateArgumentName => &CheckCode::F831,
             CheckKind::FStringMissingPlaceholders => &CheckCode::F541,
             CheckKind::ForwardAnnotationSyntaxError(..) => &CheckCode::F722,
             CheckKind::FutureFeatureNotDefined(..) => &CheckCode::F407,
@@ -1741,7 +1778,7 @@ impl CheckKind {
             CheckKind::ImportStarUsage(..) => &CheckCode::F405,
             CheckKind::ImportStarUsed(..) => &CheckCode::F403,
             CheckKind::InvalidPrintSyntax => &CheckCode::F633,
-            CheckKind::IsLiteral => &CheckCode::F632,
+            CheckKind::IsLiteral(..) => &CheckCode::F632,
             CheckKind::LateFutureImport => &CheckCode::F404,
             CheckKind::LineTooLong(..) => &CheckCode::E501,
             CheckKind::MultipleImportsOnOneLine => &CheckCode::E401,
@@ -1913,10 +1950,10 @@ impl CheckKind {
             CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::UP012,
             CheckKind::ConvertTypedDictFunctionalToClass(..) => &CheckCode::UP013,
             CheckKind::ConvertNamedTupleFunctionalToClass(..) => &CheckCode::UP014,
-            CheckKind::RedundantOpenModes => &CheckCode::UP015,
+            CheckKind::RedundantOpenModes(..) => &CheckCode::UP015,
             CheckKind::RemoveSixCompat => &CheckCode::UP016,
             CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
-            CheckKind::NativeLiterals => &CheckCode::UP018,
+            CheckKind::NativeLiterals(..) => &CheckCode::UP018,
             CheckKind::TypingTextStrAlias => &CheckCode::UP019,
             CheckKind::OpenAlias => &CheckCode::UP020,
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
@@ -2073,13 +2110,10 @@ impl CheckKind {
             CheckKind::DefaultExceptNotLast => {
                 "An `except` block as not the last exception handler".to_string()
             }
-            CheckKind::DoNotAssignLambda => {
-                "Do not assign a lambda expression, use a def".to_string()
+            CheckKind::DoNotAssignLambda(..) => {
+                "Do not assign a `lambda` expression, use a `def`".to_string()
             }
             CheckKind::DoNotUseBareExcept => "Do not use bare `except`".to_string(),
-            CheckKind::DuplicateArgumentName => {
-                "Duplicate argument name in function definition".to_string()
-            }
             CheckKind::ForwardAnnotationSyntaxError(body) => {
                 format!("Syntax error in forward annotation: `{body}`")
             }
@@ -2110,7 +2144,10 @@ impl CheckKind {
                     .join(", ");
                 format!("`{name}` may be undefined, or defined from star imports: {sources}")
             }
-            CheckKind::IsLiteral => "Use `==` and `!=` to compare constant literals".to_string(),
+            CheckKind::IsLiteral(cmpop) => match cmpop {
+                IsCmpop::Is => "Use `==` to compare constant literals".to_string(),
+                IsCmpop::IsNot => "Use `!=` to compare constant literals".to_string(),
+            },
             CheckKind::LateFutureImport => {
                 "`from __future__` imports must occur at the beginning of the file".to_string()
             }
@@ -2128,10 +2165,8 @@ impl CheckKind {
                 format!("Dictionary key `{name}` repeated")
             }
             CheckKind::NoneComparison(op) => match op {
-                RejectedCmpop::Eq => "Comparison to `None` should be `cond is None`".to_string(),
-                RejectedCmpop::NotEq => {
-                    "Comparison to `None` should be `cond is not None`".to_string()
-                }
+                EqCmpop::Eq => "Comparison to `None` should be `cond is None`".to_string(),
+                EqCmpop::NotEq => "Comparison to `None` should be `cond is not None`".to_string(),
             },
             CheckKind::NotInTest => "Test for membership should be `not in`".to_string(),
             CheckKind::NotIsTest => "Test for object identity should be `is not`".to_string(),
@@ -2195,16 +2230,16 @@ impl CheckKind {
             CheckKind::ExpressionsInStarAssignment => {
                 "Too many expressions in star-unpacking assignment".to_string()
             }
-            CheckKind::TrueFalseComparison(true, RejectedCmpop::Eq) => {
+            CheckKind::TrueFalseComparison(true, EqCmpop::Eq) => {
                 "Comparison to `True` should be `cond is True`".to_string()
             }
-            CheckKind::TrueFalseComparison(true, RejectedCmpop::NotEq) => {
+            CheckKind::TrueFalseComparison(true, EqCmpop::NotEq) => {
                 "Comparison to `True` should be `cond is not True`".to_string()
             }
-            CheckKind::TrueFalseComparison(false, RejectedCmpop::Eq) => {
+            CheckKind::TrueFalseComparison(false, EqCmpop::Eq) => {
                 "Comparison to `False` should be `cond is False`".to_string()
             }
-            CheckKind::TrueFalseComparison(false, RejectedCmpop::NotEq) => {
+            CheckKind::TrueFalseComparison(false, EqCmpop::NotEq) => {
                 "Comparison to `False` should be `cond is not False`".to_string()
             }
             CheckKind::TwoStarredExpressions => "Two starred expressions in assignment".to_string(),
@@ -2221,7 +2256,7 @@ impl CheckKind {
             CheckKind::UnusedAnnotation(name) => {
                 format!("Local variable `{name}` is annotated but never used")
             }
-            CheckKind::UnusedImport(name, ignore_init) => {
+            CheckKind::UnusedImport(name, ignore_init, ..) => {
                 if *ignore_init {
                     format!(
                         "`{name}` imported but unused; consider adding to `__all__` or using a \
@@ -2632,7 +2667,7 @@ impl CheckKind {
                 format!("`{alias}` is deprecated, use `{target}`")
             }
             CheckKind::UselessObjectInheritance(name) => {
-                format!("Class `{name}` inherits from object")
+                format!("Class `{name}` inherits from `object`")
             }
             CheckKind::UsePEP585Annotation(name) => {
                 format!(
@@ -2658,13 +2693,23 @@ impl CheckKind {
                 "Unnecessary parameters to `functools.lru_cache`".to_string()
             }
             CheckKind::UnnecessaryEncodeUTF8 => "Unnecessary call to `encode` as UTF-8".to_string(),
-            CheckKind::RedundantOpenModes => "Unnecessary open mode parameters".to_string(),
+            CheckKind::RedundantOpenModes(replacement) => match replacement {
+                None => "Unnecessary open mode parameters".to_string(),
+                Some(replacement) => {
+                    format!("Unnecessary open mode parameters, use \"{replacement}\"")
+                }
+            },
             CheckKind::RemoveSixCompat => "Unnecessary `six` compatibility usage".to_string(),
             CheckKind::DatetimeTimezoneUTC => "Use `datetime.UTC` alias".to_string(),
-            CheckKind::NativeLiterals => "Unnecessary call to `str` and `bytes`".to_string(),
+            CheckKind::NativeLiterals(literal_type) => {
+                format!("Unnecessary call to `{literal_type}`")
+            }
             CheckKind::OpenAlias => "Use builtin `open`".to_string(),
             CheckKind::ConvertTypedDictFunctionalToClass(name) => {
                 format!("Convert `{name}` from `TypedDict` functional to class syntax")
+            }
+            CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
+                format!("Convert `{name}` from `NamedTuple` functional to class syntax")
             }
             CheckKind::ReplaceUniversalNewlines => {
                 "`universal_newlines` is deprecated, use `text`".to_string()
@@ -2677,9 +2722,6 @@ impl CheckKind {
             }
             CheckKind::OSErrorAlias => "Replace aliased errors with `OSError`".to_string(),
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
-            CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
-                format!("Convert `{name}` from `NamedTuple` functional to class syntax")
-            }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -2856,14 +2898,13 @@ impl CheckKind {
             CheckKind::HardcodedBindAllInterfaces => {
                 "Possible binding to all interfaces".to_string()
             }
-            CheckKind::HardcodedPasswordString(string) => {
-                format!("Possible hardcoded password: `\"{string}\"`")
-            }
-            CheckKind::HardcodedPasswordFuncArg(string) => {
-                format!("Possible hardcoded password: `\"{string}\"`")
-            }
-            CheckKind::HardcodedPasswordDefault(string) => {
-                format!("Possible hardcoded password: `\"{string}\"`")
+            CheckKind::HardcodedPasswordString(string)
+            | CheckKind::HardcodedPasswordFuncArg(string)
+            | CheckKind::HardcodedPasswordDefault(string) => {
+                format!(
+                    "Possible hardcoded password: `\"{}\"`",
+                    string.escape_debug()
+                )
             }
             // flake8-blind-except
             CheckKind::BlindExcept(name) => format!("Do not catch blind exception: `{name}`"),
@@ -3095,6 +3136,7 @@ impl CheckKind {
             self,
             CheckKind::AmbiguousUnicodeCharacterString(..)
                 | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::AmbiguousUnicodeCharacterComment(..)
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
                 | CheckKind::BlankLineAfterSummary
@@ -3107,7 +3149,7 @@ impl CheckKind {
                 | CheckKind::DatetimeTimezoneUTC
                 | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
-                | CheckKind::DoNotAssignLambda
+                | CheckKind::DoNotAssignLambda(..)
                 | CheckKind::DuplicateHandlerException(..)
                 | CheckKind::EndsInPeriod
                 | CheckKind::EndsInPunctuation
@@ -3115,11 +3157,12 @@ impl CheckKind {
                 | CheckKind::ImplicitReturn
                 | CheckKind::ImplicitReturnValue
                 | CheckKind::InvalidEscapeSequence(..)
-                | CheckKind::IsLiteral
+                | CheckKind::IsLiteral(..)
                 | CheckKind::KeyInDict(..)
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::MissingReturnTypeSpecialMethod(..)
-                | CheckKind::NativeLiterals
+                | CheckKind::NativeLiterals(..)
+                | CheckKind::OpenAlias
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
@@ -3139,10 +3182,10 @@ impl CheckKind {
                 | CheckKind::OpenAlias
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
-                | CheckKind::PercentFormatExtraNamedArguments(..)
                 | CheckKind::PrintFound
+                | CheckKind::PercentFormatExtraNamedArguments(..)
                 | CheckKind::RaiseNotImplemented
-                | CheckKind::RedundantOpenModes
+                | CheckKind::RedundantOpenModes(..)
                 | CheckKind::RedundantTupleInExceptionHandler(..)
                 | CheckKind::RemoveSixCompat
                 | CheckKind::ReplaceStdoutStderr
@@ -3178,7 +3221,7 @@ impl CheckKind {
                 | CheckKind::UnnecessaryLiteralWithinTupleCall(..)
                 | CheckKind::UnnecessaryReturnNone
                 | CheckKind::UnsortedImports
-                | CheckKind::UnusedImport(_, false)
+                | CheckKind::UnusedImport(_, false, _)
                 | CheckKind::UnusedLoopControlVariable(..)
                 | CheckKind::UnusedNOQA(..)
                 | CheckKind::UsePEP585Annotation(..)
@@ -3188,6 +3231,235 @@ impl CheckKind {
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(..)
         )
+    }
+
+    /// The message used to describe the fix action for a given `CheckKind`.
+    pub fn commit(&self) -> Option<String> {
+        match self {
+            CheckKind::AmbiguousUnicodeCharacterString(confusable, representant)
+            | CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant)
+            | CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
+                Some(format!("Replace '{confusable}' with '{representant}'"))
+            }
+            CheckKind::BlankLineAfterLastSection(name) => {
+                Some(format!("Add blank line after \"{name}\""))
+            }
+            CheckKind::BlankLineAfterSection(name) => {
+                Some(format!("Add blank line after \"{name}\""))
+            }
+            CheckKind::BlankLineAfterSummary => Some("Insert single blank line".to_string()),
+            CheckKind::BlankLineBeforeSection(name) => {
+                Some(format!("Add blank line before \"{name}\""))
+            }
+            CheckKind::CapitalizeSectionName(name) => Some(format!("Capitalize \"{name}\"")),
+            CheckKind::CommentedOutCode => Some("Remove commented-out code".to_string()),
+            CheckKind::ConvertTypedDictFunctionalToClass(name)
+            | CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
+                Some(format!("Convert `{name}` to class syntax"))
+            }
+            CheckKind::DashedUnderlineAfterSection(name) => {
+                Some(format!("Add dashed line under \"{name}\""))
+            }
+            CheckKind::DatetimeTimezoneUTC => Some("Convert to `datetime.UTC` alias".to_string()),
+            CheckKind::DeprecatedUnittestAlias(alias, target) => {
+                Some(format!("Replace `{target}` with `{alias}`"))
+            }
+            CheckKind::DoNotAssertFalse => Some("Replace `assert False`".to_string()),
+            CheckKind::DoNotAssignLambda(name) => Some(format!("Rewrite `{name}` as a `def`")),
+            CheckKind::DuplicateHandlerException(..) => Some("De-duplicate exceptions".to_string()),
+            CheckKind::EndsInPeriod => Some("Add period".to_string()),
+            CheckKind::EndsInPunctuation => Some("Add closing punctuation".to_string()),
+            CheckKind::GetAttrWithConstant => {
+                Some("Replace `getattr` with attribute access".to_string())
+            }
+            CheckKind::ImplicitReturnValue => Some("Add explicit `None` return value".to_string()),
+            CheckKind::ImplicitReturn => Some("Add explicit `return` statement".to_string()),
+            CheckKind::InvalidEscapeSequence(..) => {
+                Some("Add backslash to escape sequence".to_string())
+            }
+            CheckKind::IsLiteral(cmpop) => Some(match cmpop {
+                IsCmpop::Is => "Replace `is` with `==`".to_string(),
+                IsCmpop::IsNot => "Replace `is not` with `!=`".to_string(),
+            }),
+            CheckKind::KeyInDict(key, dict) => Some(format!("Convert to `{key} in {dict}`")),
+            CheckKind::MisplacedComparisonConstant(comparison) => {
+                Some(format!("Replace with {comparison}"))
+            }
+            CheckKind::MissingReturnTypeSpecialMethod(..) => {
+                Some("Add `None` return type".to_string())
+            }
+            CheckKind::NativeLiterals(literal_type) => {
+                Some(format!("Replace with `{literal_type}`"))
+            }
+            CheckKind::OpenAlias => Some("Replace with builtin `open`".to_string()),
+            CheckKind::NewLineAfterLastParagraph => {
+                Some("Move closing quotes to new line".to_string())
+            }
+            CheckKind::ReplaceUniversalNewlines => {
+                Some("Replace with `text` keyword argument".to_string())
+            }
+            CheckKind::ReplaceStdoutStderr => {
+                Some("Replace with `capture_output` keyword argument".to_string())
+            }
+            CheckKind::RewriteCElementTree => Some("Replace with `ElementTree`".to_string()),
+            CheckKind::RewriteUnicodeLiteral => Some("Remove unicode prefix".to_string()),
+            CheckKind::NewLineAfterSectionName(name) => {
+                Some(format!("Add newline after \"{name}\""))
+            }
+            CheckKind::NoBlankLineBeforeFunction(..) => {
+                Some("Remove blank line(s) before function docstring".to_string())
+            }
+            CheckKind::NoBlankLineAfterFunction(..) => {
+                Some("Remove blank line(s) after function docstring".to_string())
+            }
+            CheckKind::NoBlankLineBeforeClass(..) => {
+                Some("Remove blank line(s) before class docstring".to_string())
+            }
+            CheckKind::OneBlankLineBeforeClass(..) => {
+                Some("Insert 1 blank line before class docstring".to_string())
+            }
+            CheckKind::OneBlankLineAfterClass(..) => {
+                Some("Insert 1 blank line after class docstring".to_string())
+            }
+            CheckKind::NoBlankLinesBetweenHeaderAndContent(..) => {
+                Some("Remove blank line(s)".to_string())
+            }
+            CheckKind::NoNewLineAtEndOfFile => Some("Add trailing newline".to_string()),
+            CheckKind::NoOverIndentation => Some("Remove over-indentation".to_string()),
+            CheckKind::NoSurroundingWhitespace => Some("Trim surrounding whitespace".to_string()),
+            CheckKind::NoUnderIndentation => Some("Increase indentation".to_string()),
+            CheckKind::NoneComparison(op) => Some(match op {
+                EqCmpop::Eq => "Replace with `cond is None`".to_string(),
+                EqCmpop::NotEq => "Replace with `cond is not None`".to_string(),
+            }),
+            CheckKind::NotInTest => Some("Convert to `not in`".to_string()),
+            CheckKind::NotIsTest => Some("Convert to `is not`".to_string()),
+            CheckKind::PEP3120UnnecessaryCodingComment => {
+                Some("Remove unnecessary coding comment".to_string())
+            }
+            CheckKind::PPrintFound => Some("Remove `pprint`".to_string()),
+            CheckKind::PercentFormatExtraNamedArguments(missing)
+            | CheckKind::StringDotFormatExtraNamedArguments(missing) => {
+                let message = missing.join(", ");
+                Some(format!("Remove extra named arguments: {message}"))
+            }
+            CheckKind::PrintFound => Some("Remove `print`".to_string()),
+            CheckKind::RaiseNotImplemented => Some("Use `raise NotImplementedError`".to_string()),
+            CheckKind::RedundantOpenModes(replacement) => Some(match replacement {
+                None => "Remove open mode parameters".to_string(),
+                Some(replacement) => {
+                    format!("Replace with \"{replacement}\"")
+                }
+            }),
+            CheckKind::RedundantTupleInExceptionHandler(name) => {
+                Some(format!("Replace with `except {name}`"))
+            }
+            CheckKind::RemoveSixCompat => Some("Remove `six` usage".to_string()),
+            CheckKind::SectionNameEndsInColon(name) => Some(format!("Add colon to \"{name}\"")),
+            CheckKind::SectionNotOverIndented(name) => {
+                Some(format!("Remove over-indentation from \"{name}\""))
+            }
+            CheckKind::SectionUnderlineAfterName(name) => {
+                Some(format!("Add underline to \"{name}\""))
+            }
+            CheckKind::SectionUnderlineMatchesSectionLength(name) => {
+                Some(format!("Adjust underline length to match \"{name}\""))
+            }
+            CheckKind::SectionUnderlineNotOverIndented(name) => {
+                Some(format!("Remove over-indentation from \"{name}\" underline"))
+            }
+            CheckKind::SetAttrWithConstant => Some("Replace `setattr` with assignment".to_string()),
+            CheckKind::SuperCallWithParameters => Some("Remove `__super__` parameters".to_string()),
+            CheckKind::TrueFalseComparison(true, EqCmpop::Eq) => {
+                Some("Replace with `cond is True`".to_string())
+            }
+            CheckKind::TrueFalseComparison(true, EqCmpop::NotEq) => {
+                Some("Replace with `cond is not True`".to_string())
+            }
+            CheckKind::TrueFalseComparison(false, EqCmpop::Eq) => {
+                Some("Replace with `cond is False`".to_string())
+            }
+            CheckKind::TrueFalseComparison(false, EqCmpop::NotEq) => {
+                Some("Replace with `cond is not False`".to_string())
+            }
+            CheckKind::TypeOfPrimitive(primitive) => Some(format!(
+                "Replace `type(...)` with `{}`",
+                primitive.builtin()
+            )),
+            CheckKind::TypingTextStrAlias => Some("Replace with `str`".to_string()),
+            CheckKind::UnnecessaryCallAroundSorted(func) => {
+                Some(format!("Remove unnecessary `{func}` call"))
+            }
+            CheckKind::UnnecessaryCollectionCall(..) => Some("Rewrite as a literal".to_string()),
+            CheckKind::UnnecessaryComprehension(obj_type) => {
+                Some(format!("Rewrite using `{obj_type}()`"))
+            }
+            CheckKind::UnnecessaryEncodeUTF8 => Some("Remove unnecessary `encode`".to_string()),
+            CheckKind::UnnecessaryFutureImport(..) => {
+                Some("Remove unnecessary `__future__` import".to_string())
+            }
+            CheckKind::UnnecessaryGeneratorDict => {
+                Some("Rewrite as a `dict` comprehension".to_string())
+            }
+            CheckKind::UnnecessaryGeneratorList => {
+                Some("Rewrite as a `list` comprehension".to_string())
+            }
+            CheckKind::UnnecessaryGeneratorSet => {
+                Some("Rewrite as a `set` comprehension".to_string())
+            }
+            CheckKind::UnnecessaryLRUCacheParams => {
+                Some("Remove unnecessary parameters".to_string())
+            }
+            CheckKind::UnnecessaryListCall => Some("Remove outer `list` call".to_string()),
+            CheckKind::UnnecessaryListComprehensionDict => {
+                Some("Rewrite as a `dict` comprehension".to_string())
+            }
+            CheckKind::UnnecessaryListComprehensionSet => {
+                Some("Rewrite as a `set` comprehension".to_string())
+            }
+            CheckKind::UnnecessaryLiteralDict(..) => {
+                Some("Rewrite as a `dict` literal".to_string())
+            }
+            CheckKind::UnnecessaryLiteralSet(..) => Some("Rewrite as a `set` literal".to_string()),
+            CheckKind::UnnecessaryLiteralWithinTupleCall(literal) => Some({
+                if literal == "list" {
+                    "Rewrite as a `tuple` literal".to_string()
+                } else {
+                    "Remove outer `tuple` call".to_string()
+                }
+            }),
+            CheckKind::UnnecessaryLiteralWithinListCall(literal) => Some({
+                if literal == "list" {
+                    "Remove outer `list` call".to_string()
+                } else {
+                    "Rewrite as a `list` literal".to_string()
+                }
+            }),
+            CheckKind::UnnecessaryReturnNone => Some("Remove explicit `return None`".to_string()),
+            CheckKind::UnsortedImports => Some("Organize imports".to_string()),
+            CheckKind::UnusedImport(name, false, multiple) => {
+                if *multiple {
+                    Some("Remove unused import".to_string())
+                } else {
+                    Some(format!("Remove unused import: `{name}`"))
+                }
+            }
+            CheckKind::UnusedLoopControlVariable(name) => {
+                Some(format!("Rename unused `{name}` to `_{name}`"))
+            }
+            CheckKind::UnusedNOQA(..) => Some("Remove unused `noqa` directive".to_string()),
+            CheckKind::UsePEP585Annotation(name) => {
+                Some(format!("Replace `{name}` with `{}`", name.to_lowercase(),))
+            }
+            CheckKind::UsePEP604Annotation => Some("Convert to `X | Y`".to_string()),
+            CheckKind::UseSysExit(name) => Some(format!("Replace `{name}` with `sys.exit()`")),
+            CheckKind::UselessImportAlias => Some("Remove import alias".to_string()),
+            CheckKind::UselessMetaclassType => Some("Remove `__metaclass__ = type`".to_string()),
+            CheckKind::UselessObjectInheritance(..) => {
+                Some("Remove `object` inheritance".to_string())
+            }
+            _ => None,
+        }
     }
 }
 
@@ -3367,6 +3639,19 @@ mod tests {
                 CheckCode::from_str(check_code.as_ref()).is_ok(),
                 "{check_code:?} could not be round-trip serialized."
             );
+        }
+    }
+
+    #[test]
+    fn fixable_codes() {
+        for check_code in CheckCode::iter() {
+            let kind = check_code.kind();
+            if kind.fixable() {
+                assert!(
+                    kind.commit().is_some(),
+                    "{check_code:?} is fixable but has no commit message."
+                );
+            }
         }
     }
 }

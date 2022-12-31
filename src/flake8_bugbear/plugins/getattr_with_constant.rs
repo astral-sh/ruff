@@ -46,8 +46,11 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
 
     let mut check = Check::new(CheckKind::GetAttrWithConstant, Range::from_located(expr));
     if checker.patch(check.kind.code()) {
-        let mut generator =
-            SourceCodeGenerator::new(checker.style.indentation(), checker.style.quote());
+        let mut generator = SourceCodeGenerator::new(
+            checker.style.indentation(),
+            checker.style.quote(),
+            checker.style.line_ending(),
+        );
         generator.unparse_expr(&attribute(obj, value), 0);
         if let Ok(content) = generator.generate() {
             check.amend(Fix::replacement(

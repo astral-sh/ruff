@@ -34,7 +34,11 @@ fn assignment(
             type_comment: None,
         },
     );
-    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
+    let mut generator = SourceCodeGenerator::new(
+        stylist.indentation(),
+        stylist.quote(),
+        stylist.line_ending(),
+    );
     generator.unparse_stmt(&stmt);
     generator.generate().map_err(std::convert::Into::into)
 }

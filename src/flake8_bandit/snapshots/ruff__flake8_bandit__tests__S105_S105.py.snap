@@ -342,4 +342,34 @@ expression: checks
     column: 28
   fix: ~
   parent: ~
+- kind:
+    HardcodedPasswordString: "1\n2"
+  location:
+    row: 55
+    column: 12
+  end_location:
+    row: 55
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString: "3\t4"
+  location:
+    row: 58
+    column: 12
+  end_location:
+    row: 58
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString: "5\r6"
+  location:
+    row: 61
+    column: 12
+  end_location:
+    row: 61
+    column: 18
+  fix: ~
+  parent: ~
 

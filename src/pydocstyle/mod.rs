@@ -64,20 +64,19 @@ mod tests {
     #[test_case(CheckCode::D419, Path::new("D.py"); "D419")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pydocstyle")
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
 
     #[test]
     fn d417_unspecified() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
             &settings::Settings {
                 // When inferring the convention, we'll see a few false negatives.
@@ -86,14 +85,13 @@ mod tests {
                 ..settings::Settings::for_rule(CheckCode::D417)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn d417_google() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
             &settings::Settings {
                 // With explicit Google convention, we should flag every function.
@@ -103,14 +101,13 @@ mod tests {
                 ..settings::Settings::for_rule(CheckCode::D417)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn d417_numpy() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
             &settings::Settings {
                 // With explicit Google convention, we shouldn't flag anything.
@@ -120,7 +117,6 @@ mod tests {
                 ..settings::Settings::for_rule(CheckCode::D417)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }

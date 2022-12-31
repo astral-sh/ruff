@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 1
     column: 3
@@ -18,7 +19,8 @@ expression: checks
       row: 1
       column: 7
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: IsNot
   location:
     row: 4
     column: 3
@@ -34,7 +36,8 @@ expression: checks
       row: 4
       column: 13
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: IsNot
   location:
     row: 7
     column: 3
@@ -50,7 +53,8 @@ expression: checks
       row: 8
       column: 11
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 11
     column: 3
@@ -66,7 +70,8 @@ expression: checks
       row: 11
       column: 11
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 14
     column: 3
@@ -82,7 +87,8 @@ expression: checks
       row: 14
       column: 16
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 17
     column: 3
@@ -98,7 +104,8 @@ expression: checks
       row: 17
       column: 18
   parent: ~
-- kind: IsLiteral
+- kind:
+    IsLiteral: Is
   location:
     row: 20
     column: 13
