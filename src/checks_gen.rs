@@ -540,6 +540,7 @@ pub enum CheckCodePrefix {
     UP021,
     UP022,
     UP023,
+    UP024,
     UP025,
     W,
     W2,
@@ -773,6 +774,7 @@ impl CheckCodePrefix {
                 CheckCode::UP021,
                 CheckCode::UP022,
                 CheckCode::UP023,
+                CheckCode::UP024,
                 CheckCode::UP025,
                 CheckCode::D100,
                 CheckCode::D101,
@@ -2452,6 +2454,7 @@ impl CheckCodePrefix {
                     CheckCode::UP021,
                     CheckCode::UP022,
                     CheckCode::UP023,
+                    CheckCode::UP024,
                     CheckCode::UP025,
                 ]
             }
@@ -2485,6 +2488,7 @@ impl CheckCodePrefix {
                     CheckCode::UP021,
                     CheckCode::UP022,
                     CheckCode::UP023,
+                    CheckCode::UP024,
                     CheckCode::UP025,
                 ]
             }
@@ -2702,6 +2706,7 @@ impl CheckCodePrefix {
                 CheckCode::UP021,
                 CheckCode::UP022,
                 CheckCode::UP023,
+                CheckCode::UP024,
                 CheckCode::UP025,
             ],
             CheckCodePrefix::UP0 => vec![
@@ -2727,6 +2732,7 @@ impl CheckCodePrefix {
                 CheckCode::UP021,
                 CheckCode::UP022,
                 CheckCode::UP023,
+                CheckCode::UP024,
                 CheckCode::UP025,
             ],
             CheckCodePrefix::UP00 => vec![
@@ -2774,12 +2780,14 @@ impl CheckCodePrefix {
                 CheckCode::UP021,
                 CheckCode::UP022,
                 CheckCode::UP023,
+                CheckCode::UP024,
                 CheckCode::UP025,
             ],
             CheckCodePrefix::UP020 => vec![CheckCode::UP020],
             CheckCodePrefix::UP021 => vec![CheckCode::UP021],
             CheckCodePrefix::UP022 => vec![CheckCode::UP022],
             CheckCodePrefix::UP023 => vec![CheckCode::UP023],
+            CheckCodePrefix::UP024 => vec![CheckCode::UP024],
             CheckCodePrefix::UP025 => vec![CheckCode::UP025],
             CheckCodePrefix::W => vec![CheckCode::W292, CheckCode::W605],
             CheckCodePrefix::W2 => vec![CheckCode::W292],
@@ -3352,6 +3360,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::UP021 => SuffixLength::Three,
             CheckCodePrefix::UP022 => SuffixLength::Three,
             CheckCodePrefix::UP023 => SuffixLength::Three,
+            CheckCodePrefix::UP024 => SuffixLength::Three,
             CheckCodePrefix::UP025 => SuffixLength::Three,
             CheckCodePrefix::W => SuffixLength::Zero,
             CheckCodePrefix::W2 => SuffixLength::One,

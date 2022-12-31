@@ -110,10 +110,7 @@ pub fn extract_isort_directives(lxr: &[LexResult], locator: &SourceCodeLocator) 
         }
 
         // TODO(charlie): Modify RustPython to include the comment text in the token.
-        let comment_text = locator.slice_source_code_range(&Range {
-            location: start,
-            end_location: end,
-        });
+        let comment_text = locator.slice_source_code_range(&Range::new(start, end));
 
         if comment_text == "# isort: split" {
             splits.push(start.row());

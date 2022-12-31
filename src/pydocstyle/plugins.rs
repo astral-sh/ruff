@@ -34,10 +34,7 @@ pub fn not_missing(
             if checker.settings.enabled.contains(&CheckCode::D100) {
                 checker.add_check(Check::new(
                     CheckKind::PublicModule,
-                    Range {
-                        location: Location::new(1, 0),
-                        end_location: Location::new(1, 0),
-                    },
+                    Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
             }
             false
@@ -46,10 +43,7 @@ pub fn not_missing(
             if checker.settings.enabled.contains(&CheckCode::D104) {
                 checker.add_check(Check::new(
                     CheckKind::PublicPackage,
-                    Range {
-                        location: Location::new(1, 0),
-                        end_location: Location::new(1, 0),
-                    },
+                    Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
             }
             false
@@ -412,10 +406,10 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             {
                 let mut check = Check::new(
                     CheckKind::NoUnderIndentation,
-                    Range {
-                        location: Location::new(docstring.expr.location.row() + i, 0),
-                        end_location: Location::new(docstring.expr.location.row() + i, 0),
-                    },
+                    Range::new(
+                        Location::new(docstring.expr.location.row() + i, 0),
+                        Location::new(docstring.expr.location.row() + i, 0),
+                    ),
                 );
                 if checker.patch(check.kind.code()) {
                     check.amend(Fix::replacement(
@@ -462,10 +456,10 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                     // enables autofix.
                     let mut check = Check::new(
                         CheckKind::NoOverIndentation,
-                        Range {
-                            location: Location::new(docstring.expr.location.row() + i, 0),
-                            end_location: Location::new(docstring.expr.location.row() + i, 0),
-                        },
+                        Range::new(
+                            Location::new(docstring.expr.location.row() + i, 0),
+                            Location::new(docstring.expr.location.row() + i, 0),
+                        ),
                     );
                     if checker.patch(check.kind.code()) {
                         check.amend(Fix::replacement(
@@ -486,10 +480,10 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             if line_indent.len() > docstring.indentation.len() {
                 let mut check = Check::new(
                     CheckKind::NoOverIndentation,
-                    Range {
-                        location: Location::new(docstring.expr.location.row() + i, 0),
-                        end_location: Location::new(docstring.expr.location.row() + i, 0),
-                    },
+                    Range::new(
+                        Location::new(docstring.expr.location.row() + i, 0),
+                        Location::new(docstring.expr.location.row() + i, 0),
+                    ),
                 );
                 if checker.patch(check.kind.code()) {
                     check.amend(Fix::replacement(

@@ -13,10 +13,10 @@ pub fn blanket_noqa(lineno: usize, line: &str) -> Option<Check> {
     BLANKET_NOQA_REGEX.find(line).map(|m| {
         Check::new(
             CheckKind::BlanketNOQA,
-            Range {
-                location: Location::new(lineno + 1, m.start()),
-                end_location: Location::new(lineno + 1, m.end()),
-            },
+            Range::new(
+                Location::new(lineno + 1, m.start()),
+                Location::new(lineno + 1, m.end()),
+            ),
         )
     })
 }

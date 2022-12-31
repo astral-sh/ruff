@@ -215,10 +215,10 @@ impl<'a> Checker<'a> {
             return false;
         }
         let noqa_lineno = self.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-        let line = self.locator.slice_source_code_range(&Range {
-            location: Location::new(*noqa_lineno, 0),
-            end_location: Location::new(noqa_lineno + 1, 0),
-        });
+        let line = self.locator.slice_source_code_range(&Range::new(
+            Location::new(*noqa_lineno, 0),
+            Location::new(noqa_lineno + 1, 0),
+        ));
         match noqa::extract_noqa_directive(&line) {
             Directive::None => false,
             Directive::All(..) => true,
@@ -1107,6 +1107,11 @@ where
                         flake8_errmsg::plugins::string_in_exception(self, exc);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    if let Some(item) = exc {
+                        pyupgrade::plugins::os_error_alias(self, item);
+                    }
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
@@ -1190,6 +1195,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -1715,6 +1723,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP022) {
                     pyupgrade::plugins::replace_stdout_stderr(self, expr, keywords);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, expr);
                 }
 
                 // flake8-print
@@ -3869,10 +3880,10 @@ impl<'a> Checker<'a> {
                 let content = self
                     .locator
                     .slice_source_code_range(&Range::from_located(expr));
-                let indentation = self.locator.slice_source_code_range(&Range {
-                    location: Location::new(expr.location.row(), 0),
-                    end_location: Location::new(expr.location.row(), expr.location.column()),
-                });
+                let indentation = self.locator.slice_source_code_range(&Range::new(
+                    Location::new(expr.location.row(), 0),
+                    Location::new(expr.location.row(), expr.location.column()),
+                ));
                 let body = pydocstyle::helpers::raw_contents(&content);
                 let docstring = Docstring {
                     kind: definition.kind,

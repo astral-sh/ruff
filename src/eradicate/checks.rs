@@ -28,20 +28,11 @@ pub fn commented_out_code(
 ) -> Option<Check> {
     let location = Location::new(start.row(), 0);
     let end_location = Location::new(end.row() + 1, 0);
-    let line = locator.slice_source_code_range(&Range {
-        location,
-        end_location,
-    });
+    let line = locator.slice_source_code_range(&Range::new(location, end_location));
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(&line) && comment_contains_code(&line) {
-        let mut check = Check::new(
-            CheckKind::CommentedOutCode,
-            Range {
-                location: start,
-                end_location: end,
-            },
-        );
+        let mut check = Check::new(CheckKind::CommentedOutCode, Range::new(start, end));
         if matches!(autofix, flags::Autofix::Enabled)
             && settings.fixable.contains(&CheckCode::ERA001)
         {

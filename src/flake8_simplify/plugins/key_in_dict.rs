@@ -46,10 +46,7 @@ pub fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
         checker,
         target,
         iter,
-        Range {
-            location: target.location,
-            end_location: iter.end_location.unwrap(),
-        },
+        Range::new(target.location, iter.end_location.unwrap()),
     );
 }
 

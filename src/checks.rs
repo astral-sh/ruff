@@ -236,6 +236,7 @@ pub enum CheckCode {
     UP021,
     UP022,
     UP023,
+    UP024,
     UP025,
     // pydocstyle
     D100,
@@ -907,6 +908,7 @@ pub enum CheckKind {
     ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
     RewriteCElementTree,
+    OSErrorAlias(Option<String>),
     RewriteUnicodeLiteral,
     // pydocstyle
     BlankLineAfterLastSection(String),
@@ -1301,6 +1303,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckKind::ReplaceUniversalNewlines,
             CheckCode::UP022 => CheckKind::ReplaceStdoutStderr,
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
+            CheckCode::UP024 => CheckKind::OSErrorAlias(None),
             CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
@@ -1733,6 +1736,7 @@ impl CheckCode {
             CheckCode::UP021 => CheckCategory::Pyupgrade,
             CheckCode::UP022 => CheckCategory::Pyupgrade,
             CheckCode::UP023 => CheckCategory::Pyupgrade,
+            CheckCode::UP024 => CheckCategory::Pyupgrade,
             CheckCode::UP025 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
@@ -1955,6 +1959,7 @@ impl CheckKind {
             CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
+            CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
             CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
@@ -2715,6 +2720,7 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => {
                 "`cElementTree` is deprecated, use `ElementTree`".to_string()
             }
+            CheckKind::OSErrorAlias(..) => "Replace aliased errors with `OSError`".to_string(),
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
@@ -3129,8 +3135,8 @@ impl CheckKind {
         matches!(
             self,
             CheckKind::AmbiguousUnicodeCharacterString(..)
-                | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
                 | CheckKind::AmbiguousUnicodeCharacterComment(..)
+                | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
                 | CheckKind::BlankLineAfterSummary
@@ -3156,12 +3162,7 @@ impl CheckKind {
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::MissingReturnTypeSpecialMethod(..)
                 | CheckKind::NativeLiterals(..)
-                | CheckKind::OpenAlias
                 | CheckKind::NewLineAfterLastParagraph
-                | CheckKind::ReplaceUniversalNewlines
-                | CheckKind::ReplaceStdoutStderr
-                | CheckKind::RewriteCElementTree
-                | CheckKind::RewriteUnicodeLiteral
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
                 | CheckKind::NoBlankLineBeforeClass(..)
@@ -3174,16 +3175,22 @@ impl CheckKind {
                 | CheckKind::NoneComparison(..)
                 | CheckKind::NotInTest
                 | CheckKind::NotIsTest
+                | CheckKind::OSErrorAlias(..)
                 | CheckKind::OneBlankLineAfterClass(..)
                 | CheckKind::OneBlankLineBeforeClass(..)
+                | CheckKind::OpenAlias
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
-                | CheckKind::PrintFound
                 | CheckKind::PercentFormatExtraNamedArguments(..)
+                | CheckKind::PrintFound
                 | CheckKind::RaiseNotImplemented
                 | CheckKind::RedundantOpenModes(..)
                 | CheckKind::RedundantTupleInExceptionHandler(..)
                 | CheckKind::RemoveSixCompat
+                | CheckKind::ReplaceStdoutStderr
+                | CheckKind::ReplaceUniversalNewlines
+                | CheckKind::RewriteCElementTree
+                | CheckKind::RewriteUnicodeLiteral
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
                 | CheckKind::SectionUnderlineAfterName(..)
@@ -3313,6 +3320,10 @@ impl CheckKind {
             CheckKind::OneBlankLineAfterClass(..) => {
                 Some("Insert 1 blank line after class docstring".to_string())
             }
+            CheckKind::OSErrorAlias(name) => Some(match name {
+                None => "Replace with builtin `OSError`".to_string(),
+                Some(name) => format!("Replace `{name}` with builtin `OSError`"),
+            }),
             CheckKind::NoBlankLinesBetweenHeaderAndContent(..) => {
                 Some("Remove blank line(s)".to_string())
             }

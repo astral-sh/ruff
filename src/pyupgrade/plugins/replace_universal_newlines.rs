@@ -16,13 +16,13 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
         &checker.import_aliases,
     ) {
         let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
-        let range = Range {
-            location: kwarg.location,
-            end_location: Location::new(
+        let range = Range::new(
+            kwarg.location,
+            Location::new(
                 kwarg.location.row(),
                 kwarg.location.column() + "universal_newlines".len(),
             ),
-        };
+        );
         let mut check = Check::new(CheckKind::ReplaceUniversalNewlines, range);
         if checker.patch(check.kind.code()) {
             check.amend(Fix::replacement(
