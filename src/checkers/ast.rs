@@ -532,7 +532,7 @@ where
                     Binding {
                         kind: BindingKind::FunctionDefinition,
                         used: None,
-                        range: Range::from_located(stmt),
+                        range: helpers::identifier_range(stmt, self.locator),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -1412,7 +1412,7 @@ where
                     Binding {
                         kind: BindingKind::ClassDefinition,
                         used: None,
-                        range: Range::from_located(stmt),
+                        range: helpers::identifier_range(stmt, self.locator),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
