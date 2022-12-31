@@ -432,7 +432,9 @@ pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Ran
     let end = if let Some(type_) = type_ {
         type_.location
     } else {
-        body[0].location
+        body.first()
+            .expect("Expected body to be non-empty")
+            .location
     };
     let contents = locator.slice_source_code_range(&Range {
         location: handler.location,
@@ -445,7 +447,7 @@ pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Ran
             location,
             end_location,
         })
-        .unwrap();
+        .expect("Failed to find `except` range");
     range
 }
 
@@ -457,10 +459,17 @@ pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
         | StmtKind::While { body, orelse, .. }
             if !orelse.is_empty() =>
         {
-            let body_end = body.last().unwrap().end_location.unwrap();
+            let body_end = body
+                .last()
+                .expect("Expected body to be non-empty")
+                .end_location
+                .unwrap();
             let contents = locator.slice_source_code_range(&Range {
                 location: body_end,
-                end_location: orelse[0].location,
+                end_location: orelse
+                    .first()
+                    .expect("Expected orelse to be non-empty")
+                    .location,
             });
             let range = lexer::make_tokenizer_located(&contents, body_end)
                 .flatten()
