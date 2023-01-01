@@ -104,6 +104,7 @@ jobs:
           profile: minimal
           toolchain: nightly-2022-11-01
           override: true
+      - run: cargo install cargo-insta
       - uses: actions/cache@v3
         env:
           cache-name: cache-cargo
