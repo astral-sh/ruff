@@ -1,0 +1,50 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind: RewriteListComprehension
+  location:
+    row: 2
+    column: 16
+  end_location:
+    row: 2
+    column: 38
+  fix: ~
+  parent: ~
+- kind: RewriteListComprehension
+  location:
+    row: 4
+    column: 15
+  end_location:
+    row: 4
+    column: 37
+  fix: ~
+  parent: ~
+- kind: RewriteListComprehension
+  location:
+    row: 6
+    column: 25
+  end_location:
+    row: 6
+    column: 47
+  fix: ~
+  parent: ~
+- kind: RewriteListComprehension
+  location:
+    row: 8
+    column: 16
+  end_location:
+    row: 8
+    column: 51
+  fix: ~
+  parent: ~
+- kind: RewriteListComprehension
+  location:
+    row: 10
+    column: 16
+  end_location:
+    row: 13
+    column: 1
+  fix: ~
+  parent: ~
+

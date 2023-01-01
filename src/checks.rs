@@ -2733,7 +2733,9 @@ impl CheckKind {
             CheckKind::OSErrorAlias(..) => "Replace aliased errors with `OSError`".to_string(),
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             CheckKind::RewriteMockImport => "`mock` is deprecated, use `unittest.mock`".to_string(),
-            CheckKind::RewriteListComprehension => "Rewrite a list comprehension to a set comprehension".to_string(),
+            CheckKind::RewriteListComprehension => {
+                "Rewrite a list comprehension to a set comprehension".to_string()
+            }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
