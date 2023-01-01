@@ -49,7 +49,7 @@ expression: checks
     column: 1
   end_location:
     row: 6
-    column: 13
+    column: 8
   fix: ~
   parent: ~
 - kind:
