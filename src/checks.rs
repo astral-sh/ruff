@@ -3309,6 +3309,7 @@ impl CheckKind {
             }
             CheckKind::RewriteCElementTree => Some("Replace with `ElementTree`".to_string()),
             CheckKind::RewriteUnicodeLiteral => Some("Remove unicode prefix".to_string()),
+            CheckKind::RewriteMockImport => Some("Import from `unittest.mock` instead".to_string()),
             CheckKind::NewLineAfterSectionName(name) => {
                 Some(format!("Add newline after \"{name}\""))
             }

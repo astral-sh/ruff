@@ -43,6 +43,25 @@ if True:
             c
         )
 
-
 # These should not change:
 import os, io
+
+# Mock should go on a new line as `from unittest import mock`
+import mock, mock
+
+# Mock should go on a new line as `from unittest import mock as foo`
+import mock as foo
+
+# Mock should go on a new line as `from unittest import mock as foo`
+from mock import mock as foo
+
+if True:
+    # This should yield multiple, aliased imports.
+    import mock as foo, mock as bar, mock
+
+    # This should yield multiple, aliased imports, and preserve `os`.
+    import mock as foo, mock as bar, mock, os
+
+if True:
+    # This should yield multiple, aliased imports.
+    from mock import mock as foo, mock as bar, mock
