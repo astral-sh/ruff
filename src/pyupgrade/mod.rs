@@ -47,6 +47,7 @@ mod tests {
     #[test_case(CheckCode::UP024, Path::new("UP024_2.py"); "UP024_2")]
     #[test_case(CheckCode::UP025, Path::new("UP025.py"); "UP025")]
     #[test_case(CheckCode::UP026, Path::new("UP026.py"); "UP026")]
+    #[test_case(CheckCode::UP028, Path::new("UP028.py"); "UP028")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(

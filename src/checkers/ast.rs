@@ -1183,6 +1183,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::SIM118) {
                     flake8_simplify::plugins::key_in_dict_for(self, target, iter);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP028) {
+                    pyupgrade::plugins::rewrite_yield_from(self, stmt, iter, body);
+                }
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
