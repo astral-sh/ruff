@@ -65,3 +65,10 @@ if True:
 if True:
     # This should yield multiple, aliased imports.
     from mock import mock as foo, mock as bar, mock
+
+
+# This should be unchanged.
+x = mock.Mock()
+
+# This should change to `mock.Mock`().
+x = mock.mock.Mock()

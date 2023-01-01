@@ -1606,6 +1606,10 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP019) {
                     pyupgrade::plugins::typing_text_str_alias(self, expr);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP026) {
+                    pyupgrade::plugins::rewrite_mock_attribute(self, expr);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
