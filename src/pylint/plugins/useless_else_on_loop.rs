@@ -1,6 +1,6 @@
 use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
 
-use crate::ast::types::Range;
+use crate::ast::helpers;
 use crate::checkers::ast::Checker;
 use crate::checks::CheckKind;
 use crate::Check;
@@ -35,7 +35,7 @@ pub fn useless_else_on_loop(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], o
     if !orelse.is_empty() && !loop_exits_early(body) {
         checker.add_check(Check::new(
             CheckKind::UselessElseOnLoop,
-            Range::from_located(stmt),
+            helpers::else_range(stmt, checker.locator).unwrap(),
         ));
     }
 }

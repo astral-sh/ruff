@@ -84,10 +84,10 @@ fn replace_with_bytes_literal(
 ) -> Check {
     let mut check = Check::new(CheckKind::UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
-        let content = locator.slice_source_code_range(&Range {
-            location: constant.location,
-            end_location: constant.end_location.unwrap(),
-        });
+        let content = locator.slice_source_code_range(&Range::new(
+            constant.location,
+            constant.end_location.unwrap(),
+        ));
         let content = format!(
             "b{}",
             content.trim_start_matches('u').trim_start_matches('U')

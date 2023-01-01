@@ -116,8 +116,12 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
+      - run: cargo install cargo-insta
       - run: pip install black[d]==22.12.0
-      - run: cargo test --all
+      - name: Run tests
+        run: |
+          cargo insta test --all --delete-unreferenced-snapshots
+          git diff --exit-code
       - run: cargo test --package ruff --test black_compatibility_test -- --ignored
 
 # TODO(charlie): Re-enable the `wasm-pack` tests.

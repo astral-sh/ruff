@@ -5,7 +5,7 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
-    Location, Stmt, StmtKind,
+    Located, Location, Stmt, StmtKind,
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -212,6 +212,23 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
+/// Return `true` if an `Expr` is not a reference to a variable (or something
+/// that could resolve to a variable, like a function call).
+pub fn is_non_variable(expr: &Expr) -> bool {
+    matches!(
+        expr.node,
+        ExprKind::Constant { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::List { .. }
+            | ExprKind::Set { .. }
+            | ExprKind::Dict { .. }
+            | ExprKind::SetComp { .. }
+            | ExprKind::ListComp { .. }
+            | ExprKind::DictComp { .. }
+            | ExprKind::GeneratorExp { .. }
+    )
+}
+
 /// Return the `Keyword` with the given name, if it's present in the list of
 /// `Keyword` arguments.
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
@@ -335,20 +352,17 @@ pub fn to_absolute(relative: Location, base: Location) -> Location {
 
 /// Return `true` if a `Stmt` has leading content.
 pub fn match_leading_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
-    let range = Range {
-        location: Location::new(stmt.location.row(), 0),
-        end_location: stmt.location,
-    };
+    let range = Range::new(Location::new(stmt.location.row(), 0), stmt.location);
     let prefix = locator.slice_source_code_range(&range);
     prefix.chars().any(|char| !char.is_whitespace())
 }
 
 /// Return `true` if a `Stmt` has trailing content.
 pub fn match_trailing_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
-    let range = Range {
-        location: stmt.end_location.unwrap(),
-        end_location: Location::new(stmt.end_location.unwrap().row() + 1, 0),
-    };
+    let range = Range::new(
+        stmt.end_location.unwrap(),
+        Location::new(stmt.end_location.unwrap().row() + 1, 0),
+    );
     let suffix = locator.slice_source_code_range(&range);
     for char in suffix.chars() {
         if char == '#' {
@@ -384,15 +398,25 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
         let contents = locator.slice_source_code_range(&Range::from_located(stmt));
         for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt.location).flatten() {
             if matches!(tok, Tok::Name { .. }) {
-                return Range {
-                    location: start,
-                    end_location: end,
-                };
+                return Range::new(start, end);
             }
         }
         error!("Failed to find identifier for {:?}", stmt);
     }
     Range::from_located(stmt)
+}
+
+// Return the ranges of `Name` tokens within a specified node.
+pub fn find_names<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Vec<Range> {
+    let contents = locator.slice_source_code_range(&Range::from_located(located));
+    lexer::make_tokenizer_located(&contents, located.location)
+        .flatten()
+        .filter(|(_, tok, _)| matches!(tok, Tok::Name { .. }))
+        .map(|(start, _, end)| Range {
+            location: start,
+            end_location: end,
+        })
+        .collect()
 }
 
 /// Return the `Range` of `name` in `Excepthandler`.
@@ -406,17 +430,70 @@ pub fn excepthandler_name_range(
     match (name, type_) {
         (Some(_), Some(type_)) => {
             let type_end_location = type_.end_location.unwrap();
-            let contents = locator.slice_source_code_range(&Range {
-                location: type_end_location,
-                end_location: body[0].location,
-            });
+            let contents =
+                locator.slice_source_code_range(&Range::new(type_end_location, body[0].location));
             let range = lexer::make_tokenizer_located(&contents, type_end_location)
                 .flatten()
                 .tuple_windows()
                 .find(|(tok, next_tok)| {
                     matches!(tok.1, Tok::As) && matches!(next_tok.1, Tok::Name { .. })
                 })
-                .map(|((..), (location, _, end_location))| Range {
+                .map(|((..), (location, _, end_location))| Range::new(location, end_location));
+            range
+        }
+        _ => None,
+    }
+}
+
+/// Return the `Range` of `except` in `Excepthandler`.
+pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Range {
+    let ExcepthandlerKind::ExceptHandler { body, type_, .. } = &handler.node;
+    let end = if let Some(type_) = type_ {
+        type_.location
+    } else {
+        body.first()
+            .expect("Expected body to be non-empty")
+            .location
+    };
+    let contents = locator.slice_source_code_range(&Range {
+        location: handler.location,
+        end_location: end,
+    });
+    let range = lexer::make_tokenizer_located(&contents, handler.location)
+        .flatten()
+        .find(|(_, kind, _)| matches!(kind, Tok::Except { .. }))
+        .map(|(location, _, end_location)| Range {
+            location,
+            end_location,
+        })
+        .expect("Failed to find `except` range");
+    range
+}
+
+/// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
+pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
+    match &stmt.node {
+        StmtKind::For { body, orelse, .. }
+        | StmtKind::AsyncFor { body, orelse, .. }
+        | StmtKind::While { body, orelse, .. }
+            if !orelse.is_empty() =>
+        {
+            let body_end = body
+                .last()
+                .expect("Expected body to be non-empty")
+                .end_location
+                .unwrap();
+            let contents = locator.slice_source_code_range(&Range {
+                location: body_end,
+                end_location: orelse
+                    .first()
+                    .expect("Expected orelse to be non-empty")
+                    .location,
+            });
+            let range = lexer::make_tokenizer_located(&contents, body_end)
+                .flatten()
+                .find(|(_, kind, _)| matches!(kind, Tok::Else))
+                .map(|(location, _, end_location)| Range {
                     location,
                     end_location,
                 });
@@ -435,10 +512,10 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> boo
     // make conservative choices.
     // TODO(charlie): Come up with a more robust strategy.
     if stmt.location.row() > 1 {
-        let range = Range {
-            location: Location::new(stmt.location.row() - 1, 0),
-            end_location: Location::new(stmt.location.row(), 0),
-        };
+        let range = Range::new(
+            Location::new(stmt.location.row() - 1, 0),
+            Location::new(stmt.location.row(), 0),
+        );
         let line = locator.slice_source_code_range(&range);
         if line.trim().ends_with('\\') {
             return true;
@@ -466,7 +543,9 @@ mod tests {
     use rustpython_ast::Location;
     use rustpython_parser::parser;
 
-    use crate::ast::helpers::{identifier_range, match_module_member, match_trailing_content};
+    use crate::ast::helpers::{
+        else_range, identifier_range, match_module_member, match_trailing_content,
+    };
     use crate::ast::types::Range;
     use crate::source_code_locator::SourceCodeLocator;
 
@@ -660,10 +739,7 @@ y = 2
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(1, 4),
-                end_location: Location::new(1, 5),
-            }
+            Range::new(Location::new(1, 4), Location::new(1, 5),)
         );
 
         let contents = r#"
@@ -677,10 +753,7 @@ def \
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(2, 2),
-                end_location: Location::new(2, 3),
-            }
+            Range::new(Location::new(2, 2), Location::new(2, 3),)
         );
 
         let contents = "class Class(): pass".trim();
@@ -689,10 +762,7 @@ def \
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(1, 6),
-                end_location: Location::new(1, 11),
-            }
+            Range::new(Location::new(1, 6), Location::new(1, 11),)
         );
 
         let contents = "class Class: pass".trim();
@@ -701,10 +771,7 @@ def \
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(1, 6),
-                end_location: Location::new(1, 11),
-            }
+            Range::new(Location::new(1, 6), Location::new(1, 11),)
         );
 
         let contents = r#"
@@ -718,10 +785,7 @@ class Class():
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(2, 6),
-                end_location: Location::new(2, 11),
-            }
+            Range::new(Location::new(2, 6), Location::new(2, 11),)
         );
 
         let contents = r#"x = y + 1"#.trim();
@@ -730,12 +794,29 @@ class Class():
         let locator = SourceCodeLocator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
-            Range {
-                location: Location::new(1, 0),
-                end_location: Location::new(1, 9),
-            }
+            Range::new(Location::new(1, 0), Location::new(1, 9),)
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_else_range() -> Result<()> {
+        let contents = r#"
+for x in y:
+    pass
+else:
+    pass
+"#
+        .trim();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = SourceCodeLocator::new(contents);
+        let range = else_range(stmt, &locator).unwrap();
+        assert_eq!(range.location.row(), 3);
+        assert_eq!(range.location.column(), 0);
+        assert_eq!(range.end_location.row(), 3);
+        assert_eq!(range.end_location.column(), 4);
         Ok(())
     }
 }

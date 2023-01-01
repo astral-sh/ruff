@@ -42,13 +42,12 @@ mod tests {
     #[test_case(CheckCode::B905, Path::new("B905.py"); "B905")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_bugbear")
                 .join(path)
                 .as_path(),
             &Settings::for_rule(check_code),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
@@ -56,7 +55,7 @@ mod tests {
     #[test]
     fn extend_immutable_calls() -> Result<()> {
         let snapshot = "extend_immutable_calls".to_string();
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_bugbear/B008_extended.py"),
             &Settings {
                 flake8_bugbear: flake8_bugbear::settings::Settings {
@@ -68,7 +67,6 @@ mod tests {
                 ..Settings::for_rules(vec![CheckCode::B008])
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }

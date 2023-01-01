@@ -42,86 +42,85 @@ mod tests {
     #[test_case(CheckCode::UP021, Path::new("UP021.py"); "UP021")]
     #[test_case(CheckCode::UP022, Path::new("UP022.py"); "UP022")]
     #[test_case(CheckCode::UP023, Path::new("UP023.py"); "UP023")]
+    #[test_case(CheckCode::UP024, Path::new("UP024_0.py"); "UP024_0")]
+    #[test_case(CheckCode::UP024, Path::new("UP024_1.py"); "UP024_1")]
+    #[test_case(CheckCode::UP024, Path::new("UP024_2.py"); "UP024_2")]
     #[test_case(CheckCode::UP025, Path::new("UP025.py"); "UP025")]
+    #[test_case(CheckCode::UP026, Path::new("UP026.py"); "UP026")]
+    #[test_case(CheckCode::UP027, Path::new("UP027.py"); "UP027")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pyupgrade")
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
 
     #[test]
     fn future_annotations_pep_585_p37() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(CheckCode::UP006)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn future_annotations_pep_585_py310() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py310,
                 ..settings::Settings::for_rule(CheckCode::UP006)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn future_annotations_pep_604_p37() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(CheckCode::UP007)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn future_annotations_pep_604_py310() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py310,
                 ..settings::Settings::for_rule(CheckCode::UP007)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }
 
     #[test]
     fn datetime_utc_alias_py311() -> Result<()> {
-        let mut checks = test_path(
+        let checks = test_path(
             Path::new("./resources/test/fixtures/pyupgrade/UP017.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py311,
                 ..settings::Settings::for_rule(CheckCode::UP017)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(checks);
         Ok(())
     }

@@ -1614,10 +1614,7 @@ pub fn ambiguous_unicode_character(
 ) -> Vec<Check> {
     let mut checks = vec![];
 
-    let text = locator.slice_source_code_range(&Range {
-        location: start,
-        end_location: end,
-    });
+    let text = locator.slice_source_code_range(&Range::new(start, end));
 
     let mut col_offset = 0;
     let mut row_offset = 0;
@@ -1648,10 +1645,7 @@ pub fn ambiguous_unicode_character(
                                 representant,
                             ),
                         },
-                        Range {
-                            location,
-                            end_location,
-                        },
+                        Range::new(location, end_location),
                     );
                     if settings.enabled.contains(check.kind.code()) {
                         if matches!(autofix, flags::Autofix::Enabled)

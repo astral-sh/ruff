@@ -30,7 +30,11 @@ fn compare(
             comparators: comparators.to_vec(),
         },
     );
-    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
+    let mut generator = SourceCodeGenerator::new(
+        stylist.indentation(),
+        stylist.quote(),
+        stylist.line_ending(),
+    );
     generator.unparse_expr(&cmp, 0);
     generator.generate().ok()
 }
@@ -302,7 +306,11 @@ fn function(
             type_comment: None,
         },
     );
-    let mut generator = SourceCodeGenerator::new(stylist.indentation(), stylist.quote());
+    let mut generator = SourceCodeGenerator::new(
+        stylist.indentation(),
+        stylist.quote(),
+        stylist.line_ending(),
+    );
     generator.unparse_stmt(&func);
     Ok(generator.generate()?)
 }
@@ -321,10 +329,10 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                 {
                     match function(id, args, body, checker.style) {
                         Ok(content) => {
-                            let first_line = checker.locator.slice_source_code_range(&Range {
-                                location: Location::new(stmt.location.row(), 0),
-                                end_location: Location::new(stmt.location.row() + 1, 0),
-                            });
+                            let first_line = checker.locator.slice_source_code_range(&Range::new(
+                                Location::new(stmt.location.row(), 0),
+                                Location::new(stmt.location.row() + 1, 0),
+                            ));
                             let indentation = &leading_space(&first_line);
                             let mut indented = String::new();
                             for (idx, line) in content.lines().enumerate() {

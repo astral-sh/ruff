@@ -8,7 +8,11 @@
 An extremely fast Python linter, written in Rust.
 
 <p align="center">
-  <img alt="Bar chart with benchmark results" src="https://user-images.githubusercontent.com/1309177/187504482-6d9df992-a81d-4e86-9f6a-d958741c8182.svg">
+  <picture align="center">
+    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/210156880-a97c2a0d-2c03-4393-8695-36547935a94e.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/210156881-a88fd142-5008-4695-9407-d028cec3eff7.svg">
+    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/210156881-a88fd142-5008-4695-9407-d028cec3eff7.svg">
+  </picture>
 </p>
 
 <p align="center">
@@ -169,7 +173,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.203'
+  rev: 'v0.0.206'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -682,7 +686,10 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
 | UP022 | ReplaceStdoutStderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
 | UP023 | RewriteCElementTree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
+| UP024 | OSErrorAlias | Replace aliased errors with `OSError` | 🛠 |
 | UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
+| UP026 | RewriteMockImport | `mock` is deprecated, use `unittest.mock` | 🛠 |
+| UP027 | RewriteListComprehension | Replace unpacked list comprehension with a generator expression | 🛠 |
 
 ### pep8-naming (N)
 
@@ -1302,7 +1309,7 @@ natively, including:
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (20/33)
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (21/33)
 - [`yesqa`](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different error code prefixes than would be found in the
@@ -1361,7 +1368,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 Ruff can also replace [`isort`](https://pypi.org/project/isort/),
 [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
 [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10), and a subset of the rules
-implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (20/33).
+implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (21/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
 

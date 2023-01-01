@@ -1,0 +1,362 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 3
+    column: 11
+  end_location:
+    row: 3
+    column: 15
+  fix:
+    content: from unittest import mock
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 15
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 6
+    column: 11
+  end_location:
+    row: 6
+    column: 15
+  fix:
+    content: "import sys\n    from unittest import mock"
+    location:
+      row: 6
+      column: 4
+    end_location:
+      row: 6
+      column: 20
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 9
+    column: 7
+  end_location:
+    row: 9
+    column: 16
+  fix:
+    content: from unittest import mock
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 16
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 12
+    column: 19
+  end_location:
+    row: 12
+    column: 23
+  fix:
+    content: "import contextlib, sys\nfrom unittest import mock"
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 28
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 15
+    column: 7
+  end_location:
+    row: 15
+    column: 11
+  fix:
+    content: "import sys\nfrom unittest import mock"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 16
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 21
+  fix:
+    content: from unittest import mock
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 21
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 27
+    column: 1
+  fix:
+    content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)"
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 27
+      column: 1
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 30
+    column: 0
+  end_location:
+    row: 35
+    column: 1
+  fix:
+    content: "from unittest.mock import (\n    a,\n    b,\n    c\n)"
+    location:
+      row: 30
+      column: 0
+    end_location:
+      row: 35
+      column: 1
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 39
+    column: 8
+  end_location:
+    row: 44
+    column: 9
+  fix:
+    content: "from unittest.mock import (\n            a,\n            b,\n            c\n        )"
+    location:
+      row: 39
+      column: 8
+    end_location:
+      row: 44
+      column: 9
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 50
+    column: 7
+  end_location:
+    row: 50
+    column: 11
+  fix:
+    content: "from unittest import mock\nfrom unittest import mock"
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 17
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 50
+    column: 13
+  end_location:
+    row: 50
+    column: 17
+  fix:
+    content: "from unittest import mock\nfrom unittest import mock"
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 17
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 53
+    column: 7
+  end_location:
+    row: 53
+    column: 18
+  fix:
+    content: from unittest import mock as foo
+    location:
+      row: 53
+      column: 0
+    end_location:
+      row: 53
+      column: 18
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 56
+    column: 0
+  end_location:
+    row: 56
+    column: 28
+  fix:
+    content: from unittest import mock as foo
+    location:
+      row: 56
+      column: 0
+    end_location:
+      row: 56
+      column: 28
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 60
+    column: 11
+  end_location:
+    row: 60
+    column: 22
+  fix:
+    content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
+    location:
+      row: 60
+      column: 4
+    end_location:
+      row: 60
+      column: 41
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 60
+    column: 24
+  end_location:
+    row: 60
+    column: 35
+  fix:
+    content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
+    location:
+      row: 60
+      column: 4
+    end_location:
+      row: 60
+      column: 41
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 60
+    column: 37
+  end_location:
+    row: 60
+    column: 41
+  fix:
+    content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
+    location:
+      row: 60
+      column: 4
+    end_location:
+      row: 60
+      column: 41
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 63
+    column: 11
+  end_location:
+    row: 63
+    column: 22
+  fix:
+    content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
+    location:
+      row: 63
+      column: 4
+    end_location:
+      row: 63
+      column: 45
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 63
+    column: 24
+  end_location:
+    row: 63
+    column: 35
+  fix:
+    content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
+    location:
+      row: 63
+      column: 4
+    end_location:
+      row: 63
+      column: 45
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 63
+    column: 37
+  end_location:
+    row: 63
+    column: 41
+  fix:
+    content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
+    location:
+      row: 63
+      column: 4
+    end_location:
+      row: 63
+      column: 45
+  parent: ~
+- kind:
+    RewriteMockImport: Import
+  location:
+    row: 67
+    column: 4
+  end_location:
+    row: 67
+    column: 51
+  fix:
+    content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
+    location:
+      row: 67
+      column: 4
+    end_location:
+      row: 67
+      column: 51
+  parent: ~
+- kind:
+    RewriteMockImport: Attribute
+  location:
+    row: 74
+    column: 4
+  end_location:
+    row: 74
+    column: 13
+  fix:
+    content: mock
+    location:
+      row: 74
+      column: 4
+    end_location:
+      row: 74
+      column: 13
+  parent: ~
+

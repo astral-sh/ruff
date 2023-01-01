@@ -102,10 +102,7 @@ pub fn check_noqa(
                     if matches.is_empty() {
                         let mut check = Check::new(
                             CheckKind::UnusedNOQA(None),
-                            Range {
-                                location: Location::new(row + 1, start),
-                                end_location: Location::new(row + 1, end),
-                            },
+                            Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
                             && settings.fixable.contains(check.kind.code())
@@ -169,10 +166,7 @@ pub fn check_noqa(
                                     .map(|code| (*code).to_string())
                                     .collect(),
                             })),
-                            Range {
-                                location: Location::new(row + 1, start),
-                                end_location: Location::new(row + 1, end),
-                            },
+                            Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
                             && settings.fixable.contains(check.kind.code())

@@ -1,9 +1,11 @@
 use rustpython_ast::{Cmpop, Expr, ExprKind};
 
+use crate::ast::helpers::create_expr;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::checks::{Check, CheckKind};
+use crate::source_code_generator::SourceCodeGenerator;
 
 /// SIM118
 fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
@@ -29,13 +31,21 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
         CheckKind::KeyInDict(left.to_string(), value.to_string()),
         range,
     );
-    if checker.patch(&CheckCode::SIM118) {
-        let content = right.to_string().replace(".keys()", "");
-        check.amend(Fix::replacement(
-            content,
-            right.location,
-            right.end_location.unwrap(),
-        ));
+    if checker.patch(check.kind.code()) {
+        let mut generator = SourceCodeGenerator::new(
+            checker.style.indentation(),
+            checker.style.quote(),
+            checker.style.line_ending(),
+        );
+        generator.unparse_expr(&create_expr(value.node.clone()), 0);
+
+        if let Ok(content) = generator.generate() {
+            check.amend(Fix::replacement(
+                content,
+                right.location,
+                right.end_location.unwrap(),
+            ));
+        }
     }
     checker.add_check(check);
 }
@@ -46,10 +56,7 @@ pub fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
         checker,
         target,
         iter,
-        Range {
-            location: target.location,
-            end_location: iter.end_location.unwrap(),
-        },
+        Range::new(target.location, iter.end_location.unwrap()),
     );
 }
 

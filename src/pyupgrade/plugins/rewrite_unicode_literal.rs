@@ -5,6 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+/// UP025
 pub fn rewrite_unicode_literal(checker: &mut Checker, expr: &Expr, kind: &Option<String>) {
     if let Some(const_kind) = kind {
         if const_kind.to_lowercase() == "u" {

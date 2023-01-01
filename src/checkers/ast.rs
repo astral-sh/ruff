@@ -213,10 +213,10 @@ impl<'a> Checker<'a> {
             return false;
         }
         let noqa_lineno = self.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-        let line = self.locator.slice_source_code_range(&Range {
-            location: Location::new(*noqa_lineno, 0),
-            end_location: Location::new(noqa_lineno + 1, 0),
-        });
+        let line = self.locator.slice_source_code_range(&Range::new(
+            Location::new(*noqa_lineno, 0),
+            Location::new(noqa_lineno + 1, 0),
+        ));
         match noqa::extract_noqa_directive(&line) {
             Directive::None => false,
             Directive::All(..) => true,
@@ -264,16 +264,17 @@ where
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
+                let ranges = helpers::find_names(stmt, self.locator);
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Global,
                             used: usage,
-                            range: Range::from_located(stmt),
+                            range: *range,
                             source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
@@ -284,8 +285,9 @@ where
                     self.add_checks(
                         names
                             .iter()
-                            .filter_map(|name| {
-                                pycodestyle::checks::ambiguous_variable_name(name, stmt)
+                            .zip(ranges.iter())
+                            .filter_map(|(name, range)| {
+                                pycodestyle::checks::ambiguous_variable_name(name, *range)
                             })
                             .into_iter(),
                     );
@@ -293,16 +295,17 @@ where
             }
             StmtKind::Nonlocal { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
+                let ranges = helpers::find_names(stmt, self.locator);
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
                             used: usage,
-                            range: Range::from_located(stmt),
+                            range: *range,
                             source: Some(RefEquality(stmt)),
                         });
                         scope.values.insert(name, index);
@@ -310,7 +313,7 @@ where
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
-                    for name in names {
+                    for (name, range) in names.iter().zip(ranges.iter()) {
                         let mut exists = false;
                         for index in self.scope_stack.iter().skip(1).rev().skip(1) {
                             if let Some(index) = self.scopes[*index].values.get(&name.as_str()) {
@@ -324,7 +327,7 @@ where
                             if self.settings.enabled.contains(&CheckCode::PLE0117) {
                                 self.add_check(Check::new(
                                     CheckKind::NonlocalWithoutBinding(name.to_string()),
-                                    Range::from_located(stmt),
+                                    *range,
                                 ));
                             }
                         }
@@ -335,8 +338,9 @@ where
                     self.add_checks(
                         names
                             .iter()
-                            .filter_map(|name| {
-                                pycodestyle::checks::ambiguous_variable_name(name, stmt)
+                            .zip(ranges.iter())
+                            .filter_map(|(name, range)| {
+                                pycodestyle::checks::ambiguous_variable_name(name, *range)
                             })
                             .into_iter(),
                     );
@@ -532,7 +536,7 @@ where
                     Binding {
                         kind: BindingKind::FunctionDefinition,
                         used: None,
-                        range: Range::from_located(stmt),
+                        range: helpers::identifier_range(stmt, self.locator),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -582,9 +586,12 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::N818) {
-                    if let Some(check) =
-                        pep8_naming::checks::error_suffix_on_exception_name(stmt, bases, name)
-                    {
+                    if let Some(check) = pep8_naming::checks::error_suffix_on_exception_name(
+                        stmt,
+                        bases,
+                        name,
+                        self.locator,
+                    ) {
                         self.add_check(check);
                     }
                 }
@@ -633,6 +640,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP023) {
                     pyupgrade::plugins::replace_c_element_tree(self, stmt);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP026) {
+                    pyupgrade::plugins::rewrite_mock_import(self, stmt);
                 }
 
                 for alias in names {
@@ -844,6 +854,9 @@ where
                     if self.settings.enabled.contains(&CheckCode::UP010) {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
                     }
+                }
+                if self.settings.enabled.contains(&CheckCode::UP026) {
+                    pyupgrade::plugins::rewrite_mock_import(self, stmt);
                 }
 
                 if self.settings.enabled.contains(&CheckCode::TID251) {
@@ -1098,6 +1111,11 @@ where
                         flake8_errmsg::plugins::string_in_exception(self, exc);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    if let Some(item) = exc {
+                        pyupgrade::plugins::os_error_alias(self, item);
+                    }
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
@@ -1168,7 +1186,9 @@ where
             }
             StmtKind::Try { handlers, .. } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
-                    if let Some(check) = pyflakes::checks::default_except_not_last(handlers) {
+                    if let Some(check) =
+                        pyflakes::checks::default_except_not_last(handlers, self.locator)
+                    {
                         self.add_check(check);
                     }
                 }
@@ -1180,6 +1200,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, handlers);
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
@@ -1187,18 +1210,21 @@ where
                         pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::UP001) {
-                    pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
-                }
+
                 if self.settings.enabled.contains(&CheckCode::B003) {
                     flake8_bugbear::plugins::assignment_to_os_environ(self, targets);
                 }
+
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     if let Some(check) =
                         flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
                     {
                         self.add_check(check);
                     }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::UP001) {
+                    pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
                 if self.settings.enabled.contains(&CheckCode::UP013) {
                     pyupgrade::plugins::convert_typed_dict_functional_to_class(
@@ -1210,6 +1236,10 @@ where
                         self, stmt, targets, value,
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::UP027) {
+                    pyupgrade::plugins::unpack_list_comprehension(self, targets, value);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::PD901) {
                     if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
                         self.add_check(check);
@@ -1412,7 +1442,7 @@ where
                     Binding {
                         kind: BindingKind::ClassDefinition,
                         used: None,
-                        range: Range::from_located(stmt),
+                        range: helpers::identifier_range(stmt, self.locator),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -1535,9 +1565,10 @@ where
                     }
                     ExprContext::Store => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) =
-                                pycodestyle::checks::ambiguous_variable_name(id, expr)
-                            {
+                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                                id,
+                                Range::from_located(expr),
+                            ) {
                                 self.add_check(check);
                             }
                         }
@@ -1557,7 +1588,7 @@ where
                     pylint::plugins::used_prior_global_declaration(self, id, expr);
                 }
             }
-            ExprKind::Attribute { attr, .. } => {
+            ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
                     && self.settings.enabled.contains(&CheckCode::UP006)
@@ -1582,6 +1613,10 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP019) {
                     pyupgrade::plugins::typing_text_str_alias(self, expr);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP026) {
+                    pyupgrade::plugins::rewrite_mock_attribute(self, expr);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
@@ -1594,6 +1629,16 @@ where
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if attr == name {
+                            // Avoid flagging on function calls (e.g., `df.values()`).
+                            if let Some(parent) = self.current_expr_parent() {
+                                if matches!(parent.0.node, ExprKind::Call { .. }) {
+                                    continue;
+                                }
+                            }
+                            // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`).
+                            if helpers::is_non_variable(value) {
+                                continue;
+                            }
                             self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                         };
                     }
@@ -1703,12 +1748,15 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP022) {
                     pyupgrade::plugins::replace_stdout_stderr(self, expr, keywords);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP024) {
+                    pyupgrade::plugins::os_error_alias(self, expr);
+                }
 
                 // flake8-print
                 if self.settings.enabled.contains(&CheckCode::T201)
                     || self.settings.enabled.contains(&CheckCode::T203)
                 {
-                    flake8_print::plugins::print_call(self, expr, func, keywords);
+                    flake8_print::plugins::print_call(self, func, keywords);
                 }
 
                 // flake8-bugbear
@@ -2653,6 +2701,9 @@ where
                 }
                 self.in_subscript = prev_in_subscript;
             }
+            ExprKind::JoinedStr { .. } => {
+                visitor::walk_expr(self, expr);
+            }
             _ => visitor::walk_expr(self, expr),
         }
 
@@ -2683,7 +2734,8 @@ where
                     if let Some(check) = pycodestyle::checks::do_not_use_bare_except(
                         type_.as_deref(),
                         body,
-                        Range::from_located(excepthandler),
+                        excepthandler,
+                        self.locator,
                     ) {
                         self.add_check(check);
                     }
@@ -2702,9 +2754,11 @@ where
                 match name {
                     Some(name) => {
                         if self.settings.enabled.contains(&CheckCode::E741) {
-                            if let Some(check) =
-                                pycodestyle::checks::ambiguous_variable_name(name, excepthandler)
-                            {
+                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                                name,
+                                helpers::excepthandler_name_range(excepthandler, self.locator)
+                                    .expect("Failed to find `name` range"),
+                            ) {
                                 self.add_check(check);
                             }
                         }
@@ -2770,6 +2824,17 @@ where
         }
     }
 
+    fn visit_format_spec(&mut self, format_spec: &'b Expr) {
+        match &format_spec.node {
+            ExprKind::JoinedStr { values } => {
+                for value in values {
+                    self.visit_expr(value);
+                }
+            }
+            _ => unreachable!("Unexpected expression for format_spec"),
+        }
+    }
+
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
         if self.settings.enabled.contains(&CheckCode::B006) {
             flake8_bugbear::plugins::mutable_argument_default(self, arguments);
@@ -2821,7 +2886,10 @@ where
         );
 
         if self.settings.enabled.contains(&CheckCode::E741) {
-            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(&arg.node.arg, arg) {
+            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                &arg.node.arg,
+                Range::from_located(arg),
+            ) {
                 self.add_check(check);
             }
         }
@@ -3846,10 +3914,10 @@ impl<'a> Checker<'a> {
                 let content = self
                     .locator
                     .slice_source_code_range(&Range::from_located(expr));
-                let indentation = self.locator.slice_source_code_range(&Range {
-                    location: Location::new(expr.location.row(), 0),
-                    end_location: Location::new(expr.location.row(), expr.location.column()),
-                });
+                let indentation = self.locator.slice_source_code_range(&Range::new(
+                    Location::new(expr.location.row(), 0),
+                    Location::new(expr.location.row(), expr.location.column()),
+                ));
                 let body = pydocstyle::helpers::raw_contents(&content);
                 let docstring = Docstring {
                     kind: definition.kind,

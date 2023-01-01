@@ -19,18 +19,12 @@ use crate::{Check, Settings, SourceCodeLocator};
 fn extract_range(body: &[&Stmt]) -> Range {
     let location = body.first().unwrap().location;
     let end_location = body.last().unwrap().end_location.unwrap();
-    Range {
-        location,
-        end_location,
-    }
+    Range::new(location, end_location)
 }
 
 fn extract_indentation_range(body: &[&Stmt]) -> Range {
     let location = body.first().unwrap().location;
-    Range {
-        location: Location::new(location.row(), 0),
-        end_location: location,
-    }
+    Range::new(Location::new(location.row(), 0), location)
 }
 
 /// I001
@@ -57,10 +51,10 @@ pub fn check_imports(
 
     // Extract comments. Take care to grab any inline comments from the last line.
     let comments = comments::collect_comments(
-        &Range {
-            location: range.location,
-            end_location: Location::new(range.end_location.row() + 1, 0),
-        },
+        &Range::new(
+            range.location,
+            Location::new(range.end_location.row() + 1, 0),
+        ),
         locator,
     );
 
@@ -90,12 +84,12 @@ pub fn check_imports(
     );
 
     // Expand the span the entire range, including leading and trailing space.
-    let range = Range {
-        location: Location::new(range.location.row(), 0),
-        end_location: Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
-    };
+    let range = Range::new(
+        Location::new(range.location.row(), 0),
+        Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
+    );
     let actual = dedent(&locator.slice_source_code_range(&range));
-    if actual == expected {
+    if actual == dedent(&expected) {
         None
     } else {
         let mut check = Check::new(CheckKind::UnsortedImports, range);

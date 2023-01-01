@@ -83,32 +83,52 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
+    UndefinedName: B
+  location:
+    row: 92
+    column: 10
+  end_location:
+    row: 92
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName: B
+  location:
+    row: 93
+    column: 13
+  end_location:
+    row: 93
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
     UndefinedName: PEP593Test123
   location:
-    row: 114
+    row: 115
     column: 8
   end_location:
-    row: 114
+    row: 115
     column: 23
   fix: ~
   parent: ~
 - kind:
     UndefinedName: foo
   location:
-    row: 122
+    row: 123
     column: 13
   end_location:
-    row: 122
+    row: 123
     column: 18
   fix: ~
   parent: ~
 - kind:
     UndefinedName: bar
   location:
-    row: 122
+    row: 123
     column: 20
   end_location:
-    row: 122
+    row: 123
     column: 25
   fix: ~
   parent: ~

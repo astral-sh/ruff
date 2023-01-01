@@ -20,10 +20,10 @@ expression: checks
       - 6
   location:
     row: 9
-    column: 8
+    column: 12
   end_location:
-    row: 10
-    column: 16
+    row: 9
+    column: 14
   fix: ~
   parent: ~
 
