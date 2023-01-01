@@ -38,4 +38,22 @@ expression: checks
     column: 16
   fix: ~
   parent: ~
+- kind: FStringMissingPlaceholders
+  location:
+    row: 26
+    column: 6
+  end_location:
+    row: 26
+    column: 13
+  fix: ~
+  parent: ~
+- kind: FStringMissingPlaceholders
+  location:
+    row: 27
+    column: 3
+  end_location:
+    row: 27
+    column: 6
+  fix: ~
+  parent: ~
 

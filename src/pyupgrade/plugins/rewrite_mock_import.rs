@@ -4,13 +4,14 @@ use libcst_native::{
     ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use rustpython_ast::{Stmt, StmtKind};
+use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 
+use crate::ast::helpers::collect_call_paths;
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::checks::{Check, CheckCode, CheckKind, MockReference};
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
@@ -178,6 +179,26 @@ fn format_import_from(
 }
 
 /// UP026
+pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
+    if let ExprKind::Attribute { value, .. } = &expr.node {
+        if collect_call_paths(value) == ["mock", "mock"] {
+            let mut check = Check::new(
+                CheckKind::RewriteMockImport(MockReference::Attribute),
+                Range::from_located(value),
+            );
+            if checker.patch(&CheckCode::UP026) {
+                check.amend(Fix::replacement(
+                    "mock".to_string(),
+                    value.location,
+                    value.end_location.unwrap(),
+                ));
+            }
+            checker.add_check(check);
+        }
+    }
+}
+
+/// UP026
 pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::Import { names } => {
@@ -203,8 +224,10 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 // Add a `Check` for each `mock` import.
                 for name in names {
                     if name.node.name == "mock" || name.node.name == "mock.mock" {
-                        let mut check =
-                            Check::new(CheckKind::RewriteMockImport, Range::from_located(name));
+                        let mut check = Check::new(
+                            CheckKind::RewriteMockImport(MockReference::Import),
+                            Range::from_located(name),
+                        );
                         if let Some(content) = content.as_ref() {
                             check.amend(Fix::replacement(
                                 content.clone(),
@@ -227,7 +250,10 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
             }
 
             if module == "mock" {
-                let mut check = Check::new(CheckKind::RewriteMockImport, Range::from_located(stmt));
+                let mut check = Check::new(
+                    CheckKind::RewriteMockImport(MockReference::Import),
+                    Range::from_located(stmt),
+                );
                 if checker.patch(&CheckCode::UP026) {
                     let indent = indentation(checker, stmt);
                     match format_import_from(stmt, &indent, checker.locator, checker.style) {
