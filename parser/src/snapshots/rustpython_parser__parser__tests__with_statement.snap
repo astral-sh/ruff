@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/with.rs
+source: compiler/parser/src/parser.rs
 expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
