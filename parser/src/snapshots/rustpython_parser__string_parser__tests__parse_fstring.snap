@@ -1,17 +1,17 @@
 ---
-source: compiler/parser/src/fstring.rs
+source: compiler/parser/src/string_parser.rs
 expression: parse_ast
 ---
 [
     Located {
         location: Location {
-            row: 0,
+            row: 1,
             column: 0,
         },
         end_location: Some(
             Location {
-                row: 0,
-                column: 0,
+                row: 1,
+                column: 18,
             },
         ),
         custom: (),
@@ -19,12 +19,12 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 1,
+                    column: 3,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 2,
+                        column: 4,
                     },
                 ),
                 custom: (),
@@ -39,13 +39,13 @@ expression: parse_ast
     },
     Located {
         location: Location {
-            row: 0,
+            row: 1,
             column: 0,
         },
         end_location: Some(
             Location {
-                row: 0,
-                column: 0,
+                row: 1,
+                column: 18,
             },
         ),
         custom: (),
@@ -53,12 +53,12 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 1,
-                    column: 2,
+                    column: 7,
                 },
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 3,
+                        column: 8,
                     },
                 ),
                 custom: (),
@@ -73,13 +73,13 @@ expression: parse_ast
     },
     Located {
         location: Location {
-            row: 0,
+            row: 1,
             column: 0,
         },
         end_location: Some(
             Location {
-                row: 0,
-                column: 0,
+                row: 1,
+                column: 18,
             },
         ),
         custom: (),

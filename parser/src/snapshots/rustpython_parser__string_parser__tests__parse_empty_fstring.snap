@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/fstring.rs
+source: compiler/parser/src/string_parser.rs
 expression: "parse_fstring(\"\").unwrap()"
 ---
 []
