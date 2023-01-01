@@ -2402,6 +2402,10 @@ where
                         comparators,
                     );
                 }
+
+                if self.settings.enabled.contains(&CheckCode::SIM300) {
+                    flake8_simplify::plugins::yoda_conditions(self, expr, left, ops, comparators);
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),

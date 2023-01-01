@@ -923,6 +923,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
+| SIM300 | YodaConditions | Use `left == right` instead of `right == left (Yoda-conditions)` |  |
 
 ### flake8-tidy-imports (TID)
 

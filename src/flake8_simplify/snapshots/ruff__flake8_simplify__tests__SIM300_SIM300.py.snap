@@ -1,0 +1,29 @@
+---
+source: src/flake8_simplify/mod.rs
+expression: checks
+---
+- kind:
+    YodaConditions:
+      - "'yoda'"
+      - compare
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    YodaConditions:
+      - "42"
+      - age
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 9
+  fix: ~
+  parent: ~
+
