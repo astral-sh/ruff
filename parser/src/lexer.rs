@@ -81,7 +81,7 @@ impl Indentations {
     fn current(&self) -> &IndentationLevel {
         self.indent_stack
             .last()
-            .expect("Indetations must have at least one level")
+            .expect("Indentations must have at least one level")
     }
 }
 
