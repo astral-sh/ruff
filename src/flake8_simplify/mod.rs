@@ -13,6 +13,7 @@ mod tests {
     use crate::settings;
 
     #[test_case(CheckCode::SIM118, Path::new("SIM118.py"); "SIM118")]
+    #[test_case(CheckCode::SIM300, Path::new("SIM300.py"); "SIM300")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let mut checks = test_path(

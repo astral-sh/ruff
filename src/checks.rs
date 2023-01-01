@@ -213,6 +213,7 @@ pub enum CheckCode {
     YTT303,
     // flake8-simplify
     SIM118,
+    SIM300,
     // pyupgrade
     UP001,
     UP003,
@@ -884,6 +885,7 @@ pub enum CheckKind {
     SysVersionSlice1Referenced,
     // flake8-simplify
     KeyInDict(String, String),
+    YodaConditions(String, String),
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UselessMetaclassType,
@@ -1275,6 +1277,7 @@ impl CheckCode {
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
+            CheckCode::SIM300 => CheckKind::YodaConditions("left".to_string(), "right".to_string()),
             // pyupgrade
             CheckCode::UP001 => CheckKind::UselessMetaclassType,
             CheckCode::UP003 => CheckKind::TypeOfPrimitive(Primitive::Str),
@@ -1706,6 +1709,7 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM300 => CheckCategory::Flake8Simplify,
             CheckCode::T100 => CheckCategory::Flake8Debugger,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
@@ -1932,6 +1936,7 @@ impl CheckKind {
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
+            CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
             CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
             CheckKind::UselessMetaclassType => &CheckCode::UP001,
@@ -2651,6 +2656,9 @@ impl CheckKind {
             // flake8-simplify
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
+            }
+            CheckKind::YodaConditions(left, right) => {
+                format!("Use `{left} == {right}` instead of `{right} == {left} (Yoda-conditions)`")
             }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
