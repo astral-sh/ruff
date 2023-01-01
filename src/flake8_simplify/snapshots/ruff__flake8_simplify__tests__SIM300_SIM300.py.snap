@@ -7,10 +7,10 @@ expression: checks
       - "'yoda'"
       - compare
   location:
-    row: 3
+    row: 2
     column: 0
   end_location:
-    row: 3
+    row: 2
     column: 17
   fix: ~
   parent: ~
@@ -19,10 +19,10 @@ expression: checks
       - "42"
       - age
   location:
-    row: 4
+    row: 3
     column: 0
   end_location:
-    row: 4
+    row: 3
     column: 9
   fix: ~
   parent: ~

@@ -1,16 +1,11 @@
-# Should alert
+# Errors
+"yoda" == compare  # SIM300
+42 == age  # SIM300
 
-'yoda' == compare # SIM300
-42 == age # SIM300
-
-# Shouldn't alert
-compare == 'yoda'
+# OK
+compare == "yoda"
 age == 42
 x == y
-
-'yoda' == compare == 1
-'yoda' == compare == someothervar
-
-'yoda' == 'yoda'
-
-
+"yoda" == compare == 1
+"yoda" == compare == someothervar
+"yoda" == "yoda"
