@@ -1588,7 +1588,7 @@ where
                     pylint::plugins::used_prior_global_declaration(self, id, expr);
                 }
             }
-            ExprKind::Attribute { attr, .. } => {
+            ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
                     && self.settings.enabled.contains(&CheckCode::UP006)
@@ -1629,10 +1629,15 @@ where
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if attr == name {
+                            // Avoid flagging on function calls (e.g., `df.values()`).
                             if let Some(parent) = self.current_expr_parent() {
                                 if matches!(parent.0.node, ExprKind::Call { .. }) {
                                     continue;
                                 }
+                            }
+                            // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`).
+                            if helpers::is_non_variable(value) {
+                                continue;
                             }
                             self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                         };
