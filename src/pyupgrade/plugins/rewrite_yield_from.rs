@@ -16,7 +16,13 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt, iter: &Expr, body:
         if let ExprKind::Yield { .. } = &value.node {
             let mut check = Check::new(CheckKind::RewriteYieldFrom, Range::from_located(stmt));
             let contents = checker.locator.slice_source_code_range(&Range::from_located(iter));
+            println!("{:?}", contents);
+            println!("{:?}", stmt.end_location.unwrap());
             let final_contents = format!("yield from {}", contents);
+            // FOR REVIEWER: The stmt does not include comments made after the last
+            // code in the for loop, which causes our version to still be "correct",
+            // but to different from pyupgrade. See tests that causes difference here:
+            // https://github.com/asottile/pyupgrade/blob/main/tests/features/yield_from_test.py#L52-L68
             if checker.patch(check.kind.code()) {
                 check.amend(Fix::replacement(
                     final_contents,
@@ -27,5 +33,4 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt, iter: &Expr, body:
             checker.add_check(check);
         }
     }
-    println!("");
 }

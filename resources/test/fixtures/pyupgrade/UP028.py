@@ -43,3 +43,19 @@ def f():  # Comment one\n'
 def f():
     for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
         yield x, y
+
+
+def f():
+    for x, y in z():
+        yield x, y
+
+def f():
+    def func():
+        # This comment is preserved\n'
+        for x, y in z():  # Comment one\n'
+            # Comment two\n'
+            yield x, y  # Comment three\n'
+            # Comment four\n'
+# Comment\n'
+def g():
+    print(3)
