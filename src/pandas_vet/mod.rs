@@ -81,8 +81,7 @@ mod tests {
     #[test_case("result = df.to_array()", &[]; "PD011_pass_to_array")]
     #[test_case("result = df.array", &[]; "PD011_pass_array")]
     #[test_case("result = df.values", &[CheckCode::PD011]; "PD011_fail_values")]
-    // TODO(edgarrmondragon): Check that the attribute access is NOT a method call.
-    // #[test_case("result = {}.values()", &[]; "PD011_pass_values_call")]
+    #[test_case("result = {}.values()", &[]; "PD011_pass_values_call")]
     #[test_case("result = values", &[]; "PD011_pass_node_name")]
     #[test_case("employees = pd.read_csv(input_file)", &[]; "PD012_pass_read_csv")]
     #[test_case("employees = pd.read_table(input_file)", &[CheckCode::PD012]; "PD012_fail_read_table")]

@@ -1629,6 +1629,11 @@ where
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if attr == name {
+                            if let Some(parent) = self.current_expr_parent() {
+                                if matches!(parent.0.node, ExprKind::Call { .. }) {
+                                    continue;
+                                }
+                            }
                             self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                         };
                     }

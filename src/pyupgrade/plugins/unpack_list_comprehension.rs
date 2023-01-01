@@ -17,10 +17,7 @@ fn contains_await(expr: &Expr) -> bool {
         ExprKind::IfExp { test, body, orelse } => {
             contains_await(test) || contains_await(body) || contains_await(orelse)
         }
-        ExprKind::Dict { keys, values } => keys
-            .iter()
-            .chain(values.iter())
-            .any(contains_await),
+        ExprKind::Dict { keys, values } => keys.iter().chain(values.iter()).any(contains_await),
         ExprKind::Set { elts } => elts.iter().any(contains_await),
         ExprKind::ListComp { elt, .. } => contains_await(elt),
         ExprKind::SetComp { elt, .. } => contains_await(elt),
