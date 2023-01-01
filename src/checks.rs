@@ -2742,9 +2742,8 @@ impl CheckKind {
                 "`mock` is deprecated, use `unittest.mock`".to_string()
             }
             CheckKind::RewriteListComprehension => {
-                "Rewrite a list comprehension to a set comprehension".to_string()
+                "Replace unpacked list comprehension with a tuple comprehension".to_string()
             }
-
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -3331,7 +3330,9 @@ impl CheckKind {
                 MockReference::Import => "Import from `unittest.mock` instead".to_string(),
                 MockReference::Attribute => "Replace `mock.mock` with `mock`".to_string(),
             }),
-            CheckKind::RewriteListComprehension => Some("Use a bytes string instead".to_string()),
+            CheckKind::RewriteListComprehension => {
+                Some("Replace with tuple comprehension".to_string())
+            }
             CheckKind::NewLineAfterSectionName(name) => {
                 Some(format!("Add newline after \"{name}\""))
             }

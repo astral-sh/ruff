@@ -1210,18 +1210,21 @@ where
                         pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::UP001) {
-                    pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
-                }
+
                 if self.settings.enabled.contains(&CheckCode::B003) {
                     flake8_bugbear::plugins::assignment_to_os_environ(self, targets);
                 }
+
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     if let Some(check) =
                         flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
                     {
                         self.add_check(check);
                     }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::UP001) {
+                    pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
                 if self.settings.enabled.contains(&CheckCode::UP013) {
                     pyupgrade::plugins::convert_typed_dict_functional_to_class(
@@ -1236,6 +1239,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP027) {
                     pyupgrade::plugins::unpack_list_comprehension(self, targets, value);
                 }
+
                 if self.settings.enabled.contains(&CheckCode::PD901) {
                     if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
                         self.add_check(check);
