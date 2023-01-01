@@ -22,6 +22,7 @@ pub use use_pep585_annotation::use_pep585_annotation;
 pub use use_pep604_annotation::use_pep604_annotation;
 pub use useless_metaclass_type::useless_metaclass_type;
 pub use useless_object_inheritance::useless_object_inheritance;
+pub use unpack_list_comprehension::unpack_list_comprehension;
 
 mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
@@ -47,3 +48,4 @@ mod use_pep585_annotation;
 mod use_pep604_annotation;
 mod useless_metaclass_type;
 mod useless_object_inheritance;
+mod unpack_list_comprehension;

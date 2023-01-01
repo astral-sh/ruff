@@ -1235,6 +1235,9 @@ where
                         self, stmt, targets, value,
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::UP027) {
+                    pyupgrade::plugins::unpack_list_comprehension(self, targets, value);
+                }
                 if self.settings.enabled.contains(&CheckCode::PD901) {
                     if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
                         self.add_check(check);
