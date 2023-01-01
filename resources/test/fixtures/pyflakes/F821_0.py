@@ -89,7 +89,8 @@ A = (
     f'B'
     f'{B}'
 )
-
+C = f'{A:{B}}'
+C = f'{A:{f"{B}"}}'
 
 from typing import Annotated, Literal
 

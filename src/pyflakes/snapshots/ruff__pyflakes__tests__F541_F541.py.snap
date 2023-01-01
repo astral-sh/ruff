@@ -40,19 +40,19 @@ expression: checks
   parent: ~
 - kind: FStringMissingPlaceholders
   location:
-    row: 25
+    row: 26
     column: 6
   end_location:
-    row: 25
+    row: 26
     column: 13
   fix: ~
   parent: ~
 - kind: FStringMissingPlaceholders
   location:
-    row: 26
+    row: 27
     column: 3
   end_location:
-    row: 26
+    row: 27
     column: 6
   fix: ~
   parent: ~
