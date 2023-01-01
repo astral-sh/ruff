@@ -20,7 +20,8 @@ v = 23.234234
 
 # OK
 f"{v:0.2f}"
+f"{f'{v:0.2f}'}"
 
-# OK (false negatives)
+# Errors
 f"{v:{f'0.2f'}}"
 f"{f''}"
