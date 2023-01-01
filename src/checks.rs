@@ -1315,7 +1315,6 @@ impl CheckCode {
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
             CheckCode::UP024 => CheckKind::OSErrorAlias(None),
             CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
-            CheckCode::UP026 => CheckKind::RewriteMockImport,
             CheckCode::UP026 => CheckKind::RewriteMockImport(MockReference::Import),
             CheckCode::UP027 => CheckKind::RewriteListComprehension,
             // pydocstyle
@@ -2739,7 +2738,6 @@ impl CheckKind {
             }
             CheckKind::OSErrorAlias(..) => "Replace aliased errors with `OSError`".to_string(),
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
-            CheckKind::RewriteMockImport => "`mock` is deprecated, use `unittest.mock`".to_string(),
             CheckKind::RewriteMockImport(..) => {
                 "`mock` is deprecated, use `unittest.mock`".to_string()
             }
