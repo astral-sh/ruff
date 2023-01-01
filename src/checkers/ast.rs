@@ -643,6 +643,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP023) {
                     pyupgrade::plugins::replace_c_element_tree(self, stmt);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP026) {
+                    pyupgrade::plugins::rewrite_mock_import(self, stmt);
+                }
 
                 for alias in names {
                     if alias.node.name.contains('.') && alias.node.asname.is_none() {
@@ -853,6 +856,9 @@ where
                     if self.settings.enabled.contains(&CheckCode::UP010) {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
                     }
+                }
+                if self.settings.enabled.contains(&CheckCode::UP026) {
+                    pyupgrade::plugins::rewrite_mock_import(self, stmt);
                 }
 
                 if self.settings.enabled.contains(&CheckCode::TID251) {

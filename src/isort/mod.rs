@@ -23,12 +23,12 @@ use crate::SourceCodeLocator;
 mod categorize;
 mod comments;
 pub mod format;
-mod helpers;
+pub mod helpers;
 pub mod plugins;
 pub mod settings;
 mod sorting;
 pub mod track;
-mod types;
+pub mod types;
 
 #[derive(Debug)]
 pub struct AnnotatedAliasData<'a> {

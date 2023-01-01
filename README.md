@@ -688,6 +688,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP023 | RewriteCElementTree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
 | UP024 | OSErrorAlias | Replace aliased errors with `OSError` | 🛠 |
 | UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
+| UP026 | RewriteMockImport | `mock` is deprecated, use `unittest.mock` | 🛠 |
 
 ### pep8-naming (N)
 

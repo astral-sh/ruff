@@ -238,6 +238,7 @@ pub enum CheckCode {
     UP023,
     UP024,
     UP025,
+    UP026,
     // pydocstyle
     D100,
     D101,
@@ -910,6 +911,7 @@ pub enum CheckKind {
     RewriteCElementTree,
     OSErrorAlias(Option<String>),
     RewriteUnicodeLiteral,
+    RewriteMockImport,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1305,6 +1307,7 @@ impl CheckCode {
             CheckCode::UP023 => CheckKind::RewriteCElementTree,
             CheckCode::UP024 => CheckKind::OSErrorAlias(None),
             CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
+            CheckCode::UP026 => CheckKind::RewriteMockImport,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1738,6 +1741,7 @@ impl CheckCode {
             CheckCode::UP023 => CheckCategory::Pyupgrade,
             CheckCode::UP024 => CheckCategory::Pyupgrade,
             CheckCode::UP025 => CheckCategory::Pyupgrade,
+            CheckCode::UP026 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -1961,6 +1965,7 @@ impl CheckKind {
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
             CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
             CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
+            CheckKind::RewriteMockImport => &CheckCode::UP026,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2722,6 +2727,7 @@ impl CheckKind {
             }
             CheckKind::OSErrorAlias(..) => "Replace aliased errors with `OSError`".to_string(),
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
+            CheckKind::RewriteMockImport => "`mock` is deprecated, use `unittest.mock`".to_string(),
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -3190,6 +3196,7 @@ impl CheckKind {
                 | CheckKind::ReplaceStdoutStderr
                 | CheckKind::ReplaceUniversalNewlines
                 | CheckKind::RewriteCElementTree
+                | CheckKind::RewriteMockImport
                 | CheckKind::RewriteUnicodeLiteral
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
@@ -3302,6 +3309,7 @@ impl CheckKind {
             }
             CheckKind::RewriteCElementTree => Some("Replace with `ElementTree`".to_string()),
             CheckKind::RewriteUnicodeLiteral => Some("Remove unicode prefix".to_string()),
+            CheckKind::RewriteMockImport => Some("Import from `unittest.mock` instead".to_string()),
             CheckKind::NewLineAfterSectionName(name) => {
                 Some(format!("Add newline after \"{name}\""))
             }
