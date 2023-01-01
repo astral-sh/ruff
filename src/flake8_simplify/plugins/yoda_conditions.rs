@@ -4,6 +4,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
+/// SIM300
 pub fn yoda_conditions(
     checker: &mut Checker,
     expr: &Expr,
@@ -24,6 +25,11 @@ pub fn yoda_conditions(
     }
 
     let right = comparators.first().unwrap();
+    if matches!(left.node, ExprKind::Constant { .. })
+        & matches!(right.node, ExprKind::Constant { .. })
+    {
+        return;
+    }
 
     let check = Check::new(
         CheckKind::YodaConditions(left.to_string(), right.to_string()),
