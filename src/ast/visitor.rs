@@ -38,6 +38,9 @@ pub trait Visitor<'a> {
     fn visit_excepthandler(&mut self, excepthandler: &'a Excepthandler) {
         walk_excepthandler(self, excepthandler);
     }
+    fn visit_format_spec(&mut self, format_spec: &'a Expr) {
+        walk_expr(self, format_spec);
+    }
     fn visit_arguments(&mut self, arguments: &'a Arguments) {
         walk_arguments(self, arguments);
     }
@@ -387,7 +390,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         } => {
             visitor.visit_expr(value);
             if let Some(expr) = format_spec {
-                visitor.visit_expr(expr);
+                visitor.visit_format_spec(expr);
             }
         }
         ExprKind::JoinedStr { values } => {

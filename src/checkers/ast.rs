@@ -91,7 +91,6 @@ pub struct Checker<'a> {
     in_type_definition: bool,
     in_deferred_string_type_definition: bool,
     in_deferred_type_definition: bool,
-    in_f_string: bool,
     in_literal: bool,
     in_subscript: bool,
     seen_import_boundary: bool,
@@ -148,7 +147,6 @@ impl<'a> Checker<'a> {
             in_type_definition: false,
             in_deferred_string_type_definition: false,
             in_deferred_type_definition: false,
-            in_f_string: false,
             in_literal: false,
             in_subscript: false,
             seen_import_boundary: false,
@@ -1486,7 +1484,6 @@ where
 
         self.push_expr(expr);
 
-        let prev_in_f_string = self.in_f_string;
         let prev_in_literal = self.in_literal;
         let prev_in_type_definition = self.in_type_definition;
 
@@ -2176,9 +2173,7 @@ where
                 }
             }
             ExprKind::JoinedStr { values } => {
-                // Conversion flags are parsed as f-strings without placeholders, so skip
-                // nested f-strings, which would lead to false positives.
-                if !self.in_f_string && self.settings.enabled.contains(&CheckCode::F541) {
+                if self.settings.enabled.contains(&CheckCode::F541) {
                     if !values
                         .iter()
                         .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
@@ -2682,9 +2677,7 @@ where
                 self.in_subscript = prev_in_subscript;
             }
             ExprKind::JoinedStr { .. } => {
-                self.in_f_string = true;
                 visitor::walk_expr(self, expr);
-                self.in_f_string = prev_in_f_string;
             }
             _ => visitor::walk_expr(self, expr),
         }
@@ -2703,7 +2696,6 @@ where
 
         self.in_type_definition = prev_in_type_definition;
         self.in_literal = prev_in_literal;
-        self.in_f_string = prev_in_f_string;
 
         self.pop_expr();
     }
@@ -2804,6 +2796,17 @@ where
                     None => walk_excepthandler(self, excepthandler),
                 }
             }
+        }
+    }
+
+    fn visit_format_spec(&mut self, format_spec: &'b Expr) {
+        match &format_spec.node {
+            ExprKind::JoinedStr { values } => {
+                for value in values {
+                    self.visit_expr(value);
+                }
+            }
+            _ => unreachable!("Unexpected expression for format_spec"),
         }
     }
 
