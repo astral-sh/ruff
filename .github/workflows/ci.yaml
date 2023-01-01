@@ -104,7 +104,6 @@ jobs:
           profile: minimal
           toolchain: nightly-2022-11-01
           override: true
-      - run: cargo install cargo-insta
       - uses: actions/cache@v3
         env:
           cache-name: cache-cargo
@@ -117,6 +116,7 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
+      - run: cargo install cargo-insta
       - run: pip install black[d]==22.12.0
       - name: Run tests
         run: |
