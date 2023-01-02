@@ -219,35 +219,18 @@ impl<'a> StringParser<'a> {
                         Some('a') => ConversionFlag::Ascii,
                         Some('r') => ConversionFlag::Repr,
                         Some(_) => {
-                            return Err(if expression.trim().is_empty() {
-                                EmptyExpression.to_lexical_error(self.get_pos())
-                            } else {
-                                InvalidConversionFlag.to_lexical_error(self.get_pos())
-                            });
+                            return Err(InvalidConversionFlag.to_lexical_error(self.get_pos()));
                         }
                         None => {
-                            return Err(if expression.trim().is_empty() {
-                                EmptyExpression.to_lexical_error(self.get_pos())
-                            } else {
-                                UnclosedLbrace.to_lexical_error(self.get_pos())
-                            });
+                            return Err(UnclosedLbrace.to_lexical_error(self.get_pos()));
                         }
                     };
 
-                    if let Some(&peek) = self.peek() {
-                        if peek != '}' && peek != ':' {
-                            return Err(if expression.trim().is_empty() {
-                                EmptyExpression.to_lexical_error(self.get_pos())
-                            } else {
-                                UnclosedLbrace.to_lexical_error(self.get_pos())
-                            });
+                    match self.peek() {
+                        Some('}' | ':') => {}
+                        Some(_) | None => {
+                            return Err(UnclosedLbrace.to_lexical_error(self.get_pos()))
                         }
-                    } else {
-                        return Err(if expression.trim().is_empty() {
-                            EmptyExpression.to_lexical_error(self.get_pos())
-                        } else {
-                            UnclosedLbrace.to_lexical_error(self.get_pos())
-                        });
                     }
                 }
 
