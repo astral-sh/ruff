@@ -4,8 +4,8 @@ use anyhow::Result;
 use path_absolutize::path_dedot;
 use rustpython_parser::lexer::LexResult;
 
-use crate::checks::Check;
 use crate::linter::check_path;
+use crate::registry::Check;
 use crate::resolver::Relativity;
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;

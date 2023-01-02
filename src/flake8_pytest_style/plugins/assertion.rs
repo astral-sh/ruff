@@ -6,7 +6,7 @@ use super::helpers::is_falsy_constant;
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.

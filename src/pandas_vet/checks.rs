@@ -1,7 +1,7 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// PD002
 pub fn inplace_argument(keywords: &[Keyword]) -> Option<Check> {

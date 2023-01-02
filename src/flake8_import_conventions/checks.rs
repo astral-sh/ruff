@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// ICN001
 pub fn check_conventional_import(

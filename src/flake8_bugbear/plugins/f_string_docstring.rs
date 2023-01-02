@@ -2,7 +2,7 @@ use rustpython_ast::{ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// B021
 pub fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {

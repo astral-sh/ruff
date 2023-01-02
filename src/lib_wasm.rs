@@ -5,9 +5,9 @@ use rustpython_parser::lexer::LexResult;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
-use crate::checks::CheckCode;
-use crate::checks_gen::CheckCodePrefix;
 use crate::linter::check_path;
+use crate::registry::CheckCode;
+use crate::registry_gen::CheckCodePrefix;
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;

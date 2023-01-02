@@ -11,8 +11,8 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind, MockReference};
 use crate::cst::matchers::{match_import, match_import_from, match_module};
+use crate::registry::{Check, CheckCode, CheckKind, MockReference};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 

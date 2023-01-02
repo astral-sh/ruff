@@ -9,9 +9,9 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
-    use crate::checks::CheckCode;
-    use crate::checks_gen::CheckCodePrefix;
     use crate::linter::check_path;
+    use crate::registry::CheckCode;
+    use crate::registry_gen::CheckCodePrefix;
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::source_code_style::SourceCodeStyleDetector;

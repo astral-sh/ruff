@@ -1,9 +1,9 @@
 use rustpython_ast::Located;
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
 use crate::flake8_builtins::types::ShadowingType;
 use crate::python::builtins::BUILTINS;
+use crate::registry::{Check, CheckKind};
 
 /// Check builtin name shadowing.
 pub fn builtin_shadowing<T>(

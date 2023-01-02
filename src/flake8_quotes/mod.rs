@@ -8,9 +8,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::{flake8_quotes, Settings};
 
     #[test_case(Path::new("doubles.py"))]

@@ -9,10 +9,10 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::flake8_pytest_style::settings::Settings;
     use crate::flake8_pytest_style::types;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::settings;
 
     #[test_case(CheckCode::PT001, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]

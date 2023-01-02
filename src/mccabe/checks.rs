@@ -1,7 +1,7 @@
 use rustpython_ast::{ExcepthandlerKind, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::identifier_range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 fn get_complexity_number(stmts: &[Stmt]) -> usize {

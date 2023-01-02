@@ -7,7 +7,7 @@ use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks::Check;
+use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
 
 #[derive(Debug, Copy, Clone, Hash)]

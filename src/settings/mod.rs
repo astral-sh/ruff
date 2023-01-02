@@ -14,8 +14,8 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::cache::cache_dir;
-use crate::checks::CheckCode;
-use crate::checks_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
+use crate::registry::CheckCode;
+use crate::registry_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
@@ -416,8 +416,8 @@ fn resolve_codes<'a>(specs: impl Iterator<Item = CheckCodeSpec<'a>>) -> FxHashSe
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::checks::CheckCode;
-    use crate::checks_gen::CheckCodePrefix;
+    use crate::registry::CheckCode;
+    use crate::registry_gen::CheckCodePrefix;
     use crate::settings::{resolve_codes, CheckCodeSpec};
 
     #[test]

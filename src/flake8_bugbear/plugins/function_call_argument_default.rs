@@ -8,8 +8,8 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
 use crate::flake8_bugbear::plugins::mutable_argument_default::is_mutable_func;
+use crate::registry::{Check, CheckKind};
 
 const IMMUTABLE_FUNCS: [(&str, &str); 7] = [
     ("", "tuple"),

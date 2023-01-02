@@ -3,8 +3,8 @@ use rustpython_ast::{Expr, Stmt};
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
 use crate::flake8_debugger::types::DebuggerUsingType;
+use crate::registry::{Check, CheckKind};
 
 const DEBUGGERS: &[(&str, &str)] = &[
     ("pdb", "set_trace"),

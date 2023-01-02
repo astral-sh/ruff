@@ -1,3 +1,5 @@
+//! Registry of all supported `CheckCode` and `CheckKind` types.
+
 use std::fmt;
 
 use itertools::Itertools;
@@ -10,7 +12,6 @@ use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks_gen::CheckCodePrefix;
 use crate::flake8_debugger::types::DebuggerUsingType;
 use crate::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
@@ -18,6 +19,7 @@ use crate::flake8_pytest_style::types::{
 use crate::flake8_quotes::settings::Quote;
 use crate::flake8_tidy_imports::settings::Strictness;
 use crate::pyupgrade::types::Primitive;
+use crate::registry_gen::CheckCodePrefix;
 
 #[derive(
     AsRefStr,
@@ -3932,7 +3934,7 @@ mod tests {
 
     use strum::IntoEnumIterator;
 
-    use crate::checks::CheckCode;
+    use crate::registry::CheckCode;
 
     #[test]
     fn check_code_serialization() {

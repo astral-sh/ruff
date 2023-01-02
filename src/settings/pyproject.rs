@@ -129,9 +129,9 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes::settings::Quote;
     use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
+    use crate::registry_gen::CheckCodePrefix;
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };

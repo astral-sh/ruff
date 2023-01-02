@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 /// ISC001, ISC002

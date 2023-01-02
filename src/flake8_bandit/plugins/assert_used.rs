@@ -1,7 +1,7 @@
 use rustpython_ast::{Located, StmtKind};
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// S101
 pub fn assert_used(stmt: &Located<StmtKind>) -> Check {

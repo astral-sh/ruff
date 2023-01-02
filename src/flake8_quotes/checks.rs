@@ -1,8 +1,8 @@
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
 use crate::flake8_quotes::settings::{Quote, Settings};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 fn good_single(quote: &Quote) -> char {

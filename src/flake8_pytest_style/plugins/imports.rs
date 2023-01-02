@@ -1,7 +1,7 @@
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 fn is_pytest_or_subpackage(imported_name: &str) -> bool {
     imported_name == "pytest" || imported_name.starts_with("pytest.")

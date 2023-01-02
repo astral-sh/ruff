@@ -8,8 +8,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::settings;
 
     #[test_case(CheckCode::PGH001, Path::new("PGH001_0.py"); "PGH001_0")]

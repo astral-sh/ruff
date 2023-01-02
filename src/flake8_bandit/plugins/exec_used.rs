@@ -1,7 +1,7 @@
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// S102
 pub fn exec_used(expr: &Expr, func: &Expr) -> Option<Check> {

@@ -9,8 +9,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::settings;
 
     #[test_case(CheckCode::ERA001, Path::new("ERA001.py"); "ERA001")]
