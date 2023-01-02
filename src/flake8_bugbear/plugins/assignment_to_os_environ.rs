@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// B003
 pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {

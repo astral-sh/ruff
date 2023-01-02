@@ -10,9 +10,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::pydocstyle::settings::{Convention, Settings};
+    use crate::registry::CheckCode;
     use crate::settings;
 
     #[test_case(CheckCode::D100, Path::new("D.py"); "D100")]

@@ -1,5 +1,5 @@
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// S104
 pub fn hardcoded_bind_all_interfaces(value: &str, range: &Range) -> Option<Check> {

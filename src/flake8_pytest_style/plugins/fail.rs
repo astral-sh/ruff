@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, Keyword};
 use super::helpers::{is_empty_or_null_string, is_pytest_fail, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 pub fn fail_call(checker: &mut Checker, call: &Expr, args: &Vec<Expr>, keywords: &Vec<Keyword>) {
     if is_pytest_fail(call, checker) {

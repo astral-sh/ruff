@@ -2,7 +2,7 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// SIM300
 pub fn yoda_conditions(

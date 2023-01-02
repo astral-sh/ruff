@@ -7,7 +7,7 @@ use crate::ast::operations::locate_cmpops;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// F632
 pub fn invalid_literal_comparison(

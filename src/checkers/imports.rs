@@ -5,10 +5,10 @@ use std::path::Path;
 use rustpython_parser::ast::Suite;
 
 use crate::ast::visitor::Visitor;
-use crate::checks::Check;
 use crate::directives::IsortDirectives;
 use crate::isort;
 use crate::isort::track::ImportTracker;
+use crate::registry::Check;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;

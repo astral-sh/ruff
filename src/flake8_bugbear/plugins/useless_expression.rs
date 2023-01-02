@@ -2,7 +2,7 @@ use rustpython_ast::{Constant, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 // B018
 pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {

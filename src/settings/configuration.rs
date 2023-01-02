@@ -12,8 +12,8 @@ use regex::Regex;
 use shellexpand;
 use shellexpand::LookupError;
 
-use crate::checks_gen::CheckCodePrefix;
 use crate::cli::{collect_per_file_ignores, Overrides};
+use crate::registry_gen::CheckCodePrefix;
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{

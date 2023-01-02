@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, Stmt
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 
 fn assertion_error(msg: Option<&Expr>) -> Stmt {

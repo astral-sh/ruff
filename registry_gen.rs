@@ -5,8 +5,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
-use crate::checks::CheckCode;
 use crate::one_time_warning;
+use crate::registry::CheckCode;
 
 #[derive(
     EnumString,

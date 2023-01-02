@@ -9,8 +9,8 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::{flake8_import_conventions, Settings};
 
     #[test]

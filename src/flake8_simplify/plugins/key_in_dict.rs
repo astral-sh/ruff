@@ -4,7 +4,7 @@ use crate::ast::helpers::create_expr;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 
 /// SIM118

@@ -10,13 +10,13 @@ use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
 use crate::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::pydocstyle::settings::Convention;
+use crate::registry::{Check, CheckCode, CheckKind};
 use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107

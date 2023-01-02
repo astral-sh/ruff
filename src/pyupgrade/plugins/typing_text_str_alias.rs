@@ -4,7 +4,7 @@ use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// UP019
 pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {

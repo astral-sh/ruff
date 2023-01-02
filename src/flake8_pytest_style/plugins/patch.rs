@@ -6,7 +6,7 @@ use crate::ast::helpers::{collect_arg_names, compose_call_path};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 const PATCH_NAMES: &[&str] = &[
     "mocker.patch",

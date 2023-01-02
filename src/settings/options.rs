@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::checks_gen::CheckCodePrefix;
+use crate::registry_gen::CheckCodePrefix;
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,

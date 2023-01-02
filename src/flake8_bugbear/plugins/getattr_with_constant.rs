@@ -3,9 +3,9 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
+use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 
 fn attribute(value: &Expr, attr: &str) -> Expr {

@@ -2,7 +2,7 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode, CheckKind};
 
 /// EM101, EM102, EM103
 pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {

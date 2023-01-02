@@ -1,8 +1,8 @@
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
+use crate::registry::{Check, CheckKind};
 
 fn is_password_target(target: &Expr) -> bool {
     let target_name = match &target.node {

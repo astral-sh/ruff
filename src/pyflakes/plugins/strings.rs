@@ -6,12 +6,12 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
 use crate::pyflakes::cformat::CFormatSummary;
 use crate::pyflakes::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
 };
 use crate::pyflakes::format::FormatSummary;
+use crate::registry::{Check, CheckKind};
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
     keywords.iter().any(|k| {

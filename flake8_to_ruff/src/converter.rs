@@ -1,13 +1,13 @@
 use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
-use ruff::checks_gen::CheckCodePrefix;
 use ruff::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
 use ruff::flake8_quotes::settings::Quote;
 use ruff::flake8_tidy_imports::settings::Strictness;
 use ruff::pydocstyle::settings::Convention;
+use ruff::registry_gen::CheckCodePrefix;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{
@@ -345,8 +345,8 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
-    use ruff::checks_gen::CheckCodePrefix;
     use ruff::pydocstyle::settings::Convention;
+    use ruff::registry_gen::CheckCodePrefix;
     use ruff::settings::options::Options;
     use ruff::settings::pyproject::Pyproject;
     use ruff::{flake8_quotes, pydocstyle};

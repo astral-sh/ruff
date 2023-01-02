@@ -11,9 +11,9 @@ use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::checks::CheckCode;
-use crate::checks_gen::CheckCodePrefix;
 use crate::fs;
+use crate::registry::CheckCode;
+use crate::registry_gen::CheckCodePrefix;
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,

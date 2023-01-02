@@ -8,8 +8,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::{flake8_bugbear, Settings};
 
     #[test_case(CheckCode::B002, Path::new("B002.py"); "B002")]

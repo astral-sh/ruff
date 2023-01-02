@@ -4,8 +4,8 @@ use super::helpers::is_pytest_parametrize;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
 use crate::flake8_pytest_style::types;
+use crate::registry::{Check, CheckCode, CheckKind};
 
 fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators

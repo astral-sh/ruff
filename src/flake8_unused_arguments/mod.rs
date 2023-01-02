@@ -11,8 +11,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::{flake8_unused_arguments, settings};
 
     #[test_case(CheckCode::ARG001, Path::new("ARG.py"); "ARG001")]

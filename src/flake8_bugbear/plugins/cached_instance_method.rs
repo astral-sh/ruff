@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
     let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);

@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::checks::{Check, CheckCode, CODE_REDIRECTS};
+use crate::registry::{Check, CheckCode, CODE_REDIRECTS};
 use crate::source_code_style::LineEnding;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -212,8 +212,8 @@ mod tests {
     use rustpython_parser::ast::Location;
 
     use crate::ast::types::Range;
-    use crate::checks::{Check, CheckKind};
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
+    use crate::registry::{Check, CheckKind};
     use crate::source_code_style::LineEnding;
 
     #[test]

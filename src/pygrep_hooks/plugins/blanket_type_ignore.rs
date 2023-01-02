@@ -3,7 +3,7 @@ use regex::Regex;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 static BLANKET_TYPE_IGNORE_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"# type:? *ignore($|\s)").unwrap());

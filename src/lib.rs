@@ -13,7 +13,7 @@
 
 use cfg_if::cfg_if;
 
-use crate::checks::Check;
+use crate::registry::Check;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -21,8 +21,6 @@ mod ast;
 pub mod autofix;
 pub mod cache;
 mod checkers;
-pub mod checks;
-pub mod checks_gen;
 pub mod cli;
 mod cst;
 mod directives;
@@ -67,6 +65,8 @@ mod pygrep_hooks;
 mod pylint;
 mod python;
 mod pyupgrade;
+pub mod registry;
+pub mod registry_gen;
 pub mod resolver;
 mod ruff;
 mod rustpython_helpers;

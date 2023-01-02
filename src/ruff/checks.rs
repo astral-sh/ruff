@@ -4,7 +4,7 @@ use rustpython_ast::{Expr, ExprKind, Keyword, KeywordData, Location};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks::CheckKind;
+use crate::registry::CheckKind;
 use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{Check, Settings};

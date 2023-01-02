@@ -4,7 +4,7 @@ use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode, CheckKind};
 
 fn pytest_mark_parentheses(
     checker: &mut Checker,

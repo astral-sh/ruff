@@ -7,7 +7,7 @@ use crate::ast::helpers::{compose_call_path, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 const ERROR_NAMES: &[&str] = &["EnvironmentError", "IOError", "WindowsError"];
 const ERROR_MODULES: &[&str] = &["mmap", "select", "socket"];
