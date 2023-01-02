@@ -17,6 +17,21 @@ use crate::registry::Check;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 
+cfg_if! {
+    if #[cfg(not(target_family = "wasm"))] {
+        pub mod commands;
+        mod packages;
+        #[cfg(all(feature = "update-informer"))]
+        pub mod updates;
+
+        mod lib_native;
+        pub use lib_native::check;
+    } else {
+        mod lib_wasm;
+        pub use lib_wasm::check;
+    }
+}
+
 mod ast;
 pub mod autofix;
 pub mod cache;
@@ -76,18 +91,3 @@ pub mod source_code_locator;
 pub mod source_code_style;
 mod vendor;
 pub mod visibility;
-
-cfg_if! {
-    if #[cfg(not(target_family = "wasm"))] {
-        pub mod commands;
-        mod packages;
-        #[cfg(all(feature = "update-informer"))]
-        pub mod updates;
-
-        mod lib_native;
-        pub use lib_native::check;
-    } else {
-        mod lib_wasm;
-        pub use lib_wasm::check;
-    }
-}
