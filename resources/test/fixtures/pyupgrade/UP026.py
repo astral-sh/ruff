@@ -25,6 +25,12 @@ from mock import (
     b,
     c,
 )
+from mock import (
+    a,
+    b,
+    c,
+    mock,
+)
 
 # Should not get a trailing comma
 from mock import (
@@ -33,6 +39,14 @@ from mock import (
     b,
     c
 )
+from mock import (
+    a,
+    b,
+    c,
+    mock
+)
+from mock import mock, a, b, c
+from mock import a, b, c, mock
 
 if True:
     if False:
