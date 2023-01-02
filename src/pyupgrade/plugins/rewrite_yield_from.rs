@@ -5,7 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-fn update_content(checker: &mut Checker, stmt: &Stmt, iter: &Stmt) {
+fn update_content(checker: &mut Checker, stmt: &Stmt, iter: &Expr) {
     let mut check = Check::new(CheckKind::RewriteYieldFrom, Range::from_located(stmt));
     let contents = checker
         .locator
@@ -36,15 +36,17 @@ fn get_items(expr: &Expr) -> Vec<String> {
 #[derive(Debug)]
 struct YieldFrom {
     statement: Stmt,
+    iter: Expr,
     yield_items: Vec<String>,
     target_items: Vec<String>,
 }
 
 impl YieldFrom {
-    fn new(statement: &Stmt, expression: &Expr, target: &Expr) -> Option<Self> {
+    fn new(statement: &Stmt, iter: &Expr, expression: &Expr, target: &Expr) -> Option<Self> {
         if let ExprKind::Yield { value } = &expression.node {
             let mut base = Self {
                 statement: statement.to_owned(),
+                iter: iter.to_owned(),
                 yield_items: vec![],
                 target_items: vec![],
             };
@@ -69,6 +71,7 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
             target,
             body,
             orelse,
+            iter,
             ..
         } => {
             // If there is an else statement we should not refactor
@@ -85,7 +88,7 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
             };
             if let StmtKind::Expr { value } = &first_statement.node {
                 if let ExprKind::Yield { .. } = &value.node {
-                    let the_item = YieldFrom::new(stmt, value, target).unwrap();
+                    let the_item = YieldFrom::new(stmt, iter, value, target).unwrap();
                     yields.push(the_item);
                 }
             }
@@ -103,6 +106,8 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
     let mut yields: Vec<YieldFrom> = vec![];
     get_yields_from(stmt, &mut yields);
     for item in yields {
-        println!("{:?}\n", item);
+        if item.check_items() {
+            update_content(checker, &item.statement, &item.iter);
+        }
     }
 }
