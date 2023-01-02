@@ -215,19 +215,7 @@ pub fn python_files_in_path(
     overrides: &Overrides,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
-    let mut paths = paths
-        .iter()
-        .map(|path| {
-            if path.is_file() && !is_python_path(path) {
-                Err(anyhow::anyhow!(
-                    "`{}` is not supported; Ruff only supports `.py` and `.pyi` files",
-                    path.to_str().unwrap()
-                ))
-            } else {
-                Ok(fs::normalize_path(path))
-            }
-        })
-        .collect::<Result<Vec<PathBuf>>>()?;
+    let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).collect();
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
@@ -331,7 +319,12 @@ pub fn python_files_in_path(
                 }
             }
 
-            if result.as_ref().map_or(true, is_python_entry) {
+            if result.as_ref().map_or(true, |entry| {
+                // Accept all files that are passed-in directly.
+                (entry.depth() == 0 && entry.file_type().map_or(false, |ft| ft.is_file()))
+                    // Accept all Python files.
+                    || is_python_entry(entry)
+            }) {
                 files.lock().unwrap().push(result);
             }
 
@@ -456,7 +449,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude,)
+            &make_exclusion(exclude),
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
@@ -471,7 +464,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude,)
+            &make_exclusion(exclude),
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -488,7 +481,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude,)
+            &make_exclusion(exclude),
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
@@ -503,7 +496,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude,)
+            &make_exclusion(exclude),
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -520,7 +513,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude,)
+            &make_exclusion(exclude),
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -537,7 +530,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude,)
+            &make_exclusion(exclude),
         ));
 
         let path = Path::new("foo/bar/baz.py")
@@ -554,7 +547,7 @@ mod tests {
         assert!(!match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude,)
+            &make_exclusion(exclude),
         ));
 
         Ok(())

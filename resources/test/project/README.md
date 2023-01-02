@@ -64,11 +64,11 @@ Found 9 error(s).
 9 potentially fixable with the --fix option.
 ```
 
-Running from a parent directory should this "ignore" the `exclude` (hence, `concepts/file.py` gets
+Running from a parent directory should "ignore" the `exclude` (hence, `concepts/file.py` gets
 included in the output):
 
 ```
-∴ (cd resources/test/project/examples && cargo run -- --config=docs/pyproject.toml .)
+∴ (cd resources/test/project/examples && cargo run -- --config=docs/ruff.toml .)
 docs/docs/concepts/file.py:5:5: F841 Local variable `x` is assigned to but never used
 docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
@@ -90,5 +90,7 @@ Unless we `--force-exclude`:
 
 ```
 ∴ cargo run resources/test/project/examples/excluded/ --force-exclude
+warning: No Python files found under the given path(s)
 ∴ cargo run resources/test/project/examples/excluded/script.py --force-exclude
+warning: No Python files found under the given path(s)
 ```
