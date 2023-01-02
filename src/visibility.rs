@@ -105,28 +105,48 @@ pub fn is_init(stmt: &Stmt) -> bool {
     }
 }
 
-/// Returns `true` if a module name indicates private visibility.
-fn is_private_module(module_name: &str) -> bool {
-    module_name.starts_with('_')
+/// Returns `true` if a module name indicates public visibility.
+fn is_public_module(module_name: &str) -> bool {
+    !module_name.starts_with('_') || (module_name.starts_with("__") && module_name.ends_with("__"))
 }
 
+/// Returns `true` if a module name indicates private visibility.
+fn is_private_module(module_name: &str) -> bool {
+    !is_public_module(module_name)
+}
+
+/// Return the stem of a module name (everything preceding the last dot).
+fn stem(path: &str) -> &str {
+    if let Some(index) = path.rfind('.') {
+        &path[..index]
+    } else {
+        path
+    }
+}
+
+/// Return the `Visibility` of the Python file at `Path` based on its name.
 pub fn module_visibility(path: &Path) -> Visibility {
     let mut components = path.iter().rev();
-    let filename = components.next().unwrap().to_string_lossy();
-    let mut module_name = filename.as_ref();
-    if let Some(idx) = filename.rfind('.') {
-        module_name = &filename[..idx];
-    }
 
-    if is_private_module(module_name) && module_name != "__init__" {
-        return Visibility::Private;
-    }
-
-    for component in components {
-        if is_private_module(&component.to_string_lossy()) {
+    // Is the module itself private?
+    // Ex) `_foo.py` (but not `__init__.py`)
+    if let Some(filename) = components.next() {
+        let module_name = filename.to_string_lossy();
+        let module_name = stem(&module_name);
+        if is_private_module(module_name) {
             return Visibility::Private;
         }
     }
+
+    // Is the module in a private parent?
+    // Ex) `_foo/bar.py`
+    for component in components {
+        let module_name = component.to_string_lossy();
+        if is_private_module(&module_name) {
+            return Visibility::Private;
+        }
+    }
+
     Visibility::Public
 }
 
