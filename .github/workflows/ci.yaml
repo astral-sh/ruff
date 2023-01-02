@@ -184,7 +184,7 @@ jobs:
 
   codespell:
     name: "codespell"
+    runs-on: ubuntu-latest
     steps:
-      - name: Run Codespell
-        uses: codespell-project/actions-codespell@master
+      - uses: codespell-project/actions-codespell@master
 
