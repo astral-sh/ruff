@@ -32,7 +32,6 @@ chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
 clap = { version = "4.0.1", features = ["derive"] }
 clap_complete_command = { version = "0.4.0" }
 colored = { version = "2.0.0" }
-common-path = { version = "1.0.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 filetime = { version = "0.2.17" }
@@ -71,9 +70,9 @@ toml = { version = "0.5.9" }
 walkdir = { version = "2.3.2" }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-clearscreen = { version = "1.0.10" }
+clearscreen = { version = "2.0.0" }
 rayon = { version = "1.5.3" }
-update-informer = { version = "0.5.0", default-features = false, features = ["pypi"], optional = true }
+update-informer = { version = "0.6.0", default-features = false, features = ["pypi"], optional = true }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support
