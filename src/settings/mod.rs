@@ -114,6 +114,12 @@ impl Settings {
                 .dummy_variable_rgx
                 .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
             enabled: resolve_codes(
+                config
+                    .pydocstyle
+                    .as_ref()
+                    .and_then(|pydocstyle| pydocstyle.convention)
+                    .map(|convention| convention.codes())
+                    .unwrap_or_default(),
                 [CheckCodeSpec {
                     select: &config
                         .select
@@ -135,6 +141,7 @@ impl Settings {
             fix: config.fix.unwrap_or(false),
             fix_only: config.fix_only.unwrap_or(false),
             fixable: resolve_codes(
+                vec![],
                 [CheckCodeSpec {
                     select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
                     ignore: &config.unfixable.unwrap_or_default(),
@@ -384,8 +391,11 @@ struct CheckCodeSpec<'a> {
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// error codes.
-fn resolve_codes<'a>(specs: impl Iterator<Item = CheckCodeSpec<'a>>) -> FxHashSet<CheckCode> {
-    let mut codes: FxHashSet<CheckCode> = FxHashSet::default();
+fn resolve_codes<'a>(
+    baseline: Vec<CheckCode>,
+    specs: impl Iterator<Item = CheckCodeSpec<'a>>,
+) -> FxHashSet<CheckCode> {
+    let mut codes: FxHashSet<CheckCode> = FxHashSet::from_iter(baseline);
     for spec in specs {
         for specificity in [
             SuffixLength::None,
@@ -423,6 +433,7 @@ mod tests {
     #[test]
     fn check_codes() {
         let actual = resolve_codes(
+            vec![],
             [CheckCodeSpec {
                 select: &[CheckCodePrefix::W],
                 ignore: &[],
@@ -433,6 +444,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [CheckCodeSpec {
                 select: &[CheckCodePrefix::W6],
                 ignore: &[],
@@ -443,6 +455,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [CheckCodeSpec {
                 select: &[CheckCodePrefix::W],
                 ignore: &[CheckCodePrefix::W292],
@@ -453,6 +466,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [CheckCodeSpec {
                 select: &[CheckCodePrefix::W605],
                 ignore: &[CheckCodePrefix::W605],
@@ -463,6 +477,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [
                 CheckCodeSpec {
                     select: &[CheckCodePrefix::W],
@@ -479,6 +494,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [
                 CheckCodeSpec {
                     select: &[CheckCodePrefix::W],
