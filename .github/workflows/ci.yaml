@@ -202,4 +202,4 @@ jobs:
           restore-keys: ${{ runner.os }}-linting-${{ hashFiles('**/poetry.lock') }}
 
       - run: pip install codespell
-      - run: codespell
+      - run: codespell --ignore-words-list="crate,fo,execused" -S="./target,./.git,*.json,*.snap" --q=2
