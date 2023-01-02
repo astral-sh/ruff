@@ -26,3 +26,8 @@ from A import (
 
 from D import a_long_name_to_force_multiple_lines # Comment 12
 from D import another_long_name_to_force_multiple_lines # Comment 13
+
+from E import a  # Comment 1
+
+from F import a  # Comment 1
+from F import b
