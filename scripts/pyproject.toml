@@ -1,3 +1,9 @@
+[tool.black]
+line-length = 120
+
+[tool.ruff]
+line-length = 120
+
 [tool.poetry]
 name = "scripts"
 version = "0.1.0"
