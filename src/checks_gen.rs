@@ -3398,7 +3398,7 @@ impl CheckCodePrefix {
             CheckCodePrefix::UP025 => SuffixLength::Three,
             CheckCodePrefix::UP026 => SuffixLength::Three,
             CheckCodePrefix::UP027 => SuffixLength::Three,
-            CheckCodePrefix::UP028 => SuffixLength::Three
+            CheckCodePrefix::UP028 => SuffixLength::Three,
             CheckCodePrefix::W => SuffixLength::Zero,
             CheckCodePrefix::W2 => SuffixLength::One,
             CheckCodePrefix::W29 => SuffixLength::Two,

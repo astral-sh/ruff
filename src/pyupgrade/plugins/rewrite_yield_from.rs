@@ -33,6 +33,7 @@ fn get_items(expr: &Expr) -> Vec<String> {
     }
 }
 
+#[derive(Debug)]
 struct YieldFrom {
     statement: Stmt,
     yield_items: Vec<String>,
@@ -98,7 +99,10 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
     }
 }
 
-pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt, body: &Vec<Stmt>) {
+pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
     let mut yields: Vec<YieldFrom> = vec![];
     get_yields_from(stmt, &mut yields);
+    for item in yields {
+        println!("{:?}\n", item);
+    }
 }
