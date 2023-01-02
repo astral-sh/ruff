@@ -52,9 +52,9 @@ impl YieldFrom {
     fn new(statement: &Stmt, iter: &Expr, expression: &Expr, target: &Expr) -> Option<Self> {
         if let ExprKind::Yield { value } = &expression.node {
             let mut base = Self {
-                statement: statement.to_owned(),
-                iter: iter.to_owned(),
-                yield_: expression.to_owned(),
+                statement: statement.clone(),
+                iter: iter.clone(),
+                yield_: expression.clone(),
                 yield_items: vec![],
                 target_items: vec![],
             };
@@ -89,7 +89,7 @@ impl YieldFrom {
         let after_contents = checker.locator.slice_source_code_range(&after_range);
         // Check each item in the for loop targets to see if they are used before (and
         // not used to assign)
-        for item in self.target_items.iter() {
+        for item in &self.target_items {
             let mut next_must_be_assign = false;
             for (_, tok, _) in lexer::make_tokenizer(&before_contents).flatten() {
                 // If we find a matching name we need to check if it is being assigned
@@ -110,7 +110,7 @@ impl YieldFrom {
             }
         }
         // Check each item in the for loop targets to see if they are used later
-        for item in self.target_items.iter() {
+        for item in &self.target_items {
             for (_, tok, _) in lexer::make_tokenizer(&after_contents).flatten() {
                 if let Tok::Name { name } = tok {
                     if &name == item {
