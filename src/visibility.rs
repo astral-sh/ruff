@@ -107,7 +107,7 @@ pub fn is_init(stmt: &Stmt) -> bool {
 
 /// Returns `true` if a module name indicates private visibility.
 fn is_private_module(module_name: &str) -> bool {
-    module_name.starts_with('_') || (module_name.starts_with("__") && module_name.ends_with("__"))
+    module_name.starts_with('_')
 }
 
 pub fn module_visibility(path: &Path) -> Visibility {
