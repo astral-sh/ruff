@@ -216,6 +216,7 @@ pub enum CheckCode {
     YTT303,
     // flake8-simplify
     SIM118,
+    SIM300,
     // pyupgrade
     UP001,
     UP003,
@@ -242,6 +243,7 @@ pub enum CheckCode {
     UP024,
     UP025,
     UP026,
+    UP027,
     // pydocstyle
     D100,
     D101,
@@ -928,6 +930,7 @@ pub enum CheckKind {
     SysVersionSlice1Referenced,
     // flake8-simplify
     KeyInDict(String, String),
+    YodaConditions(String, String),
     // pyupgrade
     TypeOfPrimitive(Primitive),
     UselessMetaclassType,
@@ -954,6 +957,7 @@ pub enum CheckKind {
     OSErrorAlias(Option<String>),
     RewriteUnicodeLiteral,
     RewriteMockImport(MockReference),
+    RewriteListComprehension,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1347,6 +1351,7 @@ impl CheckCode {
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
+            CheckCode::SIM300 => CheckKind::YodaConditions("left".to_string(), "right".to_string()),
             // pyupgrade
             CheckCode::UP001 => CheckKind::UselessMetaclassType,
             CheckCode::UP003 => CheckKind::TypeOfPrimitive(Primitive::Str),
@@ -1376,6 +1381,7 @@ impl CheckCode {
             CheckCode::UP024 => CheckKind::OSErrorAlias(None),
             CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
             CheckCode::UP026 => CheckKind::RewriteMockImport(MockReference::Import),
+            CheckCode::UP027 => CheckKind::RewriteListComprehension,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1841,6 +1847,7 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM300 => CheckCategory::Flake8Simplify,
             CheckCode::T100 => CheckCategory::Flake8Debugger,
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
@@ -1871,6 +1878,7 @@ impl CheckCode {
             CheckCode::UP024 => CheckCategory::Pyupgrade,
             CheckCode::UP025 => CheckCategory::Pyupgrade,
             CheckCode::UP026 => CheckCategory::Pyupgrade,
+            CheckCode::UP027 => CheckCategory::Pyupgrade,
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
             CheckCode::YTT101 => CheckCategory::Flake82020,
@@ -2069,6 +2077,7 @@ impl CheckKind {
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
+            CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
             CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
             CheckKind::UselessMetaclassType => &CheckCode::UP001,
@@ -2095,6 +2104,7 @@ impl CheckKind {
             CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
             CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             CheckKind::RewriteMockImport(..) => &CheckCode::UP026,
+            CheckKind::RewriteListComprehension => &CheckCode::UP027,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2817,6 +2827,9 @@ impl CheckKind {
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
+            CheckKind::YodaConditions(left, right) => {
+                format!("Use `{left} == {right}` instead of `{right} == {left} (Yoda-conditions)`")
+            }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
                 format!("Use `{}` instead of `type(...)`", primitive.builtin())
@@ -2884,6 +2897,9 @@ impl CheckKind {
             CheckKind::RewriteUnicodeLiteral => "Remove unicode literals from strings".to_string(),
             CheckKind::RewriteMockImport(..) => {
                 "`mock` is deprecated, use `unittest.mock`".to_string()
+            }
+            CheckKind::RewriteListComprehension => {
+                "Replace unpacked list comprehension with a generator expression".to_string()
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
@@ -3452,6 +3468,7 @@ impl CheckKind {
                 | CheckKind::RewriteCElementTree
                 | CheckKind::RewriteMockImport(..)
                 | CheckKind::RewriteUnicodeLiteral
+                | CheckKind::RewriteListComprehension
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
                 | CheckKind::SectionUnderlineAfterName(..)
@@ -3575,6 +3592,9 @@ impl CheckKind {
                 MockReference::Import => "Import from `unittest.mock` instead".to_string(),
                 MockReference::Attribute => "Replace `mock.mock` with `mock`".to_string(),
             }),
+            CheckKind::RewriteListComprehension => {
+                Some("Replace with generator expression".to_string())
+            }
             CheckKind::NewLineAfterSectionName(name) => {
                 Some(format!("Add newline after \"{name}\""))
             }
