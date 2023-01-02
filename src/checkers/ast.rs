@@ -1499,12 +1499,12 @@ where
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...]
                 if !self.in_deferred_string_type_definition
+                    && self.in_annotation
                     && self.settings.enabled.contains(&CheckCode::UP007)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && !self.settings.pyupgrade.keep_runtime_typing
-                            && self.annotations_future_enabled
-                            && self.in_annotation))
+                            && self.annotations_future_enabled))
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
