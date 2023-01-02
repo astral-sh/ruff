@@ -158,9 +158,9 @@ pacman -S ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff path/to/code/to/check.py
-ruff path/to/code/
-ruff path/to/code/*.py
+ruff path/to/code/to/check.py  # Run Ruff over `check.py`
+ruff path/to/code/             # Run Ruff over all files in `/path/to/code` (and any subdirectories)
+ruff path/to/code/*.py         # Run Ruff over all `.py` files in `/path/to/code`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
@@ -174,7 +174,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.206'
+  rev: 'v0.0.207'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
