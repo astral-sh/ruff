@@ -2758,7 +2758,7 @@ impl CheckKind {
                 "Replace unpacked list comprehension with a generator expression".to_string()
             }
             CheckKind::RewriteYieldFrom => {
-                "Itierating through a yeild is deprecated, use `yield from`".to_string()
+                "Itierating through a yield is deprecated, use `yield from`".to_string()
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
