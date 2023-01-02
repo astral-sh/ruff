@@ -21,9 +21,9 @@ use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pydocstyle,
-    pyupgrade,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
+    mccabe, pep8_naming, pydocstyle, pyupgrade,
 };
 
 pub mod configuration;
@@ -64,6 +64,7 @@ pub struct Settings {
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
+    pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
@@ -172,6 +173,10 @@ impl Settings {
                 .flake8_import_conventions
                 .map(std::convert::Into::into)
                 .unwrap_or_default(),
+            flake8_pytest_style: config
+                .flake8_pytest_style
+                .map(std::convert::Into::into)
+                .unwrap_or_default(),
             flake8_quotes: config
                 .flake8_quotes
                 .map(std::convert::Into::into)
@@ -234,6 +239,7 @@ impl Settings {
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
+            flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
@@ -272,6 +278,7 @@ impl Settings {
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
+            flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),

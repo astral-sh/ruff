@@ -42,6 +42,7 @@ pub mod flake8_errmsg;
 mod flake8_implicit_str_concat;
 mod flake8_import_conventions;
 mod flake8_print;
+pub mod flake8_pytest_style;
 pub mod flake8_quotes;
 mod flake8_return;
 mod flake8_simplify;

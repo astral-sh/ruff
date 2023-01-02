@@ -1,0 +1,41 @@
+---
+source: src/flake8_pytest_style/mod.rs
+expression: checks
+---
+- kind: UnnecessaryAsyncioMarkOnFixture
+  location:
+    row: 14
+    column: 1
+  end_location:
+    row: 14
+    column: 22
+  fix: ~
+  parent: ~
+- kind: UnnecessaryAsyncioMarkOnFixture
+  location:
+    row: 20
+    column: 1
+  end_location:
+    row: 20
+    column: 20
+  fix: ~
+  parent: ~
+- kind: UnnecessaryAsyncioMarkOnFixture
+  location:
+    row: 27
+    column: 1
+  end_location:
+    row: 27
+    column: 22
+  fix: ~
+  parent: ~
+- kind: UnnecessaryAsyncioMarkOnFixture
+  location:
+    row: 33
+    column: 1
+  end_location:
+    row: 33
+    column: 20
+  fix: ~
+  parent: ~
+

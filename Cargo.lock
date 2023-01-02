@@ -1913,6 +1913,7 @@ dependencies = [
  "nohash-hasher",
  "notify",
  "num-bigint",
+ "num-traits",
  "once_cell",
  "path-absolutize",
  "quick-junit",

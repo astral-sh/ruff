@@ -1,0 +1,32 @@
+---
+source: src/flake8_pytest_style/mod.rs
+expression: checks
+---
+- kind: IncorrectPytestImport
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 27
+  fix: ~
+  parent: ~
+- kind: IncorrectPytestImport
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 26
+  fix: ~
+  parent: ~
+- kind: IncorrectPytestImport
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 40
+  fix: ~
+  parent: ~
+

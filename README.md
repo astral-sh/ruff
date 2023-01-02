@@ -102,6 +102,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-implicit-str-concat (ISC)](#flake8-implicit-str-concat-isc)
    1. [flake8-import-conventions (ICN)](#flake8-import-conventions-icn)
    1. [flake8-print (T20)](#flake8-print-t20)
+   1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
    1. [flake8-simplify (SIM)](#flake8-simplify-sim)
@@ -889,6 +890,38 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on Py
 | ---- | ---- | ------- | --- |
 | T201 | PrintFound | `print` found | 🛠 |
 | T203 | PPrintFound | `pprint` found | 🛠 |
+
+### flake8-pytest-style (PT)
+
+For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/1.6.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PT001 | IncorrectFixtureParenthesesStyle | Use `@pytest.fixture()` over `@pytest.fixture` | 🛠 |
+| PT002 | FixturePositionalArgs | Configuration for fixture `...` specified via positional args, use kwargs |  |
+| PT003 | ExtraneousScopeFunction | `scope='function'` is implied in `@pytest.fixture()` |  |
+| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore |  |
+| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
+| PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
+| PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
+| PT008 | PatchWithLambda | Use `return_value=` instead of patching with lambda |  |
+| PT009 | UnittestAssertion | Use a regular assert instead of unittest-style '...' |  |
+| PT010 | RaisesWithoutException | set the expected exception in `pytest.raises()` |  |
+| PT011 | RaisesTooBroad | `pytest.raises(...)` is too broad, set the `match` parameter or use a more specific exception |  |
+| PT012 | RaisesWithMultipleStatements | `pytest.raises()` block should contain a single simple statement |  |
+| PT013 | IncorrectPytestImport | Found incorrect import of pytest, use simple `import pytest` instead |  |
+| PT015 | AssertAlwaysFalse | Assertion always fails, replace with `pytest.fail()` |  |
+| PT016 | FailWithoutMessage | No message passed to `pytest.fail()` |  |
+| PT017 | AssertInExcept | Found assertion on exception ... in except block, use pytest.raises() instead |  |
+| PT018 | CompositeAssertion | Assertion should be broken down into multiple parts |  |
+| PT019 | FixtureParamWithoutValue | Fixture ... without value is injected as parameter, use @pytest.mark.usefixtures instead |  |
+| PT020 | DeprecatedYieldFixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
+| PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
+| PT022 | UselessYieldFixture | No teardown in fixture ..., use `return` instead of `yield` |  |
+| PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark....` over `@pytest.mark....()` | 🛠 |
+| PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures |  |
+| PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures |  |
+| PT026 | UseFixturesWithoutParameters | Useless `pytest.mark.usefixtures` without parameters | 🛠 |
 
 ### flake8-quotes (Q)
 
@@ -2404,6 +2437,157 @@ will be added to the `aliases` mapping.
 [tool.ruff.flake8-import-conventions]
 # Declare a custom alias for the `matplotlib` module.
 "dask.dataframe" = "dd"
+```
+
+---
+
+### `flake8-pytest-style`
+
+#### [`fixture-parentheses`](#fixture-parentheses)
+
+Boolean flag specifying whether `@pytest.fixture()` without parameters
+should have parentheses. If the option is set to `true` (the
+default), `@pytest.fixture()` is valid and `@pytest.fixture` is an
+error. If set to `false`, `@pytest.fixture` is valid and
+`@pytest.fixture()` is an error.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+fixture-parentheses = true
+```
+
+---
+
+#### [`mark-parentheses`](#mark-parentheses)
+
+Boolean flag specifying whether `@pytest.mark.foo()` without parameters
+should have parentheses. If the option is set to `true` (the
+default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is an
+error. If set to `false`, `@pytest.fixture` is valid and
+`@pytest.mark.foo()` is an error.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+mark-parentheses = true
+```
+
+---
+
+#### [`parametrize-names-type`](#parametrize-names-type)
+
+Expected type for multiple argument names in `@pytest.mark.parametrize`.
+The following values are supported:
+* `csv` — a comma-separated list, e.g.
+  `@pytest.mark.parametrize('name1,name2', ...)`
+* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+  ...)`
+* `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
+
+**Default value**: `tuple`
+
+**Type**: `ParametrizeNameType`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+parametrize-names-type = "list"
+```
+
+---
+
+#### [`parametrize-values-row-type`](#parametrize-values-row-type)
+
+Expected type for each row of values in `@pytest.mark.parametrize` in
+case of multiple parameters. The following values are supported:
+* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+  [(1, 2), (3, 4)])`
+* `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2],
+  [3, 4]])`
+
+**Default value**: `tuple`
+
+**Type**: `ParametrizeValuesRowType`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+parametrize-values-row-type = "list"
+```
+
+---
+
+#### [`parametrize-values-type`](#parametrize-values-type)
+
+Expected type for the list of values rows in `@pytest.mark.parametrize`.
+The following values are supported:
+* `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))`
+* `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`
+
+**Default value**: `list`
+
+**Type**: `ParametrizeValuesType`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+parametrize-values-type = "tuple"
+```
+
+---
+
+#### [`raises-extend-require-match-for`](#raises-extend-require-match-for)
+
+List of additional exception names that require a match= parameter in a
+`pytest.raises()` call. This extends the default list of exceptions
+that require a match= parameter.
+This option is useful if you want to extend the default list of
+exceptions that require a match= parameter without having to specify
+the entire list.
+Note that this option does not remove any exceptions from the default
+list.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+raises-extend-require-match-for = ["requests.RequestException"]
+```
+
+---
+
+#### [`raises-require-match-for`](#raises-require-match-for)
+
+List of exception names that require a match= parameter in a
+`pytest.raises()` call.
+
+**Default value**: `["BaseException", "Exception", "ValueError", "OSError", "IOError", "EnvironmentError", "socket.error"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+raises-require-match-for = ["requests.RequestException"]
 ```
 
 ---

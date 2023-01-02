@@ -1,0 +1,14 @@
+---
+source: src/flake8_pytest_style/mod.rs
+expression: checks
+---
+- kind: RaisesWithoutException
+  location:
+    row: 5
+    column: 9
+  end_location:
+    row: 5
+    column: 22
+  fix: ~
+  parent: ~
+

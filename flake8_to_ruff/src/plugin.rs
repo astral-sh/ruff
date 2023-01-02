@@ -20,6 +20,7 @@ pub enum Plugin {
     Flake8ErrMsg,
     Flake8ImplicitStrConcat,
     Flake8Print,
+    Flake8PytestStyle,
     Flake8Quotes,
     Flake8Return,
     Flake8Simplify,
@@ -48,6 +49,7 @@ impl FromStr for Plugin {
             "flake8-errmsg" => Ok(Plugin::Flake8ErrMsg),
             "flake8-implicit-str-concat" => Ok(Plugin::Flake8ImplicitStrConcat),
             "flake8-print" => Ok(Plugin::Flake8Print),
+            "flake8-pytest-style" => Ok(Plugin::Flake8PytestStyle),
             "flake8-quotes" => Ok(Plugin::Flake8Quotes),
             "flake8-return" => Ok(Plugin::Flake8Return),
             "flake8-simplify" => Ok(Plugin::Flake8Simplify),
@@ -80,6 +82,7 @@ impl fmt::Debug for Plugin {
                 Plugin::Flake8ErrMsg => "flake8-errmsg",
                 Plugin::Flake8ImplicitStrConcat => "flake8-implicit-str-concat",
                 Plugin::Flake8Print => "flake8-print",
+                Plugin::Flake8PytestStyle => "flake8-pytest-style",
                 Plugin::Flake8Quotes => "flake8-quotes",
                 Plugin::Flake8Return => "flake8-return",
                 Plugin::Flake8Simplify => "flake8-simplify",
@@ -111,6 +114,7 @@ impl Plugin {
             Plugin::Flake8ErrMsg => CheckCodePrefix::EM,
             Plugin::Flake8ImplicitStrConcat => CheckCodePrefix::ISC,
             Plugin::Flake8Print => CheckCodePrefix::T2,
+            Plugin::Flake8PytestStyle => CheckCodePrefix::PT,
             Plugin::Flake8Quotes => CheckCodePrefix::Q,
             Plugin::Flake8Return => CheckCodePrefix::RET,
             Plugin::Flake8Simplify => CheckCodePrefix::SIM,
@@ -152,6 +156,7 @@ impl Plugin {
             Plugin::Flake8ErrMsg => vec![CheckCodePrefix::EM],
             Plugin::Flake8ImplicitStrConcat => vec![CheckCodePrefix::ISC],
             Plugin::Flake8Print => vec![CheckCodePrefix::T2],
+            Plugin::Flake8PytestStyle => vec![CheckCodePrefix::PT],
             Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
             Plugin::Flake8Return => vec![CheckCodePrefix::RET],
             Plugin::Flake8Simplify => vec![CheckCodePrefix::SIM],
@@ -393,6 +398,25 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
             }
             "eradicate-whitelist-extend" | "eradicate_whitelist_extend" => {
                 plugins.insert(Plugin::Flake8Eradicate);
+            }
+            // flake8-pytest-style
+            "pytest-fixture-no-parentheses" | "pytest_fixture_no_parentheses " => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-parametrize-names-type" | "pytest_parametrize_names_type" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-parametrize-values-type" | "pytest_parametrize_values_type" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-parametrize-values-row-type" | "pytest_parametrize_values_row_type" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-raises-require-match-for" | "pytest_raises_require_match_for" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-mark-no-parentheses" | "pytest_mark_no_parentheses" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
             }
             // flake8-quotes
             "quotes" | "inline-quotes" | "inline_quotes" => {

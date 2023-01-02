@@ -1,0 +1,89 @@
+---
+source: src/flake8_pytest_style/mod.rs
+expression: checks
+---
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 23
+    column: 8
+  end_location:
+    row: 23
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 24
+    column: 8
+  end_location:
+    row: 24
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 31
+    column: 34
+  end_location:
+    row: 31
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 38
+    column: 4
+  end_location:
+    row: 41
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 49
+    column: 4
+  end_location:
+    row: 52
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 50
+    column: 8
+  end_location:
+    row: 50
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 51
+    column: 8
+  end_location:
+    row: 51
+    column: 14
+  fix: ~
+  parent: ~
+

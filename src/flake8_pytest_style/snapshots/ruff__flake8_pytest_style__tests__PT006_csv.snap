@@ -1,0 +1,59 @@
+---
+source: src/flake8_pytest_style/mod.rs
+expression: checks
+---
+- kind:
+    ParametrizeNamesWrongType: csv
+  location:
+    row: 14
+    column: 25
+  end_location:
+    row: 14
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType: csv
+  location:
+    row: 19
+    column: 25
+  end_location:
+    row: 19
+    column: 36
+  fix:
+    content: "\"param1\""
+    location:
+      row: 19
+      column: 25
+    end_location:
+      row: 19
+      column: 36
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType: csv
+  location:
+    row: 24
+    column: 25
+  end_location:
+    row: 24
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType: csv
+  location:
+    row: 29
+    column: 25
+  end_location:
+    row: 29
+    column: 35
+  fix:
+    content: "\"param1\""
+    location:
+      row: 29
+      column: 25
+    end_location:
+      row: 29
+      column: 35
+  parent: ~
+

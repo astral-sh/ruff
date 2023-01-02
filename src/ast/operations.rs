@@ -266,10 +266,7 @@ pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
 /// `CPython` doesn't either. This method iterates over the token stream and
 /// re-identifies `Cmpop` nodes, annotating them with valid ranges.
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
-    let mut tok_iter = lexer::make_tokenizer(contents)
-        .flatten()
-        .into_iter()
-        .peekable();
+    let mut tok_iter = lexer::make_tokenizer(contents).flatten().peekable();
     let mut ops: Vec<LocatedCmpop> = vec![];
     let mut count: usize = 0;
     loop {
