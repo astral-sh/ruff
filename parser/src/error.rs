@@ -221,7 +221,7 @@ pub(crate) fn parse_error_from_lalrpop(
                     source_path,
                 }
             }
-        },
+        }
     }
 }
 
