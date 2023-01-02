@@ -5,7 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 
-fn update_content(checker: &Checker, stmt: &Stmt, iter: &Stmt) {
+fn update_content(checker: &mut Checker, stmt: &Stmt, iter: &Stmt) {
     let mut check = Check::new(CheckKind::RewriteYieldFrom, Range::from_located(stmt));
     let contents = checker
         .locator
@@ -33,17 +33,17 @@ fn get_items(expr: &Expr) -> Vec<String> {
     }
 }
 
-struct YieldFrom<'a> {
-    statement: &'a Stmt,
+struct YieldFrom {
+    statement: Stmt,
     yield_items: Vec<String>,
     target_items: Vec<String>,
 }
 
-impl<'a> YieldFrom<'a> {
-    fn new(statement: &'a Stmt, expression: &Expr, target: &Expr) -> Option<Self> {
+impl YieldFrom {
+    fn new(statement: &Stmt, expression: &Expr, target: &Expr) -> Option<Self> {
         if let ExprKind::Yield { value } = &expression.node {
             let mut base = Self {
-                statement,
+                statement: statement.to_owned(),
                 yield_items: vec![],
                 target_items: vec![],
             };
@@ -66,10 +66,9 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
     match &stmt.node {
         StmtKind::For {
             target,
-            iter,
             body,
             orelse,
-            type_comment,
+            ..
         } => {
             // If there is an else statement we should not refactor
             if !orelse.is_empty() {
@@ -90,8 +89,10 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
                 }
             }
         }
-        StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-            // get_yields_from(stmt.node, yields)
+        StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
+            for item in body {
+                get_yields_from(item, yields);
+            }
         }
         _ => (),
     }
@@ -99,7 +100,5 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
 
 pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt, body: &Vec<Stmt>) {
     let mut yields: Vec<YieldFrom> = vec![];
-    for item in body {
-        get_yields_from(item, &mut yields);
-    }
+    get_yields_from(stmt, &mut yields);
 }
