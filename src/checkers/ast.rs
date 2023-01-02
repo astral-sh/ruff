@@ -1210,18 +1210,21 @@ where
                         pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::UP001) {
-                    pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
-                }
+
                 if self.settings.enabled.contains(&CheckCode::B003) {
                     flake8_bugbear::plugins::assignment_to_os_environ(self, targets);
                 }
+
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     if let Some(check) =
                         flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
                     {
                         self.add_check(check);
                     }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::UP001) {
+                    pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
                 if self.settings.enabled.contains(&CheckCode::UP013) {
                     pyupgrade::plugins::convert_typed_dict_functional_to_class(
@@ -1233,6 +1236,10 @@ where
                         self, stmt, targets, value,
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::UP027) {
+                    pyupgrade::plugins::unpack_list_comprehension(self, targets, value);
+                }
+
                 if self.settings.enabled.contains(&CheckCode::PD901) {
                     if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
                         self.add_check(check);
@@ -1584,7 +1591,7 @@ where
                     pylint::plugins::used_prior_global_declaration(self, id, expr);
                 }
             }
-            ExprKind::Attribute { attr, .. } => {
+            ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
                     && self.settings.enabled.contains(&CheckCode::UP006)
@@ -1625,6 +1632,16 @@ where
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if attr == name {
+                            // Avoid flagging on function calls (e.g., `df.values()`).
+                            if let Some(parent) = self.current_expr_parent() {
+                                if matches!(parent.0.node, ExprKind::Call { .. }) {
+                                    continue;
+                                }
+                            }
+                            // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`).
+                            if helpers::is_non_variable(value) {
+                                continue;
+                            }
                             self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                         };
                     }
@@ -2387,6 +2404,10 @@ where
                         ops,
                         comparators,
                     );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::SIM300) {
+                    flake8_simplify::plugins::yoda_conditions(self, expr, left, ops, comparators);
                 }
             }
             ExprKind::Constant {

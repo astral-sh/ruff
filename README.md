@@ -173,7 +173,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.205'
+  rev: 'v0.0.206'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -689,6 +689,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP024 | OSErrorAlias | Replace aliased errors with `OSError` | 🛠 |
 | UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
 | UP026 | RewriteMockImport | `mock` is deprecated, use `unittest.mock` | 🛠 |
+| UP027 | RewriteListComprehension | Replace unpacked list comprehension with a generator expression | 🛠 |
 
 ### pep8-naming (N)
 
@@ -922,6 +923,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
+| SIM300 | YodaConditions | Use `left == right` instead of `right == left (Yoda-conditions)` |  |
 
 ### flake8-tidy-imports (TID)
 
