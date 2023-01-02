@@ -1474,8 +1474,8 @@ For example, if you're coming from `flake8-docstrings`, the following configurat
 
 ```toml
 [tool.ruff]
-extend-select = ["D"]
-extend-ignore = [
+select = ["D"]
+ignore = [
     "D107",
     "D203",
     "D212",
@@ -1492,8 +1492,8 @@ Similarly, the following is equivalent to `--docstring-convention=google`:
 
 ```toml
 [tool.ruff]
-extend-select = ["D"]
-extend-ignore = [
+select = ["D"]
+ignore = [
     "D203",
     "D204",
     "D213",
@@ -1512,8 +1512,8 @@ Similarly, the following is equivalent to `--docstring-convention=pep8`:
 
 ```toml
 [tool.ruff]
-extend-select = ["D"]
-extend-ignore = [
+select = ["D"]
+ignore = [
     "D203",
     "D212",
     "D213",
