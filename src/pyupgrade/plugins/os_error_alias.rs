@@ -77,7 +77,7 @@ fn handle_name_or_attribute(
     }
 }
 
-/// Handles one block of an except (use a loop if there are multile blocks)
+/// Handles one block of an except (use a loop if there are multiple blocks)
 fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKind>) {
     let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
     let Some(error_handlers) = type_.as_ref() else {

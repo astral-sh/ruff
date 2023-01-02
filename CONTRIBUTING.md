@@ -70,7 +70,7 @@ non-violations designed to evaluate and demonstrate the behavior of your lint ru
 Run `cargo +nightly dev generate-all` to generate the code for your new fixture. Then run Ruff locally
 with (e.g.) `cargo run resources/test/fixtures/E402.py --no-cache --select E402`.
 
-Once you're satisified with the output, codify the behavior as a snapshot test by
+Once you're satisfied with the output, codify the behavior as a snapshot test by
 adding a new `test_case` macro in `src/[test-suite-name]/mod.rs` file.
 
 Then, run `cargo test`. Your test will fail, but you'll be prompted to follow-up with
