@@ -186,5 +186,20 @@ jobs:
     name: "codespell"
     runs-on: ubuntu-latest
     steps:
-      - uses: codespell-project/actions-codespell@master
+      - name: Checkout Code
+        uses: actions/checkout@3
 
+      - name: Setup Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+          architecture: x64
+
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-linting-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: ${{ runner.os }}-linting-${{ hashFiles('**/poetry.lock') }}
+
+      - run: pip install codespell
+      - run: codespell
