@@ -189,26 +189,11 @@ impl<'a> StringParser<'a> {
             match ch {
                 // can be integrated better with the remaining code, but as a starting point ok
                 // in general I would do here a tokenizing of the fstrings to omit this peeking.
-                '!' if self.peek() == Some(&'=') => {
-                    expression.push_str("!=");
+                '!' | '=' | '>' | '<' if self.peek() == Some(&'=') => {
+                    expression.push(ch);
+                    expression.push('=');
                     self.next_char();
                 }
-
-                '=' if self.peek() == Some(&'=') => {
-                    expression.push_str("==");
-                    self.next_char();
-                }
-
-                '>' if self.peek() == Some(&'=') => {
-                    expression.push_str(">=");
-                    self.next_char();
-                }
-
-                '<' if self.peek() == Some(&'=') => {
-                    expression.push_str("<=");
-                    self.next_char();
-                }
-
                 '!' if delims.is_empty() && self.peek() != Some(&'=') => {
                     if expression.trim().is_empty() {
                         return Err(EmptyExpression.to_lexical_error(self.get_pos()));
