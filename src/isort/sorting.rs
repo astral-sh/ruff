@@ -54,7 +54,7 @@ pub fn cmp_levels(level1: Option<&usize>, level2: Option<&usize>) -> Ordering {
 }
 
 /// Compare two `StmtKind::ImportFrom` blocks.
-pub fn cmp_import_froms(import_from1: &ImportFromData, import_from2: &ImportFromData) -> Ordering {
+pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromData) -> Ordering {
     cmp_levels(import_from1.level, import_from2.level).then_with(|| {
         match (&import_from1.module, import_from2.module) {
             (None, None) => Ordering::Equal,
