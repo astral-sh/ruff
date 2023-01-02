@@ -1,9 +1,16 @@
 use anyhow::{bail, Result};
-use libcst_native::{Expr, Import, ImportFrom, Module, SmallStatement, Statement};
+use libcst_native::{Expr, Import, ImportFrom, Module, SmallStatement, Statement, Expression, Call};
 
 pub fn match_module(module_text: &str) -> Result<Module> {
     match libcst_native::parse_module(module_text, None) {
         Ok(module) => Ok(module),
+        Err(_) => bail!("Failed to extract CST from source"),
+    }
+}
+
+pub fn match_expression(expression_text: &str) -> Result<Expression> {
+    match libcst_native::parse_expression(expression_text) {
+        Ok(expression) => Ok(expression),
         Err(_) => bail!("Failed to extract CST from source"),
     }
 }
@@ -41,5 +48,14 @@ pub fn match_import_from<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut I
         }
     } else {
         bail!("Expected Statement::Simple")
+    }
+}
+
+
+pub fn match_call<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut Call<'b>> {
+    if let Expression::Call(call) = expression {
+        Ok(call)
+    } else {
+        bail!("Expected SmallStatement::Expr")
     }
 }

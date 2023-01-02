@@ -1751,6 +1751,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP024) {
                     pyupgrade::plugins::os_error_alias(self, expr);
                 }
+                if self.settings.enabled.contains(&CheckCode::UP029) {
+                    pyupgrade::plugins::format_specifiers(self, expr, func);
+                }
 
                 // flake8-print
                 if self.settings.enabled.contains(&CheckCode::T201)
