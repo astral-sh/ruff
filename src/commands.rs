@@ -46,8 +46,8 @@ pub fn run(
 
     if paths.is_empty() {
         one_time_warning!(
-            "{} {}",
-            "warning:".yellow().bold(),
+            "{}: {}",
+            "warning".yellow().bold(),
             "No Python files found under the given path(s)"
         );
         return Ok(Diagnostics::default());
@@ -196,8 +196,8 @@ pub fn add_noqa(
 
     if paths.is_empty() {
         one_time_warning!(
-            "{} {}",
-            "warning:".yellow().bold(),
+            "{}: {}",
+            "warning".yellow().bold(),
             "No Python files found under the given path(s)"
         );
         return Ok(0);
@@ -270,8 +270,8 @@ pub fn show_files(
 
     if paths.is_empty() {
         one_time_warning!(
-            "{} {}",
-            "warning:".yellow().bold(),
+            "{}: {}",
+            "warning".yellow().bold(),
             "No Python files found under the given path(s)"
         );
         return Ok(());
