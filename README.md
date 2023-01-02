@@ -157,9 +157,9 @@ pacman -S ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff path/to/code/to/check.py # Check only one file
-ruff path/to/code/            # Check all files in that directory and subdirectories   
-ruff path/to/code/*.py        # Check all files in that directory with "py" extension
+ruff path/to/code/to/check.py  # Run Ruff over `check.py`
+ruff path/to/code/             # Run Ruff over all files in `/path/to/code` (and any subdirectories)
+ruff path/to/code/*.py         # Run Ruff over all `.py` files in `/path/to/code`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
