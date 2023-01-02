@@ -111,7 +111,18 @@ fn is_private_module(module_name: &str) -> bool {
 }
 
 pub fn module_visibility(path: &Path) -> Visibility {
-    for component in path.iter().rev() {
+    let mut components = path.iter().rev();
+    let filename = components.next().unwrap().to_string_lossy();
+    let mut module_name = filename.as_ref();
+    if let Some(idx) = filename.rfind('.') {
+        module_name = &filename[..idx];
+    }
+
+    if is_private_module(module_name) && module_name != "__init__" {
+        return Visibility::Private;
+    }
+
+    for component in components {
         if is_private_module(&component.to_string_lossy()) {
             return Visibility::Private;
         }
