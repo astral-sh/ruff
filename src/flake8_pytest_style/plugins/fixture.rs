@@ -1,10 +1,10 @@
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt, StmtKind};
 
 use super::helpers::{
-    get_all_argument_names, get_mark_decorators, get_mark_name, is_abstractmethod_decorator,
-    is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
+    get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
+    is_pytest_yield_fixture, keyword_is_literal,
 };
-use crate::ast::helpers::collect_call_paths;
+use crate::ast::helpers::{collect_arg_names, collect_call_paths};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -25,6 +25,18 @@ impl<'a, 'b> Visitor<'b> for SkipFunctionsVisitor<'a>
 where
     'b: 'a,
 {
+    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        match &stmt.node {
+            StmtKind::Return { value, .. } => {
+                if value.is_some() {
+                    self.has_return_with_value = true;
+                }
+            }
+            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {}
+            _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
             ExprKind::YieldFrom { .. } => {
@@ -43,18 +55,6 @@ where
                 visitor::walk_expr(self, expr);
             }
             _ => {}
-        }
-    }
-
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt.node {
-            StmtKind::Return { value, .. } => {
-                if value.is_some() {
-                    self.has_return_with_value = true;
-                }
-            }
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {}
-            _ => visitor::walk_stmt(self, stmt),
         }
     }
 }
@@ -211,7 +211,7 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
 
 /// PT021
 fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[Stmt]) {
-    if !get_all_argument_names(args).contains(&"request".to_string()) {
+    if !collect_arg_names(args).contains(&"request") {
         return;
     }
 

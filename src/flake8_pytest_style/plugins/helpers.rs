@@ -1,6 +1,6 @@
 use num_traits::identities::Zero;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Keyword};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::{collect_call_paths, compose_call_path, match_module_member};
 use crate::checkers::ast::Checker;
@@ -51,28 +51,6 @@ impl<'a> SimpleCallArgs<'a> {
     }
 }
 
-pub fn get_all_argument_names(args: &Arguments) -> Vec<String> {
-    let mut result: Vec<String> = vec![];
-
-    result.extend(
-        args.posonlyargs
-            .iter()
-            .chain(&args.args)
-            .chain(&args.kwonlyargs)
-            .map(|arg| arg.node.arg.clone()),
-    );
-
-    if let Some(vararg) = &args.vararg {
-        result.push(vararg.node.arg.clone());
-    }
-
-    if let Some(kwarg) = &args.kwarg {
-        result.push(kwarg.node.arg.clone());
-    }
-
-    result
-}
-
 pub fn get_mark_decorators(decorators: &[Expr]) -> Vec<&Expr> {
     decorators
         .iter()
@@ -106,9 +84,10 @@ pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
 
 pub fn is_pytest_mark(decorator: &Expr) -> bool {
     if let Some(qualname) = compose_call_path(decorator) {
-        return qualname.starts_with("pytest.mark.");
-    };
-    false
+        qualname.starts_with("pytest.mark.")
+    } else {
+        false
+    }
 }
 
 pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
@@ -189,9 +168,10 @@ pub fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {
         ..
     } = &kw.node.value.node
     {
-        return string == literal;
+        string == literal
+    } else {
+        false
     }
-    false
 }
 
 pub fn is_empty_or_null_string(expr: &Expr) -> bool {

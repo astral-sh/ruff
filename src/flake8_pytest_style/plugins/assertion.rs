@@ -8,13 +8,22 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checks::{Check, CheckKind};
 
-#[derive(Default)]
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
 struct ExceptionHandlerVisitor<'a> {
     exception_name: &'a str,
     current_assert: Option<&'a Stmt>,
     errors: Vec<Check>,
+}
+
+impl<'a> ExceptionHandlerVisitor<'a> {
+    fn new(exception_name: &'a str) -> Self {
+        Self {
+            exception_name,
+            current_assert: None,
+            errors: Vec::new(),
+        }
+    }
 }
 
 impl<'a, 'b> Visitor<'b> for ExceptionHandlerVisitor<'a>
@@ -103,10 +112,7 @@ fn is_composite_condition(test: &Expr) -> bool {
 
 fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Check> {
     // Walk body to find assert statements that reference the exception name
-    let mut visitor = ExceptionHandlerVisitor {
-        exception_name: name,
-        ..Default::default()
-    };
+    let mut visitor = ExceptionHandlerVisitor::new(name);
     for stmt in body {
         visitor.visit_stmt(stmt);
     }

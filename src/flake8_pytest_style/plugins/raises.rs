@@ -30,14 +30,13 @@ fn is_non_trivial_with_body(body: &Vec<Stmt>) -> bool {
 
 pub fn raises_call(checker: &mut Checker, func: &Expr, args: &Vec<Expr>, keywords: &Vec<Keyword>) {
     if is_pytest_raises(func, &checker.from_imports, &checker.import_aliases) {
-        if checker.settings.enabled.contains(&CheckCode::PT010)
-            && args.is_empty()
-            && keywords.is_empty()
-        {
-            checker.add_check(Check::new(
-                CheckKind::RaisesWithoutException,
-                Range::from_located(func),
-            ));
+        if checker.settings.enabled.contains(&CheckCode::PT010) {
+            if args.is_empty() && keywords.is_empty() {
+                checker.add_check(Check::new(
+                    CheckKind::RaisesWithoutException,
+                    Range::from_located(func),
+                ));
+            }
         }
 
         if checker.settings.enabled.contains(&CheckCode::PT011) {
