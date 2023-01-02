@@ -181,3 +181,10 @@ jobs:
             ${{ runner.os }}-build-
             ${{ runner.os }}-
       - run: maturin build -b bin
+
+  codespell:
+    name: "codespell"
+    steps:
+      - name: Run Codespell
+        uses: codespell-project/actions-codespell@master
+
