@@ -141,7 +141,7 @@ pub fn remove_unnecessary_future_import(
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
 ) -> Result<Fix> {
-    // TODO(charlie): DRY up with pyflakes::fixes::remove_unused_import_froms.
+    // TODO(charlie): DRY up with pyflakes::fixes::remove_unused_import_from.
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text)?;
 

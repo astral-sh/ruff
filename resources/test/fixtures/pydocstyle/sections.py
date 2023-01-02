@@ -376,7 +376,7 @@ class TestGoogle:  # noqa: D203
                 Etiam at tellus a tellus faucibus maximus. Curabitur tellus
                 mauris, semper id vehicula ac, feugiat ut tortor.
             verbose (bool):
-                If True, print out as much infromation as possible.
+                If True, print out as much information as possible.
                 If False, print out concise "one-liner" information.
 
         """

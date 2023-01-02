@@ -3079,7 +3079,7 @@ impl<'a> Checker<'a> {
             }
         }
 
-        // If we're about to lose the binding, store it as overriden.
+        // If we're about to lose the binding, store it as overridden.
         if let Some((scope_index, binding_index)) = overridden {
             self.scopes[scope_index]
                 .overridden
