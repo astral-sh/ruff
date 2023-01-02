@@ -20,14 +20,23 @@ fn get_new_call(module_text: &str) -> Option<String> {
     Some(state.to_string())
 }
 
+get_specifier_order(value_str: &str) -> Vec<u8> {
+}
+
 pub fn format_specifiers(checker: &Checker, expr: &Expr, func: &Expr) {
-    if let ExprKind::Attribute { value, attr, ctx } = &func.node {
-        if let ExprKind::Constant { value, kind } = &value.node {
-            println!("{:?}", value);
-            println!("{:?}", attr);
+    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+        if let ExprKind::Constant { value: cons_value, .. } = &value.node {
+            if attr == "format" {
+                println!("{:?}", value);
+                println!("{:?}", cons_value);
+                println!("{:?}", attr);
+                let cons_val_range = Range::from_located(expr);
+                let cons_val_text = checker.locator.slice_source_code_range(&cons_val_range);
+                get_specifier_order(&cons_val_text);
+                let call_range = Range::from_located(expr);
+                let call_text = checker.locator.slice_source_code_range(&call_range);
+                get_new_call(&call_text);
+            }
         }
     }
-    let range = Range::from_located(expr);
-    let module_text = checker.locator.slice_source_code_range(&range);
-    get_new_call(&module_text);
 }
