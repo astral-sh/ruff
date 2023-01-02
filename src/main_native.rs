@@ -172,6 +172,13 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     };
     let cache = !cli.no_cache;
 
+    #[cfg(debug_assertions)]
+    if cache {
+        // save contributors from the pitfall of running `cargo run` without
+        // `--no-cache` only to wonder why their code changes don't change anything
+        eprintln!("Warning: you are running a debug build without --no-cache");
+    }
+
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
     if cli.watch {
         if !matches!(autofix, fixer::Mode::None) {
