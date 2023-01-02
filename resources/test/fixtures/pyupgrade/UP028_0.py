@@ -59,3 +59,12 @@ def f():
 # Comment\n'
 def g():
     print(3)
+
+
+def f():
+    for x in y:
+        yield x
+    for z in x:
+        yield z
+
+
