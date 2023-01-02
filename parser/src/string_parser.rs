@@ -228,10 +228,9 @@ impl<'a> StringParser<'a> {
 
                     match self.peek() {
                         Some('}' | ':') => {}
-                        Some(_) => {
-                            return Err(InvalidConversionFlag.to_lexical_error(self.get_pos()))
+                        Some(_) | None => {
+                            return Err(UnclosedLbrace.to_lexical_error(self.get_pos()))
                         }
-                        None => return Err(UnclosedLbrace.to_lexical_error(self.get_pos())),
                     }
                 }
 
