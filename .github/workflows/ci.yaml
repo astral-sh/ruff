@@ -182,24 +182,14 @@ jobs:
             ${{ runner.os }}-
       - run: maturin build -b bin
 
-  codespell:
-    name: "codespell"
+  typos:
+    name: Spell Check with Typos
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    - name: Checkout Actions Repository
+      uses: actions/checkout@v2
 
-      - name: Setup Python 3.9
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
-          architecture: x64
-
-      - uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-linting-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: ${{ runner.os }}-linting-${{ hashFiles('**/poetry.lock') }}
-
-      - run: pip install codespell
-      - run: codespell --ignore-words-list="crate,fo,execused" -S="./target,./.git,*.json,*.snap" --q=2
+    - name: Check spelling of file.txt
+      uses: crate-ci/typos@master
+      with:
+        files: .
