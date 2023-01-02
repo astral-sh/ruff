@@ -24,7 +24,7 @@ static CODING_COMMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^.*?coding[:=][ \t]*([-_.a-zA-Z0-9]+)").unwrap());
 static HASH_NUMBER: Lazy<Regex> = Lazy::new(|| Regex::new(r"#\d").unwrap());
 static MULTILINE_ASSIGNMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*\w+\s*=.*[(\[{]$").unwrap());
+    Lazy::new(|| Regex::new(r"^\s*([(\[]\s*)?(\w+\s*,\s*)*\w+\s*([)\]]\s*)?=.*[(\[{]$").unwrap());
 static PARTIAL_DICTIONARY_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"^\s*['"]\w+['"]\s*:.+[,{]\s*$"#).unwrap());
 static PRINT_RETURN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(print|return)\b\s*").unwrap());
@@ -152,6 +152,21 @@ mod tests {
         assert!(!comment_contains_code("#else"));
         assert!(!comment_contains_code("#or else:"));
         assert!(!comment_contains_code("#else True:"));
+
+        // Unpacking assignments
+        assert!(comment_contains_code(
+            "# user_content_type, _ = TimelineEvent.objects.using(db_alias).get_or_create("
+        ));
+        assert!(comment_contains_code(
+            "# (user_content_type, _) = TimelineEvent.objects.using(db_alias).get_or_create("
+        ));
+        assert!(comment_contains_code(
+            "# ( user_content_type , _ )= TimelineEvent.objects.using(db_alias).get_or_create("
+        ));
+        assert!(comment_contains_code(
+            "#     app_label=\"core\", model=\"user\""
+        ));
+        assert!(comment_contains_code("# )"));
 
         // TODO(charlie): This should be `true` under aggressive mode.
         assert!(!comment_contains_code("#def foo():"));

@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::Expr;
+use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 
@@ -219,6 +219,12 @@ pub fn match_annotated_subscript<F>(
 where
     F: Fn(&str) -> bool,
 {
+    if !matches!(
+        expr.node,
+        ExprKind::Name { .. } | ExprKind::Attribute { .. }
+    ) {
+        return None;
+    }
     let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
     if !call_path.is_empty() {
         for (module, member) in SUBSCRIPTS {

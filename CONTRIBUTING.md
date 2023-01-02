@@ -9,6 +9,15 @@ free to submit a PR. For larger changes (e.g., new lint rules, new functionality
 options), consider submitting an [Issue](https://github.com/charliermarsh/ruff/issues) outlining
 your proposed change.
 
+If you're looking for a place to start, we recommend implementing a new lint rule (see:
+[_Adding a new lint rule_](#example-adding-a-new-lint-rule), which will allow you to learn from and
+pattern-match against the examples in the existing codebase. Many lint rules are inspired by
+existing Python plugins, which can be used as a reference implementation.
+
+As a concrete example: consider taking on one of the rules in [`flake8-simplify`](https://github.com/charliermarsh/ruff/issues/998),
+and looking to the originating [Python source](https://github.com/MartinThoma/flake8-simplify) for
+guidance.
+
 ### Prerequisites
 
 Ruff is written in Rust. You'll need to install the
@@ -67,15 +76,13 @@ To add a test fixture, create a file under `resources/test/fixtures`, named to m
 you defined earlier (e.g., `E402.py`). This file should contain a variety of violations and
 non-violations designed to evaluate and demonstrate the behavior of your lint rule.
 
-Run `cargo +nightly dev generate-all` to generate the code for your new fixture. Then run Ruff locally
-with (e.g.) `cargo run resources/test/fixtures/E402.py --no-cache --select E402`.
+Run `cargo +nightly dev generate-all` to generate the code for your new fixture. Then run Ruff
+locally with (e.g.) `cargo run resources/test/fixtures/E402.py --no-cache --select E402`.
 
-Once you're satisfied with the output, codify the behavior as a snapshot test by
-adding a new `test_case` macro in `src/[test-suite-name]/mod.rs` file.
-
-Then, run `cargo test`. Your test will fail, but you'll be prompted to follow-up with
-`cargo insta review`. Accept the generated snapshot, then commit the snapshot file alongside the
-rest of your changes.
+Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
+`test_case` macro in the relevant `src/[test-suite-name]/mod.rs` file. Then, run `cargo test`. Your
+test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the generated
+snapshot, then commit the snapshot file alongside the rest of your changes.
 
 Finally, regenerate the documentation and generated code with `cargo +nightly dev generate-all`.
 
