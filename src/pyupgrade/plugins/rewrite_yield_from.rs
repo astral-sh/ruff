@@ -160,6 +160,7 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
     }
 }
 
+/// UP028
 pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
     let mut yields: Vec<YieldFrom> = vec![];
     get_yields_from(stmt, &mut yields);
