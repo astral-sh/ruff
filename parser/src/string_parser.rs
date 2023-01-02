@@ -226,12 +226,12 @@ impl<'a> StringParser<'a> {
                         }
                     };
 
-                    if let Some(&peek) = self.peek() {
-                        if peek != '}' && peek != ':' {
-                            return Err(UnclosedLbrace.to_lexical_error(self.get_pos()));
+                    match self.peek() {
+                        Some('}' | ':') => {}
+                        Some(_) => {
+                            return Err(InvalidConversionFlag.to_lexical_error(self.get_pos()))
                         }
-                    } else {
-                        return Err(UnclosedLbrace.to_lexical_error(self.get_pos()));
+                        None => return Err(UnclosedLbrace.to_lexical_error(self.get_pos())),
                     }
                 }
 
