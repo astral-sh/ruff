@@ -5,7 +5,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 fn update_content(checker: &mut Checker, for_stmt: &Stmt, iter: &Expr) {
     let mut check = Check::new(CheckKind::RewriteYieldFrom, Range::from_located(for_stmt));
