@@ -3495,6 +3495,7 @@ impl CheckKind {
                 | CheckKind::DuplicateHandlerException(..)
                 | CheckKind::EndsInPeriod
                 | CheckKind::EndsInPunctuation
+                | CheckKind::FStringMissingPlaceholders
                 | CheckKind::GetAttrWithConstant
                 | CheckKind::ImplicitReturn
                 | CheckKind::ImplicitReturnValue
