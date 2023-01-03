@@ -2232,6 +2232,26 @@ target-version = "py37"
 
 ---
 
+#### [`task-tags`](#task-tags)
+
+A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
+
+Comments starting with these tags will be ignored by commented-out code
+detection (`ERA`).
+
+**Default value**: `["TODO", "FIXME", "XXX"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+task-tags = ["HACK"]
+```
+
+---
+
 #### [`unfixable`](#unfixable)
 
 A list of check code prefixes to consider un-autofix-able.

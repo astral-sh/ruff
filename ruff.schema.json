@@ -377,6 +377,16 @@
         }
       ]
     },
+    "task-tags": {
+      "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "unfixable": {
       "description": "A list of check code prefixes to consider un-autofix-able.",
       "type": [
