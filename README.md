@@ -1466,59 +1466,49 @@ Found 3 error(s).
 
 ### Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enable a specific docstring convention, start by enabling all `pydocstyle` error codes, and
-then selectively disabling based on your [preferred convention](https://www.pydocstyle.org/en/latest/error_codes.html#default-conventions).
-
-For example, if you're coming from `flake8-docstrings`, the following configuration is equivalent to
-`--docstring-convention=numpy`:
+Yes! To enable specific docstring convention, add the following to your `pyproject.toml`:
 
 ```toml
-[tool.ruff]
-select = ["D"]
-ignore = [
-    "D107",
-    "D203",
-    "D212",
-    "D213",
-    "D402",
-    "D413",
-    "D415",
-    "D416",
-    "D417",
-]
+[tool.ruff.pydocstyle]
+convention = "google"  # Accepts: "google", "numpy", or "pep257".
 ```
 
-Similarly, the following is equivalent to `--docstring-convention=google`:
+For example, if you're coming from `flake8-docstrings`, and your originating configuration uses
+`--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
+as above.
+
+Note that setting a `convention` is equivalent to adding that convention's specific set of codes to
+your `select`. For example, `convention = "numpy"` is equivalent to:
 
 ```toml
 [tool.ruff]
-select = ["D"]
-ignore = [
-    "D203",
+# Enable all `D` errors except `D107`, `D203`, `D212`, `D213`, `D402`, `D413`, `D415`, `D416`,
+# and `D417`.
+select = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D200",
+    "D201",
+    "D202",
     "D204",
-    "D213",
-    "D215",
-    "D400",
-    "D404",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D413",
-]
-```
-
-Similarly, the following is equivalent to `--docstring-convention=pep8`:
-
-```toml
-[tool.ruff]
-select = ["D"]
-ignore = [
-    "D203",
-    "D212",
-    "D213",
+    "D205",
+    "D206",
+    "D207",
+    "D208",
+    "D209",
+    "D210",
+    "D211",
     "D214",
     "D215",
+    "D300",
+    "D301",
+    "D400",
+    "D403",
     "D404",
     "D405",
     "D406",
@@ -1527,24 +1517,16 @@ ignore = [
     "D409",
     "D410",
     "D411",
-    "D413",
-    "D415",
-    "D416",
-    "D417",
+    "D412",
+    "D414",
+    "D418",
+    "D419",
 ]
 ```
 
-Note that Ruff _also_ supports a [`convention`](#convention) setting:
+### How can I tell what settings Ruff is using to check my code?
 
-```toml
-[tool.ruff.pydocstyle]
-convention = "google"
-```
-
-However, this setting is purely used to implement robust detection of Google and NumPy-style
-sections, and thus avoid the [false negatives](https://github.com/PyCQA/pydocstyle/issues/459) seen
-in `pydocstyle`; it does not affect which errors are enabled, which is driven by the `select` and
-`ignore` settings, as described above.
+Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
 ## Development
 
@@ -2975,9 +2957,8 @@ staticmethod-decorators = ["staticmethod", "stcmthd"]
 
 #### [`convention`](#convention)
 
-Whether to use Google-style or Numpy-style conventions when detecting
-docstring sections. By default, conventions will be inferred from
-the available sections.
+Whether to use Google-style or NumPy-style conventions or the PEP257
+defaults when analyzing docstring sections.
 
 **Default value**: `None`
 

@@ -924,7 +924,7 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
                 numpy_section(checker, docstring, context);
             }
         }
-        None => {
+        Some(Convention::Pep257) | None => {
             // First, interpret as NumPy-style sections.
             let mut found_numpy_section = false;
             for context in &section_contexts(&lines, &SectionStyle::Numpy) {

@@ -998,6 +998,13 @@
           "enum": [
             "numpy"
           ]
+        },
+        {
+          "description": "Use PEP257-style docstrings.",
+          "type": "string",
+          "enum": [
+            "pep257"
+          ]
         }
       ]
     },
@@ -1415,7 +1422,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style or Numpy-style conventions when detecting docstring sections. By default, conventions will be inferred from the available sections.",
+          "description": "Whether to use Google-style or NumPy-style conventions or the PEP257 defaults when analyzing docstring sections.",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"

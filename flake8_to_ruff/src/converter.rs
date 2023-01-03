@@ -52,6 +52,19 @@ pub fn convert(
         }
     }
 
+    // Infer plugins, if not provided.
+    let plugins = plugins.unwrap_or_else(|| {
+        let from_options = plugin::infer_plugins_from_options(flake8);
+        if !from_options.is_empty() {
+            eprintln!("Inferred plugins from settings: {from_options:#?}");
+        }
+        let from_codes = plugin::infer_plugins_from_codes(&referenced_codes);
+        if !from_codes.is_empty() {
+            eprintln!("Inferred plugins from referenced check codes: {from_codes:#?}");
+        }
+        from_options.into_iter().chain(from_codes).collect()
+    });
+
     // Check if the user has specified a `select`. If not, we'll add our own
     // default `select`, and populate it based on user plugins.
     let mut select = flake8
@@ -61,22 +74,7 @@ pub fn convert(
                 .as_ref()
                 .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
         })
-        .unwrap_or_else(|| {
-            plugin::resolve_select(
-                flake8,
-                &plugins.unwrap_or_else(|| {
-                    let from_options = plugin::infer_plugins_from_options(flake8);
-                    if !from_options.is_empty() {
-                        eprintln!("Inferred plugins from settings: {from_options:#?}");
-                    }
-                    let from_codes = plugin::infer_plugins_from_codes(&referenced_codes);
-                    if !from_codes.is_empty() {
-                        eprintln!("Inferred plugins from referenced check codes: {from_codes:#?}");
-                    }
-                    from_options.into_iter().chain(from_codes).collect()
-                }),
-            )
-        });
+        .unwrap_or_else(|| plugin::resolve_select(flake8, &plugins));
     let mut ignore = flake8
         .get("ignore")
         .and_then(|value| {
@@ -209,7 +207,8 @@ pub fn convert(
                 "docstring-convention" => match value.trim() {
                     "google" => pydocstyle.convention = Some(Convention::Google),
                     "numpy" => pydocstyle.convention = Some(Convention::Numpy),
-                    "pep257" | "all" => pydocstyle.convention = None,
+                    "pep257" => pydocstyle.convention = Some(Convention::Pep257),
+                    "all" => pydocstyle.convention = None,
                     _ => eprintln!("Unexpected '{key}' value: {value}"),
                 },
                 // mccabe
@@ -289,6 +288,13 @@ pub fn convert(
                 // Unknown
                 _ => eprintln!("Skipping unsupported property: {key}"),
             }
+        }
+    }
+
+    // Set default `convention`.
+    if plugins.contains(&Plugin::Flake8Docstrings) {
+        if pydocstyle.convention.is_none() {
+            pydocstyle.convention = Some(Convention::Pep257);
         }
     }
 
@@ -691,42 +697,6 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                CheckCodePrefix::D100,
-                CheckCodePrefix::D101,
-                CheckCodePrefix::D102,
-                CheckCodePrefix::D103,
-                CheckCodePrefix::D104,
-                CheckCodePrefix::D105,
-                CheckCodePrefix::D106,
-                CheckCodePrefix::D200,
-                CheckCodePrefix::D201,
-                CheckCodePrefix::D202,
-                CheckCodePrefix::D204,
-                CheckCodePrefix::D205,
-                CheckCodePrefix::D206,
-                CheckCodePrefix::D207,
-                CheckCodePrefix::D208,
-                CheckCodePrefix::D209,
-                CheckCodePrefix::D210,
-                CheckCodePrefix::D211,
-                CheckCodePrefix::D214,
-                CheckCodePrefix::D215,
-                CheckCodePrefix::D300,
-                CheckCodePrefix::D301,
-                CheckCodePrefix::D400,
-                CheckCodePrefix::D403,
-                CheckCodePrefix::D404,
-                CheckCodePrefix::D405,
-                CheckCodePrefix::D406,
-                CheckCodePrefix::D407,
-                CheckCodePrefix::D408,
-                CheckCodePrefix::D409,
-                CheckCodePrefix::D410,
-                CheckCodePrefix::D411,
-                CheckCodePrefix::D412,
-                CheckCodePrefix::D414,
-                CheckCodePrefix::D418,
-                CheckCodePrefix::D419,
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
