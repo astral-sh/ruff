@@ -25,7 +25,19 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
             value: Constant::Str(string),
             ..
         } => {
-            let names = string.split(',').collect::<Vec<&str>>();
+            // Match the following pytest code:
+            //    [x.strip() for x in argnames.split(",") if x.strip()]
+            let names = string
+                .split(',')
+                .filter_map(|s| {
+                    let trimmed = s.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed)
+                    }
+                })
+                .collect::<Vec<&str>>();
 
             if names.len() > 1 {
                 match names_type {
@@ -238,13 +250,14 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     if let Some(decorator) = decorator {
         if let ExprKind::Call { args, .. } = &decorator.node {
             if checker.settings.enabled.contains(&CheckCode::PT006) {
-                let first = args.first().unwrap();
-                check_names(checker, first);
+                if let Some(arg) = args.get(0) {
+                    check_names(checker, arg);
+                }
             }
-
             if checker.settings.enabled.contains(&CheckCode::PT007) {
-                let second = args.get(1).unwrap();
-                check_values(checker, second);
+                if let Some(arg) = args.get(1) {
+                    check_values(checker, arg);
+                }
             }
         }
     }
