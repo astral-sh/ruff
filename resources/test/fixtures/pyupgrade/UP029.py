@@ -1,3 +1,4 @@
-"{0}" "{1}".format(1, 2)
+"{}" "{}" "{}".format()
 
-
+"a {} complicated {} string with {} {}".format(
+    )
