@@ -55,7 +55,6 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 1,
                             );
-
                             match generator.generate() {
                                 Ok(content) => {
                                     check.amend(Fix::replacement(
@@ -65,7 +64,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                     ));
                                 }
                                 Err(e) => error!(
-                                    "Failed to fix Wrong name(s) type in \
+                                    "Failed to fix wrong name(s) type in \
                                      `@pytest.mark.parametrize`: {e}"
                                 ),
                             };
@@ -98,7 +97,6 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 0,
                             );
-
                             match generator.generate() {
                                 Ok(content) => {
                                     check.amend(Fix::replacement(
@@ -108,7 +106,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                     ));
                                 }
                                 Err(e) => error!(
-                                    "Failed to fix Wrong name(s) type in \
+                                    "Failed to fix wrong name(s) type in \
                                      `@pytest.mark.parametrize`: {e}"
                                 ),
                             };
@@ -191,9 +189,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
             checker.style.quote(),
             checker.style.line_ending(),
         );
-
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
-
         match generator.generate() {
             Ok(content) => {
                 check.amend(Fix::replacement(
@@ -202,7 +198,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
                     expr.end_location.unwrap(),
                 ));
             }
-            Err(e) => error!("Failed to fix Wrong name(s) type in `@pytest.mark.parametrize`: {e}"),
+            Err(e) => error!("Failed to fix wrong name(s) type in `@pytest.mark.parametrize`: {e}"),
         };
     }
     checker.add_check(check);
