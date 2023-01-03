@@ -10,6 +10,13 @@ expression: checks
   end_location:
     row: 17
     column: 18
-  fix: ~
+  fix:
+    content: return
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 17
+      column: 9
   parent: ~
 

@@ -3594,6 +3594,7 @@ impl CheckKind {
                 | CheckKind::UselessImportAlias
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(..)
+                | CheckKind::UselessYieldFixture(..)
                 | CheckKind::YodaConditions(..)
         )
     }
@@ -3857,6 +3858,7 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(..) => {
                 Some("Remove `object` inheritance".to_string())
             }
+            CheckKind::UselessYieldFixture(..) => Some("Replace `yield` with `return`".to_string()),
             CheckKind::YodaConditions(left, right) => Some(format!(
                 "Replace with `{left} == {right}` (Yoda-conditions)`"
             )),

@@ -919,7 +919,7 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT019 | FixtureParamWithoutValue | Fixture ... without value is injected as parameter, use @pytest.mark.usefixtures instead |  |
 | PT020 | DeprecatedYieldFixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
 | PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
-| PT022 | UselessYieldFixture | No teardown in fixture ..., use `return` instead of `yield` |  |
+| PT022 | UselessYieldFixture | No teardown in fixture ..., use `return` instead of `yield` | 🛠 |
 | PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark....` over `@pytest.mark....()` | 🛠 |
 | PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures |  |
 | PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures |  |

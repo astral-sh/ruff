@@ -1,4 +1,4 @@
-use rustpython_ast::{Arguments, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
@@ -171,14 +171,25 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
     }
 
     if checker.settings.enabled.contains(&CheckCode::PT022) {
-        if let Some(last_statement) = body.last() {
-            if let StmtKind::Expr { value, .. } = &last_statement.node {
+        if let Some(stmt) = body.last() {
+            if let StmtKind::Expr { value, .. } = &stmt.node {
                 if let ExprKind::Yield { .. } = value.node {
                     if visitor.yield_statements.len() == 1 {
-                        checker.add_check(Check::new(
+                        let mut check = Check::new(
                             CheckKind::UselessYieldFixture(func_name.to_string()),
-                            Range::from_located(last_statement),
-                        ));
+                            Range::from_located(stmt),
+                        );
+                        if checker.patch(check.kind.code()) {
+                            check.amend(Fix::replacement(
+                                "return".to_string(),
+                                stmt.location,
+                                Location::new(
+                                    stmt.location.row(),
+                                    stmt.location.column() + "yield".len(),
+                                ),
+                            ));
+                        }
+                        checker.add_check(check);
                     }
                 }
             }
