@@ -22,7 +22,7 @@ use crate::settings::types::{
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, fs, isort,
-    mccabe, pep8_naming, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 #[derive(Debug, Default)]
@@ -66,6 +66,7 @@ pub struct Configuration {
     pub isort: Option<isort::settings::Options>,
     pub mccabe: Option<mccabe::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
+    pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
     pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
@@ -164,6 +165,7 @@ impl Configuration {
             isort: options.isort,
             mccabe: options.mccabe,
             pep8_naming: options.pep8_naming,
+            pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
             pyupgrade: options.pyupgrade,
         })
@@ -229,6 +231,7 @@ impl Configuration {
             isort: self.isort.or(config.isort),
             mccabe: self.mccabe.or(config.mccabe),
             pep8_naming: self.pep8_naming.or(config.pep8_naming),
+            pycodestyle: self.pycodestyle.or(config.pycodestyle),
             pydocstyle: self.pydocstyle.or(config.pydocstyle),
             pyupgrade: self.pyupgrade.or(config.pyupgrade),
         }

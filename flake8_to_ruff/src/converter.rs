@@ -403,6 +403,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -464,6 +465,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -525,6 +527,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -586,6 +589,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -652,6 +656,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -717,6 +722,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
@@ -786,6 +792,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });

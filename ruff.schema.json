@@ -288,6 +288,17 @@
         }
       }
     },
+    "pycodestyle": {
+      "description": "Options for the `pycodestyle` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Pycodestyle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pydocstyle": {
       "description": "Options for the `pydocstyle` plugin.",
       "anyOf": [
@@ -1446,6 +1457,10 @@
           ]
         }
       },
+      "additionalProperties": false
+    },
+    "Pycodestyle": {
+      "type": "object",
       "additionalProperties": false
     },
     "Pydocstyle": {

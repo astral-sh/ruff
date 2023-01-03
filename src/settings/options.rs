@@ -10,7 +10,7 @@ use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 #[derive(
@@ -390,6 +390,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `pep8-naming` plugin.
     pub pep8_naming: Option<pep8_naming::settings::Options>,
+    #[option_group]
+    /// Options for the `pycodestyle` plugin.
+    pub pycodestyle: Option<pycodestyle::settings::Options>,
     #[option_group]
     /// Options for the `pydocstyle` plugin.
     pub pydocstyle: Option<pydocstyle::settings::Options>,

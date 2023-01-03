@@ -26,7 +26,7 @@ use crate::settings::types::{
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, one_time_warning, pep8_naming, pydocstyle, pyupgrade,
+    mccabe, one_time_warning, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 pub mod configuration;
@@ -74,6 +74,7 @@ pub struct Settings {
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
+    pub pycodestyle: pycodestyle::settings::Settings,
     pub pydocstyle: pydocstyle::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
 }
@@ -223,6 +224,10 @@ impl Settings {
                 .pep8_naming
                 .map(std::convert::Into::into)
                 .unwrap_or_default(),
+            pycodestyle: config
+                .pycodestyle
+                .map(std::convert::Into::into)
+                .unwrap_or_default(),
             pydocstyle: config
                 .pydocstyle
                 .map(std::convert::Into::into)
@@ -269,6 +274,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
@@ -309,6 +315,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
