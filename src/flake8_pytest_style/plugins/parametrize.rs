@@ -8,6 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::flake8_pytest_style::types;
 use crate::registry::{Check, CheckCode, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
+
 fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators
         .iter()
