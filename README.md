@@ -277,7 +277,7 @@ alternative docstring formats. Enabling `ALL` without further configuration may 
 behavior, especially for the `pydocstyle` plugin.
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
-an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the above
+an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the
 `pyproject.toml` described above would be represented via the following `ruff.toml`:
 
 ```toml
@@ -404,7 +404,7 @@ directory hierarchy is used for every individual file, with all paths in the `py
 
 There are a few exceptions to these rules:
 
-1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignore any
+1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignores any
    `pyproject.toml` files that lack a `[tool.ruff]` section.
 2. If a configuration file is passed directly via `--config`, those settings are used for across
    files. Any relative paths in that configuration file (like `exclude` globs or `src` paths) are
@@ -449,7 +449,7 @@ For example, `ruff /path/to/excluded/file.py` will always check `file.py`.
 ### Ignoring errors
 
 To omit a lint check entirely, add it to the "ignore" list via [`ignore`](#ignore) or
-[`extend-ignore`](#extend-ignore), either on the command-line or in your `project.toml` file.
+[`extend-ignore`](#extend-ignore), either on the command-line or in your `pyproject.toml` file.
 
 To ignore an error inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual error, add `# noqa: {code}` to the end of the line, like so:
@@ -960,7 +960,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
-| SIM300 | YodaConditions | Use `left == right` instead of `right == left (Yoda-conditions)` |  |
+| SIM300 | YodaConditions | Use `left == right` instead of `right == left (Yoda-conditions)` | 🛠 |
 
 ### flake8-tidy-imports (TID)
 
@@ -1419,7 +1419,7 @@ Ruff can also replace [`isort`](https://pypi.org/project/isort/),
 [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10), and a subset of the rules
 implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (21/33).
 
-If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
+If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
 
 ### Do I need to install Rust to use Ruff?
 

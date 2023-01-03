@@ -1,6 +1,7 @@
 use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
+use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
 
@@ -31,10 +32,26 @@ pub fn yoda_conditions(
         return;
     }
 
-    let check = Check::new(
-        CheckKind::YodaConditions(left.to_string(), right.to_string()),
+    // Slice exact content to preserve formatting.
+    let left_content = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(left));
+    let right_content = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(right));
+
+    let mut check = Check::new(
+        CheckKind::YodaConditions(left_content.to_string(), right_content.to_string()),
         Range::from_located(expr),
     );
+
+    if checker.patch(check.kind.code()) {
+        check.amend(Fix::replacement(
+            format!("{right_content} == {left_content}"),
+            left.location,
+            right.end_location.unwrap(),
+        ));
+    }
 
     checker.add_check(check);
 }

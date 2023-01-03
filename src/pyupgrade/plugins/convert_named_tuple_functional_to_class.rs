@@ -193,8 +193,8 @@ pub fn convert_named_tuple_functional_to_class(
         return;
     };
     match match_defaults(keywords) {
-        Ok(defaults) => {
-            if let Ok(properties) = create_properties_from_args(args, defaults) {
+        Ok(defaults) => match create_properties_from_args(args, defaults) {
+            Ok(properties) => {
                 let mut check = Check::new(
                     CheckKind::ConvertNamedTupleFunctionalToClass(typename.to_string()),
                     Range::from_located(stmt),
@@ -209,7 +209,8 @@ pub fn convert_named_tuple_functional_to_class(
                 }
                 checker.add_check(check);
             }
-        }
+            Err(err) => error!("Failed to create properties: {err}"),
+        },
         Err(err) => error!("Failed to parse defaults: {err}"),
     }
 }

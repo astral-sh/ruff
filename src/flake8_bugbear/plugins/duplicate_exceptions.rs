@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use log::error;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
 
@@ -64,12 +65,15 @@ fn duplicate_handler_exceptions<'a>(
                 } else {
                     generator.unparse_expr(&type_pattern(unique_elts), 0);
                 }
-                if let Ok(content) = generator.generate() {
-                    check.amend(Fix::replacement(
-                        content,
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
+                match generator.generate() {
+                    Ok(content) => {
+                        check.amend(Fix::replacement(
+                            content,
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
+                    }
+                    Err(e) => error!("Failed to remove duplicate exceptions: {e}"),
                 }
             }
             checker.add_check(check);
