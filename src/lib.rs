@@ -91,3 +91,4 @@ pub mod source_code_locator;
 pub mod source_code_style;
 mod vendor;
 pub mod visibility;
+pub mod flake8_pie;
