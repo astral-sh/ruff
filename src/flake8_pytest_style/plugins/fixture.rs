@@ -1,4 +1,4 @@
-use rustpython_ast::{Arguments, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
@@ -175,10 +175,21 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
             if let StmtKind::Expr { value, .. } = &last_statement.node {
                 if let ExprKind::Yield { .. } = value.node {
                     if visitor.yield_statements.len() == 1 {
-                        checker.add_check(Check::new(
+                        let mut check = Check::new(
                             CheckKind::UselessYieldFixture(func_name.to_string()),
                             Range::from_located(last_statement),
-                        ));
+                        );
+                        if checker.patch(check.kind.code()) {
+                            check.amend(Fix::replacement(
+                                "return".to_string(),
+                                last_statement.location,
+                                Location::new(
+                                    last_statement.location.row(),
+                                    last_statement.location.column() + 5,
+                                ),
+                            ));
+                        }
+                        checker.add_check(check);
                     }
                 }
             }
