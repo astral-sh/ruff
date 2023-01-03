@@ -3798,6 +3798,14 @@ impl Check {
     }
 }
 
+/// Pairs of checks that shouldn't be enabled together.
+pub const INCOMPATIBLE_CODES: &[(CheckCode, CheckCode, &str)] = &[(
+    CheckCode::D203,
+    CheckCode::D211,
+    "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
+     Consider adding `D203` to `ignore`.",
+)];
+
 /// A hash map from deprecated `CheckCodePrefix` to latest `CheckCodePrefix`.
 pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCodePrefix>> = Lazy::new(|| {
     FxHashMap::from_iter([
