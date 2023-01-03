@@ -478,7 +478,7 @@ pub fn find_useless_f_strings(expr: &Expr, locator: &SourceCodeLocator) -> Vec<(
         .flatten()
         .filter_map(|(location, tok, end_location)| match tok {
             Tok::String {
-                kind: StringKind::RawFString | StringKind::FString,
+                kind: StringKind::FString | StringKind::RawFString,
                 ..
             } => {
                 let first_char = locator.slice_source_code_range(&Range {
