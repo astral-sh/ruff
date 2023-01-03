@@ -2851,6 +2851,24 @@ known-third-party = ["src"]
 
 ---
 
+#### [`order-by-type`](#order-by-type)
+
+Order imports by type, which is determined by case, in addition to
+alphabetically.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+order-by-type = true
+```
+
+---
+
 #### [`single-line-exclusions`](#single-line-exclusions)
 
 One or more modules to exclude from the single line rule.
