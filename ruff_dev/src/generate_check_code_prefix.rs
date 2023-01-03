@@ -211,7 +211,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("Failed to find root directory")
-            .join("registry_gen.rs");
+            .join("src/registry_gen.rs");
         if fs::read(&file).map_or(true, |old| old != stdout) {
             fs::write(&file, stdout)?;
         }
