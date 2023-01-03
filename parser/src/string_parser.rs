@@ -1,7 +1,7 @@
 use self::FStringErrorType::*;
 use crate::{
     ast::{Constant, ConversionFlag, Expr, ExprKind, Location},
-    error::{FStringErrorType, LexicalError, LexicalErrorType, ParseError},
+    error::{FStringError, FStringErrorType, LexicalError, LexicalErrorType, ParseError},
     parser::parse_expression_located,
     token::StringKind,
 };
@@ -66,10 +66,7 @@ impl<'a> StringParser<'a> {
 
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
         let mut p: u32 = 0u32;
-        let unicode_error = LexicalError {
-            error: LexicalErrorType::UnicodeError,
-            location: self.get_pos(),
-        };
+        let unicode_error = LexicalError::new(LexicalErrorType::UnicodeError, self.get_pos());
         for i in 1..=literal_number {
             match self.next_char() {
                 Some(c) => match c.to_digit(16) {
@@ -103,12 +100,7 @@ impl<'a> StringParser<'a> {
         let start_pos = self.get_pos();
         match self.next_char() {
             Some('{') => {}
-            _ => {
-                return Err(LexicalError {
-                    error: LexicalErrorType::StringError,
-                    location: start_pos,
-                })
-            }
+            _ => return Err(LexicalError::new(LexicalErrorType::StringError, start_pos)),
         }
         let start_pos = self.get_pos();
         let mut name = String::new();
@@ -117,25 +109,23 @@ impl<'a> StringParser<'a> {
                 Some('}') => break,
                 Some(c) => name.push(c),
                 None => {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::StringError,
-                        location: self.get_pos(),
-                    })
+                    return Err(LexicalError::new(
+                        LexicalErrorType::StringError,
+                        self.get_pos(),
+                    ))
                 }
             }
         }
 
         if name.len() > MAX_UNICODE_NAME {
-            return Err(LexicalError {
-                error: LexicalErrorType::UnicodeError,
-                location: self.get_pos(),
-            });
+            return Err(LexicalError::new(
+                LexicalErrorType::UnicodeError,
+                self.get_pos(),
+            ));
         }
 
-        unicode_names2::character(&name).ok_or(LexicalError {
-            error: LexicalErrorType::UnicodeError,
-            location: start_pos,
-        })
+        unicode_names2::character(&name)
+            .ok_or_else(|| LexicalError::new(LexicalErrorType::UnicodeError, start_pos))
     }
 
     fn parse_escaped_char(&mut self) -> Result<String, LexicalError> {
@@ -159,20 +149,20 @@ impl<'a> StringParser<'a> {
                 'N' if !self.kind.is_bytes() => self.parse_unicode_name()?.to_string(),
                 c => {
                     if self.kind.is_bytes() && !c.is_ascii() {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError(
+                        return Err(LexicalError::new(
+                            LexicalErrorType::OtherError(
                                 "bytes can only contain ASCII literal characters".to_owned(),
                             ),
-                            location: self.get_pos(),
-                        });
+                            self.get_pos(),
+                        ));
                     }
                     format!("\\{c}")
                 }
             }),
-            None => Err(LexicalError {
-                error: LexicalErrorType::StringError,
-                location: self.get_pos(),
-            }),
+            None => Err(LexicalError::new(
+                LexicalErrorType::StringError,
+                self.get_pos(),
+            )),
         }
     }
 
@@ -196,7 +186,7 @@ impl<'a> StringParser<'a> {
                 }
                 '!' if delims.is_empty() && self.peek() != Some(&'=') => {
                     if expression.trim().is_empty() {
-                        return Err(EmptyExpression.to_lexical_error(self.get_pos()));
+                        return Err(FStringError::new(EmptyExpression, self.get_pos()).into());
                     }
 
                     conversion = match self.next_char() {
@@ -204,17 +194,19 @@ impl<'a> StringParser<'a> {
                         Some('a') => ConversionFlag::Ascii,
                         Some('r') => ConversionFlag::Repr,
                         Some(_) => {
-                            return Err(InvalidConversionFlag.to_lexical_error(self.get_pos()));
+                            return Err(
+                                FStringError::new(InvalidConversionFlag, self.get_pos()).into()
+                            );
                         }
                         None => {
-                            return Err(UnclosedLbrace.to_lexical_error(self.get_pos()));
+                            return Err(FStringError::new(UnclosedLbrace, self.get_pos()).into());
                         }
                     };
 
                     match self.peek() {
                         Some('}' | ':') => {}
                         Some(_) | None => {
-                            return Err(UnclosedLbrace.to_lexical_error(self.get_pos()))
+                            return Err(FStringError::new(UnclosedLbrace, self.get_pos()).into());
                         }
                     }
                 }
@@ -243,12 +235,14 @@ impl<'a> StringParser<'a> {
                             expression.push(ch);
                         }
                         Some(c) => {
-                            return Err(
-                                MismatchedDelimiter(c, ')').to_lexical_error(self.get_pos())
-                            );
+                            return Err(FStringError::new(
+                                MismatchedDelimiter(c, ')'),
+                                self.get_pos(),
+                            )
+                            .into());
                         }
                         None => {
-                            return Err(Unmatched(')').to_lexical_error(self.get_pos()));
+                            return Err(FStringError::new(Unmatched(')'), self.get_pos()).into());
                         }
                     }
                 }
@@ -259,12 +253,14 @@ impl<'a> StringParser<'a> {
                             expression.push(ch);
                         }
                         Some(c) => {
-                            return Err(
-                                MismatchedDelimiter(c, ']').to_lexical_error(self.get_pos())
-                            );
+                            return Err(FStringError::new(
+                                MismatchedDelimiter(c, ']'),
+                                self.get_pos(),
+                            )
+                            .into());
                         }
                         None => {
-                            return Err(Unmatched(']').to_lexical_error(self.get_pos()));
+                            return Err(FStringError::new(Unmatched(']'), self.get_pos()).into());
                         }
                     }
                 }
@@ -275,22 +271,28 @@ impl<'a> StringParser<'a> {
                             expression.push(ch);
                         }
                         Some(c) => {
-                            return Err(MismatchedDelimiter(c, '}').to_lexical_error(self.get_pos()))
+                            return Err(FStringError::new(
+                                MismatchedDelimiter(c, '}'),
+                                self.get_pos(),
+                            )
+                            .into());
                         }
                         None => {}
                     }
                 }
                 '}' => {
                     if expression.trim().is_empty() {
-                        return Err(EmptyExpression.to_lexical_error(self.get_pos()));
+                        return Err(FStringError::new(EmptyExpression, self.get_pos()).into());
                     }
 
                     let ret = if !self_documenting {
                         vec![self.expr(ExprKind::FormattedValue {
                             value: Box::new(parse_fstring_expr(&expression, location).map_err(
                                 |e| {
-                                    InvalidExpression(Box::new(e.error))
-                                        .to_lexical_error(self.get_pos())
+                                    FStringError::new(
+                                        InvalidExpression(Box::new(e.error)),
+                                        location,
+                                    )
                                 },
                             )?),
                             conversion: conversion as _,
@@ -309,8 +311,10 @@ impl<'a> StringParser<'a> {
                             self.expr(ExprKind::FormattedValue {
                                 value: Box::new(
                                     parse_fstring_expr(&expression, location).map_err(|e| {
-                                        InvalidExpression(Box::new(e.error))
-                                            .to_lexical_error(self.get_pos())
+                                        FStringError::new(
+                                            InvalidExpression(Box::new(e.error)),
+                                            location,
+                                        )
                                     })?,
                                 ),
                                 conversion: (if conversion == ConversionFlag::None && spec.is_none()
@@ -329,7 +333,7 @@ impl<'a> StringParser<'a> {
                     expression.push(ch);
                     loop {
                         let Some(c) = self.next_char() else {
-                            return Err(UnterminatedString.to_lexical_error(self.get_pos()));
+                            return Err(FStringError::new(UnterminatedString, self.get_pos()).into());
                         };
                         expression.push(c);
                         if c == ch {
@@ -340,10 +344,10 @@ impl<'a> StringParser<'a> {
                 ' ' if self_documenting => {
                     trailing_seq.push(ch);
                 }
-                '\\' => return Err(ExpressionCannotInclude('\\').to_lexical_error(self.get_pos())),
+                '\\' => return Err(FStringError::new(UnterminatedString, self.get_pos()).into()),
                 _ => {
                     if self_documenting {
-                        return Err(UnclosedLbrace.to_lexical_error(self.get_pos()));
+                        return Err(FStringError::new(UnclosedLbrace, self.get_pos()).into());
                     }
 
                     expression.push(ch);
@@ -351,9 +355,9 @@ impl<'a> StringParser<'a> {
             }
         }
         Err(if expression.trim().is_empty() {
-            EmptyExpression.to_lexical_error(self.get_pos())
+            FStringError::new(EmptyExpression, self.get_pos()).into()
         } else {
-            UnclosedLbrace.to_lexical_error(self.get_pos())
+            FStringError::new(UnclosedLbrace, self.get_pos()).into()
         })
     }
 
@@ -393,7 +397,7 @@ impl<'a> StringParser<'a> {
 
     fn parse_fstring(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
         if nested >= 2 {
-            return Err(ExpressionNestedTooDeeply.to_lexical_error(self.get_pos()));
+            return Err(FStringError::new(ExpressionNestedTooDeeply, self.get_pos()).into());
         }
 
         let mut content = String::new();
@@ -410,7 +414,9 @@ impl<'a> StringParser<'a> {
                                 content.push('{');
                                 continue;
                             }
-                            None => return Err(UnclosedLbrace.to_lexical_error(self.get_pos())),
+                            None => {
+                                return Err(FStringError::new(UnclosedLbrace, self.get_pos()).into())
+                            }
                             _ => {}
                         }
                     }
@@ -433,7 +439,7 @@ impl<'a> StringParser<'a> {
                         self.next_char();
                         content.push('}');
                     } else {
-                        return Err(SingleRbrace.to_lexical_error(self.get_pos()));
+                        return Err(FStringError::new(SingleRbrace, self.get_pos()).into());
                     }
                 }
                 '\\' if !self.kind.is_raw() => {
@@ -466,12 +472,12 @@ impl<'a> StringParser<'a> {
                 }
                 ch => {
                     if !ch.is_ascii() {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError(
+                        return Err(LexicalError::new(
+                            LexicalErrorType::OtherError(
                                 "bytes can only contain ASCII literal characters".to_string(),
                             ),
-                            location: self.get_pos(),
-                        });
+                            self.get_pos(),
+                        ));
                     }
                     content.push(ch);
                 }
@@ -534,7 +540,7 @@ pub fn parse_string(
 mod tests {
     use super::*;
 
-    fn parse_fstring(source: &str) -> Result<Vec<Expr>, FStringErrorType> {
+    fn parse_fstring(source: &str) -> Result<Vec<Expr>, LexicalError> {
         StringParser::new(
             source,
             StringKind::FString,
@@ -543,10 +549,6 @@ mod tests {
             Location::new(1, source.len() + 3), // 3 for prefix and quotes
         )
         .parse()
-        .map_err(|e| match e.error {
-            LexicalErrorType::FStringError(e) => e,
-            e => unreachable!("Unexpected error type {:?}", e),
-        })
     }
 
     #[test]
@@ -602,26 +604,39 @@ mod tests {
         insta::assert_debug_snapshot!(parse_ast);
     }
 
+    fn parse_fstring_error(source: &str) -> FStringErrorType {
+        parse_fstring(source)
+            .map_err(|e| match e.error {
+                LexicalErrorType::FStringError(e) => e,
+                e => unreachable!("Expected FStringError: {:?}", e),
+            })
+            .err()
+            .expect("Expected error")
+    }
+
     #[test]
     fn test_parse_invalid_fstring() {
-        assert_eq!(parse_fstring("{5!a"), Err(UnclosedLbrace));
-        assert_eq!(parse_fstring("{5!a1}"), Err(UnclosedLbrace));
-        assert_eq!(parse_fstring("{5!"), Err(UnclosedLbrace));
-        assert_eq!(parse_fstring("abc{!a 'cat'}"), Err(EmptyExpression));
-        assert_eq!(parse_fstring("{!a"), Err(EmptyExpression));
-        assert_eq!(parse_fstring("{ !a}"), Err(EmptyExpression));
+        assert_eq!(parse_fstring_error("{5!a"), UnclosedLbrace);
+        assert_eq!(parse_fstring_error("{5!a1}"), UnclosedLbrace);
+        assert_eq!(parse_fstring_error("{5!"), UnclosedLbrace);
+        assert_eq!(parse_fstring_error("abc{!a 'cat'}"), EmptyExpression);
+        assert_eq!(parse_fstring_error("{!a"), EmptyExpression);
+        assert_eq!(parse_fstring_error("{ !a}"), EmptyExpression);
 
-        assert_eq!(parse_fstring("{5!}"), Err(InvalidConversionFlag));
-        assert_eq!(parse_fstring("{5!x}"), Err(InvalidConversionFlag));
+        assert_eq!(parse_fstring_error("{5!}"), InvalidConversionFlag);
+        assert_eq!(parse_fstring_error("{5!x}"), InvalidConversionFlag);
 
-        assert_eq!(parse_fstring("{a:{a:{b}}}"), Err(ExpressionNestedTooDeeply));
+        assert_eq!(
+            parse_fstring_error("{a:{a:{b}}}"),
+            ExpressionNestedTooDeeply
+        );
 
-        assert_eq!(parse_fstring("{a:b}}"), Err(SingleRbrace));
-        assert_eq!(parse_fstring("}"), Err(SingleRbrace));
-        assert_eq!(parse_fstring("{a:{b}"), Err(UnclosedLbrace));
-        assert_eq!(parse_fstring("{"), Err(UnclosedLbrace));
+        assert_eq!(parse_fstring_error("{a:b}}"), SingleRbrace);
+        assert_eq!(parse_fstring_error("}"), SingleRbrace);
+        assert_eq!(parse_fstring_error("{a:{b}"), UnclosedLbrace);
+        assert_eq!(parse_fstring_error("{"), UnclosedLbrace);
 
-        assert_eq!(parse_fstring("{}"), Err(EmptyExpression));
+        assert_eq!(parse_fstring_error("{}"), EmptyExpression);
 
         // TODO: check for InvalidExpression enum?
         assert!(parse_fstring("{class}").is_err());
