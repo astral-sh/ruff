@@ -125,7 +125,7 @@ impl<'a> StringParser<'a> {
         }
 
         unicode_names2::character(&name)
-            .ok_or(LexicalError::new(LexicalErrorType::UnicodeError, start_pos))
+            .ok_or_else(|| LexicalError::new(LexicalErrorType::UnicodeError, start_pos))
     }
 
     fn parse_escaped_char(&mut self) -> Result<String, LexicalError> {
