@@ -60,6 +60,7 @@ pub struct Settings {
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub task_tags: Vec<String>,
     pub update_check: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -174,6 +175,9 @@ impl Settings {
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
             target_version: config.target_version.unwrap_or_default(),
+            task_tags: config.task_tags.unwrap_or_else(|| {
+                vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()]
+            }),
             update_check: config.update_check.unwrap_or(true),
             // Plugins
             flake8_annotations: config
@@ -257,6 +261,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            task_tags: vec!["TODO".to_string(), "FIXME".to_string()],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
@@ -297,6 +302,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            task_tags: vec!["TODO".to_string()],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
