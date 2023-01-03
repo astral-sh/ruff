@@ -4,10 +4,10 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use crate::checks::CheckCode;
-use crate::checks_gen::CheckCodePrefix;
 use crate::fs;
 use crate::logging::LogLevel;
+use crate::registry::CheckCode;
+use crate::registry_gen::CheckCodePrefix;
 use crate::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };

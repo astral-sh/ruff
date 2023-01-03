@@ -6,9 +6,9 @@ use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
+use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 
@@ -193,8 +193,8 @@ pub fn convert_named_tuple_functional_to_class(
         return;
     };
     match match_defaults(keywords) {
-        Ok(defaults) => {
-            if let Ok(properties) = create_properties_from_args(args, defaults) {
+        Ok(defaults) => match create_properties_from_args(args, defaults) {
+            Ok(properties) => {
                 let mut check = Check::new(
                     CheckKind::ConvertNamedTupleFunctionalToClass(typename.to_string()),
                     Range::from_located(stmt),
@@ -209,7 +209,8 @@ pub fn convert_named_tuple_functional_to_class(
                 }
                 checker.add_check(check);
             }
-        }
+            Err(err) => error!("Failed to create properties: {err}"),
+        },
         Err(err) => error!("Failed to parse defaults: {err}"),
     }
 }

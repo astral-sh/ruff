@@ -12,17 +12,17 @@ use regex::Regex;
 use shellexpand;
 use shellexpand::LookupError;
 
-use crate::checks_gen::CheckCodePrefix;
 use crate::cli::{collect_per_file_ignores, Overrides};
+use crate::registry_gen::CheckCodePrefix;
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, fs, isort, mccabe, pep8_naming, pydocstyle,
-    pyupgrade,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, fs, isort,
+    mccabe, pep8_naming, pydocstyle, pyupgrade,
 };
 
 #[derive(Debug, Default)]
@@ -58,6 +58,7 @@ pub struct Configuration {
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
+    pub flake8_pytest_style: Option<flake8_pytest_style::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
     pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
@@ -154,6 +155,7 @@ impl Configuration {
             flake8_bugbear: options.flake8_bugbear,
             flake8_errmsg: options.flake8_errmsg,
             flake8_import_conventions: options.flake8_import_conventions,
+            flake8_pytest_style: options.flake8_pytest_style,
             flake8_quotes: options.flake8_quotes,
             flake8_tidy_imports: options.flake8_tidy_imports,
             flake8_unused_arguments: options.flake8_unused_arguments,
@@ -215,6 +217,7 @@ impl Configuration {
             flake8_import_conventions: self
                 .flake8_import_conventions
                 .or(config.flake8_import_conventions),
+            flake8_pytest_style: self.flake8_pytest_style.or(config.flake8_pytest_style),
             flake8_quotes: self.flake8_quotes.or(config.flake8_quotes),
             flake8_tidy_imports: self.flake8_tidy_imports.or(config.flake8_tidy_imports),
             flake8_unused_arguments: self

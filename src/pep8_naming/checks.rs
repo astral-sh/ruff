@@ -4,10 +4,10 @@ use rustpython_ast::{Arg, Arguments, Expr, ExprKind, Stmt};
 use crate::ast::function_type;
 use crate::ast::helpers::identifier_range;
 use crate::ast::types::{Range, Scope, ScopeKind};
-use crate::checks::{Check, CheckKind};
 use crate::pep8_naming::helpers;
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 /// N801

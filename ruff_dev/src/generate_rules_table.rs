@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::Args;
 use itertools::Itertools;
-use ruff::checks::{CheckCategory, CheckCode};
+use ruff::registry::{CheckCategory, CheckCode};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;

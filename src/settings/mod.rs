@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use colored::Colorize;
 use globset::{Glob, GlobMatcher, GlobSet};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -14,16 +15,16 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::cache::cache_dir;
-use crate::checks::CheckCode;
-use crate::checks_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
+use crate::registry::{CheckCode, INCOMPATIBLE_CODES};
+use crate::registry_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pydocstyle,
-    pyupgrade,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
+    mccabe, one_time_warning, pep8_naming, pydocstyle, pyupgrade,
 };
 
 pub mod configuration;
@@ -32,7 +33,6 @@ pub mod options;
 pub mod options_base;
 pub mod pyproject;
 pub mod types;
-
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
@@ -64,6 +64,7 @@ pub struct Settings {
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
+    pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
@@ -112,7 +113,13 @@ impl Settings {
             dummy_variable_rgx: config
                 .dummy_variable_rgx
                 .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
-            enabled: resolve_codes(
+            enabled: validate_enabled(resolve_codes(
+                config
+                    .pydocstyle
+                    .as_ref()
+                    .and_then(|pydocstyle| pydocstyle.convention)
+                    .map(|convention| convention.codes())
+                    .unwrap_or_default(),
                 [CheckCodeSpec {
                     select: &config
                         .select
@@ -127,13 +134,14 @@ impl Settings {
                         .zip(config.extend_ignore.iter())
                         .map(|(select, ignore)| CheckCodeSpec { select, ignore }),
                 ),
-            ),
+            )),
             exclude: resolve_globset(config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()))?,
             extend_exclude: resolve_globset(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()),
             fix: config.fix.unwrap_or(false),
             fix_only: config.fix_only.unwrap_or(false),
             fixable: resolve_codes(
+                vec![],
                 [CheckCodeSpec {
                     select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
                     ignore: &config.unfixable.unwrap_or_default(),
@@ -170,6 +178,10 @@ impl Settings {
                 .unwrap_or_default(),
             flake8_import_conventions: config
                 .flake8_import_conventions
+                .map(std::convert::Into::into)
+                .unwrap_or_default(),
+            flake8_pytest_style: config
+                .flake8_pytest_style
                 .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_quotes: config
@@ -234,6 +246,7 @@ impl Settings {
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
+            flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
@@ -272,6 +285,7 @@ impl Settings {
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
+            flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
@@ -330,6 +344,7 @@ impl Hash for Settings {
         self.flake8_bugbear.hash(state);
         self.flake8_errmsg.hash(state);
         self.flake8_import_conventions.hash(state);
+        self.flake8_pytest_style.hash(state);
         self.flake8_quotes.hash(state);
         self.flake8_tidy_imports.hash(state);
         self.flake8_unused_arguments.hash(state);
@@ -377,8 +392,11 @@ struct CheckCodeSpec<'a> {
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// error codes.
-fn resolve_codes<'a>(specs: impl Iterator<Item = CheckCodeSpec<'a>>) -> FxHashSet<CheckCode> {
-    let mut codes: FxHashSet<CheckCode> = FxHashSet::default();
+fn resolve_codes<'a>(
+    baseline: Vec<CheckCode>,
+    specs: impl Iterator<Item = CheckCodeSpec<'a>>,
+) -> FxHashSet<CheckCode> {
+    let mut codes: FxHashSet<CheckCode> = FxHashSet::from_iter(baseline);
     for spec in specs {
         for specificity in [
             SuffixLength::None,
@@ -405,17 +423,33 @@ fn resolve_codes<'a>(specs: impl Iterator<Item = CheckCodeSpec<'a>>) -> FxHashSe
     codes
 }
 
+/// Warn if the set of enabled codes contains any incompatibilities.
+fn validate_enabled(enabled: FxHashSet<CheckCode>) -> FxHashSet<CheckCode> {
+    for (a, b, message) in INCOMPATIBLE_CODES {
+        if enabled.contains(a) && enabled.contains(b) {
+            one_time_warning!(
+                "{}{} {}",
+                "warning".yellow().bold(),
+                ":".bold(),
+                message.bold()
+            );
+        }
+    }
+    enabled
+}
+
 #[cfg(test)]
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::checks::CheckCode;
-    use crate::checks_gen::CheckCodePrefix;
+    use crate::registry::CheckCode;
+    use crate::registry_gen::CheckCodePrefix;
     use crate::settings::{resolve_codes, CheckCodeSpec};
 
     #[test]
     fn check_codes() {
         let actual = resolve_codes(
+            vec![],
             [CheckCodeSpec {
                 select: &[CheckCodePrefix::W],
                 ignore: &[],
@@ -426,6 +460,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [CheckCodeSpec {
                 select: &[CheckCodePrefix::W6],
                 ignore: &[],
@@ -436,6 +471,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [CheckCodeSpec {
                 select: &[CheckCodePrefix::W],
                 ignore: &[CheckCodePrefix::W292],
@@ -446,6 +482,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [CheckCodeSpec {
                 select: &[CheckCodePrefix::W605],
                 ignore: &[CheckCodePrefix::W605],
@@ -456,6 +493,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [
                 CheckCodeSpec {
                     select: &[CheckCodePrefix::W],
@@ -472,6 +510,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
+            vec![],
             [
                 CheckCodeSpec {
                     select: &[CheckCodePrefix::W],

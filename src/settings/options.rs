@@ -5,12 +5,12 @@ use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::checks_gen::CheckCodePrefix;
+use crate::registry_gen::CheckCodePrefix;
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pydocstyle,
-    pyupgrade,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
+    mccabe, pep8_naming, pydocstyle, pyupgrade,
 };
 
 #[derive(
@@ -365,6 +365,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `flake8-import-conventions` plugin.
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
+    #[option_group]
+    /// Options for the `flake8-pytest-style` plugin.
+    pub flake8_pytest_style: Option<flake8_pytest_style::settings::Options>,
     #[option_group]
     /// Options for the `flake8-unused-arguments` plugin.
     pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,

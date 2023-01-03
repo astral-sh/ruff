@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// B026
 pub fn star_arg_unpacking_after_keyword_arg(

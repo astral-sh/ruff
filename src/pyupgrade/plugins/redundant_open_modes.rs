@@ -10,7 +10,7 @@ use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 const OPEN_FUNC_NAME: &str = "open";

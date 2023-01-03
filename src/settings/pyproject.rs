@@ -129,16 +129,16 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes::settings::Quote;
     use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
+    use crate::registry_gen::CheckCodePrefix;
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
     use crate::{
-        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-        flake8_tidy_imports, mccabe, pep8_naming,
+        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
+        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
     };
 
     #[test]
@@ -192,6 +192,7 @@ mod tests {
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -245,6 +246,7 @@ line-length = 79
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -298,6 +300,7 @@ exclude = ["foo.py"]
                     flake8_annotations: None,
                     flake8_errmsg: None,
                     flake8_bugbear: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -351,6 +354,7 @@ select = ["E501"]
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -405,6 +409,7 @@ ignore = ["E501"]
                     flake8_annotations: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -506,6 +511,27 @@ other-attribute = 1
                 }),
                 flake8_errmsg: Some(flake8_errmsg::settings::Options {
                     max_string_length: Some(20),
+                }),
+                flake8_pytest_style: Some(flake8_pytest_style::settings::Options {
+                    fixture_parentheses: Some(false),
+                    parametrize_names_type: Some(
+                        flake8_pytest_style::types::ParametrizeNameType::CSV
+                    ),
+                    parametrize_values_type: Some(
+                        flake8_pytest_style::types::ParametrizeValuesType::Tuple,
+                    ),
+                    parametrize_values_row_type: Some(
+                        flake8_pytest_style::types::ParametrizeValuesRowType::List,
+                    ),
+                    raises_require_match_for: Some(vec![
+                        "Exception".to_string(),
+                        "TypeError".to_string(),
+                        "KeyError".to_string(),
+                    ]),
+                    raises_extend_require_match_for: Some(vec![
+                        "requests.RequestException".to_string(),
+                    ]),
+                    mark_parentheses: Some(false),
                 }),
                 flake8_quotes: Some(flake8_quotes::settings::Options {
                     inline_quotes: Some(Quote::Single),

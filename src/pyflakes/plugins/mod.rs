@@ -1,4 +1,5 @@
 pub use assert_tuple::assert_tuple;
+pub use f_string_missing_placeholders::f_string_missing_placeholders;
 pub use if_tuple::if_tuple;
 pub use invalid_literal_comparisons::invalid_literal_comparison;
 pub use invalid_print_syntax::invalid_print_syntax;
@@ -13,6 +14,7 @@ pub(crate) use strings::{
 };
 
 mod assert_tuple;
+mod f_string_missing_placeholders;
 mod if_tuple;
 mod invalid_literal_comparisons;
 mod invalid_print_syntax;

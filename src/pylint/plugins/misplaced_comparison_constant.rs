@@ -3,7 +3,7 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::CheckKind;
+use crate::registry::CheckKind;
 use crate::Check;
 
 /// PLC2201

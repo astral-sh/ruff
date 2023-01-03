@@ -10,7 +10,7 @@ use anyhow::{ensure, Result};
 use clap::Parser;
 use codegen::{Scope, Type, Variant};
 use itertools::Itertools;
-use ruff::checks::{CheckCode, PREFIX_REDIRECTS};
+use ruff::registry::{CheckCode, PREFIX_REDIRECTS};
 use strum::IntoEnumIterator;
 
 const ALL: &str = "ALL";
@@ -19,7 +19,7 @@ const ALL: &str = "ALL";
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     /// Write the generated source code to stdout (rather than to
-    /// `src/checks_gen.rs`).
+    /// `src/registry_gen.rs`).
     #[arg(long)]
     pub(crate) dry_run: bool,
 }
@@ -172,7 +172,7 @@ pub fn main(cli: &Cli) -> Result<()> {
     output.push_str("use strum_macros::{AsRefStr, EnumString};");
     output.push('\n');
     output.push('\n');
-    output.push_str("use crate::checks::CheckCode;");
+    output.push_str("use crate::registry::CheckCode;");
     output.push('\n');
     output.push_str("use crate::one_time_warning;");
     output.push('\n');
@@ -204,14 +204,14 @@ pub fn main(cli: &Cli) -> Result<()> {
     let Output { status, stdout, .. } = rustfmt.wait_with_output()?;
     ensure!(status.success(), "rustfmt failed with {status}");
 
-    // Write the output to `src/checks_gen.rs` (or stdout).
+    // Write the output to `src/registry_gen.rs` (or stdout).
     if cli.dry_run {
         println!("{}", String::from_utf8(stdout)?);
     } else {
         let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("Failed to find root directory")
-            .join("src/checks_gen.rs");
+            .join("src/registry_gen.rs");
         if fs::read(&file).map_or(true, |old| old != stdout) {
             fs::write(&file, stdout)?;
         }

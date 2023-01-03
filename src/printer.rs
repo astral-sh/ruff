@@ -11,11 +11,11 @@ use serde::Serialize;
 use serde_json::json;
 
 use crate::autofix::fixer;
-use crate::checks::CheckCode;
 use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
+use crate::registry::CheckCode;
 use crate::settings::types::SerializationFormat;
 use crate::tell_user;
 

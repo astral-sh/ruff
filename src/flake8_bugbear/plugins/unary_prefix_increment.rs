@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind, Unaryop};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// B002
 pub fn unary_prefix_increment(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {

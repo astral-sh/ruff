@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// B905
 pub fn zip_without_explicit_strict(

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

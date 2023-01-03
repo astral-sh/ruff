@@ -11,7 +11,7 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::helpers::trailing_comma;
-use crate::isort::sorting::{cmp_import_froms, cmp_members, cmp_modules};
+use crate::isort::sorting::{cmp_import_from, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
@@ -483,7 +483,7 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
             })
             .sorted_by(
                 |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
-                    cmp_import_froms(import_from1, import_from2).then_with(|| {
+                    cmp_import_from(import_from1, import_from2).then_with(|| {
                         match (aliases1.first(), aliases2.first()) {
                             (None, None) => Ordering::Equal,
                             (None, Some(_)) => Ordering::Less,
@@ -644,13 +644,13 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::{isort, Settings};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
-    #[test_case(Path::new("combine_import_froms.py"))]
+    #[test_case(Path::new("combine_import_from.py"))]
     #[test_case(Path::new("comments.py"))]
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]

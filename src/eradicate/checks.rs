@@ -2,8 +2,8 @@ use rustpython_ast::Location;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks::{CheckCode, CheckKind};
 use crate::eradicate::detection::comment_contains_code;
+use crate::registry::{CheckCode, CheckKind};
 use crate::settings::flags;
 use crate::{Check, Settings, SourceCodeLocator};
 

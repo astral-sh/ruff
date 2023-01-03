@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 /// BLE001
 pub fn blind_except(

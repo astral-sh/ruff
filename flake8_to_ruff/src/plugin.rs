@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use ruff::checks_gen::CheckCodePrefix;
+use ruff::registry_gen::CheckCodePrefix;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
@@ -20,6 +20,7 @@ pub enum Plugin {
     Flake8ErrMsg,
     Flake8ImplicitStrConcat,
     Flake8Print,
+    Flake8PytestStyle,
     Flake8Quotes,
     Flake8Return,
     Flake8Simplify,
@@ -48,6 +49,7 @@ impl FromStr for Plugin {
             "flake8-errmsg" => Ok(Plugin::Flake8ErrMsg),
             "flake8-implicit-str-concat" => Ok(Plugin::Flake8ImplicitStrConcat),
             "flake8-print" => Ok(Plugin::Flake8Print),
+            "flake8-pytest-style" => Ok(Plugin::Flake8PytestStyle),
             "flake8-quotes" => Ok(Plugin::Flake8Quotes),
             "flake8-return" => Ok(Plugin::Flake8Return),
             "flake8-simplify" => Ok(Plugin::Flake8Simplify),
@@ -80,6 +82,7 @@ impl fmt::Debug for Plugin {
                 Plugin::Flake8ErrMsg => "flake8-errmsg",
                 Plugin::Flake8ImplicitStrConcat => "flake8-implicit-str-concat",
                 Plugin::Flake8Print => "flake8-print",
+                Plugin::Flake8PytestStyle => "flake8-pytest-style",
                 Plugin::Flake8Quotes => "flake8-quotes",
                 Plugin::Flake8Return => "flake8-return",
                 Plugin::Flake8Simplify => "flake8-simplify",
@@ -111,6 +114,7 @@ impl Plugin {
             Plugin::Flake8ErrMsg => CheckCodePrefix::EM,
             Plugin::Flake8ImplicitStrConcat => CheckCodePrefix::ISC,
             Plugin::Flake8Print => CheckCodePrefix::T2,
+            Plugin::Flake8PytestStyle => CheckCodePrefix::PT,
             Plugin::Flake8Quotes => CheckCodePrefix::Q,
             Plugin::Flake8Return => CheckCodePrefix::RET,
             Plugin::Flake8Simplify => CheckCodePrefix::SIM,
@@ -145,13 +149,14 @@ impl Plugin {
                         }
                     }
                 }
-                // Default to PEP8.
-                DocstringConvention::PEP8.select()
+                // Default to PEP257.
+                DocstringConvention::Pep257.select()
             }
             Plugin::Flake8Eradicate => vec![CheckCodePrefix::ERA],
             Plugin::Flake8ErrMsg => vec![CheckCodePrefix::EM],
             Plugin::Flake8ImplicitStrConcat => vec![CheckCodePrefix::ISC],
             Plugin::Flake8Print => vec![CheckCodePrefix::T2],
+            Plugin::Flake8PytestStyle => vec![CheckCodePrefix::PT],
             Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
             Plugin::Flake8Return => vec![CheckCodePrefix::RET],
             Plugin::Flake8Simplify => vec![CheckCodePrefix::SIM],
@@ -166,8 +171,8 @@ impl Plugin {
 
 pub enum DocstringConvention {
     All,
-    PEP8,
-    NumPy,
+    Pep257,
+    Numpy,
     Google,
 }
 
@@ -177,8 +182,8 @@ impl FromStr for DocstringConvention {
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         match string {
             "all" => Ok(DocstringConvention::All),
-            "pep8" => Ok(DocstringConvention::PEP8),
-            "numpy" => Ok(DocstringConvention::NumPy),
+            "pep257" => Ok(DocstringConvention::Pep257),
+            "numpy" => Ok(DocstringConvention::Numpy),
             "google" => Ok(DocstringConvention::Google),
             _ => Err(anyhow!("Unknown docstring convention: {string}")),
         }
@@ -189,151 +194,14 @@ impl DocstringConvention {
     fn select(&self) -> Vec<CheckCodePrefix> {
         match self {
             DocstringConvention::All => vec![CheckCodePrefix::D],
-            DocstringConvention::PEP8 => vec![
-                // All errors except D203, D212, D213, D214, D215, D404, D405, D406, D407, D408,
-                // D409, D410, D411, D413, D415, D416 and D417.
-                CheckCodePrefix::D100,
-                CheckCodePrefix::D101,
-                CheckCodePrefix::D102,
-                CheckCodePrefix::D103,
-                CheckCodePrefix::D104,
-                CheckCodePrefix::D105,
-                CheckCodePrefix::D106,
-                CheckCodePrefix::D107,
-                CheckCodePrefix::D200,
-                CheckCodePrefix::D201,
-                CheckCodePrefix::D202,
-                // CheckCodePrefix::D203,
-                CheckCodePrefix::D204,
-                CheckCodePrefix::D205,
-                CheckCodePrefix::D206,
-                CheckCodePrefix::D207,
-                CheckCodePrefix::D208,
-                CheckCodePrefix::D209,
-                CheckCodePrefix::D210,
-                CheckCodePrefix::D211,
-                // CheckCodePrefix::D212,
-                // CheckCodePrefix::D213,
-                // CheckCodePrefix::D214,
-                // CheckCodePrefix::D215,
-                CheckCodePrefix::D300,
-                CheckCodePrefix::D301,
-                CheckCodePrefix::D400,
-                CheckCodePrefix::D402,
-                CheckCodePrefix::D403,
-                // CheckCodePrefix::D404,
-                // CheckCodePrefix::D405,
-                // CheckCodePrefix::D406,
-                // CheckCodePrefix::D407,
-                // CheckCodePrefix::D408,
-                // CheckCodePrefix::D409,
-                // CheckCodePrefix::D410,
-                // CheckCodePrefix::D411,
-                CheckCodePrefix::D412,
-                // CheckCodePrefix::D413,
-                CheckCodePrefix::D414,
-                // CheckCodePrefix::D415,
-                // CheckCodePrefix::D416,
-                // CheckCodePrefix::D417,
-                CheckCodePrefix::D418,
-                CheckCodePrefix::D419,
+            DocstringConvention::Pep257 => vec![
+                // Covered by the `convention` setting.
             ],
-            DocstringConvention::NumPy => vec![
-                // All errors except D107, D203, D212, D213, D402, D413, D415, D416, and D417.
-                CheckCodePrefix::D100,
-                CheckCodePrefix::D101,
-                CheckCodePrefix::D102,
-                CheckCodePrefix::D103,
-                CheckCodePrefix::D104,
-                CheckCodePrefix::D105,
-                CheckCodePrefix::D106,
-                // CheckCodePrefix::D107,
-                CheckCodePrefix::D200,
-                CheckCodePrefix::D201,
-                CheckCodePrefix::D202,
-                // CheckCodePrefix::D203,
-                CheckCodePrefix::D204,
-                CheckCodePrefix::D205,
-                CheckCodePrefix::D206,
-                CheckCodePrefix::D207,
-                CheckCodePrefix::D208,
-                CheckCodePrefix::D209,
-                CheckCodePrefix::D210,
-                CheckCodePrefix::D211,
-                // CheckCodePrefix::D212,
-                // CheckCodePrefix::D213,
-                CheckCodePrefix::D214,
-                CheckCodePrefix::D215,
-                CheckCodePrefix::D300,
-                CheckCodePrefix::D301,
-                CheckCodePrefix::D400,
-                // CheckCodePrefix::D402,
-                CheckCodePrefix::D403,
-                CheckCodePrefix::D404,
-                CheckCodePrefix::D405,
-                CheckCodePrefix::D406,
-                CheckCodePrefix::D407,
-                CheckCodePrefix::D408,
-                CheckCodePrefix::D409,
-                CheckCodePrefix::D410,
-                CheckCodePrefix::D411,
-                CheckCodePrefix::D412,
-                // CheckCodePrefix::D413,
-                CheckCodePrefix::D414,
-                // CheckCodePrefix::D415,
-                // CheckCodePrefix::D416,
-                // CheckCodePrefix::D417,
-                CheckCodePrefix::D418,
-                CheckCodePrefix::D419,
+            DocstringConvention::Numpy => vec![
+                // Covered by the `convention` setting.
             ],
             DocstringConvention::Google => vec![
-                // All errors except D203, D204, D213, D215, D400, D401, D404, D406, D407, D408,
-                // D409 and D413.
-                CheckCodePrefix::D100,
-                CheckCodePrefix::D101,
-                CheckCodePrefix::D102,
-                CheckCodePrefix::D103,
-                CheckCodePrefix::D104,
-                CheckCodePrefix::D105,
-                CheckCodePrefix::D106,
-                CheckCodePrefix::D107,
-                CheckCodePrefix::D200,
-                CheckCodePrefix::D201,
-                CheckCodePrefix::D202,
-                // CheckCodePrefix::D203,
-                // CheckCodePrefix::D204,
-                CheckCodePrefix::D205,
-                CheckCodePrefix::D206,
-                CheckCodePrefix::D207,
-                CheckCodePrefix::D208,
-                CheckCodePrefix::D209,
-                CheckCodePrefix::D210,
-                CheckCodePrefix::D211,
-                CheckCodePrefix::D212,
-                // CheckCodePrefix::D213,
-                CheckCodePrefix::D214,
-                // CheckCodePrefix::D215,
-                CheckCodePrefix::D300,
-                CheckCodePrefix::D301,
-                // CheckCodePrefix::D400,
-                CheckCodePrefix::D402,
-                CheckCodePrefix::D403,
-                // CheckCodePrefix::D404,
-                CheckCodePrefix::D405,
-                // CheckCodePrefix::D406,
-                // CheckCodePrefix::D407,
-                // CheckCodePrefix::D408,
-                // CheckCodePrefix::D409,
-                CheckCodePrefix::D410,
-                CheckCodePrefix::D411,
-                CheckCodePrefix::D412,
-                // CheckCodePrefix::D413,
-                CheckCodePrefix::D414,
-                CheckCodePrefix::D415,
-                CheckCodePrefix::D416,
-                CheckCodePrefix::D417,
-                CheckCodePrefix::D418,
-                CheckCodePrefix::D419,
+                // Covered by the `convention` setting.
             ],
         }
     }
@@ -393,6 +261,25 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
             }
             "eradicate-whitelist-extend" | "eradicate_whitelist_extend" => {
                 plugins.insert(Plugin::Flake8Eradicate);
+            }
+            // flake8-pytest-style
+            "pytest-fixture-no-parentheses" | "pytest_fixture_no_parentheses " => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-parametrize-names-type" | "pytest_parametrize_names_type" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-parametrize-values-type" | "pytest_parametrize_values_type" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-parametrize-values-row-type" | "pytest_parametrize_values_row_type" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-raises-require-match-for" | "pytest_raises_require_match_for" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
+            }
+            "pytest-mark-no-parentheses" | "pytest_mark_no_parentheses" => {
+                plugins.insert(Plugin::Flake8PytestStyle);
             }
             // flake8-quotes
             "quotes" | "inline-quotes" | "inline_quotes" => {
@@ -485,7 +372,7 @@ pub fn resolve_select(
     plugins: &[Plugin],
 ) -> BTreeSet<CheckCodePrefix> {
     // Include default Pyflakes and pycodestyle checks.
-    let mut select = BTreeSet::from([CheckCodePrefix::E, CheckCodePrefix::F, CheckCodePrefix::W]);
+    let mut select = BTreeSet::from([CheckCodePrefix::F, CheckCodePrefix::E, CheckCodePrefix::W]);
 
     // Add prefix codes for every plugin.
     for plugin in plugins {

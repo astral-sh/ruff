@@ -10,8 +10,8 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::settings;
     #[test_case(CheckCode::RUF004, Path::new("RUF004.py"); "RUF004")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {

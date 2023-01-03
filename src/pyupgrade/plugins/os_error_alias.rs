@@ -7,7 +7,7 @@ use crate::ast::helpers::{compose_call_path, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 const ERROR_NAMES: &[&str] = &["EnvironmentError", "IOError", "WindowsError"];
 const ERROR_MODULES: &[&str] = &["mmap", "select", "socket"];
@@ -77,7 +77,7 @@ fn handle_name_or_attribute(
     }
 }
 
-/// Handles one block of an except (use a loop if there are multile blocks)
+/// Handles one block of an except (use a loop if there are multiple blocks)
 fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKind>) {
     let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
     let Some(error_handlers) = type_.as_ref() else {

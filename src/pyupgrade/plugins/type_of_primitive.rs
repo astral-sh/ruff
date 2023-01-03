@@ -3,8 +3,8 @@ use rustpython_ast::Expr;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::CheckKind;
 use crate::pyupgrade::checks;
+use crate::registry::CheckKind;
 
 /// UP003
 pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {

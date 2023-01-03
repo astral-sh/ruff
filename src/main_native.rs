@@ -29,8 +29,10 @@ use ::ruff::settings::{pyproject, Settings};
 use ::ruff::updates;
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
+use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
+use ruff::one_time_warning;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
@@ -172,13 +174,35 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     };
     let cache = !cli.no_cache;
 
+    #[cfg(debug_assertions)]
+    if cache {
+        // `--no-cache` doesn't respect code changes, and so is often confusing during
+        // development.
+        one_time_warning!(
+            "{}{} {}",
+            "warning".yellow().bold(),
+            ":".bold(),
+            "debug build without --no-cache.".bold()
+        );
+    }
+
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
     if cli.watch {
         if !matches!(autofix, fixer::Mode::None) {
-            eprintln!("Warning: --fix is not enabled in watch mode.");
+            one_time_warning!(
+                "{}{} {}",
+                "warning".yellow().bold(),
+                ":".bold(),
+                "--fix is not enabled in watch mode.".bold()
+            );
         }
         if format != SerializationFormat::Text {
-            eprintln!("Warning: --format 'text' is used in watch mode.");
+            one_time_warning!(
+                "{}{} {}",
+                "warning".yellow().bold(),
+                ":".bold(),
+                "--format 'text' is used in watch mode.".bold()
+            );
         }
 
         // Perform an initial run instantly.

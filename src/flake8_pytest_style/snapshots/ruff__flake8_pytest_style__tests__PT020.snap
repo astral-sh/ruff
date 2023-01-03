@@ -1,0 +1,23 @@
+---
+source: src/flake8_pytest_style/mod.rs
+expression: checks
+---
+- kind: DeprecatedYieldFixture
+  location:
+    row: 14
+    column: 1
+  end_location:
+    row: 14
+    column: 23
+  fix: ~
+  parent: ~
+- kind: DeprecatedYieldFixture
+  location:
+    row: 19
+    column: 1
+  end_location:
+    row: 19
+    column: 21
+  fix: ~
+  parent: ~
+

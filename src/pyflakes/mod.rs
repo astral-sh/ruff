@@ -15,9 +15,9 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
-    use crate::checks::CheckCode;
-    use crate::checks_gen::CheckCodePrefix;
     use crate::linter::{check_path, test_path};
+    use crate::registry::CheckCode;
+    use crate::registry_gen::CheckCodePrefix;
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::source_code_style::SourceCodeStyleDetector;
@@ -102,6 +102,7 @@ mod tests {
     #[test_case(CheckCode::F823, Path::new("F823.py"); "F823")]
     #[test_case(CheckCode::F841, Path::new("F841_0.py"); "F841_0")]
     #[test_case(CheckCode::F841, Path::new("F841_1.py"); "F841_1")]
+    #[test_case(CheckCode::F841, Path::new("F841_2.py"); "F841_2")]
     #[test_case(CheckCode::F842, Path::new("F842.py"); "F842")]
     #[test_case(CheckCode::F901, Path::new("F901.py"); "F901")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {

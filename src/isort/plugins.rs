@@ -9,9 +9,9 @@ use crate::ast::helpers::{
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
-use crate::checks::CheckKind;
 use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
+use crate::registry::CheckKind;
 use crate::settings::flags;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{Check, Settings, SourceCodeLocator};

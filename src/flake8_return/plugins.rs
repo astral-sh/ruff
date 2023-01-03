@@ -6,9 +6,9 @@ use crate::ast::visitor::Visitor;
 use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Branch, CheckCode, CheckKind};
 use crate::flake8_return::helpers::result_exists;
 use crate::flake8_return::visitor::{ReturnVisitor, Stack};
+use crate::registry::{Branch, CheckCode, CheckKind};
 use crate::Check;
 
 /// RET501

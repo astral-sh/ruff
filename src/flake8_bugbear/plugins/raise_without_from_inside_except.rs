@@ -3,8 +3,8 @@ use rustpython_ast::{ExprKind, Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
 use crate::python::string::is_lower;
+use crate::registry::{Check, CheckKind};
 
 struct RaiseVisitor {
     checks: Vec<Check>,

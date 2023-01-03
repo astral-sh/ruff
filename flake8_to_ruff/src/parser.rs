@@ -3,8 +3,8 @@ use std::str::FromStr;
 use anyhow::{bail, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff::checks::PREFIX_REDIRECTS;
-use ruff::checks_gen::CheckCodePrefix;
+use ruff::registry::PREFIX_REDIRECTS;
+use ruff::registry_gen::CheckCodePrefix;
 use ruff::settings::types::PatternPrefixPair;
 use rustc_hash::FxHashMap;
 
@@ -201,7 +201,7 @@ pub fn collect_per_file_ignores(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff::checks_gen::CheckCodePrefix;
+    use ruff::registry_gen::CheckCodePrefix;
     use ruff::settings::types::PatternPrefixPair;
 
     use crate::parser::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};

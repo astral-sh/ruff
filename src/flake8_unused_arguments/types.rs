@@ -1,4 +1,4 @@
-use crate::checks::{CheckCode, CheckKind};
+use crate::registry::{CheckCode, CheckKind};
 
 /// An AST node that can contain arguments.
 pub enum Argumentable {

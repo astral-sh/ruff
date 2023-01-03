@@ -7,6 +7,7 @@ use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Located, Location};
+use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -23,26 +24,25 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
-use crate::checks::{Check, CheckCode, CheckKind, DeferralKeyword};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::noqa::Directive;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::python::typing::SubscriptKind;
+use crate::registry::{Check, CheckCode, CheckKind, DeferralKeyword};
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::vendor::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
     flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_print, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_unused_arguments,
-    mccabe, noqa, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
-    pyupgrade, ruff, visibility,
+    flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
+    flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -282,15 +282,9 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    self.add_checks(
-                        names
-                            .iter()
-                            .zip(ranges.iter())
-                            .filter_map(|(name, range)| {
-                                pycodestyle::checks::ambiguous_variable_name(name, *range)
-                            })
-                            .into_iter(),
-                    );
+                    self.add_checks(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                        pycodestyle::checks::ambiguous_variable_name(name, *range)
+                    }));
                 }
             }
             StmtKind::Nonlocal { names } => {
@@ -335,15 +329,9 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    self.add_checks(
-                        names
-                            .iter()
-                            .zip(ranges.iter())
-                            .filter_map(|(name, range)| {
-                                pycodestyle::checks::ambiguous_variable_name(name, *range)
-                            })
-                            .into_iter(),
-                    );
+                    self.add_checks(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                        pycodestyle::checks::ambiguous_variable_name(name, *range)
+                    }));
                 }
             }
             StmtKind::Break => {
@@ -490,6 +478,40 @@ where
                     pylint::plugins::property_with_parameters(self, stmt, decorator_list, args);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::PT001)
+                    || self.settings.enabled.contains(&CheckCode::PT002)
+                    || self.settings.enabled.contains(&CheckCode::PT003)
+                    || self.settings.enabled.contains(&CheckCode::PT004)
+                    || self.settings.enabled.contains(&CheckCode::PT005)
+                    || self.settings.enabled.contains(&CheckCode::PT019)
+                    || self.settings.enabled.contains(&CheckCode::PT020)
+                    || self.settings.enabled.contains(&CheckCode::PT021)
+                    || self.settings.enabled.contains(&CheckCode::PT022)
+                    || self.settings.enabled.contains(&CheckCode::PT024)
+                    || self.settings.enabled.contains(&CheckCode::PT025)
+                {
+                    flake8_pytest_style::plugins::fixture(
+                        self,
+                        stmt,
+                        name,
+                        args,
+                        decorator_list,
+                        body,
+                    );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT006)
+                    || self.settings.enabled.contains(&CheckCode::PT007)
+                {
+                    flake8_pytest_style::plugins::parametrize(self, decorator_list);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT023)
+                    || self.settings.enabled.contains(&CheckCode::PT026)
+                {
+                    flake8_pytest_style::plugins::marks(self, decorator_list);
+                }
+
                 self.check_builtin_shadowing(name, stmt, true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be
@@ -606,6 +628,14 @@ where
                     flake8_bugbear::plugins::abstract_base_class(
                         self, stmt, name, bases, keywords, body,
                     );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT023) {
+                    flake8_pytest_style::plugins::marks(self, decorator_list);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PIE794) {
+                    flake8_pie::plugins::dupe_class_field_definitions(self, bases, body);
                 }
 
                 self.check_builtin_shadowing(name, stmt, false);
@@ -815,6 +845,16 @@ where
                             self.add_check(check);
                         }
                     }
+
+                    if self.settings.enabled.contains(&CheckCode::PT013) {
+                        if let Some(check) = flake8_pytest_style::plugins::import(
+                            stmt,
+                            &alias.node.name,
+                            alias.node.asname.as_deref(),
+                        ) {
+                            self.add_check(check);
+                        }
+                    }
                 }
             }
             StmtKind::ImportFrom {
@@ -877,6 +917,14 @@ where
                         ) {
                             self.add_check(check);
                         }
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT013) {
+                    if let Some(check) =
+                        flake8_pytest_style::plugins::import_from(stmt, module, level)
+                    {
+                        self.add_check(check);
                     }
                 }
 
@@ -1140,10 +1188,25 @@ where
                 if self.settings.enabled.contains(&CheckCode::S101) {
                     self.add_check(flake8_bandit::plugins::assert_used(stmt));
                 }
+                if self.settings.enabled.contains(&CheckCode::PT015) {
+                    if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::PT018) {
+                    if let Some(check) =
+                        flake8_pytest_style::plugins::composite_condition(stmt, test)
+                    {
+                        self.add_check(check);
+                    }
+                }
             }
-            StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
+            StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
                 if self.settings.enabled.contains(&CheckCode::B017) {
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
+                }
+                if self.settings.enabled.contains(&CheckCode::PT012) {
+                    flake8_pytest_style::plugins::complex_raises(self, stmt, items, body);
                 }
             }
             StmtKind::While { body, orelse, .. } => {
@@ -1202,6 +1265,12 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::UP024) {
                     pyupgrade::plugins::os_error_alias(self, handlers);
+                }
+                if self.settings.enabled.contains(&CheckCode::PT017) {
+                    self.add_checks(
+                        flake8_pytest_style::plugins::assert_in_exception_handler(handlers)
+                            .into_iter(),
+                    );
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -1383,9 +1452,7 @@ where
                     globals,
                 })));
 
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(body);
             }
             StmtKind::Try {
                 body,
@@ -1397,19 +1464,13 @@ where
                 if self.settings.enabled.contains(&CheckCode::B012) {
                     flake8_bugbear::plugins::jump_statement_in_finally(self, finalbody);
                 }
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(body);
                 self.except_handlers.pop();
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
-                }
-                for stmt in finalbody {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(orelse);
+                self.visit_body(finalbody);
             }
             StmtKind::AnnAssign {
                 target,
@@ -1502,12 +1563,12 @@ where
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...]
                 if !self.in_deferred_string_type_definition
+                    && self.in_annotation
                     && self.settings.enabled.contains(&CheckCode::UP007)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && !self.settings.pyupgrade.keep_runtime_typing
-                            && self.annotations_future_enabled
-                            && self.in_annotation))
+                            && self.annotations_future_enabled))
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
@@ -1682,7 +1743,7 @@ where
                                         if self.settings.enabled.contains(&CheckCode::F521) {
                                             self.add_check(Check::new(
                                                 CheckKind::StringDotFormatInvalidFormat(
-                                                    e.to_string(),
+                                                    pyflakes::format::error_to_string(&e),
                                                 ),
                                                 location,
                                             ));
@@ -2138,6 +2199,30 @@ where
                     pylint::plugins::use_sys_exit(self, func);
                 }
 
+                // flake8-pytest-style
+                if self.settings.enabled.contains(&CheckCode::PT008) {
+                    if let Some(check) =
+                        flake8_pytest_style::plugins::patch_with_lambda(func, args, keywords)
+                    {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::PT009) {
+                    if let Some(check) = flake8_pytest_style::plugins::unittest_assertion(func) {
+                        self.add_check(check);
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT010)
+                    || self.settings.enabled.contains(&CheckCode::PT011)
+                {
+                    flake8_pytest_style::plugins::raises_call(self, func, args, keywords);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT016) {
+                    flake8_pytest_style::plugins::fail_call(self, func, args, keywords);
+                }
+
                 // ruff
                 if self.settings.enabled.contains(&CheckCode::RUF004) {
                     self.add_checks(
@@ -2198,15 +2283,7 @@ where
             }
             ExprKind::JoinedStr { values } => {
                 if self.settings.enabled.contains(&CheckCode::F541) {
-                    if !values
-                        .iter()
-                        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
-                    {
-                        self.add_check(Check::new(
-                            CheckKind::FStringMissingPlaceholders,
-                            Range::from_located(expr),
-                        ));
-                    }
+                    pyflakes::plugins::f_string_missing_placeholders(expr, values, self);
                 }
             }
             ExprKind::BinOp {
@@ -2435,6 +2512,10 @@ where
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
+                if self.settings.enabled.contains(&CheckCode::PIE807) {
+                    flake8_pie::plugins::prefer_list_builtin(self, expr);
+                }
+
                 // Visit the arguments, but avoid the body, which will be deferred.
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
@@ -2496,6 +2577,12 @@ where
             ExprKind::BoolOp { op, values } => {
                 if self.settings.enabled.contains(&CheckCode::PLR1701) {
                     pylint::plugins::merge_isinstance(self, expr, op, values);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM222) {
+                    flake8_simplify::plugins::or_true(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM223) {
+                    flake8_simplify::plugins::and_false(self, expr);
                 }
             }
             _ => {}
@@ -2905,6 +2992,13 @@ where
 
         self.check_builtin_arg_shadowing(&arg.node.arg, arg);
     }
+
+    fn visit_body(&mut self, body: &'b [Stmt]) {
+        if self.settings.enabled.contains(&CheckCode::PIE790) {
+            flake8_pie::plugins::no_unnecessary_pass(self, body);
+        }
+        visitor::walk_body(self, body);
+    }
 }
 
 impl<'a> Checker<'a> {
@@ -3082,7 +3176,7 @@ impl<'a> Checker<'a> {
             }
         }
 
-        // If we're about to lose the binding, store it as overriden.
+        // If we're about to lose the binding, store it as overridden.
         if let Some((scope_index, binding_index)) = overridden {
             self.scopes[scope_index]
                 .overridden
@@ -3482,9 +3576,7 @@ impl<'a> Checker<'a> {
                 StmtKind::FunctionDef { body, args, .. }
                 | StmtKind::AsyncFunctionDef { body, args, .. } => {
                     self.visit_arguments(args);
-                    for stmt in body {
-                        self.visit_stmt(stmt);
-                    }
+                    self.visit_body(body);
                 }
                 _ => unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef"),
             }
