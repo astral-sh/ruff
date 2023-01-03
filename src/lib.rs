@@ -91,3 +91,4 @@ cfg_if! {
         pub use lib_wasm::check;
     }
 }
+pub mod flake8_pie;
