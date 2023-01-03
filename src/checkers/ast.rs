@@ -634,6 +634,10 @@ where
                     flake8_pytest_style::plugins::marks(self, decorator_list);
                 }
 
+                if self.settings.enabled.contains(&CheckCode::PIE794) {
+                    flake8_pie::plugins::dupe_class_field_definitions(self, bases, body);
+                }
+
                 self.check_builtin_shadowing(name, stmt, false);
 
                 for expr in bases {
