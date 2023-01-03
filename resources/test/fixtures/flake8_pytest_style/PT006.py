@@ -16,6 +16,11 @@ def test_csv_with_whitespace(param1, param2):
     ...
 
 
+@pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
+def test_csv_bad_quotes(param1, param2):
+    ...
+
+
 @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
 def test_tuple(param1, param2):
     ...
