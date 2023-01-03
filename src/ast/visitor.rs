@@ -62,6 +62,15 @@ pub trait Visitor<'a> {
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         walk_pattern(self, pattern);
     }
+    fn visit_body(&mut self, body: &'a [Stmt]) {
+        walk_body(self, body);
+    }
+}
+
+pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt]) {
+    for stmt in body {
+        visitor.visit_stmt(stmt);
+    }
 }
 
 pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
@@ -80,9 +89,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
         }
         StmtKind::AsyncFunctionDef {
             args,
@@ -98,9 +105,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
         }
         StmtKind::ClassDef {
             bases,
@@ -118,9 +123,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for expr in decorator_list {
                 visitor.visit_expr(expr);
             }
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
         }
         StmtKind::Return { value } => {
             if let Some(expr) = value {
@@ -164,12 +167,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         } => {
             visitor.visit_expr(iter);
             visitor.visit_expr(target);
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
-            for stmt in orelse {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
+            visitor.visit_body(orelse);
         }
         StmtKind::AsyncFor {
             target,
@@ -180,46 +179,30 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         } => {
             visitor.visit_expr(iter);
             visitor.visit_expr(target);
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
-            for stmt in orelse {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
+            visitor.visit_body(orelse);
         }
         StmtKind::While { test, body, orelse } => {
             visitor.visit_expr(test);
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
-            for stmt in orelse {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
+            visitor.visit_body(orelse);
         }
         StmtKind::If { test, body, orelse } => {
             visitor.visit_expr(test);
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
-            for stmt in orelse {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
+            visitor.visit_body(orelse);
         }
         StmtKind::With { items, body, .. } => {
             for withitem in items {
                 visitor.visit_withitem(withitem);
             }
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
         }
         StmtKind::AsyncWith { items, body, .. } => {
             for withitem in items {
                 visitor.visit_withitem(withitem);
             }
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
         }
         StmtKind::Match { subject, cases } => {
             // TODO(charlie): Handle `cases`.
@@ -242,18 +225,12 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             orelse,
             finalbody,
         } => {
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
             for excepthandler in handlers {
                 visitor.visit_excepthandler(excepthandler);
             }
-            for stmt in orelse {
-                visitor.visit_stmt(stmt);
-            }
-            for stmt in finalbody {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(orelse);
+            visitor.visit_body(finalbody);
         }
         StmtKind::Assert { test, msg } => {
             visitor.visit_expr(test);
@@ -469,9 +446,7 @@ pub fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
             if let Some(expr) = type_ {
                 visitor.visit_expr(expr);
             }
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
+            visitor.visit_body(body);
         }
     }
 }
@@ -522,9 +497,7 @@ pub fn walk_match_case<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, match_case:
     if let Some(expr) = &match_case.guard {
         visitor.visit_expr(expr);
     }
-    for stmt in &match_case.body {
-        visitor.visit_stmt(stmt);
-    }
+    visitor.visit_body(&match_case.body);
 }
 
 pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a Pattern) {
