@@ -3623,6 +3623,9 @@ impl CheckKind {
             CheckKind::EndsInPeriod => Some("Add period".to_string()),
             CheckKind::EndsInPunctuation => Some("Add closing punctuation".to_string()),
             CheckKind::ExtraneousScopeFunction => Some("Remove `scope=` argument".to_string()),
+            CheckKind::FStringMissingPlaceholders => {
+                Some("Remove extraneous `f` prefix".to_string())
+            }
             CheckKind::GetAttrWithConstant => {
                 Some("Replace `getattr` with attribute access".to_string())
             }
