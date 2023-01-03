@@ -36,3 +36,6 @@ urls = { repository = "https://github.com/charliermarsh/ruff-lsp" }
 [tool.maturin]
 bindings = "bin"
 strip = true
+
+[tool.ruff.pydocstyle]
+convention = "google"
