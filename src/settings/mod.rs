@@ -344,6 +344,7 @@ impl Hash for Settings {
         self.flake8_bugbear.hash(state);
         self.flake8_errmsg.hash(state);
         self.flake8_import_conventions.hash(state);
+        self.flake8_pytest_style.hash(state);
         self.flake8_quotes.hash(state);
         self.flake8_tidy_imports.hash(state);
         self.flake8_unused_arguments.hash(state);
