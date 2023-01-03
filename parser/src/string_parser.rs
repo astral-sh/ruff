@@ -5,7 +5,7 @@ use crate::{
     parser::parse_expression_located,
     token::StringKind,
 };
-use std::{iter, mem, str};
+use std::{iter, str};
 
 /// unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
 pub const MAX_UNICODE_NAME: usize = 88;
@@ -365,10 +365,9 @@ impl<'a> StringParser<'a> {
                 '{' => {
                     if !constant_piece.is_empty() {
                         spec_constructor.push(self.expr(ExprKind::Constant {
-                            value: constant_piece.to_owned().into(),
+                            value: constant_piece.drain(..).collect::<String>().into(),
                             kind: None,
                         }));
-                        constant_piece.clear();
                     }
                     let parsed_expr = self.parse_fstring(nested + 1)?;
                     spec_constructor.extend(parsed_expr);
@@ -385,10 +384,9 @@ impl<'a> StringParser<'a> {
         }
         if !constant_piece.is_empty() {
             spec_constructor.push(self.expr(ExprKind::Constant {
-                value: constant_piece.to_owned().into(),
+                value: constant_piece.drain(..).collect::<String>().into(),
                 kind: None,
             }));
-            constant_piece.clear();
         }
         Ok(spec_constructor)
     }
@@ -418,7 +416,7 @@ impl<'a> StringParser<'a> {
                     }
                     if !content.is_empty() {
                         values.push(self.expr(ExprKind::Constant {
-                            value: mem::take(&mut content).into(),
+                            value: content.drain(..).collect::<String>().into(),
                             kind: None,
                         }));
                     }
