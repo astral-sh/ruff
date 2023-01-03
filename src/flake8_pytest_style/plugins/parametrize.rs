@@ -193,13 +193,14 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     if let Some(decorator) = decorator {
         if let ExprKind::Call { args, .. } = &decorator.node {
             if checker.settings.enabled.contains(&CheckCode::PT006) {
-                let first = args.first().unwrap();
-                check_names(checker, first);
+                if let Some(arg) = args.get(0) {
+                    check_names(checker, arg);
+                }
             }
-
             if checker.settings.enabled.contains(&CheckCode::PT007) {
-                let second = args.get(1).unwrap();
-                check_values(checker, second);
+                if let Some(arg) = args.get(1) {
+                    check_values(checker, arg);
+                }
             }
         }
     }
