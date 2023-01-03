@@ -171,21 +171,21 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
     }
 
     if checker.settings.enabled.contains(&CheckCode::PT022) {
-        if let Some(last_statement) = body.last() {
-            if let StmtKind::Expr { value, .. } = &last_statement.node {
+        if let Some(stmt) = body.last() {
+            if let StmtKind::Expr { value, .. } = &stmt.node {
                 if let ExprKind::Yield { .. } = value.node {
                     if visitor.yield_statements.len() == 1 {
                         let mut check = Check::new(
                             CheckKind::UselessYieldFixture(func_name.to_string()),
-                            Range::from_located(last_statement),
+                            Range::from_located(stmt),
                         );
                         if checker.patch(check.kind.code()) {
                             check.amend(Fix::replacement(
                                 "return".to_string(),
-                                last_statement.location,
+                                stmt.location,
                                 Location::new(
-                                    last_statement.location.row(),
-                                    last_statement.location.column() + 5,
+                                    stmt.location.row(),
+                                    stmt.location.column() + "yield".len(),
                                 ),
                             ));
                         }
