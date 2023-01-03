@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Wrapper around Flake8 to enable multiprocessing on all operating systems.
 
 As of Python 3.8, macOS's default "start method" for multiprocessing is `spawn`. Flake8
