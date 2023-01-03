@@ -22,7 +22,19 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
             value: Constant::Str(string),
             ..
         } => {
-            let names = string.split(',').collect::<Vec<&str>>();
+            // Match the following pytest code:
+            //    [x.strip() for x in argnames.split(",") if x.strip()]
+            let names = string
+                .split(',')
+                .filter_map(|s| {
+                    let trimmed = s.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed)
+                    }
+                })
+                .collect::<Vec<&str>>();
 
             if names.len() > 1 {
                 match names_type {
