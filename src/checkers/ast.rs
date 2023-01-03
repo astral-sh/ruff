@@ -7,6 +7,7 @@ use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Located, Location};
+use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -34,7 +35,6 @@ use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::vendor::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
@@ -1744,7 +1744,7 @@ where
                                         if self.settings.enabled.contains(&CheckCode::F521) {
                                             self.add_check(Check::new(
                                                 CheckKind::StringDotFormatInvalidFormat(
-                                                    e.to_string(),
+                                                    pyflakes::format::error_to_string(&e),
                                                 ),
                                                 location,
                                             ));

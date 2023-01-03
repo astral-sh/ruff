@@ -3,8 +3,7 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 use rustc_hash::FxHashSet;
-
-use crate::vendor::cformat::{
+use rustpython_common::cformat::{
     CFormatError, CFormatPart, CFormatQuantity, CFormatSpec, CFormatString,
 };
 
@@ -24,11 +23,11 @@ impl TryFrom<&str> for CFormatSummary {
         let mut num_positional = 0;
         let mut keywords = FxHashSet::default();
 
-        for format_part in format_string.parts {
+        for format_part in format_string.iter() {
             let CFormatPart::Spec(CFormatSpec {
-                mapping_key,
-                min_field_width,
-                precision,
+                ref mapping_key,
+                ref min_field_width,
+                ref precision,
                 ..
             }) = format_part.1 else
             {
@@ -36,17 +35,17 @@ impl TryFrom<&str> for CFormatSummary {
             };
             match mapping_key {
                 Some(k) => {
-                    keywords.insert(k);
+                    keywords.insert(k.clone());
                 }
                 None => {
                     num_positional += 1;
                 }
             };
-            if min_field_width == Some(CFormatQuantity::FromValuesTuple) {
+            if min_field_width == &Some(CFormatQuantity::FromValuesTuple) {
                 num_positional += 1;
                 starred = true;
             }
-            if precision == Some(CFormatQuantity::FromValuesTuple) {
+            if precision == &Some(CFormatQuantity::FromValuesTuple) {
                 num_positional += 1;
                 starred = true;
             }
