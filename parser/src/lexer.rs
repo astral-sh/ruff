@@ -1091,7 +1091,7 @@ where
                 } else {
                     let tok_start = self.get_pos();
                     self.next_char();
-                    if let [Some('.'), Some('.')] = self.window[..2] {
+                    if self.window[..2] == [Some('.'); 2] {
                         self.next_char();
                         self.next_char();
                         let tok_end = self.get_pos();
