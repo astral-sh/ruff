@@ -1,3 +1,11 @@
+[tool.black]
+line-length = 120
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "W", "I", "C", "RET", "ANN", "UP"]
+target-version = "py310"
+
 [tool.poetry]
 name = "scripts"
 version = "0.1.0"
@@ -8,12 +16,9 @@ authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
 python = ">=3.10,<3.11"
 autoflake = "^1.4"
 flake8 = "^5.0.4"
-matplotlib = "^3.5.3"
-numpy = "^1.23.2"
 pycodestyle = "^2.9.1"
 pyflakes = "^2.5.0"
 pylint = "^2.15.0"
-scipy = "^1.9.1"
 
 [tool.poetry.dev-dependencies]
 
