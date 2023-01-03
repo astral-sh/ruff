@@ -12,6 +12,12 @@ pub struct LexicalError {
     pub location: Location,
 }
 
+impl LexicalError {
+    pub fn new(error: LexicalErrorType, location: Location) -> Self {
+        Self { error, location }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum LexicalErrorType {
     StringError,
@@ -85,6 +91,21 @@ pub struct FStringError {
     pub location: Location,
 }
 
+impl FStringError {
+    pub fn new(error: FStringErrorType, location: Location) -> Self {
+        Self { error, location }
+    }
+}
+
+impl From<FStringError> for LexicalError {
+    fn from(err: FStringError) -> Self {
+        LexicalError {
+            error: LexicalErrorType::FStringError(err.error),
+            location: err.location,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum FStringErrorType {
     UnclosedLbrace,
@@ -99,15 +120,6 @@ pub enum FStringErrorType {
     SingleRbrace,
     Unmatched(char),
     UnterminatedString,
-}
-
-impl FStringErrorType {
-    pub fn to_lexical_error(self, location: Location) -> LexicalError {
-        LexicalError {
-            error: LexicalErrorType::FStringError(self),
-            location,
-        }
-    }
 }
 
 impl fmt::Display for FStringErrorType {
