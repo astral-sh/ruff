@@ -202,6 +202,7 @@ mod tests {
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -258,6 +259,7 @@ line-length = 79
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -314,6 +316,7 @@ exclude = ["foo.py"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -370,6 +373,7 @@ select = ["E501"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -427,6 +431,7 @@ ignore = ["E501"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -604,6 +609,7 @@ other-attribute = 1
                     ]),
                     staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
                 }),
+                pycodestyle: None,
                 pydocstyle: None,
                 pyupgrade: None,
             }
