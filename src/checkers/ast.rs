@@ -24,7 +24,6 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
-use crate::autofix::Fix;
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::noqa::Directive;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -2285,26 +2284,7 @@ where
             }
             ExprKind::JoinedStr { values } => {
                 if self.settings.enabled.contains(&CheckCode::F541) {
-                    if !values
-                        .iter()
-                        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
-                    {
-                        for (f_prefix_range, tok_range) in
-                            helpers::find_useless_f_strings(expr, self.locator)
-                        {
-                            let mut check =
-                                Check::new(CheckKind::FStringMissingPlaceholders, tok_range);
-                            if self.patch(&CheckCode::F541) {
-                                check.amend(Fix::deletion(
-                                    f_prefix_range.location,
-                                    f_prefix_range.end_location,
-                                ));
-                            }
-
-                            self.add_check(check);
-                        }
-                    }
-                    {}
+                    pyflakes::plugins::f_string_missing_placeholders(expr, values, self);
                 }
             }
             ExprKind::BinOp {
