@@ -113,6 +113,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [pandas-vet (PD)](#pandas-vet-pd)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
+   1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1052,6 +1053,14 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 | PLW0602 | GlobalVariableNotAssigned | Using global for `...` but no assignment is done |  |
 
+### flake8-pie (PIE)
+
+For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PIE807 | PreferListBuiltin |  | 🛠 |
+
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
@@ -1331,6 +1340,7 @@ natively, including:
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-pie`](https://pypi.org/project/flake8-pie/) (1/7)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
@@ -1388,6 +1398,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-pie`](https://pypi.org/project/flake8-pie/) (1/7)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)

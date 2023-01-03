@@ -389,6 +389,8 @@ pub enum CheckCode {
     PT024,
     PT025,
     PT026,
+    // flake8-pie
+    PIE807,
     // Ruff
     RUF001,
     RUF002,
@@ -430,6 +432,7 @@ pub enum CheckCategory {
     PandasVet,
     PygrepHooks,
     Pylint,
+    Flake8Pie,
     Ruff,
 }
 
@@ -481,6 +484,7 @@ impl CheckCategory {
             CheckCategory::PygrepHooks => "pygrep-hooks",
             CheckCategory::Pylint => "Pylint",
             CheckCategory::Pyupgrade => "pyupgrade",
+            CheckCategory::Flake8Pie => "flake8-pie",
             CheckCategory::Ruff => "Ruff-specific rules",
         }
     }
@@ -523,6 +527,7 @@ impl CheckCategory {
                 CheckCodePrefix::PLW,
             ],
             CheckCategory::Pyupgrade => vec![CheckCodePrefix::UP],
+            CheckCategory::Flake8Pie => vec![CheckCodePrefix::PIE],
             CheckCategory::Ruff => vec![CheckCodePrefix::RUF],
         }
     }
@@ -644,6 +649,10 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => {
                 Some(("https://pypi.org/project/pyupgrade/3.2.0/", &Platform::PyPI))
             }
+            CheckCategory::Flake8Pie => Some((
+                "https://pypi.org/project/flake8-pie/0.16.0/",
+                &Platform::PyPI,
+            )),
             CheckCategory::Ruff => None,
         }
     }
@@ -1105,6 +1114,8 @@ pub enum CheckKind {
     UnnecessaryAsyncioMarkOnFixture,
     ErroneousUseFixturesOnFixture,
     UseFixturesWithoutParameters,
+    // flake8-pie
+    PreferListBuiltin,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -1556,6 +1567,8 @@ impl CheckCode {
             CheckCode::PT024 => CheckKind::UnnecessaryAsyncioMarkOnFixture,
             CheckCode::PT025 => CheckKind::ErroneousUseFixturesOnFixture,
             CheckCode::PT026 => CheckKind::UseFixturesWithoutParameters,
+            // flake8-pie
+            CheckCode::PIE807 => CheckKind::PreferListBuiltin,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -1920,6 +1933,8 @@ impl CheckCode {
             CheckCode::YTT301 => CheckCategory::Flake82020,
             CheckCode::YTT302 => CheckCategory::Flake82020,
             CheckCode::YTT303 => CheckCategory::Flake82020,
+            // flake8-pie
+            CheckCode::PIE807 => CheckCategory::Flake8Pie,
             // Ruff
             CheckCode::RUF001 => CheckCategory::Ruff,
             CheckCode::RUF002 => CheckCategory::Ruff,
@@ -2285,6 +2300,8 @@ impl CheckKind {
             CheckKind::UnnecessaryAsyncioMarkOnFixture => &CheckCode::PT024,
             CheckKind::ErroneousUseFixturesOnFixture => &CheckCode::PT025,
             CheckKind::UseFixturesWithoutParameters => &CheckCode::PT026,
+            // flake8-pie
+            CheckKind::PreferListBuiltin => &CheckCode::PIE807,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -3335,6 +3352,8 @@ impl CheckKind {
             CheckKind::UseFixturesWithoutParameters => {
                 "Useless `pytest.mark.usefixtures` without parameters".to_string()
             }
+            // flake8-pie
+            CheckKind::PreferListBuiltin => String::new(),
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(
@@ -3491,9 +3510,10 @@ impl CheckKind {
                 | CheckKind::OpenAlias
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
-                | CheckKind::PercentFormatExtraNamedArguments(..)
-                | CheckKind::PrintFound
                 | CheckKind::ParametrizeNamesWrongType(..)
+                | CheckKind::PercentFormatExtraNamedArguments(..)
+                | CheckKind::PreferListBuiltin
+                | CheckKind::PrintFound
                 | CheckKind::RaiseNotImplemented
                 | CheckKind::RedundantOpenModes(..)
                 | CheckKind::RedundantTupleInExceptionHandler(..)
@@ -3501,9 +3521,9 @@ impl CheckKind {
                 | CheckKind::ReplaceStdoutStderr
                 | CheckKind::ReplaceUniversalNewlines
                 | CheckKind::RewriteCElementTree
+                | CheckKind::RewriteListComprehension
                 | CheckKind::RewriteMockImport(..)
                 | CheckKind::RewriteUnicodeLiteral
-                | CheckKind::RewriteListComprehension
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
                 | CheckKind::SectionUnderlineAfterName(..)
@@ -3671,6 +3691,7 @@ impl CheckKind {
             CheckKind::PEP3120UnnecessaryCodingComment => {
                 Some("Remove unnecessary coding comment".to_string())
             }
+            CheckKind::PreferListBuiltin => Some("Replace with `list`".to_string()),
             CheckKind::PPrintFound => Some("Remove `pprint`".to_string()),
             CheckKind::PercentFormatExtraNamedArguments(missing)
             | CheckKind::StringDotFormatExtraNamedArguments(missing) => {

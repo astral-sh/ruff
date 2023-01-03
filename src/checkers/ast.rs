@@ -40,9 +40,9 @@ use crate::{
     docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
     flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_print, flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports,
-    flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming, pycodestyle, pydocstyle,
-    pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, visibility,
+    flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
+    flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -2521,6 +2521,10 @@ where
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
+                if self.settings.enabled.contains(&CheckCode::PIE807) {
+                    flake8_pie::plugins::prefer_list_builtin(self, expr);
+                }
+
                 // Visit the arguments, but avoid the body, which will be deferred.
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
