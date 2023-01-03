@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use colored::Colorize;
 use globset::{Glob, GlobMatcher, GlobSet};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -14,7 +15,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::cache::cache_dir;
-use crate::registry::CheckCode;
+use crate::registry::{CheckCode, INCOMPATIBLE_CODES};
 use crate::registry_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{
@@ -23,7 +24,7 @@ use crate::settings::types::{
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pydocstyle, pyupgrade,
+    mccabe, one_time_warning, pep8_naming, pydocstyle, pyupgrade,
 };
 
 pub mod configuration;
@@ -32,7 +33,6 @@ pub mod options;
 pub mod options_base;
 pub mod pyproject;
 pub mod types;
-
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
@@ -113,7 +113,7 @@ impl Settings {
             dummy_variable_rgx: config
                 .dummy_variable_rgx
                 .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
-            enabled: resolve_codes(
+            enabled: validate_enabled(resolve_codes(
                 config
                     .pydocstyle
                     .as_ref()
@@ -134,7 +134,7 @@ impl Settings {
                         .zip(config.extend_ignore.iter())
                         .map(|(select, ignore)| CheckCodeSpec { select, ignore }),
                 ),
-            ),
+            )),
             exclude: resolve_globset(config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()))?,
             extend_exclude: resolve_globset(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()),
@@ -420,6 +420,21 @@ fn resolve_codes<'a>(
         }
     }
     codes
+}
+
+/// Warn if the set of enabled codes contains any incompatibilities.
+fn validate_enabled(enabled: FxHashSet<CheckCode>) -> FxHashSet<CheckCode> {
+    for (a, b, message) in INCOMPATIBLE_CODES {
+        if enabled.contains(a) && enabled.contains(b) {
+            one_time_warning!(
+                "{}{} {}",
+                "warning".yellow().bold(),
+                ":".bold(),
+                message.bold()
+            );
+        }
+    }
+    enabled
 }
 
 #[cfg(test)]
