@@ -20,47 +20,64 @@ expression: checks
       column: 40
   parent: ~
 - kind:
-    ParametrizeNamesWrongType: csv
+    ParametrizeNamesWrongType: tuple
   location:
-    row: 19
+    row: 14
     column: 25
   end_location:
-    row: 19
+    row: 14
+    column: 56
+  fix:
+    content: "(\"param1\", \"param2\")"
+    location:
+      row: 14
+      column: 25
+    end_location:
+      row: 14
+      column: 56
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType: csv
+  location:
+    row: 24
+    column: 25
+  end_location:
+    row: 24
     column: 36
   fix:
     content: "\"param1\""
     location:
-      row: 19
+      row: 24
       column: 25
     end_location:
-      row: 19
+      row: 24
       column: 36
   parent: ~
 - kind:
     ParametrizeNamesWrongType: tuple
   location:
-    row: 24
+    row: 29
     column: 25
   end_location:
-    row: 24
+    row: 29
     column: 45
   fix: ~
   parent: ~
 - kind:
     ParametrizeNamesWrongType: csv
   location:
-    row: 29
+    row: 34
     column: 25
   end_location:
-    row: 29
+    row: 34
     column: 35
   fix:
     content: "\"param1\""
     location:
-      row: 29
+      row: 34
       column: 25
     end_location:
-      row: 29
+      row: 34
       column: 35
   parent: ~
 
