@@ -389,7 +389,6 @@ pub enum CheckCode {
     PT024,
     PT025,
     PT026,
-    // flake8-pie
     // Ruff
     RUF001,
     RUF002,
@@ -431,7 +430,6 @@ pub enum CheckCategory {
     PandasVet,
     PygrepHooks,
     Pylint,
-    Flake8Pie,
     Ruff,
 }
 
@@ -483,7 +481,6 @@ impl CheckCategory {
             CheckCategory::PygrepHooks => "pygrep-hooks",
             CheckCategory::Pylint => "Pylint",
             CheckCategory::Pyupgrade => "pyupgrade",
-            CheckCategory::Flake8Pie => "flake8-pie",
             CheckCategory::Ruff => "Ruff-specific rules",
         }
     }
@@ -526,9 +523,6 @@ impl CheckCategory {
                 CheckCodePrefix::PLW,
             ],
             CheckCategory::Pyupgrade => vec![CheckCodePrefix::UP],
-            CheckCategory::Flake8Pie => vec![
-                todo!("Fill-in prefix after generating codes")
-            ],
             CheckCategory::Ruff => vec![CheckCodePrefix::RUF],
         }
     }
@@ -650,7 +644,6 @@ impl CheckCategory {
             CheckCategory::Pyupgrade => {
                 Some(("https://pypi.org/project/pyupgrade/3.2.0/", &Platform::PyPI))
             }
-            CheckCategory::Flake8Pie => Some(("https://pypi.org/project/flake8-pie/0.16.0/", &Platform::PyPI)),
             CheckCategory::Ruff => None,
         }
     }
@@ -1112,7 +1105,6 @@ pub enum CheckKind {
     UnnecessaryAsyncioMarkOnFixture,
     ErroneousUseFixturesOnFixture,
     UseFixturesWithoutParameters,
-    // flake8-pie
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
     AmbiguousUnicodeCharacterDocstring(char, char),
@@ -1564,7 +1556,6 @@ impl CheckCode {
             CheckCode::PT024 => CheckKind::UnnecessaryAsyncioMarkOnFixture,
             CheckCode::PT025 => CheckKind::ErroneousUseFixturesOnFixture,
             CheckCode::PT026 => CheckKind::UseFixturesWithoutParameters,
-            // flake8-pie
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
             CheckCode::RUF002 => CheckKind::AmbiguousUnicodeCharacterDocstring('𝐁', 'B'),
@@ -2294,7 +2285,6 @@ impl CheckKind {
             CheckKind::UnnecessaryAsyncioMarkOnFixture => &CheckCode::PT024,
             CheckKind::ErroneousUseFixturesOnFixture => &CheckCode::PT025,
             CheckKind::UseFixturesWithoutParameters => &CheckCode::PT026,
-            // flake8-pie
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
             CheckKind::AmbiguousUnicodeCharacterDocstring(..) => &CheckCode::RUF002,
@@ -3345,7 +3335,6 @@ impl CheckKind {
             CheckKind::UseFixturesWithoutParameters => {
                 "Useless `pytest.mark.usefixtures` without parameters".to_string()
             }
-            // flake8-pie
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(

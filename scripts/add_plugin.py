@@ -54,7 +54,6 @@ mod tests {
     use crate::linter::test_path;
     use crate::settings;
 
-    // #[test_case(CheckCode::A001, Path::new("A001_0.py"); "A001_0")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(

@@ -1,10 +1,11 @@
-"""Generate boilerplate for a new plugin.
+"""Generate boilerplate for a new check.
 
 Example usage:
 
     python scripts/add_check.py \
-        flake8-pie \
-        --url https://pypi.org/project/flake8-pie/0.16.0/
+        --name PreferListBuiltin \
+        --code PIE807 \
+        --plugin flake8-pie
 """
 
 import argparse
@@ -53,42 +54,50 @@ def main(*, name: str, code: str, plugin: str) -> None:
             fp.write(line)
             fp.write("\n")
 
-            if line.strip() == f"// {dir_name(plugin)}":
+            if line.strip() == f"// {plugin}":
                 if index == 0:
                     # `CheckCode` definition
-                    indent = line.split(f"// {dir_name(plugin)}")[0]
+                    indent = line.split(f"// {plugin}")[0]
                     fp.write(f"{indent}{code},")
                     fp.write("\n")
 
                 elif index == 1:
                     # `CheckKind` definition
-                    indent = line.split(f"// {dir_name(plugin)}")[0]
-                    fp.write(f"{indent}{pascal_case(name)},")
+                    indent = line.split(f"// {plugin}")[0]
+                    fp.write(f"{indent}{name},")
+                    fp.write("\n")
 
                 elif index == 2:
                     # `CheckCode#kind()`
-                    indent = line.split(f"// {dir_name(plugin)}")[0]
-                    fp.write(f"{indent}CheckCode::{code} => CheckKind::{pascal_case(name)},")
+                    indent = line.split(f"// {plugin}")[0]
+                    fp.write(f"{indent}CheckCode::{code} => CheckKind::{name},")
+                    fp.write("\n")
 
                 elif index == 3:
-                    # `CheckKind#code()`
-                    indent = line.split(f"// {dir_name(plugin)}")[0]
-                    fp.write(f"{indent}CheckKind::{pascal_case(name)} => &CheckCode::{code},")
+                    # `CheckCode#category()`
+                    indent = line.split(f"// {plugin}")[0]
+                    fp.write(f"{indent}CheckCode::{code} => CheckCategory::{pascal_case(plugin)},")
+                    fp.write("\n")
 
                 elif index == 4:
+                    # `CheckKind#code()`
+                    indent = line.split(f"// {plugin}")[0]
+                    fp.write(f"{indent}CheckKind::{name} => &CheckCode::{code},")
+                    fp.write("\n")
+
+                elif index == 5:
                     # `CheckCode#body`
-                    indent = line.split(f"// {dir_name(plugin)}")[0]
-                    fp.write(f'{indent}CheckKind::{pascal_case(name)} => "".to_string(),')
+                    indent = line.split(f"// {plugin}")[0]
+                    fp.write(f'{indent}CheckKind::{name} => "".to_string(),')
+                    fp.write("\n")
 
                 index += 1
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate boilerplate for a new plugin.",
-        epilog=(
-            "Example usage: python scripts/add_check.py flake8-pie --url https://pypi.org/project/flake8-pie/0.16.0/"
-        ),
+        description="Generate boilerplate for a new check.",
+        epilog=("python scripts/add_check.py --name PreferListBuiltin --code PIE807 --plugin flake8-pie"),
     )
     parser.add_argument(
         "--name",
