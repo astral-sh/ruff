@@ -1,3 +1,4 @@
+use log::error;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 use super::helpers::is_pytest_parametrize;
@@ -55,13 +56,19 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 1,
                             );
 
-                            if let Ok(content) = generator.generate() {
-                                check.amend(Fix::replacement(
-                                    content,
-                                    expr.location,
-                                    expr.end_location.unwrap(),
-                                ));
-                            }
+                            match generator.generate() {
+                                Ok(content) => {
+                                    check.amend(Fix::replacement(
+                                        content,
+                                        expr.location,
+                                        expr.end_location.unwrap(),
+                                    ));
+                                }
+                                Err(e) => error!(
+                                    "Failed to fix Wrong name(s) type in \
+                                     `@pytest.mark.parametrize`: {e}"
+                                ),
+                            };
                         }
                         checker.add_check(check);
                     }
@@ -92,13 +99,19 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 0,
                             );
 
-                            if let Ok(content) = generator.generate() {
-                                check.amend(Fix::replacement(
-                                    content,
-                                    expr.location,
-                                    expr.end_location.unwrap(),
-                                ));
-                            }
+                            match generator.generate() {
+                                Ok(content) => {
+                                    check.amend(Fix::replacement(
+                                        content,
+                                        expr.location,
+                                        expr.end_location.unwrap(),
+                                    ));
+                                }
+                                Err(e) => error!(
+                                    "Failed to fix Wrong name(s) type in \
+                                     `@pytest.mark.parametrize`: {e}"
+                                ),
+                            };
                         }
                         checker.add_check(check);
                     }
@@ -178,15 +191,19 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
             checker.style.quote(),
             checker.style.line_ending(),
         );
+
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
 
-        if let Ok(content) = generator.generate() {
-            check.amend(Fix::replacement(
-                content,
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
-        }
+        match generator.generate() {
+            Ok(content) => {
+                check.amend(Fix::replacement(
+                    content,
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
+            }
+            Err(e) => error!("Failed to fix Wrong name(s) type in `@pytest.mark.parametrize`: {e}"),
+        };
     }
     checker.add_check(check);
 }
