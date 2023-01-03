@@ -152,9 +152,7 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
             }
         }
         StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
-            for item in body {
-                get_yields_from(item, yields);
-            }
+            // Don't recurse.
         }
         _ => (),
     }
