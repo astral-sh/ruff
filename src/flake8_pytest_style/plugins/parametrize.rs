@@ -1,12 +1,13 @@
-use rustpython_ast::{Constant, Expr, ExprKind};
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 use super::helpers::is_pytest_parametrize;
+use crate::ast::helpers::create_expr;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::flake8_pytest_style::types;
 use crate::registry::{Check, CheckCode, CheckKind};
-
+use crate::source_code_generator::SourceCodeGenerator;
 fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators
         .iter()
@@ -32,11 +33,34 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            check.amend(Fix::replacement(
-                                strings_to_python_tuple(&names),
-                                expr.location,
-                                expr.end_location.unwrap(),
-                            ));
+                            let mut generator = SourceCodeGenerator::new(
+                                checker.style.indentation(),
+                                checker.style.quote(),
+                                checker.style.line_ending(),
+                            );
+                            generator.unparse_expr(
+                                &create_expr(ExprKind::Tuple {
+                                    elts: names
+                                        .iter()
+                                        .map(|name| {
+                                            create_expr(ExprKind::Constant {
+                                                value: Constant::Str(name.to_string()),
+                                                kind: None,
+                                            })
+                                        })
+                                        .collect(),
+                                    ctx: ExprContext::Load,
+                                }),
+                                1,
+                            );
+
+                            if let Ok(content) = generator.generate() {
+                                check.amend(Fix::replacement(
+                                    content,
+                                    expr.location,
+                                    expr.end_location.unwrap(),
+                                ));
+                            }
                         }
                         checker.add_check(check);
                     }
@@ -46,11 +70,34 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            check.amend(Fix::replacement(
-                                strings_to_python_list(&names),
-                                expr.location,
-                                expr.end_location.unwrap(),
-                            ));
+                            let mut generator = SourceCodeGenerator::new(
+                                checker.style.indentation(),
+                                checker.style.quote(),
+                                checker.style.line_ending(),
+                            );
+                            generator.unparse_expr(
+                                &create_expr(ExprKind::List {
+                                    elts: names
+                                        .iter()
+                                        .map(|name| {
+                                            create_expr(ExprKind::Constant {
+                                                value: Constant::Str(name.to_string()),
+                                                kind: None,
+                                            })
+                                        })
+                                        .collect(),
+                                    ctx: ExprContext::Load,
+                                }),
+                                0,
+                            );
+
+                            if let Ok(content) = generator.generate() {
+                                check.amend(Fix::replacement(
+                                    content,
+                                    expr.location,
+                                    expr.end_location.unwrap(),
+                                ));
+                            }
                         }
                         checker.add_check(check);
                     }
@@ -123,40 +170,24 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
         CheckKind::ParametrizeNamesWrongType(types::ParametrizeNameType::CSV),
         Range::from_located(expr),
     );
-    if let ExprKind::Constant {
-        value: Constant::Str(string),
-        ..
-    } = &value.node
-    {
-        if checker.patch(check.kind.code()) {
+
+    if checker.patch(check.kind.code()) {
+        let mut generator = SourceCodeGenerator::new(
+            checker.style.indentation(),
+            checker.style.quote(),
+            checker.style.line_ending(),
+        );
+        generator.unparse_expr(&create_expr(value.node.clone()), 0);
+
+        if let Ok(content) = generator.generate() {
             check.amend(Fix::replacement(
-                format!("\"{string}\""),
+                content,
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
     }
     checker.add_check(check);
-}
-
-fn strings_to_python_tuple(strings: &[&str]) -> String {
-    let result = strings
-        .iter()
-        .map(|s| format!("\"{s}\""))
-        .collect::<Vec<String>>()
-        .join(", ");
-
-    format!("({result})")
-}
-
-fn strings_to_python_list(strings: &[&str]) -> String {
-    let result = strings
-        .iter()
-        .map(|s| format!("\"{s}\""))
-        .collect::<Vec<String>>()
-        .join(", ");
-
-    format!("[{result}]")
 }
 
 fn handle_value_rows(
