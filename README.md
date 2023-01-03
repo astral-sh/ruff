@@ -545,7 +545,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F523 | StringDotFormatExtraPositionalArguments | '...'.format(...) has unused arguments at position(s): ... |  |
 | F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): ... |  |
 | F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
-| F541 | FStringMissingPlaceholders | f-string without any placeholders |  |
+| F541 | FStringMissingPlaceholders | f-string without any placeholders | 🛠 |
 | F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
 | F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
 | F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |  |
