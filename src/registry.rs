@@ -341,12 +341,6 @@ pub enum CheckCode {
     DTZ007,
     DTZ011,
     DTZ012,
-    // Ruff
-    RUF001,
-    RUF002,
-    RUF003,
-    RUF004,
-    RUF100,
     // pygrep-hooks
     PGH001,
     PGH002,
@@ -395,6 +389,12 @@ pub enum CheckCode {
     PT024,
     PT025,
     PT026,
+    // Ruff
+    RUF001,
+    RUF002,
+    RUF003,
+    RUF004,
+    RUF100,
 }
 
 #[derive(EnumIter, Debug, PartialEq, Eq)]
@@ -1069,12 +1069,6 @@ pub enum CheckKind {
     RawStringInException,
     FStringInException,
     DotFormatInException,
-    // Ruff
-    AmbiguousUnicodeCharacterString(char, char),
-    AmbiguousUnicodeCharacterDocstring(char, char),
-    AmbiguousUnicodeCharacterComment(char, char),
-    KeywordArgumentBeforeStarArgument(String),
-    UnusedNOQA(Option<UnusedCodes>),
     // flake8-datetimez
     CallDatetimeWithoutTzinfo,
     CallDatetimeToday,
@@ -1111,6 +1105,12 @@ pub enum CheckKind {
     UnnecessaryAsyncioMarkOnFixture,
     ErroneousUseFixturesOnFixture,
     UseFixturesWithoutParameters,
+    // Ruff
+    AmbiguousUnicodeCharacterString(char, char),
+    AmbiguousUnicodeCharacterDocstring(char, char),
+    AmbiguousUnicodeCharacterComment(char, char),
+    KeywordArgumentBeforeStarArgument(String),
+    UnusedNOQA(Option<UnusedCodes>),
 }
 
 impl CheckCode {
@@ -3173,69 +3173,6 @@ impl CheckKind {
             CheckKind::DotFormatInException => "Exception must not use a `.format()` string \
                                                 directly, assign to variable first"
                 .to_string(),
-            // Ruff
-            CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
-                format!(
-                    "String contains ambiguous unicode character '{confusable}' (did you mean \
-                     '{representant}'?)"
-                )
-            }
-            CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant) => {
-                format!(
-                    "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
-                     '{representant}'?)"
-                )
-            }
-            CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
-                format!(
-                    "Comment contains ambiguous unicode character '{confusable}' (did you mean \
-                     '{representant}'?)"
-                )
-            }
-            CheckKind::KeywordArgumentBeforeStarArgument(name) => {
-                format!("Keyword argument `{name}` must come after starred arguments")
-            }
-            CheckKind::UnusedNOQA(codes) => match codes {
-                None => "Unused blanket `noqa` directive".to_string(),
-                Some(codes) => {
-                    let mut codes_by_reason = vec![];
-                    if !codes.unmatched.is_empty() {
-                        codes_by_reason.push(format!(
-                            "unused: {}",
-                            codes
-                                .unmatched
-                                .iter()
-                                .map(|code| format!("`{code}`"))
-                                .join(", ")
-                        ));
-                    }
-                    if !codes.disabled.is_empty() {
-                        codes_by_reason.push(format!(
-                            "non-enabled: {}",
-                            codes
-                                .disabled
-                                .iter()
-                                .map(|code| format!("`{code}`"))
-                                .join(", ")
-                        ));
-                    }
-                    if !codes.unknown.is_empty() {
-                        codes_by_reason.push(format!(
-                            "unknown: {}",
-                            codes
-                                .unknown
-                                .iter()
-                                .map(|code| format!("`{code}`"))
-                                .join(", ")
-                        ));
-                    }
-                    if codes_by_reason.is_empty() {
-                        "Unused `noqa` directive".to_string()
-                    } else {
-                        format!("Unused `noqa` directive ({})", codes_by_reason.join("; "))
-                    }
-                }
-            },
             // flake8-datetimez
             CheckKind::CallDatetimeWithoutTzinfo => "The use of `datetime.datetime()` without \
                                                      `tzinfo` argument is not allowed"
@@ -3365,6 +3302,69 @@ impl CheckKind {
             CheckKind::UseFixturesWithoutParameters => {
                 "Useless `pytest.mark.usefixtures` without parameters".to_string()
             }
+            // Ruff
+            CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
+                format!(
+                    "String contains ambiguous unicode character '{confusable}' (did you mean \
+                     '{representant}'?)"
+                )
+            }
+            CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant) => {
+                format!(
+                    "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
+                     '{representant}'?)"
+                )
+            }
+            CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
+                format!(
+                    "Comment contains ambiguous unicode character '{confusable}' (did you mean \
+                     '{representant}'?)"
+                )
+            }
+            CheckKind::KeywordArgumentBeforeStarArgument(name) => {
+                format!("Keyword argument `{name}` must come after starred arguments")
+            }
+            CheckKind::UnusedNOQA(codes) => match codes {
+                None => "Unused blanket `noqa` directive".to_string(),
+                Some(codes) => {
+                    let mut codes_by_reason = vec![];
+                    if !codes.unmatched.is_empty() {
+                        codes_by_reason.push(format!(
+                            "unused: {}",
+                            codes
+                                .unmatched
+                                .iter()
+                                .map(|code| format!("`{code}`"))
+                                .join(", ")
+                        ));
+                    }
+                    if !codes.disabled.is_empty() {
+                        codes_by_reason.push(format!(
+                            "non-enabled: {}",
+                            codes
+                                .disabled
+                                .iter()
+                                .map(|code| format!("`{code}`"))
+                                .join(", ")
+                        ));
+                    }
+                    if !codes.unknown.is_empty() {
+                        codes_by_reason.push(format!(
+                            "unknown: {}",
+                            codes
+                                .unknown
+                                .iter()
+                                .map(|code| format!("`{code}`"))
+                                .join(", ")
+                        ));
+                    }
+                    if codes_by_reason.is_empty() {
+                        "Unused `noqa` directive".to_string()
+                    } else {
+                        format!("Unused `noqa` directive ({})", codes_by_reason.join("; "))
+                    }
+                }
+            },
         }
     }
 
