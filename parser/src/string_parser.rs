@@ -130,39 +130,43 @@ impl<'a> StringParser<'a> {
 
     fn parse_escaped_char(&mut self) -> Result<String, LexicalError> {
         match self.next_char() {
-            Some(c) => Ok(match c {
-                '\\' => '\\'.to_string(),
-                '\'' => '\''.to_string(),
-                '\"' => '"'.to_string(),
-                '\n' => "".to_string(),
-                'a' => '\x07'.to_string(),
-                'b' => '\x08'.to_string(),
-                'f' => '\x0c'.to_string(),
-                'n' => '\n'.to_string(),
-                'r' => '\r'.to_string(),
-                't' => '\t'.to_string(),
-                'v' => '\x0b'.to_string(),
-                o @ '0'..='7' => self.parse_octet(o).to_string(),
-                'x' => self.parse_unicode_literal(2)?.to_string(),
-                'u' if !self.kind.is_bytes() => self.parse_unicode_literal(4)?.to_string(),
-                'U' if !self.kind.is_bytes() => self.parse_unicode_literal(8)?.to_string(),
-                'N' if !self.kind.is_bytes() => self.parse_unicode_name()?.to_string(),
-                c => {
-                    if self.kind.is_bytes() && !c.is_ascii() {
-                        return Err(LexicalError::new(
-                            LexicalErrorType::OtherError(
-                                "bytes can only contain ASCII literal characters".to_owned(),
-                            ),
-                            self.get_pos(),
-                        ));
+            Some(c) => {
+                let char = match c {
+                    '\\' => '\\',
+                    '\'' => '\'',
+                    '\"' => '"',
+                    'a' => '\x07',
+                    'b' => '\x08',
+                    'f' => '\x0c',
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    'v' => '\x0b',
+                    o @ '0'..='7' => self.parse_octet(o),
+                    'x' => self.parse_unicode_literal(2)?,
+                    'u' if !self.kind.is_bytes() => self.parse_unicode_literal(4)?,
+                    'U' if !self.kind.is_bytes() => self.parse_unicode_literal(8)?,
+                    'N' if !self.kind.is_bytes() => self.parse_unicode_name()?,
+                    // Special cases where the escape sequence is not a single character
+                    '\n' => return Ok("".to_string()),
+                    c => {
+                        if self.kind.is_bytes() && !c.is_ascii() {
+                            return Err(LexicalError {
+                                error: LexicalErrorType::OtherError(
+                                    "bytes can only contain ASCII literal characters".to_owned(),
+                                ),
+                                location: self.get_pos(),
+                            });
+                        }
+                        return Ok(format!("\\{c}"));
                     }
-                    format!("\\{c}")
-                }
+                };
+                Ok(char.to_string())
+            }
+            None => Err(LexicalError {
+                error: LexicalErrorType::StringError,
+                location: self.get_pos(),
             }),
-            None => Err(LexicalError::new(
-                LexicalErrorType::StringError,
-                self.get_pos(),
-            )),
         }
     }
 
