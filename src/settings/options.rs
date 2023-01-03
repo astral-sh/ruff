@@ -347,7 +347,8 @@ pub struct Options {
     /// A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
     ///
     /// Comments starting with these tags will be ignored by commented-out code
-    /// detection (`ERA`).
+    /// detection (`ERA`), and skipped by line-length checks (`E501`) if
+    /// `ignore-overlong-task-comments` is set to `true`.
     pub task_tags: Option<Vec<String>>,
     #[option(
         default = "true",

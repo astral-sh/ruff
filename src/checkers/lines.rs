@@ -57,7 +57,7 @@ pub fn check_lines(
         }
 
         if enforce_line_too_long {
-            if let Some(check) = line_too_long(index, line, settings.line_length) {
+            if let Some(check) = line_too_long(index, line, settings) {
                 checks.push(check);
             }
         }

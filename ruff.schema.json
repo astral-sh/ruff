@@ -378,7 +378,7 @@
       ]
     },
     "task-tags": {
-      "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`).",
+      "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length checks (`E501`) if `ignore-overlong-task-comments` is set to `true`.",
       "type": [
         "array",
         "null"
@@ -1461,6 +1461,15 @@
     },
     "Pycodestyle": {
       "type": "object",
+      "properties": {
+        "ignore-overlong-task-comments": {
+          "description": "Whether or not line-length checks (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
       "additionalProperties": false
     },
     "Pydocstyle": {
