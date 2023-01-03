@@ -957,6 +957,8 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
+| SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
+| SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
 | SIM300 | YodaConditions | Use `left == right` instead of `right == left (Yoda-conditions)` |  |
 
 ### flake8-tidy-imports (TID)
@@ -1346,7 +1348,7 @@ natively, including:
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
-- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (1/37)
+- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (4/37)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`isort`](https://pypi.org/project/isort/)
@@ -1404,7 +1406,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
-- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (1/37)
+- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (4/37)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
 - [`mccabe`](https://pypi.org/project/mccabe/)

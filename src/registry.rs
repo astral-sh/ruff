@@ -218,6 +218,8 @@ pub enum CheckCode {
     YTT303,
     // flake8-simplify
     SIM118,
+    SIM222,
+    SIM223,
     SIM300,
     // pyupgrade
     UP001,
@@ -943,6 +945,8 @@ pub enum CheckKind {
     SysVersionSlice1Referenced,
     // flake8-simplify
     KeyInDict(String, String),
+    AndFalse,
+    OrTrue,
     YodaConditions(String, String),
     // pyupgrade
     TypeOfPrimitive(Primitive),
@@ -1368,6 +1372,8 @@ impl CheckCode {
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
+            CheckCode::SIM222 => CheckKind::OrTrue,
+            CheckCode::SIM223 => CheckKind::AndFalse,
             CheckCode::SIM300 => CheckKind::YodaConditions("left".to_string(), "right".to_string()),
             // pyupgrade
             CheckCode::UP001 => CheckKind::UselessMetaclassType,
@@ -1889,6 +1895,8 @@ impl CheckCode {
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             // flake8-simplify
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM222 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM223 => CheckCategory::Flake8Simplify,
             CheckCode::SIM300 => CheckCategory::Flake8Simplify,
             // flake8-debugger
             CheckCode::T100 => CheckCategory::Flake8Debugger,
@@ -2135,6 +2143,8 @@ impl CheckKind {
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
+            CheckKind::OrTrue => &CheckCode::SIM222,
+            CheckKind::AndFalse => &CheckCode::SIM223,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
             CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
@@ -2889,6 +2899,8 @@ impl CheckKind {
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
+            CheckKind::OrTrue => "Use `True` instead of `... or True`".to_string(),
+            CheckKind::AndFalse => "Use `False` instead of `... and False`".to_string(),
             CheckKind::YodaConditions(left, right) => {
                 format!("Use `{left} == {right}` instead of `{right} == {left} (Yoda-conditions)`")
             }
@@ -3478,6 +3490,7 @@ impl CheckKind {
             CheckKind::AmbiguousUnicodeCharacterString(..)
                 | CheckKind::AmbiguousUnicodeCharacterComment(..)
                 | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::AndFalse
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
                 | CheckKind::BlankLineAfterSummary
@@ -3525,6 +3538,7 @@ impl CheckKind {
                 | CheckKind::OneBlankLineAfterClass(..)
                 | CheckKind::OneBlankLineBeforeClass(..)
                 | CheckKind::OpenAlias
+                | CheckKind::OrTrue
                 | CheckKind::PEP3120UnnecessaryCodingComment
                 | CheckKind::PPrintFound
                 | CheckKind::ParametrizeNamesWrongType(..)
@@ -3591,6 +3605,7 @@ impl CheckKind {
             | CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
                 Some(format!("Replace '{confusable}' with '{representant}'"))
             }
+            CheckKind::AndFalse => Some("Replace with `False`".to_string()),
             CheckKind::BlankLineAfterLastSection(name) => {
                 Some(format!("Add blank line after \"{name}\""))
             }
@@ -3655,6 +3670,7 @@ impl CheckKind {
                 Some(format!("Replace with `{literal_type}`"))
             }
             CheckKind::OpenAlias => Some("Replace with builtin `open`".to_string()),
+            CheckKind::OrTrue => Some("Replace with `True`".to_string()),
             CheckKind::NewLineAfterLastParagraph => {
                 Some("Move closing quotes to new line".to_string())
             }
