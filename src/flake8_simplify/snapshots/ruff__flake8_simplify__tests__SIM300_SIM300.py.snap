@@ -12,7 +12,14 @@ expression: checks
   end_location:
     row: 2
     column: 17
-  fix: ~
+  fix:
+    content: "compare == \"yoda\""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 17
   parent: ~
 - kind:
     YodaConditions:
@@ -24,6 +31,13 @@ expression: checks
   end_location:
     row: 3
     column: 9
-  fix: ~
+  fix:
+    content: age == 42
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 9
   parent: ~
 

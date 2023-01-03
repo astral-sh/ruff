@@ -3594,6 +3594,7 @@ impl CheckKind {
                 | CheckKind::UselessImportAlias
                 | CheckKind::UselessMetaclassType
                 | CheckKind::UselessObjectInheritance(..)
+                | CheckKind::YodaConditions(..)
         )
     }
 
@@ -3856,6 +3857,9 @@ impl CheckKind {
             CheckKind::UselessObjectInheritance(..) => {
                 Some("Remove `object` inheritance".to_string())
             }
+            CheckKind::YodaConditions(left, right) => Some(format!(
+                "Replace with `{left} == {right}` (Yoda-conditions)`"
+            )),
             _ => None,
         }
     }
