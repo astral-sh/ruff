@@ -9,6 +9,14 @@ e = (
     f"def" +
     "ghi"
 )
+f = (
+    f"a"
+    F"b"
+    "c"
+    rf"d"
+    fr"e"
+)
+g = f""
 
 # OK
 g = f"ghi{123:{45}}"
