@@ -391,6 +391,7 @@ pub enum CheckCode {
     PT026,
     // flake8-pie
     PIE790,
+    PIE794,
     PIE807,
     // Ruff
     RUF001,
@@ -1116,6 +1117,7 @@ pub enum CheckKind {
     ErroneousUseFixturesOnFixture,
     UseFixturesWithoutParameters,
     // flake8-pie
+    DupeClassFieldDefinitions(String),
     NoUnnecessaryPass,
     PreferListBuiltin,
     // Ruff
@@ -1571,6 +1573,7 @@ impl CheckCode {
             CheckCode::PT026 => CheckKind::UseFixturesWithoutParameters,
             // flake8-pie
             CheckCode::PIE790 => CheckKind::NoUnnecessaryPass,
+            CheckCode::PIE794 => CheckKind::DupeClassFieldDefinitions("...".to_string()),
             CheckCode::PIE807 => CheckKind::PreferListBuiltin,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
@@ -1938,6 +1941,7 @@ impl CheckCode {
             CheckCode::YTT303 => CheckCategory::Flake82020,
             // flake8-pie
             CheckCode::PIE790 => CheckCategory::Flake8Pie,
+            CheckCode::PIE794 => CheckCategory::Flake8Pie,
             CheckCode::PIE807 => CheckCategory::Flake8Pie,
             // Ruff
             CheckCode::RUF001 => CheckCategory::Ruff,
@@ -2306,6 +2310,7 @@ impl CheckKind {
             CheckKind::UseFixturesWithoutParameters => &CheckCode::PT026,
             // flake8-pie
             CheckKind::NoUnnecessaryPass => &CheckCode::PIE790,
+            CheckKind::DupeClassFieldDefinitions(..) => &CheckCode::PIE794,
             CheckKind::PreferListBuiltin => &CheckCode::PIE807,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
@@ -3358,6 +3363,9 @@ impl CheckKind {
                 "Useless `pytest.mark.usefixtures` without parameters".to_string()
             }
             // flake8-pie
+            CheckKind::DupeClassFieldDefinitions(name) => {
+                format!("Class field `{name}` is defined multiple times")
+            }
             CheckKind::NoUnnecessaryPass => "Unnecessary `pass` statement".to_string(),
             CheckKind::PreferListBuiltin => "Prefer `list()` over useless lambda".to_string(),
             // Ruff
@@ -3483,6 +3491,7 @@ impl CheckKind {
                 | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DoNotAssignLambda(..)
+                | CheckKind::DupeClassFieldDefinitions(..)
                 | CheckKind::DuplicateHandlerException(..)
                 | CheckKind::EndsInPeriod
                 | CheckKind::EndsInPunctuation
@@ -3606,6 +3615,9 @@ impl CheckKind {
             }
             CheckKind::DoNotAssertFalse => Some("Replace `assert False`".to_string()),
             CheckKind::DoNotAssignLambda(name) => Some(format!("Rewrite `{name}` as a `def`")),
+            CheckKind::DupeClassFieldDefinitions(name) => {
+                Some(format!("Remove duplicate field definition for `{name}`"))
+            }
             CheckKind::DuplicateHandlerException(..) => Some("De-duplicate exceptions".to_string()),
             CheckKind::EndsInPeriod => Some("Add period".to_string()),
             CheckKind::EndsInPunctuation => Some("Add closing punctuation".to_string()),
