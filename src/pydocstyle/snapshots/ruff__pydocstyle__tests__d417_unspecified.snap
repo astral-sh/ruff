@@ -37,4 +37,26 @@ expression: checks
     column: 12
   fix: ~
   parent: ~
+- kind:
+    DocumentAllArguments:
+      - x
+  location:
+    row: 98
+    column: 0
+  end_location:
+    row: 105
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      - "*args"
+  location:
+    row: 108
+    column: 0
+  end_location:
+    row: 115
+    column: 12
+  fix: ~
+  parent: ~
 
