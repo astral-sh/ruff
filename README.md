@@ -2237,7 +2237,8 @@ target-version = "py37"
 A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
 
 Comments starting with these tags will be ignored by commented-out code
-detection (`ERA`).
+detection (`ERA`), and skipped by line-length checks (`E501`) if
+`ignore-overlong-task-comments` is set to `true`.
 
 **Default value**: `["TODO", "FIXME", "XXX"]`
 
@@ -3036,6 +3037,25 @@ staticmethod-decorators = ["staticmethod", "stcmthd"]
 ---
 
 ### `pycodestyle`
+
+#### [`ignore-overlong-task-comments`](#ignore-overlong-task-comments)
+
+Whether or not line-length checks (`E501`) should be triggered for
+comments starting with `task-tags` (by default: ["TODO", "FIXME",
+and "XXX"]).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pycodestyle]
+ignore-overlong-task-comments = true
+```
+
+---
 
 ### `pydocstyle`
 
