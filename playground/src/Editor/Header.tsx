@@ -87,14 +87,12 @@ export default function Header({
       </div>
       <div className={"flex items-center min-w-0"}>
         {version ? (
-          <div className={"flex items-center"}>
+          <div className={"hidden sm:flex items-center"}>
             <VersionTag>v{version}</VersionTag>
           </div>
         ) : null}
         <div className="hidden sm:block mx-6 lg:mx-4 w-px h-6 bg-gray-200 dark:bg-gray-700" />
-        <div className="hidden sm:block">
-          <RepoButton />
-        </div>
+        <RepoButton />
         <div className="hidden sm:block mx-6 lg:mx-4 w-px h-6 bg-gray-200 dark:bg-gray-700" />
         <div className="hidden sm:block">
           <ShareButton key={edit} onShare={onShare} />
