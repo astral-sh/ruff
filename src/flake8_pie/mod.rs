@@ -13,6 +13,7 @@ mod tests {
     use crate::settings;
 
     #[test_case(CheckCode::PIE807, Path::new("PIE807.py"); "PIE807")]
+    #[test_case(CheckCode::PIE790, Path::new("PIE790.py"); "PIE790")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(

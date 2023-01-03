@@ -1445,9 +1445,7 @@ where
                     globals,
                 })));
 
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(body);
             }
             StmtKind::Try {
                 body,
@@ -1459,19 +1457,13 @@ where
                 if self.settings.enabled.contains(&CheckCode::B012) {
                     flake8_bugbear::plugins::jump_statement_in_finally(self, finalbody);
                 }
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(body);
                 self.except_handlers.pop();
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
-                }
-                for stmt in finalbody {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(orelse);
+                self.visit_body(finalbody);
             }
             StmtKind::AnnAssign {
                 target,
@@ -2995,6 +2987,13 @@ where
 
         self.check_builtin_arg_shadowing(&arg.node.arg, arg);
     }
+
+    fn visit_body(&mut self, body: &'b [Stmt]) {
+        if self.settings.enabled.contains(&CheckCode::PIE790) {
+            flake8_pie::plugins::no_unnecessary_pass(self, body);
+        }
+        visitor::walk_body(self, body);
+    }
 }
 
 impl<'a> Checker<'a> {
@@ -3572,9 +3571,7 @@ impl<'a> Checker<'a> {
                 StmtKind::FunctionDef { body, args, .. }
                 | StmtKind::AsyncFunctionDef { body, args, .. } => {
                     self.visit_arguments(args);
-                    for stmt in body {
-                        self.visit_stmt(stmt);
-                    }
+                    self.visit_body(body);
                 }
                 _ => unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef"),
             }

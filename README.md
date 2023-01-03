@@ -1059,7 +1059,8 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PIE807 | PreferListBuiltin |  | 🛠 |
+| PIE790 | NoUnnecessaryPass | Unnecessary `pass` statement | 🛠 |
+| PIE807 | PreferListBuiltin | Prefer `list()` over useless lambda | 🛠 |
 
 ### Ruff-specific rules (RUF)
 

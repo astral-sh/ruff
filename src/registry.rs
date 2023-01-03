@@ -390,6 +390,7 @@ pub enum CheckCode {
     PT025,
     PT026,
     // flake8-pie
+    PIE790,
     PIE807,
     // Ruff
     RUF001,
@@ -1115,6 +1116,7 @@ pub enum CheckKind {
     ErroneousUseFixturesOnFixture,
     UseFixturesWithoutParameters,
     // flake8-pie
+    NoUnnecessaryPass,
     PreferListBuiltin,
     // Ruff
     AmbiguousUnicodeCharacterString(char, char),
@@ -1568,6 +1570,7 @@ impl CheckCode {
             CheckCode::PT025 => CheckKind::ErroneousUseFixturesOnFixture,
             CheckCode::PT026 => CheckKind::UseFixturesWithoutParameters,
             // flake8-pie
+            CheckCode::PIE790 => CheckKind::NoUnnecessaryPass,
             CheckCode::PIE807 => CheckKind::PreferListBuiltin,
             // Ruff
             CheckCode::RUF001 => CheckKind::AmbiguousUnicodeCharacterString('𝐁', 'B'),
@@ -1934,6 +1937,7 @@ impl CheckCode {
             CheckCode::YTT302 => CheckCategory::Flake82020,
             CheckCode::YTT303 => CheckCategory::Flake82020,
             // flake8-pie
+            CheckCode::PIE790 => CheckCategory::Flake8Pie,
             CheckCode::PIE807 => CheckCategory::Flake8Pie,
             // Ruff
             CheckCode::RUF001 => CheckCategory::Ruff,
@@ -2301,6 +2305,7 @@ impl CheckKind {
             CheckKind::ErroneousUseFixturesOnFixture => &CheckCode::PT025,
             CheckKind::UseFixturesWithoutParameters => &CheckCode::PT026,
             // flake8-pie
+            CheckKind::NoUnnecessaryPass => &CheckCode::PIE790,
             CheckKind::PreferListBuiltin => &CheckCode::PIE807,
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(..) => &CheckCode::RUF001,
@@ -3353,7 +3358,8 @@ impl CheckKind {
                 "Useless `pytest.mark.usefixtures` without parameters".to_string()
             }
             // flake8-pie
-            CheckKind::PreferListBuiltin => String::new(),
+            CheckKind::NoUnnecessaryPass => "Unnecessary `pass` statement".to_string(),
+            CheckKind::PreferListBuiltin => "Prefer `list()` over useless lambda".to_string(),
             // Ruff
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
                 format!(
@@ -3501,6 +3507,7 @@ impl CheckKind {
                 | CheckKind::NoOverIndentation
                 | CheckKind::NoSurroundingWhitespace
                 | CheckKind::NoUnderIndentation
+                | CheckKind::NoUnnecessaryPass
                 | CheckKind::NoneComparison(..)
                 | CheckKind::NotInTest
                 | CheckKind::NotIsTest
@@ -3662,6 +3669,7 @@ impl CheckKind {
             CheckKind::NoBlankLineBeforeClass(..) => {
                 Some("Remove blank line(s) before class docstring".to_string())
             }
+            CheckKind::NoUnnecessaryPass => Some("Remove unnecessary `pass`".to_string()),
             CheckKind::OneBlankLineBeforeClass(..) => {
                 Some("Insert 1 blank line before class docstring".to_string())
             }

@@ -1,0 +1,245 @@
+---
+source: src/flake8_pie/mod.rs
+expression: checks
+---
+- kind: NoUnnecessaryPass
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 9
+      column: 4
+    end_location:
+      row: 9
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 16
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 23
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 23
+      column: 4
+    end_location:
+      row: 23
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 30
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 30
+      column: 4
+    end_location:
+      row: 30
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 37
+    column: 4
+  end_location:
+    row: 37
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 37
+      column: 4
+    end_location:
+      row: 37
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 45
+    column: 4
+  end_location:
+    row: 45
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 45
+      column: 4
+    end_location:
+      row: 45
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 53
+    column: 4
+  end_location:
+    row: 53
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 53
+      column: 4
+    end_location:
+      row: 53
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 60
+    column: 4
+  end_location:
+    row: 60
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 60
+      column: 4
+    end_location:
+      row: 60
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 69
+    column: 4
+  end_location:
+    row: 69
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 69
+      column: 4
+    end_location:
+      row: 69
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 74
+    column: 4
+  end_location:
+    row: 74
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 74
+      column: 4
+    end_location:
+      row: 74
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 78
+    column: 4
+  end_location:
+    row: 78
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 78
+      column: 4
+    end_location:
+      row: 78
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 82
+    column: 4
+  end_location:
+    row: 82
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 82
+      column: 4
+    end_location:
+      row: 82
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 87
+    column: 4
+  end_location:
+    row: 87
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 87
+      column: 4
+    end_location:
+      row: 87
+      column: 8
+  parent: ~
+- kind: NoUnnecessaryPass
+  location:
+    row: 91
+    column: 4
+  end_location:
+    row: 91
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 91
+      column: 4
+    end_location:
+      row: 91
+      column: 8
+  parent: ~
+
