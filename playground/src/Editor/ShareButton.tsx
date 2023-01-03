@@ -28,7 +28,7 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
   ) : (
     <button
       type="button"
-      className="relative flex-none rounded-md text-sm font-semibold leading-6 py-1.5 px-3 enabled:hover:bg-ayu-accent/80 bg-ayu-accent text-white shadow-sm dark:shadow-highlight/20 disabled:opacity-50"
+      className="relative flex-none rounded-md text-sm font-semibold leading-6 py-1.5 px-3 enabled:hover:bg-ayu-accent/70 bg-ayu-accent text-white shadow-sm dark:shadow-highlight/20 disabled:opacity-50"
       disabled={!onShare || copied}
       onClick={
         onShare
