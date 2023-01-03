@@ -358,11 +358,7 @@ impl<'a> StringParser<'a> {
                 }
             }
         }
-        Err(if expression.trim().is_empty() {
-            FStringError::new(EmptyExpression, self.get_pos()).into()
-        } else {
-            FStringError::new(UnclosedLbrace, self.get_pos()).into()
-        })
+        Err(FStringError::new(UnclosedLbrace, self.get_pos()).into())
     }
 
     fn parse_spec(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
