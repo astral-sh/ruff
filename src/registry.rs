@@ -1144,7 +1144,7 @@ impl CheckCode {
     /// A placeholder representation of the `CheckKind` for the check.
     pub fn kind(&self) -> CheckKind {
         match self {
-            // pycodestyle errors
+            // pycodestyle (errors)
             CheckCode::E401 => CheckKind::MultipleImportsOnOneLine,
             CheckCode::E402 => CheckKind::ModuleImportNotAtTopOfFile,
             CheckCode::E501 => CheckKind::LineTooLong(89, 88),
@@ -1160,7 +1160,7 @@ impl CheckCode {
             CheckCode::E743 => CheckKind::AmbiguousFunctionName("...".to_string()),
             CheckCode::E902 => CheckKind::IOError("IOError: `...`".to_string()),
             CheckCode::E999 => CheckKind::SyntaxError("`...`".to_string()),
-            // pycodestyle warnings
+            // pycodestyle (warnings)
             CheckCode::W292 => CheckKind::NoNewLineAtEndOfFile,
             CheckCode::W605 => CheckKind::InvalidEscapeSequence('c'),
             // pyflakes
@@ -1568,9 +1568,11 @@ impl CheckCode {
     pub fn category(&self) -> CheckCategory {
         #[allow(clippy::match_same_arms)]
         match self {
+            // flake8-builtins
             CheckCode::A001 => CheckCategory::Flake8Builtins,
             CheckCode::A002 => CheckCategory::Flake8Builtins,
             CheckCode::A003 => CheckCategory::Flake8Builtins,
+            // flake8-annotations
             CheckCode::ANN001 => CheckCategory::Flake8Annotations,
             CheckCode::ANN002 => CheckCategory::Flake8Annotations,
             CheckCode::ANN003 => CheckCategory::Flake8Annotations,
@@ -1582,11 +1584,13 @@ impl CheckCode {
             CheckCode::ANN205 => CheckCategory::Flake8Annotations,
             CheckCode::ANN206 => CheckCategory::Flake8Annotations,
             CheckCode::ANN401 => CheckCategory::Flake8Annotations,
+            // flake8-unused-arguments
             CheckCode::ARG001 => CheckCategory::Flake8UnusedArguments,
             CheckCode::ARG002 => CheckCategory::Flake8UnusedArguments,
             CheckCode::ARG003 => CheckCategory::Flake8UnusedArguments,
             CheckCode::ARG004 => CheckCategory::Flake8UnusedArguments,
             CheckCode::ARG005 => CheckCategory::Flake8UnusedArguments,
+            // flake8-bugbear
             CheckCode::B002 => CheckCategory::Flake8Bugbear,
             CheckCode::B003 => CheckCategory::Flake8Bugbear,
             CheckCode::B004 => CheckCategory::Flake8Bugbear,
@@ -1615,7 +1619,9 @@ impl CheckCode {
             CheckCode::B027 => CheckCategory::Flake8Bugbear,
             CheckCode::B904 => CheckCategory::Flake8Bugbear,
             CheckCode::B905 => CheckCategory::Flake8Bugbear,
+            // flake8-blind-except
             CheckCode::BLE001 => CheckCategory::Flake8BlindExcept,
+            // flake8-comprehensions
             CheckCode::C400 => CheckCategory::Flake8Comprehensions,
             CheckCode::C401 => CheckCategory::Flake8Comprehensions,
             CheckCode::C402 => CheckCategory::Flake8Comprehensions,
@@ -1632,7 +1638,9 @@ impl CheckCode {
             CheckCode::C415 => CheckCategory::Flake8Comprehensions,
             CheckCode::C416 => CheckCategory::Flake8Comprehensions,
             CheckCode::C417 => CheckCategory::Flake8Comprehensions,
+            // mccabe
             CheckCode::C901 => CheckCategory::McCabe,
+            // pydocstyle
             CheckCode::D100 => CheckCategory::Pydocstyle,
             CheckCode::D101 => CheckCategory::Pydocstyle,
             CheckCode::D102 => CheckCategory::Pydocstyle,
@@ -1678,6 +1686,7 @@ impl CheckCode {
             CheckCode::D417 => CheckCategory::Pydocstyle,
             CheckCode::D418 => CheckCategory::Pydocstyle,
             CheckCode::D419 => CheckCategory::Pydocstyle,
+            // flake8-datetimez
             CheckCode::DTZ001 => CheckCategory::Flake8Datetimez,
             CheckCode::DTZ002 => CheckCategory::Flake8Datetimez,
             CheckCode::DTZ003 => CheckCategory::Flake8Datetimez,
@@ -1687,6 +1696,7 @@ impl CheckCode {
             CheckCode::DTZ007 => CheckCategory::Flake8Datetimez,
             CheckCode::DTZ011 => CheckCategory::Flake8Datetimez,
             CheckCode::DTZ012 => CheckCategory::Flake8Datetimez,
+            // pycodestyle (errors)
             CheckCode::E401 => CheckCategory::Pycodestyle,
             CheckCode::E402 => CheckCategory::Pycodestyle,
             CheckCode::E501 => CheckCategory::Pycodestyle,
@@ -1702,10 +1712,13 @@ impl CheckCode {
             CheckCode::E743 => CheckCategory::Pycodestyle,
             CheckCode::E902 => CheckCategory::Pycodestyle,
             CheckCode::E999 => CheckCategory::Pycodestyle,
+            // flake8-errmsg
             CheckCode::EM101 => CheckCategory::Flake8ErrMsg,
             CheckCode::EM102 => CheckCategory::Flake8ErrMsg,
             CheckCode::EM103 => CheckCategory::Flake8ErrMsg,
+            // eradicate
             CheckCode::ERA001 => CheckCategory::Eradicate,
+            // pyflakes
             CheckCode::F401 => CheckCategory::Pyflakes,
             CheckCode::F402 => CheckCategory::Pyflakes,
             CheckCode::F403 => CheckCategory::Pyflakes,
@@ -1749,14 +1762,19 @@ impl CheckCode {
             CheckCode::F841 => CheckCategory::Pyflakes,
             CheckCode::F842 => CheckCategory::Pyflakes,
             CheckCode::F901 => CheckCategory::Pyflakes,
+            // flake8-boolean-trap
             CheckCode::FBT001 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
             CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
+            // isort
             CheckCode::I001 => CheckCategory::Isort,
+            // flake8-import-conventions
             CheckCode::ICN001 => CheckCategory::Flake8ImportConventions,
+            // flake8-implicit-str-concat
             CheckCode::ISC001 => CheckCategory::Flake8ImplicitStrConcat,
             CheckCode::ISC002 => CheckCategory::Flake8ImplicitStrConcat,
             CheckCode::ISC003 => CheckCategory::Flake8ImplicitStrConcat,
+            // pep8-naming
             CheckCode::N801 => CheckCategory::PEP8Naming,
             CheckCode::N802 => CheckCategory::PEP8Naming,
             CheckCode::N803 => CheckCategory::PEP8Naming,
@@ -1772,6 +1790,7 @@ impl CheckCode {
             CheckCode::N816 => CheckCategory::PEP8Naming,
             CheckCode::N817 => CheckCategory::PEP8Naming,
             CheckCode::N818 => CheckCategory::PEP8Naming,
+            // pandas-vet
             CheckCode::PD002 => CheckCategory::PandasVet,
             CheckCode::PD003 => CheckCategory::PandasVet,
             CheckCode::PD004 => CheckCategory::PandasVet,
@@ -1784,10 +1803,12 @@ impl CheckCode {
             CheckCode::PD013 => CheckCategory::PandasVet,
             CheckCode::PD015 => CheckCategory::PandasVet,
             CheckCode::PD901 => CheckCategory::PandasVet,
+            // pygrep-hooks
             CheckCode::PGH001 => CheckCategory::PygrepHooks,
             CheckCode::PGH002 => CheckCategory::PygrepHooks,
             CheckCode::PGH003 => CheckCategory::PygrepHooks,
             CheckCode::PGH004 => CheckCategory::PygrepHooks,
+            // pylint
             CheckCode::PLC0414 => CheckCategory::Pylint,
             CheckCode::PLC2201 => CheckCategory::Pylint,
             CheckCode::PLC3002 => CheckCategory::Pylint,
@@ -1800,6 +1821,7 @@ impl CheckCode {
             CheckCode::PLR1722 => CheckCategory::Pylint,
             CheckCode::PLW0120 => CheckCategory::Pylint,
             CheckCode::PLW0602 => CheckCategory::Pylint,
+            // flake8-pytest-style
             CheckCode::PT001 => CheckCategory::Flake8PytestStyle,
             CheckCode::PT002 => CheckCategory::Flake8PytestStyle,
             CheckCode::PT003 => CheckCategory::Flake8PytestStyle,
@@ -1825,10 +1847,12 @@ impl CheckCode {
             CheckCode::PT024 => CheckCategory::Flake8PytestStyle,
             CheckCode::PT025 => CheckCategory::Flake8PytestStyle,
             CheckCode::PT026 => CheckCategory::Flake8PytestStyle,
+            // flake8-quotes
             CheckCode::Q000 => CheckCategory::Flake8Quotes,
             CheckCode::Q001 => CheckCategory::Flake8Quotes,
             CheckCode::Q002 => CheckCategory::Flake8Quotes,
             CheckCode::Q003 => CheckCategory::Flake8Quotes,
+            // flake8-return
             CheckCode::RET501 => CheckCategory::Flake8Return,
             CheckCode::RET502 => CheckCategory::Flake8Return,
             CheckCode::RET503 => CheckCategory::Flake8Return,
@@ -1837,24 +1861,25 @@ impl CheckCode {
             CheckCode::RET506 => CheckCategory::Flake8Return,
             CheckCode::RET507 => CheckCategory::Flake8Return,
             CheckCode::RET508 => CheckCategory::Flake8Return,
-            CheckCode::RUF001 => CheckCategory::Ruff,
-            CheckCode::RUF002 => CheckCategory::Ruff,
-            CheckCode::RUF003 => CheckCategory::Ruff,
-            CheckCode::RUF004 => CheckCategory::Ruff,
-            CheckCode::RUF100 => CheckCategory::Ruff,
+            // flake8-bandit
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
             CheckCode::S104 => CheckCategory::Flake8Bandit,
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
+            // flake8-simplify
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::SIM300 => CheckCategory::Flake8Simplify,
+            // flake8-debugger
             CheckCode::T100 => CheckCategory::Flake8Debugger,
+            // flake8-print
             CheckCode::T201 => CheckCategory::Flake8Print,
             CheckCode::T203 => CheckCategory::Flake8Print,
+            // flake8-tidy-imports
             CheckCode::TID251 => CheckCategory::Flake8TidyImports,
             CheckCode::TID252 => CheckCategory::Flake8TidyImports,
+            // pyupgrade
             CheckCode::UP001 => CheckCategory::Pyupgrade,
             CheckCode::UP003 => CheckCategory::Pyupgrade,
             CheckCode::UP004 => CheckCategory::Pyupgrade,
@@ -1881,8 +1906,10 @@ impl CheckCode {
             CheckCode::UP025 => CheckCategory::Pyupgrade,
             CheckCode::UP026 => CheckCategory::Pyupgrade,
             CheckCode::UP027 => CheckCategory::Pyupgrade,
+            // pycodestyle (warnings)
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
+            // flake8-2020
             CheckCode::YTT101 => CheckCategory::Flake82020,
             CheckCode::YTT102 => CheckCategory::Flake82020,
             CheckCode::YTT103 => CheckCategory::Flake82020,
@@ -1893,6 +1920,12 @@ impl CheckCode {
             CheckCode::YTT301 => CheckCategory::Flake82020,
             CheckCode::YTT302 => CheckCategory::Flake82020,
             CheckCode::YTT303 => CheckCategory::Flake82020,
+            // Ruff
+            CheckCode::RUF001 => CheckCategory::Ruff,
+            CheckCode::RUF002 => CheckCategory::Ruff,
+            CheckCode::RUF003 => CheckCategory::Ruff,
+            CheckCode::RUF004 => CheckCategory::Ruff,
+            CheckCode::RUF100 => CheckCategory::Ruff,
         }
     }
 }
@@ -1901,7 +1934,7 @@ impl CheckKind {
     /// A four-letter shorthand code for the check.
     pub fn code(&self) -> &'static CheckCode {
         match self {
-            // pycodestyle errors
+            // pycodestyle (errors)
             CheckKind::AmbiguousClassName(..) => &CheckCode::E742,
             CheckKind::AmbiguousFunctionName(..) => &CheckCode::E743,
             CheckKind::AmbiguousVariableName(..) => &CheckCode::E741,
@@ -1960,7 +1993,7 @@ impl CheckKind {
             CheckKind::UnusedVariable(..) => &CheckCode::F841,
             CheckKind::UnusedAnnotation(..) => &CheckCode::F842,
             CheckKind::YieldOutsideFunction(..) => &CheckCode::F704,
-            // pycodestyle warnings
+            // pycodestyle (warnings)
             CheckKind::NoNewLineAtEndOfFile => &CheckCode::W292,
             CheckKind::InvalidEscapeSequence(..) => &CheckCode::W605,
             // pylint
@@ -2264,7 +2297,7 @@ impl CheckKind {
     /// The body text for the check.
     pub fn body(&self) -> String {
         match self {
-            // pycodestyle errors
+            // pycodestyle (errors)
             CheckKind::AmbiguousClassName(name) => {
                 format!("Ambiguous class name: `{name}`")
             }
@@ -2444,7 +2477,7 @@ impl CheckKind {
             CheckKind::YieldOutsideFunction(keyword) => {
                 format!("`{keyword}` statement outside of a function")
             }
-            // pycodestyle warnings
+            // pycodestyle (warnings)
             CheckKind::NoNewLineAtEndOfFile => "No newline at end of file".to_string(),
             CheckKind::InvalidEscapeSequence(char) => {
                 format!("Invalid escape sequence: '\\{char}'")
