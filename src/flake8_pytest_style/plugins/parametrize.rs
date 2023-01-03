@@ -43,7 +43,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 &create_expr(ExprKind::Tuple {
                                     elts: names
                                         .iter()
-                                        .map(|name| {
+                                        .map(|&name| {
                                             create_expr(ExprKind::Constant {
                                                 value: Constant::Str(name.to_string()),
                                                 kind: None,
@@ -80,7 +80,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 &create_expr(ExprKind::List {
                                     elts: names
                                         .iter()
-                                        .map(|name| {
+                                        .map(|&name| {
                                             create_expr(ExprKind::Constant {
                                                 value: Constant::Str(name.to_string()),
                                                 kind: None,
