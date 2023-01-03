@@ -2280,15 +2280,7 @@ where
             }
             ExprKind::JoinedStr { values } => {
                 if self.settings.enabled.contains(&CheckCode::F541) {
-                    if !values
-                        .iter()
-                        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
-                    {
-                        self.add_check(Check::new(
-                            CheckKind::FStringMissingPlaceholders,
-                            Range::from_located(expr),
-                        ));
-                    }
+                    pyflakes::plugins::f_string_missing_placeholders(expr, values, self);
                 }
             }
             ExprKind::BinOp {

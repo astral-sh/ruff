@@ -9,6 +9,7 @@ use rustpython_ast::{
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+use rustpython_parser::token::StringKind;
 
 use crate::ast::types::Range;
 use crate::SourceCodeLocator;
@@ -468,6 +469,43 @@ pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Ran
         })
         .expect("Failed to find `except` range");
     range
+}
+
+/// Find f-strings that don't contain any formatted values in a `JoinedStr`.
+pub fn find_useless_f_strings(expr: &Expr, locator: &SourceCodeLocator) -> Vec<(Range, Range)> {
+    let contents = locator.slice_source_code_range(&Range::from_located(expr));
+    lexer::make_tokenizer_located(&contents, expr.location)
+        .flatten()
+        .filter_map(|(location, tok, end_location)| match tok {
+            Tok::String {
+                kind: StringKind::FString | StringKind::RawFString,
+                ..
+            } => {
+                let first_char = locator.slice_source_code_range(&Range {
+                    location,
+                    end_location: Location::new(location.row(), location.column() + 1),
+                });
+                // f"..."  => f_position = 0
+                // fr"..." => f_position = 0
+                // rf"..." => f_position = 1
+                let f_position = usize::from(!(first_char == "f" || first_char == "F"));
+                Some((
+                    Range {
+                        location: Location::new(location.row(), location.column() + f_position),
+                        end_location: Location::new(
+                            location.row(),
+                            location.column() + f_position + 1,
+                        ),
+                    },
+                    Range {
+                        location,
+                        end_location,
+                    },
+                ))
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 /// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
