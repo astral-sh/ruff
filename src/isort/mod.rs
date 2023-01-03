@@ -399,7 +399,7 @@ fn categorize_imports<'a>(
     block_by_type
 }
 
-fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
+fn sort_imports(block: ImportBlock, order_by_type: bool) -> OrderedImportBlock {
     let mut ordered = OrderedImportBlock::default();
 
     // Sort `StmtKind::Import`.
@@ -477,7 +477,9 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                     locations,
                     aliases
                         .into_iter()
-                        .sorted_by(|(alias1, _), (alias2, _)| cmp_members(alias1, alias2))
+                        .sorted_by(|(alias1, _), (alias2, _)| {
+                            cmp_members(alias1, alias2, order_by_type)
+                        })
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
             })
@@ -488,7 +490,9 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                             (None, None) => Ordering::Equal,
                             (None, Some(_)) => Ordering::Less,
                             (Some(_), None) => Ordering::Greater,
-                            (Some((alias1, _)), Some((alias2, _))) => cmp_members(alias1, alias2),
+                            (Some((alias1, _)), Some((alias2, _))) => {
+                                cmp_members(alias1, alias2, order_by_type)
+                            }
                         }
                     })
                 },
@@ -561,6 +565,7 @@ pub fn format_imports(
     split_on_trailing_comma: bool,
     force_single_line: bool,
     single_line_exclusions: &BTreeSet<String>,
+    order_by_type: bool,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -583,7 +588,7 @@ pub fn format_imports(
     // Generate replacement source code.
     let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
-        let mut import_block = sort_imports(import_block);
+        let mut import_block = sort_imports(import_block, order_by_type);
         if force_single_line {
             import_block = force_single_line_imports(import_block, single_line_exclusions);
         }
@@ -778,6 +783,27 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("order_by_type.py"))]
+    fn order_by_type(path: &Path) -> Result<()> {
+        let snapshot = format!("order_by_type_false_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    order_by_type: false,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }

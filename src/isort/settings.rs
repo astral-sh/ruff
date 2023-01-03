@@ -79,6 +79,16 @@ pub struct Options {
     /// See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
     pub split_on_trailing_comma: Option<bool>,
     #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = r#"
+            order-by-type = true
+        "#
+    )]
+    /// Order imports by type, which is determined by case, in addition to
+    /// alphabetically.
+    pub order_by_type: Option<bool>,
+    #[option(
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
@@ -120,6 +130,7 @@ pub struct Settings {
     pub single_line_exclusions: BTreeSet<String>,
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
+    pub order_by_type: bool,
     pub extra_standard_library: BTreeSet<String>,
 }
 
@@ -130,6 +141,7 @@ impl Default for Settings {
             force_wrap_aliases: false,
             split_on_trailing_comma: true,
             force_single_line: false,
+            order_by_type: true,
             single_line_exclusions: BTreeSet::new(),
             known_first_party: BTreeSet::new(),
             known_third_party: BTreeSet::new(),
@@ -145,6 +157,7 @@ impl From<Options> for Settings {
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
             split_on_trailing_comma: options.split_on_trailing_comma.unwrap_or(true),
             force_single_line: options.force_single_line.unwrap_or(false),
+            order_by_type: options.order_by_type.unwrap_or(true),
             single_line_exclusions: BTreeSet::from_iter(
                 options.single_line_exclusions.unwrap_or_default(),
             ),
@@ -164,6 +177,7 @@ impl From<Settings> for Options {
             force_wrap_aliases: Some(settings.force_wrap_aliases),
             split_on_trailing_comma: Some(settings.split_on_trailing_comma),
             force_single_line: Some(settings.force_single_line),
+            order_by_type: Some(settings.order_by_type),
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
             known_first_party: Some(settings.known_first_party.into_iter().collect()),
             known_third_party: Some(settings.known_third_party.into_iter().collect()),

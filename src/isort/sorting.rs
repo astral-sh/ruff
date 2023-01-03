@@ -11,8 +11,10 @@ pub enum Prefix {
     Variables,
 }
 
-fn prefix(name: &str) -> Prefix {
-    if name.len() > 1 && string::is_upper(name) {
+fn prefix(name: &str, order_by_type: bool) -> Prefix {
+    if !order_by_type {
+        Prefix::Variables
+    } else if name.len() > 1 && string::is_upper(name) {
         // Ex) `CONSTANT`
         Prefix::Constants
     } else if name.chars().next().map_or(false, char::is_uppercase) {
@@ -37,9 +39,9 @@ pub fn cmp_modules(alias1: &AliasData, alias2: &AliasData) -> Ordering {
 }
 
 /// Compare two member imports within `StmtKind::ImportFrom` blocks.
-pub fn cmp_members(alias1: &AliasData, alias2: &AliasData) -> Ordering {
-    prefix(alias1.name)
-        .cmp(&prefix(alias2.name))
+pub fn cmp_members(alias1: &AliasData, alias2: &AliasData, order_by_type: bool) -> Ordering {
+    prefix(alias1.name, order_by_type)
+        .cmp(&prefix(alias2.name, order_by_type))
         .then_with(|| cmp_modules(alias1, alias2))
 }
 
