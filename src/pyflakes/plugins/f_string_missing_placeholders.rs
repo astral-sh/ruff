@@ -5,6 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
 
+/// F541
 pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
     if !values
         .iter()
