@@ -112,6 +112,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         show_source: None,
         src: None,
         unfixable: None,
+        task_tags: None,
         update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),

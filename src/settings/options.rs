@@ -340,6 +340,16 @@ pub struct Options {
     /// A list of check code prefixes to consider un-autofix-able.
     pub unfixable: Option<Vec<CheckCodePrefix>>,
     #[option(
+        default = r#"["TODO", "FIXME", "XXX"]"#,
+        value_type = "Vec<String>",
+        example = r#"task-tags = ["HACK"]"#
+    )]
+    /// A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
+    ///
+    /// Comments starting with these tags will be ignored by commented-out code
+    /// detection (`ERA`).
+    pub task_tags: Option<Vec<String>>,
+    #[option(
         default = "true",
         value_type = "bool",
         example = "update-check = false"
