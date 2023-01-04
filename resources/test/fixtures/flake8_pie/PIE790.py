@@ -9,6 +9,11 @@ if foo:
     pass  # PIE790
 
 
+def multi_statement() -> None:
+    """This is a function."""
+    pass; print("hello")
+
+
 if foo:
     pass
 else:
