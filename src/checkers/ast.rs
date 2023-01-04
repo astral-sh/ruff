@@ -2933,7 +2933,7 @@ where
                 &comprehension.iter,
             );
         }
-        visitor::walk_comprehension(self, &comprehension);
+        visitor::walk_comprehension(self, comprehension);
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
