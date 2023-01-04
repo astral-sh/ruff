@@ -2757,6 +2757,25 @@ force-single-line = true
 
 ---
 
+#### [`force-sort-within-sections`](#force-sort-within-sections)
+
+Don't sort straight-style imports (like import sys) before from-style
+imports (like from itertools import groupby). Instead, sort the imports
+by module, independent of import style.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+force-sort-within-sections = true
+```
+
+---
+
 #### [`force-wrap-aliases`](#force-wrap-aliases)
 
 Force `import from` statements with multiple members and at least one

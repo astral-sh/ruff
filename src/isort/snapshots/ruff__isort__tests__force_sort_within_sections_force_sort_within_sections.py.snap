@@ -1,0 +1,21 @@
+---
+source: src/isort/mod.rs
+expression: checks
+---
+- kind: UnsortedImports
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 11
+    column: 0
+  fix:
+    content: "import numpy as np\nimport torch\nimport torch.nn.functional as F\nfrom torch.utils.data import DataLoader\nfrom torchvision import datasets\nfrom torchvision.transforms import ToTensor\nimport tqdm\n\nfrom . import my_module\nfrom .my_module import my_func\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 11
+      column: 0
+  parent: ~
+

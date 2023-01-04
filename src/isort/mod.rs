@@ -11,7 +11,7 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::helpers::trailing_comma;
-use crate::isort::sorting::{cmp_import_from, cmp_members, cmp_modules};
+use crate::isort::sorting::{cmp_import_from, cmp_members, cmp_modules, merge_imports};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
@@ -549,6 +549,7 @@ pub fn format_imports(
     force_single_line: bool,
     single_line_exclusions: &BTreeSet<String>,
     order_by_type: bool,
+    force_sort_within_sections: bool,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -585,29 +586,29 @@ pub fn format_imports(
 
         let mut is_first_statement = true;
 
-        // Format `StmtKind::Import` statements.
-        for (alias, comments) in &import_block.import {
-            output.append(&format::format_import(
-                alias,
-                comments,
-                is_first_statement,
-                stylist,
-            ));
-            is_first_statement = false;
-        }
-
-        // Format `StmtKind::ImportFrom` statements.
-        for (import_from, comments, trailing_comma, aliases) in &import_block.import_from {
-            output.append(&format::format_import_from(
-                import_from,
-                comments,
-                aliases,
-                line_length,
-                stylist,
-                force_wrap_aliases,
-                is_first_statement,
-                split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
-            ));
+        for (v, idx) in merge_imports(&import_block, force_sort_within_sections) {
+            if v == 0 {
+                let (alias, comments) = &import_block.import[idx];
+                output.append(&format::format_import(
+                    alias,
+                    comments,
+                    is_first_statement,
+                    stylist,
+                ));
+            } else if v == 1 {
+                let (import_from, comments, trailing_comma, aliases) =
+                    &import_block.import_from[idx];
+                output.append(&format::format_import_from(
+                    import_from,
+                    comments,
+                    aliases,
+                    line_length,
+                    stylist,
+                    force_wrap_aliases,
+                    is_first_statement,
+                    split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
+                ));
+            }
             is_first_statement = false;
         }
     }
@@ -781,6 +782,27 @@ mod tests {
             &Settings {
                 isort: isort::settings::Settings {
                     order_by_type: false,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_sort_within_sections.py"))]
+    fn force_sort_within_sections(path: &Path) -> Result<()> {
+        let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    force_sort_within_sections: true,
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
