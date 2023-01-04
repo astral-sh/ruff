@@ -3,6 +3,7 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
+use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
@@ -123,6 +124,48 @@ impl YieldFrom {
     }
 }
 
+#[derive(Default)]
+pub struct YieldFromVisitor<'a> {
+    pub stack: Stack<'a>,
+}
+
+impl<'a> Visitor<'a> for YieldFromVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match &stmt.node {
+            StmtKind::For {
+                target,
+                body,
+                orelse,
+                iter,
+                ..
+            } => {
+                // If there is an else statement we should not refactor
+                if !orelse.is_empty() {
+                    return;
+                }
+                // Don't run if there is logic besides the yield
+                if body.len() > 1 {
+                    return;
+                }
+                let first_statement = match body.get(0) {
+                    None => return,
+                    Some(item) => item,
+                };
+                if let StmtKind::Expr { value } = &first_statement.node {
+                    if let ExprKind::Yield { .. } = &value.node {
+                        let the_item = YieldFrom::new(stmt, iter, value, target).unwrap();
+                        yields.push(the_item);
+                    }
+                }
+            }
+            StmtKind::FunctionDef { body: _, .. } | StmtKind::AsyncFunctionDef { body: _, .. } => {
+                // Don't recurse.
+            }
+            _ => (),
+        }
+    }
+}
+
 fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
     match &stmt.node {
         StmtKind::For {
@@ -151,7 +194,7 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
                 }
             }
         }
-        StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
+        StmtKind::FunctionDef { body: _, .. } | StmtKind::AsyncFunctionDef { body: _, .. } => {
             // Don't recurse.
         }
         _ => (),
@@ -159,7 +202,7 @@ fn get_yields_from(stmt: &Stmt, yields: &mut Vec<YieldFrom>) {
 }
 
 /// UP028
-pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
+pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt, body: &[Stmt]) {
     let mut yields: Vec<YieldFrom> = vec![];
     get_yields_from(stmt, &mut yields);
     for item in yields {

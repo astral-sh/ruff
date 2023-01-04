@@ -3563,7 +3563,6 @@ impl CheckKind {
                 | CheckKind::RewriteListComprehension
                 | CheckKind::RewriteMockImport(..)
                 | CheckKind::RewriteUnicodeLiteral
-                | CheckKind::RewriteListComprehension
                 | CheckKind::RewriteYieldFrom
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)

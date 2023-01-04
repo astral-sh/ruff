@@ -1,0 +1,7 @@
+---
+source: src/pyupgrade/mod.rs
+assertion_line: 61
+expression: checks
+---
+[]
+

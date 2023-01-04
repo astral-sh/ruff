@@ -3,6 +3,7 @@ def f():
     for x in z:
         yield
 
+
 def f():
     for x in z:
         yield y
@@ -75,3 +76,21 @@ def f():
 
 def f(x):
     del x
+
+
+async def f():
+    for x in y:
+        yield x
+
+
+def f():
+    x = 1
+    print(x)
+    for x in y:
+        yield x
+
+
+def f():
+    for x in y:
+        yield x
+    print(x)
