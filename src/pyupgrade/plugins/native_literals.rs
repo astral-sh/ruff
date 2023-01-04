@@ -17,21 +17,31 @@ pub fn native_literals(
 ) {
     let ExprKind::Name { id, .. } = &func.node else { return; };
 
-    if (id == "str" || id == "bytes")
-        && keywords.is_empty()
-        && args.len() <= 1
-        && checker.is_builtin(id)
-    {
+    if !keywords.is_empty() || args.len() > 1 {
+        return;
+    }
+
+    if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let literal_type = if id == "str" {
+            let mut check = Check::new(CheckKind::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
-            };
-             let mut check = Check::new(CheckKind::NativeLiterals(literal_type), Range::from_located(expr));
+            }), Range::from_located(expr));
             if checker.patch(&CheckCode::UP018) {
                 check.amend(Fix::replacement(
-                    format!("{}\"\"", if id == "bytes" { "b" } else { "" }),
+                    if id == "bytes" {
+                        let mut content = String::with_capacity(3);
+                        content.push('b');
+                        content.push(checker.style.quote().into());
+                        content.push(checker.style.quote().into());
+                        content
+                    } else {
+                        let mut content = String::with_capacity(2);
+                        content.push(checker.style.quote().into());
+                        content.push(checker.style.quote().into());
+                        content
+                    },
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
@@ -40,14 +50,31 @@ pub fn native_literals(
             return;
         };
 
-        let ExprKind::Constant { value, ..} = &arg.node else {
+        // Look for `str("")`.
+        if id == "str"
+            && !matches!(
+                &arg.node,
+                ExprKind::Constant {
+                    value: Constant::Str(_),
+                    ..
+                },
+            )
+        {
             return;
-        };
-        let literal_type = match value {
-            Constant::Str { .. } => LiteralType::Str,
-            Constant::Bytes { .. } => LiteralType::Bytes,
-            _ => return,
-        };
+        }
+
+        // Look for `bytes(b"")`
+        if id == "bytes"
+            && !matches!(
+                &arg.node,
+                ExprKind::Constant {
+                    value: Constant::Bytes(_),
+                    ..
+                },
+            )
+        {
+            return;
+        }
 
         // rust-python merges adjacent string/bytes literals into one node, but we can't
         // safely remove the outer call in this situation. We're following pyupgrade
@@ -65,7 +92,11 @@ pub fn native_literals(
         }
 
         let mut check = Check::new(
-            CheckKind::NativeLiterals(literal_type),
+            CheckKind::NativeLiterals(if id == "str" {
+                LiteralType::Str
+            } else {
+                LiteralType::Bytes
+            }),
             Range::from_located(expr),
         );
         if checker.patch(&CheckCode::UP018) {
