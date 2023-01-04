@@ -1493,52 +1493,20 @@ For example, if you're coming from `flake8-docstrings`, and your originating con
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Note that setting a `convention` is equivalent to adding that convention's specific set of codes to
-your `select`. For example, `convention = "numpy"` is equivalent to:
+Alongside `convention`, you'll want to explicitly enable the `D` error code class, like so:
 
 ```toml
 [tool.ruff]
-# Enable all `D` errors except `D107`, `D203`, `D212`, `D213`, `D402`, `D413`, `D415`, `D416`,
-# and `D417`.
 select = [
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D104",
-    "D105",
-    "D106",
-    "D200",
-    "D201",
-    "D202",
-    "D204",
-    "D205",
-    "D206",
-    "D207",
-    "D208",
-    "D209",
-    "D210",
-    "D211",
-    "D214",
-    "D215",
-    "D300",
-    "D301",
-    "D400",
-    "D403",
-    "D404",
-    "D405",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D410",
-    "D411",
-    "D412",
-    "D414",
-    "D418",
-    "D419",
+    "D",
 ]
+
+[tool.ruff.pydocstyle]
+convention = "google"
 ```
+
+Setting a `convention` force-disables any rules that are incompatible with that convention, no
+matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
 
 ### How can I tell what settings Ruff is using to check my code?
 
