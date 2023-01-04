@@ -1357,6 +1357,9 @@ where
                     body,
                     &Documentable::Function,
                 );
+                if self.settings.enabled.contains(&CheckCode::UP028) {
+                    pyupgrade::plugins::rewrite_yield_from(self, stmt);
+                }
                 let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Function);
                 self.definitions
                     .push((definition, scope.visibility.clone()));

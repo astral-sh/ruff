@@ -16,6 +16,59 @@ fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> O
         .find(|decorator| is_pytest_parametrize(decorator, checker))
 }
 
+fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
+    let all_literals = elts.iter().all(|e| {
+        matches!(
+            e.node,
+            ExprKind::Constant {
+                value: Constant::Str(_),
+                ..
+            }
+        )
+    });
+
+    if !all_literals {
+        return None;
+    }
+
+    let mut generator = SourceCodeGenerator::new(
+        checker.style.indentation(),
+        checker.style.quote(),
+        checker.style.line_ending(),
+    );
+
+    generator.unparse_expr(
+        &create_expr(ExprKind::Constant {
+            value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
+                if let ExprKind::Constant {
+                    value: Constant::Str(ref s),
+                    ..
+                } = elt.node
+                {
+                    if !acc.is_empty() {
+                        acc.push(',');
+                    }
+                    acc.push_str(s);
+                }
+                acc
+            })),
+            kind: None,
+        }),
+        0,
+    );
+
+    match generator.generate() {
+        Ok(s) => Some(s),
+        Err(e) => {
+            error!(
+                "Failed to generate CSV string from sequence of names: {}",
+                e
+            );
+            None
+        }
+    }
+}
+
 /// PT006
 fn check_names(checker: &mut Checker, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
@@ -134,11 +187,60 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 if let Some(first) = elts.first() {
                     handle_single_name(checker, expr, first);
                 }
-            } else if names_type != types::ParametrizeNameType::Tuple {
-                checker.add_check(Check::new(
-                    CheckKind::ParametrizeNamesWrongType(names_type),
-                    Range::from_located(expr),
-                ));
+            } else {
+                match names_type {
+                    types::ParametrizeNameType::Tuple => {}
+                    types::ParametrizeNameType::List => {
+                        let mut check = Check::new(
+                            CheckKind::ParametrizeNamesWrongType(names_type),
+                            Range::from_located(expr),
+                        );
+                        if checker.patch(check.kind.code()) {
+                            let mut generator = SourceCodeGenerator::new(
+                                checker.style.indentation(),
+                                checker.style.quote(),
+                                checker.style.line_ending(),
+                            );
+                            generator.unparse_expr(
+                                &create_expr(ExprKind::List {
+                                    elts: elts.clone(),
+                                    ctx: ExprContext::Load,
+                                }),
+                                0,
+                            );
+                            match generator.generate() {
+                                Ok(content) => {
+                                    check.amend(Fix::replacement(
+                                        content,
+                                        expr.location,
+                                        expr.end_location.unwrap(),
+                                    ));
+                                }
+                                Err(e) => error!(
+                                    "Failed to fix wrong name(s) type in \
+                                     `@pytest.mark.parametrize`: {e}"
+                                ),
+                            };
+                        }
+                        checker.add_check(check);
+                    }
+                    types::ParametrizeNameType::CSV => {
+                        let mut check = Check::new(
+                            CheckKind::ParametrizeNamesWrongType(names_type),
+                            Range::from_located(expr),
+                        );
+                        if checker.patch(check.kind.code()) {
+                            if let Some(content) = elts_to_csv(elts, checker) {
+                                check.amend(Fix::replacement(
+                                    content,
+                                    expr.location,
+                                    expr.end_location.unwrap(),
+                                ));
+                            }
+                        }
+                        checker.add_check(check);
+                    }
+                }
             };
         }
         ExprKind::List { elts, .. } => {
@@ -146,11 +248,60 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 if let Some(first) = elts.first() {
                     handle_single_name(checker, expr, first);
                 }
-            } else if names_type != types::ParametrizeNameType::List {
-                checker.add_check(Check::new(
-                    CheckKind::ParametrizeNamesWrongType(names_type),
-                    Range::from_located(expr),
-                ));
+            } else {
+                match names_type {
+                    types::ParametrizeNameType::List => {}
+                    types::ParametrizeNameType::Tuple => {
+                        let mut check = Check::new(
+                            CheckKind::ParametrizeNamesWrongType(names_type),
+                            Range::from_located(expr),
+                        );
+                        if checker.patch(check.kind.code()) {
+                            let mut generator = SourceCodeGenerator::new(
+                                checker.style.indentation(),
+                                checker.style.quote(),
+                                checker.style.line_ending(),
+                            );
+                            generator.unparse_expr(
+                                &create_expr(ExprKind::Tuple {
+                                    elts: elts.clone(),
+                                    ctx: ExprContext::Load,
+                                }),
+                                1, // so tuple is generated with parentheses
+                            );
+                            match generator.generate() {
+                                Ok(content) => {
+                                    check.amend(Fix::replacement(
+                                        content,
+                                        expr.location,
+                                        expr.end_location.unwrap(),
+                                    ));
+                                }
+                                Err(e) => error!(
+                                    "Failed to fix wrong name(s) type in \
+                                     `@pytest.mark.parametrize`: {e}"
+                                ),
+                            };
+                        }
+                        checker.add_check(check);
+                    }
+                    types::ParametrizeNameType::CSV => {
+                        let mut check = Check::new(
+                            CheckKind::ParametrizeNamesWrongType(names_type),
+                            Range::from_located(expr),
+                        );
+                        if checker.patch(check.kind.code()) {
+                            if let Some(content) = elts_to_csv(elts, checker) {
+                                check.amend(Fix::replacement(
+                                    content,
+                                    expr.location,
+                                    expr.end_location.unwrap(),
+                                ));
+                            }
+                        }
+                        checker.add_check(check);
+                    }
+                }
             };
         }
         _ => {}

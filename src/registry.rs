@@ -248,6 +248,7 @@ pub enum CheckCode {
     UP025,
     UP026,
     UP027,
+    UP028,
     // pydocstyle
     D100,
     D101,
@@ -976,6 +977,7 @@ pub enum CheckKind {
     RewriteUnicodeLiteral,
     RewriteMockImport(MockReference),
     RewriteListComprehension,
+    RewriteYieldFrom,
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1408,6 +1410,7 @@ impl CheckCode {
             CheckCode::UP025 => CheckKind::RewriteUnicodeLiteral,
             CheckCode::UP026 => CheckKind::RewriteMockImport(MockReference::Import),
             CheckCode::UP027 => CheckKind::RewriteListComprehension,
+            CheckCode::UP028 => CheckKind::RewriteYieldFrom,
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1938,6 +1941,7 @@ impl CheckCode {
             CheckCode::UP025 => CheckCategory::Pyupgrade,
             CheckCode::UP026 => CheckCategory::Pyupgrade,
             CheckCode::UP027 => CheckCategory::Pyupgrade,
+            CheckCode::UP028 => CheckCategory::Pyupgrade,
             // pycodestyle (warnings)
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
@@ -2178,6 +2182,7 @@ impl CheckKind {
             CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             CheckKind::RewriteMockImport(..) => &CheckCode::UP026,
             CheckKind::RewriteListComprehension => &CheckCode::UP027,
+            CheckKind::RewriteYieldFrom => &CheckCode::UP028,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2981,6 +2986,9 @@ impl CheckKind {
             CheckKind::RewriteListComprehension => {
                 "Replace unpacked list comprehension with a generator expression".to_string()
             }
+            CheckKind::RewriteYieldFrom => {
+                "Replace `yield` over `for` loop with `yield from`".to_string()
+            }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
             CheckKind::BlankLineAfterSummary => {
@@ -3562,6 +3570,7 @@ impl CheckKind {
                 | CheckKind::RewriteListComprehension
                 | CheckKind::RewriteMockImport(..)
                 | CheckKind::RewriteUnicodeLiteral
+                | CheckKind::RewriteYieldFrom
                 | CheckKind::SectionNameEndsInColon(..)
                 | CheckKind::SectionNotOverIndented(..)
                 | CheckKind::SectionUnderlineAfterName(..)
@@ -3698,6 +3707,7 @@ impl CheckKind {
             CheckKind::RewriteListComprehension => {
                 Some("Replace with generator expression".to_string())
             }
+            CheckKind::RewriteYieldFrom => Some("Replace with `yield from`".to_string()),
             CheckKind::NewLineAfterSectionName(name) => {
                 Some(format!("Add newline after \"{name}\""))
             }

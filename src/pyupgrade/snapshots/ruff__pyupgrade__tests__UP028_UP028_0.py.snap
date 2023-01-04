@@ -1,0 +1,197 @@
+---
+source: src/pyupgrade/mod.rs
+expression: checks
+---
+- kind: RewriteYieldFrom
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 3
+    column: 15
+  fix:
+    content: yield from y
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 3
+      column: 15
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 8
+    column: 20
+  fix:
+    content: yield from z
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 8
+      column: 20
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 13
+    column: 15
+  fix:
+    content: "yield from [1, 2, 3]"
+    location:
+      row: 12
+      column: 4
+    end_location:
+      row: 13
+      column: 15
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 18
+    column: 15
+  fix:
+    content: "yield from {x for x in y}"
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 18
+      column: 15
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 22
+    column: 4
+  end_location:
+    row: 23
+    column: 15
+  fix:
+    content: "yield from (1, 2, 3)"
+    location:
+      row: 22
+      column: 4
+    end_location:
+      row: 23
+      column: 15
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 27
+    column: 4
+  end_location:
+    row: 28
+    column: 18
+  fix:
+    content: "yield from {3: \"x\", 6: \"y\"}"
+    location:
+      row: 27
+      column: 4
+    end_location:
+      row: 28
+      column: 18
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 33
+    column: 4
+  end_location:
+    row: 39
+    column: 18
+  fix:
+    content: "yield from {  # Comment three\\n'\n        3: \"x\",  # Comment four\\n'\n        # Comment five\\n'\n        6: \"y\",  # Comment six\\n'\n    }"
+    location:
+      row: 33
+      column: 4
+    end_location:
+      row: 39
+      column: 18
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 44
+    column: 4
+  end_location:
+    row: 45
+    column: 18
+  fix:
+    content: "yield from [{3: (3, [44, \"long ss\"]), 6: \"y\"}]"
+    location:
+      row: 44
+      column: 4
+    end_location:
+      row: 45
+      column: 18
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 49
+    column: 4
+  end_location:
+    row: 50
+    column: 18
+  fix:
+    content: yield from z()
+    location:
+      row: 49
+      column: 4
+    end_location:
+      row: 50
+      column: 18
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 55
+    column: 8
+  end_location:
+    row: 57
+    column: 22
+  fix:
+    content: yield from z()
+    location:
+      row: 55
+      column: 8
+    end_location:
+      row: 57
+      column: 22
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 67
+    column: 4
+  end_location:
+    row: 68
+    column: 15
+  fix:
+    content: yield from x
+    location:
+      row: 67
+      column: 4
+    end_location:
+      row: 68
+      column: 15
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 72
+    column: 4
+  end_location:
+    row: 73
+    column: 18
+  fix:
+    content: yield from z()
+    location:
+      row: 72
+      column: 4
+    end_location:
+      row: 73
+      column: 18
+  parent: ~
+

@@ -66,21 +66,21 @@ To define the rule, open up `src/registry.rs`. You'll need to define both a `Che
 `CheckKind`. As an example, you can grep for `E402` and `ModuleImportNotAtTopOfFile`, and follow the
 pattern implemented therein.
 
-To trigger the rule, you'll likely want to augment the logic in `src/check_ast.rs`, which defines
+To trigger the rule, you'll likely want to augment the logic in `src/checkers/ast.rs`, which defines
 the Python AST visitor, responsible for iterating over the abstract syntax tree and collecting
 lint-rule violations as it goes. If you need to inspect the AST, you can run
 `cargo +nightly dev print-ast` with a Python file. Grep for the `Check::new` invocations to
 understand how other, similar rules are implemented.
 
-To add a test fixture, create a file under `resources/test/fixtures`, named to match the `CheckCode`
-you defined earlier (e.g., `E402.py`). This file should contain a variety of violations and
-non-violations designed to evaluate and demonstrate the behavior of your lint rule.
+To add a test fixture, create a file under `resources/test/fixtures/[plugin-name]`, named to match
+the `CheckCode` you defined earlier (e.g., `E402.py`). This file should contain a variety of
+violations and non-violations designed to evaluate and demonstrate the behavior of your lint rule.
 
 Run `cargo +nightly dev generate-all` to generate the code for your new fixture. Then run Ruff
-locally with (e.g.) `cargo run resources/test/fixtures/E402.py --no-cache --select E402`.
+locally with (e.g.) `cargo run resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `src/[test-suite-name]/mod.rs` file. Then, run `cargo test`. Your
+`test_case` macro in the relevant `src/[plugin-name]/mod.rs` file. Then, run `cargo test`. Your
 test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the generated
 snapshot, then commit the snapshot file alongside the rest of your changes.
 
@@ -88,21 +88,23 @@ Finally, regenerate the documentation and generated code with `cargo +nightly de
 
 ### Example: Adding a new configuration option
 
-Ruff's user-facing settings live in two places: first, the command-line options defined with
-[clap](https://docs.rs/clap/latest/clap/) via the `Cli` struct in `src/main.rs`; and second, the
-`Config` struct defined `src/pyproject.rs`, which is responsible for extracting user-defined
-settings from a `pyproject.toml` file.
+Ruff's user-facing settings live in a few different places.
 
-Ultimately, these two sources of configuration are merged into the `Settings` struct defined
-in `src/settings.rs`, which is then threaded through the codebase.
+First, the command-line options are defined via the `Cli` struct in `src/cli.rs`.
 
-To add a new configuration option, you'll likely want to _both_ add a CLI option to `src/main.rs`
-_and_ a `pyproject.toml` parameter to `src/pyproject.rs`. If you want to pattern-match against an
-existing example, grep for `dummy_variable_rgx`, which defines a regular expression to match against
-acceptable unused variables (e.g., `_`).
+Second, the `pyproject.toml` options are defined in `src/settings/options.rs` (via the `Options`
+struct), `src/settings/configuration.rs` (via the `Configuration` struct), and `src/settings/mod.rs`
+(via the `Settings` struct). These represent, respectively: the schema used to parse the
+`pyproject.toml` file; an internal, intermediate representation; and the final, internal
+representation used to power Ruff.
 
-If the new plugin's configuration should be cached between runs, you'll need to add it to the
-`Hash` implementation for `Settings` in `src/settings/mod.rs`.
+To add a new configuration option, you'll likely want to modify these latter few files (along with
+`cli.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
+`dummy_variable_rgx`, which defines a regular expression to match against acceptable unused
+variables (e.g., `_`).
+
+Note that plugin-specific configuration options are defined in their own modules (e.g.,
+`src/flake8_unused_arguments/settings.rs`).
 
 You may also want to add the new configuration option to the `flake8-to-ruff` tool, which is
 responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
