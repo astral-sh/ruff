@@ -1,7 +1,9 @@
+use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
+use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
@@ -27,10 +29,14 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut check =
                     Check::new(CheckKind::NoUnnecessaryPass, Range::from_located(pass_stmt));
                 if checker.patch(&CheckCode::PIE790) {
-                    check.amend(Fix::deletion(
-                        pass_stmt.location,
-                        pass_stmt.end_location.unwrap(),
-                    ));
+                    match delete_stmt(pass_stmt, None, &[], checker.locator) {
+                        Ok(fix) => {
+                            check.amend(fix);
+                        }
+                        Err(e) => {
+                            error!("Failed to delete pass statement: {}", e);
+                        }
+                    }
                 }
                 checker.add_check(check);
             }
