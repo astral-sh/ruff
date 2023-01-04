@@ -34,7 +34,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                             check.amend(fix);
                         }
                         Err(e) => {
-                            error!("Failed to delete pass statement: {}", e);
+                            error!("Failed to delete `pass` statement: {}", e);
                         }
                     }
                 }
