@@ -56,6 +56,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Saleor](https://github.com/saleor/saleor)
 - [Polars](https://github.com/pola-rs/polars)
 - [Ibis](https://github.com/ibis-project/ibis)
+- [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
 - [`pyca/cryptography`](https://github.com/pyca/cryptography)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
