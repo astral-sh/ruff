@@ -1340,7 +1340,7 @@ natively, including:
 - [`eradicate`](https://pypi.org/project/eradicate/)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
-- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
+- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (7/40)
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
@@ -1364,7 +1364,7 @@ natively, including:
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
-- [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10)
+- [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/6)
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) (21/33)
 - [`yesqa`](https://github.com/asottile/yesqa)
 
@@ -1379,6 +1379,13 @@ Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flak
 1. Ruff does not yet support structural pattern matching.
 2. Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
    plugins are re-implemented in Rust as part of Ruff itself.)
+
+There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
+
+- Ruff doesn't implement the "opinionated" lint rules from `flake8-bugbear`.
+- Depending on your project structure, Ruff and `isort` can differ in their detection of first-party
+  code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
+  code is nested in a `src` directory.)
 
 ### How does Ruff compare to Pylint?
 
@@ -1398,7 +1405,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
-- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
+- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (7/40)
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
@@ -1424,7 +1431,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/),
 [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
-[`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10), and a subset of the rules
+[`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/6), and a subset of the rules
 implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (21/33).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
