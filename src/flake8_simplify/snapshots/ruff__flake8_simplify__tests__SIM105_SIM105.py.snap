@@ -32,4 +32,14 @@ expression: checks
     column: 8
   fix: ~
   parent: ~
+- kind:
+    UseContextlibSuppress: "a.Error, b.Error"
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 22
+    column: 8
+  fix: ~
+  parent: ~
 
