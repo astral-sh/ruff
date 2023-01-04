@@ -968,7 +968,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
-| SIM300 | YodaConditions | Use `left == right` instead of `right == left (Yoda-conditions)` | 🛠 |
+| SIM300 | YodaConditions | Yoda conditions are discouraged, use `left == right` instead | 🛠 |
 
 ### flake8-tidy-imports (TID)
 
