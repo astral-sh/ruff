@@ -108,11 +108,20 @@ fn annotate_imports<'a>(
                 }
 
                 // Find comments inline.
+                // We associate inline comments with the import statement unless there's a
+                // single member, and it's a single-line import (like `from foo
+                // import bar  # noqa`).
                 let mut inline = vec![];
-                while let Some(comment) =
-                    comments_iter.next_if(|comment| comment.location.row() == import.location.row())
+                if names.len() > 1
+                    || names
+                        .first()
+                        .map_or(false, |alias| alias.location.row() > import.location.row())
                 {
-                    inline.push(comment);
+                    while let Some(comment) = comments_iter
+                        .next_if(|comment| comment.location.row() == import.location.row())
+                    {
+                        inline.push(comment);
+                    }
                 }
 
                 // Capture names.
@@ -206,11 +215,6 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 inline,
                 trailing_comma,
             } => {
-                let single_import = names.len() == 1;
-
-                // If we're dealing with a multi-import block (i.e., a non-star, non-aliased
-                // import), associate the comments with the first alias (best
-                // effort).
                 if let Some(alias) = names.first() {
                     let entry = if alias.name == "*" {
                         block
@@ -240,29 +244,8 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                         entry.atop.push(comment.value);
                     }
 
-                    // Associate inline comments with first alias if multiple names have been
-                    // imported, i.e., the comment applies to all names; otherwise, associate
-                    // with the alias.
-                    if single_import
-                        && (alias.name != "*" && (alias.asname.is_none() || combine_as_imports))
-                    {
-                        let entry = block
-                            .import_from
-                            .entry(ImportFromData { module, level })
-                            .or_default()
-                            .1
-                            .entry(AliasData {
-                                name: alias.name,
-                                asname: alias.asname,
-                            })
-                            .or_default();
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
-                    } else {
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
+                    for comment in inline {
+                        entry.inline.push(comment.value);
                     }
                 }
 
@@ -662,9 +645,14 @@ mod tests {
     #[test_case(Path::new("fit_line_length_comment.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
+    #[test_case(Path::new("inline_comments.py"))]
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
+    #[test_case(Path::new("line_ending_cr.py"))]
+    #[test_case(Path::new("line_ending_crlf.py"))]
+    #[test_case(Path::new("line_ending_lf.py"))]
+    #[test_case(Path::new("magic_trailing_comma.py"))]
     #[test_case(Path::new("natural_order.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
     #[test_case(Path::new("no_wrap_star.py"))]
@@ -684,10 +672,6 @@ mod tests {
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
-    #[test_case(Path::new("magic_trailing_comma.py"))]
-    #[test_case(Path::new("line_ending_lf.py"))]
-    #[test_case(Path::new("line_ending_crlf.py"))]
-    #[test_case(Path::new("line_ending_cr.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let checks = test_path(
