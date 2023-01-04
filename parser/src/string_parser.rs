@@ -32,7 +32,7 @@ impl<'a> StringParser<'a> {
             kind,
             str_start,
             str_end,
-            location: Location::new(str_start.row(), str_start.column() + offset),
+            location: str_start.with_col_offset(offset),
         }
     }
 
@@ -519,11 +519,7 @@ impl<'a> StringParser<'a> {
 
 fn parse_fstring_expr(source: &str, location: Location) -> Result<Expr, ParseError> {
     let fstring_body = format!("({source})");
-    parse_expression_located(
-        &fstring_body,
-        "<fstring>",
-        Location::new(location.row(), location.column() - 1),
-    )
+    parse_expression_located(&fstring_body, "<fstring>", location.with_col_offset(-1))
 }
 
 pub fn parse_string(

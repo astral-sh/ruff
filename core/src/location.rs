@@ -58,6 +58,34 @@ impl Location {
         self.row += 1;
         self.column = 0;
     }
+
+    pub fn with_col_offset<T: TryInto<isize>>(&self, offset: T) -> Self
+    where
+        <T as TryInto<isize>>::Error: std::fmt::Debug,
+    {
+        let column = (self.column as isize
+            + offset
+                .try_into()
+                .expect("offset should be able to convert to isize")) as u32;
+        Self {
+            row: self.row,
+            column,
+        }
+    }
+
+    pub fn with_row_offset<T: TryInto<isize>>(&self, offset: T) -> Self
+    where
+        <T as TryInto<isize>>::Error: std::fmt::Debug,
+    {
+        let row = (self.row as isize
+            + offset
+                .try_into()
+                .expect("offset should be able to convert to isize")) as u32;
+        Self {
+            row,
+            column: self.column,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -76,5 +104,17 @@ mod tests {
         assert!(Location::new(1, 1) < Location::new(1, 2));
         assert!(Location::new(1, 1) < Location::new(2, 1));
         assert!(Location::new(1, 2) < Location::new(2, 1));
+    }
+
+    #[test]
+    fn test_with_col_offset() {
+        assert_eq!(Location::new(1, 1).with_col_offset(1), Location::new(1, 2));
+        assert_eq!(Location::new(1, 1).with_col_offset(-1), Location::new(1, 0));
+    }
+
+    #[test]
+    fn test_with_row_offset() {
+        assert_eq!(Location::new(1, 1).with_row_offset(1), Location::new(2, 1));
+        assert_eq!(Location::new(1, 1).with_row_offset(-1), Location::new(0, 1));
     }
 }
