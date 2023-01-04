@@ -1,8 +1,7 @@
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
-use super::helpers::SimpleCallArgs;
-use crate::ast::helpers::{collect_arg_names, compose_call_path};
+use crate::ast::helpers::{collect_arg_names, compose_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;

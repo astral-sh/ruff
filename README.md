@@ -763,6 +763,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | ---- | ---- | ------- | --- |
 | S101 | AssertUsed | Use of `assert` detected |  |
 | S102 | ExecUsed | Use of `exec` detected |  |
+| S103 | BadFilePermissions | `os.chmod` setting a permissive mask `0o777` on file or directory |  |
 | S104 | HardcodedBindAllInterfaces | Possible binding to all interfaces |  |
 | S105 | HardcodedPasswordString | Possible hardcoded password: `"..."` |  |
 | S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `"..."` |  |

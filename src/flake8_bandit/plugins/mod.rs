@@ -1,4 +1,5 @@
 pub use assert_used::assert_used;
+pub use bad_file_permissions::bad_file_permissions;
 pub use exec_used::exec_used;
 pub use hardcoded_bind_all_interfaces::hardcoded_bind_all_interfaces;
 pub use hardcoded_password_default::hardcoded_password_default;
@@ -8,6 +9,7 @@ pub use hardcoded_password_string::{
 };
 
 mod assert_used;
+mod bad_file_permissions;
 mod exec_used;
 mod hardcoded_bind_all_interfaces;
 mod hardcoded_password_default;

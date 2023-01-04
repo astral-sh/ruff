@@ -321,6 +321,7 @@ pub enum CheckCode {
     // flake8-bandit
     S101,
     S102,
+    S103,
     S104,
     S105,
     S106,
@@ -1052,6 +1053,7 @@ pub enum CheckKind {
     // flake8-bandit
     AssertUsed,
     ExecUsed,
+    BadFilePermissions(u16),
     HardcodedBindAllInterfaces,
     HardcodedPasswordString(String),
     HardcodedPasswordFuncArg(String),
@@ -1502,6 +1504,7 @@ impl CheckCode {
             // flake8-bandit
             CheckCode::S101 => CheckKind::AssertUsed,
             CheckCode::S102 => CheckKind::ExecUsed,
+            CheckCode::S103 => CheckKind::BadFilePermissions(0o777),
             CheckCode::S104 => CheckKind::HardcodedBindAllInterfaces,
             CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
@@ -1901,6 +1904,7 @@ impl CheckCode {
             // flake8-bandit
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
+            CheckCode::S103 => CheckCategory::Flake8Bandit,
             CheckCode::S104 => CheckCategory::Flake8Bandit,
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
@@ -2262,6 +2266,7 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => &CheckCode::S101,
             CheckKind::ExecUsed => &CheckCode::S102,
+            CheckKind::BadFilePermissions(..) => &CheckCode::S103,
             CheckKind::HardcodedBindAllInterfaces => &CheckCode::S104,
             CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
@@ -3176,6 +3181,9 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
             CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
+            CheckKind::BadFilePermissions(mask) => {
+                format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory",)
+            }
             CheckKind::HardcodedBindAllInterfaces => {
                 "Possible binding to all interfaces".to_string()
             }
