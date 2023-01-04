@@ -1,4 +1,4 @@
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
@@ -18,8 +18,7 @@ pub fn use_contextlib_suppress(
     let handler = &handlers[0];
     let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
     if body.len() == 1 {
-        let node = &body[0].node;
-        if matches!(node, rustpython_ast::StmtKind::Pass) {
+        if matches!(body[0].node, StmtKind::Pass) {
             let handler_names: Vec<_> = helpers::extract_handler_names(handlers)
                 .into_iter()
                 .flatten()
