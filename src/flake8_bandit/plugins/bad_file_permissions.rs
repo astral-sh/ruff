@@ -83,6 +83,7 @@ fn get_int_value(expr: &Expr) -> Option<u16> {
     }
 }
 
+/// S103
 pub fn bad_file_permissions(
     func: &Expr,
     args: &Vec<Expr>,
