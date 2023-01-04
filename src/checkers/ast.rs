@@ -2578,6 +2578,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::PLR1701) {
                     pylint::plugins::merge_isinstance(self, expr, op, values);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM220) {
+                    flake8_simplify::plugins::a_and_not_a(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM221) {
+                    flake8_simplify::plugins::a_or_not_a(self, expr);
+                }
                 if self.settings.enabled.contains(&CheckCode::SIM222) {
                     flake8_simplify::plugins::or_true(self, expr);
                 }
