@@ -67,7 +67,7 @@ impl Location {
             + offset
                 .try_into()
                 .expect("offset should be able to convert to isize")) as u32;
-        Location {
+        Self {
             row: self.row,
             column,
         }
@@ -81,7 +81,7 @@ impl Location {
             + offset
                 .try_into()
                 .expect("offset should be able to convert to isize")) as u32;
-        Location {
+        Self {
             row,
             column: self.column,
         }
