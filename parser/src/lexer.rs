@@ -124,12 +124,12 @@ where
 impl<T, const N: usize, Idx> Index<Idx> for CharWindow<T, N>
 where
     T: Iterator<Item = char>,
-    Idx: SliceIndex<[Option<char>], Output = Option<char>>,
+    Idx: SliceIndex<[Option<char>]>,
 {
-    type Output = Option<char>;
+    type Output = Idx::Output;
 
     fn index(&self, index: Idx) -> &Self::Output {
-        self.window.index(index)
+        &self.window[index]
     }
 }
 
@@ -199,12 +199,12 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         // Collapse \r\n into \n
         loop {
-            match (self.window[0], self.window[1]) {
-                (Some('\r'), Some('\n')) => {
+            match self.window[..2] {
+                [Some('\r'), Some('\n')] => {
                     // Windows EOL into \n
                     self.shift();
                 }
-                (Some('\r'), _) => {
+                [Some('\r'), _] => {
                     // MAC EOL into \n
                     self.window.change_first('\n');
                 }
@@ -309,20 +309,20 @@ where
     /// Numeric lexing. The feast can start!
     fn lex_number(&mut self) -> LexResult {
         let start_pos = self.get_pos();
-        match (self.window[0], self.window[1]) {
-            (Some('0'), Some('x' | 'X')) => {
+        match self.window[..2] {
+            [Some('0'), Some('x' | 'X')] => {
                 // Hex! (0xdeadbeef)
                 self.next_char();
                 self.next_char();
                 self.lex_number_radix(start_pos, 16)
             }
-            (Some('0'), Some('o' | 'O')) => {
+            [Some('0'), Some('o' | 'O')] => {
                 // Octal style! (0o377)
                 self.next_char();
                 self.next_char();
                 self.lex_number_radix(start_pos, 8)
             }
-            (Some('0'), Some('b' | 'B')) => {
+            [Some('0'), Some('b' | 'B')] => {
                 // Binary! (0b_1110_0101)
                 self.next_char();
                 self.next_char();
@@ -470,9 +470,9 @@ where
 
     /// Test if we face '[eE][-+]?[0-9]+'
     fn at_exponent(&self) -> bool {
-        match (self.window[0], self.window[1]) {
-            (Some('e' | 'E'), Some('+' | '-')) => matches!(self.window[2], Some('0'..='9')),
-            (Some('e' | 'E'), Some('0'..='9')) => true,
+        match self.window[..2] {
+            [Some('e' | 'E'), Some('+' | '-')] => matches!(self.window[2], Some('0'..='9')),
+            [Some('e' | 'E'), Some('0'..='9')] => true,
             _ => false,
         }
     }
@@ -500,14 +500,13 @@ where
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close
-        let triple_quoted =
-            if self.window[0] == Some(quote_char) && self.window[1] == Some(quote_char) {
-                self.next_char();
-                self.next_char();
-                true
-            } else {
-                false
-            };
+        let triple_quoted = if self.window[..2] == [Some(quote_char); 2] {
+            self.next_char();
+            self.next_char();
+            true
+        } else {
+            false
+        };
 
         loop {
             match self.next_char() {
@@ -534,9 +533,7 @@ where
                             // Look ahead at the next two characters; if we have two more
                             // quote_chars, it's the end of the string; consume the remaining
                             // closing quotes and break the loop
-                            if self.window[0] == Some(quote_char)
-                                && self.window[1] == Some(quote_char)
-                            {
+                            if self.window[..2] == [Some(quote_char); 2] {
                                 self.next_char();
                                 self.next_char();
                                 break;
@@ -1094,7 +1091,7 @@ where
                 } else {
                     let tok_start = self.get_pos();
                     self.next_char();
-                    if let (Some('.'), Some('.')) = (&self.window[0], &self.window[1]) {
+                    if self.window[..2] == [Some('.'); 2] {
                         self.next_char();
                         self.next_char();
                         let tok_end = self.get_pos();
