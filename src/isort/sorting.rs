@@ -70,7 +70,7 @@ pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromD
     })
 }
 
-/// Compare two `AnyImport` enums which may be Import or ImportFrom structs.
+/// Compare two `AnyImport` enums which may be `Import` or `ImportFrom` structs.
 pub fn cmp_any_import(a: &AnyImport, b: &AnyImport) -> Ordering {
     match (&a, &b) {
         (AnyImport::Import(x), AnyImport::Import(y)) => cmp_modules(&x.0, &y.0),
