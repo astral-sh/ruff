@@ -1,7 +1,7 @@
 /// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
 use std::cmp::Ordering;
 
-use crate::isort::types::{AliasData, ImportFromData, OrderedImportBlock};
+use crate::isort::types::{AliasData, AnyImport, ImportFromData};
 use crate::python::string;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
@@ -70,49 +70,16 @@ pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromD
     })
 }
 
-pub fn merge_imports(
-    import_block: &OrderedImportBlock,
-    force_sort_within_sections: bool,
-) -> Vec<(i32, usize)> {
-    let mut idx_import = 0;
-    let len_import = import_block.import.len();
-
-    let mut idx_import_from = 0;
-    let len_import_from = import_block.import_from.len();
-
-    let mut merged: Vec<(i32, usize)> = Vec::new();
-
-    while idx_import < len_import {
-        if !force_sort_within_sections || idx_import_from >= len_import_from {
-            merged.push((0, idx_import));
-            idx_import += 1;
-            continue;
+/// Compare two `AnyImport` enums which may be Import or ImportFrom structs.
+pub fn cmp_any_import(a: &AnyImport, b: &AnyImport) -> Ordering {
+    match (&a, &b) {
+        (AnyImport::Import(x), AnyImport::Import(y)) => cmp_modules(&x.0, &y.0),
+        (AnyImport::ImportFrom(x), AnyImport::Import(y)) => {
+            natord::compare_ignore_case(x.0.module.unwrap(), y.0.name)
         }
-
-        let import = &import_block.import[idx_import];
-        let (alias, _) = &import;
-
-        let import_from = &import_block.import_from[idx_import_from];
-        let (import_from_data, ..) = &import_from;
-
-        let cmp = alias
-            .name
-            .to_lowercase()
-            .cmp(&import_from_data.module.unwrap().to_lowercase());
-        match cmp {
-            Ordering::Equal | Ordering::Less => {
-                merged.push((0, idx_import));
-                idx_import += 1;
-            }
-            Ordering::Greater => {
-                merged.push((1, idx_import_from));
-                idx_import_from += 1;
-            }
+        (AnyImport::Import(x), AnyImport::ImportFrom(y)) => {
+            natord::compare_ignore_case(x.0.name, y.0.module.unwrap())
         }
+        (AnyImport::ImportFrom(x), AnyImport::ImportFrom(y)) => cmp_import_from(&x.0, &y.0),
     }
-    while idx_import_from < len_import_from {
-        merged.push((1, idx_import_from));
-        idx_import_from += 1;
-    }
-    merged
 }

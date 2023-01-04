@@ -11,10 +11,10 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::helpers::trailing_comma;
-use crate::isort::sorting::{cmp_import_from, cmp_members, cmp_modules, merge_imports};
+use crate::isort::sorting::{cmp_any_import, cmp_import_from, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
-    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
+    AliasData, AnyImport, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
     TrailingComma,
 };
 use crate::source_code_style::SourceCodeStyleDetector;
@@ -586,28 +586,48 @@ pub fn format_imports(
 
         let mut is_first_statement = true;
 
-        for (v, idx) in merge_imports(&import_block, force_sort_within_sections) {
-            if v == 0 {
-                let (alias, comments) = &import_block.import[idx];
-                output.append(&format::format_import(
-                    alias,
-                    comments,
-                    is_first_statement,
-                    stylist,
-                ));
-            } else if v == 1 {
-                let (import_from, comments, trailing_comma, aliases) =
-                    &import_block.import_from[idx];
-                output.append(&format::format_import_from(
-                    import_from,
-                    comments,
-                    aliases,
-                    line_length,
-                    stylist,
-                    force_wrap_aliases,
-                    is_first_statement,
-                    split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
-                ));
+        let it = import_block
+            .import
+            .into_iter()
+            .map(AnyImport::Import)
+            .chain(
+                import_block
+                    .import_from
+                    .into_iter()
+                    .map(AnyImport::ImportFrom),
+            )
+            .sorted_by(|a, b| {
+                if force_sort_within_sections {
+                    cmp_any_import(a, b)
+                } else {
+                    Ordering::Greater
+                }
+            });
+
+        for import in it {
+            match import {
+                AnyImport::Import(x) => {
+                    let (alias, comments) = &x;
+                    output.append(&format::format_import(
+                        alias,
+                        comments,
+                        is_first_statement,
+                        stylist,
+                    ));
+                }
+                AnyImport::ImportFrom(x) => {
+                    let (import_from, comments, trailing_comma, aliases) = &x;
+                    output.append(&format::format_import_from(
+                        import_from,
+                        comments,
+                        aliases,
+                        line_length,
+                        stylist,
+                        force_wrap_aliases,
+                        is_first_statement,
+                        split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
+                    ));
+                }
             }
             is_first_statement = false;
         }
