@@ -217,7 +217,10 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
+    SIM105,
     SIM118,
+    SIM220,
+    SIM221,
     SIM222,
     SIM223,
     SIM300,
@@ -318,6 +321,7 @@ pub enum CheckCode {
     // flake8-bandit
     S101,
     S102,
+    S103,
     S104,
     S105,
     S106,
@@ -874,6 +878,7 @@ pub enum CheckKind {
     UnaryPrefixIncrement,
     UnreliableCallableCheck,
     UnusedLoopControlVariable(String),
+    UseContextlibSuppress(String),
     UselessComparison,
     UselessContextlibSuppress,
     UselessExpression,
@@ -945,6 +950,8 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    AAndNotA(String),
+    AOrNotA(String),
     KeyInDict(String, String),
     AndFalse,
     OrTrue,
@@ -1046,6 +1053,7 @@ pub enum CheckKind {
     // flake8-bandit
     AssertUsed,
     ExecUsed,
+    BadFilePermissions(u16),
     HardcodedBindAllInterfaces,
     HardcodedPasswordString(String),
     HardcodedPasswordFuncArg(String),
@@ -1373,7 +1381,10 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
+            CheckCode::SIM105 => CheckKind::UseContextlibSuppress("..".to_string()),
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
+            CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
+            CheckCode::SIM221 => CheckKind::AOrNotA("...".to_string()),
             CheckCode::SIM222 => CheckKind::OrTrue,
             CheckCode::SIM223 => CheckKind::AndFalse,
             CheckCode::SIM300 => CheckKind::YodaConditions("left".to_string(), "right".to_string()),
@@ -1493,6 +1504,7 @@ impl CheckCode {
             // flake8-bandit
             CheckCode::S101 => CheckKind::AssertUsed,
             CheckCode::S102 => CheckKind::ExecUsed,
+            CheckCode::S103 => CheckKind::BadFilePermissions(0o777),
             CheckCode::S104 => CheckKind::HardcodedBindAllInterfaces,
             CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
@@ -1892,12 +1904,16 @@ impl CheckCode {
             // flake8-bandit
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
+            CheckCode::S103 => CheckCategory::Flake8Bandit,
             CheckCode::S104 => CheckCategory::Flake8Bandit,
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM220 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM221 => CheckCategory::Flake8Simplify,
             CheckCode::SIM222 => CheckCategory::Flake8Simplify,
             CheckCode::SIM223 => CheckCategory::Flake8Simplify,
             CheckCode::SIM300 => CheckCategory::Flake8Simplify,
@@ -2146,7 +2162,10 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
+            CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
+            CheckKind::AAndNotA(..) => &CheckCode::SIM220,
+            CheckKind::AOrNotA(..) => &CheckCode::SIM221,
             CheckKind::OrTrue => &CheckCode::SIM222,
             CheckKind::AndFalse => &CheckCode::SIM223,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
@@ -2247,6 +2266,7 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => &CheckCode::S101,
             CheckKind::ExecUsed => &CheckCode::S102,
+            CheckKind::BadFilePermissions(..) => &CheckCode::S103,
             CheckKind::HardcodedBindAllInterfaces => &CheckCode::S104,
             CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
@@ -2657,6 +2677,9 @@ impl CheckKind {
             CheckKind::FStringDocstring => "f-string used as docstring. This will be interpreted \
                                             by python as a joined string rather than a docstring."
                 .to_string(),
+            CheckKind::UseContextlibSuppress(exception) => {
+                format!("Use 'contextlib.suppress({exception})' instead of try-except-pass")
+            }
             CheckKind::UselessContextlibSuppress => {
                 "No arguments passed to `contextlib.suppress`. No exceptions will be suppressed \
                  and therefore this context manager is redundant"
@@ -2904,10 +2927,12 @@ impl CheckKind {
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
+            CheckKind::AAndNotA(name) => format!("Use `False` instead of `{name} and not {name}`"),
+            CheckKind::AOrNotA(name) => format!("Use `True` instead of `{name} or not {name}`"),
             CheckKind::OrTrue => "Use `True` instead of `... or True`".to_string(),
             CheckKind::AndFalse => "Use `False` instead of `... and False`".to_string(),
             CheckKind::YodaConditions(left, right) => {
-                format!("Use `{left} == {right}` instead of `{right} == {left} (Yoda-conditions)`")
+                format!("Yoda conditions are discouraged, use `{left} == {right}` instead")
             }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
@@ -3156,6 +3181,9 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
             CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
+            CheckKind::BadFilePermissions(mask) => {
+                format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory",)
+            }
             CheckKind::HardcodedBindAllInterfaces => {
                 "Possible binding to all interfaces".to_string()
             }
@@ -3495,9 +3523,11 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::AmbiguousUnicodeCharacterString(..)
+            CheckKind::AAndNotA(..)
+                | CheckKind::AOrNotA(..)
                 | CheckKind::AmbiguousUnicodeCharacterComment(..)
                 | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::AmbiguousUnicodeCharacterString(..)
                 | CheckKind::AndFalse
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
@@ -3611,6 +3641,8 @@ impl CheckKind {
     /// The message used to describe the fix action for a given `CheckKind`.
     pub fn commit(&self) -> Option<String> {
         match self {
+            CheckKind::AAndNotA(..) => Some("Replace with `False`".to_string()),
+            CheckKind::AOrNotA(..) => Some("Replace with `True`".to_string()),
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant)
             | CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant)
             | CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
@@ -3869,9 +3901,9 @@ impl CheckKind {
                 Some("Remove `object` inheritance".to_string())
             }
             CheckKind::UselessYieldFixture(..) => Some("Replace `yield` with `return`".to_string()),
-            CheckKind::YodaConditions(left, right) => Some(format!(
-                "Replace with `{left} == {right}` (Yoda-conditions)`"
-            )),
+            CheckKind::YodaConditions(left, right) => {
+                Some(format!("Replace Yoda condition with `{left} == {right}`"))
+            }
             _ => None,
         }
     }

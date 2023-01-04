@@ -6,7 +6,7 @@ use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Located, Location};
+use rustpython_ast::{Comprehension, Located, Location};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
@@ -470,7 +470,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_default(args).into_iter(),
+                        flake8_bandit::checks::hardcoded_password_default(args).into_iter(),
                     );
                 }
 
@@ -1186,7 +1186,7 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&CheckCode::S101) {
-                    self.add_check(flake8_bandit::plugins::assert_used(stmt));
+                    self.add_check(flake8_bandit::checks::assert_used(stmt));
                 }
                 if self.settings.enabled.contains(&CheckCode::PT015) {
                     if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
@@ -1247,7 +1247,12 @@ where
                     flake8_simplify::plugins::key_in_dict_for(self, target, iter);
                 }
             }
-            StmtKind::Try { handlers, .. } => {
+            StmtKind::Try {
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
                     if let Some(check) =
                         pyflakes::checks::default_except_not_last(handlers, self.locator)
@@ -1272,6 +1277,11 @@ where
                             .into_iter(),
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM105) {
+                    flake8_simplify::plugins::use_contextlib_suppress(
+                        self, stmt, handlers, orelse, finalbody,
+                    );
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
@@ -1286,7 +1296,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     if let Some(check) =
-                        flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
+                        flake8_bandit::checks::assign_hardcoded_password_string(value, targets)
                     {
                         self.add_check(check);
                     }
@@ -1854,13 +1864,24 @@ where
 
                 // flake8-bandit
                 if self.settings.enabled.contains(&CheckCode::S102) {
-                    if let Some(check) = flake8_bandit::plugins::exec_used(expr, func) {
+                    if let Some(check) = flake8_bandit::checks::exec_used(expr, func) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S103) {
+                    if let Some(check) = flake8_bandit::checks::bad_file_permissions(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
                         self.add_check(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S106) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_func_arg(keywords).into_iter(),
+                        flake8_bandit::checks::hardcoded_password_func_arg(keywords).into_iter(),
                     );
                 }
 
@@ -2455,7 +2476,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     self.add_checks(
-                        flake8_bandit::plugins::compare_to_hardcoded_password_string(
+                        flake8_bandit::checks::compare_to_hardcoded_password_string(
                             left,
                             comparators,
                         )
@@ -2500,7 +2521,7 @@ where
                     ));
                 }
                 if self.settings.enabled.contains(&CheckCode::S104) {
-                    if let Some(check) = flake8_bandit::plugins::hardcoded_bind_all_interfaces(
+                    if let Some(check) = flake8_bandit::checks::hardcoded_bind_all_interfaces(
                         value,
                         &Range::from_located(expr),
                     ) {
@@ -2577,6 +2598,12 @@ where
             ExprKind::BoolOp { op, values } => {
                 if self.settings.enabled.contains(&CheckCode::PLR1701) {
                     pylint::plugins::merge_isinstance(self, expr, op, values);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM220) {
+                    flake8_simplify::plugins::a_and_not_a(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM221) {
+                    flake8_simplify::plugins::a_or_not_a(self, expr);
                 }
                 if self.settings.enabled.contains(&CheckCode::SIM222) {
                     flake8_simplify::plugins::or_true(self, expr);
@@ -2923,6 +2950,17 @@ where
             }
             _ => unreachable!("Unexpected expression for format_spec"),
         }
+    }
+
+    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
+        if self.settings.enabled.contains(&CheckCode::SIM118) {
+            flake8_simplify::plugins::key_in_dict_for(
+                self,
+                &comprehension.target,
+                &comprehension.iter,
+            );
+        }
+        visitor::walk_comprehension(self, comprehension);
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
