@@ -1,7 +1,7 @@
 //! Lint rules based on checking raw physical lines.
 
 use crate::pycodestyle::checks::{line_too_long, no_newline_at_end_of_file};
-use crate::pygrep_hooks::plugins::{blanket_noqa, blanket_type_ignore};
+use crate::pygrep_hooks::plugins::{blanket_noqa, blanket_type_ignore, rst_backticks};
 use crate::pyupgrade::checks::unnecessary_coding_comment;
 use crate::registry::{Check, CheckCode};
 use crate::settings::{flags, Settings};
@@ -19,6 +19,7 @@ pub fn check_lines(
     let enforce_no_newline_at_end_of_file = settings.enabled.contains(&CheckCode::W292);
     let enforce_blanket_type_ignore = settings.enabled.contains(&CheckCode::PGH003);
     let enforce_blanket_noqa = settings.enabled.contains(&CheckCode::PGH004);
+    let enforce_rst_backticks = settings.enabled.contains(&CheckCode::PGH005);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     for (index, line) in contents.lines().enumerate() {
@@ -50,6 +51,14 @@ pub fn check_lines(
             if enforce_blanket_noqa {
                 if commented_lines.contains(&(index + 1)) {
                     if let Some(check) = blanket_noqa(index, line) {
+                        checks.push(check);
+                    }
+                }
+            }
+
+            if enforce_rst_backticks {
+                if commented_lines.contains(&(index + 1)) {
+                    if let Some(check) = rst_backticks(index, line) {
                         checks.push(check);
                     }
                 }

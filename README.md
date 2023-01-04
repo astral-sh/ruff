@@ -1036,6 +1036,7 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 | PGH002 | DeprecatedLogWarn | `warn` is deprecated in favor of `warning` |  |
 | PGH003 | BlanketTypeIgnore | Use specific error codes when ignoring type issues |  |
 | PGH004 | BlanketNOQA | Use specific error codes when using `noqa` |  |
+| PGH005 | RstBackticks | Use two backticks when writing RST |  |
 
 ### Pylint (PLC, PLE, PLR, PLW)
 
