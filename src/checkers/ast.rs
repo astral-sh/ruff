@@ -1868,6 +1868,17 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::S103) {
+                    if let Some(check) = flake8_bandit::plugins::bad_file_permissions(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
                 if self.settings.enabled.contains(&CheckCode::S106) {
                     self.add_checks(
                         flake8_bandit::plugins::hardcoded_password_func_arg(keywords).into_iter(),

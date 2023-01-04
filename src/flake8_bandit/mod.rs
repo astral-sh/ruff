@@ -3,7 +3,6 @@ pub mod plugins;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -15,6 +14,7 @@ mod tests {
 
     #[test_case(CheckCode::S101, Path::new("S101.py"); "S101")]
     #[test_case(CheckCode::S102, Path::new("S102.py"); "S102")]
+    #[test_case(CheckCode::S103, Path::new("S103.py"); "S103")]
     #[test_case(CheckCode::S104, Path::new("S104.py"); "S104")]
     #[test_case(CheckCode::S105, Path::new("S105.py"); "S105")]
     #[test_case(CheckCode::S106, Path::new("S106.py"); "S106")]
