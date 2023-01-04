@@ -74,7 +74,7 @@ pub fn convert(
                 .as_ref()
                 .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
         })
-        .unwrap_or_else(|| plugin::resolve_select(flake8, &plugins));
+        .unwrap_or_else(|| plugin::resolve_select(&plugins));
     let mut ignore = flake8
         .get("ignore")
         .and_then(|value| {
@@ -288,13 +288,6 @@ pub fn convert(
                 // Unknown
                 _ => eprintln!("Skipping unsupported property: {key}"),
             }
-        }
-    }
-
-    // Set default `convention`.
-    if plugins.contains(&Plugin::Flake8Docstrings) {
-        if pydocstyle.convention.is_none() {
-            pydocstyle.convention = Some(Convention::Pep257);
         }
     }
 
@@ -697,6 +690,7 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
+                CheckCodePrefix::D,
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
