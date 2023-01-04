@@ -151,7 +151,7 @@ impl<'a> Checker<'a> {
             in_subscript: false,
             seen_import_boundary: false,
             futures_allowed: true,
-            annotations_future_enabled: false,
+            annotations_future_enabled: path.extension().map_or(false, |ext| ext == "pyi"),
             except_handlers: vec![],
             // Check-specific state.
             flake8_bugbear_seen: vec![],
