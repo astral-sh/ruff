@@ -39,3 +39,13 @@ def test_list(param1, param2):
 @pytest.mark.parametrize(["param1"], [1, 2, 3])
 def test_list_one_elem(param1, param2):
     ...
+
+
+@pytest.mark.parametrize([some_expr, another_expr], [1, 2, 3])
+def test_list_expressions(param1, param2):
+    ...
+
+
+@pytest.mark.parametrize([some_expr, "param2"], [1, 2, 3])
+def test_list_mixed_expr_literal(param1, param2):
+    ...

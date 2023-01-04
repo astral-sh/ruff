@@ -61,7 +61,14 @@ expression: checks
   end_location:
     row: 24
     column: 45
-  fix: ~
+  fix:
+    content: "[\"param1\", \"param2\"]"
+    location:
+      row: 24
+      column: 25
+    end_location:
+      row: 24
+      column: 45
   parent: ~
 - kind:
     ParametrizeNamesWrongType: csv
