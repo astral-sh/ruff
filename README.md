@@ -53,8 +53,10 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [Synapse](https://github.com/matrix-org/synapse)
-- [Ibis](https://github.com/ibis-project/ibis)
 - [Saleor](https://github.com/saleor/saleor)
+- [Polars](https://github.com/pola-rs/polars)
+- [Ibis](https://github.com/ibis-project/ibis)
+- [`pyca/cryptography`](https://github.com/pyca/cryptography)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
