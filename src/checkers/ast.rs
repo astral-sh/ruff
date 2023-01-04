@@ -470,7 +470,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_default(args).into_iter(),
+                        flake8_bandit::checks::hardcoded_password_default(args).into_iter(),
                     );
                 }
 
@@ -1186,7 +1186,7 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&CheckCode::S101) {
-                    self.add_check(flake8_bandit::plugins::assert_used(stmt));
+                    self.add_check(flake8_bandit::checks::assert_used(stmt));
                 }
                 if self.settings.enabled.contains(&CheckCode::PT015) {
                     if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
@@ -1296,7 +1296,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     if let Some(check) =
-                        flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
+                        flake8_bandit::checks::assign_hardcoded_password_string(value, targets)
                     {
                         self.add_check(check);
                     }
@@ -1864,12 +1864,12 @@ where
 
                 // flake8-bandit
                 if self.settings.enabled.contains(&CheckCode::S102) {
-                    if let Some(check) = flake8_bandit::plugins::exec_used(expr, func) {
+                    if let Some(check) = flake8_bandit::checks::exec_used(expr, func) {
                         self.add_check(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S103) {
-                    if let Some(check) = flake8_bandit::plugins::bad_file_permissions(
+                    if let Some(check) = flake8_bandit::checks::bad_file_permissions(
                         func,
                         args,
                         keywords,
@@ -1881,7 +1881,7 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::S106) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_func_arg(keywords).into_iter(),
+                        flake8_bandit::checks::hardcoded_password_func_arg(keywords).into_iter(),
                     );
                 }
 
@@ -2476,7 +2476,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     self.add_checks(
-                        flake8_bandit::plugins::compare_to_hardcoded_password_string(
+                        flake8_bandit::checks::compare_to_hardcoded_password_string(
                             left,
                             comparators,
                         )
@@ -2521,7 +2521,7 @@ where
                     ));
                 }
                 if self.settings.enabled.contains(&CheckCode::S104) {
-                    if let Some(check) = flake8_bandit::plugins::hardcoded_bind_all_interfaces(
+                    if let Some(check) = flake8_bandit::checks::hardcoded_bind_all_interfaces(
                         value,
                         &Range::from_located(expr),
                     ) {
