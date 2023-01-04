@@ -22,7 +22,7 @@ use crate::settings::types::{
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, fs, isort,
-    mccabe, pep8_naming, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 #[derive(Debug, Default)]
@@ -52,6 +52,7 @@ pub struct Configuration {
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<CheckCodePrefix>>,
+    pub task_tags: Option<Vec<String>>,
     pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
@@ -65,6 +66,7 @@ pub struct Configuration {
     pub isort: Option<isort::settings::Options>,
     pub mccabe: Option<mccabe::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
+    pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
     pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
@@ -149,6 +151,7 @@ impl Configuration {
                 .transpose()?,
             target_version: options.target_version,
             unfixable: options.unfixable,
+            task_tags: options.task_tags,
             update_check: options.update_check,
             // Plugins
             flake8_annotations: options.flake8_annotations,
@@ -162,6 +165,7 @@ impl Configuration {
             isort: options.isort,
             mccabe: options.mccabe,
             pep8_naming: options.pep8_naming,
+            pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
             pyupgrade: options.pyupgrade,
         })
@@ -209,6 +213,7 @@ impl Configuration {
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
             unfixable: self.unfixable.or(config.unfixable),
+            task_tags: self.task_tags.or(config.task_tags),
             update_check: self.update_check.or(config.update_check),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
@@ -226,6 +231,7 @@ impl Configuration {
             isort: self.isort.or(config.isort),
             mccabe: self.mccabe.or(config.mccabe),
             pep8_naming: self.pep8_naming.or(config.pep8_naming),
+            pycodestyle: self.pycodestyle.or(config.pycodestyle),
             pydocstyle: self.pydocstyle.or(config.pydocstyle),
             pyupgrade: self.pyupgrade.or(config.pyupgrade),
         }

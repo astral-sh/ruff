@@ -26,7 +26,7 @@ use crate::settings::types::{
 use crate::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, one_time_warning, pep8_naming, pydocstyle, pyupgrade,
+    mccabe, one_time_warning, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 pub mod configuration;
@@ -60,6 +60,7 @@ pub struct Settings {
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub task_tags: Vec<String>,
     pub update_check: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -73,6 +74,7 @@ pub struct Settings {
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
+    pub pycodestyle: pycodestyle::settings::Settings,
     pub pydocstyle: pydocstyle::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
 }
@@ -173,6 +175,9 @@ impl Settings {
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
             target_version: config.target_version.unwrap_or_default(),
+            task_tags: config.task_tags.unwrap_or_else(|| {
+                vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()]
+            }),
             update_check: config.update_check.unwrap_or(true),
             // Plugins
             flake8_annotations: config
@@ -219,6 +224,10 @@ impl Settings {
                 .pep8_naming
                 .map(std::convert::Into::into)
                 .unwrap_or_default(),
+            pycodestyle: config
+                .pycodestyle
+                .map(std::convert::Into::into)
+                .unwrap_or_default(),
             pydocstyle: config
                 .pydocstyle
                 .map(std::convert::Into::into)
@@ -252,6 +261,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            task_tags: vec!["TODO".to_string(), "FIXME".to_string()],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
@@ -264,6 +274,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
@@ -291,6 +302,7 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            task_tags: vec!["TODO".to_string()],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
@@ -303,6 +315,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }

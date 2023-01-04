@@ -18,7 +18,7 @@ use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{
     directives, flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -112,6 +112,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         show_source: None,
         src: None,
         unfixable: None,
+        task_tags: None,
         update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
@@ -129,6 +130,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         isort: Some(isort::settings::Settings::default().into()),
         mccabe: Some(mccabe::settings::Settings::default().into()),
         pep8_naming: Some(pep8_naming::settings::Settings::default().into()),
+        pycodestyle: Some(pycodestyle::settings::Settings::default().into()),
         pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
         pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
     })?)
