@@ -56,17 +56,17 @@ prior to merging.
 
 There are four phases to adding a new lint rule:
 
-1. Define the rule in `src/checks.rs`.
+1. Define the rule in `src/registry.rs`.
 2. Define the _logic_ for triggering the rule in `src/checkers/ast.rs` (for AST-based checks),
    `src/checkers/tokens.rs` (for token-based checks), or `src/checkers/lines.rs` (for text-based checks).
 3. Add a test fixture.
 4. Update the generated files (documentation and generated code).
 
-To define the rule, open up `src/checks.rs`. You'll need to define both a `CheckCode` and
+To define the rule, open up `src/registry.rs`. You'll need to define both a `CheckCode` and
 `CheckKind`. As an example, you can grep for `E402` and `ModuleImportNotAtTopOfFile`, and follow the
 pattern implemented therein.
 
-To trigger the rule, you'll likely want to augment the logic in `src/check_ast.rs`, which defines
+To trigger the rule, you'll likely want to augment the logic in `src/checkers/ast.rs`, which defines
 the Python AST visitor, responsible for iterating over the abstract syntax tree and collecting
 lint-rule violations as it goes. If you need to inspect the AST, you can run
 `cargo +nightly dev print-ast` with a Python file. Grep for the `Check::new` invocations to
