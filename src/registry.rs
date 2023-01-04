@@ -219,6 +219,8 @@ pub enum CheckCode {
     // flake8-simplify
     SIM105,
     SIM118,
+    SIM220,
+    SIM221,
     SIM222,
     SIM223,
     SIM300,
@@ -947,6 +949,8 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    AAndNotA(String),
+    AOrNotA(String),
     KeyInDict(String, String),
     AndFalse,
     OrTrue,
@@ -1377,6 +1381,8 @@ impl CheckCode {
             // flake8-simplify
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("..".to_string()),
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
+            CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
+            CheckCode::SIM221 => CheckKind::AOrNotA("...".to_string()),
             CheckCode::SIM222 => CheckKind::OrTrue,
             CheckCode::SIM223 => CheckKind::AndFalse,
             CheckCode::SIM300 => CheckKind::YodaConditions("left".to_string(), "right".to_string()),
@@ -1902,6 +1908,8 @@ impl CheckCode {
             // flake8-simplify
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM220 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM221 => CheckCategory::Flake8Simplify,
             CheckCode::SIM222 => CheckCategory::Flake8Simplify,
             CheckCode::SIM223 => CheckCategory::Flake8Simplify,
             CheckCode::SIM300 => CheckCategory::Flake8Simplify,
@@ -2152,6 +2160,8 @@ impl CheckKind {
             // flake8-simplify
             CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
+            CheckKind::AAndNotA(..) => &CheckCode::SIM220,
+            CheckKind::AOrNotA(..) => &CheckCode::SIM221,
             CheckKind::OrTrue => &CheckCode::SIM222,
             CheckKind::AndFalse => &CheckCode::SIM223,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
@@ -2912,6 +2922,8 @@ impl CheckKind {
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
+            CheckKind::AAndNotA(name) => format!("Use `False` instead of `{name} and not {name}`"),
+            CheckKind::AOrNotA(name) => format!("Use `True` instead of `{name} or not {name}`"),
             CheckKind::OrTrue => "Use `True` instead of `... or True`".to_string(),
             CheckKind::AndFalse => "Use `False` instead of `... and False`".to_string(),
             CheckKind::YodaConditions(left, right) => {
@@ -3503,9 +3515,11 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::AmbiguousUnicodeCharacterString(..)
+            CheckKind::AAndNotA(..)
+                | CheckKind::AOrNotA(..)
                 | CheckKind::AmbiguousUnicodeCharacterComment(..)
                 | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::AmbiguousUnicodeCharacterString(..)
                 | CheckKind::AndFalse
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
@@ -3619,6 +3633,8 @@ impl CheckKind {
     /// The message used to describe the fix action for a given `CheckKind`.
     pub fn commit(&self) -> Option<String> {
         match self {
+            CheckKind::AAndNotA(..) => Some("Replace with `False`".to_string()),
+            CheckKind::AOrNotA(..) => Some("Replace with `True`".to_string()),
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant)
             | CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant)
             | CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {

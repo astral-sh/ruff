@@ -6,7 +6,7 @@ use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Located, Location};
+use rustpython_ast::{Comprehension, Located, Location};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
@@ -2583,6 +2583,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::PLR1701) {
                     pylint::plugins::merge_isinstance(self, expr, op, values);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM220) {
+                    flake8_simplify::plugins::a_and_not_a(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM221) {
+                    flake8_simplify::plugins::a_or_not_a(self, expr);
+                }
                 if self.settings.enabled.contains(&CheckCode::SIM222) {
                     flake8_simplify::plugins::or_true(self, expr);
                 }
@@ -2928,6 +2934,17 @@ where
             }
             _ => unreachable!("Unexpected expression for format_spec"),
         }
+    }
+
+    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
+        if self.settings.enabled.contains(&CheckCode::SIM118) {
+            flake8_simplify::plugins::key_in_dict_for(
+                self,
+                &comprehension.target,
+                &comprehension.iter,
+            );
+        }
+        visitor::walk_comprehension(self, comprehension);
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {

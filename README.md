@@ -960,7 +960,8 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| SIM105 | UseContextlibSuppress | Use 'contextlib.suppress(..)' instead of try-except-pass |  |
+| SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
+| SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
@@ -1353,9 +1354,9 @@ natively, including:
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
-- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (4/37)
+- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (6/30)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
-- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
+- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
 - [`isort`](https://pypi.org/project/isort/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
@@ -1411,9 +1412,9 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
-- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (4/37)
+- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (6/30)
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
-- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
+- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)

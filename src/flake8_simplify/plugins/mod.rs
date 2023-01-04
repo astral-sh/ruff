@@ -1,4 +1,4 @@
-pub use bool_ops::{and_false, or_true};
+pub use bool_ops::{a_and_not_a, a_or_not_a, and_false, or_true};
 pub use key_in_dict::{key_in_dict_compare, key_in_dict_for};
 pub use use_contextlib_suppress::use_contextlib_suppress;
 pub use yoda_conditions::yoda_conditions;
