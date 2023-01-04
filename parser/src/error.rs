@@ -213,7 +213,7 @@ pub(crate) fn parse_error_from_lalrpop(
             let expected = (expected.len() == 1).then(|| expected[0].clone());
             ParseError {
                 error: ParseErrorType::UnrecognizedToken(token.1, expected),
-                location: Location::new(token.0.row(), token.0.column() + 1),
+                location: token.0.with_col_offset(1),
                 source_path,
             }
         }
