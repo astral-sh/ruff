@@ -68,3 +68,7 @@ def f():
         yield z
 
 
+def f():
+    for x, y in z():
+        yield x, y
+    x = 1

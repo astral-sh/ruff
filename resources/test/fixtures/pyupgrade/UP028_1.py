@@ -75,6 +75,8 @@ def f():
 
 
 def f(x):
+    for x in y:
+        yield x
     del x
 
 
@@ -94,3 +96,18 @@ def f():
     for x in y:
         yield x
     print(x)
+
+
+def f():
+    for x in y:
+        yield x
+    z = lambda: x
+
+
+def f():
+    for x in y:
+        yield x
+
+    class C:
+        def __init__(self):
+            print(x)

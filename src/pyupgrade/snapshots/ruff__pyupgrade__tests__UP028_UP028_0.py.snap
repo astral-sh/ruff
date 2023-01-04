@@ -164,22 +164,6 @@ expression: checks
   parent: ~
 - kind: RewriteYieldFrom
   location:
-    row: 55
-    column: 8
-  end_location:
-    row: 57
-    column: 22
-  fix:
-    content: yield from z()
-    location:
-      row: 55
-      column: 8
-    end_location:
-      row: 57
-      column: 22
-  parent: ~
-- kind: RewriteYieldFrom
-  location:
     row: 67
     column: 4
   end_location:
@@ -193,5 +177,21 @@ expression: checks
     end_location:
       row: 68
       column: 15
+  parent: ~
+- kind: RewriteYieldFrom
+  location:
+    row: 72
+    column: 4
+  end_location:
+    row: 73
+    column: 18
+  fix:
+    content: yield from z()
+    location:
+      row: 72
+      column: 4
+    end_location:
+      row: 73
+      column: 18
   parent: ~
 

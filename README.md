@@ -693,7 +693,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
 | UP026 | RewriteMockImport | `mock` is deprecated, use `unittest.mock` | 🛠 |
 | UP027 | RewriteListComprehension | Replace unpacked list comprehension with a generator expression | 🛠 |
-| UP028 | RewriteYieldFrom | Itierating through a yield is deprecated, use `yield from` | 🛠 |
+| UP028 | RewriteYieldFrom | Replace `yield` over `for` loop with `yield from` | 🛠 |
 
 ### pep8-naming (N)
 
