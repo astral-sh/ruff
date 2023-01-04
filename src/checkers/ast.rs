@@ -1247,7 +1247,9 @@ where
                     flake8_simplify::plugins::key_in_dict_for(self, target, iter);
                 }
             }
-            StmtKind::Try { handlers, .. } => {
+            StmtKind::Try {
+                handlers, orelse, ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
                     if let Some(check) =
                         pyflakes::checks::default_except_not_last(handlers, self.locator)
@@ -1271,6 +1273,9 @@ where
                         flake8_pytest_style::plugins::assert_in_exception_handler(handlers)
                             .into_iter(),
                     );
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM105) {
+                    flake8_simplify::plugins::use_contextlib_suppress(self, stmt, handlers, orelse);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {

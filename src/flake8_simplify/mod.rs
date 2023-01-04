@@ -12,6 +12,7 @@ mod tests {
     use crate::registry::CheckCode;
     use crate::settings;
 
+    #[test_case(CheckCode::SIM105, Path::new("SIM105.py"); "SIM105")]
     #[test_case(CheckCode::SIM118, Path::new("SIM118.py"); "SIM118")]
     #[test_case(CheckCode::SIM222, Path::new("SIM222.py"); "SIM222")]
     #[test_case(CheckCode::SIM223, Path::new("SIM223.py"); "SIM223")]
