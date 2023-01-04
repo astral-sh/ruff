@@ -37,10 +37,14 @@ pub fn cmp_modules(alias1: &AliasData, alias2: &AliasData) -> Ordering {
 }
 
 /// Compare two member imports within `StmtKind::ImportFrom` blocks.
-pub fn cmp_members(alias1: &AliasData, alias2: &AliasData) -> Ordering {
-    prefix(alias1.name)
-        .cmp(&prefix(alias2.name))
-        .then_with(|| cmp_modules(alias1, alias2))
+pub fn cmp_members(alias1: &AliasData, alias2: &AliasData, order_by_type: bool) -> Ordering {
+    if order_by_type {
+        prefix(alias1.name)
+            .cmp(&prefix(alias2.name))
+            .then_with(|| cmp_modules(alias1, alias2))
+    } else {
+        cmp_modules(alias1, alias2)
+    }
 }
 
 /// Compare two relative import levels.

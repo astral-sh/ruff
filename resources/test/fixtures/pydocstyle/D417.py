@@ -1,5 +1,5 @@
 def f(x, y, z):
-    """Do f.
+    """Do something.
 
     Args:
         x: the value
@@ -12,7 +12,7 @@ def f(x, y, z):
 
 
 def f(x, y, z):
-    """Do f.
+    """Do something.
 
     Args:
         x:
@@ -25,7 +25,7 @@ def f(x, y, z):
 
 
 def f(x, y, z):
-    """Do f.
+    """Do something.
 
     Args:
         x:
@@ -37,7 +37,7 @@ def f(x, y, z):
 
 
 def f(x, y, z):
-    """Do f.
+    """Do something.
 
     Args:
         x: the value def
@@ -50,7 +50,7 @@ def f(x, y, z):
 
 
 def f(x, y, z):
-    """Do f.
+    """Do something.
 
     Args:
         x: the value
@@ -63,7 +63,7 @@ def f(x, y, z):
 
 
 def f(x, y, z):
-    """Do g.
+    """Do something.
 
     Args:
         x: the value
@@ -75,10 +75,41 @@ def f(x, y, z):
 
 
 def f(x, y, z):
-    """Do h.
+    """Do something.
 
     Args:
         x: the value
         z: A final argument
+    """
+    return x
+
+
+def f(x, *args, **kwargs):
+    """Do something.
+
+    Args:
+        x: the value
+        *args: variable arguments
+        **kwargs: keyword arguments
+    """
+    return x
+
+
+def f(x, *args, **kwargs):
+    """Do something.
+
+    Args:
+        *args: variable arguments
+        **kwargs: keyword arguments
+    """
+    return x
+
+
+def f(x, *args, **kwargs):
+    """Do something.
+
+    Args:
+        x: the value
+        **kwargs: keyword arguments
     """
     return x

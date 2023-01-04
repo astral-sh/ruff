@@ -1413,7 +1413,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
 static GOOGLE_ARGS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\w+)\s*(\(.*?\))?\s*:.+").unwrap());
+    Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:.+").unwrap());
 
 fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     let mut matches = Vec::new();

@@ -1,5 +1,6 @@
 //! Detect code style from Python source code.
 
+use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
@@ -65,6 +66,24 @@ impl From<&Quote> for vendor::str::Quote {
         match val {
             Quote::Single => vendor::str::Quote::Single,
             Quote::Double => vendor::str::Quote::Double,
+        }
+    }
+}
+
+impl fmt::Display for Quote {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Quote::Single => write!(f, "\'"),
+            Quote::Double => write!(f, "\""),
+        }
+    }
+}
+
+impl From<&Quote> for char {
+    fn from(val: &Quote) -> Self {
+        match val {
+            Quote::Single => '\'',
+            Quote::Double => '"',
         }
     }
 }

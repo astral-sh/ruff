@@ -1325,6 +1325,13 @@
             "type": "string"
           }
         },
+        "order-by-type": {
+          "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "single-line-exclusions": {
           "description": "One or more modules to exclude from the single line rule.",
           "type": [

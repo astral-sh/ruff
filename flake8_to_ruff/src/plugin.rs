@@ -97,7 +97,7 @@ impl fmt::Debug for Plugin {
 }
 
 impl Plugin {
-    pub fn default(&self) -> CheckCodePrefix {
+    pub fn prefix(&self) -> CheckCodePrefix {
         match self {
             Plugin::Flake8Annotations => CheckCodePrefix::ANN,
             Plugin::Flake8Bandit => CheckCodePrefix::S,
@@ -125,48 +125,6 @@ impl Plugin {
             Plugin::Pyupgrade => CheckCodePrefix::UP,
         }
     }
-
-    pub fn select(&self, flake8: &HashMap<String, Option<String>>) -> Vec<CheckCodePrefix> {
-        match self {
-            Plugin::Flake8Annotations => vec![CheckCodePrefix::ANN],
-            Plugin::Flake8Bandit => vec![CheckCodePrefix::S],
-            Plugin::Flake8BlindExcept => vec![CheckCodePrefix::BLE],
-            Plugin::Flake8Bugbear => vec![CheckCodePrefix::B],
-            Plugin::Flake8Builtins => vec![CheckCodePrefix::A],
-            Plugin::Flake8Comprehensions => vec![CheckCodePrefix::C4],
-            Plugin::Flake8Datetimez => vec![CheckCodePrefix::DTZ],
-            Plugin::Flake8Debugger => vec![CheckCodePrefix::T1],
-            Plugin::Flake8Docstrings => {
-                // Use the user-provided docstring.
-                for key in ["docstring-convention", "docstring_convention"] {
-                    if let Some(Some(value)) = flake8.get(key) {
-                        match DocstringConvention::from_str(value) {
-                            Ok(convention) => return convention.select(),
-                            Err(e) => {
-                                eprintln!("Unexpected '{key}' value: {value} ({e}");
-                                return vec![];
-                            }
-                        }
-                    }
-                }
-                // Default to PEP257.
-                DocstringConvention::Pep257.select()
-            }
-            Plugin::Flake8Eradicate => vec![CheckCodePrefix::ERA],
-            Plugin::Flake8ErrMsg => vec![CheckCodePrefix::EM],
-            Plugin::Flake8ImplicitStrConcat => vec![CheckCodePrefix::ISC],
-            Plugin::Flake8Print => vec![CheckCodePrefix::T2],
-            Plugin::Flake8PytestStyle => vec![CheckCodePrefix::PT],
-            Plugin::Flake8Quotes => vec![CheckCodePrefix::Q],
-            Plugin::Flake8Return => vec![CheckCodePrefix::RET],
-            Plugin::Flake8Simplify => vec![CheckCodePrefix::SIM],
-            Plugin::Flake8TidyImports => vec![CheckCodePrefix::TID],
-            Plugin::McCabe => vec![CheckCodePrefix::C9],
-            Plugin::PandasVet => vec![CheckCodePrefix::PD],
-            Plugin::PEP8Naming => vec![CheckCodePrefix::N],
-            Plugin::Pyupgrade => vec![CheckCodePrefix::UP],
-        }
-    }
 }
 
 pub enum DocstringConvention {
@@ -186,23 +144,6 @@ impl FromStr for DocstringConvention {
             "numpy" => Ok(DocstringConvention::Numpy),
             "google" => Ok(DocstringConvention::Google),
             _ => Err(anyhow!("Unknown docstring convention: {string}")),
-        }
-    }
-}
-
-impl DocstringConvention {
-    fn select(&self) -> Vec<CheckCodePrefix> {
-        match self {
-            DocstringConvention::All => vec![CheckCodePrefix::D],
-            DocstringConvention::Pep257 => vec![
-                // Covered by the `convention` setting.
-            ],
-            DocstringConvention::Numpy => vec![
-                // Covered by the `convention` setting.
-            ],
-            DocstringConvention::Google => vec![
-                // Covered by the `convention` setting.
-            ],
         }
     }
 }
@@ -356,7 +297,7 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin
             if prefix
                 .codes()
                 .iter()
-                .any(|code| plugin.default().codes().contains(code))
+                .any(|code| plugin.prefix().codes().contains(code))
             {
                 return true;
             }
@@ -367,18 +308,9 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin
 }
 
 /// Resolve the set of enabled `CheckCodePrefix` values for the given plugins.
-pub fn resolve_select(
-    flake8: &HashMap<String, Option<String>>,
-    plugins: &[Plugin],
-) -> BTreeSet<CheckCodePrefix> {
-    // Include default Pyflakes and pycodestyle checks.
+pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<CheckCodePrefix> {
     let mut select = BTreeSet::from([CheckCodePrefix::F, CheckCodePrefix::E, CheckCodePrefix::W]);
-
-    // Add prefix codes for every plugin.
-    for plugin in plugins {
-        select.extend(plugin.select(flake8));
-    }
-
+    select.extend(plugins.iter().map(Plugin::prefix));
     select
 }
 
