@@ -960,6 +960,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| SIM105 | UseContextlibSuppress | Use 'contextlib.suppress(..)' instead of try-except-pass |  |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |

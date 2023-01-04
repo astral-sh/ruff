@@ -217,6 +217,7 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
+    SIM105,
     SIM118,
     SIM222,
     SIM223,
@@ -874,6 +875,7 @@ pub enum CheckKind {
     UnaryPrefixIncrement,
     UnreliableCallableCheck,
     UnusedLoopControlVariable(String),
+    UseContextlibSuppress(String),
     UselessComparison,
     UselessContextlibSuppress,
     UselessExpression,
@@ -1373,6 +1375,7 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
+            CheckCode::SIM105 => CheckKind::UseContextlibSuppress("..".to_string()),
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             CheckCode::SIM222 => CheckKind::OrTrue,
             CheckCode::SIM223 => CheckKind::AndFalse,
@@ -1897,6 +1900,7 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::SIM222 => CheckCategory::Flake8Simplify,
             CheckCode::SIM223 => CheckCategory::Flake8Simplify,
@@ -2146,6 +2150,7 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
+            CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::OrTrue => &CheckCode::SIM222,
             CheckKind::AndFalse => &CheckCode::SIM223,
@@ -2657,6 +2662,9 @@ impl CheckKind {
             CheckKind::FStringDocstring => "f-string used as docstring. This will be interpreted \
                                             by python as a joined string rather than a docstring."
                 .to_string(),
+            CheckKind::UseContextlibSuppress(exception) => {
+                format!("Use 'contextlib.suppress({exception})' instead of try-except-pass")
+            }
             CheckKind::UselessContextlibSuppress => {
                 "No arguments passed to `contextlib.suppress`. No exceptions will be suppressed \
                  and therefore this context manager is redundant"
