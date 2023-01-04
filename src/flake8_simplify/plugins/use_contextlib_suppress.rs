@@ -11,8 +11,9 @@ pub fn use_contextlib_suppress(
     stmt: &Stmt,
     handlers: &[Excepthandler],
     orelse: &[Stmt],
+    finalbody: &[Stmt],
 ) {
-    if handlers.len() != 1 || !orelse.is_empty() {
+    if handlers.len() != 1 || !orelse.is_empty() || !finalbody.is_empty() {
         return;
     }
     let handler = &handlers[0];
@@ -21,7 +22,7 @@ pub fn use_contextlib_suppress(
         if matches!(body[0].node, StmtKind::Pass) {
             let handler_names: Vec<_> = helpers::extract_handler_names(handlers)
                 .into_iter()
-                .flatten()
+                .map(|v| v.join("."))
                 .collect();
             let exception = if handler_names.is_empty() {
                 "Exception".to_string()

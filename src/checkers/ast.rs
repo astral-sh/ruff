@@ -1248,7 +1248,10 @@ where
                 }
             }
             StmtKind::Try {
-                handlers, orelse, ..
+                handlers,
+                orelse,
+                finalbody,
+                ..
             } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
                     if let Some(check) =
@@ -1275,7 +1278,9 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&CheckCode::SIM105) {
-                    flake8_simplify::plugins::use_contextlib_suppress(self, stmt, handlers, orelse);
+                    flake8_simplify::plugins::use_contextlib_suppress(
+                        self, stmt, handlers, orelse, finalbody,
+                    );
                 }
             }
             StmtKind::Assign { targets, value, .. } => {

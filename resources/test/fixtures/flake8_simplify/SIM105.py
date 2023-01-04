@@ -18,6 +18,11 @@ except:  # SIM105
 
 try:
     foo()
+except (a.Error, b.Error):  # SIM105
+    pass
+
+try:
+    foo()
 except ValueError:
     print('foo')
 except OSError:
@@ -28,4 +33,11 @@ try:
 except ValueError:
     pass
 else:
+    print('bar')
+
+try:
+    foo()
+except ValueError:
+    pass
+finally:
     print('bar')
