@@ -1,0 +1,15 @@
+---
+source: src/flake8_bandit/mod.rs
+expression: checks
+---
+- kind:
+    HardcodedTempFile: /foo/bar
+  location:
+    row: 15
+    column: 10
+  end_location:
+    row: 15
+    column: 20
+  fix: ~
+  parent: ~
+

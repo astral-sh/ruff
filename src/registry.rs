@@ -327,6 +327,7 @@ pub enum CheckCode {
     S105,
     S106,
     S107,
+    S108,
     // flake8-boolean-trap
     FBT001,
     FBT002,
@@ -1060,6 +1061,7 @@ pub enum CheckKind {
     HardcodedPasswordString(String),
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
+    HardcodedTempFile(String),
     // mccabe
     FunctionIsTooComplex(String, usize),
     // flake8-boolean-trap
@@ -1512,6 +1514,7 @@ impl CheckCode {
             CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
+            CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
             // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
             // flake8-boolean-trap
@@ -1913,6 +1916,7 @@ impl CheckCode {
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
+            CheckCode::S108 => CheckCategory::Flake8Bandit,
             // flake8-simplify
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
@@ -2277,6 +2281,7 @@ impl CheckKind {
             CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
+            CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
             // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
             // flake8-boolean-trap
@@ -3207,6 +3212,12 @@ impl CheckKind {
             | CheckKind::HardcodedPasswordDefault(string) => {
                 format!(
                     "Possible hardcoded password: `\"{}\"`",
+                    string.escape_debug()
+                )
+            }
+            CheckKind::HardcodedTempFile(string) => {
+                format!(
+                    "Probable insecure usage of temp file/directory: `\"{}\"`",
                     string.escape_debug()
                 )
             }
