@@ -2932,7 +2932,7 @@ impl CheckKind {
             CheckKind::OrTrue => "Use `True` instead of `... or True`".to_string(),
             CheckKind::AndFalse => "Use `False` instead of `... and False`".to_string(),
             CheckKind::YodaConditions(left, right) => {
-                format!("Use `{left} == {right}` instead of `{right} == {left} (Yoda-conditions)`")
+                format!("Yoda conditions are discouraged, use `{left} == {right}` instead")
             }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
@@ -3901,9 +3901,9 @@ impl CheckKind {
                 Some("Remove `object` inheritance".to_string())
             }
             CheckKind::UselessYieldFixture(..) => Some("Replace `yield` with `return`".to_string()),
-            CheckKind::YodaConditions(left, right) => Some(format!(
-                "Replace with `{left} == {right}` (Yoda-conditions)`"
-            )),
+            CheckKind::YodaConditions(left, right) => {
+                Some(format!("Replace Yoda condition with `{left} == {right}`"))
+            }
             _ => None,
         }
     }
