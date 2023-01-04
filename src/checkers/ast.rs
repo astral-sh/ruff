@@ -37,7 +37,7 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
+    autofix, docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
     flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
@@ -3892,8 +3892,10 @@ impl<'a> Checker<'a> {
                     let fix = if !ignore_init && self.patch(&CheckCode::F401) {
                         let deleted: Vec<&Stmt> =
                             self.deletions.iter().map(|node| node.0).collect();
-                        match pyflakes::fixes::remove_unused_imports(
-                            &unused_imports,
+                        match autofix::helpers::remove_unused_imports(
+                            unused_imports
+                                .iter()
+                                .map(|(full_name, _)| full_name.as_str()),
                             child,
                             parent,
                             &deleted,
@@ -3917,7 +3919,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
+                            CheckKind::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
