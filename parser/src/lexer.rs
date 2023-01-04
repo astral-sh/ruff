@@ -244,12 +244,12 @@ where
         // Detect potential string like rb'' b'' f'' u'' r''
         match self.window[..3] {
             [Some(c), Some('"' | '\''), ..] => {
-                if let Ok(kind) = c.to_string().try_into() {
+                if let Ok(kind) = StringKind::try_from(c.to_string()) {
                     return self.lex_string(kind);
                 }
             }
             [Some(c1), Some(c2), Some('"' | '\'')] => {
-                if let Ok(kind) = format!("{c1}{c2}").try_into() {
+                if let Ok(kind) = StringKind::try_from(format!("{c1}{c2}")) {
                     return self.lex_string(kind);
                 }
             }
