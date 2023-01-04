@@ -241,59 +241,23 @@ where
 
     // Lexer helper functions:
     fn lex_identifier(&mut self) -> LexResult {
-        let mut name = String::new();
-        let start_pos = self.get_pos();
-
         // Detect potential string like rb'' b'' f'' u'' r''
-        let mut saw_b = false;
-        let mut saw_r = false;
-        let mut saw_u = false;
-        let mut saw_f = false;
-        loop {
-            // Detect r"", f"", b"" and u""
-            if !(saw_b || saw_u || saw_f) && matches!(self.window[0], Some('b' | 'B')) {
-                saw_b = true;
-            } else if !(saw_b || saw_r || saw_u || saw_f)
-                && matches!(self.window[0], Some('u' | 'U'))
-            {
-                saw_u = true;
-            } else if !(saw_r || saw_u) && matches!(self.window[0], Some('r' | 'R')) {
-                saw_r = true;
-            } else if !(saw_b || saw_u || saw_f) && matches!(self.window[0], Some('f' | 'F')) {
-                saw_f = true;
-            } else {
-                break;
+        match self.window[..3] {
+            [Some(c), Some('"' | '\''), ..] => {
+                if let Ok(kind) = c.to_string().try_into() {
+                    return self.lex_string(kind);
+                }
             }
-
-            // Take up char into name:
-            name.push(self.next_char().unwrap());
-
-            // Check if we have a string:
-            if matches!(self.window[0], Some('"' | '\'')) {
-                let kind = if saw_r {
-                    if saw_b {
-                        StringKind::RawBytes
-                    } else if saw_f {
-                        StringKind::RawFString
-                    } else {
-                        StringKind::RawString
-                    }
-                } else if saw_b {
-                    StringKind::Bytes
-                } else if saw_u {
-                    StringKind::Unicode
-                } else if saw_f {
-                    StringKind::FString
-                } else {
-                    StringKind::String
-                };
-
-                return self
-                    .lex_string(kind)
-                    .map(|(_, tok, end_pos)| (start_pos, tok, end_pos));
+            [Some(c1), Some(c2), Some('"' | '\'')] => {
+                if let Ok(kind) = format!("{c1}{c2}").try_into() {
+                    return self.lex_string(kind);
+                }
             }
-        }
+            _ => {}
+        };
 
+        let start_pos = self.get_pos();
+        let mut name = String::new();
         while self.is_identifier_continuation() {
             name.push(self.next_char().unwrap());
         }
@@ -495,6 +459,9 @@ where
 
     fn lex_string(&mut self, kind: StringKind) -> LexResult {
         let start_pos = self.get_pos();
+        for _ in 0..kind.to_string().len() {
+            self.next_char();
+        }
         let quote_char = self.next_char().unwrap();
         let mut string_content = String::new();
 
