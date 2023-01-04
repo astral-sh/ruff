@@ -7,45 +7,60 @@ use crate::ast::types::Range;
 use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
-use crate::settings::types::PythonVersion;
 
-const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
-    "nested_scopes",
-    "generators",
-    "with_statement",
-    "division",
-    "absolute_import",
-    "with_statement",
-    "print_function",
-    "unicode_literals",
+const BUILTINS: &[&str] = &[
+    "*",
+    "ascii",
+    "bytes",
+    "chr",
+    "dict",
+    "filter",
+    "hex",
+    "input",
+    "int",
+    "isinstance",
+    "list",
+    "map",
+    "max",
+    "min",
+    "next",
+    "object",
+    "oct",
+    "open",
+    "pow",
+    "range",
+    "round",
+    "str",
+    "super",
+    "zip",
 ];
+const IO: &[&str] = &["open"];
+const SIX_MOVES_BUILTINS: &[&str] = BUILTINS;
+const SIX: &[&str] = &["callable", "next"];
+const SIX_MOVES: &[&str] = &["filter", "input", "map", "range", "zip"];
 
-const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
-    "nested_scopes",
-    "generators",
-    "with_statement",
-    "division",
-    "absolute_import",
-    "with_statement",
-    "print_function",
-    "unicode_literals",
-    "generator_stop",
-];
-
-/// UP010
-pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Located<AliasData>]) {
-    let target_version = checker.settings.target_version;
+/// UP029
+pub fn unnecessary_builtin_import(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    module: &str,
+    names: &[Located<AliasData>],
+) {
+    let deprecated_names = match module {
+        "builtins" => BUILTINS,
+        "io" => IO,
+        "six" => SIX,
+        "six.moves" => SIX_MOVES,
+        "six.moves.builtins" => SIX_MOVES_BUILTINS,
+        _ => return,
+    };
 
     let mut unused_imports: Vec<&Alias> = vec![];
     for alias in names {
         if alias.node.asname.is_some() {
             continue;
         }
-        if (target_version >= PythonVersion::Py33
-            && PY33_PLUS_REMOVE_FUTURES.contains(&alias.node.name.as_str()))
-            || (target_version >= PythonVersion::Py37
-                && PY37_PLUS_REMOVE_FUTURES.contains(&alias.node.name.as_str()))
-        {
+        if deprecated_names.contains(&alias.node.name.as_str()) {
             unused_imports.push(alias);
         }
     }
@@ -54,7 +69,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         return;
     }
     let mut check = Check::new(
-        CheckKind::UnnecessaryFutureImport(
+        CheckKind::UnnecessaryBuiltinImport(
             unused_imports
                 .iter()
                 .map(|alias| alias.node.name.to_string())
@@ -70,10 +85,10 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         let defined_in = checker.current_stmt_parent();
         let unused_imports: Vec<String> = unused_imports
             .iter()
-            .map(|alias| format!("__future__.{}", alias.node.name))
+            .map(|alias| format!("{module}.{}", alias.node.name))
             .collect();
         match autofix::helpers::remove_unused_imports(
-            unused_imports.iter().map(std::string::String::as_str),
+            unused_imports.iter().map(String::as_str),
             defined_by.0,
             defined_in.map(|node| node.0),
             &deleted,
@@ -85,7 +100,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 }
                 check.amend(fix);
             }
-            Err(e) => error!("Failed to remove `__future__` import: {e}"),
+            Err(e) => error!("Failed to remove builtin import: {e}"),
         }
     }
     checker.add_check(check);

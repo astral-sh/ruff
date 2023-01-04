@@ -252,6 +252,7 @@ pub enum CheckCode {
     UP026,
     UP027,
     UP028,
+    UP029,
     // pydocstyle
     D100,
     D101,
@@ -957,33 +958,34 @@ pub enum CheckKind {
     OrTrue,
     YodaConditions(String, String),
     // pyupgrade
-    TypeOfPrimitive(Primitive),
-    UselessMetaclassType,
-    TypingTextStrAlias,
-    DeprecatedUnittestAlias(String, String),
-    UselessObjectInheritance(String),
-    UsePEP585Annotation(String),
-    UsePEP604Annotation,
-    SuperCallWithParameters,
-    PEP3120UnnecessaryCodingComment,
-    UnnecessaryFutureImport(Vec<String>),
-    UnnecessaryLRUCacheParams,
-    UnnecessaryEncodeUTF8,
-    ConvertTypedDictFunctionalToClass(String),
     ConvertNamedTupleFunctionalToClass(String),
+    ConvertTypedDictFunctionalToClass(String),
+    DatetimeTimezoneUTC,
+    DeprecatedUnittestAlias(String, String),
+    NativeLiterals(LiteralType),
+    OSErrorAlias(Option<String>),
+    OpenAlias,
+    PEP3120UnnecessaryCodingComment,
     RedundantOpenModes(Option<String>),
     RemoveSixCompat,
-    DatetimeTimezoneUTC,
-    NativeLiterals(LiteralType),
-    OpenAlias,
-    ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
+    ReplaceUniversalNewlines,
     RewriteCElementTree,
-    OSErrorAlias(Option<String>),
-    RewriteUnicodeLiteral,
-    RewriteMockImport(MockReference),
     RewriteListComprehension,
+    RewriteMockImport(MockReference),
+    RewriteUnicodeLiteral,
     RewriteYieldFrom,
+    SuperCallWithParameters,
+    TypeOfPrimitive(Primitive),
+    TypingTextStrAlias,
+    UnnecessaryBuiltinImport(Vec<String>),
+    UnnecessaryEncodeUTF8,
+    UnnecessaryFutureImport(Vec<String>),
+    UnnecessaryLRUCacheParams,
+    UsePEP585Annotation(String),
+    UsePEP604Annotation,
+    UselessMetaclassType,
+    UselessObjectInheritance(String),
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1381,7 +1383,7 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
-            CheckCode::SIM105 => CheckKind::UseContextlibSuppress("..".to_string()),
+            CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
             CheckCode::SIM221 => CheckKind::AOrNotA("...".to_string()),
@@ -1419,6 +1421,7 @@ impl CheckCode {
             CheckCode::UP026 => CheckKind::RewriteMockImport(MockReference::Import),
             CheckCode::UP027 => CheckKind::RewriteListComprehension,
             CheckCode::UP028 => CheckKind::RewriteYieldFrom,
+            CheckCode::UP029 => CheckKind::UnnecessaryBuiltinImport(vec!["...".to_string()]),
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1953,6 +1956,7 @@ impl CheckCode {
             CheckCode::UP026 => CheckCategory::Pyupgrade,
             CheckCode::UP027 => CheckCategory::Pyupgrade,
             CheckCode::UP028 => CheckCategory::Pyupgrade,
+            CheckCode::UP029 => CheckCategory::Pyupgrade,
             // pycodestyle (warnings)
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
@@ -2170,33 +2174,34 @@ impl CheckKind {
             CheckKind::AndFalse => &CheckCode::SIM223,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
-            CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
-            CheckKind::UselessMetaclassType => &CheckCode::UP001,
-            CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::UP005,
-            CheckKind::UsePEP585Annotation(..) => &CheckCode::UP006,
-            CheckKind::UsePEP604Annotation => &CheckCode::UP007,
-            CheckKind::UselessObjectInheritance(..) => &CheckCode::UP004,
-            CheckKind::SuperCallWithParameters => &CheckCode::UP008,
-            CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::UP009,
-            CheckKind::UnnecessaryFutureImport(..) => &CheckCode::UP010,
-            CheckKind::UnnecessaryLRUCacheParams => &CheckCode::UP011,
-            CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::UP012,
-            CheckKind::ConvertTypedDictFunctionalToClass(..) => &CheckCode::UP013,
             CheckKind::ConvertNamedTupleFunctionalToClass(..) => &CheckCode::UP014,
+            CheckKind::ConvertTypedDictFunctionalToClass(..) => &CheckCode::UP013,
+            CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
+            CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::UP005,
+            CheckKind::NativeLiterals(..) => &CheckCode::UP018,
+            CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
+            CheckKind::OpenAlias => &CheckCode::UP020,
+            CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::UP009,
             CheckKind::RedundantOpenModes(..) => &CheckCode::UP015,
             CheckKind::RemoveSixCompat => &CheckCode::UP016,
-            CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
-            CheckKind::NativeLiterals(..) => &CheckCode::UP018,
-            CheckKind::TypingTextStrAlias => &CheckCode::UP019,
-            CheckKind::OpenAlias => &CheckCode::UP020,
-            CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
+            CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
-            CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
-            CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
-            CheckKind::RewriteMockImport(..) => &CheckCode::UP026,
             CheckKind::RewriteListComprehension => &CheckCode::UP027,
+            CheckKind::RewriteMockImport(..) => &CheckCode::UP026,
+            CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             CheckKind::RewriteYieldFrom => &CheckCode::UP028,
+            CheckKind::SuperCallWithParameters => &CheckCode::UP008,
+            CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
+            CheckKind::TypingTextStrAlias => &CheckCode::UP019,
+            CheckKind::UnnecessaryBuiltinImport(..) => &CheckCode::UP029,
+            CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::UP012,
+            CheckKind::UnnecessaryFutureImport(..) => &CheckCode::UP010,
+            CheckKind::UnnecessaryLRUCacheParams => &CheckCode::UP011,
+            CheckKind::UsePEP585Annotation(..) => &CheckCode::UP006,
+            CheckKind::UsePEP604Annotation => &CheckCode::UP007,
+            CheckKind::UselessMetaclassType => &CheckCode::UP001,
+            CheckKind::UselessObjectInheritance(..) => &CheckCode::UP004,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2678,7 +2683,7 @@ impl CheckKind {
                                             by python as a joined string rather than a docstring."
                 .to_string(),
             CheckKind::UseContextlibSuppress(exception) => {
-                format!("Use 'contextlib.suppress({exception})' instead of try-except-pass")
+                format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
             }
             CheckKind::UselessContextlibSuppress => {
                 "No arguments passed to `contextlib.suppress`. No exceptions will be suppressed \
@@ -2964,6 +2969,15 @@ impl CheckKind {
                 } else {
                     let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
                     format!("Unnecessary `__future__` imports {imports} for target Python version")
+                }
+            }
+            CheckKind::UnnecessaryBuiltinImport(names) => {
+                if names.len() == 1 {
+                    let import = &names[0];
+                    format!("Unnecessary builtin import: `{import}`")
+                } else {
+                    let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
+                    format!("Unnecessary builtin imports: {imports}")
                 }
             }
             CheckKind::UnnecessaryLRUCacheParams => {
@@ -3605,6 +3619,7 @@ impl CheckKind {
                 | CheckKind::TrueFalseComparison(..)
                 | CheckKind::TypeOfPrimitive(..)
                 | CheckKind::TypingTextStrAlias
+                | CheckKind::UnnecessaryBuiltinImport(..)
                 | CheckKind::UnnecessaryCallAroundSorted(..)
                 | CheckKind::UnnecessaryCollectionCall(..)
                 | CheckKind::UnnecessaryComprehension(..)
@@ -3826,6 +3841,9 @@ impl CheckKind {
                 primitive.builtin()
             )),
             CheckKind::TypingTextStrAlias => Some("Replace with `str`".to_string()),
+            CheckKind::UnnecessaryBuiltinImport(..) => {
+                Some("Remove unnecessary builtin import".to_string())
+            }
             CheckKind::UnnecessaryCallAroundSorted(func) => {
                 Some(format!("Remove unnecessary `{func}` call"))
             }

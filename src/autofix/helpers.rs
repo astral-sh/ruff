@@ -211,11 +211,33 @@ pub fn remove_unused_imports<'a>(
         Some(SmallStatement::ImportFrom(import_body)) => {
             if let ImportNames::Aliases(names) = &mut import_body.names {
                 (names, import_body.module.as_ref())
+            } else if let ImportNames::Star(..) = &import_body.names {
+                // Special-case: if the import is a `from ... import *`, then we delete the
+                // entire statement.
+                let mut found_star = false;
+                for unused_import in unused_imports {
+                    let full_name = match import_body.module.as_ref() {
+                        Some(module_name) => format!("{}.*", compose_module_path(module_name),),
+                        None => "*".to_string(),
+                    };
+                    if unused_import == full_name {
+                        found_star = true;
+                    } else {
+                        bail!(
+                            "Expected \"*\" for unused import (got: \"{}\")",
+                            unused_import
+                        );
+                    }
+                }
+                if !found_star {
+                    bail!("Expected \'*\' for unused import");
+                }
+                return delete_stmt(stmt, parent, deleted, locator);
             } else {
-                bail!("Expected ImportNames::Aliases")
+                bail!("Expected: ImportNames::Aliases | ImportNames::Star");
             }
         }
-        _ => bail!("Expected SmallStatement::ImportFrom or SmallStatement::Import"),
+        _ => bail!("Expected: SmallStatement::ImportFrom | SmallStatement::Import"),
     };
 
     // Preserve the trailing comma (or not) from the last entry.
