@@ -8,7 +8,7 @@ use crate::registry::{Check, CheckKind};
 static RST_BACKTICKS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?!    ).*(^| )`[^`]+`([^_]|$)").unwrap());
 
-/// PGH003 - use of blanket type ignore comments
+/// PGH005 - Use two backticks when writing RST
 pub fn rst_backticks(lineno: usize, line: &str) -> Option<Check> {
     RST_BACKTICKS_REGEX.find(line).map(|m| {
         Check::new(
