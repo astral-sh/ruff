@@ -541,8 +541,8 @@ mod tests {
             source,
             StringKind::FString,
             false,
-            Location::new(1, 0),
-            Location::new(1, source.len() + 3), // 3 for prefix and quotes
+            Location::default(),
+            Location::default().with_col_offset(source.len() + 3), // 3 for prefix and quotes
         )
         .parse()
     }

@@ -153,7 +153,7 @@ pub type LexResult = Result<Spanned, LexicalError>;
 
 #[inline]
 pub fn make_tokenizer(source: &str) -> impl Iterator<Item = LexResult> + '_ {
-    make_tokenizer_located(source, Location::new(1, 0))
+    make_tokenizer_located(source, Location::default())
 }
 
 pub fn make_tokenizer_located(

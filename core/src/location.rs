@@ -1,10 +1,16 @@
 use serde::{Deserialize, Serialize};
 
 /// Sourcecode location.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Location {
     pub(super) row: u32,
     pub(super) column: u32,
+}
+
+impl Default for Location {
+    fn default() -> Self {
+        Self { row: 1, column: 0 }
+    }
 }
 
 impl Location {
