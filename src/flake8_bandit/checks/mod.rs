@@ -9,6 +9,7 @@ pub use hardcoded_password_string::{
 };
 pub use hardcoded_tmp_directory::hardcoded_tmp_directory;
 pub use hashlib_insecure_hash_functions::hashlib_insecure_hash_functions;
+pub use unsafe_yaml_load::unsafe_yaml_load;
 
 mod assert_used;
 mod bad_file_permissions;
@@ -19,3 +20,4 @@ mod hardcoded_password_func_arg;
 mod hardcoded_password_string;
 mod hardcoded_tmp_directory;
 mod hashlib_insecure_hash_functions;
+mod unsafe_yaml_load;

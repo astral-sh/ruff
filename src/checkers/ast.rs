@@ -1896,6 +1896,17 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::S506) {
+                    if let Some(check) = flake8_bandit::checks::unsafe_yaml_load(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
                 if self.settings.enabled.contains(&CheckCode::S106) {
                     self.add_checks(
                         flake8_bandit::checks::hardcoded_password_func_arg(keywords).into_iter(),

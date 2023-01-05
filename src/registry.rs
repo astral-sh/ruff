@@ -335,6 +335,7 @@ pub enum CheckCode {
     S107,
     S108,
     S324,
+    S506,
     // flake8-boolean-trap
     FBT001,
     FBT002,
@@ -1075,6 +1076,7 @@ pub enum CheckKind {
     HardcodedPasswordDefault(String),
     HardcodedTempFile(String),
     HashlibInsecureHashFunction(String),
+    UnsafeYAMLLoad(Option<String>),
     // mccabe
     FunctionIsTooComplex(String, usize),
     // flake8-boolean-trap
@@ -1538,6 +1540,7 @@ impl CheckCode {
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
             CheckCode::S324 => CheckKind::HashlibInsecureHashFunction("...".to_string()),
+            CheckCode::S506 => CheckKind::UnsafeYAMLLoad(None),
             // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
             // flake8-boolean-trap
@@ -1941,6 +1944,7 @@ impl CheckCode {
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::S108 => CheckCategory::Flake8Bandit,
             CheckCode::S324 => CheckCategory::Flake8Bandit,
+            CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
@@ -2317,6 +2321,7 @@ impl CheckKind {
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
             CheckKind::HashlibInsecureHashFunction(..) => &CheckCode::S324,
+            CheckKind::UnsafeYAMLLoad(..) => &CheckCode::S506,
             // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
             // flake8-boolean-trap
@@ -3260,23 +3265,31 @@ impl CheckKind {
             CheckKind::HardcodedPasswordString(string)
             | CheckKind::HardcodedPasswordFuncArg(string)
             | CheckKind::HardcodedPasswordDefault(string) => {
-                format!(
-                    "Possible hardcoded password: `\"{}\"`",
-                    string.escape_debug()
-                )
+                format!("Possible hardcoded password: \"{}\"", string.escape_debug())
             }
             CheckKind::HardcodedTempFile(string) => {
                 format!(
-                    "Probable insecure usage of temp file/directory: `\"{}\"`",
+                    "Probable insecure usage of temporary file or directory: \"{}\"",
                     string.escape_debug()
                 )
             }
             CheckKind::HashlibInsecureHashFunction(string) => {
                 format!(
-                    "Probable use of insecure hash functions in hashlib: `\"{}\"`",
+                    "Probable use of insecure hash functions in `hashlib`: \"{}\"",
                     string.escape_debug()
                 )
             }
+            CheckKind::UnsafeYAMLLoad(loader) => match loader {
+                Some(name) => {
+                    format!(
+                        "Probable use of unsafe loader `{name}` with `yaml.load`. Allows \
+                         instantiation of arbitrary objects. Consider `yaml.safe_load`."
+                    )
+                }
+                None => "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary \
+                         objects. Consider `yaml.safe_load`."
+                    .to_string(),
+            },
             // flake8-blind-except
             CheckKind::BlindExcept(name) => format!("Do not catch blind exception: `{name}`"),
             // mccabe
