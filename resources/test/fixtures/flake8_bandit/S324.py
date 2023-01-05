@@ -28,7 +28,7 @@ hashlib_new('sha1')
 
 hashlib_sha1('sha1')
 
-# usedforsecurity arg only availabe in Python 3.9+
+# usedforsecurity arg only available in Python 3.9+
 hashlib.new('sha1', usedforsecurity=True)
 
 # Valid
@@ -39,14 +39,14 @@ hashlib.new('SHA512')
 
 hashlib.sha256(data=b'test')
 
-# usedforsecurity arg only availabe in Python 3.9+
+# usedforsecurity arg only available in Python 3.9+
 hashlib_new(name='sha1', usedforsecurity=False)
 
-# usedforsecurity arg only availabe in Python 3.9+
+# usedforsecurity arg only available in Python 3.9+
 hashlib_sha1(name='sha1', usedforsecurity=False)
 
-# usedforsecurity arg only availabe in Python 3.9+
+# usedforsecurity arg only available in Python 3.9+
 hashlib.md4(usedforsecurity=False)
 
-# usedforsecurity arg only availabe in Python 3.9+
+# usedforsecurity arg only available in Python 3.9+
 hashlib.new(name='sha256', usedforsecurity=False)
