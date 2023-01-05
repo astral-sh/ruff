@@ -539,7 +539,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F501 | PercentFormatInvalidFormat | '...' % ... has invalid format string: ... |  |
 | F502 | PercentFormatExpectedMapping | '...' % ... expected mapping but got sequence |  |
 | F503 | PercentFormatExpectedSequence | '...' % ... expected sequence but got mapping |  |
-| F504 | PercentFormatExtraNamedArguments | '...' % ... has unused named argument(s): ... | 🛠 |
+| F504 | PercentFormatExtraNamedArguments | '...' % f ... has unused named argument(s): ... | 🛠 |
 | F505 | PercentFormatMissingArgument | '...' % ... is missing argument(s) for placeholder(s): ... |  |
 | F506 | PercentFormatMixedPositionalAndNamed | '...' % ... has mixed positional and named placeholders |  |
 | F507 | PercentFormatPositionalCountMismatch | '...' % ... has 4 placeholder(s) but 2 substitution(s) |  |
@@ -972,6 +972,9 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM110 | ConvertLoopToAny | Use `return any(x for x in y)` instead of `for` loop | 🛠 |
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
 | SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
+| SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
+| SIM202 | NegateNotEqualOp | Use `left == right` instead of `not left != right` | 🛠 |
+| SIM208 | DoubleNegation | Use `expr` instead of `not (not expr)` | 🛠 |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
