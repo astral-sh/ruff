@@ -2536,6 +2536,15 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::S108) {
+                    if let Some(check) = flake8_bandit::checks::hardcoded_tmp_directory(
+                        expr,
+                        value,
+                        &self.settings.flake8_bandit.hardcoded_tmp_directory,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
                 if self.settings.enabled.contains(&CheckCode::UP025) {
                     pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind);
                 }

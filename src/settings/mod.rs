@@ -24,7 +24,7 @@ use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
     mccabe, one_time_warning, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
@@ -64,6 +64,7 @@ pub struct Settings {
     pub update_check: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
+    pub flake8_bandit: flake8_bandit::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
@@ -184,6 +185,10 @@ impl Settings {
                 .flake8_annotations
                 .map(std::convert::Into::into)
                 .unwrap_or_default(),
+            flake8_bandit: config
+                .flake8_bandit
+                .map(std::convert::Into::into)
+                .unwrap_or_default(),
             flake8_bugbear: config
                 .flake8_bugbear
                 .map(std::convert::Into::into)
@@ -264,6 +269,7 @@ impl Settings {
             task_tags: vec!["TODO".to_string(), "FIXME".to_string()],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
+            flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
@@ -305,6 +311,7 @@ impl Settings {
             task_tags: vec!["TODO".to_string()],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
+            flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
@@ -365,6 +372,7 @@ impl Hash for Settings {
         self.target_version.hash(state);
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
+        self.flake8_bandit.hash(state);
         self.flake8_bugbear.hash(state);
         self.flake8_errmsg.hash(state);
         self.flake8_import_conventions.hash(state);

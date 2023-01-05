@@ -121,6 +121,17 @@
         }
       ]
     },
+    "flake8-bandit": {
+      "description": "Options for the `flake8-bandit` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8BanditOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-bugbear": {
       "description": "Options for the `flake8-bugbear` plugin.",
       "anyOf": [
@@ -915,9 +926,11 @@
         "S105",
         "S106",
         "S107",
+        "S108",
         "SIM",
         "SIM1",
         "SIM10",
+        "SIM102",
         "SIM105",
         "SIM11",
         "SIM118",
@@ -1078,6 +1091,32 @@
             "boolean",
             "null"
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8BanditOptions": {
+      "type": "object",
+      "properties": {
+        "hardcoded-tmp-directory": {
+          "description": "A list of directories to consider temporary.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "hardcoded-tmp-directory-extend": {
+          "description": "A list of directories to consider temporary, in addition to those specified by `hardcoded-tmp-directory`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false

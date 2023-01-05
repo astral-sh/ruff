@@ -20,7 +20,7 @@ use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, fs, isort,
     mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
@@ -56,6 +56,7 @@ pub struct Configuration {
     pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
+    pub flake8_bandit: Option<flake8_bandit::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
@@ -155,6 +156,7 @@ impl Configuration {
             update_check: options.update_check,
             // Plugins
             flake8_annotations: options.flake8_annotations,
+            flake8_bandit: options.flake8_bandit,
             flake8_bugbear: options.flake8_bugbear,
             flake8_errmsg: options.flake8_errmsg,
             flake8_import_conventions: options.flake8_import_conventions,
@@ -217,6 +219,7 @@ impl Configuration {
             update_check: self.update_check.or(config.update_check),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
+            flake8_bandit: self.flake8_bandit.or(config.flake8_bandit),
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
             flake8_errmsg: self.flake8_errmsg.or(config.flake8_errmsg),
             flake8_import_conventions: self
