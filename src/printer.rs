@@ -303,7 +303,7 @@ impl<'a> Printer<'a> {
     }
 }
 
-fn group_messages_by_filename(messages: &Vec<Message>) -> BTreeMap<&String, Vec<&Message>> {
+fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&String, Vec<&Message>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
