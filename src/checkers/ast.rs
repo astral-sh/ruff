@@ -1177,6 +1177,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::F634) {
                     pyflakes::plugins::if_tuple(self, stmt, test);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM102) {
+                    flake8_simplify::plugins::nested_if_statements(self, stmt);
+                }
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.enabled.contains(&CheckCode::F631) {

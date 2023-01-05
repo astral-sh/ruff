@@ -217,6 +217,7 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
+    SIM102,
     SIM105,
     SIM118,
     SIM220,
@@ -952,6 +953,7 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    NestedIfStatements,
     AAndNotA(String),
     AOrNotA(String),
     KeyInDict(String, String),
@@ -1385,6 +1387,7 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
+            CheckCode::SIM102 => CheckKind::NestedIfStatements,
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
@@ -1918,6 +1921,7 @@ impl CheckCode {
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::S108 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::SIM220 => CheckCategory::Flake8Simplify,
@@ -2171,6 +2175,7 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
+            CheckKind::NestedIfStatements => &CheckCode::SIM102,
             CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::AAndNotA(..) => &CheckCode::SIM220,
@@ -2935,6 +2940,9 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::NestedIfStatements => {
+                "Use a single if-statement instead of nested if-statements".to_string()
+            }
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
