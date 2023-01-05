@@ -36,3 +36,9 @@ urls = { repository = "https://github.com/charliermarsh/ruff" }
 [tool.maturin]
 bindings = "bin"
 strip = true
+
+[tool.setuptools]
+license-files = [
+  "LICENSE",
+  "licenses/*",
+]
