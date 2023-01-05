@@ -1907,6 +1907,7 @@ dependencies = [
  "insta",
  "itertools",
  "js-sys",
+ "lazy_static",
  "libcst",
  "log",
  "natord",

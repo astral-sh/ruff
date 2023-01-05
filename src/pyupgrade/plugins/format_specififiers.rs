@@ -1,4 +1,5 @@
 use libcst_native::{Arg, Codegen, CodegenState, Expression};
+use lazy_static::lazy_static;
 use num_bigint::{BigInt, Sign};
 use rustpython_ast::{Constant, Expr, ExprKind};
 use rustpython_parser::lexer;
@@ -10,6 +11,12 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::cst::matchers::{match_call, match_expression};
+
+// The regex documentation says to do this because creating regexs is expensive:
+// https://docs.rs/regex/latest/regex/#example-avoid-compiling-the-same-regex-in-a-loop
+lazy_static! {
+    static ref RE: Regex = Regex::new(r"\{(\d+)\}").unwrap();
+}
 
 /// Convert a python integer to a unsigned 32 but integer. We are assuming this will never overflow
 /// because people will probbably never have more than 2^32 arguments to a format string. I am also
@@ -56,6 +63,8 @@ fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Option<String> {
     call.args = get_new_args(call.args.clone(), correct_order);
     // Create the new function
     if let Expression::Attribute(item) = &*call.func {
+        // Converting the struct to a struct and then back is not very efficient, but regexs were
+        // the simplest way I could find to remove the specifiers
         let mut state = CodegenState::default();
         item.codegen(&mut state);
         let cleaned = remove_specifiers(&state.to_string());
@@ -71,34 +80,38 @@ fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Option<String> {
     None
 }
 
-fn get_specifier_order(value_str: &Constant) -> Vec<u32> {
+fn get_specifier_order(value_str: &str) -> Vec<u32> {
     let mut specifier_ints: Vec<u32> = vec![];
-    if let Constant::Str(item) = value_str {
-        // Whether the previous character was a Lbrace. If this is true and the next character is
-        // an integer than this integer gets added to the list of constants
-        let mut prev_l_brace = false;
-        for (_, tok, _) in lexer::make_tokenizer(item).flatten() {
-            if Tok::Lbrace == tok {
-                prev_l_brace = true;
-            } else if let Tok::Int { value } = tok {
-                if prev_l_brace {
-                    if let Some(int_val) = convert_big_int(value) {
-                        specifier_ints.push(int_val);
-                    }
+    // Whether the previous character was a Lbrace. If this is true and the next character is
+    // an integer than this integer gets added to the list of constants
+    let mut prev_l_brace = false;
+    for (_, tok, _) in lexer::make_tokenizer(value_str).flatten() {
+        if Tok::Lbrace == tok {
+            prev_l_brace = true;
+        } else if let Tok::Int { value } = tok {
+            if prev_l_brace {
+                if let Some(int_val) = convert_big_int(value) {
+                    specifier_ints.push(int_val);
                 }
-                prev_l_brace = false;
-            } else {
-                prev_l_brace = false;
             }
+            prev_l_brace = false;
+        } else {
+            prev_l_brace = false;
         }
     }
-    specifier_ints
+specifier_ints
 }
 
 /// Returns a string without the format specifiers. Ex. "Hello {0} {1}" -> "Hello {} {}"
 fn remove_specifiers(raw_specifiers: &str) -> String {
-    let re = Regex::new(r"\{(\d+)\}").unwrap();
-    re.replace_all(raw_specifiers, "{}").to_string()
+    RE.replace_all(raw_specifiers, "{}").to_string()
+}
+
+/// Checks if there is a single specifier in the string. The string must either have all
+/// formatterts or no formatters (or else an error will be thrown), so this will work as long as
+/// the python code is valid
+fn has_specifiers(raw_specifiers: &str) -> bool {
+    RE.is_match(raw_specifiers)
 }
 
 /// UP029
@@ -108,24 +121,27 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
             value: cons_value, ..
         } = &value.node
         {
-            if attr == "format" {
-                let as_ints = get_specifier_order(cons_value);
-                let call_range = Range::from_located(expr);
-                let call_text = checker.locator.slice_source_code_range(&call_range);
-                let new_call = match get_new_call(&call_text, as_ints) {
-                    None => return,
-                    Some(item) => item,
-                };
-                println!("{}", new_call);
-                let mut check = Check::new(CheckKind::FormatSpecifiers, Range::from_located(expr));
-                if checker.patch(check.kind.code()) {
-                    check.amend(Fix::replacement(
-                        new_call,
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
+            if let Constant::Str(provided_string) = cons_value {
+                if attr == "format" && has_specifiers(provided_string) {
+                    let as_ints = get_specifier_order(provided_string);
+                    let call_range = Range::from_located(expr);
+                    let call_text = checker.locator.slice_source_code_range(&call_range);
+                    let new_call = match get_new_call(&call_text, as_ints) {
+                        None => return,
+                        Some(item) => item,
+                    };
+                    println!("{}", new_call);
+                    let mut check = Check::new(CheckKind::FormatSpecifiers, Range::from_located(expr));
+                    if checker.patch(check.kind.code()) {
+                        check.amend(Fix::replacement(
+                            new_call,
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
+                    }
+                    checker.add_check(check);
                 }
-                checker.add_check(check);
+
             }
         }
     }
