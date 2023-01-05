@@ -2537,7 +2537,7 @@ where
                     if let Some(check) = flake8_bandit::checks::hardcoded_tmp_dir(
                         expr,
                         value,
-                        &mut self.settings.flake8_bandit.all_hardcoded_tmp_directories(),
+                        &self.settings.flake8_bandit.hardcoded_tmp_directory,
                     ) {
                         self.add_check(check);
                     }

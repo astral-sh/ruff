@@ -40,26 +40,16 @@ pub struct Options {
 #[derive(Debug, Hash)]
 pub struct Settings {
     pub hardcoded_tmp_directory: Vec<String>,
-    pub hardcoded_tmp_directory_extend: Vec<String>,
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
+        let mut hardcoded_tmp_directory = options
+            .hardcoded_tmp_directory
+            .unwrap_or_else(default_tmp_dirs);
+        hardcoded_tmp_directory.extend(options.hardcoded_tmp_directory_extend.unwrap_or_default());
         Self {
-            hardcoded_tmp_directory: options
-                .hardcoded_tmp_directory
-                .unwrap_or_else(default_tmp_dirs),
-            hardcoded_tmp_directory_extend: options
-                .hardcoded_tmp_directory_extend
-                .unwrap_or_default(),
-        }
-    }
-}
-impl From<Settings> for Options {
-    fn from(settings: Settings) -> Self {
-        Self {
-            hardcoded_tmp_directory: Some(settings.hardcoded_tmp_directory),
-            hardcoded_tmp_directory_extend: Some(settings.hardcoded_tmp_directory_extend),
+            hardcoded_tmp_directory,
         }
     }
 }
@@ -68,16 +58,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             hardcoded_tmp_directory: default_tmp_dirs(),
-            hardcoded_tmp_directory_extend: Vec::new(),
         }
-    }
-}
-
-impl Settings {
-    /// Returns an iterator over all directories that are considered temporary.
-    pub fn all_hardcoded_tmp_directories(&'_ self) -> impl Iterator<Item = &'_ String> {
-        self.hardcoded_tmp_directory
-            .iter()
-            .chain(self.hardcoded_tmp_directory_extend.iter())
     }
 }
