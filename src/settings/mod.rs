@@ -17,16 +17,15 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::cache::cache_dir;
-use crate::registry::{CheckCode, INCOMPATIBLE_CODES};
-use crate::registry_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
+use crate::registry::{CheckCode, CheckCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, one_time_warning, pep8_naming, pydocstyle, pyupgrade,
+    mccabe, one_time_warning, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 pub mod configuration;
@@ -60,9 +59,11 @@ pub struct Settings {
     pub show_source: bool,
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+    pub task_tags: Vec<String>,
     pub update_check: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
+    pub flake8_bandit: flake8_bandit::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
@@ -73,6 +74,7 @@ pub struct Settings {
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
     pub pep8_naming: pep8_naming::settings::Settings,
+    pub pycodestyle: pycodestyle::settings::Settings,
     pub pydocstyle: pydocstyle::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
 }
@@ -173,10 +175,17 @@ impl Settings {
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
             target_version: config.target_version.unwrap_or_default(),
+            task_tags: config.task_tags.unwrap_or_else(|| {
+                vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()]
+            }),
             update_check: config.update_check.unwrap_or(true),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
+                .map(std::convert::Into::into)
+                .unwrap_or_default(),
+            flake8_bandit: config
+                .flake8_bandit
                 .map(std::convert::Into::into)
                 .unwrap_or_default(),
             flake8_bugbear: config
@@ -219,6 +228,10 @@ impl Settings {
                 .pep8_naming
                 .map(std::convert::Into::into)
                 .unwrap_or_default(),
+            pycodestyle: config
+                .pycodestyle
+                .map(std::convert::Into::into)
+                .unwrap_or_default(),
             pydocstyle: config
                 .pydocstyle
                 .map(std::convert::Into::into)
@@ -252,8 +265,10 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            task_tags: vec!["TODO".to_string(), "FIXME".to_string()],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
+            flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
@@ -264,6 +279,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
@@ -291,8 +307,10 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
+            task_tags: vec!["TODO".to_string()],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
+            flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
@@ -303,6 +321,7 @@ impl Settings {
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
             pep8_naming: pep8_naming::settings::Settings::default(),
+            pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
@@ -352,6 +371,7 @@ impl Hash for Settings {
         self.target_version.hash(state);
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
+        self.flake8_bandit.hash(state);
         self.flake8_bugbear.hash(state);
         self.flake8_errmsg.hash(state);
         self.flake8_import_conventions.hash(state);
@@ -450,8 +470,7 @@ fn validate_enabled(enabled: FxHashSet<CheckCode>) -> FxHashSet<CheckCode> {
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::registry::CheckCode;
-    use crate::registry_gen::CheckCodePrefix;
+    use crate::registry::{CheckCode, CheckCodePrefix};
     use crate::settings::{resolve_codes, CheckCodeSpec};
 
     #[test]

@@ -1,11 +1,17 @@
 use anyhow::{bail, Result};
 use itertools::Itertools;
+use libcst_native::{
+    Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
+};
 use rustpython_parser::ast::{ExcepthandlerKind, Location, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::ast::helpers::to_absolute;
+use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::autofix::Fix;
+use crate::cst::helpers::compose_module_path;
+use crate::cst::matchers::match_module;
 use crate::source_code_locator::SourceCodeLocator;
 
 /// Determine if a body contains only a single statement, taking into account
@@ -182,6 +188,107 @@ pub fn delete_stmt(
                 Location::new(stmt.end_location.unwrap().row() + 1, 0),
             )
         })
+    }
+}
+
+/// Generate a `Fix` to remove any unused imports from an `import` statement.
+pub fn remove_unused_imports<'a>(
+    unused_imports: impl Iterator<Item = &'a str>,
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
+    deleted: &[&Stmt],
+    locator: &SourceCodeLocator,
+) -> Result<Fix> {
+    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+    let mut tree = match_module(&module_text)?;
+
+    let Some(Statement::Simple(body)) = tree.body.first_mut() else {
+        bail!("Expected Statement::Simple");
+    };
+
+    let (aliases, import_module) = match body.body.first_mut() {
+        Some(SmallStatement::Import(import_body)) => (&mut import_body.names, None),
+        Some(SmallStatement::ImportFrom(import_body)) => {
+            if let ImportNames::Aliases(names) = &mut import_body.names {
+                (names, import_body.module.as_ref())
+            } else if let ImportNames::Star(..) = &import_body.names {
+                // Special-case: if the import is a `from ... import *`, then we delete the
+                // entire statement.
+                let mut found_star = false;
+                for unused_import in unused_imports {
+                    let full_name = match import_body.module.as_ref() {
+                        Some(module_name) => format!("{}.*", compose_module_path(module_name),),
+                        None => "*".to_string(),
+                    };
+                    if unused_import == full_name {
+                        found_star = true;
+                    } else {
+                        bail!(
+                            "Expected \"*\" for unused import (got: \"{}\")",
+                            unused_import
+                        );
+                    }
+                }
+                if !found_star {
+                    bail!("Expected \'*\' for unused import");
+                }
+                return delete_stmt(stmt, parent, deleted, locator);
+            } else {
+                bail!("Expected: ImportNames::Aliases | ImportNames::Star");
+            }
+        }
+        _ => bail!("Expected: SmallStatement::ImportFrom | SmallStatement::Import"),
+    };
+
+    // Preserve the trailing comma (or not) from the last entry.
+    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
+
+    for unused_import in unused_imports {
+        let alias_index = aliases.iter().position(|alias| {
+            let full_name = match import_module {
+                Some(module_name) => format!(
+                    "{}.{}",
+                    compose_module_path(module_name),
+                    compose_module_path(&alias.name)
+                ),
+                None => compose_module_path(&alias.name),
+            };
+            full_name == unused_import
+        });
+
+        if let Some(index) = alias_index {
+            aliases.remove(index);
+        }
+    }
+
+    // But avoid destroying any trailing comments.
+    if let Some(alias) = aliases.last_mut() {
+        let has_comment = if let Some(comma) = &alias.comma {
+            match &comma.whitespace_after {
+                ParenthesizableWhitespace::SimpleWhitespace(_) => false,
+                ParenthesizableWhitespace::ParenthesizedWhitespace(whitespace) => {
+                    whitespace.first_line.comment.is_some()
+                }
+            }
+        } else {
+            false
+        };
+        if !has_comment {
+            alias.comma = trailing_comma;
+        }
+    }
+
+    if aliases.is_empty() {
+        delete_stmt(stmt, parent, deleted, locator)
+    } else {
+        let mut state = CodegenState::default();
+        tree.codegen(&mut state);
+
+        Ok(Fix::replacement(
+            state.to_string(),
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ))
     }
 }
 

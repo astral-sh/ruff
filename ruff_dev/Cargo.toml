@@ -1,12 +1,11 @@
 [package]
 name = "ruff_dev"
-version = "0.0.210"
+version = "0.0.211"
 edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0.66" }
 clap = { version = "4.0.1", features = ["derive"] }
-codegen = { version = "0.2.0" }
 itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
 once_cell = { version = "1.16.0" }

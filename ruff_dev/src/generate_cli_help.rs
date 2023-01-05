@@ -28,7 +28,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         print!("{output}");
     } else {
         replace_readme_section(
-            &format!("```shell\n{output}\n```\n"),
+            &format!("```\n{output}\n```\n"),
             HELP_BEGIN_PRAGMA,
             HELP_END_PRAGMA,
         )?;

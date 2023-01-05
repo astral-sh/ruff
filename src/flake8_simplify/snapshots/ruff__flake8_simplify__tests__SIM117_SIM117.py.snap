@@ -1,0 +1,14 @@
+---
+source: src/flake8_simplify/mod.rs
+expression: checks
+---
+- kind: MultipleWithStatements
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 3
+    column: 22
+  fix: ~
+  parent: ~
+

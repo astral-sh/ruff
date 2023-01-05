@@ -131,7 +131,7 @@ mod tests {
 
     use crate::flake8_quotes::settings::Quote;
     use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
-    use crate::registry_gen::CheckCodePrefix;
+    use crate::registry::CheckCodePrefix;
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
@@ -188,8 +188,10 @@ mod tests {
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
@@ -200,6 +202,7 @@ mod tests {
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -241,9 +244,11 @@ line-length = 79
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     cache_dir: None,
                     flake8_annotations: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
@@ -254,6 +259,7 @@ line-length = 79
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -296,10 +302,12 @@ exclude = ["foo.py"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
-                    flake8_errmsg: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
@@ -308,6 +316,7 @@ exclude = ["foo.py"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -350,8 +359,10 @@ select = ["E501"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
@@ -362,6 +373,7 @@ select = ["E501"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -405,8 +417,10 @@ ignore = ["E501"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
@@ -417,6 +431,7 @@ ignore = ["E501"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -490,6 +505,7 @@ other-attribute = 1
                 format: None,
                 force_exclude: None,
                 unfixable: None,
+                task_tags: None,
                 update_check: None,
                 cache_dir: None,
                 per_file_ignores: Some(FxHashMap::from_iter([(
@@ -503,6 +519,7 @@ other-attribute = 1
                 target_version: None,
                 show_source: None,
                 flake8_annotations: None,
+                flake8_bandit: None,
                 flake8_bugbear: Some(flake8_bugbear::settings::Options {
                     extend_immutable_calls: Some(vec![
                         "fastapi.Depends".to_string(),
@@ -592,6 +609,7 @@ other-attribute = 1
                     ]),
                     staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
                 }),
+                pycodestyle: None,
                 pydocstyle: None,
                 pyupgrade: None,
             }

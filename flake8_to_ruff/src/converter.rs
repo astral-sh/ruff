@@ -7,7 +7,7 @@ use ruff::flake8_pytest_style::types::{
 use ruff::flake8_quotes::settings::Quote;
 use ruff::flake8_tidy_imports::settings::Strictness;
 use ruff::pydocstyle::settings::Convention;
-use ruff::registry_gen::CheckCodePrefix;
+use ruff::registry::CheckCodePrefix;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{
@@ -345,7 +345,7 @@ mod tests {
 
     use anyhow::Result;
     use ruff::pydocstyle::settings::Convention;
-    use ruff::registry_gen::CheckCodePrefix;
+    use ruff::registry::CheckCodePrefix;
     use ruff::settings::options::Options;
     use ruff::settings::pyproject::Pyproject;
     use ruff::{flake8_quotes, pydocstyle};
@@ -390,8 +390,10 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
@@ -402,6 +404,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -450,8 +453,10 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
@@ -462,6 +467,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -510,8 +516,10 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
@@ -522,6 +530,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -570,8 +579,10 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
@@ -582,6 +593,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -630,8 +642,10 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
@@ -647,6 +661,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -699,8 +714,10 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
@@ -711,6 +728,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
@@ -762,8 +780,10 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
@@ -779,6 +799,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });

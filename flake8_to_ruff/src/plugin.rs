@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use ruff::registry_gen::CheckCodePrefix;
+use ruff::registry::CheckCodePrefix;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {

@@ -97,4 +97,80 @@ expression: checks
       row: 9
       column: 21
   parent: ~
+- kind:
+    KeyInDict:
+      - k
+      - obj
+  location:
+    row: 16
+    column: 7
+  end_location:
+    row: 16
+    column: 22
+  fix:
+    content: obj
+    location:
+      row: 16
+      column: 12
+    end_location:
+      row: 16
+      column: 22
+  parent: ~
+- kind:
+    KeyInDict:
+      - k
+      - obj
+  location:
+    row: 18
+    column: 7
+  end_location:
+    row: 18
+    column: 22
+  fix:
+    content: obj
+    location:
+      row: 18
+      column: 12
+    end_location:
+      row: 18
+      column: 22
+  parent: ~
+- kind:
+    KeyInDict:
+      - k
+      - obj
+  location:
+    row: 20
+    column: 10
+  end_location:
+    row: 20
+    column: 25
+  fix:
+    content: obj
+    location:
+      row: 20
+      column: 15
+    end_location:
+      row: 20
+      column: 25
+  parent: ~
+- kind:
+    KeyInDict:
+      - k
+      - obj
+  location:
+    row: 22
+    column: 7
+  end_location:
+    row: 22
+    column: 22
+  fix:
+    content: obj
+    location:
+      row: 22
+      column: 12
+    end_location:
+      row: 22
+      column: 22
+  parent: ~
 

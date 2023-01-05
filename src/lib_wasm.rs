@@ -6,8 +6,7 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::linter::check_path;
-use crate::registry::CheckCode;
-use crate::registry_gen::CheckCodePrefix;
+use crate::registry::{CheckCode, CheckCodePrefix};
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
@@ -16,9 +15,9 @@ use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{
-    directives, flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pydocstyle, pyupgrade,
+    directives, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -112,9 +111,11 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         show_source: None,
         src: None,
         unfixable: None,
+        task_tags: None,
         update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
+        flake8_bandit: Some(flake8_bandit::settings::Settings::default().into()),
         flake8_bugbear: Some(flake8_bugbear::settings::Settings::default().into()),
         flake8_errmsg: Some(flake8_errmsg::settings::Settings::default().into()),
         flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
@@ -129,6 +130,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         isort: Some(isort::settings::Settings::default().into()),
         mccabe: Some(mccabe::settings::Settings::default().into()),
         pep8_naming: Some(pep8_naming::settings::Settings::default().into()),
+        pycodestyle: Some(pycodestyle::settings::Settings::default().into()),
         pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
         pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
     })?)

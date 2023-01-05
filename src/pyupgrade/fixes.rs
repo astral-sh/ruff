@@ -1,15 +1,12 @@
-use anyhow::Result;
 use libcst_native::{
-    Codegen, CodegenState, Expression, ImportNames, ParenthesizableWhitespace, SmallStatement,
-    Statement,
+    Codegen, CodegenState, Expression, ParenthesizableWhitespace, SmallStatement, Statement,
 };
-use rustpython_ast::{Expr, Keyword, Location, Stmt};
+use rustpython_ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
-use crate::autofix::{self, Fix};
-use crate::cst::matchers::match_module;
+use crate::autofix::Fix;
 use crate::source_code_locator::SourceCodeLocator;
 
 /// Generate a fix to remove a base from a `ClassDef` statement.
@@ -103,6 +100,7 @@ pub fn remove_class_def_base(
     }
 }
 
+/// Generate a fix to remove arguments from a `super` call.
 pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Option<Fix> {
     let range = Range::from_located(expr);
     let contents = locator.slice_source_code_range(&range);
@@ -131,68 +129,4 @@ pub fn remove_super_arguments(locator: &SourceCodeLocator, expr: &Expr) -> Optio
         range.location,
         range.end_location,
     ))
-}
-
-/// UP010
-pub fn remove_unnecessary_future_import(
-    locator: &SourceCodeLocator,
-    removable: &[usize],
-    stmt: &Stmt,
-    parent: Option<&Stmt>,
-    deleted: &[&Stmt],
-) -> Result<Fix> {
-    // TODO(charlie): DRY up with pyflakes::fixes::remove_unused_import_from.
-    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text)?;
-
-    let Some(Statement::Simple(body)) = tree.body.first_mut() else {
-        return Err(anyhow::anyhow!("Expected Statement::Simple"));
-    };
-    let Some(SmallStatement::ImportFrom(body)) = body.body.first_mut() else {
-        return Err(anyhow::anyhow!(
-            "Expected SmallStatement::ImportFrom"
-        ));
-    };
-
-    let ImportNames::Aliases(aliases) = &mut body.names else {
-        return Err(anyhow::anyhow!("Expected Aliases"));
-    };
-
-    // Preserve the trailing comma (or not) from the last entry.
-    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
-
-    // TODO(charlie): This is quadratic.
-    for index in removable.iter().rev() {
-        aliases.remove(*index);
-    }
-
-    // But avoid destroying any trailing comments.
-    if let Some(alias) = aliases.last_mut() {
-        let has_comment = if let Some(comma) = &alias.comma {
-            match &comma.whitespace_after {
-                ParenthesizableWhitespace::SimpleWhitespace(_) => false,
-                ParenthesizableWhitespace::ParenthesizedWhitespace(whitespace) => {
-                    whitespace.first_line.comment.is_some()
-                }
-            }
-        } else {
-            false
-        };
-        if !has_comment {
-            alias.comma = trailing_comma;
-        }
-    }
-
-    if aliases.is_empty() {
-        autofix::helpers::delete_stmt(stmt, parent, deleted, locator)
-    } else {
-        let mut state = CodegenState::default();
-        tree.codegen(&mut state);
-
-        Ok(Fix::replacement(
-            state.to_string(),
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ))
-    }
 }

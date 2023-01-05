@@ -4,6 +4,7 @@ use std::fmt;
 
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use ruff_macros::CheckCodePrefix;
 use rustc_hash::FxHashMap;
 use rustpython_ast::Cmpop;
 use rustpython_parser::ast::Location;
@@ -19,10 +20,10 @@ use crate::flake8_pytest_style::types::{
 use crate::flake8_quotes::settings::Quote;
 use crate::flake8_tidy_imports::settings::Strictness;
 use crate::pyupgrade::types::Primitive;
-use crate::registry_gen::CheckCodePrefix;
 
 #[derive(
     AsRefStr,
+    CheckCodePrefix,
     EnumIter,
     EnumString,
     Debug,
@@ -217,10 +218,18 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
+    SIM102,
+    SIM105,
+    SIM107,
+    SIM110,
+    SIM111,
+    SIM117,
     SIM201,
     SIM202,
     SIM208,
     SIM118,
+    SIM220,
+    SIM221,
     SIM222,
     SIM223,
     SIM300,
@@ -252,6 +261,7 @@ pub enum CheckCode {
     UP026,
     UP027,
     UP028,
+    UP029,
     // pydocstyle
     D100,
     D101,
@@ -321,10 +331,13 @@ pub enum CheckCode {
     // flake8-bandit
     S101,
     S102,
+    S103,
     S104,
     S105,
     S106,
     S107,
+    S108,
+    S324,
     // flake8-boolean-trap
     FBT001,
     FBT002,
@@ -948,41 +961,50 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    AAndNotA(String),
+    AOrNotA(String),
     NegateEqualOp(String, String),
     NegateNotEqualOp(String, String),
     DoubleNegation(String),
-    KeyInDict(String, String),
     AndFalse,
+    ConvertLoopToAll(String),
+    ConvertLoopToAny(String),
+    KeyInDict(String, String),
+    MultipleWithStatements,
+    NestedIfStatements,
     OrTrue,
+    ReturnInTryExceptFinally,
+    UseContextlibSuppress(String),
     YodaConditions(String, String),
     // pyupgrade
-    TypeOfPrimitive(Primitive),
-    UselessMetaclassType,
-    TypingTextStrAlias,
-    DeprecatedUnittestAlias(String, String),
-    UselessObjectInheritance(String),
-    UsePEP585Annotation(String),
-    UsePEP604Annotation,
-    SuperCallWithParameters,
-    PEP3120UnnecessaryCodingComment,
-    UnnecessaryFutureImport(Vec<String>),
-    UnnecessaryLRUCacheParams,
-    UnnecessaryEncodeUTF8,
-    ConvertTypedDictFunctionalToClass(String),
     ConvertNamedTupleFunctionalToClass(String),
+    ConvertTypedDictFunctionalToClass(String),
+    DatetimeTimezoneUTC,
+    DeprecatedUnittestAlias(String, String),
+    NativeLiterals(LiteralType),
+    OSErrorAlias(Option<String>),
+    OpenAlias,
+    PEP3120UnnecessaryCodingComment,
     RedundantOpenModes(Option<String>),
     RemoveSixCompat,
-    DatetimeTimezoneUTC,
-    NativeLiterals(LiteralType),
-    OpenAlias,
-    ReplaceUniversalNewlines,
     ReplaceStdoutStderr,
+    ReplaceUniversalNewlines,
     RewriteCElementTree,
-    OSErrorAlias(Option<String>),
-    RewriteUnicodeLiteral,
-    RewriteMockImport(MockReference),
     RewriteListComprehension,
+    RewriteMockImport(MockReference),
+    RewriteUnicodeLiteral,
     RewriteYieldFrom,
+    SuperCallWithParameters,
+    TypeOfPrimitive(Primitive),
+    TypingTextStrAlias,
+    UnnecessaryBuiltinImport(Vec<String>),
+    UnnecessaryEncodeUTF8,
+    UnnecessaryFutureImport(Vec<String>),
+    UnnecessaryLRUCacheParams,
+    UsePEP585Annotation(String),
+    UsePEP604Annotation,
+    UselessMetaclassType,
+    UselessObjectInheritance(String),
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
@@ -1052,10 +1074,13 @@ pub enum CheckKind {
     // flake8-bandit
     AssertUsed,
     ExecUsed,
+    BadFilePermissions(u16),
     HardcodedBindAllInterfaces,
     HardcodedPasswordString(String),
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
+    HardcodedTempFile(String),
+    HashlibInsecureHashFunction(String),
     // mccabe
     FunctionIsTooComplex(String, usize),
     // flake8-boolean-trap
@@ -1379,12 +1404,24 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
+            CheckCode::SIM102 => CheckKind::NestedIfStatements,
+            CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
+            CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
+            CheckCode::SIM110 => {
+                CheckKind::ConvertLoopToAny("return any(x for x in y)".to_string())
+            }
+            CheckCode::SIM111 => {
+                CheckKind::ConvertLoopToAll("return all(x for x in y)".to_string())
+            }
+            CheckCode::SIM117 => CheckKind::MultipleWithStatements,
             CheckCode::SIM201 => CheckKind::NegateEqualOp("left".to_string(), "right".to_string()),
             CheckCode::SIM202 => {
                 CheckKind::NegateNotEqualOp("left".to_string(), "right".to_string())
             }
             CheckCode::SIM208 => CheckKind::DoubleNegation("expr".to_string()),
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
+            CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
+            CheckCode::SIM221 => CheckKind::AOrNotA("...".to_string()),
             CheckCode::SIM222 => CheckKind::OrTrue,
             CheckCode::SIM223 => CheckKind::AndFalse,
             CheckCode::SIM300 => CheckKind::YodaConditions("left".to_string(), "right".to_string()),
@@ -1419,6 +1456,7 @@ impl CheckCode {
             CheckCode::UP026 => CheckKind::RewriteMockImport(MockReference::Import),
             CheckCode::UP027 => CheckKind::RewriteListComprehension,
             CheckCode::UP028 => CheckKind::RewriteYieldFrom,
+            CheckCode::UP029 => CheckKind::UnnecessaryBuiltinImport(vec!["...".to_string()]),
             // pydocstyle
             CheckCode::D100 => CheckKind::PublicModule,
             CheckCode::D101 => CheckKind::PublicClass,
@@ -1504,10 +1542,14 @@ impl CheckCode {
             // flake8-bandit
             CheckCode::S101 => CheckKind::AssertUsed,
             CheckCode::S102 => CheckKind::ExecUsed,
+            CheckCode::S103 => CheckKind::BadFilePermissions(0o777),
             CheckCode::S104 => CheckKind::HardcodedBindAllInterfaces,
             CheckCode::S105 => CheckKind::HardcodedPasswordString("...".to_string()),
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
+            CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
+            CheckCode::S324 => CheckKind::HashlibInsecureHashFunction("...".to_string()),
+            // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
             // flake8-boolean-trap
             CheckCode::FBT001 => CheckKind::BooleanPositionalArgInFunctionDefinition,
@@ -1903,15 +1945,26 @@ impl CheckCode {
             // flake8-bandit
             CheckCode::S101 => CheckCategory::Flake8Bandit,
             CheckCode::S102 => CheckCategory::Flake8Bandit,
+            CheckCode::S103 => CheckCategory::Flake8Bandit,
             CheckCode::S104 => CheckCategory::Flake8Bandit,
             CheckCode::S105 => CheckCategory::Flake8Bandit,
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
+            CheckCode::S108 => CheckCategory::Flake8Bandit,
+            CheckCode::S324 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM102 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM105 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM107 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM110 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM111 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM117 => CheckCategory::Flake8Simplify,
             CheckCode::SIM201 => CheckCategory::Flake8Simplify,
             CheckCode::SIM202 => CheckCategory::Flake8Simplify,
             CheckCode::SIM208 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM220 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM221 => CheckCategory::Flake8Simplify,
             CheckCode::SIM222 => CheckCategory::Flake8Simplify,
             CheckCode::SIM223 => CheckCategory::Flake8Simplify,
             CheckCode::SIM300 => CheckCategory::Flake8Simplify,
@@ -1951,6 +2004,7 @@ impl CheckCode {
             CheckCode::UP026 => CheckCategory::Pyupgrade,
             CheckCode::UP027 => CheckCategory::Pyupgrade,
             CheckCode::UP028 => CheckCategory::Pyupgrade,
+            CheckCode::UP029 => CheckCategory::Pyupgrade,
             // pycodestyle (warnings)
             CheckCode::W292 => CheckCategory::Pycodestyle,
             CheckCode::W605 => CheckCategory::Pycodestyle,
@@ -2160,41 +2214,50 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
+            CheckKind::AAndNotA(..) => &CheckCode::SIM220,
+            CheckKind::AOrNotA(..) => &CheckCode::SIM221,
+            CheckKind::AndFalse => &CheckCode::SIM223,
+            CheckKind::ConvertLoopToAll(..) => &CheckCode::SIM111,
+            CheckKind::ConvertLoopToAny(..) => &CheckCode::SIM110,
             CheckKind::NegateEqualOp(..) => &CheckCode::SIM201,
             CheckKind::NegateNotEqualOp(..) => &CheckCode::SIM202,
             CheckKind::DoubleNegation(..) => &CheckCode::SIM208,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
+            CheckKind::MultipleWithStatements => &CheckCode::SIM117,
+            CheckKind::NestedIfStatements => &CheckCode::SIM102,
             CheckKind::OrTrue => &CheckCode::SIM222,
-            CheckKind::AndFalse => &CheckCode::SIM223,
+            CheckKind::ReturnInTryExceptFinally => &CheckCode::SIM107,
+            CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
-            CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
-            CheckKind::UselessMetaclassType => &CheckCode::UP001,
-            CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::UP005,
-            CheckKind::UsePEP585Annotation(..) => &CheckCode::UP006,
-            CheckKind::UsePEP604Annotation => &CheckCode::UP007,
-            CheckKind::UselessObjectInheritance(..) => &CheckCode::UP004,
-            CheckKind::SuperCallWithParameters => &CheckCode::UP008,
-            CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::UP009,
-            CheckKind::UnnecessaryFutureImport(..) => &CheckCode::UP010,
-            CheckKind::UnnecessaryLRUCacheParams => &CheckCode::UP011,
-            CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::UP012,
-            CheckKind::ConvertTypedDictFunctionalToClass(..) => &CheckCode::UP013,
             CheckKind::ConvertNamedTupleFunctionalToClass(..) => &CheckCode::UP014,
+            CheckKind::ConvertTypedDictFunctionalToClass(..) => &CheckCode::UP013,
+            CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
+            CheckKind::DeprecatedUnittestAlias(..) => &CheckCode::UP005,
+            CheckKind::NativeLiterals(..) => &CheckCode::UP018,
+            CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
+            CheckKind::OpenAlias => &CheckCode::UP020,
+            CheckKind::PEP3120UnnecessaryCodingComment => &CheckCode::UP009,
             CheckKind::RedundantOpenModes(..) => &CheckCode::UP015,
             CheckKind::RemoveSixCompat => &CheckCode::UP016,
-            CheckKind::DatetimeTimezoneUTC => &CheckCode::UP017,
-            CheckKind::NativeLiterals(..) => &CheckCode::UP018,
-            CheckKind::TypingTextStrAlias => &CheckCode::UP019,
-            CheckKind::OpenAlias => &CheckCode::UP020,
-            CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::ReplaceStdoutStderr => &CheckCode::UP022,
+            CheckKind::ReplaceUniversalNewlines => &CheckCode::UP021,
             CheckKind::RewriteCElementTree => &CheckCode::UP023,
-            CheckKind::OSErrorAlias(..) => &CheckCode::UP024,
-            CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
-            CheckKind::RewriteMockImport(..) => &CheckCode::UP026,
             CheckKind::RewriteListComprehension => &CheckCode::UP027,
+            CheckKind::RewriteMockImport(..) => &CheckCode::UP026,
+            CheckKind::RewriteUnicodeLiteral => &CheckCode::UP025,
             CheckKind::RewriteYieldFrom => &CheckCode::UP028,
+            CheckKind::SuperCallWithParameters => &CheckCode::UP008,
+            CheckKind::TypeOfPrimitive(..) => &CheckCode::UP003,
+            CheckKind::TypingTextStrAlias => &CheckCode::UP019,
+            CheckKind::UnnecessaryBuiltinImport(..) => &CheckCode::UP029,
+            CheckKind::UnnecessaryEncodeUTF8 => &CheckCode::UP012,
+            CheckKind::UnnecessaryFutureImport(..) => &CheckCode::UP010,
+            CheckKind::UnnecessaryLRUCacheParams => &CheckCode::UP011,
+            CheckKind::UsePEP585Annotation(..) => &CheckCode::UP006,
+            CheckKind::UsePEP604Annotation => &CheckCode::UP007,
+            CheckKind::UselessMetaclassType => &CheckCode::UP001,
+            CheckKind::UselessObjectInheritance(..) => &CheckCode::UP004,
             // pydocstyle
             CheckKind::BlankLineAfterLastSection(..) => &CheckCode::D413,
             CheckKind::BlankLineAfterSection(..) => &CheckCode::D410,
@@ -2264,10 +2327,13 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => &CheckCode::S101,
             CheckKind::ExecUsed => &CheckCode::S102,
+            CheckKind::BadFilePermissions(..) => &CheckCode::S103,
             CheckKind::HardcodedBindAllInterfaces => &CheckCode::S104,
             CheckKind::HardcodedPasswordString(..) => &CheckCode::S105,
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
+            CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
+            CheckKind::HashlibInsecureHashFunction(..) => &CheckCode::S324,
             // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
             // flake8-boolean-trap
@@ -2918,6 +2984,21 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::UseContextlibSuppress(exception) => {
+                format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
+            }
+            CheckKind::ReturnInTryExceptFinally => {
+                "Don't use `return` in `try`/`except` and `finally`".to_string()
+            }
+            CheckKind::AAndNotA(name) => format!("Use `False` instead of `{name} and not {name}`"),
+            CheckKind::AOrNotA(name) => format!("Use `True` instead of `{name} or not {name}`"),
+            CheckKind::AndFalse => "Use `False` instead of `... and False`".to_string(),
+            CheckKind::ConvertLoopToAll(all) => {
+                format!("Use `{all}` instead of `for` loop")
+            }
+            CheckKind::ConvertLoopToAny(any) => {
+                format!("Use `{any}` instead of `for` loop")
+            }
             CheckKind::NegateEqualOp(left, right) => {
                 format!("Use `{left} != {right}` instead of `not {left} == {right}`")
             }
@@ -2930,10 +3011,15 @@ impl CheckKind {
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
+            CheckKind::MultipleWithStatements => "Use a single `with` statement with multiple \
+                                                  contexts instead of nested `with` statements"
+                .to_string(),
+            CheckKind::NestedIfStatements => {
+                "Use a single `if` statement instead of nested `if` statements".to_string()
+            }
             CheckKind::OrTrue => "Use `True` instead of `... or True`".to_string(),
-            CheckKind::AndFalse => "Use `False` instead of `... and False`".to_string(),
             CheckKind::YodaConditions(left, right) => {
-                format!("Use `{left} == {right}` instead of `{right} == {left} (Yoda-conditions)`")
+                format!("Yoda conditions are discouraged, use `{left} == {right}` instead")
             }
             // pyupgrade
             CheckKind::TypeOfPrimitive(primitive) => {
@@ -2965,6 +3051,15 @@ impl CheckKind {
                 } else {
                     let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
                     format!("Unnecessary `__future__` imports {imports} for target Python version")
+                }
+            }
+            CheckKind::UnnecessaryBuiltinImport(names) => {
+                if names.len() == 1 {
+                    let import = &names[0];
+                    format!("Unnecessary builtin import: `{import}`")
+                } else {
+                    let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
+                    format!("Unnecessary builtin imports: {imports}")
                 }
             }
             CheckKind::UnnecessaryLRUCacheParams => {
@@ -3182,6 +3277,9 @@ impl CheckKind {
             // flake8-bandit
             CheckKind::AssertUsed => "Use of `assert` detected".to_string(),
             CheckKind::ExecUsed => "Use of `exec` detected".to_string(),
+            CheckKind::BadFilePermissions(mask) => {
+                format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory",)
+            }
             CheckKind::HardcodedBindAllInterfaces => {
                 "Possible binding to all interfaces".to_string()
             }
@@ -3190,6 +3288,18 @@ impl CheckKind {
             | CheckKind::HardcodedPasswordDefault(string) => {
                 format!(
                     "Possible hardcoded password: `\"{}\"`",
+                    string.escape_debug()
+                )
+            }
+            CheckKind::HardcodedTempFile(string) => {
+                format!(
+                    "Probable insecure usage of temp file/directory: `\"{}\"`",
+                    string.escape_debug()
+                )
+            }
+            CheckKind::HashlibInsecureHashFunction(string) => {
+                format!(
+                    "Probable use of insecure hash functions in hashlib: `\"{}\"`",
                     string.escape_debug()
                 )
             }
@@ -3521,9 +3631,11 @@ impl CheckKind {
     pub fn fixable(&self) -> bool {
         matches!(
             self,
-            CheckKind::AmbiguousUnicodeCharacterString(..)
+            CheckKind::AAndNotA(..)
+                | CheckKind::AOrNotA(..)
                 | CheckKind::AmbiguousUnicodeCharacterComment(..)
                 | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+                | CheckKind::AmbiguousUnicodeCharacterString(..)
                 | CheckKind::AndFalse
                 | CheckKind::BlankLineAfterLastSection(..)
                 | CheckKind::BlankLineAfterSection(..)
@@ -3531,6 +3643,8 @@ impl CheckKind {
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
                 | CheckKind::CommentedOutCode
+                | CheckKind::ConvertLoopToAll(..)
+                | CheckKind::ConvertLoopToAny(..)
                 | CheckKind::ConvertNamedTupleFunctionalToClass(..)
                 | CheckKind::ConvertTypedDictFunctionalToClass(..)
                 | CheckKind::DashedUnderlineAfterSection(..)
@@ -3604,6 +3718,7 @@ impl CheckKind {
                 | CheckKind::TrueFalseComparison(..)
                 | CheckKind::TypeOfPrimitive(..)
                 | CheckKind::TypingTextStrAlias
+                | CheckKind::UnnecessaryBuiltinImport(..)
                 | CheckKind::UnnecessaryCallAroundSorted(..)
                 | CheckKind::UnnecessaryCollectionCall(..)
                 | CheckKind::UnnecessaryComprehension(..)
@@ -3640,6 +3755,8 @@ impl CheckKind {
     /// The message used to describe the fix action for a given `CheckKind`.
     pub fn commit(&self) -> Option<String> {
         match self {
+            CheckKind::AAndNotA(..) => Some("Replace with `False`".to_string()),
+            CheckKind::AOrNotA(..) => Some("Replace with `True`".to_string()),
             CheckKind::AmbiguousUnicodeCharacterString(confusable, representant)
             | CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant)
             | CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
@@ -3658,6 +3775,8 @@ impl CheckKind {
             }
             CheckKind::CapitalizeSectionName(name) => Some(format!("Capitalize \"{name}\"")),
             CheckKind::CommentedOutCode => Some("Remove commented-out code".to_string()),
+            CheckKind::ConvertLoopToAll(all) => Some(format!("Replace with `{all}`")),
+            CheckKind::ConvertLoopToAny(any) => Some(format!("Replace with `{any}`")),
             CheckKind::ConvertTypedDictFunctionalToClass(name)
             | CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 Some(format!("Convert `{name}` to class syntax"))
@@ -3828,6 +3947,9 @@ impl CheckKind {
                 primitive.builtin()
             )),
             CheckKind::TypingTextStrAlias => Some("Replace with `str`".to_string()),
+            CheckKind::UnnecessaryBuiltinImport(..) => {
+                Some("Remove unnecessary builtin import".to_string())
+            }
             CheckKind::UnnecessaryCallAroundSorted(func) => {
                 Some(format!("Remove unnecessary `{func}` call"))
             }
@@ -3903,9 +4025,9 @@ impl CheckKind {
                 Some("Remove `object` inheritance".to_string())
             }
             CheckKind::UselessYieldFixture(..) => Some("Replace `yield` with `return`".to_string()),
-            CheckKind::YodaConditions(left, right) => Some(format!(
-                "Replace with `{left} == {right}` (Yoda-conditions)`"
-            )),
+            CheckKind::YodaConditions(left, right) => {
+                Some(format!("Replace Yoda condition with `{left} == {right}`"))
+            }
             _ => None,
         }
     }
@@ -3949,82 +4071,6 @@ pub const INCOMPATIBLE_CODES: &[(CheckCode, CheckCode, &str)] = &[(
     "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
      Consider adding `D203` to `ignore`.",
 )];
-
-/// A hash map from deprecated `CheckCodePrefix` to latest `CheckCodePrefix`.
-pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCodePrefix>> = Lazy::new(|| {
-    FxHashMap::from_iter([
-        // TODO(charlie): Remove by 2023-01-01.
-        ("U001", CheckCodePrefix::UP001),
-        ("U003", CheckCodePrefix::UP003),
-        ("U004", CheckCodePrefix::UP004),
-        ("U005", CheckCodePrefix::UP005),
-        ("U006", CheckCodePrefix::UP006),
-        ("U007", CheckCodePrefix::UP007),
-        ("U008", CheckCodePrefix::UP008),
-        ("U009", CheckCodePrefix::UP009),
-        ("U010", CheckCodePrefix::UP010),
-        ("U011", CheckCodePrefix::UP011),
-        ("U012", CheckCodePrefix::UP012),
-        ("U013", CheckCodePrefix::UP013),
-        ("U014", CheckCodePrefix::UP014),
-        ("U015", CheckCodePrefix::UP015),
-        ("U016", CheckCodePrefix::UP016),
-        ("U017", CheckCodePrefix::UP017),
-        ("U019", CheckCodePrefix::UP019),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("I252", CheckCodePrefix::TID252),
-        ("M001", CheckCodePrefix::RUF100),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("PDV002", CheckCodePrefix::PD002),
-        ("PDV003", CheckCodePrefix::PD003),
-        ("PDV004", CheckCodePrefix::PD004),
-        ("PDV007", CheckCodePrefix::PD007),
-        ("PDV008", CheckCodePrefix::PD008),
-        ("PDV009", CheckCodePrefix::PD009),
-        ("PDV010", CheckCodePrefix::PD010),
-        ("PDV011", CheckCodePrefix::PD011),
-        ("PDV012", CheckCodePrefix::PD012),
-        ("PDV013", CheckCodePrefix::PD013),
-        ("PDV015", CheckCodePrefix::PD015),
-        ("PDV901", CheckCodePrefix::PD901),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("R501", CheckCodePrefix::RET501),
-        ("R502", CheckCodePrefix::RET502),
-        ("R503", CheckCodePrefix::RET503),
-        ("R504", CheckCodePrefix::RET504),
-        ("R505", CheckCodePrefix::RET505),
-        ("R506", CheckCodePrefix::RET506),
-        ("R507", CheckCodePrefix::RET507),
-        ("R508", CheckCodePrefix::RET508),
-        ("IC001", CheckCodePrefix::ICN001),
-        ("IC002", CheckCodePrefix::ICN001),
-        ("IC003", CheckCodePrefix::ICN001),
-        ("IC004", CheckCodePrefix::ICN001),
-        // TODO(charlie): Remove by 2023-01-01.
-        ("U", CheckCodePrefix::UP),
-        ("U0", CheckCodePrefix::UP0),
-        ("U00", CheckCodePrefix::UP00),
-        ("U01", CheckCodePrefix::UP01),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("I2", CheckCodePrefix::TID2),
-        ("I25", CheckCodePrefix::TID25),
-        ("M", CheckCodePrefix::RUF100),
-        ("M0", CheckCodePrefix::RUF100),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("PDV", CheckCodePrefix::PD),
-        ("PDV0", CheckCodePrefix::PD0),
-        ("PDV01", CheckCodePrefix::PD01),
-        ("PDV9", CheckCodePrefix::PD9),
-        ("PDV90", CheckCodePrefix::PD90),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("R", CheckCodePrefix::RET),
-        ("R5", CheckCodePrefix::RET5),
-        ("R50", CheckCodePrefix::RET50),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("IC", CheckCodePrefix::ICN),
-        ("IC0", CheckCodePrefix::ICN0),
-    ])
-});
 
 /// A hash map from deprecated to latest `CheckCode`.
 pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(|| {

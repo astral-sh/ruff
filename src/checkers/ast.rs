@@ -6,7 +6,7 @@ use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Located, Location};
+use rustpython_ast::{Comprehension, Located, Location};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
@@ -37,7 +37,7 @@ use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
+    autofix, docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
     flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
@@ -470,7 +470,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_default(args).into_iter(),
+                        flake8_bandit::checks::hardcoded_password_default(args).into_iter(),
                     );
                 }
 
@@ -890,13 +890,18 @@ where
                     }
                 }
 
-                if let Some("__future__") = module.as_deref() {
-                    if self.settings.enabled.contains(&CheckCode::UP010) {
+                if self.settings.enabled.contains(&CheckCode::UP010) {
+                    if let Some("__future__") = module.as_deref() {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP026) {
                     pyupgrade::plugins::rewrite_mock_import(self, stmt);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP029) {
+                    if let Some(module) = module.as_deref() {
+                        pyupgrade::plugins::unnecessary_builtin_import(self, stmt, module, names);
+                    }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::TID251) {
@@ -1172,6 +1177,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::F634) {
                     pyflakes::plugins::if_tuple(self, stmt, test);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM102) {
+                    flake8_simplify::plugins::nested_if_statements(self, stmt);
+                }
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.enabled.contains(&CheckCode::F631) {
@@ -1186,7 +1194,7 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&CheckCode::S101) {
-                    self.add_check(flake8_bandit::plugins::assert_used(stmt));
+                    self.add_check(flake8_bandit::checks::assert_used(stmt));
                 }
                 if self.settings.enabled.contains(&CheckCode::PT015) {
                     if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
@@ -1207,6 +1215,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::PT012) {
                     flake8_pytest_style::plugins::complex_raises(self, stmt, items, body);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM117) {
+                    flake8_simplify::plugins::multiple_with_statements(self, stmt);
                 }
             }
             StmtKind::While { body, orelse, .. } => {
@@ -1247,7 +1258,13 @@ where
                     flake8_simplify::plugins::key_in_dict_for(self, target, iter);
                 }
             }
-            StmtKind::Try { handlers, .. } => {
+            StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
                     if let Some(check) =
                         pyflakes::checks::default_except_not_last(handlers, self.locator)
@@ -1272,6 +1289,16 @@ where
                             .into_iter(),
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM105) {
+                    flake8_simplify::plugins::use_contextlib_suppress(
+                        self, stmt, handlers, orelse, finalbody,
+                    );
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM107) {
+                    flake8_simplify::plugins::return_in_try_except_finally(
+                        self, body, handlers, finalbody,
+                    );
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
@@ -1286,7 +1313,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     if let Some(check) =
-                        flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
+                        flake8_bandit::checks::assign_hardcoded_password_string(value, targets)
                     {
                         self.add_check(check);
                     }
@@ -1854,14 +1881,36 @@ where
 
                 // flake8-bandit
                 if self.settings.enabled.contains(&CheckCode::S102) {
-                    if let Some(check) = flake8_bandit::plugins::exec_used(expr, func) {
+                    if let Some(check) = flake8_bandit::checks::exec_used(expr, func) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S103) {
+                    if let Some(check) = flake8_bandit::checks::bad_file_permissions(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
                         self.add_check(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S106) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_func_arg(keywords).into_iter(),
+                        flake8_bandit::checks::hardcoded_password_func_arg(keywords).into_iter(),
                     );
+                }
+                if self.settings.enabled.contains(&CheckCode::S324) {
+                    if let Some(check) = flake8_bandit::checks::hashlib_insecure_hash_functions(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
                 }
 
                 // flake8-comprehensions
@@ -2465,7 +2514,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     self.add_checks(
-                        flake8_bandit::plugins::compare_to_hardcoded_password_string(
+                        flake8_bandit::checks::compare_to_hardcoded_password_string(
                             left,
                             comparators,
                         )
@@ -2510,9 +2559,18 @@ where
                     ));
                 }
                 if self.settings.enabled.contains(&CheckCode::S104) {
-                    if let Some(check) = flake8_bandit::plugins::hardcoded_bind_all_interfaces(
+                    if let Some(check) = flake8_bandit::checks::hardcoded_bind_all_interfaces(
                         value,
                         &Range::from_located(expr),
+                    ) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S108) {
+                    if let Some(check) = flake8_bandit::checks::hardcoded_tmp_directory(
+                        expr,
+                        value,
+                        &self.settings.flake8_bandit.hardcoded_tmp_directory,
                     ) {
                         self.add_check(check);
                     }
@@ -2587,6 +2645,12 @@ where
             ExprKind::BoolOp { op, values } => {
                 if self.settings.enabled.contains(&CheckCode::PLR1701) {
                     pylint::plugins::merge_isinstance(self, expr, op, values);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM220) {
+                    flake8_simplify::plugins::a_and_not_a(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM221) {
+                    flake8_simplify::plugins::a_or_not_a(self, expr);
                 }
                 if self.settings.enabled.contains(&CheckCode::SIM222) {
                     flake8_simplify::plugins::or_true(self, expr);
@@ -2935,6 +2999,17 @@ where
         }
     }
 
+    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
+        if self.settings.enabled.contains(&CheckCode::SIM118) {
+            flake8_simplify::plugins::key_in_dict_for(
+                self,
+                &comprehension.target,
+                &comprehension.iter,
+            );
+        }
+        visitor::walk_comprehension(self, comprehension);
+    }
+
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
         if self.settings.enabled.contains(&CheckCode::B006) {
             flake8_bugbear::plugins::mutable_argument_default(self, arguments);
@@ -3007,6 +3082,19 @@ where
         if self.settings.enabled.contains(&CheckCode::PIE790) {
             flake8_pie::plugins::no_unnecessary_pass(self, body);
         }
+
+        if self.settings.enabled.contains(&CheckCode::SIM110)
+            || self.settings.enabled.contains(&CheckCode::SIM111)
+        {
+            for (stmt, sibling) in body.iter().tuple_windows() {
+                if matches!(stmt.node, StmtKind::For { .. })
+                    && matches!(sibling.node, StmtKind::Return { .. })
+                {
+                    flake8_simplify::plugins::convert_loop_to_any_all(self, stmt, sibling);
+                }
+            }
+        }
+
         visitor::walk_body(self, body);
     }
 }
@@ -3864,8 +3952,10 @@ impl<'a> Checker<'a> {
                     let fix = if !ignore_init && self.patch(&CheckCode::F401) {
                         let deleted: Vec<&Stmt> =
                             self.deletions.iter().map(|node| node.0).collect();
-                        match pyflakes::fixes::remove_unused_imports(
-                            &unused_imports,
+                        match autofix::helpers::remove_unused_imports(
+                            unused_imports
+                                .iter()
+                                .map(|(full_name, _)| full_name.as_str()),
                             child,
                             parent,
                             &deleted,
@@ -3889,7 +3979,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
+                            CheckKind::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })

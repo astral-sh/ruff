@@ -574,6 +574,53 @@ pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &SourceCodeLocator
     match_trailing_content(stmt, locator)
 }
 
+#[derive(Default)]
+/// A simple representation of a call's positional and keyword arguments.
+pub struct SimpleCallArgs<'a> {
+    pub args: Vec<&'a Expr>,
+    pub kwargs: FxHashMap<&'a str, &'a Expr>,
+}
+
+impl<'a> SimpleCallArgs<'a> {
+    pub fn new(args: &'a [Expr], keywords: &'a [Keyword]) -> Self {
+        let mut result = SimpleCallArgs::default();
+
+        for arg in args {
+            match &arg.node {
+                ExprKind::Starred { .. } => {
+                    break;
+                }
+                _ => {
+                    result.args.push(arg);
+                }
+            }
+        }
+
+        for keyword in keywords {
+            if let Some(arg) = &keyword.node.arg {
+                result.kwargs.insert(arg, &keyword.node.value);
+            }
+        }
+
+        result
+    }
+
+    /// Get the argument with the given name or position.
+    /// If the argument is not found with either name or position, return
+    /// `None`.
+    pub fn get_argument(&self, name: &'a str, position: Option<usize>) -> Option<&'a Expr> {
+        if let Some(kwarg) = self.kwargs.get(name) {
+            return Some(kwarg);
+        }
+        if let Some(position) = position {
+            if position < self.args.len() {
+                return Some(self.args[position]);
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
