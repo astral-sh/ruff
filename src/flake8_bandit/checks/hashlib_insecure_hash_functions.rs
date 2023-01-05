@@ -47,7 +47,7 @@ pub fn hashlib_insecure_hash_functions(
             }
         }
     } else {
-        for func_name in WEAK_HASHES.iter() {
+        for func_name in &WEAK_HASHES {
             if match_module_member(func, "hashlib", func_name, from_imports, import_aliases) {
                 let call_args = SimpleCallArgs::new(args, keywords);
 
@@ -56,7 +56,7 @@ pub fn hashlib_insecure_hash_functions(
                 }
 
                 return Some(Check::new(
-                    CheckKind::HashlibInsecureHashFunction(func_name.to_string()),
+                    CheckKind::HashlibInsecureHashFunction((*func_name).to_string()),
                     Range::from_located(func),
                 ));
             }
