@@ -316,7 +316,7 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 }
 
 /// Format the module name for a relative import.
-pub fn format_import_from(level: Option<&usize>, module: Option<&String>) -> String {
+pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
     if let Some(level) = level {
         for _ in 0..*level {

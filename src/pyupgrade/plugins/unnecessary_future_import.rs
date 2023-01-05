@@ -73,7 +73,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             .map(|alias| format!("__future__.{}", alias.node.name))
             .collect();
         match autofix::helpers::remove_unused_imports(
-            unused_imports.iter().map(std::string::String::as_str),
+            unused_imports.iter().map(String::as_str),
             defined_by.0,
             defined_in.map(|node| node.0),
             &deleted,

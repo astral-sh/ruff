@@ -18,7 +18,7 @@ fn is_pytest_raises(
     match_module_member(func, "pytest", "raises", from_imports, import_aliases)
 }
 
-fn is_non_trivial_with_body(body: &Vec<Stmt>) -> bool {
+fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     if body.len() > 1 {
         true
     } else if let Some(first_body_stmt) = body.first() {
@@ -28,7 +28,7 @@ fn is_non_trivial_with_body(body: &Vec<Stmt>) -> bool {
     }
 }
 
-pub fn raises_call(checker: &mut Checker, func: &Expr, args: &Vec<Expr>, keywords: &Vec<Keyword>) {
+pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(func, &checker.from_imports, &checker.import_aliases) {
         if checker.settings.enabled.contains(&CheckCode::PT010) {
             if args.is_empty() && keywords.is_empty() {
@@ -57,7 +57,7 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &Vec<Expr>, keyword
     }
 }
 
-pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], body: &Vec<Stmt>) {
+pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], body: &[Stmt]) {
     let mut is_too_complex = false;
 
     let raises_called = items.iter().any(|item| match &item.context_expr.node {

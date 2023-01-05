@@ -926,9 +926,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::PT013) {
-                    if let Some(check) =
-                        flake8_pytest_style::plugins::import_from(stmt, module, level)
-                    {
+                    if let Some(check) = flake8_pytest_style::plugins::import_from(
+                        stmt,
+                        module.as_ref().map(String::as_str),
+                        level.as_ref(),
+                    ) {
                         self.add_check(check);
                     }
                 }
@@ -992,7 +994,7 @@ where
                                 self.add_check(Check::new(
                                     CheckKind::ImportStarNotPermitted(helpers::format_import_from(
                                         level.as_ref(),
-                                        module.as_ref(),
+                                        module.as_ref().map(String::as_str),
                                     )),
                                     Range::from_located(stmt),
                                 ));
@@ -1003,7 +1005,7 @@ where
                             self.add_check(Check::new(
                                 CheckKind::ImportStarUsed(helpers::format_import_from(
                                     level.as_ref(),
-                                    module.as_ref(),
+                                    module.as_ref().map(String::as_str),
                                 )),
                                 Range::from_located(stmt),
                             ));
@@ -2577,7 +2579,11 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP025) {
-                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind);
+                    pyupgrade::plugins::rewrite_unicode_literal(
+                        self,
+                        expr,
+                        kind.as_ref().map(String::as_str),
+                    );
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
@@ -3376,7 +3382,7 @@ impl<'a> Checker<'a> {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
-                                    module.as_ref(),
+                                    module.as_ref().map(String::as_str),
                                 ));
                             }
                         }
@@ -3857,7 +3863,7 @@ impl<'a> Checker<'a> {
                                 if let BindingKind::StarImportation(level, module) = &binding.kind {
                                     from_list.push(helpers::format_import_from(
                                         level.as_ref(),
-                                        module.as_ref(),
+                                        module.as_ref().map(String::as_str),
                                     ));
                                 }
                             }
@@ -3882,7 +3888,7 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
-                type UnusedImport<'a> = (&'a String, &'a Range);
+                type UnusedImport<'a> = (&'a str, &'a Range);
                 type BindingContext<'a, 'b> =
                     (&'a RefEquality<'b, Stmt>, Option<&'a RefEquality<'b, Stmt>>);
 
@@ -3954,9 +3960,7 @@ impl<'a> Checker<'a> {
                         let deleted: Vec<&Stmt> =
                             self.deletions.iter().map(|node| node.0).collect();
                         match autofix::helpers::remove_unused_imports(
-                            unused_imports
-                                .iter()
-                                .map(|(full_name, _)| full_name.as_str()),
+                            unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
                             parent,
                             &deleted,
@@ -4002,7 +4006,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
+                            CheckKind::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
