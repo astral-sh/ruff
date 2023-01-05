@@ -1,12 +1,11 @@
 use itertools::Itertools;
 use log::error;
-use rustc_hash::FxHashSet;
-use rustpython_ast::{AliasData, Located};
+use rustpython_ast::{Alias, AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
+use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::pyupgrade::fixes;
 use crate::registry::{Check, CheckKind};
 use crate::settings::types::PythonVersion;
 
@@ -37,26 +36,25 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
 pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Located<AliasData>]) {
     let target_version = checker.settings.target_version;
 
-    let mut removable_index: Vec<usize> = vec![];
-    let mut removable_names: FxHashSet<&str> = FxHashSet::default();
-    for (index, alias) in names.iter().enumerate() {
-        let name = alias.node.name.as_str();
-        if (target_version >= PythonVersion::Py33 && PY33_PLUS_REMOVE_FUTURES.contains(&name))
-            || (target_version >= PythonVersion::Py37 && PY37_PLUS_REMOVE_FUTURES.contains(&name))
+    let mut unused_imports: Vec<&Alias> = vec![];
+    for alias in names {
+        if (target_version >= PythonVersion::Py33
+            && PY33_PLUS_REMOVE_FUTURES.contains(&alias.node.name.as_str()))
+            || (target_version >= PythonVersion::Py37
+                && PY37_PLUS_REMOVE_FUTURES.contains(&alias.node.name.as_str()))
         {
-            removable_index.push(index);
-            removable_names.insert(name);
+            unused_imports.push(alias);
         }
     }
 
-    if removable_index.is_empty() {
+    if unused_imports.is_empty() {
         return;
     }
     let mut check = Check::new(
         CheckKind::UnnecessaryFutureImport(
-            removable_names
-                .into_iter()
-                .map(String::from)
+            unused_imports
+                .iter()
+                .map(|alias| alias.node.name.to_string())
                 .sorted()
                 .collect(),
         ),
@@ -67,12 +65,16 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
         let defined_by = checker.current_stmt();
         let defined_in = checker.current_stmt_parent();
-        match fixes::remove_unnecessary_future_import(
-            checker.locator,
-            &removable_index,
+        let unused_imports: Vec<String> = unused_imports
+            .iter()
+            .map(|alias| format!("__future__.{}", alias.node.name))
+            .collect();
+        match autofix::helpers::remove_unused_imports(
+            unused_imports.iter().map(std::string::String::as_str),
             defined_by.0,
             defined_in.map(|node| node.0),
             &deleted,
+            checker.locator,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {
