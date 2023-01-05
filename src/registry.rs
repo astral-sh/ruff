@@ -217,6 +217,9 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
+    SIM201,
+    SIM202,
+    SIM208,
     SIM118,
     SIM222,
     SIM223,
@@ -945,6 +948,9 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    NegateEqualOp(String, String),
+    NegateNotEqualOp(String, String),
+    DoubleNegation(String),
     KeyInDict(String, String),
     AndFalse,
     OrTrue,
@@ -1373,6 +1379,11 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
+            CheckCode::SIM201 => CheckKind::NegateEqualOp("left".to_string(), "right".to_string()),
+            CheckCode::SIM202 => {
+                CheckKind::NegateNotEqualOp("left".to_string(), "right".to_string())
+            }
+            CheckCode::SIM208 => CheckKind::DoubleNegation("expr".to_string()),
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             CheckCode::SIM222 => CheckKind::OrTrue,
             CheckCode::SIM223 => CheckKind::AndFalse,
@@ -1897,6 +1908,9 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM201 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM202 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM208 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::SIM222 => CheckCategory::Flake8Simplify,
             CheckCode::SIM223 => CheckCategory::Flake8Simplify,
@@ -2146,6 +2160,9 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
+            CheckKind::NegateEqualOp(..) => &CheckCode::SIM201,
+            CheckKind::NegateNotEqualOp(..) => &CheckCode::SIM202,
+            CheckKind::DoubleNegation(..) => &CheckCode::SIM208,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::OrTrue => &CheckCode::SIM222,
             CheckKind::AndFalse => &CheckCode::SIM223,
@@ -2431,7 +2448,7 @@ impl CheckKind {
             }
             CheckKind::PercentFormatExtraNamedArguments(missing) => {
                 let message = missing.join(", ");
-                format!("'...' % ... has unused named argument(s): {message}")
+                format!("'...' % f ... has unused named argument(s): {message}")
             }
             CheckKind::PercentFormatMissingArgument(missing) => {
                 let message = missing.join(", ");
@@ -2901,6 +2918,15 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::NegateEqualOp(left, right) => {
+                format!("Use `{left} != {right}` instead of `not {left} == {right}`")
+            }
+            CheckKind::NegateNotEqualOp(left, right) => {
+                format!("Use `{left} == {right}` instead of `not {left} != {right}`")
+            }
+            CheckKind::DoubleNegation(expr) => {
+                format!("Use `{expr}` instead of `not (not {expr})`")
+            }
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
@@ -3512,6 +3538,7 @@ impl CheckKind {
                 | CheckKind::DeprecatedUnittestAlias(..)
                 | CheckKind::DoNotAssertFalse
                 | CheckKind::DoNotAssignLambda(..)
+                | CheckKind::DoubleNegation(..)
                 | CheckKind::DupeClassFieldDefinitions(..)
                 | CheckKind::DuplicateHandlerException(..)
                 | CheckKind::EndsInPeriod
@@ -3528,6 +3555,8 @@ impl CheckKind {
                 | CheckKind::MisplacedComparisonConstant(..)
                 | CheckKind::MissingReturnTypeSpecialMethod(..)
                 | CheckKind::NativeLiterals(..)
+                | CheckKind::NegateEqualOp(..)
+                | CheckKind::NegateNotEqualOp(..)
                 | CheckKind::NewLineAfterLastParagraph
                 | CheckKind::NewLineAfterSectionName(..)
                 | CheckKind::NoBlankLineAfterFunction(..)
@@ -3642,6 +3671,9 @@ impl CheckKind {
             }
             CheckKind::DoNotAssertFalse => Some("Replace `assert False`".to_string()),
             CheckKind::DoNotAssignLambda(name) => Some(format!("Rewrite `{name}` as a `def`")),
+            CheckKind::DoubleNegation(expr) => {
+                Some(format!("Remove double negation and replace with `{expr}`"))
+            }
             CheckKind::DupeClassFieldDefinitions(name) => {
                 Some(format!("Remove duplicate field definition for `{name}`"))
             }
@@ -3680,11 +3712,13 @@ impl CheckKind {
             CheckKind::NativeLiterals(literal_type) => {
                 Some(format!("Replace with `{literal_type}`"))
             }
-            CheckKind::OpenAlias => Some("Replace with builtin `open`".to_string()),
-            CheckKind::OrTrue => Some("Replace with `True`".to_string()),
+            CheckKind::NegateEqualOp(..) => Some("Replace with != operator".to_string()),
+            CheckKind::NegateNotEqualOp(..) => Some("Replace with == operator".to_string()),
             CheckKind::NewLineAfterLastParagraph => {
                 Some("Move closing quotes to new line".to_string())
             }
+            CheckKind::OpenAlias => Some("Replace with builtin `open`".to_string()),
+            CheckKind::OrTrue => Some("Replace with `True`".to_string()),
             CheckKind::ReplaceUniversalNewlines => {
                 Some("Replace with `text` keyword argument".to_string())
             }

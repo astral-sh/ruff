@@ -15,7 +15,7 @@ use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 
-fn compare(
+pub fn compare(
     left: &Expr,
     ops: &[Cmpop],
     comparators: &[Expr],
