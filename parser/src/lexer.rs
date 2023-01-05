@@ -244,12 +244,12 @@ where
         // Detect potential string like rb'' b'' f'' u'' r''
         match self.window[..3] {
             [Some(c), Some('"' | '\''), ..] => {
-                if let Ok(kind) = StringKind::try_from(c.to_string()) {
+                if let Ok(kind) = StringKind::try_from(c) {
                     return self.lex_string(kind);
                 }
             }
             [Some(c1), Some(c2), Some('"' | '\'')] => {
-                if let Ok(kind) = StringKind::try_from(format!("{c1}{c2}")) {
+                if let Ok(kind) = StringKind::try_from([c1, c2]) {
                     return self.lex_string(kind);
                 }
             }
@@ -459,7 +459,7 @@ where
 
     fn lex_string(&mut self, kind: StringKind) -> LexResult {
         let start_pos = self.get_pos();
-        for _ in 0..kind.to_string().len() {
+        for _ in 0..kind.prefix_len() {
             self.next_char();
         }
         let quote_char = self.next_char().unwrap();

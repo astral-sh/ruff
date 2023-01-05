@@ -26,7 +26,7 @@ impl<'a> StringParser<'a> {
         str_start: Location,
         str_end: Location,
     ) -> Self {
-        let offset = kind.to_string().len() + if triple_quoted { 3 } else { 1 };
+        let offset = kind.prefix_len() + if triple_quoted { 3 } else { 1 };
         Self {
             chars: source.chars().peekable(),
             kind,
