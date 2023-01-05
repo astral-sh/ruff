@@ -15,7 +15,7 @@ use crate::cst::matchers::{match_call, match_expression};
 // The regex documentation says to do this because creating regexs is expensive:
 // https://docs.rs/regex/latest/regex/#example-avoid-compiling-the-same-regex-in-a-loop
 lazy_static! {
-    static ref RE: Regex = Regex::new(r"\{(\d+)\}").unwrap();
+    static ref FORMAT_SPECIFIER: Regex = Regex::new(r"\{(?P<int>\d+)?(?P<fmt>.*?)\}").unwrap();
 }
 
 /// Convert a python integer to a unsigned 32 but integer. We are assuming this
@@ -107,14 +107,17 @@ fn get_specifier_order(value_str: &str) -> Vec<u32> {
 /// Returns a string without the format specifiers. Ex. "Hello {0} {1}" ->
 /// "Hello {} {}"
 fn remove_specifiers(raw_specifiers: &str) -> String {
-    RE.replace_all(raw_specifiers, "{}").to_string()
+    println!("BEFORE: {}", raw_specifiers);
+    let new_str = FORMAT_SPECIFIER.replace_all(raw_specifiers, "{$fmt}").to_string();
+    println!("AFTER: {}\n", new_str);
+    new_str
 }
 
 /// Checks if there is a single specifier in the string. The string must either
 /// have all formatterts or no formatters (or else an error will be thrown), so
 /// this will work as long as the python code is valid
 fn has_specifiers(raw_specifiers: &str) -> bool {
-    RE.is_match(raw_specifiers)
+    FORMAT_SPECIFIER.is_match(raw_specifiers)
 }
 
 /// UP029
@@ -133,7 +136,6 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
                         None => return,
                         Some(item) => item,
                     };
-                    println!("{}", new_call);
                     let mut check =
                         Check::new(CheckKind::FormatSpecifiers, Range::from_located(expr));
                     if checker.patch(check.kind.code()) {
