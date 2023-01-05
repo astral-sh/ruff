@@ -188,7 +188,6 @@ mod tests {
                     src: None,
                     target_version: None,
                     unfixable: None,
-                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
                     flake8_bandit: None,
@@ -202,7 +201,6 @@ mod tests {
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
-                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -244,7 +242,6 @@ line-length = 79
                     src: None,
                     target_version: None,
                     unfixable: None,
-                    task_tags: None,
                     update_check: None,
                     cache_dir: None,
                     flake8_annotations: None,
@@ -259,7 +256,6 @@ line-length = 79
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
-                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -302,7 +298,6 @@ exclude = ["foo.py"]
                     src: None,
                     target_version: None,
                     unfixable: None,
-                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
                     flake8_bandit: None,
@@ -316,7 +311,6 @@ exclude = ["foo.py"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
-                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -359,7 +353,6 @@ select = ["E501"]
                     src: None,
                     target_version: None,
                     unfixable: None,
-                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
                     flake8_bandit: None,
@@ -373,7 +366,6 @@ select = ["E501"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
-                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -417,7 +409,6 @@ ignore = ["E501"]
                     src: None,
                     target_version: None,
                     unfixable: None,
-                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
                     flake8_bandit: None,
@@ -431,7 +422,6 @@ ignore = ["E501"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
-                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
@@ -505,7 +495,6 @@ other-attribute = 1
                 format: None,
                 force_exclude: None,
                 unfixable: None,
-                task_tags: None,
                 update_check: None,
                 cache_dir: None,
                 per_file_ignores: Some(FxHashMap::from_iter([(
@@ -609,7 +598,6 @@ other-attribute = 1
                     ]),
                     staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
                 }),
-                pycodestyle: None,
                 pydocstyle: None,
                 pyupgrade: None,
             }

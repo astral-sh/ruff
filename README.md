@@ -2232,27 +2232,6 @@ target-version = "py37"
 
 ---
 
-#### [`task-tags`](#task-tags)
-
-A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
-
-Comments starting with these tags will be ignored by commented-out code
-detection (`ERA`), and skipped by line-length checks (`E501`) if
-`ignore-overlong-task-comments` is set to `true`.
-
-**Default value**: `["TODO", "FIXME", "XXX"]`
-
-**Type**: `Vec<String>`
-
-**Example usage**:
-
-```toml
-[tool.ruff]
-task-tags = ["HACK"]
-```
-
----
-
 #### [`unfixable`](#unfixable)
 
 A list of check code prefixes to consider un-autofix-able.
@@ -3032,27 +3011,6 @@ expect that any method decorated by a decorator in this list has no
 [tool.ruff.pep8-naming]
 # Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.
 staticmethod-decorators = ["staticmethod", "stcmthd"]
-```
-
----
-
-### `pycodestyle`
-
-#### [`ignore-overlong-task-comments`](#ignore-overlong-task-comments)
-
-Whether or not line-length checks (`E501`) should be triggered for
-comments starting with `task-tags` (by default: ["TODO", "FIXME",
-and "XXX"]).
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```toml
-[tool.ruff.pycodestyle]
-ignore-overlong-task-comments = true
 ```
 
 ---
