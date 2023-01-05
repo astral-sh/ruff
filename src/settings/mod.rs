@@ -17,8 +17,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::cache::cache_dir;
-use crate::registry::{CheckCode, INCOMPATIBLE_CODES};
-use crate::registry_gen::{CheckCodePrefix, SuffixLength, CATEGORIES};
+use crate::registry::{CheckCode, CheckCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
@@ -471,8 +470,7 @@ fn validate_enabled(enabled: FxHashSet<CheckCode>) -> FxHashSet<CheckCode> {
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::registry::CheckCode;
-    use crate::registry_gen::CheckCodePrefix;
+    use crate::registry::{CheckCode, CheckCodePrefix};
     use crate::settings::{resolve_codes, CheckCodeSpec};
 
     #[test]

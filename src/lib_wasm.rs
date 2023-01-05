@@ -6,8 +6,7 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::linter::check_path;
-use crate::registry::CheckCode;
-use crate::registry_gen::CheckCodePrefix;
+use crate::registry::{CheckCode, CheckCodePrefix};
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;

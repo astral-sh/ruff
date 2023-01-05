@@ -15,7 +15,6 @@ pub fn unsafe_yaml_load(
 ) -> Option<Check> {
     if match_module_member(func, "yaml", "load", from_imports, import_aliases) {
         let call_args = SimpleCallArgs::new(args, keywords);
-
         if let Some(loader_arg) = call_args.get_argument("Loader", Some(1)) {
             if !match_module_member(
                 loader_arg,

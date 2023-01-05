@@ -52,8 +52,8 @@ where
 
 fn check_patch_call(
     call: &Expr,
-    args: &Vec<Expr>,
-    keywords: &Vec<Keyword>,
+    args: &[Expr],
+    keywords: &[Keyword],
     new_arg_number: usize,
 ) -> Option<Check> {
     let simple_args = SimpleCallArgs::new(args, keywords);
@@ -81,7 +81,7 @@ fn check_patch_call(
     None
 }
 
-pub fn patch_with_lambda(call: &Expr, args: &Vec<Expr>, keywords: &Vec<Keyword>) -> Option<Check> {
+pub fn patch_with_lambda(call: &Expr, args: &[Expr], keywords: &[Keyword]) -> Option<Check> {
     if let Some(call_path) = compose_call_path(call) {
         if PATCH_NAMES.contains(&call_path.as_str()) {
             check_patch_call(call, args, keywords, 1)

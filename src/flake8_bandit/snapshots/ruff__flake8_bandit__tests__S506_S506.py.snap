@@ -5,20 +5,20 @@ expression: checks
 - kind:
     UnsafeYAMLLoad: No Loader used
   location:
-    row: 9
+    row: 10
     column: 8
   end_location:
-    row: 9
+    row: 10
     column: 17
   fix: ~
   parent: ~
 - kind:
     UnsafeYAMLLoad: Loader
   location:
-    row: 22
+    row: 24
     column: 23
   end_location:
-    row: 22
+    row: 24
     column: 34
   fix: ~
   parent: ~

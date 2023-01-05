@@ -111,3 +111,13 @@ def f():
     class C:
         def __init__(self):
             print(x)
+
+
+def f():
+    for x in y:
+        yield x, x + 1
+
+
+def f():
+    for x, y in z:
+        yield x, y, x + y
