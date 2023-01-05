@@ -24,8 +24,8 @@ fn is_used_for_security(call_args: &SimpleCallArgs) -> bool {
 /// S324
 pub fn hashlib_insecure_hash_functions(
     func: &Expr,
-    args: &Vec<Expr>,
-    keywords: &Vec<Keyword>,
+    args: &[Expr],
+    keywords: &[Keyword],
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
 ) -> Option<Check> {

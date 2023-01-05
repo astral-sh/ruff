@@ -6,7 +6,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
 
-pub fn fail_call(checker: &mut Checker, call: &Expr, args: &Vec<Expr>, keywords: &Vec<Keyword>) {
+pub fn fail_call(checker: &mut Checker, call: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_fail(call, checker) {
         let call_args = SimpleCallArgs::new(args, keywords);
         let msg = call_args.get_argument("msg", Some(0));
