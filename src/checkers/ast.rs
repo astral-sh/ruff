@@ -2537,7 +2537,7 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S108) {
-                    if let Some(check) = flake8_bandit::checks::hardcoded_tmp_dir(
+                    if let Some(check) = flake8_bandit::checks::hardcoded_tmp_directory(
                         expr,
                         value,
                         &self.settings.flake8_bandit.hardcoded_tmp_directory,
