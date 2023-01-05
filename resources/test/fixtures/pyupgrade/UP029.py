@@ -7,11 +7,11 @@
 
 '{0}'.format(1)
 
-"'{0:x}'.format(30)"
+'{0:x}'.format(30)
 
-"x = '{0}'.format(1)"
+x = '{0}'.format(1)
 
-"'''{0}\n{1}\n'''.format(1, 2)", "'''{}\n{}\n'''.format(1, 2)"
+'''{0}\n{1}\n'''.format(1, 2)
 
 print(
     'foo{0}'
@@ -28,4 +28,4 @@ x = "foo {0}" \
 
 '("{0}").format(1)'
 
-r'"\N{snowman} {0}".format(1)'
+"\N{snowman} {0}".format(1)

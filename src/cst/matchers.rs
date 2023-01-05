@@ -1,5 +1,7 @@
 use anyhow::{bail, Result};
-use libcst_native::{Expr, Import, ImportFrom, Module, SmallStatement, Statement, Expression, Call};
+use libcst_native::{
+    Call, Expr, Expression, Import, ImportFrom, Module, SmallStatement, Statement,
+};
 
 pub fn match_module(module_text: &str) -> Result<Module> {
     match libcst_native::parse_module(module_text, None) {
@@ -50,7 +52,6 @@ pub fn match_import_from<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut I
         bail!("Expected Statement::Simple")
     }
 }
-
 
 pub fn match_call<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut Call<'b>> {
     if let Expression::Call(call) = expression {

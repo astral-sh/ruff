@@ -1,13 +1,13 @@
-use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use lazy_static::lazy_static;
+use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use num_bigint::{BigInt, Sign};
+use regex::Regex;
 use rustpython_ast::{Constant, Expr, ExprKind};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
-use regex::Regex;
 
-use crate::autofix::Fix;
 use crate::ast::types::Range;
+use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::checks::{Check, CheckKind};
 use crate::cst::matchers::{match_call, match_expression};
@@ -18,9 +18,10 @@ lazy_static! {
     static ref RE: Regex = Regex::new(r"\{(\d+)\}").unwrap();
 }
 
-/// Convert a python integer to a unsigned 32 but integer. We are assuming this will never overflow
-/// because people will probbably never have more than 2^32 arguments to a format string. I am also
-/// ignoring the signed, I personally checked and negative numbers are not allowed in format strings
+/// Convert a python integer to a unsigned 32 but integer. We are assuming this
+/// will never overflow because people will probbably never have more than 2^32
+/// arguments to a format string. I am also ignoring the signed, I personally
+/// checked and negative numbers are not allowed in format strings
 fn convert_big_int(bigint: BigInt) -> Option<u32> {
     let (sign, digits) = bigint.to_u32_digits();
     match sign {
@@ -63,8 +64,8 @@ fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Option<String> {
     call.args = get_new_args(call.args.clone(), correct_order);
     // Create the new function
     if let Expression::Attribute(item) = &*call.func {
-        // Converting the struct to a struct and then back is not very efficient, but regexs were
-        // the simplest way I could find to remove the specifiers
+        // Converting the struct to a struct and then back is not very efficient, but
+        // regexs were the simplest way I could find to remove the specifiers
         let mut state = CodegenState::default();
         item.codegen(&mut state);
         let cleaned = remove_specifiers(&state.to_string());
@@ -82,8 +83,9 @@ fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Option<String> {
 
 fn get_specifier_order(value_str: &str) -> Vec<u32> {
     let mut specifier_ints: Vec<u32> = vec![];
-    // Whether the previous character was a Lbrace. If this is true and the next character is
-    // an integer than this integer gets added to the list of constants
+    // Whether the previous character was a Lbrace. If this is true and the next
+    // character is an integer than this integer gets added to the list of
+    // constants
     let mut prev_l_brace = false;
     for (_, tok, _) in lexer::make_tokenizer(value_str).flatten() {
         if Tok::Lbrace == tok {
@@ -99,17 +101,18 @@ fn get_specifier_order(value_str: &str) -> Vec<u32> {
             prev_l_brace = false;
         }
     }
-specifier_ints
+    specifier_ints
 }
 
-/// Returns a string without the format specifiers. Ex. "Hello {0} {1}" -> "Hello {} {}"
+/// Returns a string without the format specifiers. Ex. "Hello {0} {1}" ->
+/// "Hello {} {}"
 fn remove_specifiers(raw_specifiers: &str) -> String {
     RE.replace_all(raw_specifiers, "{}").to_string()
 }
 
-/// Checks if there is a single specifier in the string. The string must either have all
-/// formatterts or no formatters (or else an error will be thrown), so this will work as long as
-/// the python code is valid
+/// Checks if there is a single specifier in the string. The string must either
+/// have all formatterts or no formatters (or else an error will be thrown), so
+/// this will work as long as the python code is valid
 fn has_specifiers(raw_specifiers: &str) -> bool {
     RE.is_match(raw_specifiers)
 }
@@ -131,7 +134,8 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
                         Some(item) => item,
                     };
                     println!("{}", new_call);
-                    let mut check = Check::new(CheckKind::FormatSpecifiers, Range::from_located(expr));
+                    let mut check =
+                        Check::new(CheckKind::FormatSpecifiers, Range::from_located(expr));
                     if checker.patch(check.kind.code()) {
                         check.amend(Fix::replacement(
                             new_call,
@@ -141,7 +145,6 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
                     }
                     checker.add_check(check);
                 }
-
             }
         }
     }
