@@ -3,10 +3,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::{
-    generate_check_code_prefix, generate_cli_help, generate_json_schema, generate_options,
-    generate_rules_table,
-};
+use crate::{generate_cli_help, generate_json_schema, generate_options, generate_rules_table};
 
 #[derive(Args)]
 pub struct Cli {
@@ -16,9 +13,6 @@ pub struct Cli {
 }
 
 pub fn main(cli: &Cli) -> Result<()> {
-    generate_check_code_prefix::main(&generate_check_code_prefix::Cli {
-        dry_run: cli.dry_run,
-    })?;
     generate_json_schema::main(&generate_json_schema::Cli {
         dry_run: cli.dry_run,
     })?;
