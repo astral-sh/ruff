@@ -1075,11 +1075,8 @@ pub enum CheckKind {
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
     HardcodedTempFile(String),
-
-    UnsafeYAMLLoad(String),
-
     HashlibInsecureHashFunction(String),
-
+    UnsafeYAMLLoad(Option<String>),
     // mccabe
     FunctionIsTooComplex(String, usize),
     // flake8-boolean-trap
@@ -1543,7 +1540,7 @@ impl CheckCode {
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
             CheckCode::S324 => CheckKind::HashlibInsecureHashFunction("...".to_string()),
-            CheckCode::S506 => CheckKind::UnsafeYAMLLoad("...".to_string()),
+            CheckCode::S506 => CheckKind::UnsafeYAMLLoad(None),
             // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
             // flake8-boolean-trap
@@ -3268,10 +3265,7 @@ impl CheckKind {
             CheckKind::HardcodedPasswordString(string)
             | CheckKind::HardcodedPasswordFuncArg(string)
             | CheckKind::HardcodedPasswordDefault(string) => {
-                format!(
-                    "Possible hardcoded password: `\"{}\"`",
-                    string.escape_debug()
-                )
+                format!("Possible hardcoded password: \"{}\"", string.escape_debug())
             }
             CheckKind::HardcodedTempFile(string) => {
                 format!(
@@ -3285,12 +3279,17 @@ impl CheckKind {
                     string.escape_debug()
                 )
             }
-            CheckKind::UnsafeYAMLLoad(string) => {
-                format!(
-                    "Probable insecure usage of `yaml.load`: \"{}\"",
-                    string.escape_debug()
-                )
-            }
+            CheckKind::UnsafeYAMLLoad(loader) => match loader {
+                Some(name) => {
+                    format!(
+                        "Probable use of unsafe loader `{name}` with `yaml.load`. Allows \
+                         instantiation of arbitrary objects. Consider `yaml.safe_load`."
+                    )
+                }
+                None => "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary \
+                         objects. Consider `yaml.safe_load`."
+                    .to_string(),
+            },
             // flake8-blind-except
             CheckKind::BlindExcept(name) => format!("Do not catch blind exception: `{name}`"),
             // mccabe

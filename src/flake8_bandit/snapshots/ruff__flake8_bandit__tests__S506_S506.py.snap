@@ -3,7 +3,7 @@ source: src/flake8_bandit/mod.rs
 expression: checks
 ---
 - kind:
-    UnsafeYAMLLoad: No Loader used
+    UnsafeYAMLLoad: ~
   location:
     row: 10
     column: 8

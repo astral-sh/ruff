@@ -8,8 +8,8 @@ use crate::registry::{Check, CheckKind};
 /// S506
 pub fn unsafe_yaml_load(
     func: &Expr,
-    args: &Vec<Expr>,
-    keywords: &Vec<Keyword>,
+    args: &[Expr],
+    keywords: &[Keyword],
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
 ) -> Option<Check> {
@@ -29,19 +29,19 @@ pub fn unsafe_yaml_load(
                 from_imports,
                 import_aliases,
             ) {
-                let loader_name = match &loader_arg.node {
-                    ExprKind::Attribute { attr, .. } => Some(attr),
-                    ExprKind::Name { id, .. } => Some(id),
+                let loader = match &loader_arg.node {
+                    ExprKind::Attribute { attr, .. } => Some(attr.to_string()),
+                    ExprKind::Name { id, .. } => Some(id.to_string()),
                     _ => None,
-                }?;
+                };
                 return Some(Check::new(
-                    CheckKind::UnsafeYAMLLoad(loader_name.clone()),
+                    CheckKind::UnsafeYAMLLoad(loader),
                     Range::from_located(loader_arg),
                 ));
             }
         } else {
             return Some(Check::new(
-                CheckKind::UnsafeYAMLLoad("No Loader used".to_string()),
+                CheckKind::UnsafeYAMLLoad(None),
                 Range::from_located(func),
             ));
         }
