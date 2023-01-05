@@ -16,7 +16,6 @@ expression: checks
   parent: ~
 - kind:
     DocumentAllArguments:
-      - x
       - y
       - z
   location:
@@ -29,7 +28,6 @@ expression: checks
   parent: ~
 - kind:
     DocumentAllArguments:
-      - x
       - y
       - z
   location:
