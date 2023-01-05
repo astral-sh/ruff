@@ -16,9 +16,9 @@ use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{
-    directives, flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    directives, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -116,6 +116,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
+        flake8_bandit: Some(flake8_bandit::settings::Settings::default().into()),
         flake8_bugbear: Some(flake8_bugbear::settings::Settings::default().into()),
         flake8_errmsg: Some(flake8_errmsg::settings::Settings::default().into()),
         flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
