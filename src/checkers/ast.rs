@@ -1216,6 +1216,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::PT012) {
                     flake8_pytest_style::plugins::complex_raises(self, stmt, items, body);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM117) {
+                    flake8_simplify::plugins::multiple_with_statements(self, stmt);
+                }
             }
             StmtKind::While { body, orelse, .. } => {
                 if self.settings.enabled.contains(&CheckCode::B023) {
