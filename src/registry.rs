@@ -334,6 +334,7 @@ pub enum CheckCode {
     S106,
     S107,
     S108,
+    S324,
     // flake8-boolean-trap
     FBT001,
     FBT002,
@@ -1073,6 +1074,7 @@ pub enum CheckKind {
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
     HardcodedTempFile(String),
+    HashlibInsecureHashFunction(String),
     // mccabe
     FunctionIsTooComplex(String, usize),
     // flake8-boolean-trap
@@ -1535,6 +1537,7 @@ impl CheckCode {
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
+            CheckCode::S324 => CheckKind::HashlibInsecureHashFunction("...".to_string()),
             // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
             // flake8-boolean-trap
@@ -1937,6 +1940,7 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::S108 => CheckCategory::Flake8Bandit,
+            CheckCode::S324 => CheckCategory::Flake8Bandit,
             // flake8-simplify
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
@@ -2312,6 +2316,7 @@ impl CheckKind {
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
+            CheckKind::HashlibInsecureHashFunction(..) => &CheckCode::S324,
             // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
             // flake8-boolean-trap
@@ -3263,6 +3268,12 @@ impl CheckKind {
             CheckKind::HardcodedTempFile(string) => {
                 format!(
                     "Probable insecure usage of temp file/directory: `\"{}\"`",
+                    string.escape_debug()
+                )
+            }
+            CheckKind::HashlibInsecureHashFunction(string) => {
+                format!(
+                    "Probable use of insecure hash functions in hashlib: `\"{}\"`",
                     string.escape_debug()
                 )
             }

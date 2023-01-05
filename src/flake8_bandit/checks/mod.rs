@@ -8,6 +8,7 @@ pub use hardcoded_password_string::{
     assign_hardcoded_password_string, compare_to_hardcoded_password_string,
 };
 pub use hardcoded_tmp_directory::hardcoded_tmp_directory;
+pub use hashlib_insecure_hash_functions::hashlib_insecure_hash_functions;
 
 mod assert_used;
 mod bad_file_permissions;
@@ -17,3 +18,4 @@ mod hardcoded_password_default;
 mod hardcoded_password_func_arg;
 mod hardcoded_password_string;
 mod hardcoded_tmp_directory;
+mod hashlib_insecure_hash_functions;

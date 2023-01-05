@@ -582,7 +582,7 @@ pub struct SimpleCallArgs<'a> {
 }
 
 impl<'a> SimpleCallArgs<'a> {
-    pub fn new(args: &'a Vec<Expr>, keywords: &'a Vec<Keyword>) -> Self {
+    pub fn new(args: &'a [Expr], keywords: &'a [Keyword]) -> Self {
         let mut result = SimpleCallArgs::default();
 
         for arg in args {
