@@ -1901,6 +1901,17 @@ where
                         flake8_bandit::checks::hardcoded_password_func_arg(keywords).into_iter(),
                     );
                 }
+                if self.settings.enabled.contains(&CheckCode::S324) {
+                    if let Some(check) = flake8_bandit::checks::hashlib_insecure_hash_functions(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {
