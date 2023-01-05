@@ -2367,7 +2367,7 @@ suppress-none-returning = true
 
 #### [`hardcoded-tmp-directory`](#hardcoded-tmp-directory)
 
-List of directories that are considered temporary.
+A list of directories to consider temporary.
 
 **Default value**: `["/tmp", "/var/tmp", "/dev/shm"]`
 
@@ -2377,16 +2377,15 @@ List of directories that are considered temporary.
 
 ```toml
 [tool.ruff.flake8-bandit]
-hardcoded_tmp_directory = ["/foo/bar"]
+hardcoded-tmp-directory = ["/foo/bar"]
 ```
 
 ---
 
 #### [`hardcoded-tmp-directory-extend`](#hardcoded-tmp-directory-extend)
 
-List of directories that are considered temporary.
-These directories are added to the list in
-`hardcoded_tmp_directory`.
+A list of directories to consider temporary, in addition to those
+specified by `hardcoded-tmp-directory`.
 
 **Default value**: `[]`
 
@@ -2396,7 +2395,7 @@ These directories are added to the list in
 
 ```toml
 [tool.ruff.flake8-bandit]
-hardcoded_tmp_directory_extend = ["/foo/bar"]
+extend-hardcoded-tmp-directory = ["/foo/bar"]
 ```
 
 ---

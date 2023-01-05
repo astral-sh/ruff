@@ -930,6 +930,7 @@
         "SIM",
         "SIM1",
         "SIM10",
+        "SIM102",
         "SIM105",
         "SIM11",
         "SIM118",
@@ -1098,7 +1099,7 @@
       "type": "object",
       "properties": {
         "hardcoded-tmp-directory": {
-          "description": "List of directories that are considered temporary.",
+          "description": "A list of directories to consider temporary.",
           "type": [
             "array",
             "null"
@@ -1108,7 +1109,7 @@
           }
         },
         "hardcoded-tmp-directory-extend": {
-          "description": "List of directories that are considered temporary. These directories are added to the list in `hardcoded_tmp_directory`.",
+          "description": "A list of directories to consider temporary, in addition to those specified by `hardcoded-tmp-directory`.",
           "type": [
             "array",
             "null"

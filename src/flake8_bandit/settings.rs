@@ -22,18 +22,17 @@ pub struct Options {
     #[option(
         default = "[\"/tmp\", \"/var/tmp\", \"/dev/shm\"]",
         value_type = "Vec<String>",
-        example = "hardcoded_tmp_directory = [\"/foo/bar\"]"
+        example = "hardcoded-tmp-directory = [\"/foo/bar\"]"
     )]
-    /// List of directories that are considered temporary.
+    /// A list of directories to consider temporary.
     pub hardcoded_tmp_directory: Option<Vec<String>>,
     #[option(
         default = "[]",
         value_type = "Vec<String>",
-        example = "hardcoded_tmp_directory_extend = [\"/foo/bar\"]"
+        example = "extend-hardcoded-tmp-directory = [\"/foo/bar\"]"
     )]
-    /// List of directories that are considered temporary.
-    /// These directories are added to the list in
-    /// `hardcoded_tmp_directory`.
+    /// A list of directories to consider temporary, in addition to those
+    /// specified by `hardcoded-tmp-directory`.
     pub hardcoded_tmp_directory_extend: Option<Vec<String>>,
 }
 
@@ -44,12 +43,27 @@ pub struct Settings {
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
-        let mut hardcoded_tmp_directory = options
-            .hardcoded_tmp_directory
-            .unwrap_or_else(default_tmp_dirs);
-        hardcoded_tmp_directory.extend(options.hardcoded_tmp_directory_extend.unwrap_or_default());
         Self {
-            hardcoded_tmp_directory,
+            hardcoded_tmp_directory: options
+                .hardcoded_tmp_directory
+                .unwrap_or_else(default_tmp_dirs)
+                .into_iter()
+                .chain(
+                    options
+                        .hardcoded_tmp_directory_extend
+                        .unwrap_or_default()
+                        .into_iter(),
+                )
+                .collect(),
+        }
+    }
+}
+
+impl From<Settings> for Options {
+    fn from(settings: Settings) -> Self {
+        Self {
+            hardcoded_tmp_directory: Some(settings.hardcoded_tmp_directory),
+            hardcoded_tmp_directory_extend: None,
         }
     }
 }
