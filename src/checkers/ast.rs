@@ -890,13 +890,18 @@ where
                     }
                 }
 
-                if let Some("__future__") = module.as_deref() {
-                    if self.settings.enabled.contains(&CheckCode::UP010) {
+                if self.settings.enabled.contains(&CheckCode::UP010) {
+                    if let Some("__future__") = module.as_deref() {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP026) {
                     pyupgrade::plugins::rewrite_mock_import(self, stmt);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP029) {
+                    if let Some(module) = module.as_deref() {
+                        pyupgrade::plugins::unnecessary_builtin_import(self, stmt, module, names);
+                    }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::TID251) {
