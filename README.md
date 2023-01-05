@@ -2458,10 +2458,10 @@ the `extend_aliases` option.
 **Example usage**:
 
 ```toml
-[tool.ruff.flake8-import-conventions]
+[tool.ruff.flake8-import-conventions.aliases]
 # Declare the default aliases.
 altair = "alt"
-matplotlib.pyplot = "plt"
+"matplotlib.pyplot" = "plt"
 numpy = "np"
 pandas = "pd"
 seaborn = "sns"
@@ -2481,7 +2481,7 @@ will be added to the `aliases` mapping.
 **Example usage**:
 
 ```toml
-[tool.ruff.flake8-import-conventions]
+[tool.ruff.flake8-import-conventions.extend-aliases]
 # Declare a custom alias for the `matplotlib` module.
 "dask.dataframe" = "dd"
 ```
