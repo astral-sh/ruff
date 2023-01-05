@@ -333,6 +333,7 @@ pub enum CheckCode {
     S106,
     S107,
     S108,
+    S506,
     // flake8-boolean-trap
     FBT001,
     FBT002,
@@ -1072,6 +1073,7 @@ pub enum CheckKind {
     HardcodedPasswordFuncArg(String),
     HardcodedPasswordDefault(String),
     HardcodedTempFile(String),
+    UnsafeYAMLLoad(String),
     // mccabe
     FunctionIsTooComplex(String, usize),
     // flake8-boolean-trap
@@ -1534,6 +1536,7 @@ impl CheckCode {
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
+            CheckCode::S506 => CheckKind::UnsafeYAMLLoad("...".to_string()),
             // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
             // flake8-boolean-trap
@@ -1936,6 +1939,7 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::S108 => CheckCategory::Flake8Bandit,
+            CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
@@ -2311,6 +2315,7 @@ impl CheckKind {
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
+            CheckKind::UnsafeYAMLLoad(..) => &CheckCode::S506,
             // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
             // flake8-boolean-trap
@@ -3262,6 +3267,12 @@ impl CheckKind {
             CheckKind::HardcodedTempFile(string) => {
                 format!(
                     "Probable insecure usage of temp file/directory: `\"{}\"`",
+                    string.escape_debug()
+                )
+            }
+            CheckKind::UnsafeYAMLLoad(string) => {
+                format!(
+                    "Probable insecure usage of `yaml.load`: `\"{}\"`",
                     string.escape_debug()
                 )
             }

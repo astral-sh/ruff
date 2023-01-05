@@ -1,0 +1,25 @@
+---
+source: src/flake8_bandit/mod.rs
+expression: checks
+---
+- kind:
+    UnsafeYAMLLoad: No Loader used
+  location:
+    row: 9
+    column: 8
+  end_location:
+    row: 9
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnsafeYAMLLoad: Loader
+  location:
+    row: 22
+    column: 23
+  end_location:
+    row: 22
+    column: 34
+  fix: ~
+  parent: ~
+
