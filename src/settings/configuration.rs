@@ -13,7 +13,7 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::cli::{collect_per_file_ignores, Overrides};
-use crate::registry_gen::CheckCodePrefix;
+use crate::registry::CheckCodePrefix;
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{

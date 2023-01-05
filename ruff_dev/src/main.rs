@@ -14,8 +14,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use ruff_dev::{
-    generate_all, generate_check_code_prefix, generate_cli_help, generate_json_schema,
-    generate_options, generate_rules_table, print_ast, print_cst, print_tokens, round_trip,
+    generate_all, generate_cli_help, generate_json_schema, generate_options, generate_rules_table,
+    print_ast, print_cst, print_tokens, round_trip,
 };
 
 #[derive(Parser)]
@@ -30,8 +30,6 @@ struct Cli {
 enum Commands {
     /// Run all code and documentation generation steps.
     GenerateAll(generate_all::Cli),
-    /// Generate the `CheckCodePrefix` enum.
-    GenerateCheckCodePrefix(generate_check_code_prefix::Cli),
     /// Generate JSON schema for the TOML configuration file.
     GenerateJSONSchema(generate_json_schema::Cli),
     /// Generate a Markdown-compatible table of supported lint rules.
@@ -54,7 +52,6 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match &cli.command {
         Commands::GenerateAll(args) => generate_all::main(args)?,
-        Commands::GenerateCheckCodePrefix(args) => generate_check_code_prefix::main(args)?,
         Commands::GenerateJSONSchema(args) => generate_json_schema::main(args)?,
         Commands::GenerateRulesTable(args) => generate_rules_table::main(args)?,
         Commands::GenerateOptions(args) => generate_options::main(args)?,

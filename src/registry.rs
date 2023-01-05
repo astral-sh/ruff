@@ -4,6 +4,7 @@ use std::fmt;
 
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use ruff_macros::CheckCodePrefix;
 use rustc_hash::FxHashMap;
 use rustpython_ast::Cmpop;
 use rustpython_parser::ast::Location;
@@ -19,10 +20,10 @@ use crate::flake8_pytest_style::types::{
 use crate::flake8_quotes::settings::Quote;
 use crate::flake8_tidy_imports::settings::Strictness;
 use crate::pyupgrade::types::Primitive;
-use crate::registry_gen::CheckCodePrefix;
 
 #[derive(
     AsRefStr,
+    CheckCodePrefix,
     EnumIter,
     EnumString,
     Debug,
@@ -4025,82 +4026,6 @@ pub const INCOMPATIBLE_CODES: &[(CheckCode, CheckCode, &str)] = &[(
     "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
      Consider adding `D203` to `ignore`.",
 )];
-
-/// A hash map from deprecated `CheckCodePrefix` to latest `CheckCodePrefix`.
-pub static PREFIX_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCodePrefix>> = Lazy::new(|| {
-    FxHashMap::from_iter([
-        // TODO(charlie): Remove by 2023-01-01.
-        ("U001", CheckCodePrefix::UP001),
-        ("U003", CheckCodePrefix::UP003),
-        ("U004", CheckCodePrefix::UP004),
-        ("U005", CheckCodePrefix::UP005),
-        ("U006", CheckCodePrefix::UP006),
-        ("U007", CheckCodePrefix::UP007),
-        ("U008", CheckCodePrefix::UP008),
-        ("U009", CheckCodePrefix::UP009),
-        ("U010", CheckCodePrefix::UP010),
-        ("U011", CheckCodePrefix::UP011),
-        ("U012", CheckCodePrefix::UP012),
-        ("U013", CheckCodePrefix::UP013),
-        ("U014", CheckCodePrefix::UP014),
-        ("U015", CheckCodePrefix::UP015),
-        ("U016", CheckCodePrefix::UP016),
-        ("U017", CheckCodePrefix::UP017),
-        ("U019", CheckCodePrefix::UP019),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("I252", CheckCodePrefix::TID252),
-        ("M001", CheckCodePrefix::RUF100),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("PDV002", CheckCodePrefix::PD002),
-        ("PDV003", CheckCodePrefix::PD003),
-        ("PDV004", CheckCodePrefix::PD004),
-        ("PDV007", CheckCodePrefix::PD007),
-        ("PDV008", CheckCodePrefix::PD008),
-        ("PDV009", CheckCodePrefix::PD009),
-        ("PDV010", CheckCodePrefix::PD010),
-        ("PDV011", CheckCodePrefix::PD011),
-        ("PDV012", CheckCodePrefix::PD012),
-        ("PDV013", CheckCodePrefix::PD013),
-        ("PDV015", CheckCodePrefix::PD015),
-        ("PDV901", CheckCodePrefix::PD901),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("R501", CheckCodePrefix::RET501),
-        ("R502", CheckCodePrefix::RET502),
-        ("R503", CheckCodePrefix::RET503),
-        ("R504", CheckCodePrefix::RET504),
-        ("R505", CheckCodePrefix::RET505),
-        ("R506", CheckCodePrefix::RET506),
-        ("R507", CheckCodePrefix::RET507),
-        ("R508", CheckCodePrefix::RET508),
-        ("IC001", CheckCodePrefix::ICN001),
-        ("IC002", CheckCodePrefix::ICN001),
-        ("IC003", CheckCodePrefix::ICN001),
-        ("IC004", CheckCodePrefix::ICN001),
-        // TODO(charlie): Remove by 2023-01-01.
-        ("U", CheckCodePrefix::UP),
-        ("U0", CheckCodePrefix::UP0),
-        ("U00", CheckCodePrefix::UP00),
-        ("U01", CheckCodePrefix::UP01),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("I2", CheckCodePrefix::TID2),
-        ("I25", CheckCodePrefix::TID25),
-        ("M", CheckCodePrefix::RUF100),
-        ("M0", CheckCodePrefix::RUF100),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("PDV", CheckCodePrefix::PD),
-        ("PDV0", CheckCodePrefix::PD0),
-        ("PDV01", CheckCodePrefix::PD01),
-        ("PDV9", CheckCodePrefix::PD9),
-        ("PDV90", CheckCodePrefix::PD90),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("R", CheckCodePrefix::RET),
-        ("R5", CheckCodePrefix::RET5),
-        ("R50", CheckCodePrefix::RET50),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("IC", CheckCodePrefix::ICN),
-        ("IC0", CheckCodePrefix::ICN0),
-    ])
-});
 
 /// A hash map from deprecated to latest `CheckCode`.
 pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(|| {
