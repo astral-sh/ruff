@@ -2951,7 +2951,7 @@ impl CheckKind {
                 format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
             }
             CheckKind::ReturnInTryExceptFinally => {
-                "Don't use return in try/except and finally".to_string()
+                "Don't use `return` in `try`/`except` and `finally`".to_string()
             }
             CheckKind::AAndNotA(name) => format!("Use `False` instead of `{name} and not {name}`"),
             CheckKind::AOrNotA(name) => format!("Use `True` instead of `{name} or not {name}`"),

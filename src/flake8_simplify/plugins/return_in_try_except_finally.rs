@@ -4,6 +4,12 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
 
+fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
+    stmts
+        .iter()
+        .find(|stmt| matches!(stmt.node, StmtKind::Return { .. }))
+}
+
 /// SIM107
 pub fn return_in_try_except_finally(
     checker: &mut Checker,
@@ -19,17 +25,10 @@ pub fn return_in_try_except_finally(
 
     if let Some(finally_return) = find_return(finalbody) {
         if try_has_return || except_has_return {
-            let check = Check::new(
+            checker.add_check(Check::new(
                 CheckKind::ReturnInTryExceptFinally,
                 Range::from_located(finally_return),
-            );
-            checker.add_check(check);
+            ));
         }
     }
-}
-
-fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
-    stmts
-        .iter()
-        .find(|stmt| matches!(stmt.node, StmtKind::Return { .. }))
 }
