@@ -539,7 +539,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F501 | PercentFormatInvalidFormat | '...' % ... has invalid format string: ... |  |
 | F502 | PercentFormatExpectedMapping | '...' % ... expected mapping but got sequence |  |
 | F503 | PercentFormatExpectedSequence | '...' % ... expected sequence but got mapping |  |
-| F504 | PercentFormatExtraNamedArguments | '...' % f ... has unused named argument(s): ... | 🛠 |
+| F504 | PercentFormatExtraNamedArguments | '...' % ... has unused named argument(s): ... | 🛠 |
 | F505 | PercentFormatMissingArgument | '...' % ... is missing argument(s) for placeholder(s): ... |  |
 | F506 | PercentFormatMixedPositionalAndNamed | '...' % ... has mixed positional and named placeholders |  |
 | F507 | PercentFormatPositionalCountMismatch | '...' % ... has 4 placeholder(s) but 2 substitution(s) |  |
@@ -767,11 +767,12 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S102 | ExecUsed | Use of `exec` detected |  |
 | S103 | BadFilePermissions | `os.chmod` setting a permissive mask `0o777` on file or directory |  |
 | S104 | HardcodedBindAllInterfaces | Possible binding to all interfaces |  |
-| S105 | HardcodedPasswordString | Possible hardcoded password: `"..."` |  |
-| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `"..."` |  |
-| S107 | HardcodedPasswordDefault | Possible hardcoded password: `"..."` |  |
-| S108 | HardcodedTempFile | Probable insecure usage of temp file/directory: `"..."` |  |
-| S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in hashlib: `"..."` |  |
+| S105 | HardcodedPasswordString | Possible hardcoded password: "..." |  |
+| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: "..." |  |
+| S107 | HardcodedPasswordDefault | Possible hardcoded password: "..." |  |
+| S108 | HardcodedTempFile | Probable insecure usage of temporary file or directory: "..." |  |
+| S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "..." |  |
+| S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 
 ### flake8-blind-except (BLE)
 
