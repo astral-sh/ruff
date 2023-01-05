@@ -312,7 +312,7 @@ ruff path/to/code/ --select F401 --select F403
 See `ruff --help` for more:
 
 <!-- Begin auto-generated cli help. -->
-```shell
+```
 Ruff: An extremely fast Python linter.
 
 Usage: ruff [OPTIONS] [FILES]...

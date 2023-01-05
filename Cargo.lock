@@ -368,15 +368,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codegen"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff61280aed771c3070e7dcc9e050c66f1eb1e3b96431ba66f9f74641d02fc41d"
-dependencies = [
- "indexmap",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1365,9 +1356,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
 
 [[package]]
 name = "oorandom"
@@ -1945,7 +1936,6 @@ version = "0.0.211"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
- "codegen",
  "itertools",
  "libcst",
  "once_cell",
@@ -1964,6 +1954,7 @@ dependencies = [
 name = "ruff_macros"
 version = "0.0.211"
 dependencies = [
+ "once_cell",
  "proc-macro2",
  "quote",
  "syn",

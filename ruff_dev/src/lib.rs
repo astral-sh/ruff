@@ -12,7 +12,6 @@
 )]
 
 pub mod generate_all;
-pub mod generate_check_code_prefix;
 pub mod generate_cli_help;
 pub mod generate_json_schema;
 pub mod generate_options;

@@ -16,8 +16,7 @@ mod tests {
     use textwrap::dedent;
 
     use crate::linter::{check_path, test_path};
-    use crate::registry::CheckCode;
-    use crate::registry_gen::CheckCodePrefix;
+    use crate::registry::{CheckCode, CheckCodePrefix};
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::source_code_style::SourceCodeStyleDetector;

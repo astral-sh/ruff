@@ -66,7 +66,6 @@ mod pylint;
 mod python;
 mod pyupgrade;
 pub mod registry;
-pub mod registry_gen;
 pub mod resolver;
 mod ruff;
 mod rustpython_helpers;

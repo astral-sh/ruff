@@ -12,8 +12,7 @@ use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::fs;
-use crate::registry::CheckCode;
-use crate::registry_gen::CheckCodePrefix;
+use crate::registry::{CheckCode, CheckCodePrefix};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,

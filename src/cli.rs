@@ -6,8 +6,7 @@ use rustc_hash::FxHashMap;
 
 use crate::fs;
 use crate::logging::LogLevel;
-use crate::registry::CheckCode;
-use crate::registry_gen::CheckCodePrefix;
+use crate::registry::{CheckCode, CheckCodePrefix};
 use crate::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
