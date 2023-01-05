@@ -2951,8 +2951,9 @@ impl CheckKind {
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
-            CheckKind::MultipleWithStatements => "Use a single `with` statement with multiple contexts instead of nested `with` \
-                 statements".to_string(),
+            CheckKind::MultipleWithStatements => "Use a single `with` statement with multiple \
+                                                  contexts instead of nested `with` statements"
+                .to_string(),
             CheckKind::NestedIfStatements => {
                 "Use a single `if` statement instead of nested `if` statements".to_string()
             }
