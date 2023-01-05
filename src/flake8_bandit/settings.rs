@@ -29,7 +29,7 @@ pub struct Options {
     #[option(
         default = "[]",
         value_type = "Vec<String>",
-        example = "extend_hardcoded_tmp_directory = [\"/foo/bar\"]"
+        example = "hardcoded_tmp_directory_extend = [\"/foo/bar\"]"
     )]
     /// List of directories that are considered temporary.
     /// These directories are added to the list in

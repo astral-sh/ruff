@@ -2395,7 +2395,7 @@ These directories are added to the list in
 
 ```toml
 [tool.ruff.flake8-bandit]
-extend_hardcoded_tmp_directory = ["/foo/bar"]
+hardcoded_tmp_directory_extend = ["/foo/bar"]
 ```
 
 ---
