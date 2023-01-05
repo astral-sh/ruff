@@ -1,0 +1,39 @@
+---
+source: src/flake8_simplify/mod.rs
+expression: checks
+---
+- kind:
+    ConvertLoopToAll: return all(not check(x) for x in iterable)
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 18
+    column: 24
+  fix:
+    content: return all(not check(x) for x in iterable)
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 19
+      column: 15
+  parent: ~
+- kind:
+    ConvertLoopToAll: return all(x.is_empty() for x in iterable)
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 25
+    column: 24
+  fix:
+    content: return all(x.is_empty() for x in iterable)
+    location:
+      row: 23
+      column: 4
+    end_location:
+      row: 26
+      column: 15
+  parent: ~
+

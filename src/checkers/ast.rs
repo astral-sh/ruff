@@ -3061,6 +3061,19 @@ where
         if self.settings.enabled.contains(&CheckCode::PIE790) {
             flake8_pie::plugins::no_unnecessary_pass(self, body);
         }
+
+        if self.settings.enabled.contains(&CheckCode::SIM110)
+            || self.settings.enabled.contains(&CheckCode::SIM111)
+        {
+            for (stmt, sibling) in body.iter().tuple_windows() {
+                if matches!(stmt.node, StmtKind::For { .. })
+                    && matches!(sibling.node, StmtKind::Return { .. })
+                {
+                    flake8_simplify::plugins::convert_loop_to_any_all(self, stmt, sibling);
+                }
+            }
+        }
+
         visitor::walk_body(self, body);
     }
 }

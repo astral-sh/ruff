@@ -217,10 +217,12 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
-    SIM117,
     SIM102,
     SIM105,
     SIM107,
+    SIM110,
+    SIM111,
+    SIM117,
     SIM118,
     SIM220,
     SIM221,
@@ -954,15 +956,17 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
-    MultipleWithStatements,
-    NestedIfStatements,
-    UseContextlibSuppress(String),
-    ReturnInTryExceptFinally,
     AAndNotA(String),
     AOrNotA(String),
-    KeyInDict(String, String),
     AndFalse,
+    ConvertLoopToAll(String),
+    ConvertLoopToAny(String),
+    KeyInDict(String, String),
+    MultipleWithStatements,
+    NestedIfStatements,
     OrTrue,
+    ReturnInTryExceptFinally,
+    UseContextlibSuppress(String),
     YodaConditions(String, String),
     // pyupgrade
     ConvertNamedTupleFunctionalToClass(String),
@@ -1394,6 +1398,12 @@ impl CheckCode {
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
+            CheckCode::SIM110 => {
+                CheckKind::ConvertLoopToAny("return any(x for x in y)".to_string())
+            }
+            CheckCode::SIM111 => {
+                CheckKind::ConvertLoopToAll("return all(x for x in y)".to_string())
+            }
             CheckCode::SIM117 => CheckKind::MultipleWithStatements,
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
@@ -1930,6 +1940,8 @@ impl CheckCode {
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM107 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM110 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM111 => CheckCategory::Flake8Simplify,
             CheckCode::SIM117 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::SIM220 => CheckCategory::Flake8Simplify,
@@ -2183,15 +2195,17 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
-            CheckKind::NestedIfStatements => &CheckCode::SIM102,
-            CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
-            CheckKind::ReturnInTryExceptFinally => &CheckCode::SIM107,
-            CheckKind::MultipleWithStatements => &CheckCode::SIM117,
-            CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::AAndNotA(..) => &CheckCode::SIM220,
             CheckKind::AOrNotA(..) => &CheckCode::SIM221,
-            CheckKind::OrTrue => &CheckCode::SIM222,
             CheckKind::AndFalse => &CheckCode::SIM223,
+            CheckKind::ConvertLoopToAll(..) => &CheckCode::SIM111,
+            CheckKind::ConvertLoopToAny(..) => &CheckCode::SIM110,
+            CheckKind::KeyInDict(..) => &CheckCode::SIM118,
+            CheckKind::MultipleWithStatements => &CheckCode::SIM117,
+            CheckKind::NestedIfStatements => &CheckCode::SIM102,
+            CheckKind::OrTrue => &CheckCode::SIM222,
+            CheckKind::ReturnInTryExceptFinally => &CheckCode::SIM107,
+            CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
             CheckKind::ConvertNamedTupleFunctionalToClass(..) => &CheckCode::UP014,
@@ -2956,6 +2970,12 @@ impl CheckKind {
             CheckKind::AAndNotA(name) => format!("Use `False` instead of `{name} and not {name}`"),
             CheckKind::AOrNotA(name) => format!("Use `True` instead of `{name} or not {name}`"),
             CheckKind::AndFalse => "Use `False` instead of `... and False`".to_string(),
+            CheckKind::ConvertLoopToAll(all) => {
+                format!("Use `{all}` instead of `for` loop")
+            }
+            CheckKind::ConvertLoopToAny(any) => {
+                format!("Use `{any}` instead of `for` loop")
+            }
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
             }
@@ -3585,6 +3605,8 @@ impl CheckKind {
                 | CheckKind::BlankLineBeforeSection(..)
                 | CheckKind::CapitalizeSectionName(..)
                 | CheckKind::CommentedOutCode
+                | CheckKind::ConvertLoopToAll(..)
+                | CheckKind::ConvertLoopToAny(..)
                 | CheckKind::ConvertNamedTupleFunctionalToClass(..)
                 | CheckKind::ConvertTypedDictFunctionalToClass(..)
                 | CheckKind::DashedUnderlineAfterSection(..)
@@ -3712,6 +3734,8 @@ impl CheckKind {
             }
             CheckKind::CapitalizeSectionName(name) => Some(format!("Capitalize \"{name}\"")),
             CheckKind::CommentedOutCode => Some("Remove commented-out code".to_string()),
+            CheckKind::ConvertLoopToAll(all) => Some(format!("Replace with `{all}`")),
+            CheckKind::ConvertLoopToAny(any) => Some(format!("Replace with `{any}`")),
             CheckKind::ConvertTypedDictFunctionalToClass(name)
             | CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 Some(format!("Convert `{name}` to class syntax"))
