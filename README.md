@@ -964,6 +964,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| SIM102 | NestedIfStatements | Use a single if-statement instead of nested if-statements |  |
 | SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
