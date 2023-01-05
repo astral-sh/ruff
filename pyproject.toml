@@ -31,7 +31,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Software Development :: Quality Assurance",
 ]
-urls = { repository = "https://github.com/charliermarsh/ruff-lsp" }
+urls = { repository = "https://github.com/charliermarsh/ruff" }
 
 [tool.maturin]
 bindings = "bin"
