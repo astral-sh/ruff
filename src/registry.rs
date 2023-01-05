@@ -220,6 +220,7 @@ pub enum CheckCode {
     SIM117,
     SIM102,
     SIM105,
+    SIM107,
     SIM118,
     SIM220,
     SIM221,
@@ -882,7 +883,6 @@ pub enum CheckKind {
     UnaryPrefixIncrement,
     UnreliableCallableCheck,
     UnusedLoopControlVariable(String),
-    UseContextlibSuppress(String),
     UselessComparison,
     UselessContextlibSuppress,
     UselessExpression,
@@ -956,6 +956,8 @@ pub enum CheckKind {
     // flake8-simplify
     MultipleWithStatements,
     NestedIfStatements,
+    UseContextlibSuppress(String),
+    ReturnInTryExceptFinally,
     AAndNotA(String),
     AOrNotA(String),
     KeyInDict(String, String),
@@ -1391,6 +1393,7 @@ impl CheckCode {
             // flake8-simplify
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
+            CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
             CheckCode::SIM117 => CheckKind::MultipleWithStatements,
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
@@ -1926,6 +1929,7 @@ impl CheckCode {
             // flake8-simplify
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM107 => CheckCategory::Flake8Simplify,
             CheckCode::SIM117 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::SIM220 => CheckCategory::Flake8Simplify,
@@ -2179,14 +2183,15 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
+            CheckKind::NestedIfStatements => &CheckCode::SIM102,
+            CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
+            CheckKind::ReturnInTryExceptFinally => &CheckCode::SIM107,
+            CheckKind::MultipleWithStatements => &CheckCode::SIM117,
+            CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::AAndNotA(..) => &CheckCode::SIM220,
             CheckKind::AOrNotA(..) => &CheckCode::SIM221,
-            CheckKind::AndFalse => &CheckCode::SIM223,
-            CheckKind::KeyInDict(..) => &CheckCode::SIM118,
-            CheckKind::MultipleWithStatements => &CheckCode::SIM117,
-            CheckKind::NestedIfStatements => &CheckCode::SIM102,
             CheckKind::OrTrue => &CheckCode::SIM222,
-            CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
+            CheckKind::AndFalse => &CheckCode::SIM223,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
             CheckKind::ConvertNamedTupleFunctionalToClass(..) => &CheckCode::UP014,
@@ -2698,9 +2703,6 @@ impl CheckKind {
             CheckKind::FStringDocstring => "f-string used as docstring. This will be interpreted \
                                             by python as a joined string rather than a docstring."
                 .to_string(),
-            CheckKind::UseContextlibSuppress(exception) => {
-                format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
-            }
             CheckKind::UselessContextlibSuppress => {
                 "No arguments passed to `contextlib.suppress`. No exceptions will be suppressed \
                  and therefore this context manager is redundant"
@@ -2945,6 +2947,12 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::UseContextlibSuppress(exception) => {
+                format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
+            }
+            CheckKind::ReturnInTryExceptFinally => {
+                "Don't use return in try/except and finally".to_string()
+            }
             CheckKind::AAndNotA(name) => format!("Use `False` instead of `{name} and not {name}`"),
             CheckKind::AOrNotA(name) => format!("Use `True` instead of `{name} or not {name}`"),
             CheckKind::AndFalse => "Use `False` instead of `... and False`".to_string(),

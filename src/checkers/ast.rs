@@ -1259,6 +1259,7 @@ where
                 }
             }
             StmtKind::Try {
+                body,
                 handlers,
                 orelse,
                 finalbody,
@@ -1291,6 +1292,11 @@ where
                 if self.settings.enabled.contains(&CheckCode::SIM105) {
                     flake8_simplify::plugins::use_contextlib_suppress(
                         self, stmt, handlers, orelse, finalbody,
+                    );
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM107) {
+                    flake8_simplify::plugins::return_in_try_except_finally(
+                        self, body, handlers, finalbody,
                     );
                 }
             }
