@@ -606,21 +606,19 @@ pub fn format_imports(
 
         for import in it {
             match import {
-                AnyImport::Import(x) => {
-                    let (alias, comments) = &x;
+                AnyImport::Import((alias, comments)) => {
                     output.append(&format::format_import(
-                        alias,
-                        comments,
+                        &alias,
+                        &comments,
                         is_first_statement,
                         stylist,
                     ));
                 }
-                AnyImport::ImportFrom(x) => {
-                    let (import_from, comments, trailing_comma, aliases) = &x;
+                AnyImport::ImportFrom((import_from, comments, trailing_comma, aliases)) => {
                     output.append(&format::format_import_from(
-                        import_from,
-                        comments,
-                        aliases,
+                        &import_from,
+                        &comments,
+                        &aliases,
                         line_length,
                         stylist,
                         force_wrap_aliases,
