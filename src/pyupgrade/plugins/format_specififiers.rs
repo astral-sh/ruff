@@ -18,7 +18,7 @@ static FORMAT_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<int>\d+)?(?P<fmt>.*?)\}").unwrap());
 
 /// Convert a python integer to a unsigned 32 but integer. We are assuming this
-/// will never overflow because people will probbably never have more than 2^32
+/// will never overflow because people will probably never have more than 2^32
 /// arguments to a format string. I am also ignoring the signed, I personally
 /// checked and negative numbers are not allowed in format strings
 fn convert_big_int(bigint: BigInt) -> Option<u32> {
@@ -140,15 +140,15 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
                 if attr == "format" && has_specifiers(provided_string) {
                     let as_ints = get_specifier_order(provided_string);
                     let call_range = Range::from_located(expr);
-                    println!("Checkpoit 1");
+                    println!("Checkpoint 1");
                     let call_text = checker.locator.slice_source_code_range(&call_range);
                     println!("Call text: {}", call_text);
-                    println!("Checkpoit 2");
+                    println!("Checkpoint 2");
                     let new_call = match get_new_call(&call_text, as_ints) {
                         None => return,
                         Some(item) => item,
                     };
-                    println!("Checkpoit 3");
+                    println!("Checkpoint 3");
                     let mut check =
                         Check::new(CheckKind::FormatSpecifiers, Range::from_located(expr));
                     if checker.patch(check.kind.code()) {
