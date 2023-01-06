@@ -1965,6 +1965,17 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::S113) {
+                    if let Some(check) = flake8_bandit::checks::request_without_timeout(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&CheckCode::C400) {

@@ -336,6 +336,7 @@ pub enum CheckCode {
     S106,
     S107,
     S108,
+    S113,
     S324,
     S506,
     // flake8-boolean-trap
@@ -1080,6 +1081,7 @@ pub enum CheckKind {
     HardcodedPasswordDefault(String),
     HardcodedTempFile(String),
     HashlibInsecureHashFunction(String),
+    RequestWithoutTimeout(Option<String>),
     UnsafeYAMLLoad(Option<String>),
     // mccabe
     FunctionIsTooComplex(String, usize),
@@ -1545,6 +1547,7 @@ impl CheckCode {
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
+            CheckCode::S113 => CheckKind::RequestWithoutTimeout(None),
             CheckCode::S324 => CheckKind::HashlibInsecureHashFunction("...".to_string()),
             CheckCode::S506 => CheckKind::UnsafeYAMLLoad(None),
             // mccabe
@@ -1949,6 +1952,7 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::S108 => CheckCategory::Flake8Bandit,
+            CheckCode::S113 => CheckCategory::Flake8Bandit,
             CheckCode::S324 => CheckCategory::Flake8Bandit,
             CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
@@ -2330,6 +2334,7 @@ impl CheckKind {
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
+            CheckKind::RequestWithoutTimeout(..) => &CheckCode::S113,
             CheckKind::HashlibInsecureHashFunction(..) => &CheckCode::S324,
             CheckKind::UnsafeYAMLLoad(..) => &CheckCode::S506,
             // mccabe
@@ -3312,6 +3317,12 @@ impl CheckKind {
                 None => "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary \
                          objects. Consider `yaml.safe_load`."
                     .to_string(),
+            },
+            CheckKind::RequestWithoutTimeout(timeout) => match timeout {
+                Some(value) => {
+                    format!("Probable use of requests call with timeout set to `{value}`")
+                }
+                None => "Probable use of requests call without timeout".to_string(),
             },
             // flake8-blind-except
             CheckKind::BlindExcept(name) => format!("Do not catch blind exception: `{name}`"),
