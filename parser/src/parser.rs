@@ -96,7 +96,7 @@ pub fn parse_located(
     let marker_token = (Default::default(), mode.to_marker(), Default::default());
     let tokenizer = iter::once(Ok(marker_token))
         .chain(lxr)
-        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment));
+        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. }));
 
     python::TopParser::new()
         .parse(tokenizer)
@@ -112,7 +112,7 @@ pub fn parse_tokens(
     let marker_token = (Default::default(), mode.to_marker(), Default::default());
     let tokenizer = iter::once(Ok(marker_token))
         .chain(lxr)
-        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment));
+        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment(_)));
 
     python::TopParser::new()
         .parse(tokenizer)

@@ -444,16 +444,17 @@ where
     /// Skip everything until end of line
     fn lex_comment(&mut self) -> LexResult {
         let start_pos = self.get_pos();
-        self.next_char();
+        let mut value = String::new();
+        value.push(self.next_char().unwrap());
         loop {
             match self.window[0] {
                 Some('\n') | None => {
                     let end_pos = self.get_pos();
-                    return Ok((start_pos, Tok::Comment, end_pos));
+                    return Ok((start_pos, Tok::Comment(value), end_pos));
                 }
                 Some(_) => {}
             }
-            self.next_char();
+            value.push(self.next_char().unwrap());
         }
     }
 
@@ -1266,7 +1267,7 @@ mod tests {
             fn $name() {
                 let source = format!(r"99232  # {}", $eol);
                 let tokens = lex_source(&source);
-                assert_eq!(tokens, vec![Tok::Int { value: BigInt::from(99232) }, Tok::Comment, Tok::Newline]);
+                assert_eq!(tokens, vec![Tok::Int { value: BigInt::from(99232) }, Tok::Comment(format!("# {}", $eol)), Tok::Newline]);
             }
             )*
         }
@@ -1290,7 +1291,7 @@ mod tests {
                     tokens,
                     vec![
                         Tok::Int { value: BigInt::from(123) },
-                        Tok::Comment,
+                        Tok::Comment("# Foo".to_string()),
                         Tok::Newline,
                         Tok::Int { value: BigInt::from(456) },
                         Tok::Newline,
