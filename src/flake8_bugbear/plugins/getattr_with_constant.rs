@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location};
 
 use crate::ast::types::Range;
@@ -53,16 +52,11 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
             checker.style.line_ending(),
         );
         generator.unparse_expr(&attribute(obj, value), 0);
-        match generator.generate() {
-            Ok(content) => {
-                check.amend(Fix::replacement(
-                    content,
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
-            }
-            Err(e) => error!("Failed to rewrite `getattr`: {e}"),
-        }
+        check.amend(Fix::replacement(
+            generator.generate(),
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
     }
     checker.add_check(check);
 }

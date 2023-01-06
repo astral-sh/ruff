@@ -198,7 +198,7 @@ fn convert_to_class(
     total_keyword: Option<KeywordData>,
     base_class: &ExprKind,
     stylist: &SourceCodeStyleDetector,
-) -> Result<Fix> {
+) -> Fix {
     let mut generator = SourceCodeGenerator::new(
         stylist.indentation(),
         stylist.quote(),
@@ -210,12 +210,11 @@ fn convert_to_class(
         total_keyword,
         base_class,
     ));
-    let content = generator.generate()?;
-    Ok(Fix::replacement(
-        content,
+    Fix::replacement(
+        generator.generate(),
         stmt.location,
         stmt.end_location.unwrap(),
-    ))
+    )
 }
 
 /// UP013
@@ -242,19 +241,14 @@ pub fn convert_typed_dict_functional_to_class(
         Range::from_located(stmt),
     );
     if checker.patch(check.kind.code()) {
-        match convert_to_class(
+        check.amend(convert_to_class(
             stmt,
             class_name,
             body,
             total_keyword,
             base_class,
             checker.style,
-        ) {
-            Ok(fix) => {
-                check.amend(fix);
-            }
-            Err(err) => error!("Failed to convert TypedDict: {err}"),
-        };
+        ));
     }
     checker.add_check(check);
 }

@@ -182,64 +182,34 @@ impl Settings {
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
-                .map(std::convert::Into::into)
+                .map(Into::into)
                 .unwrap_or_default(),
-            flake8_bandit: config
-                .flake8_bandit
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
-            flake8_bugbear: config
-                .flake8_bugbear
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
-            flake8_errmsg: config
-                .flake8_errmsg
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
+            flake8_bandit: config.flake8_bandit.map(Into::into).unwrap_or_default(),
+            flake8_bugbear: config.flake8_bugbear.map(Into::into).unwrap_or_default(),
+            flake8_errmsg: config.flake8_errmsg.map(Into::into).unwrap_or_default(),
             flake8_import_conventions: config
                 .flake8_import_conventions
-                .map(std::convert::Into::into)
+                .map(Into::into)
                 .unwrap_or_default(),
             flake8_pytest_style: config
                 .flake8_pytest_style
-                .map(std::convert::Into::into)
+                .map(Into::into)
                 .unwrap_or_default(),
-            flake8_quotes: config
-                .flake8_quotes
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
+            flake8_quotes: config.flake8_quotes.map(Into::into).unwrap_or_default(),
             flake8_tidy_imports: config
                 .flake8_tidy_imports
-                .map(std::convert::Into::into)
+                .map(Into::into)
                 .unwrap_or_default(),
             flake8_unused_arguments: config
                 .flake8_unused_arguments
-                .map(std::convert::Into::into)
+                .map(Into::into)
                 .unwrap_or_default(),
-            isort: config
-                .isort
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
-            mccabe: config
-                .mccabe
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
-            pep8_naming: config
-                .pep8_naming
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
-            pycodestyle: config
-                .pycodestyle
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
-            pydocstyle: config
-                .pydocstyle
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
-            pyupgrade: config
-                .pyupgrade
-                .map(std::convert::Into::into)
-                .unwrap_or_default(),
+            isort: config.isort.map(Into::into).unwrap_or_default(),
+            mccabe: config.mccabe.map(Into::into).unwrap_or_default(),
+            pep8_naming: config.pep8_naming.map(Into::into).unwrap_or_default(),
+            pycodestyle: config.pycodestyle.map(Into::into).unwrap_or_default(),
+            pydocstyle: config.pydocstyle.map(Into::into).unwrap_or_default(),
+            pyupgrade: config.pyupgrade.map(Into::into).unwrap_or_default(),
         })
     }
 
@@ -393,7 +363,7 @@ pub fn resolve_globset(patterns: Vec<FilePattern>) -> Result<GlobSet> {
     for pattern in patterns {
         pattern.add_to(&mut builder)?;
     }
-    builder.build().map_err(std::convert::Into::into)
+    builder.build().map_err(Into::into)
 }
 
 /// Given a list of patterns, create a `GlobSet`.
