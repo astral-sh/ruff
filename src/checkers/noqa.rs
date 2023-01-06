@@ -42,7 +42,7 @@ pub fn check_noqa(
 
     // Remove any ignored checks.
     for (index, check) in checks.iter().enumerate() {
-        if check.kind == violations::BlanketNOQA {
+        if matches!(check.kind, CheckKind::BlanketNOQA(..)) {
             continue;
         }
 

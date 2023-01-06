@@ -59,7 +59,7 @@ where
                     && !is_nan_or_infinity(func, args)
                 {
                     self.checks.push((
-                        violations::FunctionCallArgumentDefault(compose_call_path(expr)),
+                        violations::FunctionCallArgumentDefault(compose_call_path(expr)).into(),
                         Range::from_located(expr),
                     ));
                 }
