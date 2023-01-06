@@ -1005,7 +1005,7 @@ pub enum CheckKind {
     // pydocstyle
     BlankLineAfterLastSection(String),
     BlankLineAfterSection(String),
-    BlankLineAfterSummary,
+    BlankLineAfterSummary(usize),
     BlankLineBeforeSection(String),
     CapitalizeSectionName(String),
     DashedUnderlineAfterSection(String),
@@ -1465,7 +1465,7 @@ impl CheckCode {
             CheckCode::D202 => CheckKind::NoBlankLineAfterFunction(1),
             CheckCode::D203 => CheckKind::OneBlankLineBeforeClass(0),
             CheckCode::D204 => CheckKind::OneBlankLineAfterClass(0),
-            CheckCode::D205 => CheckKind::BlankLineAfterSummary,
+            CheckCode::D205 => CheckKind::BlankLineAfterSummary(2),
             CheckCode::D206 => CheckKind::IndentWithSpaces,
             CheckCode::D207 => CheckKind::NoUnderIndentation,
             CheckCode::D208 => CheckKind::NoOverIndentation,
@@ -2268,7 +2268,7 @@ impl CheckKind {
             CheckKind::NewLineAfterLastParagraph => &CheckCode::D209,
             CheckKind::NewLineAfterSectionName(..) => &CheckCode::D406,
             CheckKind::NoBlankLineAfterFunction(..) => &CheckCode::D202,
-            CheckKind::BlankLineAfterSummary => &CheckCode::D205,
+            CheckKind::BlankLineAfterSummary(..) => &CheckCode::D205,
             CheckKind::NoBlankLineBeforeClass(..) => &CheckCode::D211,
             CheckKind::NoBlankLineBeforeFunction(..) => &CheckCode::D201,
             CheckKind::NoBlankLinesBetweenHeaderAndContent(..) => &CheckCode::D412,
@@ -3093,8 +3093,15 @@ impl CheckKind {
             }
             // pydocstyle
             CheckKind::FitsOnOneLine => "One-line docstring should fit on one line".to_string(),
-            CheckKind::BlankLineAfterSummary => {
-                "1 blank line required between summary line and description".to_string()
+            CheckKind::BlankLineAfterSummary(num_lines) => {
+                if *num_lines == 0 {
+                    "1 blank line required between summary line and description".to_string()
+                } else {
+                    format!(
+                        "1 blank line required between summary line and description (found \
+                         {num_lines})"
+                    )
+                }
             }
             CheckKind::NewLineAfterLastParagraph => {
                 "Multi-line docstring closing quotes should be on a separate line".to_string()
@@ -3624,125 +3631,128 @@ impl CheckKind {
 
     /// Whether the check kind is (potentially) fixable.
     pub fn fixable(&self) -> bool {
-        matches!(
-            self,
+        match self {
+            // Always-fixable checks.
             CheckKind::AAndNotA(..)
-                | CheckKind::AOrNotA(..)
-                | CheckKind::AmbiguousUnicodeCharacterComment(..)
-                | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
-                | CheckKind::AmbiguousUnicodeCharacterString(..)
-                | CheckKind::AndFalse
-                | CheckKind::BlankLineAfterLastSection(..)
-                | CheckKind::BlankLineAfterSection(..)
-                | CheckKind::BlankLineAfterSummary
-                | CheckKind::BlankLineBeforeSection(..)
-                | CheckKind::CapitalizeSectionName(..)
-                | CheckKind::CommentedOutCode
-                | CheckKind::ConvertLoopToAll(..)
-                | CheckKind::ConvertLoopToAny(..)
-                | CheckKind::ConvertNamedTupleFunctionalToClass(..)
-                | CheckKind::ConvertTypedDictFunctionalToClass(..)
-                | CheckKind::DashedUnderlineAfterSection(..)
-                | CheckKind::DatetimeTimezoneUTC
-                | CheckKind::DeprecatedUnittestAlias(..)
-                | CheckKind::DoNotAssertFalse
-                | CheckKind::DoNotAssignLambda(..)
-                | CheckKind::DupeClassFieldDefinitions(..)
-                | CheckKind::DuplicateHandlerException(..)
-                | CheckKind::DuplicateIsinstanceCall(..)
-                | CheckKind::EndsInPeriod
-                | CheckKind::EndsInPunctuation
-                | CheckKind::FStringMissingPlaceholders
-                | CheckKind::GetAttrWithConstant
-                | CheckKind::ImplicitReturn
-                | CheckKind::ImplicitReturnValue
-                | CheckKind::IncorrectFixtureParenthesesStyle(..)
-                | CheckKind::IncorrectMarkParenthesesStyle(..)
-                | CheckKind::InvalidEscapeSequence(..)
-                | CheckKind::IsLiteral(..)
-                | CheckKind::KeyInDict(..)
-                | CheckKind::MisplacedComparisonConstant(..)
-                | CheckKind::MissingReturnTypeSpecialMethod(..)
-                | CheckKind::NativeLiterals(..)
-                | CheckKind::NewLineAfterLastParagraph
-                | CheckKind::NewLineAfterSectionName(..)
-                | CheckKind::NoBlankLineAfterFunction(..)
-                | CheckKind::NoBlankLineBeforeClass(..)
-                | CheckKind::NoBlankLineBeforeFunction(..)
-                | CheckKind::NoBlankLinesBetweenHeaderAndContent(..)
-                | CheckKind::NoNewLineAtEndOfFile
-                | CheckKind::NoOverIndentation
-                | CheckKind::NoSurroundingWhitespace
-                | CheckKind::NoUnderIndentation
-                | CheckKind::NoUnnecessaryPass
-                | CheckKind::NoneComparison(..)
-                | CheckKind::NotInTest
-                | CheckKind::NotIsTest
-                | CheckKind::OSErrorAlias(..)
-                | CheckKind::OneBlankLineAfterClass(..)
-                | CheckKind::OneBlankLineBeforeClass(..)
-                | CheckKind::OpenAlias
-                | CheckKind::OrTrue
-                | CheckKind::PEP3120UnnecessaryCodingComment
-                | CheckKind::PPrintFound
-                | CheckKind::ParametrizeNamesWrongType(..)
-                | CheckKind::PercentFormatExtraNamedArguments(..)
-                | CheckKind::PreferListBuiltin
-                | CheckKind::PrintFound
-                | CheckKind::RaiseNotImplemented
-                | CheckKind::RedundantOpenModes(..)
-                | CheckKind::RedundantTupleInExceptionHandler(..)
-                | CheckKind::RemoveSixCompat
-                | CheckKind::ReplaceStdoutStderr
-                | CheckKind::ReplaceUniversalNewlines
-                | CheckKind::RewriteCElementTree
-                | CheckKind::RewriteListComprehension
-                | CheckKind::RewriteMockImport(..)
-                | CheckKind::RewriteUnicodeLiteral
-                | CheckKind::RewriteYieldFrom
-                | CheckKind::SectionNameEndsInColon(..)
-                | CheckKind::SectionNotOverIndented(..)
-                | CheckKind::SectionUnderlineAfterName(..)
-                | CheckKind::SectionUnderlineMatchesSectionLength(..)
-                | CheckKind::SectionUnderlineNotOverIndented(..)
-                | CheckKind::SetAttrWithConstant
-                | CheckKind::StringDotFormatExtraNamedArguments(..)
-                | CheckKind::SuperCallWithParameters
-                | CheckKind::TrueFalseComparison(..)
-                | CheckKind::TypeOfPrimitive(..)
-                | CheckKind::TypingTextStrAlias
-                | CheckKind::UnnecessaryBuiltinImport(..)
-                | CheckKind::UnnecessaryCallAroundSorted(..)
-                | CheckKind::UnnecessaryCollectionCall(..)
-                | CheckKind::UnnecessaryComprehension(..)
-                | CheckKind::UnnecessaryEncodeUTF8
-                | CheckKind::UnnecessaryFutureImport(..)
-                | CheckKind::UnnecessaryGeneratorDict
-                | CheckKind::UnnecessaryGeneratorList
-                | CheckKind::UnnecessaryGeneratorSet
-                | CheckKind::UnnecessaryLRUCacheParams
-                | CheckKind::UnnecessaryListCall
-                | CheckKind::UnnecessaryListComprehensionDict
-                | CheckKind::UnnecessaryListComprehensionSet
-                | CheckKind::UnnecessaryLiteralDict(..)
-                | CheckKind::UnnecessaryLiteralSet(..)
-                | CheckKind::UnnecessaryLiteralWithinListCall(..)
-                | CheckKind::UnnecessaryLiteralWithinTupleCall(..)
-                | CheckKind::UnnecessaryReturnNone
-                | CheckKind::UnsortedImports
-                | CheckKind::UnusedImport(_, false, _)
-                | CheckKind::UnusedLoopControlVariable(..)
-                | CheckKind::UnusedNOQA(..)
-                | CheckKind::UseFixturesWithoutParameters
-                | CheckKind::UsePEP585Annotation(..)
-                | CheckKind::UsePEP604Annotation
-                | CheckKind::UseSysExit(..)
-                | CheckKind::UselessImportAlias
-                | CheckKind::UselessMetaclassType
-                | CheckKind::UselessObjectInheritance(..)
-                | CheckKind::UselessYieldFixture(..)
-                | CheckKind::YodaConditions(..)
-        )
+            | CheckKind::AOrNotA(..)
+            | CheckKind::AmbiguousUnicodeCharacterComment(..)
+            | CheckKind::AmbiguousUnicodeCharacterDocstring(..)
+            | CheckKind::AmbiguousUnicodeCharacterString(..)
+            | CheckKind::AndFalse
+            | CheckKind::BlankLineAfterLastSection(..)
+            | CheckKind::BlankLineAfterSection(..)
+            | CheckKind::BlankLineBeforeSection(..)
+            | CheckKind::CapitalizeSectionName(..)
+            | CheckKind::CommentedOutCode
+            | CheckKind::ConvertLoopToAll(..)
+            | CheckKind::ConvertLoopToAny(..)
+            | CheckKind::ConvertNamedTupleFunctionalToClass(..)
+            | CheckKind::ConvertTypedDictFunctionalToClass(..)
+            | CheckKind::DashedUnderlineAfterSection(..)
+            | CheckKind::DatetimeTimezoneUTC
+            | CheckKind::DeprecatedUnittestAlias(..)
+            | CheckKind::DoNotAssertFalse
+            | CheckKind::DoNotAssignLambda(..)
+            | CheckKind::DupeClassFieldDefinitions(..)
+            | CheckKind::DuplicateHandlerException(..)
+            | CheckKind::DuplicateIsinstanceCall(..)
+            | CheckKind::EndsInPeriod
+            | CheckKind::EndsInPunctuation
+            | CheckKind::FStringMissingPlaceholders
+            | CheckKind::GetAttrWithConstant
+            | CheckKind::ImplicitReturn
+            | CheckKind::ImplicitReturnValue
+            | CheckKind::IncorrectFixtureParenthesesStyle(..)
+            | CheckKind::IncorrectMarkParenthesesStyle(..)
+            | CheckKind::InvalidEscapeSequence(..)
+            | CheckKind::IsLiteral(..)
+            | CheckKind::KeyInDict(..)
+            | CheckKind::MisplacedComparisonConstant(..)
+            | CheckKind::MissingReturnTypeSpecialMethod(..)
+            | CheckKind::NativeLiterals(..)
+            | CheckKind::NewLineAfterLastParagraph
+            | CheckKind::NewLineAfterSectionName(..)
+            | CheckKind::NoBlankLineAfterFunction(..)
+            | CheckKind::NoBlankLineBeforeClass(..)
+            | CheckKind::NoBlankLineBeforeFunction(..)
+            | CheckKind::NoBlankLinesBetweenHeaderAndContent(..)
+            | CheckKind::NoNewLineAtEndOfFile
+            | CheckKind::NoOverIndentation
+            | CheckKind::NoSurroundingWhitespace
+            | CheckKind::NoUnderIndentation
+            | CheckKind::NoUnnecessaryPass
+            | CheckKind::NoneComparison(..)
+            | CheckKind::NotInTest
+            | CheckKind::NotIsTest
+            | CheckKind::OSErrorAlias(..)
+            | CheckKind::OneBlankLineAfterClass(..)
+            | CheckKind::OneBlankLineBeforeClass(..)
+            | CheckKind::OpenAlias
+            | CheckKind::OrTrue
+            | CheckKind::PEP3120UnnecessaryCodingComment
+            | CheckKind::PPrintFound
+            | CheckKind::ParametrizeNamesWrongType(..)
+            | CheckKind::PercentFormatExtraNamedArguments(..)
+            | CheckKind::PreferListBuiltin
+            | CheckKind::PrintFound
+            | CheckKind::RaiseNotImplemented
+            | CheckKind::RedundantOpenModes(..)
+            | CheckKind::RedundantTupleInExceptionHandler(..)
+            | CheckKind::RemoveSixCompat
+            | CheckKind::ReplaceStdoutStderr
+            | CheckKind::ReplaceUniversalNewlines
+            | CheckKind::RewriteCElementTree
+            | CheckKind::RewriteListComprehension
+            | CheckKind::RewriteMockImport(..)
+            | CheckKind::RewriteUnicodeLiteral
+            | CheckKind::RewriteYieldFrom
+            | CheckKind::SectionNameEndsInColon(..)
+            | CheckKind::SectionNotOverIndented(..)
+            | CheckKind::SectionUnderlineAfterName(..)
+            | CheckKind::SectionUnderlineMatchesSectionLength(..)
+            | CheckKind::SectionUnderlineNotOverIndented(..)
+            | CheckKind::SetAttrWithConstant
+            | CheckKind::StringDotFormatExtraNamedArguments(..)
+            | CheckKind::SuperCallWithParameters
+            | CheckKind::TrueFalseComparison(..)
+            | CheckKind::TypeOfPrimitive(..)
+            | CheckKind::TypingTextStrAlias
+            | CheckKind::UnnecessaryBuiltinImport(..)
+            | CheckKind::UnnecessaryCallAroundSorted(..)
+            | CheckKind::UnnecessaryCollectionCall(..)
+            | CheckKind::UnnecessaryComprehension(..)
+            | CheckKind::UnnecessaryEncodeUTF8
+            | CheckKind::UnnecessaryFutureImport(..)
+            | CheckKind::UnnecessaryGeneratorDict
+            | CheckKind::UnnecessaryGeneratorList
+            | CheckKind::UnnecessaryGeneratorSet
+            | CheckKind::UnnecessaryLRUCacheParams
+            | CheckKind::UnnecessaryListCall
+            | CheckKind::UnnecessaryListComprehensionDict
+            | CheckKind::UnnecessaryListComprehensionSet
+            | CheckKind::UnnecessaryLiteralDict(..)
+            | CheckKind::UnnecessaryLiteralSet(..)
+            | CheckKind::UnnecessaryLiteralWithinListCall(..)
+            | CheckKind::UnnecessaryLiteralWithinTupleCall(..)
+            | CheckKind::UnnecessaryReturnNone
+            | CheckKind::UnsortedImports
+            | CheckKind::UnusedLoopControlVariable(..)
+            | CheckKind::UnusedNOQA(..)
+            | CheckKind::UseFixturesWithoutParameters
+            | CheckKind::UsePEP585Annotation(..)
+            | CheckKind::UsePEP604Annotation
+            | CheckKind::UseSysExit(..)
+            | CheckKind::UselessImportAlias
+            | CheckKind::UselessMetaclassType
+            | CheckKind::UselessObjectInheritance(..)
+            | CheckKind::UselessYieldFixture(..)
+            | CheckKind::YodaConditions(..) => true,
+            // Conditionally-fixable checks.
+            CheckKind::UnusedImport(_, false, _) => true,
+            CheckKind::BlankLineAfterSummary(num_lines) if *num_lines > 0 => true,
+            // Non-fixable checks.
+            _ => false,
+        }
     }
 
     /// The message used to describe the fix action for a given `CheckKind`.
@@ -3762,7 +3772,7 @@ impl CheckKind {
             CheckKind::BlankLineAfterSection(name) => {
                 Some(format!("Add blank line after \"{name}\""))
             }
-            CheckKind::BlankLineAfterSummary => Some("Insert single blank line".to_string()),
+            CheckKind::BlankLineAfterSummary(..) => Some("Insert single blank line".to_string()),
             CheckKind::BlankLineBeforeSection(name) => {
                 Some(format!("Add blank line before \"{name}\""))
             }

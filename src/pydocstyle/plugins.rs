@@ -336,21 +336,21 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     }
     if lines_count > 1 && blanks_count != 1 {
         let mut check = Check::new(
-            CheckKind::BlankLineAfterSummary,
+            CheckKind::BlankLineAfterSummary(blanks_count),
             Range::from_located(docstring.expr),
         );
         if checker.patch(check.kind.code()) {
-            // Find the "summary" line (defined as the first non-blank line).
-            let mut summary_line = 0;
-            for line in body.lines() {
-                if line.trim().is_empty() {
-                    summary_line += 1;
-                } else {
-                    break;
-                }
-            }
-
             if blanks_count > 1 {
+                // Find the "summary" line (defined as the first non-blank line).
+                let mut summary_line = 0;
+                for line in body.lines() {
+                    if line.trim().is_empty() {
+                        summary_line += 1;
+                    } else {
+                        break;
+                    }
+                }
+
                 // Insert one blank line after the summary (replacing any existing lines).
                 check.amend(Fix::replacement(
                     "\n".to_string(),
