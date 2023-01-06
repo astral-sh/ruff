@@ -127,7 +127,7 @@ fn tokenize_files_to_codes_mapping(value: &str) -> Vec<Token> {
                 if mat.start() == 0 {
                     tokens.push(Token {
                         token_name,
-                        src: mat.as_str().to_string().trim().to_string(),
+                        src: mat.as_str().trim().to_string(),
                     });
                     i += mat.end();
                     break;
