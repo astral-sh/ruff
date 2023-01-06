@@ -3322,7 +3322,7 @@ impl CheckKind {
                 Some(value) => {
                     format!("Probable use of requests call with timeout set to `{value}`")
                 }
-                None => "Probable use of requests call without timeout.".to_string(),
+                None => "Probable use of requests call without timeout".to_string(),
             },
             // flake8-blind-except
             CheckKind::BlindExcept(name) => format!("Do not catch blind exception: `{name}`"),
