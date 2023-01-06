@@ -218,12 +218,12 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
-    SIM109,
     SIM101,
     SIM102,
     SIM105,
     SIM107,
     SIM108,
+    SIM109,
     SIM110,
     SIM111,
     SIM117,
@@ -1408,16 +1408,16 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
-            CheckCode::SIM109 => CheckKind::CompareWithTuple(
-                "value".to_string(),
-                vec!["...".to_string(), "...".to_string()],
-                "value == ... or value == ...".to_string(),
-            ),
             CheckCode::SIM101 => CheckKind::DuplicateIsinstanceCall("...".to_string()),
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
             CheckCode::SIM108 => CheckKind::UseTernaryOperator("..".to_string()),
+            CheckCode::SIM109 => CheckKind::CompareWithTuple(
+                "value".to_string(),
+                vec!["...".to_string(), "...".to_string()],
+                "value == ... or value == ...".to_string(),
+            ),
             CheckCode::SIM110 => {
                 CheckKind::ConvertLoopToAny("return any(x for x in y)".to_string())
             }
@@ -1963,12 +1963,12 @@ impl CheckCode {
             CheckCode::S324 => CheckCategory::Flake8Bandit,
             CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
-            CheckCode::SIM109 => CheckCategory::Flake8Simplify,
             CheckCode::SIM101 => CheckCategory::Flake8Simplify,
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM107 => CheckCategory::Flake8Simplify,
             CheckCode::SIM108 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM109 => CheckCategory::Flake8Simplify,
             CheckCode::SIM110 => CheckCategory::Flake8Simplify,
             CheckCode::SIM111 => CheckCategory::Flake8Simplify,
             CheckCode::SIM117 => CheckCategory::Flake8Simplify,
@@ -2224,13 +2224,13 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
-            CheckKind::CompareWithTuple(..) => &CheckCode::SIM109,
-            CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
             CheckKind::AAndNotA(..) => &CheckCode::SIM220,
             CheckKind::AOrNotA(..) => &CheckCode::SIM221,
             CheckKind::AndFalse => &CheckCode::SIM223,
+            CheckKind::CompareWithTuple(..) => &CheckCode::SIM109,
             CheckKind::ConvertLoopToAll(..) => &CheckCode::SIM111,
             CheckKind::ConvertLoopToAny(..) => &CheckCode::SIM110,
+            CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::MultipleWithStatements => &CheckCode::SIM117,
             CheckKind::NestedIfStatements => &CheckCode::SIM102,

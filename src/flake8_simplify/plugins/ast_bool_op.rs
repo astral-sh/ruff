@@ -140,7 +140,8 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
         return;
     };
-    let mut id_to_values = BTreeMap::<String, Vec<_>>::new();
+
+    let mut id_to_values = BTreeMap::<&str, Vec<&Expr>>::new();
     for value in values {
         let ExprKind::Compare { left, ops, comparators } = &value.node else {
             continue;
@@ -158,10 +159,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         if !matches!(&comparator.node, ExprKind::Name { .. }) {
             continue;
         }
-        id_to_values
-            .entry(id.to_string())
-            .or_default()
-            .push(comparator.clone());
+        id_to_values.entry(id).or_default().push(comparator);
     }
 
     for (value, values) in id_to_values {
@@ -170,26 +168,26 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
         let str_values = values
             .iter()
-            .map(|v| unparse_expr(v, checker.style))
+            .map(|value| unparse_expr(value, checker.style))
             .collect();
         let mut check = Check::new(
             CheckKind::CompareWithTuple(
-                value.clone(),
+                value.to_string(),
                 str_values,
                 unparse_expr(expr, checker.style),
             ),
             Range::from_located(expr),
         );
         if checker.patch(&CheckCode::SIM109) {
-            // create a `x in (a, b)` compare expr
+            // Create a `x in (a, b)` compare expr.
             let in_expr = create_expr(ExprKind::Compare {
                 left: Box::new(create_expr(ExprKind::Name {
-                    id: value,
+                    id: value.to_string(),
                     ctx: ExprContext::Load,
                 })),
                 ops: vec![Cmpop::In],
                 comparators: vec![create_expr(ExprKind::Tuple {
-                    elts: values,
+                    elts: values.into_iter().map(Clone::clone).collect(),
                     ctx: ExprContext::Load,
                 })],
             });
