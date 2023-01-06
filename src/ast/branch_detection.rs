@@ -52,8 +52,8 @@ fn common_ancestor<'a>(
 }
 
 /// Return the alternative branches for a given node.
-fn alternatives<'a>(node: &'a RefEquality<'a, Stmt>) -> Vec<Vec<RefEquality<'a, Stmt>>> {
-    match &node.0.node {
+fn alternatives<'a>(stmt: &'a RefEquality<'a, Stmt>) -> Vec<Vec<RefEquality<'a, Stmt>>> {
+    match &stmt.node {
         StmtKind::If { body, .. } => vec![body.iter().map(RefEquality).collect()],
         StmtKind::Try {
             body,
@@ -71,16 +71,16 @@ fn alternatives<'a>(node: &'a RefEquality<'a, Stmt>) -> Vec<Vec<RefEquality<'a, 
     }
 }
 
-/// Return `true` if `node` is a descendent of any of the nodes in `ancestors`.
+/// Return `true` if `stmt` is a descendent of any of the nodes in `ancestors`.
 fn descendant_of<'a>(
-    node: &RefEquality<'a, Stmt>,
+    stmt: &RefEquality<'a, Stmt>,
     ancestors: &[RefEquality<'a, Stmt>],
     stop: &RefEquality<'a, Stmt>,
     depths: &FxHashMap<RefEquality<'a, Stmt>, usize>,
     child_to_parent: &FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
 ) -> bool {
     ancestors.iter().any(|ancestor| {
-        common_ancestor(node, ancestor, Some(stop), depths, child_to_parent).is_some()
+        common_ancestor(stmt, ancestor, Some(stop), depths, child_to_parent).is_some()
     })
 }
 
