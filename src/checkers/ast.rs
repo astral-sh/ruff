@@ -1191,7 +1191,7 @@ where
                     flake8_simplify::plugins::use_ternary_operator(
                         self,
                         stmt,
-                        self.parents.iter().map(|p| p.0).skip(1).last(),
+                        self.current_stmt_parent().map(|parent| parent.0),
                     );
                 }
             }

@@ -1,18 +1,10 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
+use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
-use crate::source_code_generator::SourceCodeGenerator;
-use crate::source_code_style::SourceCodeStyleDetector;
-
-/// Generate source code from an `Expr`.
-fn to_source(expr: &Expr, stylist: &SourceCodeStyleDetector) -> String {
-    let mut generator: SourceCodeGenerator = stylist.into();
-    generator.unparse_expr(expr, 0);
-    generator.generate()
-}
 
 fn is_main_check(expr: &Expr) -> bool {
     if let ExprKind::Compare {
@@ -73,6 +65,18 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
     ));
 }
 
+fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
+    create_stmt(StmtKind::Assign {
+        targets: vec![target_var.clone()],
+        value: Box::new(create_expr(ExprKind::IfExp {
+            test: Box::new(test.clone()),
+            body: Box::new(body_value.clone()),
+            orelse: Box::new(orelse_value.clone()),
+        })),
+        type_comment: None,
+    })
+}
+
 /// SIM108
 pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
     let StmtKind::If { test, body, orelse } = &stmt.node else {
@@ -122,18 +126,15 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         }
     }
 
-    let assign = to_source(target_var, checker.style);
-    let body = to_source(body_value, checker.style);
-    let cond = to_source(test, checker.style);
-    let orelse = to_source(orelse_value, checker.style);
-    let new_code = format!("{assign} = {body} if {cond} else {orelse}");
+    let ternary = ternary(target_var, body_value, test, orelse_value);
+    let content = unparse_stmt(&ternary, checker.style);
     let mut check = Check::new(
-        CheckKind::UseTernaryOperator(new_code.clone()),
+        CheckKind::UseTernaryOperator(content.clone()),
         Range::from_located(stmt),
     );
     if checker.patch(&CheckCode::SIM108) {
         check.amend(Fix::replacement(
-            new_code,
+            content,
             stmt.location,
             stmt.end_location.unwrap(),
         ));

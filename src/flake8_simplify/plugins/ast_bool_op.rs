@@ -4,13 +4,11 @@ use itertools::Either::{Left, Right};
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Boolop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use crate::ast::helpers::create_expr;
+use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
-use crate::source_code_generator::SourceCodeGenerator;
-use crate::source_code_style::SourceCodeStyleDetector;
 
 /// Return `true` if two `Expr` instances are equivalent names.
 fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
@@ -20,13 +18,6 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
         }
     }
     None
-}
-
-/// Generate source code from an `Expr`.
-fn to_source(expr: &Expr, stylist: &SourceCodeStyleDetector) -> String {
-    let mut generator: SourceCodeGenerator = stylist.into();
-    generator.unparse_expr(expr, 0);
-    generator.generate()
 }
 
 /// SIM101
@@ -133,7 +124,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
                 check.amend(Fix::replacement(
-                    to_source(&bool_op, checker.style),
+                    unparse_expr(&bool_op, checker.style),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
