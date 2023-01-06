@@ -218,6 +218,7 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
+    SIM109,
     SIM101,
     SIM102,
     SIM105,
@@ -962,6 +963,7 @@ pub enum CheckKind {
     SysVersionSlice1Referenced,
     // flake8-simplify
     UseTernaryOperator(String),
+    CompareWithTuple(String, Vec<String>, String),
     DuplicateIsinstanceCall(String),
     AAndNotA(String),
     AOrNotA(String),
@@ -1404,6 +1406,11 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
+            CheckCode::SIM109 => CheckKind::CompareWithTuple(
+                "value".to_string(),
+                vec!["...".to_string(), "...".to_string()],
+                "value == ... or value == ...".to_string(),
+            ),
             CheckCode::SIM101 => CheckKind::DuplicateIsinstanceCall("...".to_string()),
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
@@ -1952,6 +1959,7 @@ impl CheckCode {
             CheckCode::S324 => CheckCategory::Flake8Bandit,
             CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM109 => CheckCategory::Flake8Simplify,
             CheckCode::SIM101 => CheckCategory::Flake8Simplify,
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
@@ -2212,6 +2220,7 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
+            CheckKind::CompareWithTuple(..) => &CheckCode::SIM109,
             CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
             CheckKind::AAndNotA(..) => &CheckCode::SIM220,
             CheckKind::AOrNotA(..) => &CheckCode::SIM221,
@@ -2982,6 +2991,10 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::CompareWithTuple(value, values, or_op) => {
+                let values = values.join(", ");
+                format!("Use `{value} in ({values})` instead of `{or_op}`")
+            }
             CheckKind::DuplicateIsinstanceCall(name) => {
                 format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
             }
@@ -3652,6 +3665,7 @@ impl CheckKind {
             | CheckKind::BlankLineBeforeSection(..)
             | CheckKind::CapitalizeSectionName(..)
             | CheckKind::CommentedOutCode
+            | CheckKind::CompareWithTuple(..)
             | CheckKind::ConvertLoopToAll(..)
             | CheckKind::ConvertLoopToAny(..)
             | CheckKind::ConvertNamedTupleFunctionalToClass(..)
@@ -3787,6 +3801,10 @@ impl CheckKind {
             }
             CheckKind::CapitalizeSectionName(name) => Some(format!("Capitalize \"{name}\"")),
             CheckKind::CommentedOutCode => Some("Remove commented-out code".to_string()),
+            CheckKind::CompareWithTuple(value, values, or_op) => {
+                let values = values.join(", ");
+                Some(format!("Replace `{or_op}` with `{value} in {values}`"))
+            }
             CheckKind::ConvertLoopToAll(all) => Some(format!("Replace with `{all}`")),
             CheckKind::ConvertLoopToAny(any) => Some(format!("Replace with `{any}`")),
             CheckKind::ConvertTypedDictFunctionalToClass(name)

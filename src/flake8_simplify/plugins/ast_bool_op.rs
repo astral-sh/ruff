@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
 use std::iter;
 
 use itertools::Either::{Left, Right};
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Boolop, Constant, Expr, ExprContext, ExprKind, Unaryop};
+use rustpython_ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
@@ -131,6 +132,74 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             }
             checker.add_check(check);
         }
+    }
+}
+
+/// SIM109
+pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
+        return;
+    };
+    let mut id_to_values = BTreeMap::<String, Vec<_>>::new();
+    for value in values {
+        let ExprKind::Compare { left, ops, comparators } = &value.node else {
+            continue;
+        };
+        if ops.len() != 1 || comparators.len() != 1 {
+            continue;
+        }
+        if !matches!(&ops[0], Cmpop::Eq) {
+            continue;
+        }
+        let ExprKind::Name { id, .. } = &left.node else {
+            continue;
+        };
+        let comparator = &comparators[0];
+        if !matches!(&comparator.node, ExprKind::Name { .. }) {
+            continue;
+        }
+        id_to_values
+            .entry(id.to_string())
+            .or_default()
+            .push(comparator.clone());
+    }
+
+    for (value, values) in id_to_values {
+        if values.len() == 1 {
+            continue;
+        }
+        let str_values = values
+            .iter()
+            .map(|v| unparse_expr(v, checker.style))
+            .collect();
+        let mut check = Check::new(
+            CheckKind::CompareWithTuple(
+                value.clone(),
+                str_values,
+                unparse_expr(expr, checker.style),
+            ),
+            Range::from_located(expr),
+        );
+        if checker.patch(&CheckCode::SIM109) {
+            // create a `x in (a, b)` compare expr
+            let in_expr = create_expr(ExprKind::Compare {
+                left: Box::new(create_expr(ExprKind::Name {
+                    id: value,
+                    ctx: ExprContext::Load,
+                })),
+                ops: vec![Cmpop::In],
+                comparators: vec![create_expr(ExprKind::Tuple {
+                    elts: values,
+                    ctx: ExprContext::Load,
+                })],
+            });
+            check.amend(Fix::replacement(
+                unparse_expr(&in_expr, checker.style),
+                expr.location,
+                expr.end_location.unwrap(),
+            ));
+        }
+        checker.add_check(check);
     }
 }
 

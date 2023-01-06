@@ -967,6 +967,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| SIM109 | CompareWithTuple | Use `value in (..., ...)` instead of `value == ... or value == ...` | 🛠 |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
 | SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
