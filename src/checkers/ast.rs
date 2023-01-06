@@ -191,13 +191,18 @@ impl<'a> Checker<'a> {
                 && match_call_path(call_path, "typing_extensions", target, &self.from_imports))
     }
 
-    /// Return `true` if `member` is bound as a builtin.
-    pub fn is_builtin(&self, member: &str) -> bool {
+    /// Return the current `Binding` for a given `name`.
+    pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.current_scopes()
             .find_map(|scope| scope.values.get(member))
-            .map_or(false, |index| {
-                matches!(self.bindings[*index].kind, BindingKind::Builtin)
-            })
+            .map(|index| &self.bindings[*index])
+    }
+
+    /// Return `true` if `member` is bound as a builtin.
+    pub fn is_builtin(&self, member: &str) -> bool {
+        self.find_binding(member).map_or(false, |binding| {
+            matches!(binding.kind, BindingKind::Builtin)
+        })
     }
 
     /// Return `true` if a `CheckCode` is disabled by a `noqa` directive.
@@ -1729,10 +1734,30 @@ where
                                 }
                             }
                             // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`).
-                            if helpers::is_non_variable(value) {
-                                continue;
+                            if pandas_vet::helpers::is_dataframe_candidate(value) {
+                                // If the target is a named variable, avoid triggering on
+                                // irrelevant bindings (like imports).
+                                if let ExprKind::Name { id, .. } = &value.node {
+                                    if self.find_binding(id).map_or(true, |binding| {
+                                        matches!(
+                                            binding.kind,
+                                            BindingKind::Builtin
+                                                | BindingKind::ClassDefinition
+                                                | BindingKind::FunctionDefinition
+                                                | BindingKind::Export(..)
+                                                | BindingKind::FutureImportation
+                                                | BindingKind::StarImportation(..)
+                                                | BindingKind::Importation(..)
+                                                | BindingKind::FromImportation(..)
+                                                | BindingKind::SubmoduleImportation(..)
+                                        )
+                                    }) {
+                                        continue;
+                                    }
+                                }
+
+                                self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                             }
-                            self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                         };
                     }
                 }
@@ -2160,9 +2185,41 @@ where
                     (CheckCode::PD013, "stack"),
                 ] {
                     if self.settings.enabled.contains(&code) {
-                        if let ExprKind::Attribute { attr, .. } = &func.node {
+                        if let ExprKind::Attribute { value, attr, .. } = &func.node {
                             if attr == name {
-                                self.add_check(Check::new(code.kind(), Range::from_located(func)));
+                                if pandas_vet::helpers::is_dataframe_candidate(value) {
+                                    // If the target is a named variable, avoid triggering on
+                                    // irrelevant bindings (like non-Pandas imports).
+                                    if let ExprKind::Name { id, .. } = &value.node {
+                                        if self.find_binding(id).map_or(true, |binding| {
+                                            if let BindingKind::Importation(.., module) =
+                                                &binding.kind
+                                            {
+                                                module != "pandas"
+                                            } else {
+                                                matches!(
+                                                    binding.kind,
+                                                    BindingKind::Builtin
+                                                        | BindingKind::ClassDefinition
+                                                        | BindingKind::FunctionDefinition
+                                                        | BindingKind::Export(..)
+                                                        | BindingKind::FutureImportation
+                                                        | BindingKind::StarImportation(..)
+                                                        | BindingKind::Importation(..)
+                                                        | BindingKind::FromImportation(..)
+                                                        | BindingKind::SubmoduleImportation(..)
+                                                )
+                                            }
+                                        }) {
+                                            continue;
+                                        }
+                                    }
+
+                                    self.add_check(Check::new(
+                                        code.kind(),
+                                        Range::from_located(func),
+                                    ));
+                                }
                             };
                         }
                     }
