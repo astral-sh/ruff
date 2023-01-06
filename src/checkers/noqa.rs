@@ -7,10 +7,10 @@ use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::noqa;
 use crate::noqa::{is_file_exempt, Directive};
 use crate::registry::{Check, CheckCode, CheckKind, UnusedCodes, CODE_REDIRECTS};
 use crate::settings::{flags, Settings};
+use crate::{noqa, violations};
 
 pub fn check_noqa(
     checks: &mut Vec<Check>,
@@ -42,7 +42,7 @@ pub fn check_noqa(
 
     // Remove any ignored checks.
     for (index, check) in checks.iter().enumerate() {
-        if check.kind == CheckKind::BlanketNOQA {
+        if check.kind == violations::BlanketNOQA {
             continue;
         }
 
@@ -101,7 +101,7 @@ pub fn check_noqa(
                 Directive::All(spaces, start, end) => {
                     if matches.is_empty() {
                         let mut check = Check::new(
-                            CheckKind::UnusedNOQA(None),
+                            violations::UnusedNOQA(None),
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
@@ -152,7 +152,7 @@ pub fn check_noqa(
                         && unmatched_codes.is_empty())
                     {
                         let mut check = Check::new(
-                            CheckKind::UnusedNOQA(Some(UnusedCodes {
+                            violations::UnusedNOQA(Some(UnusedCodes {
                                 disabled: disabled_codes
                                     .iter()
                                     .map(|code| (*code).to_string())

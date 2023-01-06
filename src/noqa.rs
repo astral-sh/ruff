@@ -10,6 +10,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::registry::{Check, CheckCode, CODE_REDIRECTS};
 use crate::source_code_style::LineEnding;
+use crate::violations;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -215,6 +216,7 @@ mod tests {
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::{Check, CheckKind};
     use crate::source_code_style::LineEnding;
+    use crate::violations;
 
     #[test]
     fn regex() {
@@ -247,7 +249,7 @@ mod tests {
         assert_eq!(output, format!("{contents}\n"));
 
         let checks = vec![Check::new(
-            CheckKind::UnusedVariable("x".to_string()),
+            violations::UnusedVariable("x".to_string()),
             Range::new(Location::new(1, 0), Location::new(1, 0)),
         )];
         let contents = "x = 1";
@@ -265,11 +267,11 @@ mod tests {
 
         let checks = vec![
             Check::new(
-                CheckKind::AmbiguousVariableName("x".to_string()),
+                violations::AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Check::new(
-                CheckKind::UnusedVariable("x".to_string()),
+                violations::UnusedVariable("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];
@@ -288,11 +290,11 @@ mod tests {
 
         let checks = vec![
             Check::new(
-                CheckKind::AmbiguousVariableName("x".to_string()),
+                violations::AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Check::new(
-                CheckKind::UnusedVariable("x".to_string()),
+                violations::UnusedVariable("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];

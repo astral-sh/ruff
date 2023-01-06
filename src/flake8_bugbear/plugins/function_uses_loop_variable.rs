@@ -7,6 +7,7 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
@@ -212,7 +213,7 @@ where
                 if !checker.flake8_bugbear_seen.contains(&expr) {
                     checker.flake8_bugbear_seen.push(expr);
                     checker.checks.push(Check::new(
-                        CheckKind::FunctionUsesLoopVariable(name.to_string()),
+                        violations::FunctionUsesLoopVariable(name.to_string()),
                         range,
                     ));
                 }

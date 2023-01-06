@@ -9,7 +9,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{flake8_errmsg, settings};
+    use crate::{flake8_errmsg, settings, violations};
 
     #[test]
     fn defaults() -> Result<()> {

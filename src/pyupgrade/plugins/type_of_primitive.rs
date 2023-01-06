@@ -5,6 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::pyupgrade::checks;
 use crate::registry::CheckKind;
+use crate::violations;
 
 /// UP003
 pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
@@ -12,7 +13,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
         return;
     };
     if checker.patch(check.kind.code()) {
-        if let CheckKind::TypeOfPrimitive(primitive) = &check.kind {
+        if let violations::TypeOfPrimitive(primitive) = &check.kind {
             check.amend(Fix::replacement(
                 primitive.builtin(),
                 expr.location,

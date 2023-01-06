@@ -12,7 +12,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::settings;
+    use crate::{settings, violations};
     #[test_case(CheckCode::RUF004, Path::new("RUF004.py"); "RUF004")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());

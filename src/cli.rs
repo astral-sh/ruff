@@ -4,12 +4,12 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use crate::fs;
 use crate::logging::LogLevel;
 use crate::registry::{CheckCode, CheckCodePrefix};
 use crate::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
+use crate::{fs, violations};
 
 #[derive(Debug, Parser)]
 #[command(author, about = "Ruff: An extremely fast Python linter.")]

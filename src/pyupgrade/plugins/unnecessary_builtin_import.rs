@@ -4,9 +4,9 @@ use rustpython_ast::{Alias, AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::{autofix, violations};
 
 const BUILTINS: &[&str] = &[
     "*",
@@ -69,7 +69,7 @@ pub fn unnecessary_builtin_import(
         return;
     }
     let mut check = Check::new(
-        CheckKind::UnnecessaryBuiltinImport(
+        violations::UnnecessaryBuiltinImport(
             unused_imports
                 .iter()
                 .map(|alias| alias.node.name.to_string())

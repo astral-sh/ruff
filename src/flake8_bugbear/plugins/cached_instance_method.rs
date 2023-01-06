@@ -4,6 +4,7 @@ use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path
 use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
     let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
@@ -34,7 +35,7 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
             },
         ) {
             checker.checks.push(Check::new(
-                CheckKind::CachedInstanceMethod,
+                violations::CachedInstanceMethod,
                 Range::from_located(decorator),
             ));
         }

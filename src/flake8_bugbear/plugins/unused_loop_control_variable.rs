@@ -7,6 +7,7 @@ use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// Identify all `ExprKind::Name` nodes in an AST.
 struct NameFinder<'a> {
@@ -62,7 +63,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
         }
 
         let mut check = Check::new(
-            CheckKind::UnusedLoopControlVariable(name.to_string()),
+            violations::UnusedLoopControlVariable(name.to_string()),
             Range::from_located(expr),
         );
         if checker.patch(check.kind.code()) {

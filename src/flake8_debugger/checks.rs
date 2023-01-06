@@ -5,6 +5,7 @@ use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path
 use crate::ast::types::Range;
 use crate::flake8_debugger::types::DebuggerUsingType;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 const DEBUGGERS: &[(&str, &str)] = &[
     ("pdb", "set_trace"),
@@ -31,7 +32,7 @@ pub fn debugger_call(
         .any(|(module, member)| match_call_path(&call_path, module, member, from_imports))
     {
         Some(Check::new(
-            CheckKind::Debugger(DebuggerUsingType::Call(call_path.join("."))),
+            violations::Debugger(DebuggerUsingType::Call(call_path.join("."))),
             Range::from_located(expr),
         ))
     } else {
@@ -53,7 +54,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
             .find(|(module_name, member)| module_name == &module && member == &name)
         {
             return Some(Check::new(
-                CheckKind::Debugger(DebuggerUsingType::Import(format!("{module_name}.{member}"))),
+                violations::Debugger(DebuggerUsingType::Import(format!("{module_name}.{member}"))),
                 Range::from_located(stmt),
             ));
         }
@@ -62,7 +63,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
         .any(|(module_name, ..)| module_name == &name)
     {
         return Some(Check::new(
-            CheckKind::Debugger(DebuggerUsingType::Import(name.to_string())),
+            violations::Debugger(DebuggerUsingType::Import(name.to_string())),
             Range::from_located(stmt),
         ));
     }

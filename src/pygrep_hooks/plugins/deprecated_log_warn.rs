@@ -4,6 +4,7 @@ use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// PGH002 - deprecated use of logging.warn
 pub fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
@@ -12,7 +13,7 @@ pub fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
         || match_call_path(&call_path, "logging", "warn", &checker.from_imports)
     {
         checker.checks.push(Check::new(
-            CheckKind::DeprecatedLogWarn,
+            violations::DeprecatedLogWarn,
             Range::from_located(func),
         ));
     }

@@ -13,7 +13,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{flake8_unused_arguments, settings};
+    use crate::{flake8_unused_arguments, settings, violations};
 
     #[test_case(CheckCode::ARG001, Path::new("ARG.py"); "ARG001")]
     #[test_case(CheckCode::ARG002, Path::new("ARG.py"); "ARG002")]

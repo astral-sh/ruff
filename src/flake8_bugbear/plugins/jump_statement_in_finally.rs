@@ -3,12 +3,13 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
             checker.checks.push(Check::new(
-                CheckKind::JumpStatementInFinally(match &stmt.node {
+                violations::JumpStatementInFinally(match &stmt.node {
                     StmtKind::Break { .. } => "break".to_string(),
                     StmtKind::Continue { .. } => "continue".to_string(),
                     StmtKind::Return { .. } => "return".to_string(),

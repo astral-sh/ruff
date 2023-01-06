@@ -9,6 +9,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::violations;
 
 struct Loop<'a> {
     return_value: bool,
@@ -118,7 +119,7 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     checker.style,
                 );
                 let mut check = Check::new(
-                    CheckKind::ConvertLoopToAny(content.clone()),
+                    violations::ConvertLoopToAny(content.clone()),
                     Range::from_located(stmt),
                 );
                 if checker.patch(&CheckCode::SIM110) {
@@ -157,7 +158,7 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     checker.style,
                 );
                 let mut check = Check::new(
-                    CheckKind::ConvertLoopToAll(content.clone()),
+                    violations::ConvertLoopToAll(content.clone()),
                     Range::from_located(stmt),
                 );
                 if checker.patch(&CheckCode::SIM111) {

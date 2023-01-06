@@ -5,6 +5,7 @@ use rustpython_parser::ast::Constant;
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 const REQUESTS_HTTP_VERBS: [&str; 7] = ["get", "options", "head", "post", "put", "patch", "delete"];
 const HTTPX_METHODS: [&str; 11] = [
@@ -41,7 +42,7 @@ pub fn request_with_no_cert_validation(
                 } = &verify_arg.node
                 {
                     return Some(Check::new(
-                        CheckKind::RequestWithNoCertValidation("requests".to_string()),
+                        violations::RequestWithNoCertValidation("requests".to_string()),
                         Range::from_located(verify_arg),
                     ));
                 }
@@ -58,7 +59,7 @@ pub fn request_with_no_cert_validation(
                 } = &verify_arg.node
                 {
                     return Some(Check::new(
-                        CheckKind::RequestWithNoCertValidation("httpx".to_string()),
+                        violations::RequestWithNoCertValidation("httpx".to_string()),
                         Range::from_located(verify_arg),
                     ));
                 }

@@ -5,6 +5,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// UP021
 pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
@@ -23,7 +24,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
                 kwarg.location.column() + "universal_newlines".len(),
             ),
         );
-        let mut check = Check::new(CheckKind::ReplaceUniversalNewlines, range);
+        let mut check = Check::new(violations::ReplaceUniversalNewlines, range);
         if checker.patch(check.kind.code()) {
             check.amend(Fix::replacement(
                 "text".to_string(),

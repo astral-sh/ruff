@@ -13,7 +13,7 @@ mod tests {
     use crate::linter::test_path;
     use crate::pydocstyle::settings::{Convention, Settings};
     use crate::registry::CheckCode;
-    use crate::settings;
+    use crate::{settings, violations};
 
     #[test_case(CheckCode::D100, Path::new("D.py"); "D100")]
     #[test_case(CheckCode::D101, Path::new("D.py"); "D101")]

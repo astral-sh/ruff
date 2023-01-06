@@ -10,6 +10,7 @@ use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::flake8_bugbear::plugins::mutable_argument_default::is_mutable_func;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 const IMMUTABLE_FUNCS: [(&str, &str); 7] = [
     ("", "tuple"),
@@ -58,7 +59,7 @@ where
                     && !is_nan_or_infinity(func, args)
                 {
                     self.checks.push((
-                        CheckKind::FunctionCallArgumentDefault(compose_call_path(expr)),
+                        violations::FunctionCallArgumentDefault(compose_call_path(expr)),
                         Range::from_located(expr),
                     ));
                 }

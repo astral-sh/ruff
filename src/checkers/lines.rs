@@ -5,6 +5,7 @@ use crate::pygrep_hooks::plugins::{blanket_noqa, blanket_type_ignore};
 use crate::pyupgrade::checks::unnecessary_coding_comment;
 use crate::registry::{Check, CheckCode};
 use crate::settings::{flags, Settings};
+use crate::violations;
 
 pub fn check_lines(
     contents: &str,
@@ -82,6 +83,7 @@ mod tests {
     use super::check_lines;
     use crate::registry::CheckCode;
     use crate::settings::{flags, Settings};
+    use crate::violations;
 
     #[test]
     fn e501_non_ascii_char() {

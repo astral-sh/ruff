@@ -11,6 +11,7 @@ use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
@@ -51,7 +52,7 @@ where
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
                         self.errors.push(Check::new(
-                            CheckKind::AssertInExcept(id.to_string()),
+                            violations::AssertInExcept(id.to_string()),
                             Range::from_located(current_assert),
                         ));
                     }
@@ -99,7 +100,7 @@ pub fn unittest_assertion(
         ExprKind::Attribute { attr, .. } => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 let mut check = Check::new(
-                    CheckKind::UnittestAssertion(unittest_assert.to_string()),
+                    violations::UnittestAssertion(unittest_assert.to_string()),
                     Range::from_located(func),
                 );
                 if checker.patch(check.kind.code()) {
@@ -124,7 +125,7 @@ pub fn unittest_assertion(
 pub fn assert_falsy(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Check> {
     if is_falsy_constant(test_expr) {
         Some(Check::new(
-            CheckKind::AssertAlwaysFalse,
+            violations::AssertAlwaysFalse,
             Range::from_located(assert_stmt),
         ))
     } else {
@@ -152,7 +153,7 @@ pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Check> {
 pub fn composite_condition(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Check> {
     if is_composite_condition(test_expr) {
         Some(Check::new(
-            CheckKind::CompositeAssertion,
+            violations::CompositeAssertion,
             Range::from_located(assert_stmt),
         ))
     } else {

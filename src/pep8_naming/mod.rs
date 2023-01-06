@@ -13,7 +13,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::settings;
+    use crate::{settings, violations};
 
     #[test_case(CheckCode::N801, Path::new("N801.py"); "N801")]
     #[test_case(CheckCode::N802, Path::new("N802.py"); "N802")]
