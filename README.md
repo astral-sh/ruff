@@ -771,6 +771,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S106 | HardcodedPasswordFuncArg | Possible hardcoded password: "..." |  |
 | S107 | HardcodedPasswordDefault | Possible hardcoded password: "..." |  |
 | S108 | HardcodedTempFile | Probable insecure usage of temporary file or directory: "..." |  |
+| S113 | RequestWithoutTimeout | Probable use of requests call without timeout. |  |
 | S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "..." |  |
 | S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 
