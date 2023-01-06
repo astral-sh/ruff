@@ -4,7 +4,7 @@ use std::io::Write;
 use std::ops::AddAssign;
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::debug;
 use rustpython_parser::lexer::LexResult;
@@ -24,7 +24,7 @@ use crate::noqa::add_noqa;
 use crate::registry::{Check, CheckCode, CheckKind, LintSource};
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code_style::{LineEnding, SourceCodeStyleDetector};
 use crate::{cache, directives, fs, rustpython_helpers};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -69,6 +69,12 @@ pub(crate) fn check_path(
 
     // Aggregate all checks.
     let mut checks: Vec<Check> = vec![];
+
+    if stylist.line_ending() == &LineEnding::Cr {
+        return Err(anyhow!(
+            "Detected old MacOS style line-endings that are unsupported."
+        ));
+    }
 
     // Run the token-based checks.
     if settings
@@ -499,6 +505,12 @@ quoting the contents of `{}`, along with the `pyproject.toml` settings and execu
 #[cfg(test)]
 pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
     let contents = fs::read_file(path)?;
+    test_contents(path, contents, settings)
+}
+
+#[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
+pub fn test_contents(path: &Path, contents: String, settings: &Settings) -> Result<Vec<Check>> {
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
     let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
@@ -566,4 +578,22 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
 
     checks.sort_by_key(|check| check.location);
     Ok(checks)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::linter::test_contents;
+    use crate::settings::Settings;
+
+    #[test]
+    fn no_support_for_carriage_return_line_endings() {
+        let contents = "print(1)\rprint(2)".to_string();
+        let result = test_contents(Path::new("-"), contents, &Settings::for_rules(vec![]));
+        assert_eq!(
+            result.err().map_or(String::new(), |e| e.to_string()),
+            "Detected old MacOS style line-endings that are unsupported.".to_string()
+        );
+    }
 }
