@@ -3679,6 +3679,7 @@ impl CheckKind {
             | CheckKind::DeprecatedUnittestAlias(..)
             | CheckKind::DoNotAssertFalse
             | CheckKind::DoNotAssignLambda(..)
+            | CheckKind::DoubleNegation(..)
             | CheckKind::DupeClassFieldDefinitions(..)
             | CheckKind::DuplicateHandlerException(..)
             | CheckKind::DuplicateIsinstanceCall(..)
@@ -3696,6 +3697,8 @@ impl CheckKind {
             | CheckKind::MisplacedComparisonConstant(..)
             | CheckKind::MissingReturnTypeSpecialMethod(..)
             | CheckKind::NativeLiterals(..)
+            | CheckKind::NegateEqualOp(..)
+            | CheckKind::NegateNotEqualOp(..)
             | CheckKind::NewLineAfterLastParagraph
             | CheckKind::NewLineAfterSectionName(..)
             | CheckKind::NoBlankLineAfterFunction(..)
