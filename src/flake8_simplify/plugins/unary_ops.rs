@@ -1,6 +1,3 @@
-use std::string::FromUtf8Error;
-
-use log::error;
 use rustpython_ast::{Cmpop, Expr, ExprKind, StmtKind, Unaryop};
 
 use crate::ast::helpers::create_expr;
@@ -24,7 +21,7 @@ fn is_exception_check(stmt: &StmtKind) -> bool {
     false
 }
 
-fn expr_with_style(expr: &Expr, checker: &mut Checker) -> Result<String, FromUtf8Error> {
+fn expr_with_style(expr: &Expr, checker: &mut Checker) -> String {
     let mut generator = SourceCodeGenerator::new(
         checker.style.indentation(),
         checker.style.quote(),
@@ -51,22 +48,19 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     }
     let mut check = Check::new(
         CheckKind::NegateEqualOp(
-            expr_with_style(left, checker).unwrap(),
-            expr_with_style(&comparators[0], checker).unwrap(),
+            expr_with_style(left, checker),
+            expr_with_style(&comparators[0], checker),
         ),
         Range::from_located(operand),
     );
     if checker.patch(check.kind.code()) {
-        match pycodestyle::plugins::compare(left, &[Cmpop::NotEq], comparators, checker.style) {
-            Ok(content) => {
-                check.amend(Fix::replacement(
-                    content,
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
-            }
-            Err(e) => error!("Failed to generate fix: {e}"),
-        };
+        let content =
+            pycodestyle::plugins::compare(left, &[Cmpop::NotEq], comparators, checker.style);
+        check.amend(Fix::replacement(
+            content,
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
     }
     checker.add_check(check);
 }
@@ -93,22 +87,18 @@ pub fn negation_with_not_equal_op(
     }
     let mut check = Check::new(
         CheckKind::NegateNotEqualOp(
-            expr_with_style(left, checker).unwrap(),
-            expr_with_style(&comparators[0], checker).unwrap(),
+            expr_with_style(left, checker),
+            expr_with_style(&comparators[0], checker),
         ),
         Range::from_located(operand),
     );
     if checker.patch(check.kind.code()) {
-        match pycodestyle::plugins::compare(left, &[Cmpop::Eq], comparators, checker.style) {
-            Ok(content) => {
-                check.amend(Fix::replacement(
-                    content,
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
-            }
-            Err(e) => error!("Failed to generate fix: {e}"),
-        };
+        let content = pycodestyle::plugins::compare(left, &[Cmpop::Eq], comparators, checker.style);
+        check.amend(Fix::replacement(
+            content,
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
     }
     checker.add_check(check);
 }
@@ -131,16 +121,11 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
     );
     if checker.patch(check.kind.code()) {
         let inner_expr = create_expr(operand.node.clone());
-        match expr_with_style(&inner_expr, checker) {
-            Ok(content) => {
-                check.amend(Fix::replacement(
-                    content,
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
-            }
-            Err(e) => error!("Failed to generate fix: {e}"),
-        }
+        check.amend(Fix::replacement(
+            expr_with_style(&inner_expr, checker),
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
     }
     checker.add_check(check);
 }

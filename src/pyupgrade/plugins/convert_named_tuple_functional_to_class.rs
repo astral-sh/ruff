@@ -165,19 +165,14 @@ fn convert_to_class(
     body: Vec<Stmt>,
     base_class: &ExprKind,
     stylist: &SourceCodeStyleDetector,
-) -> Result<Fix> {
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+) -> Fix {
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&create_class_def_stmt(typename, body, base_class));
-    let content = generator.generate()?;
-    Ok(Fix::replacement(
-        content,
+    Fix::replacement(
+        generator.generate(),
         stmt.location,
         stmt.end_location.unwrap(),
-    ))
+    )
 }
 
 /// UP014
@@ -200,12 +195,13 @@ pub fn convert_named_tuple_functional_to_class(
                     Range::from_located(stmt),
                 );
                 if checker.patch(check.kind.code()) {
-                    match convert_to_class(stmt, typename, properties, base_class, checker.style) {
-                        Ok(fix) => {
-                            check.amend(fix);
-                        }
-                        Err(err) => error!("Failed to convert `NamedTuple`: {err}"),
-                    }
+                    check.amend(convert_to_class(
+                        stmt,
+                        typename,
+                        properties,
+                        base_class,
+                        checker.style,
+                    ));
                 }
                 checker.add_check(check);
             }

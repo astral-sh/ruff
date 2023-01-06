@@ -191,13 +191,18 @@ impl<'a> Checker<'a> {
                 && match_call_path(call_path, "typing_extensions", target, &self.from_imports))
     }
 
-    /// Return `true` if `member` is bound as a builtin.
-    pub fn is_builtin(&self, member: &str) -> bool {
+    /// Return the current `Binding` for a given `name`.
+    pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.current_scopes()
             .find_map(|scope| scope.values.get(member))
-            .map_or(false, |index| {
-                matches!(self.bindings[*index].kind, BindingKind::Builtin)
-            })
+            .map(|index| &self.bindings[*index])
+    }
+
+    /// Return `true` if `member` is bound as a builtin.
+    pub fn is_builtin(&self, member: &str) -> bool {
+        self.find_binding(member).map_or(false, |binding| {
+            matches!(binding.kind, BindingKind::Builtin)
+        })
     }
 
     /// Return `true` if a `CheckCode` is disabled by a `noqa` directive.
@@ -926,9 +931,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::PT013) {
-                    if let Some(check) =
-                        flake8_pytest_style::plugins::import_from(stmt, module, level)
-                    {
+                    if let Some(check) = flake8_pytest_style::plugins::import_from(
+                        stmt,
+                        module.as_deref(),
+                        level.as_ref(),
+                    ) {
                         self.add_check(check);
                     }
                 }
@@ -992,7 +999,7 @@ where
                                 self.add_check(Check::new(
                                     CheckKind::ImportStarNotPermitted(helpers::format_import_from(
                                         level.as_ref(),
-                                        module.as_ref(),
+                                        module.as_deref(),
                                     )),
                                     Range::from_located(stmt),
                                 ));
@@ -1003,7 +1010,7 @@ where
                             self.add_check(Check::new(
                                 CheckKind::ImportStarUsed(helpers::format_import_from(
                                     level.as_ref(),
-                                    module.as_ref(),
+                                    module.as_deref(),
                                 )),
                                 Range::from_located(stmt),
                             ));
@@ -1069,7 +1076,7 @@ where
                     if self.settings.enabled.contains(&CheckCode::T100) {
                         if let Some(check) = flake8_debugger::checks::debugger_import(
                             stmt,
-                            module.as_ref().map(String::as_str),
+                            module.as_deref(),
                             &alias.node.name,
                         ) {
                             self.add_check(check);
@@ -1727,10 +1734,30 @@ where
                                 }
                             }
                             // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`).
-                            if helpers::is_non_variable(value) {
-                                continue;
+                            if pandas_vet::helpers::is_dataframe_candidate(value) {
+                                // If the target is a named variable, avoid triggering on
+                                // irrelevant bindings (like imports).
+                                if let ExprKind::Name { id, .. } = &value.node {
+                                    if self.find_binding(id).map_or(true, |binding| {
+                                        matches!(
+                                            binding.kind,
+                                            BindingKind::Builtin
+                                                | BindingKind::ClassDefinition
+                                                | BindingKind::FunctionDefinition
+                                                | BindingKind::Export(..)
+                                                | BindingKind::FutureImportation
+                                                | BindingKind::StarImportation(..)
+                                                | BindingKind::Importation(..)
+                                                | BindingKind::FromImportation(..)
+                                                | BindingKind::SubmoduleImportation(..)
+                                        )
+                                    }) {
+                                        continue;
+                                    }
+                                }
+
+                                self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                             }
-                            self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                         };
                     }
                 }
@@ -2158,9 +2185,41 @@ where
                     (CheckCode::PD013, "stack"),
                 ] {
                     if self.settings.enabled.contains(&code) {
-                        if let ExprKind::Attribute { attr, .. } = &func.node {
+                        if let ExprKind::Attribute { value, attr, .. } = &func.node {
                             if attr == name {
-                                self.add_check(Check::new(code.kind(), Range::from_located(func)));
+                                if pandas_vet::helpers::is_dataframe_candidate(value) {
+                                    // If the target is a named variable, avoid triggering on
+                                    // irrelevant bindings (like non-Pandas imports).
+                                    if let ExprKind::Name { id, .. } = &value.node {
+                                        if self.find_binding(id).map_or(true, |binding| {
+                                            if let BindingKind::Importation(.., module) =
+                                                &binding.kind
+                                            {
+                                                module != "pandas"
+                                            } else {
+                                                matches!(
+                                                    binding.kind,
+                                                    BindingKind::Builtin
+                                                        | BindingKind::ClassDefinition
+                                                        | BindingKind::FunctionDefinition
+                                                        | BindingKind::Export(..)
+                                                        | BindingKind::FutureImportation
+                                                        | BindingKind::StarImportation(..)
+                                                        | BindingKind::Importation(..)
+                                                        | BindingKind::FromImportation(..)
+                                                        | BindingKind::SubmoduleImportation(..)
+                                                )
+                                            }
+                                        }) {
+                                            continue;
+                                        }
+                                    }
+
+                                    self.add_check(Check::new(
+                                        code.kind(),
+                                        Range::from_located(func),
+                                    ));
+                                }
                             };
                         }
                     }
@@ -2587,7 +2646,7 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP025) {
-                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind);
+                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
@@ -2656,6 +2715,9 @@ where
             ExprKind::BoolOp { op, values } => {
                 if self.settings.enabled.contains(&CheckCode::PLR1701) {
                     pylint::plugins::merge_isinstance(self, expr, op, values);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM101) {
+                    flake8_simplify::plugins::duplicate_isinstance_call(self, expr);
                 }
                 if self.settings.enabled.contains(&CheckCode::SIM220) {
                     flake8_simplify::plugins::a_and_not_a(self, expr);
@@ -2922,7 +2984,7 @@ where
                     flake8_blind_except::plugins::blind_except(
                         self,
                         type_.as_deref(),
-                        name.as_ref().map(String::as_str),
+                        name.as_deref(),
                         body,
                     );
                 }
@@ -3386,7 +3448,7 @@ impl<'a> Checker<'a> {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
-                                    module.as_ref(),
+                                    module.as_deref(),
                                 ));
                             }
                         }
@@ -3867,7 +3929,7 @@ impl<'a> Checker<'a> {
                                 if let BindingKind::StarImportation(level, module) = &binding.kind {
                                     from_list.push(helpers::format_import_from(
                                         level.as_ref(),
-                                        module.as_ref(),
+                                        module.as_deref(),
                                     ));
                                 }
                             }
@@ -3892,7 +3954,7 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
-                type UnusedImport<'a> = (&'a String, &'a Range);
+                type UnusedImport<'a> = (&'a str, &'a Range);
                 type BindingContext<'a, 'b> =
                     (&'a RefEquality<'b, Stmt>, Option<&'a RefEquality<'b, Stmt>>);
 
@@ -3964,9 +4026,7 @@ impl<'a> Checker<'a> {
                         let deleted: Vec<&Stmt> =
                             self.deletions.iter().map(|node| node.0).collect();
                         match autofix::helpers::remove_unused_imports(
-                            unused_imports
-                                .iter()
-                                .map(|(full_name, _)| full_name.as_str()),
+                            unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
                             parent,
                             &deleted,
@@ -4012,7 +4072,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
+                            CheckKind::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })

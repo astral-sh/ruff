@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 use super::helpers::is_pytest_parametrize;
@@ -31,12 +30,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         return None;
     }
 
-    let mut generator = SourceCodeGenerator::new(
-        checker.style.indentation(),
-        checker.style.quote(),
-        checker.style.line_ending(),
-    );
-
+    let mut generator: SourceCodeGenerator = checker.style.into();
     generator.unparse_expr(
         &create_expr(ExprKind::Constant {
             value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
@@ -56,17 +50,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         }),
         0,
     );
-
-    match generator.generate() {
-        Ok(s) => Some(s),
-        Err(e) => {
-            error!(
-                "Failed to generate CSV string from sequence of names: {}",
-                e
-            );
-            None
-        }
-    }
+    Some(generator.generate())
 }
 
 /// PT006
@@ -100,11 +84,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            let mut generator = SourceCodeGenerator::new(
-                                checker.style.indentation(),
-                                checker.style.quote(),
-                                checker.style.line_ending(),
-                            );
+                            let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: names
@@ -120,19 +100,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 1,
                             );
-                            match generator.generate() {
-                                Ok(content) => {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
-                                }
-                                Err(e) => error!(
-                                    "Failed to fix wrong name(s) type in \
-                                     `@pytest.mark.parametrize`: {e}"
-                                ),
-                            };
+                            check.amend(Fix::replacement(
+                                generator.generate(),
+                                expr.location,
+                                expr.end_location.unwrap(),
+                            ));
                         }
                         checker.add_check(check);
                     }
@@ -142,11 +114,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            let mut generator = SourceCodeGenerator::new(
-                                checker.style.indentation(),
-                                checker.style.quote(),
-                                checker.style.line_ending(),
-                            );
+                            let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: names
@@ -162,19 +130,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 0,
                             );
-                            match generator.generate() {
-                                Ok(content) => {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
-                                }
-                                Err(e) => error!(
-                                    "Failed to fix wrong name(s) type in \
-                                     `@pytest.mark.parametrize`: {e}"
-                                ),
-                            };
+                            check.amend(Fix::replacement(
+                                generator.generate(),
+                                expr.location,
+                                expr.end_location.unwrap(),
+                            ));
                         }
                         checker.add_check(check);
                     }
@@ -196,11 +156,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            let mut generator = SourceCodeGenerator::new(
-                                checker.style.indentation(),
-                                checker.style.quote(),
-                                checker.style.line_ending(),
-                            );
+                            let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: elts.clone(),
@@ -208,19 +164,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 0,
                             );
-                            match generator.generate() {
-                                Ok(content) => {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
-                                }
-                                Err(e) => error!(
-                                    "Failed to fix wrong name(s) type in \
-                                     `@pytest.mark.parametrize`: {e}"
-                                ),
-                            };
+                            check.amend(Fix::replacement(
+                                generator.generate(),
+                                expr.location,
+                                expr.end_location.unwrap(),
+                            ));
                         }
                         checker.add_check(check);
                     }
@@ -257,11 +205,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            let mut generator = SourceCodeGenerator::new(
-                                checker.style.indentation(),
-                                checker.style.quote(),
-                                checker.style.line_ending(),
-                            );
+                            let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: elts.clone(),
@@ -269,19 +213,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 1, // so tuple is generated with parentheses
                             );
-                            match generator.generate() {
-                                Ok(content) => {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
-                                }
-                                Err(e) => error!(
-                                    "Failed to fix wrong name(s) type in \
-                                     `@pytest.mark.parametrize`: {e}"
-                                ),
-                            };
+                            check.amend(Fix::replacement(
+                                generator.generate(),
+                                expr.location,
+                                expr.end_location.unwrap(),
+                            ));
                         }
                         checker.add_check(check);
                     }
@@ -347,22 +283,13 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     );
 
     if checker.patch(check.kind.code()) {
-        let mut generator = SourceCodeGenerator::new(
-            checker.style.indentation(),
-            checker.style.quote(),
-            checker.style.line_ending(),
-        );
+        let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
-        match generator.generate() {
-            Ok(content) => {
-                check.amend(Fix::replacement(
-                    content,
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
-            }
-            Err(e) => error!("Failed to fix wrong name(s) type in `@pytest.mark.parametrize`: {e}"),
-        };
+        check.amend(Fix::replacement(
+            generator.generate(),
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
     }
     checker.add_check(check);
 }

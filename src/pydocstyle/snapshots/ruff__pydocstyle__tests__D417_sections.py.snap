@@ -77,18 +77,6 @@ expression: checks
   parent: ~
 - kind:
     DocumentAllArguments:
-      - skip
-      - verbose
-  location:
-    row: 370
-    column: 4
-  end_location:
-    row: 382
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    DocumentAllArguments:
       - y
   location:
     row: 389

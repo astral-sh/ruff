@@ -33,7 +33,7 @@ pub mod types;
 #[derive(Debug)]
 pub struct AnnotatedAliasData<'a> {
     pub name: &'a str,
-    pub asname: Option<&'a String>,
+    pub asname: Option<&'a str>,
     pub atop: Vec<Comment<'a>>,
     pub inline: Vec<Comment<'a>>,
 }
@@ -46,7 +46,7 @@ pub enum AnnotatedImport<'a> {
         inline: Vec<Comment<'a>>,
     },
     ImportFrom {
-        module: Option<&'a String>,
+        module: Option<&'a str>,
         names: Vec<AnnotatedAliasData<'a>>,
         level: Option<&'a usize>,
         atop: Vec<Comment<'a>>,
@@ -87,7 +87,7 @@ fn annotate_imports<'a>(
                         .iter()
                         .map(|alias| AliasData {
                             name: &alias.node.name,
-                            asname: alias.node.asname.as_ref(),
+                            asname: alias.node.asname.as_deref(),
                         })
                         .collect(),
                     atop,
@@ -145,14 +145,14 @@ fn annotate_imports<'a>(
 
                     aliases.push(AnnotatedAliasData {
                         name: &alias.node.name,
-                        asname: alias.node.asname.as_ref(),
+                        asname: alias.node.asname.as_deref(),
                         atop: alias_atop,
                         inline: alias_inline,
                     });
                 }
 
                 annotated.push(AnnotatedImport::ImportFrom {
-                    module: module.as_ref(),
+                    module: module.as_deref(),
                     names: aliases,
                     level: level.as_ref(),
                     trailing_comma: if split_on_trailing_comma {

@@ -1,5 +1,3 @@
-use anyhow::Result;
-use log::error;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -11,12 +9,7 @@ use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 
-fn assignment(
-    obj: &Expr,
-    name: &str,
-    value: &Expr,
-    stylist: &SourceCodeStyleDetector,
-) -> Result<String> {
+fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &SourceCodeStyleDetector) -> String {
     let stmt = Stmt::new(
         Location::default(),
         Location::default(),
@@ -34,13 +27,9 @@ fn assignment(
             type_comment: None,
         },
     );
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&stmt);
-    generator.generate().map_err(std::convert::Into::into)
+    generator.generate()
 }
 
 /// B010
@@ -73,16 +62,11 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         if expr == child.as_ref() {
             let mut check = Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
             if checker.patch(check.kind.code()) {
-                match assignment(obj, name, value, checker.style) {
-                    Ok(content) => {
-                        check.amend(Fix::replacement(
-                            content,
-                            expr.location,
-                            expr.end_location.unwrap(),
-                        ));
-                    }
-                    Err(e) => error!("Failed to fix invalid comparison: {e}"),
-                };
+                check.amend(Fix::replacement(
+                    assignment(obj, name, value, checker.style),
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
             }
             checker.add_check(check);
         }

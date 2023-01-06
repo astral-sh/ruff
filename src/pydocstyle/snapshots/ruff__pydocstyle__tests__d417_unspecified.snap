@@ -4,7 +4,6 @@ expression: checks
 ---
 - kind:
     DocumentAllArguments:
-      - x
       - y
       - z
   location:

@@ -132,7 +132,7 @@ pub fn default_except_not_last(
 #[derive(Debug, PartialEq)]
 enum DictionaryKey<'a> {
     Constant(&'a Constant),
-    Variable(&'a String),
+    Variable(&'a str),
 }
 
 fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {

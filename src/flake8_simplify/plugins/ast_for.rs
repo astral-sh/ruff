@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_ast::{
     Comprehension, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop,
 };
@@ -83,12 +82,8 @@ fn return_stmt(
     target: &Expr,
     iter: &Expr,
     stylist: &SourceCodeStyleDetector,
-) -> Option<String> {
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+) -> String {
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&create_stmt(StmtKind::Return {
         value: Some(Box::new(create_expr(ExprKind::Call {
             func: Box::new(create_expr(ExprKind::Name {
@@ -107,13 +102,7 @@ fn return_stmt(
             keywords: vec![],
         }))),
     }));
-    match generator.generate() {
-        Ok(test) => Some(test),
-        Err(e) => {
-            error!("Failed to generate source code: {}", e);
-            None
-        }
-    }
+    generator.generate()
 }
 
 /// SIM110, SIM111
@@ -121,26 +110,25 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
     if let Some(loop_info) = return_values(stmt, sibling) {
         if loop_info.return_value && !loop_info.next_return_value {
             if checker.settings.enabled.contains(&CheckCode::SIM110) {
-                if let Some(content) = return_stmt(
+                let content = return_stmt(
                     "any",
                     loop_info.test,
                     loop_info.target,
                     loop_info.iter,
                     checker.style,
-                ) {
-                    let mut check = Check::new(
-                        CheckKind::ConvertLoopToAny(content.clone()),
-                        Range::from_located(stmt),
-                    );
-                    if checker.patch(&CheckCode::SIM110) {
-                        check.amend(Fix::replacement(
-                            content,
-                            stmt.location,
-                            sibling.end_location.unwrap(),
-                        ));
-                    }
-                    checker.add_check(check);
+                );
+                let mut check = Check::new(
+                    CheckKind::ConvertLoopToAny(content.clone()),
+                    Range::from_located(stmt),
+                );
+                if checker.patch(&CheckCode::SIM110) {
+                    check.amend(Fix::replacement(
+                        content,
+                        stmt.location,
+                        sibling.end_location.unwrap(),
+                    ));
                 }
+                checker.add_check(check);
             }
         }
 
@@ -161,26 +149,25 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                         })
                     }
                 };
-                if let Some(content) = return_stmt(
+                let content = return_stmt(
                     "all",
                     &test,
                     loop_info.target,
                     loop_info.iter,
                     checker.style,
-                ) {
-                    let mut check = Check::new(
-                        CheckKind::ConvertLoopToAll(content.clone()),
-                        Range::from_located(stmt),
-                    );
-                    if checker.patch(&CheckCode::SIM111) {
-                        check.amend(Fix::replacement(
-                            content,
-                            stmt.location,
-                            sibling.end_location.unwrap(),
-                        ));
-                    }
-                    checker.add_check(check);
+                );
+                let mut check = Check::new(
+                    CheckKind::ConvertLoopToAll(content.clone()),
+                    Range::from_located(stmt),
+                );
+                if checker.patch(&CheckCode::SIM111) {
+                    check.amend(Fix::replacement(
+                        content,
+                        stmt.location,
+                        sibling.end_location.unwrap(),
+                    ));
                 }
+                checker.add_check(check);
             }
         }
     }

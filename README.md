@@ -1,6 +1,6 @@
 # Ruff
 
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v0.json)](https://github.com/charliermarsh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json)](https://github.com/charliermarsh/ruff)
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
@@ -180,7 +180,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.211'
+  rev: 'v0.0.212'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -632,7 +632,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) | 🛠 |
 | D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring | 🛠 |
 | D204 | OneBlankLineAfterClass | 1 blank line required after class docstring | 🛠 |
-| D205 | BlankLineAfterSummary | 1 blank line required between summary line and description | 🛠 |
+| D205 | BlankLineAfterSummary | 1 blank line required between summary line and description (found 2) | 🛠 |
 | D206 | IndentWithSpaces | Docstring should be indented with spaces, not tabs |  |
 | D207 | NoUnderIndentation | Docstring is under-indented | 🛠 |
 | D208 | NoOverIndentation | Docstring is over-indented | 🛠 |
@@ -967,6 +967,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
 | SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
 | SIM107 | ReturnInTryExceptFinally | Don't use `return` in `try`/`except` and `finally` |  |
@@ -2464,9 +2465,10 @@ the `extend_aliases` option.
 
 ```toml
 [tool.ruff.flake8-import-conventions]
+[tool.ruff.flake8-import-conventions.aliases]
 # Declare the default aliases.
 altair = "alt"
-matplotlib.pyplot = "plt"
+"matplotlib.pyplot" = "plt"
 numpy = "np"
 pandas = "pd"
 seaborn = "sns"
@@ -2487,6 +2489,7 @@ will be added to the `aliases` mapping.
 
 ```toml
 [tool.ruff.flake8-import-conventions]
+[tool.ruff.flake8-import-conventions.extend-aliases]
 # Declare a custom alias for the `matplotlib` module.
 "dask.dataframe" = "dd"
 ```

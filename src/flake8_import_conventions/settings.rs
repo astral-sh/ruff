@@ -29,9 +29,10 @@ pub struct Options {
         default = r#"{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}"#,
         value_type = "FxHashMap<String, String>",
         example = r#"
+            [tool.ruff.flake8-import-conventions.aliases]
             # Declare the default aliases.
             altair = "alt"
-            matplotlib.pyplot = "plt"
+            "matplotlib.pyplot" = "plt"
             numpy = "np"
             pandas = "pd"
             seaborn = "sns"
@@ -44,6 +45,7 @@ pub struct Options {
         default = r#"{}"#,
         value_type = "FxHashMap<String, String>",
         example = r#"
+            [tool.ruff.flake8-import-conventions.extend-aliases]
             # Declare a custom alias for the `matplotlib` module.
             "dask.dataframe" = "dd"
         "#

@@ -1,0 +1,8 @@
+{
+  "label": "",
+  "message": "Ruff",
+  "logoSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"109\" height=\"132\" fill=\"none\"><g filter=\"url(#a)\"><path fill=\"#FCC21B\" d=\"m103.642 61.492-45.14-11.35 44.23-48.09a1.222 1.222 0 0 0-1.54-1.87L.582 61.632c-.41.25-.64.72-.57 1.2.06.48.4.87.87 1.01l45.07 13.25-44.29 48.16c-.42.46-.44 1.15-.04 1.61.24.29.58.44.94.44.22 0 .45-.06.65-.19l100.78-63.41c.42-.26.64-.75.56-1.22-.08-.49-.43-.88-.91-.99Z\"/></g><defs><filter id=\"a\" width=\"108.569\" height=\"131.302\" x=\"0\" y=\"0\" color-interpolation-filters=\"sRGB\" filterUnits=\"userSpaceOnUse\"><feFlood flood-opacity=\"0\" result=\"BackgroundImageFix\"/><feColorMatrix in=\"SourceAlpha\" result=\"hardAlpha\" values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0\"/><feOffset dx=\"4\" dy=\"4\"/><feComposite in2=\"hardAlpha\" operator=\"out\"/><feColorMatrix values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0\"/><feBlend in2=\"BackgroundImageFix\" result=\"effect1_dropShadow_7_4\"/><feBlend in=\"SourceGraphic\" in2=\"effect1_dropShadow_7_4\" result=\"shape\"/></filter></defs></svg>",
+  "logoWidth": 10,
+  "labelColor": "grey",
+  "color": "#E15759"
+}

@@ -2,16 +2,14 @@
 
 use std::fmt;
 use std::ops::Deref;
-use std::string::FromUtf8Error;
 
-use anyhow::Result;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Suite, Withitem};
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Expr, ExprKind,
     Operator, Stmt, StmtKind,
 };
 
-use crate::source_code_style::{Indentation, LineEnding, Quote};
+use crate::source_code_style::{Indentation, LineEnding, Quote, SourceCodeStyleDetector};
 use crate::vendor::{bytes, str};
 
 mod precedence {
@@ -45,6 +43,20 @@ pub struct SourceCodeGenerator<'a> {
     initial: bool,
 }
 
+impl<'a> From<&'a SourceCodeStyleDetector<'a>> for SourceCodeGenerator<'a> {
+    fn from(stylist: &'a SourceCodeStyleDetector<'a>) -> Self {
+        Self {
+            indent: stylist.indentation(),
+            quote: stylist.quote(),
+            line_ending: stylist.line_ending(),
+            buffer: Vec::new(),
+            indent_depth: 0,
+            num_newlines: 0,
+            initial: true,
+        }
+    }
+}
+
 impl<'a> SourceCodeGenerator<'a> {
     pub fn new(indent: &'a Indentation, quote: &'a Quote, line_ending: &'a LineEnding) -> Self {
         SourceCodeGenerator {
@@ -60,8 +72,8 @@ impl<'a> SourceCodeGenerator<'a> {
         }
     }
 
-    pub fn generate(self) -> Result<String, FromUtf8Error> {
-        String::from_utf8(self.buffer)
+    pub fn generate(self) -> String {
+        String::from_utf8(self.buffer).expect("Generated source code is not valid UTF-8")
     }
 
     fn newline(&mut self) {
@@ -1030,21 +1042,20 @@ impl<'a> SourceCodeGenerator<'a> {
 #[cfg(test)]
 mod tests {
 
-    use anyhow::Result;
     use rustpython_parser::parser;
 
     use crate::source_code_generator::SourceCodeGenerator;
     use crate::source_code_style::{Indentation, LineEnding, Quote};
 
-    fn round_trip(contents: &str) -> Result<String> {
+    fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = parser::parse_program(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
         let mut generator = SourceCodeGenerator::new(&indentation, &quote, &line_ending);
         generator.unparse_stmt(stmt);
-        generator.generate().map_err(std::convert::Into::into)
+        generator.generate()
     }
 
     fn round_trip_with(
@@ -1052,30 +1063,29 @@ mod tests {
         quote: &Quote,
         line_ending: &LineEnding,
         contents: &str,
-    ) -> Result<String> {
-        let program = parser::parse_program(contents, "<filename>")?;
+    ) -> String {
+        let program = parser::parse_program(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
         let mut generator = SourceCodeGenerator::new(indentation, quote, line_ending);
         generator.unparse_stmt(stmt);
-        generator.generate().map_err(std::convert::Into::into)
+        generator.generate()
     }
 
     #[test]
-    fn quote() -> Result<()> {
-        assert_eq!(round_trip(r#""hello""#)?, r#""hello""#);
-        assert_eq!(round_trip(r#"'hello'"#)?, r#""hello""#);
-        assert_eq!(round_trip(r#"u'hello'"#)?, r#"u"hello""#);
-        assert_eq!(round_trip(r#"r'hello'"#)?, r#""hello""#);
-        assert_eq!(round_trip(r#"b'hello'"#)?, r#"b"hello""#);
-        assert_eq!(round_trip(r#"("abc" "def" "ghi")"#)?, r#""abcdefghi""#);
-        assert_eq!(round_trip(r#""he\"llo""#)?, r#"'he"llo'"#);
-        assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#)?, r#"f'abc{"def"}{1}'"#);
-        assert_eq!(round_trip(r#"f"abc{'def'}{1}""#)?, r#"f'abc{"def"}{1}'"#);
-        Ok(())
+    fn quote() {
+        assert_eq!(round_trip(r#""hello""#), r#""hello""#);
+        assert_eq!(round_trip(r#"'hello'"#), r#""hello""#);
+        assert_eq!(round_trip(r#"u'hello'"#), r#"u"hello""#);
+        assert_eq!(round_trip(r#"r'hello'"#), r#""hello""#);
+        assert_eq!(round_trip(r#"b'hello'"#), r#"b"hello""#);
+        assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abcdefghi""#);
+        assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
+        assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f'abc{"def"}{1}'"#);
+        assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f'abc{"def"}{1}'"#);
     }
 
     #[test]
-    fn indent() -> Result<()> {
+    fn indent() {
         assert_eq!(
             round_trip(
                 r#"
@@ -1083,25 +1093,24 @@ if True:
   pass
 "#
                 .trim(),
-            )?,
+            ),
             r#"
 if True:
     pass
 "#
             .trim()
         );
-        Ok(())
     }
 
     #[test]
-    fn set_quote() -> Result<()> {
+    fn set_quote() {
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
                 &Quote::Double,
                 &LineEnding::default(),
                 r#""hello""#
-            )?,
+            ),
             r#""hello""#
         );
         assert_eq!(
@@ -1110,7 +1119,7 @@ if True:
                 &Quote::Single,
                 &LineEnding::default(),
                 r#""hello""#
-            )?,
+            ),
             r#"'hello'"#
         );
         assert_eq!(
@@ -1119,7 +1128,7 @@ if True:
                 &Quote::Double,
                 &LineEnding::default(),
                 r#"'hello'"#
-            )?,
+            ),
             r#""hello""#
         );
         assert_eq!(
@@ -1128,14 +1137,13 @@ if True:
                 &Quote::Single,
                 &LineEnding::default(),
                 r#"'hello'"#
-            )?,
+            ),
             r#"'hello'"#
         );
-        Ok(())
     }
 
     #[test]
-    fn set_indent() -> Result<()> {
+    fn set_indent() {
         assert_eq!(
             round_trip_with(
                 &Indentation::new("    ".to_string()),
@@ -1146,7 +1154,7 @@ if True:
   pass
 "#
                 .trim(),
-            )?,
+            ),
             r#"
 if True:
     pass
@@ -1163,7 +1171,7 @@ if True:
   pass
 "#
                 .trim(),
-            )?,
+            ),
             r#"
 if True:
   pass
@@ -1180,26 +1188,24 @@ if True:
   pass
 "#
                 .trim(),
-            )?,
+            ),
             r#"
 if True:
 	pass
 "#
             .trim()
         );
-
-        Ok(())
     }
 
     #[test]
-    fn set_line_ending() -> Result<()> {
+    fn set_line_ending() {
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
                 &Quote::default(),
                 &LineEnding::Lf,
                 "if True:\n    print(42)",
-            )?,
+            ),
             "if True:\n    print(42)",
         );
 
@@ -1209,7 +1215,7 @@ if True:
                 &Quote::default(),
                 &LineEnding::CrLf,
                 "if True:\n    print(42)",
-            )?,
+            ),
             "if True:\r\n    print(42)",
         );
 
@@ -1219,10 +1225,8 @@ if True:
                 &Quote::default(),
                 &LineEnding::Cr,
                 "if True:\n    print(42)",
-            )?,
+            ),
             "if True:\r    print(42)",
         );
-
-        Ok(())
     }
 }

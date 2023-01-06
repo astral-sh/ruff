@@ -213,23 +213,6 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Return `true` if an `Expr` is not a reference to a variable (or something
-/// that could resolve to a variable, like a function call).
-pub fn is_non_variable(expr: &Expr) -> bool {
-    matches!(
-        expr.node,
-        ExprKind::Constant { .. }
-            | ExprKind::Tuple { .. }
-            | ExprKind::List { .. }
-            | ExprKind::Set { .. }
-            | ExprKind::Dict { .. }
-            | ExprKind::SetComp { .. }
-            | ExprKind::ListComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::GeneratorExp { .. }
-    )
-}
-
 /// Return the `Keyword` with the given name, if it's present in the list of
 /// `Keyword` arguments.
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
@@ -316,7 +299,7 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 }
 
 /// Format the module name for a relative import.
-pub fn format_import_from(level: Option<&usize>, module: Option<&String>) -> String {
+pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
     if let Some(level) = level {
         for _ in 0..*level {
