@@ -1332,9 +1332,9 @@ pub struct Check {
 }
 
 impl Check {
-    pub fn new(kind: CheckKind, range: Range) -> Self {
+    pub fn new<K: Into<CheckKind>>(kind: K, range: Range) -> Self {
         Self {
-            kind,
+            kind: kind.into(),
             location: range.location,
             end_location: range.end_location,
             fix: None,
