@@ -3649,6 +3649,7 @@ impl CheckKind {
                 | CheckKind::DoNotAssignLambda(..)
                 | CheckKind::DupeClassFieldDefinitions(..)
                 | CheckKind::DuplicateHandlerException(..)
+                | CheckKind::DuplicateIsinstanceCall(..)
                 | CheckKind::EndsInPeriod
                 | CheckKind::EndsInPunctuation
                 | CheckKind::FStringMissingPlaceholders
@@ -3786,6 +3787,9 @@ impl CheckKind {
                 Some(format!("Remove duplicate field definition for `{name}`"))
             }
             CheckKind::DuplicateHandlerException(..) => Some("De-duplicate exceptions".to_string()),
+            CheckKind::DuplicateIsinstanceCall(name) => {
+                Some(format!("Merge `isinstance` calls for `{name}`"))
+            }
             CheckKind::EndsInPeriod => Some("Add period".to_string()),
             CheckKind::EndsInPunctuation => Some("Add closing punctuation".to_string()),
             CheckKind::ExtraneousScopeFunction => Some("Remove `scope=` argument".to_string()),
