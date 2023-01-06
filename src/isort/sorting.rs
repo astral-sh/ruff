@@ -25,7 +25,7 @@ fn prefix(name: &str) -> Prefix {
     }
 }
 
-fn cmp_option_ignore_case(a: Option<&String>, b: Option<&String>) -> Ordering {
+fn cmp_option_ignore_case(a: Option<&str>, b: Option<&str>) -> Ordering {
     match (a, b) {
         (None, None) => Ordering::Equal,
         (None, Some(_)) => Ordering::Less,
@@ -86,10 +86,10 @@ pub fn cmp_either_import(a: &EitherImport, b: &EitherImport) -> Ordering {
     match (a, b) {
         (Import(import1), Import(import2)) => cmp_modules(&import1.0, &import2.0),
         (ImportFrom(import_from), Import(import)) => {
-            cmp_option_ignore_case(import_from.0.module, Some(&import.0.name.to_string()))
+            cmp_option_ignore_case(import_from.0.module.map(|x| &**x), Some(import.0.name))
         }
         (Import(import), ImportFrom(import_from)) => {
-            cmp_option_ignore_case(Some(&import.0.name.to_string()), import_from.0.module)
+            cmp_option_ignore_case(Some(import.0.name), import_from.0.module.map(|x| &**x))
         }
         (ImportFrom(import_from1), ImportFrom(import_from2)) => {
             cmp_import_from(&import_from1.0, &import_from2.0)
