@@ -13,11 +13,11 @@ pub enum Argumentable {
 impl Argumentable {
     pub fn check_for(&self, name: String) -> CheckKind {
         match self {
-            Argumentable::Function => violations::UnusedFunctionArgument(name),
-            Argumentable::Method => violations::UnusedMethodArgument(name),
-            Argumentable::ClassMethod => violations::UnusedClassMethodArgument(name),
-            Argumentable::StaticMethod => violations::UnusedStaticMethodArgument(name),
-            Argumentable::Lambda => violations::UnusedLambdaArgument(name),
+            Argumentable::Function => violations::UnusedFunctionArgument(name).into(),
+            Argumentable::Method => violations::UnusedMethodArgument(name).into(),
+            Argumentable::ClassMethod => violations::UnusedClassMethodArgument(name).into(),
+            Argumentable::StaticMethod => violations::UnusedStaticMethodArgument(name).into(),
+            Argumentable::Lambda => violations::UnusedLambdaArgument(name).into(),
         }
     }
 

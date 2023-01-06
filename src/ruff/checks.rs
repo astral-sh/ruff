@@ -1630,20 +1630,23 @@ pub fn ambiguous_unicode_character(
                     };
                     let location = Location::new(start.row() + row_offset, col);
                     let end_location = Location::new(location.row(), location.column() + 1);
-                    let mut check = Check::new(
+                    let mut check = Check::new::<CheckKind>(
                         match context {
                             Context::String => violations::AmbiguousUnicodeCharacterString(
                                 current_char,
                                 representant,
-                            ),
+                            )
+                            .into(),
                             Context::Docstring => violations::AmbiguousUnicodeCharacterDocstring(
                                 current_char,
                                 representant,
-                            ),
+                            )
+                            .into(),
                             Context::Comment => violations::AmbiguousUnicodeCharacterComment(
                                 current_char,
                                 representant,
-                            ),
+                            )
+                            .into(),
                         },
                         Range::new(location, end_location),
                     );

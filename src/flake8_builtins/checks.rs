@@ -13,11 +13,17 @@ pub fn builtin_shadowing<T>(
     node_type: ShadowingType,
 ) -> Option<Check> {
     if BUILTINS.contains(&name) {
-        Some(Check::new(
+        Some(Check::new::<CheckKind>(
             match node_type {
-                ShadowingType::Variable => violations::BuiltinVariableShadowing(name.to_string()),
-                ShadowingType::Argument => violations::BuiltinArgumentShadowing(name.to_string()),
-                ShadowingType::Attribute => violations::BuiltinAttributeShadowing(name.to_string()),
+                ShadowingType::Variable => {
+                    violations::BuiltinVariableShadowing(name.to_string()).into()
+                }
+                ShadowingType::Argument => {
+                    violations::BuiltinArgumentShadowing(name.to_string()).into()
+                }
+                ShadowingType::Attribute => {
+                    violations::BuiltinAttributeShadowing(name.to_string()).into()
+                }
             },
             Range::from_located(located),
         ))

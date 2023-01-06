@@ -91,7 +91,7 @@ pub fn check_boolean_default_value_in_function_definition(
         add_if_boolean(
             checker,
             arg,
-            violations::BooleanDefaultValueInFunctionDefinition,
+            violations::BooleanDefaultValueInFunctionDefinition.into(),
         );
     }
 }
@@ -108,7 +108,7 @@ pub fn check_boolean_positional_value_in_function_call(
         add_if_boolean(
             checker,
             arg,
-            violations::BooleanPositionalValueInFunctionCall,
+            violations::BooleanPositionalValueInFunctionCall.into(),
         );
     }
 }

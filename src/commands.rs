@@ -119,7 +119,7 @@ pub fn run(
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.enabled.contains(&CheckCode::E902) {
                         Diagnostics::new(vec![Message {
-                            kind: violations::IOError(message),
+                            kind: violations::IOError(message).into(),
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,
