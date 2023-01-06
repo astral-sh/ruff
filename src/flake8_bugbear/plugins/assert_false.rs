@@ -47,11 +47,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
 
     let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
     if checker.patch(check.kind.code()) {
-        let mut generator = SourceCodeGenerator::new(
-            checker.style.indentation(),
-            checker.style.quote(),
-            checker.style.line_ending(),
-        );
+        let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_stmt(&assertion_error(msg));
         check.amend(Fix::replacement(
             generator.generate(),

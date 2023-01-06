@@ -28,11 +28,7 @@ fn compare(
             comparators: comparators.to_vec(),
         },
     );
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_expr(&cmp, 0);
     generator.generate()
 }
@@ -295,11 +291,7 @@ fn function(
             type_comment: None,
         },
     );
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&func);
     generator.generate()
 }

@@ -30,11 +30,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         return None;
     }
 
-    let mut generator = SourceCodeGenerator::new(
-        checker.style.indentation(),
-        checker.style.quote(),
-        checker.style.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = checker.style.into();
     generator.unparse_expr(
         &create_expr(ExprKind::Constant {
             value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
@@ -88,11 +84,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            let mut generator = SourceCodeGenerator::new(
-                                checker.style.indentation(),
-                                checker.style.quote(),
-                                checker.style.line_ending(),
-                            );
+                            let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: names
@@ -122,11 +114,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            let mut generator = SourceCodeGenerator::new(
-                                checker.style.indentation(),
-                                checker.style.quote(),
-                                checker.style.line_ending(),
-                            );
+                            let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: names
@@ -168,11 +156,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            let mut generator = SourceCodeGenerator::new(
-                                checker.style.indentation(),
-                                checker.style.quote(),
-                                checker.style.line_ending(),
-                            );
+                            let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: elts.clone(),
@@ -221,11 +205,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(check.kind.code()) {
-                            let mut generator = SourceCodeGenerator::new(
-                                checker.style.indentation(),
-                                checker.style.quote(),
-                                checker.style.line_ending(),
-                            );
+                            let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: elts.clone(),
@@ -303,11 +283,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     );
 
     if checker.patch(check.kind.code()) {
-        let mut generator = SourceCodeGenerator::new(
-            checker.style.indentation(),
-            checker.style.quote(),
-            checker.style.line_ending(),
-        );
+        let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
         check.amend(Fix::replacement(
             generator.generate(),
