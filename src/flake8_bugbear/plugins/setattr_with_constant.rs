@@ -58,7 +58,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `StmtKind::Expr`).
-    if let StmtKind::Expr { value: child } = &checker.current_stmt().0.node {
+    if let StmtKind::Expr { value: child } = &checker.current_stmt().node {
         if expr == child.as_ref() {
             let mut check = Check::new(CheckKind::SetAttrWithConstant, Range::from_located(expr));
             if checker.patch(check.kind.code()) {
