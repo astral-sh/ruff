@@ -28,6 +28,6 @@ pub fn main(cli: &Cli) -> Result<()> {
         stylist.line_ending(),
     );
     generator.unparse_suite(&python_ast);
-    println!("{}", generator.generate()?);
+    println!("{}", generator.generate());
     Ok(())
 }

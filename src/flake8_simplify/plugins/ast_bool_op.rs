@@ -30,7 +30,7 @@ fn to_source(expr: &Expr, stylist: &SourceCodeStyleDetector) -> String {
         stylist.line_ending(),
     );
     generator.unparse_expr(expr, 0);
-    generator.generate().unwrap()
+    generator.generate()
 }
 
 /// SIM101

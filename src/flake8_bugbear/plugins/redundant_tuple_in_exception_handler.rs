@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
 use crate::ast::types::Range;
@@ -30,16 +29,11 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
                 checker.style.line_ending(),
             );
             generator.unparse_expr(elt, 0);
-            match generator.generate() {
-                Ok(content) => {
-                    check.amend(Fix::replacement(
-                        content,
-                        type_.location,
-                        type_.end_location.unwrap(),
-                    ));
-                }
-                Err(e) => error!("Failed to remove redundant tuple: {e}"),
-            }
+            check.amend(Fix::replacement(
+                generator.generate(),
+                type_.location,
+                type_.end_location.unwrap(),
+            ));
         }
         checker.add_check(check);
     }

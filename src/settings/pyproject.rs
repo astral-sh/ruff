@@ -31,13 +31,13 @@ impl Pyproject {
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
     let contents = fs::read_file(path)?;
-    toml::from_str(&contents).map_err(std::convert::Into::into)
+    toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    toml::from_str(&contents).map_err(std::convert::Into::into)
+    toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
