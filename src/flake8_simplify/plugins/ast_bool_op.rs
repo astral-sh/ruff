@@ -39,8 +39,8 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    // Locate duplicate `isinstance` calls, represented as a map from argument name to indices
-    // of the relevant `Expr` instances in `values`.
+    // Locate duplicate `isinstance` calls, represented as a map from argument name
+    // to indices of the relevant `Expr` instances in `values`.
     let mut duplicates = FxHashMap::default();
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
@@ -90,18 +90,6 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     })
                     .collect();
 
-                // Flatten all the types used across the `isinstance` cals.
-                let elts: Vec<&Expr> = types
-                    .iter()
-                    .flat_map(|value| {
-                        if let ExprKind::Tuple { elts, .. } = &value.node {
-                            Left(elts.iter())
-                        } else {
-                            Right(iter::once(*value))
-                        }
-                    })
-                    .collect();
-
                 // Generate a single `isinstance` call.
                 let call = create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Name {
@@ -114,7 +102,18 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                             ctx: ExprContext::Load,
                         }),
                         create_expr(ExprKind::Tuple {
-                            elts: elts.into_iter().map(Clone::clone).collect(),
+                            // Flatten all the types used across the `isinstance` calls.
+                            elts: types
+                                .iter()
+                                .flat_map(|value| {
+                                    if let ExprKind::Tuple { elts, .. } = &value.node {
+                                        Left(elts.iter())
+                                    } else {
+                                        Right(iter::once(*value))
+                                    }
+                                })
+                                .map(Clone::clone)
+                                .collect(),
                             ctx: ExprContext::Load,
                         }),
                     ],
