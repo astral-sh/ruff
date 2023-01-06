@@ -1,0 +1,53 @@
+---
+source: src/flake8_pie/mod.rs
+expression: checks
+---
+- kind: PreferListBuiltin
+  location:
+    row: 3
+    column: 43
+  end_location:
+    row: 3
+    column: 53
+  fix:
+    content: list
+    location:
+      row: 3
+      column: 43
+    end_location:
+      row: 3
+      column: 53
+  parent: ~
+- kind: PreferListBuiltin
+  location:
+    row: 7
+    column: 35
+  end_location:
+    row: 7
+    column: 45
+  fix:
+    content: list
+    location:
+      row: 7
+      column: 35
+    end_location:
+      row: 7
+      column: 45
+  parent: ~
+- kind: PreferListBuiltin
+  location:
+    row: 11
+    column: 27
+  end_location:
+    row: 11
+    column: 37
+  fix:
+    content: list
+    location:
+      row: 11
+      column: 27
+    end_location:
+      row: 11
+      column: 37
+  parent: ~
+

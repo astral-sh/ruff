@@ -12,8 +12,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::settings;
     use crate::settings::types::PythonVersion;
 
@@ -48,6 +48,9 @@ mod tests {
     #[test_case(CheckCode::UP025, Path::new("UP025.py"); "UP025")]
     #[test_case(CheckCode::UP026, Path::new("UP026.py"); "UP026")]
     #[test_case(CheckCode::UP027, Path::new("UP027.py"); "UP027")]
+    #[test_case(CheckCode::UP028, Path::new("UP028_0.py"); "UP028_0")]
+    #[test_case(CheckCode::UP028, Path::new("UP028_1.py"); "UP028_1")]
+    #[test_case(CheckCode::UP029, Path::new("UP029.py"); "UP029")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(

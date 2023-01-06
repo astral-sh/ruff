@@ -5,7 +5,7 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 
 pub fn call_datetime_without_tzinfo(
     checker: &mut Checker,
@@ -190,8 +190,8 @@ pub fn call_datetime_strptime_without_zone(
         return;
     };
 
-    if let ExprKind::Call { keywords, .. } = &grandparent.0.node {
-        if let ExprKind::Attribute { attr, .. } = &parent.0.node {
+    if let ExprKind::Call { keywords, .. } = &grandparent.node {
+        if let ExprKind::Attribute { attr, .. } = &parent.node {
             // Ex) `datetime.strptime(...).astimezone()`
             if attr == "astimezone" {
                 return;

@@ -31,13 +31,13 @@ impl Pyproject {
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
     let contents = fs::read_file(path)?;
-    toml::from_str(&contents).map_err(std::convert::Into::into)
+    toml_edit::easy::from_str(&contents).map_err(Into::into)
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    toml::from_str(&contents).map_err(std::convert::Into::into)
+    toml_edit::easy::from_str(&contents).map_err(Into::into)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -129,31 +129,31 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::checks_gen::CheckCodePrefix;
     use crate::flake8_quotes::settings::Quote;
     use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
+    use crate::registry::CheckCodePrefix;
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
     use crate::{
-        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-        flake8_tidy_imports, mccabe, pep8_naming,
+        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
+        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
     };
 
     #[test]
     fn deserialize() -> Result<()> {
-        let pyproject: Pyproject = toml::from_str(r#""#)?;
+        let pyproject: Pyproject = toml_edit::easy::from_str(r#""#)?;
         assert_eq!(pyproject.tool, None);
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 "#,
         )?;
         assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -188,10 +188,13 @@ mod tests {
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -199,13 +202,14 @@ mod tests {
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
             })
         );
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -240,11 +244,14 @@ line-length = 79
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     cache_dir: None,
                     flake8_annotations: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -252,13 +259,14 @@ line-length = 79
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
             })
         );
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -294,10 +302,13 @@ exclude = ["foo.py"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
-                    flake8_errmsg: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -305,13 +316,14 @@ exclude = ["foo.py"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
             })
         );
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -347,10 +359,13 @@ select = ["E501"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -358,13 +373,14 @@ select = ["E501"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
             })
         );
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -401,10 +417,13 @@ ignore = ["E501"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
+                    flake8_bandit: None,
                     flake8_bugbear: None,
                     flake8_errmsg: None,
+                    flake8_pytest_style: None,
                     flake8_quotes: None,
                     flake8_tidy_imports: None,
                     flake8_import_conventions: None,
@@ -412,13 +431,14 @@ ignore = ["E501"]
                     isort: None,
                     mccabe: None,
                     pep8_naming: None,
+                    pycodestyle: None,
                     pydocstyle: None,
                     pyupgrade: None,
                 })
             })
         );
 
-        assert!(toml::from_str::<Pyproject>(
+        assert!(toml_edit::easy::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -427,7 +447,7 @@ line_length = 79
         )
         .is_err());
 
-        assert!(toml::from_str::<Pyproject>(
+        assert!(toml_edit::easy::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -436,7 +456,7 @@ select = ["E123"]
         )
         .is_err());
 
-        assert!(toml::from_str::<Pyproject>(
+        assert!(toml_edit::easy::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -485,6 +505,7 @@ other-attribute = 1
                 format: None,
                 force_exclude: None,
                 unfixable: None,
+                task_tags: None,
                 update_check: None,
                 cache_dir: None,
                 per_file_ignores: Some(FxHashMap::from_iter([(
@@ -498,6 +519,7 @@ other-attribute = 1
                 target_version: None,
                 show_source: None,
                 flake8_annotations: None,
+                flake8_bandit: None,
                 flake8_bugbear: Some(flake8_bugbear::settings::Options {
                     extend_immutable_calls: Some(vec![
                         "fastapi.Depends".to_string(),
@@ -506,6 +528,27 @@ other-attribute = 1
                 }),
                 flake8_errmsg: Some(flake8_errmsg::settings::Options {
                     max_string_length: Some(20),
+                }),
+                flake8_pytest_style: Some(flake8_pytest_style::settings::Options {
+                    fixture_parentheses: Some(false),
+                    parametrize_names_type: Some(
+                        flake8_pytest_style::types::ParametrizeNameType::CSV
+                    ),
+                    parametrize_values_type: Some(
+                        flake8_pytest_style::types::ParametrizeValuesType::Tuple,
+                    ),
+                    parametrize_values_row_type: Some(
+                        flake8_pytest_style::types::ParametrizeValuesRowType::List,
+                    ),
+                    raises_require_match_for: Some(vec![
+                        "Exception".to_string(),
+                        "TypeError".to_string(),
+                        "KeyError".to_string(),
+                    ]),
+                    raises_extend_require_match_for: Some(vec![
+                        "requests.RequestException".to_string(),
+                    ]),
+                    mark_parentheses: Some(false),
                 }),
                 flake8_quotes: Some(flake8_quotes::settings::Options {
                     inline_quotes: Some(Quote::Single),
@@ -566,6 +609,7 @@ other-attribute = 1
                     ]),
                     staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
                 }),
+                pycodestyle: None,
                 pydocstyle: None,
                 pyupgrade: None,
             }

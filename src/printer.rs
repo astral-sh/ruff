@@ -11,11 +11,11 @@ use serde::Serialize;
 use serde_json::json;
 
 use crate::autofix::fixer;
-use crate::checks::CheckCode;
 use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
+use crate::registry::CheckCode;
 use crate::settings::types::SerializationFormat;
 use crate::tell_user;
 
@@ -223,19 +223,30 @@ impl<'a> Printer<'a> {
                 self.post_text(diagnostics);
             }
             SerializationFormat::Github => {
-                // Generate error workflow command in GitHub Actions format
-                // https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
+                // Generate error workflow command in GitHub Actions format.
+                // See: https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
                 diagnostics.messages.iter().for_each(|message| {
+                    let label = format!(
+                        "{}{}{}{}{}{} {} {}",
+                        relativize_path(Path::new(&message.filename)),
+                        ":",
+                        message.location.row(),
+                        ":",
+                        message.location.column(),
+                        ":",
+                        message.kind.code().as_ref(),
+                        message.kind.body(),
+                    );
                     println!(
-                        "::notice title=Ruff,file={},line={},col={},endLine={},endColumn={}::({}) \
-                         {}",
+                        "::error title=Ruff \
+                         ({}),file={},line={},col={},endLine={},endColumn={}::{}",
+                        message.kind.code(),
                         relativize_path(Path::new(&message.filename)),
                         message.location.row(),
                         message.location.column(),
                         message.end_location.row(),
                         message.end_location.column(),
-                        message.kind.code(),
-                        message.kind.body(),
+                        label,
                     );
                 });
             }
@@ -303,7 +314,7 @@ impl<'a> Printer<'a> {
     }
 }
 
-fn group_messages_by_filename(messages: &Vec<Message>) -> BTreeMap<&String, Vec<&Message>> {
+fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&String, Vec<&Message>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages

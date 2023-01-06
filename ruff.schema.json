@@ -121,6 +121,17 @@
         }
       ]
     },
+    "flake8-bandit": {
+      "description": "Options for the `flake8-bandit` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8BanditOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-bugbear": {
       "description": "Options for the `flake8-bugbear` plugin.",
       "anyOf": [
@@ -148,6 +159,17 @@
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ImportConventionsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-pytest-style": {
+      "description": "Options for the `flake8-pytest-style` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8PytestStyleOptions"
         },
         {
           "type": "null"
@@ -277,6 +299,17 @@
         }
       }
     },
+    "pycodestyle": {
+      "description": "Options for the `pycodestyle` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Pycodestyle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pydocstyle": {
       "description": "Options for the `pydocstyle` plugin.",
       "anyOf": [
@@ -354,6 +387,16 @@
           "type": "null"
         }
       ]
+    },
+    "task-tags": {
+      "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length checks (`E501`) if `ignore-overlong-task-comments` is set to `true`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
     },
     "unfixable": {
       "description": "A list of check code prefixes to consider un-autofix-able.",
@@ -751,6 +794,14 @@
         "PGH002",
         "PGH003",
         "PGH004",
+        "PIE",
+        "PIE7",
+        "PIE79",
+        "PIE790",
+        "PIE794",
+        "PIE8",
+        "PIE80",
+        "PIE807",
         "PLC",
         "PLC0",
         "PLC04",
@@ -796,6 +847,36 @@
         "PLW06",
         "PLW060",
         "PLW0602",
+        "PT",
+        "PT0",
+        "PT00",
+        "PT001",
+        "PT002",
+        "PT003",
+        "PT004",
+        "PT005",
+        "PT006",
+        "PT007",
+        "PT008",
+        "PT009",
+        "PT01",
+        "PT010",
+        "PT011",
+        "PT012",
+        "PT013",
+        "PT015",
+        "PT016",
+        "PT017",
+        "PT018",
+        "PT019",
+        "PT02",
+        "PT020",
+        "PT021",
+        "PT022",
+        "PT023",
+        "PT024",
+        "PT025",
+        "PT026",
         "Q",
         "Q0",
         "Q00",
@@ -840,14 +921,45 @@
         "S10",
         "S101",
         "S102",
+        "S103",
         "S104",
         "S105",
         "S106",
         "S107",
+        "S108",
+        "S11",
+        "S113",
+        "S3",
+        "S32",
+        "S324",
+        "S5",
+        "S50",
+        "S501",
+        "S506",
         "SIM",
         "SIM1",
+        "SIM10",
+        "SIM101",
+        "SIM102",
+        "SIM105",
+        "SIM107",
+        "SIM108",
+        "SIM109",
         "SIM11",
+        "SIM110",
+        "SIM111",
+        "SIM117",
         "SIM118",
+        "SIM2",
+        "SIM20",
+        "SIM201",
+        "SIM202",
+        "SIM208",
+        "SIM22",
+        "SIM220",
+        "SIM221",
+        "SIM222",
+        "SIM223",
         "SIM3",
         "SIM30",
         "SIM300",
@@ -916,6 +1028,8 @@
         "UP025",
         "UP026",
         "UP027",
+        "UP028",
+        "UP029",
         "W",
         "W2",
         "W29",
@@ -957,6 +1071,13 @@
           "enum": [
             "numpy"
           ]
+        },
+        {
+          "description": "Use PEP257-style docstrings.",
+          "type": "string",
+          "enum": [
+            "pep257"
+          ]
         }
       ]
     },
@@ -990,6 +1111,32 @@
             "boolean",
             "null"
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8BanditOptions": {
+      "type": "object",
+      "properties": {
+        "hardcoded-tmp-directory": {
+          "description": "A list of directories to consider temporary.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "hardcoded-tmp-directory-extend": {
+          "description": "A list of directories to consider temporary, in addition to those specified by `hardcoded-tmp-directory`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -1045,6 +1192,79 @@
             "null"
           ],
           "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8PytestStyleOptions": {
+      "type": "object",
+      "properties": {
+        "fixture-parentheses": {
+          "description": "Boolean flag specifying whether `@pytest.fixture()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.fixture()` is valid and `@pytest.fixture` is an error. If set to `false`, `@pytest.fixture` is valid and `@pytest.fixture()` is an error.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "mark-parentheses": {
+          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is an error. If set to `false`, `@pytest.fixture` is valid and `@pytest.mark.foo()` is an error.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "parametrize-names-type": {
+          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported: * `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize('name1,name2', ...)` * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), ...)` * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ParametrizeNameType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parametrize-values-row-type": {
+          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported: * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])` * `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ParametrizeValuesRowType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parametrize-values-type": {
+          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported: * `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))` * `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ParametrizeValuesType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raises-extend-require-match-for": {
+          "description": "List of additional exception names that require a match= parameter in a `pytest.raises()` call. This extends the default list of exceptions that require a match= parameter. This option is useful if you want to extend the default list of exceptions that require a match= parameter without having to specify the entire list. Note that this option does not remove any exceptions from the default list.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "raises-require-match-for": {
+          "description": "List of exception names that require a match= parameter in a `pytest.raises()` call.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
             "type": "string"
           }
         }
@@ -1191,6 +1411,13 @@
             "type": "string"
           }
         },
+        "order-by-type": {
+          "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "single-line-exclusions": {
           "description": "One or more modules to exclude from the single line rule.",
           "type": [
@@ -1225,6 +1452,28 @@
         }
       },
       "additionalProperties": false
+    },
+    "ParametrizeNameType": {
+      "type": "string",
+      "enum": [
+        "csv",
+        "tuple",
+        "list"
+      ]
+    },
+    "ParametrizeValuesRowType": {
+      "type": "string",
+      "enum": [
+        "tuple",
+        "list"
+      ]
+    },
+    "ParametrizeValuesType": {
+      "type": "string",
+      "enum": [
+        "tuple",
+        "list"
+      ]
     },
     "Pep8NamingOptions": {
       "type": "object",
@@ -1275,11 +1524,24 @@
       },
       "additionalProperties": false
     },
+    "Pycodestyle": {
+      "type": "object",
+      "properties": {
+        "ignore-overlong-task-comments": {
+          "description": "Whether or not line-length checks (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "Pydocstyle": {
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style or Numpy-style conventions when detecting docstring sections. By default, conventions will be inferred from the available sections.",
+          "description": "Whether to use Google-style or NumPy-style conventions or the PEP257 defaults when analyzing docstring sections.",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"

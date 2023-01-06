@@ -6,7 +6,8 @@ use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Located, Location};
+use rustpython_ast::{Comprehension, Located, Location};
+use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
     KeywordData, Operator, Stmt, StmtKind, Suite,
@@ -23,26 +24,25 @@ use crate::ast::types::{
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
-use crate::checks::{Check, CheckCode, CheckKind, DeferralKeyword};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::noqa::Directive;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::python::typing::SubscriptKind;
+use crate::registry::{Check, CheckCode, CheckKind, DeferralKeyword};
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::vendor::cformat::{CFormatError, CFormatErrorType};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
-    docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
+    autofix, docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
     flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_print, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_unused_arguments,
-    mccabe, noqa, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
-    pyupgrade, ruff, visibility,
+    flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
+    flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -151,7 +151,7 @@ impl<'a> Checker<'a> {
             in_subscript: false,
             seen_import_boundary: false,
             futures_allowed: true,
-            annotations_future_enabled: false,
+            annotations_future_enabled: path.extension().map_or(false, |ext| ext == "pyi"),
             except_handlers: vec![],
             // Check-specific state.
             flake8_bugbear_seen: vec![],
@@ -173,8 +173,6 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: &CheckCode) -> bool {
-        // TODO(charlie): We can't fix errors in f-strings until RustPython adds
-        // location data.
         matches!(self.autofix, flags::Autofix::Enabled) && self.settings.fixable.contains(code)
     }
 
@@ -191,13 +189,18 @@ impl<'a> Checker<'a> {
                 && match_call_path(call_path, "typing_extensions", target, &self.from_imports))
     }
 
-    /// Return `true` if `member` is bound as a builtin.
-    pub fn is_builtin(&self, member: &str) -> bool {
+    /// Return the current `Binding` for a given `name`.
+    pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.current_scopes()
             .find_map(|scope| scope.values.get(member))
-            .map_or(false, |index| {
-                matches!(self.bindings[*index].kind, BindingKind::Builtin)
-            })
+            .map(|index| &self.bindings[*index])
+    }
+
+    /// Return `true` if `member` is bound as a builtin.
+    pub fn is_builtin(&self, member: &str) -> bool {
+        self.find_binding(member).map_or(false, |binding| {
+            matches!(binding.kind, BindingKind::Builtin)
+        })
     }
 
     /// Return `true` if a `CheckCode` is disabled by a `noqa` directive.
@@ -252,7 +255,7 @@ where
                 if !self.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(stmt)
                     && !operations::in_nested_block(
-                        &mut self.parents.iter().rev().map(|node| node.0),
+                        self.parents.iter().rev().map(std::convert::Into::into),
                     )
                 {
                     self.seen_import_boundary = true;
@@ -282,15 +285,9 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    self.add_checks(
-                        names
-                            .iter()
-                            .zip(ranges.iter())
-                            .filter_map(|(name, range)| {
-                                pycodestyle::checks::ambiguous_variable_name(name, *range)
-                            })
-                            .into_iter(),
-                    );
+                    self.add_checks(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                        pycodestyle::checks::ambiguous_variable_name(name, *range)
+                    }));
                 }
             }
             StmtKind::Nonlocal { names } => {
@@ -335,22 +332,21 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    self.add_checks(
-                        names
-                            .iter()
-                            .zip(ranges.iter())
-                            .filter_map(|(name, range)| {
-                                pycodestyle::checks::ambiguous_variable_name(name, *range)
-                            })
-                            .into_iter(),
-                    );
+                    self.add_checks(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                        pycodestyle::checks::ambiguous_variable_name(name, *range)
+                    }));
                 }
             }
             StmtKind::Break => {
                 if self.settings.enabled.contains(&CheckCode::F701) {
                     if let Some(check) = pyflakes::checks::break_outside_loop(
                         stmt,
-                        &mut self.parents.iter().rev().map(|node| node.0).skip(1),
+                        &mut self
+                            .parents
+                            .iter()
+                            .rev()
+                            .map(std::convert::Into::into)
+                            .skip(1),
                     ) {
                         self.add_check(check);
                     }
@@ -360,7 +356,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::F702) {
                     if let Some(check) = pyflakes::checks::continue_outside_loop(
                         stmt,
-                        &mut self.parents.iter().rev().map(|node| node.0).skip(1),
+                        &mut self
+                            .parents
+                            .iter()
+                            .rev()
+                            .map(std::convert::Into::into)
+                            .skip(1),
                     ) {
                         self.add_check(check);
                     }
@@ -482,12 +483,46 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_default(args).into_iter(),
+                        flake8_bandit::checks::hardcoded_password_default(args).into_iter(),
                     );
                 }
 
                 if self.settings.enabled.contains(&CheckCode::PLR0206) {
                     pylint::plugins::property_with_parameters(self, stmt, decorator_list, args);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT001)
+                    || self.settings.enabled.contains(&CheckCode::PT002)
+                    || self.settings.enabled.contains(&CheckCode::PT003)
+                    || self.settings.enabled.contains(&CheckCode::PT004)
+                    || self.settings.enabled.contains(&CheckCode::PT005)
+                    || self.settings.enabled.contains(&CheckCode::PT019)
+                    || self.settings.enabled.contains(&CheckCode::PT020)
+                    || self.settings.enabled.contains(&CheckCode::PT021)
+                    || self.settings.enabled.contains(&CheckCode::PT022)
+                    || self.settings.enabled.contains(&CheckCode::PT024)
+                    || self.settings.enabled.contains(&CheckCode::PT025)
+                {
+                    flake8_pytest_style::plugins::fixture(
+                        self,
+                        stmt,
+                        name,
+                        args,
+                        decorator_list,
+                        body,
+                    );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT006)
+                    || self.settings.enabled.contains(&CheckCode::PT007)
+                {
+                    flake8_pytest_style::plugins::parametrize(self, decorator_list);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT023)
+                    || self.settings.enabled.contains(&CheckCode::PT026)
+                {
+                    flake8_pytest_style::plugins::marks(self, decorator_list);
                 }
 
                 self.check_builtin_shadowing(name, stmt, true);
@@ -606,6 +641,14 @@ where
                     flake8_bugbear::plugins::abstract_base_class(
                         self, stmt, name, bases, keywords, body,
                     );
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT023) {
+                    flake8_pytest_style::plugins::marks(self, decorator_list);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PIE794) {
+                    flake8_pie::plugins::dupe_class_field_definitions(self, bases, body);
                 }
 
                 self.check_builtin_shadowing(name, stmt, false);
@@ -815,6 +858,16 @@ where
                             self.add_check(check);
                         }
                     }
+
+                    if self.settings.enabled.contains(&CheckCode::PT013) {
+                        if let Some(check) = flake8_pytest_style::plugins::import(
+                            stmt,
+                            &alias.node.name,
+                            alias.node.asname.as_deref(),
+                        ) {
+                            self.add_check(check);
+                        }
+                    }
                 }
             }
             StmtKind::ImportFrom {
@@ -850,13 +903,18 @@ where
                     }
                 }
 
-                if let Some("__future__") = module.as_deref() {
-                    if self.settings.enabled.contains(&CheckCode::UP010) {
+                if self.settings.enabled.contains(&CheckCode::UP010) {
+                    if let Some("__future__") = module.as_deref() {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP026) {
                     pyupgrade::plugins::rewrite_mock_import(self, stmt);
+                }
+                if self.settings.enabled.contains(&CheckCode::UP029) {
+                    if let Some(module) = module.as_deref() {
+                        pyupgrade::plugins::unnecessary_builtin_import(self, stmt, module, names);
+                    }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::TID251) {
@@ -877,6 +935,16 @@ where
                         ) {
                             self.add_check(check);
                         }
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT013) {
+                    if let Some(check) = flake8_pytest_style::plugins::import_from(
+                        stmt,
+                        module.as_deref(),
+                        level.as_ref(),
+                    ) {
+                        self.add_check(check);
                     }
                 }
 
@@ -939,7 +1007,7 @@ where
                                 self.add_check(Check::new(
                                     CheckKind::ImportStarNotPermitted(helpers::format_import_from(
                                         level.as_ref(),
-                                        module.as_ref(),
+                                        module.as_deref(),
                                     )),
                                     Range::from_located(stmt),
                                 ));
@@ -950,7 +1018,7 @@ where
                             self.add_check(Check::new(
                                 CheckKind::ImportStarUsed(helpers::format_import_from(
                                     level.as_ref(),
-                                    module.as_ref(),
+                                    module.as_deref(),
                                 )),
                                 Range::from_located(stmt),
                             ));
@@ -1016,7 +1084,7 @@ where
                     if self.settings.enabled.contains(&CheckCode::T100) {
                         if let Some(check) = flake8_debugger::checks::debugger_import(
                             stmt,
-                            module.as_ref().map(String::as_str),
+                            module.as_deref(),
                             &alias.node.name,
                         ) {
                             self.add_check(check);
@@ -1124,6 +1192,16 @@ where
                 if self.settings.enabled.contains(&CheckCode::F634) {
                     pyflakes::plugins::if_tuple(self, stmt, test);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM102) {
+                    flake8_simplify::plugins::nested_if_statements(self, stmt);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM108) {
+                    flake8_simplify::plugins::use_ternary_operator(
+                        self,
+                        stmt,
+                        self.current_stmt_parent().map(|parent| parent.0),
+                    );
+                }
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.enabled.contains(&CheckCode::F631) {
@@ -1138,12 +1216,30 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&CheckCode::S101) {
-                    self.add_check(flake8_bandit::plugins::assert_used(stmt));
+                    self.add_check(flake8_bandit::checks::assert_used(stmt));
+                }
+                if self.settings.enabled.contains(&CheckCode::PT015) {
+                    if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::PT018) {
+                    if let Some(check) =
+                        flake8_pytest_style::plugins::composite_condition(stmt, test)
+                    {
+                        self.add_check(check);
+                    }
                 }
             }
-            StmtKind::With { items, .. } | StmtKind::AsyncWith { items, .. } => {
+            StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
                 if self.settings.enabled.contains(&CheckCode::B017) {
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
+                }
+                if self.settings.enabled.contains(&CheckCode::PT012) {
+                    flake8_pytest_style::plugins::complex_raises(self, stmt, items, body);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM117) {
+                    flake8_simplify::plugins::multiple_with_statements(self, stmt);
                 }
             }
             StmtKind::While { body, orelse, .. } => {
@@ -1184,7 +1280,13 @@ where
                     flake8_simplify::plugins::key_in_dict_for(self, target, iter);
                 }
             }
-            StmtKind::Try { handlers, .. } => {
+            StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            } => {
                 if self.settings.enabled.contains(&CheckCode::F707) {
                     if let Some(check) =
                         pyflakes::checks::default_except_not_last(handlers, self.locator)
@@ -1203,6 +1305,22 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP024) {
                     pyupgrade::plugins::os_error_alias(self, handlers);
                 }
+                if self.settings.enabled.contains(&CheckCode::PT017) {
+                    self.add_checks(
+                        flake8_pytest_style::plugins::assert_in_exception_handler(handlers)
+                            .into_iter(),
+                    );
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM105) {
+                    flake8_simplify::plugins::use_contextlib_suppress(
+                        self, stmt, handlers, orelse, finalbody,
+                    );
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM107) {
+                    flake8_simplify::plugins::return_in_try_except_finally(
+                        self, body, handlers, finalbody,
+                    );
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&CheckCode::E731) {
@@ -1217,7 +1335,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     if let Some(check) =
-                        flake8_bandit::plugins::assign_hardcoded_password_string(value, targets)
+                        flake8_bandit::checks::assign_hardcoded_password_string(value, targets)
                     {
                         self.add_check(check);
                     }
@@ -1288,6 +1406,9 @@ where
                     body,
                     &Documentable::Function,
                 );
+                if self.settings.enabled.contains(&CheckCode::UP028) {
+                    pyupgrade::plugins::rewrite_yield_from(self, stmt);
+                }
                 let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Function);
                 self.definitions
                     .push((definition, scope.visibility.clone()));
@@ -1380,9 +1501,7 @@ where
                     globals,
                 })));
 
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(body);
             }
             StmtKind::Try {
                 body,
@@ -1394,19 +1513,13 @@ where
                 if self.settings.enabled.contains(&CheckCode::B012) {
                     flake8_bugbear::plugins::jump_statement_in_finally(self, finalbody);
                 }
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(body);
                 self.except_handlers.pop();
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
-                }
-                for stmt in finalbody {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(orelse);
+                self.visit_body(finalbody);
             }
             StmtKind::AnnAssign {
                 target,
@@ -1499,12 +1612,12 @@ where
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...]
                 if !self.in_deferred_string_type_definition
+                    && self.in_annotation
                     && self.settings.enabled.contains(&CheckCode::UP007)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && !self.settings.pyupgrade.keep_runtime_typing
-                            && self.annotations_future_enabled
-                            && self.in_annotation))
+                            && self.annotations_future_enabled))
                 {
                     pyupgrade::plugins::use_pep604_annotation(self, expr, value, slice);
                 }
@@ -1631,15 +1744,35 @@ where
                         if attr == name {
                             // Avoid flagging on function calls (e.g., `df.values()`).
                             if let Some(parent) = self.current_expr_parent() {
-                                if matches!(parent.0.node, ExprKind::Call { .. }) {
+                                if matches!(parent.node, ExprKind::Call { .. }) {
                                     continue;
                                 }
                             }
                             // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`).
-                            if helpers::is_non_variable(value) {
-                                continue;
+                            if pandas_vet::helpers::is_dataframe_candidate(value) {
+                                // If the target is a named variable, avoid triggering on
+                                // irrelevant bindings (like imports).
+                                if let ExprKind::Name { id, .. } = &value.node {
+                                    if self.find_binding(id).map_or(true, |binding| {
+                                        matches!(
+                                            binding.kind,
+                                            BindingKind::Builtin
+                                                | BindingKind::ClassDefinition
+                                                | BindingKind::FunctionDefinition
+                                                | BindingKind::Export(..)
+                                                | BindingKind::FutureImportation
+                                                | BindingKind::StarImportation(..)
+                                                | BindingKind::Importation(..)
+                                                | BindingKind::FromImportation(..)
+                                                | BindingKind::SubmoduleImportation(..)
+                                        )
+                                    }) {
+                                        continue;
+                                    }
+                                }
+
+                                self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                             }
-                            self.add_check(Check::new(code.kind(), Range::from_located(expr)));
                         };
                     }
                 }
@@ -1679,7 +1812,7 @@ where
                                         if self.settings.enabled.contains(&CheckCode::F521) {
                                             self.add_check(Check::new(
                                                 CheckKind::StringDotFormatInvalidFormat(
-                                                    e.to_string(),
+                                                    pyflakes::format::error_to_string(&e),
                                                 ),
                                                 location,
                                             ));
@@ -1751,7 +1884,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::UP024) {
                     pyupgrade::plugins::os_error_alias(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP029) {
+                if self.settings.enabled.contains(&CheckCode::UP030) {
                     pyupgrade::plugins::format_specifiers(self, expr, func);
                 }
 
@@ -1793,14 +1926,69 @@ where
 
                 // flake8-bandit
                 if self.settings.enabled.contains(&CheckCode::S102) {
-                    if let Some(check) = flake8_bandit::plugins::exec_used(expr, func) {
+                    if let Some(check) = flake8_bandit::checks::exec_used(expr, func) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S103) {
+                    if let Some(check) = flake8_bandit::checks::bad_file_permissions(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S501) {
+                    if let Some(check) = flake8_bandit::checks::request_with_no_cert_validation(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S506) {
+                    if let Some(check) = flake8_bandit::checks::unsafe_yaml_load(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
                         self.add_check(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S106) {
                     self.add_checks(
-                        flake8_bandit::plugins::hardcoded_password_func_arg(keywords).into_iter(),
+                        flake8_bandit::checks::hardcoded_password_func_arg(keywords).into_iter(),
                     );
+                }
+                if self.settings.enabled.contains(&CheckCode::S324) {
+                    if let Some(check) = flake8_bandit::checks::hashlib_insecure_hash_functions(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S113) {
+                    if let Some(check) = flake8_bandit::checks::request_without_timeout(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
                 }
 
                 // flake8-comprehensions
@@ -2037,9 +2225,41 @@ where
                     (CheckCode::PD013, "stack"),
                 ] {
                     if self.settings.enabled.contains(&code) {
-                        if let ExprKind::Attribute { attr, .. } = &func.node {
+                        if let ExprKind::Attribute { value, attr, .. } = &func.node {
                             if attr == name {
-                                self.add_check(Check::new(code.kind(), Range::from_located(func)));
+                                if pandas_vet::helpers::is_dataframe_candidate(value) {
+                                    // If the target is a named variable, avoid triggering on
+                                    // irrelevant bindings (like non-Pandas imports).
+                                    if let ExprKind::Name { id, .. } = &value.node {
+                                        if self.find_binding(id).map_or(true, |binding| {
+                                            if let BindingKind::Importation(.., module) =
+                                                &binding.kind
+                                            {
+                                                module != "pandas"
+                                            } else {
+                                                matches!(
+                                                    binding.kind,
+                                                    BindingKind::Builtin
+                                                        | BindingKind::ClassDefinition
+                                                        | BindingKind::FunctionDefinition
+                                                        | BindingKind::Export(..)
+                                                        | BindingKind::FutureImportation
+                                                        | BindingKind::StarImportation(..)
+                                                        | BindingKind::Importation(..)
+                                                        | BindingKind::FromImportation(..)
+                                                        | BindingKind::SubmoduleImportation(..)
+                                                )
+                                            }
+                                        }) {
+                                            continue;
+                                        }
+                                    }
+
+                                    self.add_check(Check::new(
+                                        code.kind(),
+                                        Range::from_located(func),
+                                    ));
+                                }
                             };
                         }
                     }
@@ -2138,6 +2358,30 @@ where
                     pylint::plugins::use_sys_exit(self, func);
                 }
 
+                // flake8-pytest-style
+                if self.settings.enabled.contains(&CheckCode::PT008) {
+                    if let Some(check) =
+                        flake8_pytest_style::plugins::patch_with_lambda(func, args, keywords)
+                    {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::PT009) {
+                    if let Some(check) = flake8_pytest_style::plugins::unittest_assertion(func) {
+                        self.add_check(check);
+                    }
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT010)
+                    || self.settings.enabled.contains(&CheckCode::PT011)
+                {
+                    flake8_pytest_style::plugins::raises_call(self, func, args, keywords);
+                }
+
+                if self.settings.enabled.contains(&CheckCode::PT016) {
+                    flake8_pytest_style::plugins::fail_call(self, func, args, keywords);
+                }
+
                 // ruff
                 if self.settings.enabled.contains(&CheckCode::RUF004) {
                     self.add_checks(
@@ -2198,15 +2442,7 @@ where
             }
             ExprKind::JoinedStr { values } => {
                 if self.settings.enabled.contains(&CheckCode::F541) {
-                    if !values
-                        .iter()
-                        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
-                    {
-                        self.add_check(Check::new(
-                            CheckKind::FStringMissingPlaceholders,
-                            Range::from_located(expr),
-                        ));
-                    }
+                    pyflakes::plugins::f_string_missing_placeholders(expr, values, self);
                 }
             }
             ExprKind::BinOp {
@@ -2326,6 +2562,16 @@ where
                 if self.settings.enabled.contains(&CheckCode::B002) {
                     flake8_bugbear::plugins::unary_prefix_increment(self, expr, op, operand);
                 }
+
+                if self.settings.enabled.contains(&CheckCode::SIM201) {
+                    flake8_simplify::plugins::negation_with_equal_op(self, expr, op, operand);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM202) {
+                    flake8_simplify::plugins::negation_with_not_equal_op(self, expr, op, operand);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM208) {
+                    flake8_simplify::plugins::double_negation(self, expr, op, operand);
+                }
             }
             ExprKind::Compare {
                 left,
@@ -2378,7 +2624,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
                     self.add_checks(
-                        flake8_bandit::plugins::compare_to_hardcoded_password_string(
+                        flake8_bandit::checks::compare_to_hardcoded_password_string(
                             left,
                             comparators,
                         )
@@ -2423,18 +2669,31 @@ where
                     ));
                 }
                 if self.settings.enabled.contains(&CheckCode::S104) {
-                    if let Some(check) = flake8_bandit::plugins::hardcoded_bind_all_interfaces(
+                    if let Some(check) = flake8_bandit::checks::hardcoded_bind_all_interfaces(
                         value,
                         &Range::from_located(expr),
                     ) {
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::S108) {
+                    if let Some(check) = flake8_bandit::checks::hardcoded_tmp_directory(
+                        expr,
+                        value,
+                        &self.settings.flake8_bandit.hardcoded_tmp_directory,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
                 if self.settings.enabled.contains(&CheckCode::UP025) {
-                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind);
+                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
+                if self.settings.enabled.contains(&CheckCode::PIE807) {
+                    flake8_pie::plugins::prefer_list_builtin(self, expr);
+                }
+
                 // Visit the arguments, but avoid the body, which will be deferred.
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
@@ -2496,6 +2755,24 @@ where
             ExprKind::BoolOp { op, values } => {
                 if self.settings.enabled.contains(&CheckCode::PLR1701) {
                     pylint::plugins::merge_isinstance(self, expr, op, values);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM101) {
+                    flake8_simplify::plugins::duplicate_isinstance_call(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM109) {
+                    flake8_simplify::plugins::compare_with_tuple(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM220) {
+                    flake8_simplify::plugins::a_and_not_a(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM221) {
+                    flake8_simplify::plugins::a_or_not_a(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM222) {
+                    flake8_simplify::plugins::or_true(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM223) {
+                    flake8_simplify::plugins::and_false(self, expr);
                 }
             }
             _ => {}
@@ -2750,7 +3027,7 @@ where
                     flake8_blind_except::plugins::blind_except(
                         self,
                         type_.as_deref(),
-                        name.as_ref().map(String::as_str),
+                        name.as_deref(),
                         body,
                     );
                 }
@@ -2838,6 +3115,17 @@ where
         }
     }
 
+    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
+        if self.settings.enabled.contains(&CheckCode::SIM118) {
+            flake8_simplify::plugins::key_in_dict_for(
+                self,
+                &comprehension.target,
+                &comprehension.iter,
+            );
+        }
+        visitor::walk_comprehension(self, comprehension);
+    }
+
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
         if self.settings.enabled.contains(&CheckCode::B006) {
             flake8_bugbear::plugins::mutable_argument_default(self, arguments);
@@ -2904,6 +3192,26 @@ where
         }
 
         self.check_builtin_arg_shadowing(&arg.node.arg, arg);
+    }
+
+    fn visit_body(&mut self, body: &'b [Stmt]) {
+        if self.settings.enabled.contains(&CheckCode::PIE790) {
+            flake8_pie::plugins::no_unnecessary_pass(self, body);
+        }
+
+        if self.settings.enabled.contains(&CheckCode::SIM110)
+            || self.settings.enabled.contains(&CheckCode::SIM111)
+        {
+            for (stmt, sibling) in body.iter().tuple_windows() {
+                if matches!(stmt.node, StmtKind::For { .. })
+                    && matches!(sibling.node, StmtKind::Return { .. })
+                {
+                    flake8_simplify::plugins::convert_loop_to_any_all(self, stmt, sibling);
+                }
+            }
+        }
+
+        visitor::walk_body(self, body);
     }
 }
 
@@ -3059,7 +3367,7 @@ impl<'a> Checker<'a> {
                         && !(matches!(existing.kind, BindingKind::FunctionDefinition)
                             && visibility::is_overload(
                                 self,
-                                cast::decorator_list(existing.source.as_ref().unwrap().0),
+                                cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
                         overridden = Some((*scope_index, *existing_binding_index));
@@ -3082,7 +3390,7 @@ impl<'a> Checker<'a> {
             }
         }
 
-        // If we're about to lose the binding, store it as overriden.
+        // If we're about to lose the binding, store it as overridden.
         if let Some((scope_index, binding_index)) = overridden {
             self.scopes[scope_index]
                 .overridden
@@ -3183,7 +3491,7 @@ impl<'a> Checker<'a> {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
-                                    module.as_ref(),
+                                    module.as_deref(),
                                 ));
                             }
                         }
@@ -3381,8 +3689,9 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         if let ExprKind::Name { id, .. } = &expr.node {
-            if operations::on_conditional_branch(&mut self.parents.iter().rev().map(|node| node.0))
-            {
+            if operations::on_conditional_branch(
+                &mut self.parents.iter().rev().map(std::convert::Into::into),
+            ) {
                 return;
             }
 
@@ -3482,9 +3791,7 @@ impl<'a> Checker<'a> {
                 StmtKind::FunctionDef { body, args, .. }
                 | StmtKind::AsyncFunctionDef { body, args, .. } => {
                     self.visit_arguments(args);
-                    for stmt in body {
-                        self.visit_stmt(stmt);
-                    }
+                    self.visit_body(body);
                 }
                 _ => unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef"),
             }
@@ -3666,7 +3973,7 @@ impl<'a> Checker<'a> {
                                 if let BindingKind::StarImportation(level, module) = &binding.kind {
                                     from_list.push(helpers::format_import_from(
                                         level.as_ref(),
-                                        module.as_ref(),
+                                        module.as_deref(),
                                     ));
                                 }
                             }
@@ -3691,7 +3998,7 @@ impl<'a> Checker<'a> {
             if self.settings.enabled.contains(&CheckCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
-                type UnusedImport<'a> = (&'a String, &'a Range);
+                type UnusedImport<'a> = (&'a str, &'a Range);
                 type BindingContext<'a, 'b> =
                     (&'a RefEquality<'b, Stmt>, Option<&'a RefEquality<'b, Stmt>>);
 
@@ -3722,7 +4029,7 @@ impl<'a> Checker<'a> {
 
                     let defined_by = binding.source.as_ref().unwrap();
                     let defined_in = self.child_to_parent.get(defined_by);
-                    let child = defined_by.0;
+                    let child: &Stmt = defined_by.into();
 
                     let check_lineno = binding.range.location.row();
                     let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -3754,16 +4061,19 @@ impl<'a> Checker<'a> {
                     self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
                 for ((defined_by, defined_in), unused_imports) in unused
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
+                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
                 {
-                    let child = defined_by.0;
-                    let parent = defined_in.map(|defined_in| defined_in.0);
+                    let child: &Stmt = defined_by.into();
+                    let parent: Option<&Stmt> = defined_in.map(std::convert::Into::into);
 
                     let fix = if !ignore_init && self.patch(&CheckCode::F401) {
-                        let deleted: Vec<&Stmt> =
-                            self.deletions.iter().map(|node| node.0).collect();
-                        match pyflakes::fixes::remove_unused_imports(
-                            &unused_imports,
+                        let deleted: Vec<&Stmt> = self
+                            .deletions
+                            .iter()
+                            .map(std::convert::Into::into)
+                            .collect();
+                        match autofix::helpers::remove_unused_imports(
+                            unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
                             parent,
                             &deleted,
@@ -3787,7 +4097,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
+                            CheckKind::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -3803,13 +4113,13 @@ impl<'a> Checker<'a> {
                 }
                 for ((defined_by, ..), unused_imports) in ignored
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
+                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
                 {
-                    let child = defined_by.0;
+                    let child: &Stmt = defined_by.into();
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.clone(), ignore_init, multiple),
+                            CheckKind::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })

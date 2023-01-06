@@ -13,7 +13,7 @@
 
 use cfg_if::cfg_if;
 
-use crate::checks::Check;
+use crate::registry::Check;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -21,8 +21,6 @@ mod ast;
 pub mod autofix;
 pub mod cache;
 mod checkers;
-pub mod checks;
-pub mod checks_gen;
 pub mod cli;
 mod cst;
 mod directives;
@@ -42,6 +40,7 @@ pub mod flake8_errmsg;
 mod flake8_implicit_str_concat;
 mod flake8_import_conventions;
 mod flake8_print;
+pub mod flake8_pytest_style;
 pub mod flake8_quotes;
 mod flake8_return;
 mod flake8_simplify;
@@ -66,6 +65,7 @@ mod pygrep_hooks;
 mod pylint;
 mod python;
 mod pyupgrade;
+pub mod registry;
 pub mod resolver;
 mod ruff;
 mod rustpython_helpers;
@@ -90,3 +90,4 @@ cfg_if! {
         pub use lib_wasm::check;
     }
 }
+pub mod flake8_pie;

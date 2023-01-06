@@ -1,5 +1,6 @@
 pub mod checks;
 pub mod plugins;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -9,8 +10,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
+    use super::settings::Settings;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::settings;
 
     #[test_case(CheckCode::E401, Path::new("E40.py"))]
@@ -54,6 +56,23 @@ mod tests {
             &settings::Settings::for_rules(vec![CheckCode::E711, CheckCode::E712, CheckCode::F632]),
         )?;
         insta::assert_yaml_snapshot!(checks);
+        Ok(())
+    }
+
+    #[test_case(false)]
+    #[test_case(true)]
+    fn task_tags(ignore_overlong_task_comments: bool) -> Result<()> {
+        let snapshot = format!("task_tags_{ignore_overlong_task_comments}");
+        let checks = test_path(
+            Path::new("./resources/test/fixtures/pycodestyle/E501_1.py"),
+            &settings::Settings {
+                pycodestyle: Settings {
+                    ignore_overlong_task_comments,
+                },
+                ..settings::Settings::for_rule(CheckCode::E501)
+            },
+        )?;
+        insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }
 }

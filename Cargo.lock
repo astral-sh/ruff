@@ -356,24 +356,15 @@ dependencies = [
 
 [[package]]
 name = "clearscreen"
-version = "1.0.10"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c969a6b6dadff9f3349b1f783f553e2411104763ca4789e1c6ca6a41f46a57b0"
+checksum = "41aa24cc5e1d6b3fc49ad4cd540b522fedcbe88bc6f259ff16e20e7010b6f8c7"
 dependencies = [
  "nix",
  "terminfo",
  "thiserror",
  "which",
  "winapi",
-]
-
-[[package]]
-name = "codegen"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff61280aed771c3070e7dcc9e050c66f1eb1e3b96431ba66f9f74641d02fc41d"
-dependencies = [
- "indexmap",
 ]
 
 [[package]]
@@ -396,12 +387,6 @@ dependencies = [
  "lazy_static",
  "winapi",
 ]
-
-[[package]]
-name = "common-path"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
 
 [[package]]
 name = "configparser"
@@ -750,7 +735,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.206-dev.0"
+version = "0.0.212-dev.0"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
@@ -763,7 +748,7 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
- "toml",
+ "toml_edit",
 ]
 
 [[package]]
@@ -1274,13 +1259,14 @@ checksum = "d906846a98739ed9d73d66e62c2641eef8321f1734b7a1156ab045a0248fb2b3"
 
 [[package]]
 name = "nix"
-version = "0.24.3"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa52e972a9a719cecb6864fb88568781eb706bac2cd1d4f04a648542dbf78069"
+checksum = "46a58d1d356c6597d08cde02c2f09d785b09e28711837b1ed667dc652c08a694"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "libc",
+ "static_assertions",
 ]
 
 [[package]]
@@ -1297,6 +1283,15 @@ checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
 dependencies = [
  "memchr",
  "version_check",
+]
+
+[[package]]
+name = "nom8"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae01545c9c7fc4486ab7debaf2aad7003ac19431791868fb2e8066df97fad2f8"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -1370,9 +1365,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
 
 [[package]]
 name = "oorandom"
@@ -1878,7 +1873,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.206"
+version = "0.0.212"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1893,7 +1888,6 @@ dependencies = [
  "clap_complete_command",
  "clearscreen",
  "colored",
- "common-path",
  "console_error_panic_hook",
  "console_log",
  "criterion",
@@ -1913,6 +1907,7 @@ dependencies = [
  "nohash-hasher",
  "notify",
  "num-bigint",
+ "num-traits",
  "once_cell",
  "path-absolutize",
  "quick-junit",
@@ -1936,7 +1931,7 @@ dependencies = [
  "test-case",
  "textwrap",
  "titlecase",
- "toml",
+ "toml_edit",
  "update-informer",
  "ureq",
  "walkdir",
@@ -1946,11 +1941,10 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.206"
+version = "0.0.212"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
- "codegen",
  "itertools",
  "libcst",
  "once_cell",
@@ -1967,8 +1961,9 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.206"
+version = "0.0.212"
 dependencies = [
+ "once_cell",
  "proc-macro2",
  "quote",
  "syn",
@@ -2010,7 +2005,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.1.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=71becd4059fdce4bce7010f1208ed3b1c883abba#71becd4059fdce4bce7010f1208ed3b1c883abba"
+source = "git+https://github.com/RustPython/RustPython.git?rev=4d53c7cb27c0379adf8b51c4d3d0d2174f41d590#4d53c7cb27c0379adf8b51c4d3d0d2174f41d590"
 dependencies = [
  "num-bigint",
  "rustpython-common",
@@ -2020,11 +2015,13 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.0.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=71becd4059fdce4bce7010f1208ed3b1c883abba#71becd4059fdce4bce7010f1208ed3b1c883abba"
+source = "git+https://github.com/RustPython/RustPython.git?rev=4d53c7cb27c0379adf8b51c4d3d0d2174f41d590#4d53c7cb27c0379adf8b51c4d3d0d2174f41d590"
 dependencies = [
  "ascii",
+ "bitflags",
  "cfg-if 1.0.0",
  "hexf-parse",
+ "itertools",
  "lexical-parse-float",
  "libc",
  "lock_api",
@@ -2043,7 +2040,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=71becd4059fdce4bce7010f1208ed3b1c883abba#71becd4059fdce4bce7010f1208ed3b1c883abba"
+source = "git+https://github.com/RustPython/RustPython.git?rev=4d53c7cb27c0379adf8b51c4d3d0d2174f41d590#4d53c7cb27c0379adf8b51c4d3d0d2174f41d590"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2060,7 +2057,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=71becd4059fdce4bce7010f1208ed3b1c883abba#71becd4059fdce4bce7010f1208ed3b1c883abba"
+source = "git+https://github.com/RustPython/RustPython.git?rev=4d53c7cb27c0379adf8b51c4d3d0d2174f41d590#4d53c7cb27c0379adf8b51c4d3d0d2174f41d590"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2499,12 +2496,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "toml"
-version = "0.5.10"
+name = "toml_datetime"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1333c76748e868a4d9d1017b5ab53171dfd095f70c712fdb4653a406547f598f"
+checksum = "808b51e57d0ef8f71115d8f3a01e7d3750d01c79cac4b3eda910f4389fdf92fd"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a34cc558345efd7e88b9eda9626df2138b80bb46a7606f695e751c892bc7dac6"
+dependencies = [
+ "indexmap",
+ "itertools",
+ "nom8",
+ "serde",
+ "toml_datetime",
 ]
 
 [[package]]
@@ -2638,9 +2648,9 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "update-informer"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f154aee470c0882ea0f3b1cc2a46c5f4d24f282655f7b0cec065614fe24c447f"
+checksum = "152ff185ca29f7f487c51ca785b0f1d85970c4581f4cdd12ed499227890200f5"
 dependencies = [
  "directories",
  "semver",

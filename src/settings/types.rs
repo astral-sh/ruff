@@ -1,4 +1,3 @@
-use std::env;
 use std::hash::Hash;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -11,9 +10,8 @@ use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use crate::checks::CheckCode;
-use crate::checks_gen::CheckCodePrefix;
 use crate::fs;
+use crate::registry::{CheckCode, CheckCodePrefix};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
@@ -165,17 +163,6 @@ pub enum SerializationFormat {
 
 impl Default for SerializationFormat {
     fn default() -> Self {
-        if let Ok(github_actions) = env::var("GITHUB_ACTIONS") {
-            if github_actions == "true" {
-                return Self::Github;
-            }
-        }
-
-        if let Ok(gitlab_ci) = env::var("GITLAB_CI") {
-            if gitlab_ci == "true" {
-                return Self::Gitlab;
-            }
-        }
         Self::Text
     }
 }

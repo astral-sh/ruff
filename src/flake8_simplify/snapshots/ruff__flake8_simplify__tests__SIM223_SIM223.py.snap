@@ -1,0 +1,53 @@
+---
+source: src/flake8_simplify/mod.rs
+expression: checks
+---
+- kind: AndFalse
+  location:
+    row: 1
+    column: 9
+  end_location:
+    row: 1
+    column: 14
+  fix:
+    content: "False"
+    location:
+      row: 1
+      column: 3
+    end_location:
+      row: 1
+      column: 14
+  parent: ~
+- kind: AndFalse
+  location:
+    row: 4
+    column: 16
+  end_location:
+    row: 4
+    column: 21
+  fix:
+    content: "False"
+    location:
+      row: 4
+      column: 3
+    end_location:
+      row: 4
+      column: 21
+  parent: ~
+- kind: AndFalse
+  location:
+    row: 7
+    column: 15
+  end_location:
+    row: 7
+    column: 20
+  fix:
+    content: "False"
+    location:
+      row: 7
+      column: 9
+    end_location:
+      row: 7
+      column: 20
+  parent: ~
+

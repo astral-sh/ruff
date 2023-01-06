@@ -8,9 +8,9 @@ use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
+use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 
@@ -198,24 +198,19 @@ fn convert_to_class(
     total_keyword: Option<KeywordData>,
     base_class: &ExprKind,
     stylist: &SourceCodeStyleDetector,
-) -> Result<Fix> {
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+) -> Fix {
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&create_class_def_stmt(
         class_name,
         body,
         total_keyword,
         base_class,
     ));
-    let content = generator.generate()?;
-    Ok(Fix::replacement(
-        content,
+    Fix::replacement(
+        generator.generate(),
         stmt.location,
         stmt.end_location.unwrap(),
-    ))
+    )
 }
 
 /// UP013
@@ -242,19 +237,14 @@ pub fn convert_typed_dict_functional_to_class(
         Range::from_located(stmt),
     );
     if checker.patch(check.kind.code()) {
-        match convert_to_class(
+        check.amend(convert_to_class(
             stmt,
             class_name,
             body,
             total_keyword,
             base_class,
             checker.style,
-        ) {
-            Ok(fix) => {
-                check.amend(fix);
-            }
-            Err(err) => error!("Failed to convert TypedDict: {err}"),
-        };
+        ));
     }
     checker.add_check(check);
 }

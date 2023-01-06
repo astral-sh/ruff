@@ -10,9 +10,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
     use crate::pydocstyle::settings::{Convention, Settings};
+    use crate::registry::CheckCode;
     use crate::settings;
 
     #[test_case(CheckCode::D100, Path::new("D.py"); "D100")]
@@ -62,6 +62,7 @@ mod tests {
     #[test_case(CheckCode::D417, Path::new("sections.py"); "D417_0")]
     #[test_case(CheckCode::D418, Path::new("D.py"); "D418")]
     #[test_case(CheckCode::D419, Path::new("D.py"); "D419")]
+    #[test_case(CheckCode::D104, Path::new("D104/__init__.py"); "D104_1")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(

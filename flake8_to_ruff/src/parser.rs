@@ -3,8 +3,7 @@ use std::str::FromStr;
 use anyhow::{bail, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff::checks::PREFIX_REDIRECTS;
-use ruff::checks_gen::CheckCodePrefix;
+use ruff::registry::{CheckCodePrefix, PREFIX_REDIRECTS};
 use ruff::settings::types::PatternPrefixPair;
 use rustc_hash::FxHashMap;
 
@@ -128,7 +127,7 @@ fn tokenize_files_to_codes_mapping(value: &str) -> Vec<Token> {
                 if mat.start() == 0 {
                     tokens.push(Token {
                         token_name,
-                        src: mat.as_str().to_string().trim().to_string(),
+                        src: mat.as_str().trim().to_string(),
                     });
                     i += mat.end();
                     break;
@@ -201,7 +200,7 @@ pub fn collect_per_file_ignores(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff::checks_gen::CheckCodePrefix;
+    use ruff::registry::CheckCodePrefix;
     use ruff::settings::types::PatternPrefixPair;
 
     use crate::parser::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};

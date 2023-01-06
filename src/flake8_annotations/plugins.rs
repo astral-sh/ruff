@@ -5,10 +5,10 @@ use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::{cast, helpers, visitor};
 use crate::checkers::ast::Checker;
-use crate::checks::{CheckCode, CheckKind};
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::flake8_annotations::fixes;
 use crate::flake8_annotations::helpers::match_function_def;
+use crate::registry::{CheckCode, CheckKind};
 use crate::visibility::Visibility;
 use crate::{visibility, Check};
 

@@ -12,17 +12,17 @@ use regex::Regex;
 use shellexpand;
 use shellexpand::LookupError;
 
-use crate::checks_gen::CheckCodePrefix;
 use crate::cli::{collect_per_file_ignores, Overrides};
+use crate::registry::CheckCodePrefix;
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 use crate::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, fs, isort, mccabe, pep8_naming, pydocstyle,
-    pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, fs, isort,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 #[derive(Debug, Default)]
@@ -52,18 +52,22 @@ pub struct Configuration {
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<CheckCodePrefix>>,
+    pub task_tags: Option<Vec<String>>,
     pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
+    pub flake8_bandit: Option<flake8_bandit::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
+    pub flake8_pytest_style: Option<flake8_pytest_style::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
     pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
     pub isort: Option<isort::settings::Options>,
     pub mccabe: Option<mccabe::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
+    pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
     pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
@@ -148,18 +152,22 @@ impl Configuration {
                 .transpose()?,
             target_version: options.target_version,
             unfixable: options.unfixable,
+            task_tags: options.task_tags,
             update_check: options.update_check,
             // Plugins
             flake8_annotations: options.flake8_annotations,
+            flake8_bandit: options.flake8_bandit,
             flake8_bugbear: options.flake8_bugbear,
             flake8_errmsg: options.flake8_errmsg,
             flake8_import_conventions: options.flake8_import_conventions,
+            flake8_pytest_style: options.flake8_pytest_style,
             flake8_quotes: options.flake8_quotes,
             flake8_tidy_imports: options.flake8_tidy_imports,
             flake8_unused_arguments: options.flake8_unused_arguments,
             isort: options.isort,
             mccabe: options.mccabe,
             pep8_naming: options.pep8_naming,
+            pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
             pyupgrade: options.pyupgrade,
         })
@@ -207,14 +215,17 @@ impl Configuration {
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
             unfixable: self.unfixable.or(config.unfixable),
+            task_tags: self.task_tags.or(config.task_tags),
             update_check: self.update_check.or(config.update_check),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
+            flake8_bandit: self.flake8_bandit.or(config.flake8_bandit),
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
             flake8_errmsg: self.flake8_errmsg.or(config.flake8_errmsg),
             flake8_import_conventions: self
                 .flake8_import_conventions
                 .or(config.flake8_import_conventions),
+            flake8_pytest_style: self.flake8_pytest_style.or(config.flake8_pytest_style),
             flake8_quotes: self.flake8_quotes.or(config.flake8_quotes),
             flake8_tidy_imports: self.flake8_tidy_imports.or(config.flake8_tidy_imports),
             flake8_unused_arguments: self
@@ -223,6 +234,7 @@ impl Configuration {
             isort: self.isort.or(config.isort),
             mccabe: self.mccabe.or(config.mccabe),
             pep8_naming: self.pep8_naming.or(config.pep8_naming),
+            pycodestyle: self.pycodestyle.or(config.pycodestyle),
             pydocstyle: self.pydocstyle.or(config.pydocstyle),
             pyupgrade: self.pyupgrade.or(config.pyupgrade),
         }

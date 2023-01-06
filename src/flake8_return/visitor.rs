@@ -62,7 +62,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
             StmtKind::Global { names } | StmtKind::Nonlocal { names } => {
                 self.stack
                     .non_locals
-                    .extend(names.iter().map(std::string::String::as_str));
+                    .extend(names.iter().map(String::as_str));
             }
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                 // Don't recurse.

@@ -2,8 +2,8 @@ use rustpython_ast::{Expr, Stmt};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::CheckKind;
 use crate::pep8_naming::helpers;
+use crate::registry::CheckKind;
 use crate::Check;
 
 /// N806

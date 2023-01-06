@@ -45,8 +45,8 @@ f"foo{bar}".encode(encoding)
 "unicode text©".encode()
 "unicode text©".encode(encoding="UTF8")  # "unicode text©".encode()
 
-r"fo\o".encode("utf-8")  # br"fo\o"
+r"foo\o".encode("utf-8")  # br"foo\o"
 u"foo".encode("utf-8")  # b"foo"
-R"fo\o".encode("utf-8")  # br"fo\o"
+R"foo\o".encode("utf-8")  # br"foo\o"
 U"foo".encode("utf-8")  # b"foo"
 print("foo".encode())  # print(b"foo")

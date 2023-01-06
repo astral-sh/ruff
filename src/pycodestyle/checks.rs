@@ -7,35 +7,45 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 use crate::ast::helpers::except_range;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
+use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
 
 /// E501
-pub fn line_too_long(lineno: usize, line: &str, max_line_length: usize) -> Option<Check> {
+pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Check> {
     let line_length = line.chars().count();
 
-    if line_length <= max_line_length {
+    if line_length <= settings.line_length {
         return None;
     }
 
     let mut chunks = line.split_whitespace();
-    let (Some(first), Some(_)) = (chunks.next(), chunks.next()) else {
+    let (Some(first), Some(second)) = (chunks.next(), chunks.next()) else {
         // Single word / no printable chars - no way to make the line shorter
         return None;
     };
 
-    // Do not enforce the line length for commented lines that end with a URL
-    // or contain only a single word.
-    if first == "#" && chunks.last().map_or(true, |c| URL_REGEX.is_match(c)) {
-        return None;
+    if first == "#" {
+        if settings.pycodestyle.ignore_overlong_task_comments {
+            let second = second.trim_end_matches(':');
+            if settings.task_tags.iter().any(|tag| tag == second) {
+                return None;
+            }
+        }
+
+        // Do not enforce the line length for commented lines that end with a URL
+        // or contain only a single word.
+        if chunks.last().map_or(true, |c| URL_REGEX.is_match(c)) {
+            return None;
+        }
     }
 
     Some(Check::new(
-        CheckKind::LineTooLong(line_length, max_line_length),
+        CheckKind::LineTooLong(line_length, settings.line_length),
         Range::new(
-            Location::new(lineno + 1, max_line_length),
+            Location::new(lineno + 1, settings.line_length),
             Location::new(lineno + 1, line_length),
         ),
     ))

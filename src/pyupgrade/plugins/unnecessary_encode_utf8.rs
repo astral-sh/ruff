@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
@@ -34,7 +34,7 @@ fn is_utf8_encoding_arg(arg: &Expr) -> bool {
     }
 }
 
-fn is_default_encode(args: &Vec<Expr>, kwargs: &Vec<Keyword>) -> bool {
+fn is_default_encode(args: &[Expr], kwargs: &[Keyword]) -> bool {
     match (args.len(), kwargs.len()) {
         // .encode()
         (0, 0) => true,
@@ -106,8 +106,8 @@ pub fn unnecessary_encode_utf8(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
-    args: &Vec<Expr>,
-    kwargs: &Vec<Keyword>,
+    args: &[Expr],
+    kwargs: &[Keyword],
 ) {
     let Some(variable) = match_encoded_variable(func) else {
         return;

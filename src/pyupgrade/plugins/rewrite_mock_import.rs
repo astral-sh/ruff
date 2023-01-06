@@ -11,13 +11,16 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind, MockReference};
 use crate::cst::matchers::{match_import, match_import_from, match_module};
+use crate::registry::{Check, CheckCode, CheckKind, MockReference};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 
 /// Return a vector of all non-`mock` imports.
 fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Option<AsName>>) {
+    // Preserve the trailing comma (or not) from the last entry.
+    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
+
     let mut clean_aliases: Vec<ImportAlias> = vec![];
     let mut mock_aliases: Vec<Option<AsName>> = vec![];
     for alias in aliases {
@@ -42,6 +45,24 @@ fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Opt
             }
         }
     }
+
+    // But avoid destroying any trailing comments.
+    if let Some(alias) = clean_aliases.last_mut() {
+        let has_comment = if let Some(comma) = &alias.comma {
+            match &comma.whitespace_after {
+                ParenthesizableWhitespace::SimpleWhitespace(_) => false,
+                ParenthesizableWhitespace::ParenthesizedWhitespace(whitespace) => {
+                    whitespace.first_line.comment.is_some()
+                }
+            }
+        } else {
+            false
+        };
+        if !has_comment {
+            alias.comma = trailing_comma;
+        }
+    }
+
     (clean_aliases, mock_aliases)
 }
 
@@ -133,14 +154,14 @@ fn format_import_from(
     let mut import = match_import_from(&mut tree)?;
 
     let ImportFrom {
-        names: ImportNames::Aliases(names),
+        names: ImportNames::Aliases(aliases),
         ..
     } = import.clone() else {
         unreachable!("Expected ImportNames::Aliases");
     };
 
-    let has_mock_member = includes_mock_member(&names);
-    let (clean_aliases, mock_aliases) = clean_import_aliases(names);
+    let has_mock_member = includes_mock_member(&aliases);
+    let (clean_aliases, mock_aliases) = clean_import_aliases(aliases);
 
     Ok(if clean_aliases.is_empty() {
         format_mocks(mock_aliases, indent, stylist)

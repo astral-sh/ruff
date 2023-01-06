@@ -1,17 +1,18 @@
 use std::string::ToString;
 
+use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Keyword, KeywordData};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
 use crate::pyflakes::cformat::CFormatSummary;
 use crate::pyflakes::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
 };
 use crate::pyflakes::format::FormatSummary;
+use crate::registry::{Check, CheckKind};
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
     keywords.iter().any(|k| {
@@ -115,9 +116,11 @@ pub(crate) fn percent_format_extra_named_arguments(
         location,
     );
     if checker.patch(check.kind.code()) {
-        if let Ok(fix) = remove_unused_format_arguments_from_dict(&missing, right, checker.locator)
-        {
-            check.amend(fix);
+        match remove_unused_format_arguments_from_dict(&missing, right, checker.locator) {
+            Ok(fix) => {
+                check.amend(fix);
+            }
+            Err(e) => error!("Failed to remove unused format arguments: {e}"),
         }
     }
     checker.add_check(check);
@@ -272,10 +275,12 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         location,
     );
     if checker.patch(check.kind.code()) {
-        if let Ok(fix) =
-            remove_unused_keyword_arguments_from_format_call(&missing, location, checker.locator)
+        match remove_unused_keyword_arguments_from_format_call(&missing, location, checker.locator)
         {
-            check.amend(fix);
+            Ok(fix) => {
+                check.amend(fix);
+            }
+            Err(e) => error!("Failed to remove unused keyword arguments: {e}"),
         }
     }
     checker.add_check(check);

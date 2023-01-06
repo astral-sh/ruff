@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
@@ -38,9 +42,8 @@ jobs:
       - run: cargo build --all --release
       - run: ./target/release/ruff_dev generate-all
       - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo +nightly dev generate-all'."
-      - run: git diff --quiet src/checks_gen.rs || echo "::error file=src/checks_gen.rs::This file is outdated. Run 'cargo +nightly dev generate-all'."
       - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo +nightly dev generate-all'."
-      - run: git diff --exit-code -- README.md src/checks_gen.rs ruff.schema.json
+      - run: git diff --exit-code -- README.md ruff.schema.json
 
   cargo-fmt:
     name: "cargo fmt"
@@ -181,3 +184,15 @@ jobs:
             ${{ runner.os }}-build-
             ${{ runner.os }}-
       - run: maturin build -b bin
+
+  typos:
+    name: Spell Check with Typos
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Actions Repository
+      uses: actions/checkout@v2
+
+    - name: Check spelling of file.txt
+      uses: crate-ci/typos@master
+      with:
+        files: .

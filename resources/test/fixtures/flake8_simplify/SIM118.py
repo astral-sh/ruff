@@ -1,12 +1,22 @@
-key in dict.keys() # SIM118
+key in obj.keys()  # SIM118
 
-foo["bar"] in dict.keys() # SIM118
+foo["bar"] in obj.keys()  # SIM118
 
-foo() in dict.keys() # SIM118
+foo['bar'] in obj.keys()  # SIM118
 
-for key in dict.keys(): # SIM118
+foo() in obj.keys()  # SIM118
+
+for key in obj.keys():  # SIM118
     pass
 
-for key in list(dict.keys()):
+for key in list(obj.keys()):
     if some_property(key):
-        del dict[key]
+        del obj[key]
+
+[k for k in obj.keys()]  # SIM118
+
+{k for k in obj.keys()}  # SIM118
+
+{k: k for k in obj.keys()}  # SIM118
+
+(k for k in obj.keys())  # SIM118

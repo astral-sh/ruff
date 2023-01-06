@@ -11,7 +11,7 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::helpers::trailing_comma;
-use crate::isort::sorting::{cmp_import_froms, cmp_members, cmp_modules};
+use crate::isort::sorting::{cmp_import_from, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::{
     AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
@@ -33,7 +33,7 @@ pub mod types;
 #[derive(Debug)]
 pub struct AnnotatedAliasData<'a> {
     pub name: &'a str,
-    pub asname: Option<&'a String>,
+    pub asname: Option<&'a str>,
     pub atop: Vec<Comment<'a>>,
     pub inline: Vec<Comment<'a>>,
 }
@@ -46,7 +46,7 @@ pub enum AnnotatedImport<'a> {
         inline: Vec<Comment<'a>>,
     },
     ImportFrom {
-        module: Option<&'a String>,
+        module: Option<&'a str>,
         names: Vec<AnnotatedAliasData<'a>>,
         level: Option<&'a usize>,
         atop: Vec<Comment<'a>>,
@@ -87,7 +87,7 @@ fn annotate_imports<'a>(
                         .iter()
                         .map(|alias| AliasData {
                             name: &alias.node.name,
-                            asname: alias.node.asname.as_ref(),
+                            asname: alias.node.asname.as_deref(),
                         })
                         .collect(),
                     atop,
@@ -108,11 +108,20 @@ fn annotate_imports<'a>(
                 }
 
                 // Find comments inline.
+                // We associate inline comments with the import statement unless there's a
+                // single member, and it's a single-line import (like `from foo
+                // import bar  # noqa`).
                 let mut inline = vec![];
-                while let Some(comment) =
-                    comments_iter.next_if(|comment| comment.location.row() == import.location.row())
+                if names.len() > 1
+                    || names
+                        .first()
+                        .map_or(false, |alias| alias.location.row() > import.location.row())
                 {
-                    inline.push(comment);
+                    while let Some(comment) = comments_iter
+                        .next_if(|comment| comment.location.row() == import.location.row())
+                    {
+                        inline.push(comment);
+                    }
                 }
 
                 // Capture names.
@@ -136,14 +145,14 @@ fn annotate_imports<'a>(
 
                     aliases.push(AnnotatedAliasData {
                         name: &alias.node.name,
-                        asname: alias.node.asname.as_ref(),
+                        asname: alias.node.asname.as_deref(),
                         atop: alias_atop,
                         inline: alias_inline,
                     });
                 }
 
                 annotated.push(AnnotatedImport::ImportFrom {
-                    module: module.as_ref(),
+                    module: module.as_deref(),
                     names: aliases,
                     level: level.as_ref(),
                     trailing_comma: if split_on_trailing_comma {
@@ -206,11 +215,6 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                 inline,
                 trailing_comma,
             } => {
-                let single_import = names.len() == 1;
-
-                // If we're dealing with a multi-import block (i.e., a non-star, non-aliased
-                // import), associate the comments with the first alias (best
-                // effort).
                 if let Some(alias) = names.first() {
                     let entry = if alias.name == "*" {
                         block
@@ -240,29 +244,8 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                         entry.atop.push(comment.value);
                     }
 
-                    // Associate inline comments with first alias if multiple names have been
-                    // imported, i.e., the comment applies to all names; otherwise, associate
-                    // with the alias.
-                    if single_import
-                        && (alias.name != "*" && (alias.asname.is_none() || combine_as_imports))
-                    {
-                        let entry = block
-                            .import_from
-                            .entry(ImportFromData { module, level })
-                            .or_default()
-                            .1
-                            .entry(AliasData {
-                                name: alias.name,
-                                asname: alias.asname,
-                            })
-                            .or_default();
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
-                    } else {
-                        for comment in inline {
-                            entry.inline.push(comment.value);
-                        }
+                    for comment in inline {
+                        entry.inline.push(comment.value);
                     }
                 }
 
@@ -399,7 +382,7 @@ fn categorize_imports<'a>(
     block_by_type
 }
 
-fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
+fn sort_imports(block: ImportBlock, order_by_type: bool) -> OrderedImportBlock {
     let mut ordered = OrderedImportBlock::default();
 
     // Sort `StmtKind::Import`.
@@ -477,18 +460,22 @@ fn sort_imports(block: ImportBlock) -> OrderedImportBlock {
                     locations,
                     aliases
                         .into_iter()
-                        .sorted_by(|(alias1, _), (alias2, _)| cmp_members(alias1, alias2))
+                        .sorted_by(|(alias1, _), (alias2, _)| {
+                            cmp_members(alias1, alias2, order_by_type)
+                        })
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
             })
             .sorted_by(
                 |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
-                    cmp_import_froms(import_from1, import_from2).then_with(|| {
+                    cmp_import_from(import_from1, import_from2).then_with(|| {
                         match (aliases1.first(), aliases2.first()) {
                             (None, None) => Ordering::Equal,
                             (None, Some(_)) => Ordering::Less,
                             (Some(_), None) => Ordering::Greater,
-                            (Some((alias1, _)), Some((alias2, _))) => cmp_members(alias1, alias2),
+                            (Some((alias1, _)), Some((alias2, _))) => {
+                                cmp_members(alias1, alias2, order_by_type)
+                            }
                         }
                     })
                 },
@@ -561,6 +548,7 @@ pub fn format_imports(
     split_on_trailing_comma: bool,
     force_single_line: bool,
     single_line_exclusions: &BTreeSet<String>,
+    order_by_type: bool,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -583,7 +571,7 @@ pub fn format_imports(
     // Generate replacement source code.
     let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
-        let mut import_block = sort_imports(import_block);
+        let mut import_block = sort_imports(import_block, order_by_type);
         if force_single_line {
             import_block = force_single_line_imports(import_block, single_line_exclusions);
         }
@@ -644,22 +632,27 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::checks::CheckCode;
     use crate::linter::test_path;
+    use crate::registry::CheckCode;
     use crate::{isort, Settings};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
-    #[test_case(Path::new("combine_import_froms.py"))]
+    #[test_case(Path::new("combine_import_from.py"))]
     #[test_case(Path::new("comments.py"))]
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
+    #[test_case(Path::new("inline_comments.py"))]
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
+    #[test_case(Path::new("line_ending_cr.py"))]
+    #[test_case(Path::new("line_ending_crlf.py"))]
+    #[test_case(Path::new("line_ending_lf.py"))]
+    #[test_case(Path::new("magic_trailing_comma.py"))]
     #[test_case(Path::new("natural_order.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
     #[test_case(Path::new("no_wrap_star.py"))]
@@ -679,10 +672,6 @@ mod tests {
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
-    #[test_case(Path::new("magic_trailing_comma.py"))]
-    #[test_case(Path::new("line_ending_lf.py"))]
-    #[test_case(Path::new("line_ending_crlf.py"))]
-    #[test_case(Path::new("line_ending_cr.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let checks = test_path(
@@ -778,6 +767,27 @@ mod tests {
                 ..Settings::for_rule(CheckCode::I001)
             },
         )?;
+        insta::assert_yaml_snapshot!(snapshot, checks);
+        Ok(())
+    }
+
+    #[test_case(Path::new("order_by_type.py"))]
+    fn order_by_type(path: &Path) -> Result<()> {
+        let snapshot = format!("order_by_type_false_{}", path.to_string_lossy());
+        let mut checks = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    order_by_type: false,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(CheckCode::I001)
+            },
+        )?;
+        checks.sort_by_key(|check| check.location);
         insta::assert_yaml_snapshot!(snapshot, checks);
         Ok(())
     }

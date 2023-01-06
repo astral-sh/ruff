@@ -1,42 +1,34 @@
-use anyhow::Result;
 use itertools::izip;
-use log::error;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Arguments, Location, StmtKind};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Stmt, Unaryop};
 
 use crate::ast::helpers;
-use crate::ast::helpers::{match_leading_content, match_trailing_content};
+use crate::ast::helpers::{
+    create_expr, match_leading_content, match_trailing_content, unparse_expr,
+};
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 
-fn compare(
+pub fn compare(
     left: &Expr,
     ops: &[Cmpop],
     comparators: &[Expr],
     stylist: &SourceCodeStyleDetector,
-) -> Option<String> {
-    let cmp = Expr::new(
-        Location::default(),
-        Location::default(),
-        ExprKind::Compare {
+) -> String {
+    unparse_expr(
+        &create_expr(ExprKind::Compare {
             left: Box::new(left.clone()),
             ops: ops.to_vec(),
             comparators: comparators.to_vec(),
-        },
-    );
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
-    generator.unparse_expr(&cmp, 0);
-    generator.generate().ok()
+        }),
+        stylist,
+    )
 }
 
 /// E711, E712
@@ -204,14 +196,13 @@ pub fn literal_comparisons(
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .cloned()
             .collect::<Vec<_>>();
-        if let Some(content) = compare(left, &ops, comparators, checker.style) {
-            for check in &mut checks {
-                check.amend(Fix::replacement(
-                    content.to_string(),
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
-            }
+        let content = compare(left, &ops, comparators, checker.style);
+        for check in &mut checks {
+            check.amend(Fix::replacement(
+                content.to_string(),
+                expr.location,
+                expr.end_location.unwrap(),
+            ));
         }
     }
 
@@ -243,15 +234,11 @@ pub fn not_tests(
                             let mut check =
                                 Check::new(CheckKind::NotInTest, Range::from_located(operand));
                             if checker.patch(check.kind.code()) && should_fix {
-                                if let Some(content) =
-                                    compare(left, &[Cmpop::NotIn], comparators, checker.style)
-                                {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
-                                }
+                                check.amend(Fix::replacement(
+                                    compare(left, &[Cmpop::NotIn], comparators, checker.style),
+                                    expr.location,
+                                    expr.end_location.unwrap(),
+                                ));
                             }
                             checker.add_check(check);
                         }
@@ -261,15 +248,11 @@ pub fn not_tests(
                             let mut check =
                                 Check::new(CheckKind::NotIsTest, Range::from_located(operand));
                             if checker.patch(check.kind.code()) && should_fix {
-                                if let Some(content) =
-                                    compare(left, &[Cmpop::IsNot], comparators, checker.style)
-                                {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
-                                }
+                                check.amend(Fix::replacement(
+                                    compare(left, &[Cmpop::IsNot], comparators, checker.style),
+                                    expr.location,
+                                    expr.end_location.unwrap(),
+                                ));
                             }
                             checker.add_check(check);
                         }
@@ -286,7 +269,7 @@ fn function(
     args: &Arguments,
     body: &Expr,
     stylist: &SourceCodeStyleDetector,
-) -> Result<String> {
+) -> String {
     let body = Stmt::new(
         Location::default(),
         Location::default(),
@@ -306,13 +289,9 @@ fn function(
             type_comment: None,
         },
     );
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&func);
-    Ok(generator.generate()?)
+    generator.generate()
 }
 
 /// E731
@@ -327,31 +306,26 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)
                 {
-                    match function(id, args, body, checker.style) {
-                        Ok(content) => {
-                            let first_line = checker.locator.slice_source_code_range(&Range::new(
-                                Location::new(stmt.location.row(), 0),
-                                Location::new(stmt.location.row() + 1, 0),
-                            ));
-                            let indentation = &leading_space(&first_line);
-                            let mut indented = String::new();
-                            for (idx, line) in content.lines().enumerate() {
-                                if idx == 0 {
-                                    indented.push_str(line);
-                                } else {
-                                    indented.push('\n');
-                                    indented.push_str(indentation);
-                                    indented.push_str(line);
-                                }
-                            }
-                            check.amend(Fix::replacement(
-                                indented,
-                                stmt.location,
-                                stmt.end_location.unwrap(),
-                            ));
+                    let first_line = checker.locator.slice_source_code_range(&Range::new(
+                        Location::new(stmt.location.row(), 0),
+                        Location::new(stmt.location.row() + 1, 0),
+                    ));
+                    let indentation = &leading_space(&first_line);
+                    let mut indented = String::new();
+                    for (idx, line) in function(id, args, body, checker.style).lines().enumerate() {
+                        if idx == 0 {
+                            indented.push_str(line);
+                        } else {
+                            indented.push('\n');
+                            indented.push_str(indentation);
+                            indented.push_str(line);
                         }
-                        Err(e) => error!("Failed to generate fix: {e}"),
                     }
+                    check.amend(Fix::replacement(
+                        indented,
+                        stmt.location,
+                        stmt.end_location.unwrap(),
+                    ));
                 }
             }
             checker.add_check(check);

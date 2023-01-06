@@ -12,8 +12,8 @@ use anyhow::{anyhow, Context, Result};
 use assert_cmd::{crate_name, Command};
 use itertools::Itertools;
 use log::info;
-use ruff::checks::CheckCategory;
 use ruff::logging::{set_up_logging, LogLevel};
+use ruff::registry::CheckCategory;
 use strum::IntoEnumIterator;
 use walkdir::WalkDir;
 

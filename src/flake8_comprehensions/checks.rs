@@ -5,8 +5,8 @@ use rustpython_ast::{
 };
 
 use crate::ast::types::Range;
-use crate::checks::{Check, CheckKind};
 use crate::flake8_comprehensions::fixes;
+use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 fn function_name(func: &Expr) -> Option<&str> {

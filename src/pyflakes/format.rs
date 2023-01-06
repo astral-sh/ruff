@@ -1,29 +1,24 @@
 //! Implements helper functions for using vendored/format.rs
 use std::convert::TryFrom;
-use std::fmt;
 
 use rustc_hash::FxHashSet;
-
-use crate::vendor::format::{
+use rustpython_common::format::{
     FieldName, FieldType, FormatParseError, FormatPart, FormatString, FromTemplate,
 };
 
-impl fmt::Display for FormatParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let message = match self {
-            FormatParseError::EmptyAttribute => "Empty attribute in format string",
-            FormatParseError::InvalidCharacterAfterRightBracket => {
-                "Only '.' or '[' may follow ']' in format field specifier"
-            }
-            FormatParseError::InvalidFormatSpecifier => "Max string recursion exceeded",
-            FormatParseError::MissingStartBracket => "Single '}' encountered in format string",
-            FormatParseError::MissingRightBracket => "Expected '}' before end of string",
-            FormatParseError::UnmatchedBracket => "Single '{' encountered in format string",
-            _ => "Unexpected error parsing format string",
-        };
-
-        write!(f, "{message}")
+pub(crate) fn error_to_string(err: &FormatParseError) -> String {
+    match err {
+        FormatParseError::EmptyAttribute => "Empty attribute in format string",
+        FormatParseError::InvalidCharacterAfterRightBracket => {
+            "Only '.' or '[' may follow ']' in format field specifier"
+        }
+        FormatParseError::InvalidFormatSpecifier => "Max string recursion exceeded",
+        FormatParseError::MissingStartBracket => "Single '}' encountered in format string",
+        FormatParseError::MissingRightBracket => "Expected '}' before end of string",
+        FormatParseError::UnmatchedBracket => "Single '{' encountered in format string",
+        _ => "Unexpected error parsing format string",
     }
+    .to_string()
 }
 
 pub(crate) struct FormatSummary {
@@ -82,7 +77,6 @@ impl TryFrom<&str> for FormatSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vendor::format::FromTemplate;
 
     #[test]
     fn test_format_summary() {

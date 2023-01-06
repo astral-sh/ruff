@@ -1,0 +1,119 @@
+---
+source: src/flake8_pytest_style/mod.rs
+expression: checks
+---
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      - ""
+      - ()
+  location:
+    row: 14
+    column: 1
+  end_location:
+    row: 14
+    column: 17
+  fix:
+    content: ""
+    location:
+      row: 14
+      column: 15
+    end_location:
+      row: 14
+      column: 17
+  parent: ~
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      - ""
+      - ()
+  location:
+    row: 24
+    column: 1
+  end_location:
+    row: 26
+    column: 1
+  fix:
+    content: ""
+    location:
+      row: 24
+      column: 15
+    end_location:
+      row: 26
+      column: 1
+  parent: ~
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      - ""
+      - ()
+  location:
+    row: 39
+    column: 1
+  end_location:
+    row: 39
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 39
+      column: 8
+    end_location:
+      row: 39
+      column: 10
+  parent: ~
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      - ""
+      - ()
+  location:
+    row: 49
+    column: 1
+  end_location:
+    row: 51
+    column: 1
+  fix:
+    content: ""
+    location:
+      row: 49
+      column: 8
+    end_location:
+      row: 51
+      column: 1
+  parent: ~
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      - ""
+      - ()
+  location:
+    row: 64
+    column: 1
+  end_location:
+    row: 64
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 64
+      column: 8
+    end_location:
+      row: 64
+      column: 10
+  parent: ~
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      - ""
+      - ()
+  location:
+    row: 74
+    column: 1
+  end_location:
+    row: 76
+    column: 1
+  fix:
+    content: ""
+    location:
+      row: 74
+      column: 8
+    end_location:
+      row: 76
+      column: 1
+  parent: ~
+

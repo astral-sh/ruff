@@ -9,8 +9,11 @@ use rustpython_ast::{
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+use rustpython_parser::token::StringKind;
 
 use crate::ast::types::Range;
+use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::SourceCodeLocator;
 
 /// Create an `Expr` with default location from an `ExprKind`.
@@ -21,6 +24,20 @@ pub fn create_expr(node: ExprKind) -> Expr {
 /// Create a `Stmt` with a default location from a `StmtKind`.
 pub fn create_stmt(node: StmtKind) -> Stmt {
     Stmt::new(Location::default(), Location::default(), node)
+}
+
+/// Generate source code from an `Expr`.
+pub fn unparse_expr(expr: &Expr, stylist: &SourceCodeStyleDetector) -> String {
+    let mut generator: SourceCodeGenerator = stylist.into();
+    generator.unparse_expr(expr, 0);
+    generator.generate()
+}
+
+/// Generate source code from an `Stmt`.
+pub fn unparse_stmt(stmt: &Stmt, stylist: &SourceCodeStyleDetector) -> String {
+    let mut generator: SourceCodeGenerator = stylist.into();
+    generator.unparse_stmt(stmt);
+    generator.generate()
 }
 
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
@@ -212,23 +229,6 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Return `true` if an `Expr` is not a reference to a variable (or something
-/// that could resolve to a variable, like a function call).
-pub fn is_non_variable(expr: &Expr) -> bool {
-    matches!(
-        expr.node,
-        ExprKind::Constant { .. }
-            | ExprKind::Tuple { .. }
-            | ExprKind::List { .. }
-            | ExprKind::Set { .. }
-            | ExprKind::Dict { .. }
-            | ExprKind::SetComp { .. }
-            | ExprKind::ListComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::GeneratorExp { .. }
-    )
-}
-
 /// Return the `Keyword` with the given name, if it's present in the list of
 /// `Keyword` arguments.
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
@@ -315,7 +315,7 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 }
 
 /// Format the module name for a relative import.
-pub fn format_import_from(level: Option<&usize>, module: Option<&String>) -> String {
+pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
     if let Some(level) = level {
         for _ in 0..*level {
@@ -470,6 +470,43 @@ pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Ran
     range
 }
 
+/// Find f-strings that don't contain any formatted values in a `JoinedStr`.
+pub fn find_useless_f_strings(expr: &Expr, locator: &SourceCodeLocator) -> Vec<(Range, Range)> {
+    let contents = locator.slice_source_code_range(&Range::from_located(expr));
+    lexer::make_tokenizer_located(&contents, expr.location)
+        .flatten()
+        .filter_map(|(location, tok, end_location)| match tok {
+            Tok::String {
+                kind: StringKind::FString | StringKind::RawFString,
+                ..
+            } => {
+                let first_char = locator.slice_source_code_range(&Range {
+                    location,
+                    end_location: Location::new(location.row(), location.column() + 1),
+                });
+                // f"..."  => f_position = 0
+                // fr"..." => f_position = 0
+                // rf"..." => f_position = 1
+                let f_position = usize::from(!(first_char == "f" || first_char == "F"));
+                Some((
+                    Range {
+                        location: Location::new(location.row(), location.column() + f_position),
+                        end_location: Location::new(
+                            location.row(),
+                            location.column() + f_position + 1,
+                        ),
+                    },
+                    Range {
+                        location,
+                        end_location,
+                    },
+                ))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
 pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
     match &stmt.node {
@@ -534,6 +571,53 @@ pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &SourceCodeLocator
 /// other statements following it.
 pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
     match_trailing_content(stmt, locator)
+}
+
+#[derive(Default)]
+/// A simple representation of a call's positional and keyword arguments.
+pub struct SimpleCallArgs<'a> {
+    pub args: Vec<&'a Expr>,
+    pub kwargs: FxHashMap<&'a str, &'a Expr>,
+}
+
+impl<'a> SimpleCallArgs<'a> {
+    pub fn new(args: &'a [Expr], keywords: &'a [Keyword]) -> Self {
+        let mut result = SimpleCallArgs::default();
+
+        for arg in args {
+            match &arg.node {
+                ExprKind::Starred { .. } => {
+                    break;
+                }
+                _ => {
+                    result.args.push(arg);
+                }
+            }
+        }
+
+        for keyword in keywords {
+            if let Some(arg) = &keyword.node.arg {
+                result.kwargs.insert(arg, &keyword.node.value);
+            }
+        }
+
+        result
+    }
+
+    /// Get the argument with the given name or position.
+    /// If the argument is not found with either name or position, return
+    /// `None`.
+    pub fn get_argument(&self, name: &'a str, position: Option<usize>) -> Option<&'a Expr> {
+        if let Some(kwarg) = self.kwargs.get(name) {
+            return Some(kwarg);
+        }
+        if let Some(position) = position {
+            if position < self.args.len() {
+                return Some(self.args[position]);
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]

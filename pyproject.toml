@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.206"
+version = "0.0.212"
 description = "An extremely fast Python linter, written in Rust."
 authors = [
   { name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" },
@@ -31,20 +31,14 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Software Development :: Quality Assurance",
 ]
-urls = { repository = "https://github.com/charliermarsh/ruff-lsp" }
+urls = { repository = "https://github.com/charliermarsh/ruff" }
 
 [tool.maturin]
 bindings = "bin"
 strip = true
 
-[tool.ruff]
-line-length = 88
-
-[tool.ruff.isort]
-force-wrap-aliases = true
-combine-as-imports = true
-force-single-line = true
-single-line-exclusions = ["os", "logging.handlers"]
-
-[tool.ruff.pydocstyle]
-convention = "google"
+[tool.setuptools]
+license-files = [
+  "LICENSE",
+  "licenses/*",
+]

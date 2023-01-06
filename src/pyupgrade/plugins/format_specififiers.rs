@@ -128,7 +128,7 @@ fn has_specifiers(raw_specifiers: &str) -> bool {
     FORMAT_SPECIFIER.is_match(raw_specifiers)
 }
 
-/// UP029
+/// UP030
 pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
         if let ExprKind::Constant {

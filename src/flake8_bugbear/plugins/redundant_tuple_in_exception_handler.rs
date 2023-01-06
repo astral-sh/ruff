@@ -3,7 +3,7 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 
 /// B013
@@ -23,19 +23,13 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             Range::from_located(type_),
         );
         if checker.patch(check.kind.code()) {
-            let mut generator = SourceCodeGenerator::new(
-                checker.style.indentation(),
-                checker.style.quote(),
-                checker.style.line_ending(),
-            );
+            let mut generator: SourceCodeGenerator = checker.style.into();
             generator.unparse_expr(elt, 0);
-            if let Ok(content) = generator.generate() {
-                check.amend(Fix::replacement(
-                    content,
-                    type_.location,
-                    type_.end_location.unwrap(),
-                ));
-            }
+            check.amend(Fix::replacement(
+                generator.generate(),
+                type_.location,
+                type_.end_location.unwrap(),
+            ));
         }
         checker.add_check(check);
     }

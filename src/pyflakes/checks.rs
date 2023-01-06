@@ -7,7 +7,7 @@ use rustpython_parser::ast::{
 
 use crate::ast::helpers::except_range;
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 /// F631
@@ -132,7 +132,7 @@ pub fn default_except_not_last(
 #[derive(Debug, PartialEq)]
 enum DictionaryKey<'a> {
     Constant(&'a Constant),
-    Variable(&'a String),
+    Variable(&'a str),
 }
 
 fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {

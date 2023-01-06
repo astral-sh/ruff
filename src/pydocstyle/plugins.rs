@@ -10,13 +10,13 @@ use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckCode, CheckKind};
 use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
 use crate::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::pydocstyle::settings::Convention;
+use crate::registry::{Check, CheckCode, CheckKind};
 use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
@@ -336,21 +336,21 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     }
     if lines_count > 1 && blanks_count != 1 {
         let mut check = Check::new(
-            CheckKind::BlankLineAfterSummary,
+            CheckKind::BlankLineAfterSummary(blanks_count),
             Range::from_located(docstring.expr),
         );
         if checker.patch(check.kind.code()) {
-            // Find the "summary" line (defined as the first non-blank line).
-            let mut summary_line = 0;
-            for line in body.lines() {
-                if line.trim().is_empty() {
-                    summary_line += 1;
-                } else {
-                    break;
-                }
-            }
-
             if blanks_count > 1 {
+                // Find the "summary" line (defined as the first non-blank line).
+                let mut summary_line = 0;
+                for line in body.lines() {
+                    if line.trim().is_empty() {
+                        summary_line += 1;
+                    } else {
+                        break;
+                    }
+                }
+
                 // Insert one blank line after the summary (replacing any existing lines).
                 check.amend(Fix::replacement(
                     "\n".to_string(),
@@ -924,7 +924,7 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
                 numpy_section(checker, docstring, context);
             }
         }
-        None => {
+        Some(Convention::Pep257) | None => {
             // First, interpret as NumPy-style sections.
             let mut found_numpy_section = false;
             for context in &section_contexts(&lines, &SectionStyle::Numpy) {
@@ -1413,24 +1413,56 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
 static GOOGLE_ARGS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\w+)\s*(\(.*?\))?\s*:.+").unwrap());
+    Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:\n?\s*.+").unwrap());
 
 fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
-    let mut matches = Vec::new();
-    for line in context.following_lines {
-        if let Some(captures) = GOOGLE_ARGS_REGEX.captures(line) {
-            matches.push(captures);
+    if context.following_lines.is_empty() {
+        missing_args(checker, docstring, &FxHashSet::default());
+        return;
+    }
+
+    // Normalize leading whitespace, by removing any lines with less indentation
+    // than the first.
+    let leading_space = whitespace::leading_space(context.following_lines[0]);
+    let relevant_lines = context
+        .following_lines
+        .iter()
+        .filter(|line| line.starts_with(leading_space) || line.is_empty())
+        .join("\n");
+    let args_content = textwrap::dedent(&relevant_lines);
+
+    // Reformat each section.
+    let mut args_sections: Vec<String> = vec![];
+    for line in args_content.trim().lines() {
+        if line.chars().next().map_or(true, char::is_whitespace) {
+            // This is a continuation of the documentation for the previous parameter,
+            // because it starts with whitespace.
+            if let Some(last) = args_sections.last_mut() {
+                last.push_str(line);
+                last.push('\n');
+            }
+        } else {
+            // This line is the start of documentation for the next parameter, because it
+            // doesn't start with any whitespace.
+            let mut line = line.to_string();
+            line.push('\n');
+            args_sections.push(line);
         }
     }
 
-    missing_args(
-        checker,
-        docstring,
-        &matches
-            .iter()
-            .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str()))
-            .collect(),
-    );
+    // Extract the argument name from each section.
+    let mut matches = Vec::new();
+    for section in &args_sections {
+        if let Some(captures) = GOOGLE_ARGS_REGEX.captures(section) {
+            matches.push(captures);
+        }
+    }
+    let docstrings_args = matches
+        .iter()
+        .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str()))
+        .collect();
+
+    missing_args(checker, docstring, &docstrings_args);
 }
 
 fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {

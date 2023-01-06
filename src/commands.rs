@@ -17,12 +17,12 @@ use walkdir::WalkDir;
 
 use crate::autofix::fixer;
 use crate::cache::DEFAULT_CACHE_DIR_NAME;
-use crate::checks::{CheckCode, CheckKind};
 use crate::cli::Overrides;
 use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, lint_path, lint_stdin, Diagnostics};
 use crate::logging::LogLevel;
 use crate::message::Message;
+use crate::registry::{CheckCode, CheckKind};
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
@@ -46,9 +46,10 @@ pub fn run(
 
     if paths.is_empty() {
         one_time_warning!(
-            "{}: {}",
+            "{}{} {}",
             "warning".yellow().bold(),
-            "No Python files found under the given path(s)"
+            ":".bold(),
+            "No Python files found under the given path(s)".bold()
         );
         return Ok(Diagnostics::default());
     }
@@ -196,9 +197,10 @@ pub fn add_noqa(
 
     if paths.is_empty() {
         one_time_warning!(
-            "{}: {}",
+            "{}{} {}",
             "warning".yellow().bold(),
-            "No Python files found under the given path(s)"
+            ":".bold(),
+            "No Python files found under the given path(s)".bold()
         );
         return Ok(0);
     }
@@ -270,9 +272,10 @@ pub fn show_files(
 
     if paths.is_empty() {
         one_time_warning!(
-            "{}: {}",
+            "{}{} {}",
             "warning".yellow().bold(),
-            "No Python files found under the given path(s)"
+            ":".bold(),
+            "No Python files found under the given path(s)".bold()
         );
         return Ok(());
     }

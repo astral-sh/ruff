@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rustc_hash::FxHashMap;
@@ -215,3 +216,23 @@ impl<'a, 'b, T> PartialEq<RefEquality<'b, T>> for RefEquality<'a, T> {
 }
 
 impl<'a, T> Eq for RefEquality<'a, T> {}
+
+impl<'a, T> Deref for RefEquality<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.0
+    }
+}
+
+impl<'a> From<&RefEquality<'a, Stmt>> for &'a Stmt {
+    fn from(r: &RefEquality<'a, Stmt>) -> Self {
+        r.0
+    }
+}
+
+impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
+    fn from(r: &RefEquality<'a, Expr>) -> Self {
+        r.0
+    }
+}

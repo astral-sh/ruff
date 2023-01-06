@@ -1,31 +1,9 @@
-# These SHOULD change
-"{0}" "{1}" "{2}".format(1, 2, 3)
-
-"a {3} complicated {1} string with {0} {2}".format(
-    "first", "second", "third", "fourth"
-)
-
-'{0}'.format(1)
-
-'{0:x}'.format(30)
-
-x = '{0}'.format(1)
-
-'''{0}\n{1}\n'''.format(1, 2)
-
-print(
-    'foo{0}'
-    'bar{1}'.format(1, 2)
-)
-
-print(
-    'foo{0}'  # ohai\n"
-    'bar{1}'.format(1, 2)
-)
-
-x = "foo {0}" \
-    "bar {1}".format(1, 2)
-
-'("{0}").format(1)'
-
-"\N{snowman} {0}".format(1)
+from builtins import *
+from builtins import ascii, bytes, compile
+from builtins import str as _str
+from six.moves import filter, zip, zip_longest
+from io import open
+import io
+import six
+import six.moves
+import builtins

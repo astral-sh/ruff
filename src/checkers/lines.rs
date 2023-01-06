@@ -1,9 +1,9 @@
 //! Lint rules based on checking raw physical lines.
 
-use crate::checks::{Check, CheckCode};
 use crate::pycodestyle::checks::{line_too_long, no_newline_at_end_of_file};
 use crate::pygrep_hooks::plugins::{blanket_noqa, blanket_type_ignore};
 use crate::pyupgrade::checks::unnecessary_coding_comment;
+use crate::registry::{Check, CheckCode};
 use crate::settings::{flags, Settings};
 
 pub fn check_lines(
@@ -57,7 +57,7 @@ pub fn check_lines(
         }
 
         if enforce_line_too_long {
-            if let Some(check) = line_too_long(index, line, settings.line_length) {
+            if let Some(check) = line_too_long(index, line, settings) {
                 checks.push(check);
             }
         }
@@ -80,7 +80,7 @@ pub fn check_lines(
 mod tests {
 
     use super::check_lines;
-    use crate::checks::CheckCode;
+    use crate::registry::CheckCode;
     use crate::settings::{flags, Settings};
 
     #[test]

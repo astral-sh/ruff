@@ -1,5 +1,6 @@
 # Ruff
 
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json)](https://github.com/charliermarsh/ruff)
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
@@ -26,8 +27,9 @@ An extremely fast Python linter, written in Rust.
 - 📦  Built-in caching, to avoid re-analyzing unchanged files
 - 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 - ⚖️  [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-- 🔌  Native re-implementations of popular Flake8 plugins, like [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
-- 🌎  Monorepo-friendly configuration via hierarchical and cascading settings
+- 🔌  Native re-implementations of dozens of Flake8 plugins, like [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
+- ⌨️  First-party editor integrations for [VS Code](https://github.com/charliermarsh/ruff-vscode) and [more](https://github.com/charliermarsh/ruff-lsp)
+- 🌎  Monorepo-friendly, with [hierarchical and cascading configuration](#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
@@ -52,8 +54,11 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [Synapse](https://github.com/matrix-org/synapse)
-- [Ibis](https://github.com/ibis-project/ibis)
 - [Saleor](https://github.com/saleor/saleor)
+- [Polars](https://github.com/pola-rs/polars)
+- [Ibis](https://github.com/ibis-project/ibis)
+- [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
+- [`pyca/cryptography`](https://github.com/pyca/cryptography)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -102,6 +107,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [flake8-implicit-str-concat (ISC)](#flake8-implicit-str-concat-isc)
    1. [flake8-import-conventions (ICN)](#flake8-import-conventions-icn)
    1. [flake8-print (T20)](#flake8-print-t20)
+   1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
    1. [flake8-simplify (SIM)](#flake8-simplify-sim)
@@ -112,6 +118,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [pandas-vet (PD)](#pandas-vet-pd)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
+   1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -157,9 +164,9 @@ pacman -S ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff path/to/code/to/check.py
-ruff path/to/code/
-ruff path/to/code/*.py
+ruff path/to/code/to/check.py  # Run Ruff over `check.py`
+ruff path/to/code/             # Run Ruff over all files in `/path/to/code` (and any subdirectories)
+ruff path/to/code/*.py         # Run Ruff over all `.py` files in `/path/to/code`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
@@ -173,7 +180,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.206'
+  rev: 'v0.0.212'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -274,7 +281,7 @@ alternative docstring formats. Enabling `ALL` without further configuration may 
 behavior, especially for the `pydocstyle` plugin.
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
-an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the above
+an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the
 `pyproject.toml` described above would be represented via the following `ruff.toml`:
 
 ```toml
@@ -305,7 +312,7 @@ ruff path/to/code/ --select F401 --select F403
 See `ruff --help` for more:
 
 <!-- Begin auto-generated cli help. -->
-```shell
+```
 Ruff: An extremely fast Python linter.
 
 Usage: ruff [OPTIONS] [FILES]...
@@ -401,7 +408,7 @@ directory hierarchy is used for every individual file, with all paths in the `py
 
 There are a few exceptions to these rules:
 
-1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignore any
+1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignores any
    `pyproject.toml` files that lack a `[tool.ruff]` section.
 2. If a configuration file is passed directly via `--config`, those settings are used for across
    files. Any relative paths in that configuration file (like `exclude` globs or `src` paths) are
@@ -446,7 +453,7 @@ For example, `ruff /path/to/excluded/file.py` will always check `file.py`.
 ### Ignoring errors
 
 To omit a lint check entirely, add it to the "ignore" list via [`ignore`](#ignore) or
-[`extend-ignore`](#extend-ignore), either on the command-line or in your `project.toml` file.
+[`extend-ignore`](#extend-ignore), either on the command-line or in your `pyproject.toml` file.
 
 To ignore an error inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual error, add `# noqa: {code}` to the end of the line, like so:
@@ -543,7 +550,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F523 | StringDotFormatExtraPositionalArguments | '...'.format(...) has unused arguments at position(s): ... |  |
 | F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): ... |  |
 | F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
-| F541 | FStringMissingPlaceholders | f-string without any placeholders |  |
+| F541 | FStringMissingPlaceholders | f-string without any placeholders | 🛠 |
 | F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
 | F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
 | F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |  |
@@ -625,7 +632,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) | 🛠 |
 | D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring | 🛠 |
 | D204 | OneBlankLineAfterClass | 1 blank line required after class docstring | 🛠 |
-| D205 | BlankLineAfterSummary | 1 blank line required between summary line and description | 🛠 |
+| D205 | BlankLineAfterSummary | 1 blank line required between summary line and description (found 2) | 🛠 |
 | D206 | IndentWithSpaces | Docstring should be indented with spaces, not tabs |  |
 | D207 | NoUnderIndentation | Docstring is under-indented | 🛠 |
 | D208 | NoOverIndentation | Docstring is over-indented | 🛠 |
@@ -690,6 +697,8 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
 | UP026 | RewriteMockImport | `mock` is deprecated, use `unittest.mock` | 🛠 |
 | UP027 | RewriteListComprehension | Replace unpacked list comprehension with a generator expression | 🛠 |
+| UP028 | RewriteYieldFrom | Replace `yield` over `for` loop with `yield from` | 🛠 |
+| UP029 | UnnecessaryBuiltinImport | Unnecessary builtin import: `...` | 🛠 |
 
 ### pep8-naming (N)
 
@@ -756,10 +765,16 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | ---- | ---- | ------- | --- |
 | S101 | AssertUsed | Use of `assert` detected |  |
 | S102 | ExecUsed | Use of `exec` detected |  |
+| S103 | BadFilePermissions | `os.chmod` setting a permissive mask `0o777` on file or directory |  |
 | S104 | HardcodedBindAllInterfaces | Possible binding to all interfaces |  |
-| S105 | HardcodedPasswordString | Possible hardcoded password: `"..."` |  |
-| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: `"..."` |  |
-| S107 | HardcodedPasswordDefault | Possible hardcoded password: `"..."` |  |
+| S105 | HardcodedPasswordString | Possible hardcoded password: "..." |  |
+| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: "..." |  |
+| S107 | HardcodedPasswordDefault | Possible hardcoded password: "..." |  |
+| S108 | HardcodedTempFile | Probable insecure usage of temporary file or directory: "..." |  |
+| S113 | RequestWithoutTimeout | Probable use of requests call without timeout |  |
+| S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "..." |  |
+| S501 | RequestWithNoCertValidation | Probable use of `...` call with `verify=False` disabling SSL certificate checks |  |
+| S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 
 ### flake8-blind-except (BLE)
 
@@ -890,6 +905,38 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on Py
 | T201 | PrintFound | `print` found | 🛠 |
 | T203 | PPrintFound | `pprint` found | 🛠 |
 
+### flake8-pytest-style (PT)
+
+For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/1.6.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PT001 | IncorrectFixtureParenthesesStyle | Use `@pytest.fixture()` over `@pytest.fixture` | 🛠 |
+| PT002 | FixturePositionalArgs | Configuration for fixture `...` specified via positional args, use kwargs |  |
+| PT003 | ExtraneousScopeFunction | `scope='function'` is implied in `@pytest.fixture()` |  |
+| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore |  |
+| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
+| PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
+| PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
+| PT008 | PatchWithLambda | Use `return_value=` instead of patching with lambda |  |
+| PT009 | UnittestAssertion | Use a regular assert instead of unittest-style '...' |  |
+| PT010 | RaisesWithoutException | set the expected exception in `pytest.raises()` |  |
+| PT011 | RaisesTooBroad | `pytest.raises(...)` is too broad, set the `match` parameter or use a more specific exception |  |
+| PT012 | RaisesWithMultipleStatements | `pytest.raises()` block should contain a single simple statement |  |
+| PT013 | IncorrectPytestImport | Found incorrect import of pytest, use simple `import pytest` instead |  |
+| PT015 | AssertAlwaysFalse | Assertion always fails, replace with `pytest.fail()` |  |
+| PT016 | FailWithoutMessage | No message passed to `pytest.fail()` |  |
+| PT017 | AssertInExcept | Found assertion on exception ... in except block, use pytest.raises() instead |  |
+| PT018 | CompositeAssertion | Assertion should be broken down into multiple parts |  |
+| PT019 | FixtureParamWithoutValue | Fixture ... without value is injected as parameter, use @pytest.mark.usefixtures instead |  |
+| PT020 | DeprecatedYieldFixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
+| PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
+| PT022 | UselessYieldFixture | No teardown in fixture ..., use `return` instead of `yield` | 🛠 |
+| PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark....` over `@pytest.mark....()` | 🛠 |
+| PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures |  |
+| PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures |  |
+| PT026 | UseFixturesWithoutParameters | Useless `pytest.mark.usefixtures` without parameters | 🛠 |
+
 ### flake8-quotes (Q)
 
 For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on PyPI.
@@ -922,8 +969,24 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
+| SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
+| SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
+| SIM107 | ReturnInTryExceptFinally | Don't use `return` in `try`/`except` and `finally` |  |
+| SIM108 | UseTernaryOperator | Use ternary operator `..` instead of if-else-block | 🛠 |
+| SIM109 | CompareWithTuple | Use `value in (..., ...)` instead of `value == ... or value == ...` | 🛠 |
+| SIM110 | ConvertLoopToAny | Use `return any(x for x in y)` instead of `for` loop | 🛠 |
+| SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
+| SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
-| SIM300 | YodaConditions | Use `left == right` instead of `right == left (Yoda-conditions)` |  |
+| SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
+| SIM202 | NegateNotEqualOp | Use `left == right` instead of `not left != right` | 🛠 |
+| SIM208 | DoubleNegation | Use `expr` instead of `not (not expr)` | 🛠 |
+| SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
+| SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
+| SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
+| SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
+| SIM300 | YodaConditions | Yoda conditions are discouraged, use `left == right` instead | 🛠 |
 
 ### flake8-tidy-imports (TID)
 
@@ -1018,6 +1081,16 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 | PLW0602 | GlobalVariableNotAssigned | Using global for `...` but no assignment is done |  |
+
+### flake8-pie (PIE)
+
+For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PIE790 | NoUnnecessaryPass | Unnecessary `pass` statement | 🛠 |
+| PIE794 | DupeClassFieldDefinitions | Class field `...` is defined multiple times | 🛠 |
+| PIE807 | PreferListBuiltin | Prefer `list()` over useless lambda | 🛠 |
 
 ### Ruff-specific rules (RUF)
 
@@ -1254,8 +1327,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff
+      # Include `--format=github` to enable automatic inline annotations.
       - name: Run Ruff
-        run: ruff .
+        run: ruff --format=github .
 ```
 
 ## FAQ
@@ -1281,11 +1355,11 @@ Under those conditions, Ruff implements every rule in Flake8.
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:
 
-- [`autoflake`](https://pypi.org/project/autoflake/) (1/7)
+- [`autoflake`](https://pypi.org/project/autoflake/) ([#1647](https://github.com/charliermarsh/ruff/issues/1647))
 - [`eradicate`](https://pypi.org/project/eradicate/)
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
-- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
+- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
@@ -1298,18 +1372,19 @@ natively, including:
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
-- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (1/37)
+- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
-- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
+- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
 - [`isort`](https://pypi.org/project/isort/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
-- [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10)
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) (21/33)
+- [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980))
+- [`pyupgrade`](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827))
 - [`yesqa`](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different error code prefixes than would be found in the
@@ -1323,6 +1398,13 @@ Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flak
 1. Ruff does not yet support structural pattern matching.
 2. Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
    plugins are re-implemented in Rust as part of Ruff itself.)
+
+There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
+
+- Ruff doesn't implement the "opinionated" lint rules from `flake8-bugbear`.
+- Depending on your project structure, Ruff and `isort` can differ in their detection of first-party
+  code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
+  code is nested in a `src` directory.)
 
 ### How does Ruff compare to Pylint?
 
@@ -1342,7 +1424,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 
 - [`flake8-2020`](https://pypi.org/project/flake8-2020/)
 - [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
-- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) (6/40)
+- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
 - [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
@@ -1355,22 +1437,23 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
-- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) (1/37)
+- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
-- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/) (1/3)
+- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 
 Ruff can also replace [`isort`](https://pypi.org/project/isort/),
 [`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
-[`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) (3/10), and a subset of the rules
-implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) (21/33).
+[`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980)), and a subset of the rules
+implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827)).
 
-If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, free to file an Issue.
+If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
 
 ### Do I need to install Rust to use Ruff?
 
@@ -1433,85 +1516,35 @@ Found 3 error(s).
 
 ### Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enable a specific docstring convention, start by enabling all `pydocstyle` error codes, and
-then selectively disabling based on your [preferred convention](https://www.pydocstyle.org/en/latest/error_codes.html#default-conventions).
+Yes! To enable specific docstring convention, add the following to your `pyproject.toml`:
 
-For example, if you're coming from `flake8-docstrings`, the following configuration is equivalent to
-`--docstring-convention=numpy`:
+```toml
+[tool.ruff.pydocstyle]
+convention = "google"  # Accepts: "google", "numpy", or "pep257".
+```
+
+For example, if you're coming from `flake8-docstrings`, and your originating configuration uses
+`--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
+as above.
+
+Alongside `convention`, you'll want to explicitly enable the `D` error code class, like so:
 
 ```toml
 [tool.ruff]
-extend-select = ["D"]
-extend-ignore = [
-    "D107",
-    "D203",
-    "D212",
-    "D213",
-    "D402",
-    "D413",
-    "D415",
-    "D416",
-    "D417",
+select = [
+    "D",
 ]
-```
 
-Similarly, the following is equivalent to `--docstring-convention=google`:
-
-```toml
-[tool.ruff]
-extend-select = ["D"]
-extend-ignore = [
-    "D203",
-    "D204",
-    "D213",
-    "D215",
-    "D400",
-    "D404",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D413",
-]
-```
-
-Similarly, the following is equivalent to `--docstring-convention=pep8`:
-
-```toml
-[tool.ruff]
-extend-select = ["D"]
-extend-ignore = [
-    "D203",
-    "D212",
-    "D213",
-    "D214",
-    "D215",
-    "D404",
-    "D405",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D410",
-    "D411",
-    "D413",
-    "D415",
-    "D416",
-    "D417",
-]
-```
-
-Note that Ruff _also_ supports a [`convention`](#convention) setting:
-
-```toml
 [tool.ruff.pydocstyle]
 convention = "google"
 ```
 
-However, this setting is purely used to implement robust detection of Google and NumPy-style
-sections, and thus avoid the [false negatives](https://github.com/PyCQA/pydocstyle/issues/459) seen
-in `pydocstyle`; it does not affect which errors are enabled, which is driven by the `select` and
-`ignore` settings, as described above.
+Setting a `convention` force-disables any rules that are incompatible with that convention, no
+matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
+
+### How can I tell what settings Ruff is using to check my code?
+
+Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
 ## Development
 
@@ -2210,6 +2243,27 @@ target-version = "py37"
 
 ---
 
+#### [`task-tags`](#task-tags)
+
+A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
+
+Comments starting with these tags will be ignored by commented-out code
+detection (`ERA`), and skipped by line-length checks (`E501`) if
+`ignore-overlong-task-comments` is set to `true`.
+
+**Default value**: `["TODO", "FIXME", "XXX"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+task-tags = ["HACK"]
+```
+
+---
+
 #### [`unfixable`](#unfixable)
 
 A list of check code prefixes to consider un-autofix-able.
@@ -2324,6 +2378,43 @@ suppress-none-returning = true
 
 ---
 
+### `flake8-bandit`
+
+#### [`hardcoded-tmp-directory`](#hardcoded-tmp-directory)
+
+A list of directories to consider temporary.
+
+**Default value**: `["/tmp", "/var/tmp", "/dev/shm"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-bandit]
+hardcoded-tmp-directory = ["/foo/bar"]
+```
+
+---
+
+#### [`hardcoded-tmp-directory-extend`](#hardcoded-tmp-directory-extend)
+
+A list of directories to consider temporary, in addition to those
+specified by `hardcoded-tmp-directory`.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-bandit]
+extend-hardcoded-tmp-directory = ["/foo/bar"]
+```
+
+---
+
 ### `flake8-bugbear`
 
 #### [`extend-immutable-calls`](#extend-immutable-calls)
@@ -2379,9 +2470,10 @@ the `extend_aliases` option.
 
 ```toml
 [tool.ruff.flake8-import-conventions]
+[tool.ruff.flake8-import-conventions.aliases]
 # Declare the default aliases.
 altair = "alt"
-matplotlib.pyplot = "plt"
+"matplotlib.pyplot" = "plt"
 numpy = "np"
 pandas = "pd"
 seaborn = "sns"
@@ -2402,8 +2494,160 @@ will be added to the `aliases` mapping.
 
 ```toml
 [tool.ruff.flake8-import-conventions]
+[tool.ruff.flake8-import-conventions.extend-aliases]
 # Declare a custom alias for the `matplotlib` module.
 "dask.dataframe" = "dd"
+```
+
+---
+
+### `flake8-pytest-style`
+
+#### [`fixture-parentheses`](#fixture-parentheses)
+
+Boolean flag specifying whether `@pytest.fixture()` without parameters
+should have parentheses. If the option is set to `true` (the
+default), `@pytest.fixture()` is valid and `@pytest.fixture` is an
+error. If set to `false`, `@pytest.fixture` is valid and
+`@pytest.fixture()` is an error.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+fixture-parentheses = true
+```
+
+---
+
+#### [`mark-parentheses`](#mark-parentheses)
+
+Boolean flag specifying whether `@pytest.mark.foo()` without parameters
+should have parentheses. If the option is set to `true` (the
+default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is an
+error. If set to `false`, `@pytest.fixture` is valid and
+`@pytest.mark.foo()` is an error.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+mark-parentheses = true
+```
+
+---
+
+#### [`parametrize-names-type`](#parametrize-names-type)
+
+Expected type for multiple argument names in `@pytest.mark.parametrize`.
+The following values are supported:
+* `csv` — a comma-separated list, e.g.
+  `@pytest.mark.parametrize('name1,name2', ...)`
+* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+  ...)`
+* `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
+
+**Default value**: `tuple`
+
+**Type**: `ParametrizeNameType`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+parametrize-names-type = "list"
+```
+
+---
+
+#### [`parametrize-values-row-type`](#parametrize-values-row-type)
+
+Expected type for each row of values in `@pytest.mark.parametrize` in
+case of multiple parameters. The following values are supported:
+* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+  [(1, 2), (3, 4)])`
+* `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2],
+  [3, 4]])`
+
+**Default value**: `tuple`
+
+**Type**: `ParametrizeValuesRowType`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+parametrize-values-row-type = "list"
+```
+
+---
+
+#### [`parametrize-values-type`](#parametrize-values-type)
+
+Expected type for the list of values rows in `@pytest.mark.parametrize`.
+The following values are supported:
+* `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))`
+* `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`
+
+**Default value**: `list`
+
+**Type**: `ParametrizeValuesType`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+parametrize-values-type = "tuple"
+```
+
+---
+
+#### [`raises-extend-require-match-for`](#raises-extend-require-match-for)
+
+List of additional exception names that require a match= parameter in a
+`pytest.raises()` call. This extends the default list of exceptions
+that require a match= parameter.
+This option is useful if you want to extend the default list of
+exceptions that require a match= parameter without having to specify
+the entire list.
+Note that this option does not remove any exceptions from the default
+list.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+raises-extend-require-match-for = ["requests.RequestException"]
+```
+
+---
+
+#### [`raises-require-match-for`](#raises-require-match-for)
+
+List of exception names that require a match= parameter in a
+`pytest.raises()` call.
+
+**Default value**: `["BaseException", "Exception", "ValueError", "OSError", "IOError", "EnvironmentError", "socket.error"]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-pytest-style]
+raises-require-match-for = ["requests.RequestException"]
 ```
 
 ---
@@ -2669,6 +2913,24 @@ known-third-party = ["src"]
 
 ---
 
+#### [`order-by-type`](#order-by-type)
+
+Order imports by type, which is determined by case, in addition to
+alphabetically.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+order-by-type = true
+```
+
+---
+
 #### [`single-line-exclusions`](#single-line-exclusions)
 
 One or more modules to exclude from the single line rule.
@@ -2787,13 +3049,33 @@ staticmethod-decorators = ["staticmethod", "stcmthd"]
 
 ---
 
+### `pycodestyle`
+
+#### [`ignore-overlong-task-comments`](#ignore-overlong-task-comments)
+
+Whether or not line-length checks (`E501`) should be triggered for
+comments starting with `task-tags` (by default: ["TODO", "FIXME",
+and "XXX"]).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pycodestyle]
+ignore-overlong-task-comments = true
+```
+
+---
+
 ### `pydocstyle`
 
 #### [`convention`](#convention)
 
-Whether to use Google-style or Numpy-style conventions when detecting
-docstring sections. By default, conventions will be inferred from
-the available sections.
+Whether to use Google-style or NumPy-style conventions or the PEP257
+defaults when analyzing docstring sections.
 
 **Default value**: `None`
 
@@ -2842,4 +3124,4 @@ MIT
 ## Contributing
 
 Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
+[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/.github/CONTRIBUTING.md).

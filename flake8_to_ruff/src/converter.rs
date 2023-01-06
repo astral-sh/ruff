@@ -1,15 +1,18 @@
 use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
-use ruff::checks_gen::CheckCodePrefix;
+use ruff::flake8_pytest_style::types::{
+    ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
+};
 use ruff::flake8_quotes::settings::Quote;
 use ruff::flake8_tidy_imports::settings::Strictness;
 use ruff::pydocstyle::settings::Convention;
+use ruff::registry::CheckCodePrefix;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_quotes, flake8_tidy_imports, mccabe,
-    pep8_naming, pydocstyle,
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
+    flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
 };
 
 use crate::black::Black;
@@ -49,6 +52,19 @@ pub fn convert(
         }
     }
 
+    // Infer plugins, if not provided.
+    let plugins = plugins.unwrap_or_else(|| {
+        let from_options = plugin::infer_plugins_from_options(flake8);
+        if !from_options.is_empty() {
+            eprintln!("Inferred plugins from settings: {from_options:#?}");
+        }
+        let from_codes = plugin::infer_plugins_from_codes(&referenced_codes);
+        if !from_codes.is_empty() {
+            eprintln!("Inferred plugins from referenced check codes: {from_codes:#?}");
+        }
+        from_options.into_iter().chain(from_codes).collect()
+    });
+
     // Check if the user has specified a `select`. If not, we'll add our own
     // default `select`, and populate it based on user plugins.
     let mut select = flake8
@@ -58,22 +74,7 @@ pub fn convert(
                 .as_ref()
                 .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
         })
-        .unwrap_or_else(|| {
-            plugin::resolve_select(
-                flake8,
-                &plugins.unwrap_or_else(|| {
-                    let from_options = plugin::infer_plugins_from_options(flake8);
-                    if !from_options.is_empty() {
-                        eprintln!("Inferred plugins from settings: {from_options:#?}");
-                    }
-                    let from_codes = plugin::infer_plugins_from_codes(&referenced_codes);
-                    if !from_codes.is_empty() {
-                        eprintln!("Inferred plugins from referenced check codes: {from_codes:#?}");
-                    }
-                    from_options.into_iter().chain(from_codes).collect()
-                }),
-            )
-        });
+        .unwrap_or_else(|| plugin::resolve_select(&plugins));
     let mut ignore = flake8
         .get("ignore")
         .and_then(|value| {
@@ -88,6 +89,7 @@ pub fn convert(
     let mut flake8_annotations = flake8_annotations::settings::Options::default();
     let mut flake8_bugbear = flake8_bugbear::settings::Options::default();
     let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
+    let mut flake8_pytest_style = flake8_pytest_style::settings::Options::default();
     let mut flake8_quotes = flake8_quotes::settings::Options::default();
     let mut flake8_tidy_imports = flake8_tidy_imports::settings::Options::default();
     let mut mccabe = mccabe::settings::Options::default();
@@ -205,7 +207,8 @@ pub fn convert(
                 "docstring-convention" => match value.trim() {
                     "google" => pydocstyle.convention = Some(Convention::Google),
                     "numpy" => pydocstyle.convention = Some(Convention::Numpy),
-                    "pep257" | "all" => pydocstyle.convention = None,
+                    "pep257" => pydocstyle.convention = Some(Convention::Pep257),
+                    "all" => pydocstyle.convention = None,
                     _ => eprintln!("Unexpected '{key}' value: {value}"),
                 },
                 // mccabe
@@ -219,6 +222,66 @@ pub fn convert(
                         Ok(max_string_length) => {
                             flake8_errmsg.max_string_length = Some(max_string_length);
                         }
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
+                // flake8-pytest-style
+                "pytest-fixture-no-parentheses" | "pytest_fixture_no_parentheses " => {
+                    match parser::parse_bool(value.as_ref()) {
+                        Ok(bool) => flake8_pytest_style.fixture_parentheses = Some(!bool),
+                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    }
+                }
+                "pytest-parametrize-names-type" | "pytest_parametrize_names_type" => {
+                    match value.trim() {
+                        "csv" => {
+                            flake8_pytest_style.parametrize_names_type =
+                                Some(ParametrizeNameType::CSV);
+                        }
+                        "tuple" => {
+                            flake8_pytest_style.parametrize_names_type =
+                                Some(ParametrizeNameType::Tuple);
+                        }
+                        "list" => {
+                            flake8_pytest_style.parametrize_names_type =
+                                Some(ParametrizeNameType::List);
+                        }
+                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    }
+                }
+                "pytest-parametrize-values-type" | "pytest_parametrize_values_type" => {
+                    match value.trim() {
+                        "tuple" => {
+                            flake8_pytest_style.parametrize_values_type =
+                                Some(ParametrizeValuesType::Tuple);
+                        }
+                        "list" => {
+                            flake8_pytest_style.parametrize_values_type =
+                                Some(ParametrizeValuesType::List);
+                        }
+                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    }
+                }
+                "pytest-parametrize-values-row-type" | "pytest_parametrize_values_row_type" => {
+                    match value.trim() {
+                        "tuple" => {
+                            flake8_pytest_style.parametrize_values_row_type =
+                                Some(ParametrizeValuesRowType::Tuple);
+                        }
+                        "list" => {
+                            flake8_pytest_style.parametrize_values_row_type =
+                                Some(ParametrizeValuesRowType::List);
+                        }
+                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    }
+                }
+                "pytest-raises-require-match-for" | "pytest_raises_require_match_for" => {
+                    flake8_pytest_style.raises_require_match_for =
+                        Some(parser::parse_strings(value.as_ref()));
+                }
+                "pytest-mark-no-parentheses" | "pytest_mark_no_parentheses" => {
+                    match parser::parse_bool(value.as_ref()) {
+                        Ok(bool) => flake8_pytest_style.mark_parentheses = Some(!bool),
                         Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
                     }
                 }
@@ -239,6 +302,9 @@ pub fn convert(
     }
     if flake8_errmsg != flake8_errmsg::settings::Options::default() {
         options.flake8_errmsg = Some(flake8_errmsg);
+    }
+    if flake8_pytest_style != flake8_pytest_style::settings::Options::default() {
+        options.flake8_pytest_style = Some(flake8_pytest_style);
     }
     if flake8_quotes != flake8_quotes::settings::Options::default() {
         options.flake8_quotes = Some(flake8_quotes);
@@ -278,8 +344,8 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
-    use ruff::checks_gen::CheckCodePrefix;
     use ruff::pydocstyle::settings::Convention;
+    use ruff::registry::CheckCodePrefix;
     use ruff::settings::options::Options;
     use ruff::settings::pyproject::Pyproject;
     use ruff::{flake8_quotes, pydocstyle};
@@ -324,10 +390,13 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -335,6 +404,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -383,10 +453,13 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -394,6 +467,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -442,10 +516,13 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -453,6 +530,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -501,10 +579,13 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -512,6 +593,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -560,10 +642,13 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
@@ -576,6 +661,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
@@ -619,42 +705,7 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                CheckCodePrefix::D100,
-                CheckCodePrefix::D101,
-                CheckCodePrefix::D102,
-                CheckCodePrefix::D103,
-                CheckCodePrefix::D104,
-                CheckCodePrefix::D105,
-                CheckCodePrefix::D106,
-                CheckCodePrefix::D200,
-                CheckCodePrefix::D201,
-                CheckCodePrefix::D202,
-                CheckCodePrefix::D204,
-                CheckCodePrefix::D205,
-                CheckCodePrefix::D206,
-                CheckCodePrefix::D207,
-                CheckCodePrefix::D208,
-                CheckCodePrefix::D209,
-                CheckCodePrefix::D210,
-                CheckCodePrefix::D211,
-                CheckCodePrefix::D214,
-                CheckCodePrefix::D215,
-                CheckCodePrefix::D300,
-                CheckCodePrefix::D301,
-                CheckCodePrefix::D400,
-                CheckCodePrefix::D403,
-                CheckCodePrefix::D404,
-                CheckCodePrefix::D405,
-                CheckCodePrefix::D406,
-                CheckCodePrefix::D407,
-                CheckCodePrefix::D408,
-                CheckCodePrefix::D409,
-                CheckCodePrefix::D410,
-                CheckCodePrefix::D411,
-                CheckCodePrefix::D412,
-                CheckCodePrefix::D414,
-                CheckCodePrefix::D418,
-                CheckCodePrefix::D419,
+                CheckCodePrefix::D,
                 CheckCodePrefix::E,
                 CheckCodePrefix::F,
                 CheckCodePrefix::W,
@@ -663,10 +714,13 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: None,
             flake8_tidy_imports: None,
             flake8_import_conventions: None,
@@ -674,6 +728,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
@@ -725,10 +780,13 @@ mod tests {
             src: None,
             target_version: None,
             unfixable: None,
+            task_tags: None,
             update_check: None,
             flake8_annotations: None,
+            flake8_bandit: None,
             flake8_bugbear: None,
             flake8_errmsg: None,
+            flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
@@ -741,6 +799,7 @@ mod tests {
             isort: None,
             mccabe: None,
             pep8_naming: None,
+            pycodestyle: None,
             pydocstyle: None,
             pyupgrade: None,
         });
