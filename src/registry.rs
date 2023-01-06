@@ -227,10 +227,10 @@ pub enum CheckCode {
     SIM110,
     SIM111,
     SIM117,
+    SIM118,
     SIM201,
     SIM202,
     SIM208,
-    SIM118,
     SIM220,
     SIM221,
     SIM222,
@@ -1431,12 +1431,12 @@ impl CheckCode {
                 CheckKind::ConvertLoopToAll("return all(x for x in y)".to_string())
             }
             CheckCode::SIM117 => CheckKind::MultipleWithStatements,
+            CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             CheckCode::SIM201 => CheckKind::NegateEqualOp("left".to_string(), "right".to_string()),
             CheckCode::SIM202 => {
                 CheckKind::NegateNotEqualOp("left".to_string(), "right".to_string())
             }
             CheckCode::SIM208 => CheckKind::DoubleNegation("expr".to_string()),
-            CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
             CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
             CheckCode::SIM221 => CheckKind::AOrNotA("...".to_string()),
             CheckCode::SIM222 => CheckKind::OrTrue,
@@ -1983,10 +1983,10 @@ impl CheckCode {
             CheckCode::SIM110 => CheckCategory::Flake8Simplify,
             CheckCode::SIM111 => CheckCategory::Flake8Simplify,
             CheckCode::SIM117 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::SIM201 => CheckCategory::Flake8Simplify,
             CheckCode::SIM202 => CheckCategory::Flake8Simplify,
             CheckCode::SIM208 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM118 => CheckCategory::Flake8Simplify,
             CheckCode::SIM220 => CheckCategory::Flake8Simplify,
             CheckCode::SIM221 => CheckCategory::Flake8Simplify,
             CheckCode::SIM222 => CheckCategory::Flake8Simplify,
