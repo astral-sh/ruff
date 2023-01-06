@@ -1,6 +1,0 @@
----
-source: src/flake8_simplify/mod.rs
-expression: checks
----
-[]
-
