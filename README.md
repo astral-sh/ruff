@@ -632,7 +632,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found 1) | 🛠 |
 | D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring | 🛠 |
 | D204 | OneBlankLineAfterClass | 1 blank line required after class docstring | 🛠 |
-| D205 | BlankLineAfterSummary | 1 blank line required between summary line and description | 🛠 |
+| D205 | BlankLineAfterSummary | 1 blank line required between summary line and description (found 2) | 🛠 |
 | D206 | IndentWithSpaces | Docstring should be indented with spaces, not tabs |  |
 | D207 | NoUnderIndentation | Docstring is under-indented | 🛠 |
 | D208 | NoOverIndentation | Docstring is over-indented | 🛠 |
