@@ -25,15 +25,6 @@ fn prefix(name: &str) -> Prefix {
     }
 }
 
-fn cmp_option_ignore_case(a: Option<&str>, b: Option<&str>) -> Ordering {
-    match (a, b) {
-        (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Less,
-        (Some(_), None) => Ordering::Greater,
-        (Some(a), Some(b)) => natord::compare_ignore_case(a, b),
-    }
-}
-
 /// Compare two top-level modules.
 pub fn cmp_modules(alias1: &AliasData, alias2: &AliasData) -> Ordering {
     natord::compare_ignore_case(alias1.name, alias2.name)
@@ -84,15 +75,17 @@ pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromD
 /// structs.
 pub fn cmp_either_import(a: &EitherImport, b: &EitherImport) -> Ordering {
     match (a, b) {
-        (Import(import1), Import(import2)) => cmp_modules(&import1.0, &import2.0),
-        (ImportFrom(import_from), Import(import)) => {
-            cmp_option_ignore_case(import_from.0.module.map(|x| &**x), Some(import.0.name))
-        }
-        (Import(import), ImportFrom(import_from)) => {
-            cmp_option_ignore_case(Some(import.0.name), import_from.0.module.map(|x| &**x))
-        }
-        (ImportFrom(import_from1), ImportFrom(import_from2)) => {
-            cmp_import_from(&import_from1.0, &import_from2.0)
+        (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2),
+        (ImportFrom((import_from, ..)), Import((alias, _))) => natord::compare_ignore_case(
+            import_from.module.as_ref().map_or("", |x| &**x),
+            alias.name,
+        ),
+        (Import((alias, _)), ImportFrom((import_from, ..))) => natord::compare_ignore_case(
+            alias.name,
+            import_from.module.as_ref().map_or("", |x| &**x),
+        ),
+        (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => {
+            cmp_import_from(import_from1, import_from2)
         }
     }
 }
