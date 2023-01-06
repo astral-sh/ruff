@@ -3738,6 +3738,7 @@ impl CheckKind {
             | CheckKind::UnsortedImports
             | CheckKind::UnusedLoopControlVariable(..)
             | CheckKind::UnusedNOQA(..)
+            | CheckKind::UnusedVariable(..)
             | CheckKind::UseFixturesWithoutParameters
             | CheckKind::UsePEP585Annotation(..)
             | CheckKind::UsePEP604Annotation
@@ -4012,6 +4013,9 @@ impl CheckKind {
                 Some(format!("Rename unused `{name}` to `_{name}`"))
             }
             CheckKind::UnusedNOQA(..) => Some("Remove unused `noqa` directive".to_string()),
+            CheckKind::UnusedVariable(name) => {
+                Some(format!("Remove assignment to unused variable `{name}`"))
+            }
             CheckKind::UsePEP585Annotation(name) => {
                 Some(format!("Replace `{name}` with `{}`", name.to_lowercase(),))
             }
