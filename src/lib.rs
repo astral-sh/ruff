@@ -75,6 +75,7 @@ pub mod source_code_generator;
 pub mod source_code_locator;
 pub mod source_code_style;
 mod vendor;
+mod violation;
 pub mod visibility;
 
 cfg_if! {
