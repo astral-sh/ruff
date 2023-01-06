@@ -66,7 +66,7 @@ strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
-toml = { version = "0.5.9" }
+toml_edit = { version = "0.17.1", features = ["easy"] }
 walkdir = { version = "2.3.2" }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
