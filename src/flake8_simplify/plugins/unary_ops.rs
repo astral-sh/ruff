@@ -1,15 +1,13 @@
-use rustpython_ast::{Cmpop, Expr, ExprKind, StmtKind, Unaryop};
+use rustpython_ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
 
-use crate::ast::helpers::create_expr;
+use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::pycodestyle;
 use crate::registry::{Check, CheckKind};
-use crate::source_code_generator::SourceCodeGenerator;
 
-fn is_exception_check(stmt: &StmtKind) -> bool {
-    let StmtKind::If {test: _, body, orelse: _} = stmt else {
+fn is_exception_check(stmt: &Stmt) -> bool {
+    let StmtKind::If {test: _, body, orelse: _} = &stmt.node else {
         return false;
     };
     if body.len() != 1 {
@@ -19,16 +17,6 @@ fn is_exception_check(stmt: &StmtKind) -> bool {
         return true;
     }
     false
-}
-
-fn expr_with_style(expr: &Expr, checker: &mut Checker) -> String {
-    let mut generator = SourceCodeGenerator::new(
-        checker.style.indentation(),
-        checker.style.quote(),
-        checker.style.line_ending(),
-    );
-    generator.unparse_expr(expr, 0);
-    generator.generate()
 }
 
 /// SIM201
@@ -42,22 +30,27 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     if !matches!(&ops[..], [Cmpop::Eq]) {
         return;
     }
-    let parent = &checker.current_stmt().0.node;
-    if is_exception_check(parent) {
+    if is_exception_check(checker.current_stmt()) {
         return;
     }
+
     let mut check = Check::new(
         CheckKind::NegateEqualOp(
-            expr_with_style(left, checker),
-            expr_with_style(&comparators[0], checker),
+            unparse_expr(left, checker.style),
+            unparse_expr(&comparators[0], checker.style),
         ),
         Range::from_located(operand),
     );
     if checker.patch(check.kind.code()) {
-        let content =
-            pycodestyle::plugins::compare(left, &[Cmpop::NotEq], comparators, checker.style);
         check.amend(Fix::replacement(
-            content,
+            unparse_expr(
+                &create_expr(ExprKind::Compare {
+                    left: left.clone(),
+                    ops: vec![Cmpop::NotEq],
+                    comparators: comparators.clone(),
+                }),
+                checker.style,
+            ),
             expr.location,
             expr.end_location.unwrap(),
         ));
@@ -81,21 +74,27 @@ pub fn negation_with_not_equal_op(
     if !matches!(&ops[..], [Cmpop::NotEq]) {
         return;
     }
-    let parent = &checker.current_stmt().0.node;
-    if is_exception_check(parent) {
+    if is_exception_check(checker.current_stmt()) {
         return;
     }
+
     let mut check = Check::new(
         CheckKind::NegateNotEqualOp(
-            expr_with_style(left, checker),
-            expr_with_style(&comparators[0], checker),
+            unparse_expr(left, checker.style),
+            unparse_expr(&comparators[0], checker.style),
         ),
         Range::from_located(operand),
     );
     if checker.patch(check.kind.code()) {
-        let content = pycodestyle::plugins::compare(left, &[Cmpop::Eq], comparators, checker.style);
         check.amend(Fix::replacement(
-            content,
+            unparse_expr(
+                &create_expr(ExprKind::Compare {
+                    left: left.clone(),
+                    ops: vec![Cmpop::Eq],
+                    comparators: comparators.clone(),
+                }),
+                checker.style,
+            ),
             expr.location,
             expr.end_location.unwrap(),
         ));
@@ -120,9 +119,8 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
         Range::from_located(operand),
     );
     if checker.patch(check.kind.code()) {
-        let inner_expr = create_expr(operand.node.clone());
         check.amend(Fix::replacement(
-            expr_with_style(&inner_expr, checker),
+            unparse_expr(operand, checker.style),
             expr.location,
             expr.end_location.unwrap(),
         ));

@@ -3860,9 +3860,7 @@ impl CheckKind {
             }
             CheckKind::DoNotAssertFalse => Some("Replace `assert False`".to_string()),
             CheckKind::DoNotAssignLambda(name) => Some(format!("Rewrite `{name}` as a `def`")),
-            CheckKind::DoubleNegation(expr) => {
-                Some(format!("Remove double negation and replace with `{expr}`"))
-            }
+            CheckKind::DoubleNegation(expr) => Some(format!("Replace with `{expr}`")),
             CheckKind::DupeClassFieldDefinitions(name) => {
                 Some(format!("Remove duplicate field definition for `{name}`"))
             }
@@ -3904,8 +3902,8 @@ impl CheckKind {
             CheckKind::NativeLiterals(literal_type) => {
                 Some(format!("Replace with `{literal_type}`"))
             }
-            CheckKind::NegateEqualOp(..) => Some("Replace with != operator".to_string()),
-            CheckKind::NegateNotEqualOp(..) => Some("Replace with == operator".to_string()),
+            CheckKind::NegateEqualOp(..) => Some("Replace with `!=` operator".to_string()),
+            CheckKind::NegateNotEqualOp(..) => Some("Replace with `==` operator".to_string()),
             CheckKind::NewLineAfterLastParagraph => {
                 Some("Move closing quotes to new line".to_string())
             }

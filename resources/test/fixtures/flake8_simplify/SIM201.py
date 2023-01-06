@@ -1,16 +1,17 @@
-if not a == b: #SIM201
-  pass
+if not a == b:  # SIM201
+    pass
 
-if not a == (b + c): #SIM201
-  pass
+if not a == (b + c):  # SIM201
+    pass
 
-if not (a+b) == c: #SIM201
-  pass
+if not (a + b) == c:  # SIM201
+    pass
 
-if not a != b: #NG
-  pass
+if not a != b:  # OK
+    pass
 
-if a == b: #NG
-  pass
+if a == b:  # OK
+    pass
 
-
+if not a == b:  # OK
+    raise ValueError()

@@ -21,7 +21,6 @@ mod tests {
     #[test_case(CheckCode::SIM111, Path::new("SIM111.py"); "SIM111")]
     #[test_case(CheckCode::SIM117, Path::new("SIM117.py"); "SIM117")]
     #[test_case(CheckCode::SIM201, Path::new("SIM201.py"); "SIM201")]
-    #[test_case(CheckCode::SIM201, Path::new("SIM201_2.py"); "SIM201_2")]
     #[test_case(CheckCode::SIM202, Path::new("SIM202.py"); "SIM202")]
     #[test_case(CheckCode::SIM208, Path::new("SIM208.py"); "SIM208")]
     #[test_case(CheckCode::SIM118, Path::new("SIM118.py"); "SIM118")]

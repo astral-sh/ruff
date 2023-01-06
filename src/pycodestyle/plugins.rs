@@ -4,7 +4,9 @@ use rustpython_ast::{Arguments, Location, StmtKind};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Stmt, Unaryop};
 
 use crate::ast::helpers;
-use crate::ast::helpers::{match_leading_content, match_trailing_content};
+use crate::ast::helpers::{
+    create_expr, match_leading_content, match_trailing_content, unparse_expr,
+};
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
@@ -19,18 +21,14 @@ pub fn compare(
     comparators: &[Expr],
     stylist: &SourceCodeStyleDetector,
 ) -> String {
-    let cmp = Expr::new(
-        Location::default(),
-        Location::default(),
-        ExprKind::Compare {
+    unparse_expr(
+        &create_expr(ExprKind::Compare {
             left: Box::new(left.clone()),
             ops: ops.to_vec(),
             comparators: comparators.to_vec(),
-        },
-    );
-    let mut generator: SourceCodeGenerator = stylist.into();
-    generator.unparse_expr(&cmp, 0);
-    generator.generate()
+        }),
+        stylist,
+    )
 }
 
 /// E711, E712

@@ -49,7 +49,7 @@ expression: checks
     column: 7
   end_location:
     row: 7
-    column: 17
+    column: 19
   fix:
     content: a + b == c
     location:
@@ -57,6 +57,6 @@ expression: checks
       column: 3
     end_location:
       row: 7
-      column: 17
+      column: 19
   parent: ~
 
