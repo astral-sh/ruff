@@ -1,3 +1,5 @@
+use std::string::FromUtf8Error;
+
 use anyhow::Result;
 use itertools::izip;
 use log::error;
@@ -20,7 +22,7 @@ pub fn compare(
     ops: &[Cmpop],
     comparators: &[Expr],
     stylist: &SourceCodeStyleDetector,
-) -> Option<String> {
+) -> Result<String, FromUtf8Error> {
     let cmp = Expr::new(
         Location::default(),
         Location::default(),
@@ -36,7 +38,7 @@ pub fn compare(
         stylist.line_ending(),
     );
     generator.unparse_expr(&cmp, 0);
-    generator.generate().ok()
+    generator.generate()
 }
 
 /// E711, E712
@@ -204,14 +206,17 @@ pub fn literal_comparisons(
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .cloned()
             .collect::<Vec<_>>();
-        if let Some(content) = compare(left, &ops, comparators, checker.style) {
-            for check in &mut checks {
-                check.amend(Fix::replacement(
-                    content.to_string(),
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
+        match compare(left, &ops, comparators, checker.style) {
+            Ok(content) => {
+                for check in &mut checks {
+                    check.amend(Fix::replacement(
+                        content.to_string(),
+                        expr.location,
+                        expr.end_location.unwrap(),
+                    ));
+                }
             }
+            Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
 
@@ -243,14 +248,15 @@ pub fn not_tests(
                             let mut check =
                                 Check::new(CheckKind::NotInTest, Range::from_located(operand));
                             if checker.patch(check.kind.code()) && should_fix {
-                                if let Some(content) =
-                                    compare(left, &[Cmpop::NotIn], comparators, checker.style)
-                                {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
+                                match compare(left, &[Cmpop::NotIn], comparators, checker.style) {
+                                    Ok(content) => {
+                                        check.amend(Fix::replacement(
+                                            content,
+                                            expr.location,
+                                            expr.end_location.unwrap(),
+                                        ));
+                                    }
+                                    Err(e) => error!("Failed to generate fix: {e}"),
                                 }
                             }
                             checker.add_check(check);
@@ -261,14 +267,15 @@ pub fn not_tests(
                             let mut check =
                                 Check::new(CheckKind::NotIsTest, Range::from_located(operand));
                             if checker.patch(check.kind.code()) && should_fix {
-                                if let Some(content) =
-                                    compare(left, &[Cmpop::IsNot], comparators, checker.style)
-                                {
-                                    check.amend(Fix::replacement(
-                                        content,
-                                        expr.location,
-                                        expr.end_location.unwrap(),
-                                    ));
+                                match compare(left, &[Cmpop::IsNot], comparators, checker.style) {
+                                    Ok(content) => {
+                                        check.amend(Fix::replacement(
+                                            content,
+                                            expr.location,
+                                            expr.end_location.unwrap(),
+                                        ));
+                                    }
+                                    Err(e) => error!("Failed to generate fix: {e}"),
                                 }
                             }
                             checker.add_check(check);
