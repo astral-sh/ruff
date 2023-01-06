@@ -933,7 +933,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::PT013) {
                     if let Some(check) = flake8_pytest_style::plugins::import_from(
                         stmt,
-                        module.as_ref().map(String::as_str),
+                        module.as_deref(),
                         level.as_ref(),
                     ) {
                         self.add_check(check);
@@ -999,7 +999,7 @@ where
                                 self.add_check(Check::new(
                                     CheckKind::ImportStarNotPermitted(helpers::format_import_from(
                                         level.as_ref(),
-                                        module.as_ref().map(String::as_str),
+                                        module.as_deref(),
                                     )),
                                     Range::from_located(stmt),
                                 ));
@@ -1010,7 +1010,7 @@ where
                             self.add_check(Check::new(
                                 CheckKind::ImportStarUsed(helpers::format_import_from(
                                     level.as_ref(),
-                                    module.as_ref().map(String::as_str),
+                                    module.as_deref(),
                                 )),
                                 Range::from_located(stmt),
                             ));
@@ -1076,7 +1076,7 @@ where
                     if self.settings.enabled.contains(&CheckCode::T100) {
                         if let Some(check) = flake8_debugger::checks::debugger_import(
                             stmt,
-                            module.as_ref().map(String::as_str),
+                            module.as_deref(),
                             &alias.node.name,
                         ) {
                             self.add_check(check);
@@ -2636,11 +2636,7 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP025) {
-                    pyupgrade::plugins::rewrite_unicode_literal(
-                        self,
-                        expr,
-                        kind.as_ref().map(String::as_str),
-                    );
+                    pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
@@ -2978,7 +2974,7 @@ where
                     flake8_blind_except::plugins::blind_except(
                         self,
                         type_.as_deref(),
-                        name.as_ref().map(String::as_str),
+                        name.as_deref(),
                         body,
                     );
                 }
@@ -3442,7 +3438,7 @@ impl<'a> Checker<'a> {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
-                                    module.as_ref().map(String::as_str),
+                                    module.as_deref(),
                                 ));
                             }
                         }
@@ -3923,7 +3919,7 @@ impl<'a> Checker<'a> {
                                 if let BindingKind::StarImportation(level, module) = &binding.kind {
                                     from_list.push(helpers::format_import_from(
                                         level.as_ref(),
-                                        module.as_ref().map(String::as_str),
+                                        module.as_deref(),
                                     ));
                                 }
                             }
