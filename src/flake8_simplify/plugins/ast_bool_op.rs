@@ -1,4 +1,6 @@
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Boolop, Constant, Expr, ExprKind, Unaryop};
+use std::collections::HashMap;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -12,6 +14,52 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
         }
     }
     None
+}
+
+fn duplicate_isinstance_call_by_node(values: &[Expr]) -> FxHashMap<&str, Vec<&Expr>> {
+    let mut duplicates = FxHashMap::default();
+    for call in values {
+        // Verify that this is an `isinstance` call.
+        let ExprKind::Call { func, args, keywords } = &call.node else {
+            continue;
+        };
+        if args.len() != 2 {
+            continue;
+        }
+        let ExprKind::Name { id: func_name, .. } = &func.node else {
+            continue;
+        };
+        if func_name != "isinstance" {
+            continue;
+        }
+
+        // Collect the name of the argument.
+        let ExprKind::Name { id: arg_name, .. } = &args[0].node else {
+            continue;
+        };
+
+        duplicates
+            .entry(arg_name.as_str())
+            .or_insert_with(Vec::new)
+            .push(&args[1]);
+    }
+    duplicates
+}
+
+/// SIM101
+pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
+        return;
+    };
+
+    for (arg_name, values) in duplicate_isinstance_call_by_node(values) {
+        let mut check = Check::new(
+            CheckKind::DuplicateIsinstanceCall(arg_name.to_string()),
+            Range::from_located(expr),
+        );
+        if checker.patch(&CheckCode::SIM101) {}
+        checker.add_check(check);
+    }
 }
 
 /// SIM220
