@@ -59,7 +59,7 @@ impl<'a> SourceCodeGenerator<'a> {
     }
 
     pub fn generate(self) -> String {
-        unsafe { String::from_utf8_unchecked(self.buffer) }
+        String::from_utf8(self.buffer).expect("Generated source code is not valid UTF-8")
     }
 
     fn newline(&mut self) {
