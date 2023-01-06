@@ -173,8 +173,6 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: &CheckCode) -> bool {
-        // TODO(charlie): We can't fix errors in f-strings until RustPython adds
-        // location data.
         matches!(self.autofix, flags::Autofix::Enabled) && self.settings.fixable.contains(code)
     }
 
@@ -257,7 +255,7 @@ where
                 if !self.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(stmt)
                     && !operations::in_nested_block(
-                        &mut self.parents.iter().rev().map(|node| node.0),
+                        self.parents.iter().rev().map(std::convert::Into::into),
                     )
                 {
                     self.seen_import_boundary = true;
@@ -343,7 +341,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::F701) {
                     if let Some(check) = pyflakes::checks::break_outside_loop(
                         stmt,
-                        &mut self.parents.iter().rev().map(|node| node.0).skip(1),
+                        &mut self
+                            .parents
+                            .iter()
+                            .rev()
+                            .map(std::convert::Into::into)
+                            .skip(1),
                     ) {
                         self.add_check(check);
                     }
@@ -353,7 +356,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::F702) {
                     if let Some(check) = pyflakes::checks::continue_outside_loop(
                         stmt,
-                        &mut self.parents.iter().rev().map(|node| node.0).skip(1),
+                        &mut self
+                            .parents
+                            .iter()
+                            .rev()
+                            .map(std::convert::Into::into)
+                            .skip(1),
                     ) {
                         self.add_check(check);
                     }
@@ -1736,7 +1744,7 @@ where
                         if attr == name {
                             // Avoid flagging on function calls (e.g., `df.values()`).
                             if let Some(parent) = self.current_expr_parent() {
-                                if matches!(parent.0.node, ExprKind::Call { .. }) {
+                                if matches!(parent.node, ExprKind::Call { .. }) {
                                     continue;
                                 }
                             }
@@ -3332,7 +3340,7 @@ impl<'a> Checker<'a> {
                         && !(matches!(existing.kind, BindingKind::FunctionDefinition)
                             && visibility::is_overload(
                                 self,
-                                cast::decorator_list(existing.source.as_ref().unwrap().0),
+                                cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
                         overridden = Some((*scope_index, *existing_binding_index));
@@ -3654,8 +3662,9 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         if let ExprKind::Name { id, .. } = &expr.node {
-            if operations::on_conditional_branch(&mut self.parents.iter().rev().map(|node| node.0))
-            {
+            if operations::on_conditional_branch(
+                &mut self.parents.iter().rev().map(std::convert::Into::into),
+            ) {
                 return;
             }
 
@@ -3993,7 +4002,7 @@ impl<'a> Checker<'a> {
 
                     let defined_by = binding.source.as_ref().unwrap();
                     let defined_in = self.child_to_parent.get(defined_by);
-                    let child = defined_by.0;
+                    let child: &Stmt = defined_by.into();
 
                     let check_lineno = binding.range.location.row();
                     let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -4025,14 +4034,17 @@ impl<'a> Checker<'a> {
                     self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
                 for ((defined_by, defined_in), unused_imports) in unused
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
+                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
                 {
-                    let child = defined_by.0;
-                    let parent = defined_in.map(|defined_in| defined_in.0);
+                    let child: &Stmt = defined_by.into();
+                    let parent: Option<&Stmt> = defined_in.map(std::convert::Into::into);
 
                     let fix = if !ignore_init && self.patch(&CheckCode::F401) {
-                        let deleted: Vec<&Stmt> =
-                            self.deletions.iter().map(|node| node.0).collect();
+                        let deleted: Vec<&Stmt> = self
+                            .deletions
+                            .iter()
+                            .map(std::convert::Into::into)
+                            .collect();
                         match autofix::helpers::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
@@ -4074,9 +4086,9 @@ impl<'a> Checker<'a> {
                 }
                 for ((defined_by, ..), unused_imports) in ignored
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
+                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
                 {
-                    let child = defined_by.0;
+                    let child: &Stmt = defined_by.into();
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(

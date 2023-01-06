@@ -86,11 +86,11 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         return;
     }
     let StmtKind::Assign { targets: body_targets, value: body_value, .. } = &body[0].node else {
-            return;
-        };
+        return;
+    };
     let StmtKind::Assign { targets: orelse_targets, value: orelse_value, .. } = &orelse[0].node else {
-            return;
-        };
+        return;
+    };
     if body_targets.len() != 1 || orelse_targets.len() != 1 {
         return;
     }
@@ -109,20 +109,30 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     // It's part of a bigger if-elif block:
     // https://github.com/MartinThoma/flake8-simplify/issues/115
     if let Some(StmtKind::If {
-        body: parent_body, ..
-    }) = parent.map(|p| &p.node)
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
     {
-        for s in parent_body {
-            let StmtKind::Assign { targets: parent_targets, .. } = &s.node else {
-                continue;
-            };
-            let Some(ExprKind::Name { id: parent_id, .. }) =
-                parent_targets.get(0).map(|t| &t.node) else {
-                continue;
-            };
-            if body_id == parent_id {
-                return;
-            }
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
         }
     }
 
