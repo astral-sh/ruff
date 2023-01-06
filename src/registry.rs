@@ -2599,18 +2599,18 @@ impl CheckKind {
             CheckKind::ExpressionsInStarAssignment => {
                 "Too many expressions in star-unpacking assignment".to_string()
             }
-            CheckKind::TrueFalseComparison(true, EqCmpop::Eq) => {
-                "Comparison to `True` should be `cond is True`".to_string()
-            }
-            CheckKind::TrueFalseComparison(true, EqCmpop::NotEq) => {
-                "Comparison to `True` should be `cond is not True`".to_string()
-            }
-            CheckKind::TrueFalseComparison(false, EqCmpop::Eq) => {
-                "Comparison to `False` should be `cond is False`".to_string()
-            }
-            CheckKind::TrueFalseComparison(false, EqCmpop::NotEq) => {
-                "Comparison to `False` should be `cond is not False`".to_string()
-            }
+            CheckKind::TrueFalseComparison(value, op) => match (value, op) {
+                (true, EqCmpop::Eq) => "Comparison to `True` should be `cond is True`".to_string(),
+                (true, EqCmpop::NotEq) => {
+                    "Comparison to `True` should be `cond is not True`".to_string()
+                }
+                (false, EqCmpop::Eq) => {
+                    "Comparison to `False` should be `cond is False`".to_string()
+                }
+                (false, EqCmpop::NotEq) => {
+                    "Comparison to `False` should be `cond is not False`".to_string()
+                }
+            },
             CheckKind::TwoStarredExpressions => "Two starred expressions in assignment".to_string(),
             CheckKind::TypeComparison => "Do not compare types, use `isinstance()`".to_string(),
             CheckKind::UndefinedExport(name) => {
@@ -3342,9 +3342,13 @@ impl CheckKind {
             CheckKind::HardcodedBindAllInterfaces => {
                 "Possible binding to all interfaces".to_string()
             }
-            CheckKind::HardcodedPasswordString(string)
-            | CheckKind::HardcodedPasswordFuncArg(string)
-            | CheckKind::HardcodedPasswordDefault(string) => {
+            CheckKind::HardcodedPasswordString(string) => {
+                format!("Possible hardcoded password: \"{}\"", string.escape_debug())
+            }
+            CheckKind::HardcodedPasswordFuncArg(string) => {
+                format!("Possible hardcoded password: \"{}\"", string.escape_debug())
+            }
+            CheckKind::HardcodedPasswordDefault(string) => {
                 format!("Possible hardcoded password: \"{}\"", string.escape_debug())
             }
             CheckKind::HardcodedTempFile(string) => {
@@ -3833,7 +3837,7 @@ impl CheckKind {
             | CheckKind::UselessYieldFixture(..)
             | CheckKind::YodaConditions(..) => true,
             // Conditionally-fixable checks.
-            CheckKind::UnusedImport(_, false, _) => true,
+            CheckKind::UnusedImport(_, ignore_init, _) => !ignore_init,
             CheckKind::BlankLineAfterSummary(num_lines) if *num_lines > 0 => true,
             // Non-fixable checks.
             _ => false,
@@ -3845,9 +3849,13 @@ impl CheckKind {
         match self {
             CheckKind::AAndNotA(..) => Some("Replace with `False`".to_string()),
             CheckKind::AOrNotA(..) => Some("Replace with `True`".to_string()),
-            CheckKind::AmbiguousUnicodeCharacterString(confusable, representant)
-            | CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant)
-            | CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
+            CheckKind::AmbiguousUnicodeCharacterString(confusable, representant) => {
+                Some(format!("Replace '{confusable}' with '{representant}'"))
+            }
+            CheckKind::AmbiguousUnicodeCharacterDocstring(confusable, representant) => {
+                Some(format!("Replace '{confusable}' with '{representant}'"))
+            }
+            CheckKind::AmbiguousUnicodeCharacterComment(confusable, representant) => {
                 Some(format!("Replace '{confusable}' with '{representant}'"))
             }
             CheckKind::AndFalse => Some("Replace with `False`".to_string()),
@@ -3869,8 +3877,10 @@ impl CheckKind {
             }
             CheckKind::ConvertLoopToAll(all) => Some(format!("Replace with `{all}`")),
             CheckKind::ConvertLoopToAny(any) => Some(format!("Replace with `{any}`")),
-            CheckKind::ConvertTypedDictFunctionalToClass(name)
-            | CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
+            CheckKind::ConvertTypedDictFunctionalToClass(name) => {
+                Some(format!("Convert `{name}` to class syntax"))
+            }
+            CheckKind::ConvertNamedTupleFunctionalToClass(name) => {
                 Some(format!("Convert `{name}` to class syntax"))
             }
             CheckKind::DashedUnderlineAfterSection(name) => {
@@ -3991,8 +4001,11 @@ impl CheckKind {
             }
             CheckKind::PreferListBuiltin => Some("Replace with `list`".to_string()),
             CheckKind::PPrintFound => Some("Remove `pprint`".to_string()),
-            CheckKind::PercentFormatExtraNamedArguments(missing)
-            | CheckKind::StringDotFormatExtraNamedArguments(missing) => {
+            CheckKind::PercentFormatExtraNamedArguments(missing) => {
+                let message = missing.join(", ");
+                Some(format!("Remove extra named arguments: {message}"))
+            }
+            CheckKind::StringDotFormatExtraNamedArguments(missing) => {
                 let message = missing.join(", ");
                 Some(format!("Remove extra named arguments: {message}"))
             }
@@ -4026,18 +4039,12 @@ impl CheckKind {
             }
             CheckKind::SetAttrWithConstant => Some("Replace `setattr` with assignment".to_string()),
             CheckKind::SuperCallWithParameters => Some("Remove `__super__` parameters".to_string()),
-            CheckKind::TrueFalseComparison(true, EqCmpop::Eq) => {
-                Some("Replace with `cond is True`".to_string())
-            }
-            CheckKind::TrueFalseComparison(true, EqCmpop::NotEq) => {
-                Some("Replace with `cond is not True`".to_string())
-            }
-            CheckKind::TrueFalseComparison(false, EqCmpop::Eq) => {
-                Some("Replace with `cond is False`".to_string())
-            }
-            CheckKind::TrueFalseComparison(false, EqCmpop::NotEq) => {
-                Some("Replace with `cond is not False`".to_string())
-            }
+            CheckKind::TrueFalseComparison(value, op) => Some(match (value, op) {
+                (true, EqCmpop::Eq) => "Replace with `cond is True`".to_string(),
+                (true, EqCmpop::NotEq) => "Replace with `cond is not True`".to_string(),
+                (false, EqCmpop::Eq) => "Replace with `cond is False`".to_string(),
+                (false, EqCmpop::NotEq) => "Replace with `cond is not False`".to_string(),
+            }),
             CheckKind::TypeOfPrimitive(primitive) => Some(format!(
                 "Replace `type(...)` with `{}`",
                 primitive.builtin()
@@ -4099,11 +4106,15 @@ impl CheckKind {
             }),
             CheckKind::UnnecessaryReturnNone => Some("Remove explicit `return None`".to_string()),
             CheckKind::UnsortedImports => Some("Organize imports".to_string()),
-            CheckKind::UnusedImport(name, false, multiple) => {
-                if *multiple {
-                    Some("Remove unused import".to_string())
+            CheckKind::UnusedImport(name, ignore_init, multiple) => {
+                if !*ignore_init {
+                    Some(if *multiple {
+                        "Remove unused import".to_string()
+                    } else {
+                        format!("Remove unused import: `{name}`")
+                    })
                 } else {
-                    Some(format!("Remove unused import: `{name}`"))
+                    None
                 }
             }
             CheckKind::UnusedLoopControlVariable(name) => {
