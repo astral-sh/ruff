@@ -2735,6 +2735,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::SIM101) {
                     flake8_simplify::plugins::duplicate_isinstance_call(self, expr);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM109) {
+                    flake8_simplify::plugins::compare_with_tuple(self, expr);
+                }
                 if self.settings.enabled.contains(&CheckCode::SIM220) {
                     flake8_simplify::plugins::a_and_not_a(self, expr);
                 }

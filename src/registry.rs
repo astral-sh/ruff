@@ -223,6 +223,7 @@ pub enum CheckCode {
     SIM105,
     SIM107,
     SIM108,
+    SIM109,
     SIM110,
     SIM111,
     SIM117,
@@ -963,6 +964,7 @@ pub enum CheckKind {
     SysVersionSlice1Referenced,
     // flake8-simplify
     UseTernaryOperator(String),
+    CompareWithTuple(String, Vec<String>, String),
     DuplicateIsinstanceCall(String),
     AAndNotA(String),
     AOrNotA(String),
@@ -1411,6 +1413,11 @@ impl CheckCode {
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
             CheckCode::SIM108 => CheckKind::UseTernaryOperator("..".to_string()),
+            CheckCode::SIM109 => CheckKind::CompareWithTuple(
+                "value".to_string(),
+                vec!["...".to_string(), "...".to_string()],
+                "value == ... or value == ...".to_string(),
+            ),
             CheckCode::SIM110 => {
                 CheckKind::ConvertLoopToAny("return any(x for x in y)".to_string())
             }
@@ -1961,6 +1968,7 @@ impl CheckCode {
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM107 => CheckCategory::Flake8Simplify,
             CheckCode::SIM108 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM109 => CheckCategory::Flake8Simplify,
             CheckCode::SIM110 => CheckCategory::Flake8Simplify,
             CheckCode::SIM111 => CheckCategory::Flake8Simplify,
             CheckCode::SIM117 => CheckCategory::Flake8Simplify,
@@ -2216,12 +2224,13 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
-            CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
             CheckKind::AAndNotA(..) => &CheckCode::SIM220,
             CheckKind::AOrNotA(..) => &CheckCode::SIM221,
             CheckKind::AndFalse => &CheckCode::SIM223,
+            CheckKind::CompareWithTuple(..) => &CheckCode::SIM109,
             CheckKind::ConvertLoopToAll(..) => &CheckCode::SIM111,
             CheckKind::ConvertLoopToAny(..) => &CheckCode::SIM110,
+            CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::MultipleWithStatements => &CheckCode::SIM117,
             CheckKind::NestedIfStatements => &CheckCode::SIM102,
@@ -2987,6 +2996,10 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::CompareWithTuple(value, values, or_op) => {
+                let values = values.join(", ");
+                format!("Use `{value} in ({values})` instead of `{or_op}`")
+            }
             CheckKind::DuplicateIsinstanceCall(name) => {
                 format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
             }
@@ -3663,6 +3676,7 @@ impl CheckKind {
             | CheckKind::BlankLineBeforeSection(..)
             | CheckKind::CapitalizeSectionName(..)
             | CheckKind::CommentedOutCode
+            | CheckKind::CompareWithTuple(..)
             | CheckKind::ConvertLoopToAll(..)
             | CheckKind::ConvertLoopToAny(..)
             | CheckKind::ConvertNamedTupleFunctionalToClass(..)
@@ -3798,6 +3812,10 @@ impl CheckKind {
             }
             CheckKind::CapitalizeSectionName(name) => Some(format!("Capitalize \"{name}\"")),
             CheckKind::CommentedOutCode => Some("Remove commented-out code".to_string()),
+            CheckKind::CompareWithTuple(value, values, or_op) => {
+                let values = values.join(", ");
+                Some(format!("Replace `{or_op}` with `{value} in {values}`"))
+            }
             CheckKind::ConvertLoopToAll(all) => Some(format!("Replace with `{all}`")),
             CheckKind::ConvertLoopToAny(any) => Some(format!("Replace with `{any}`")),
             CheckKind::ConvertTypedDictFunctionalToClass(name)
