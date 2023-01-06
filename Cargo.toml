@@ -68,7 +68,6 @@ textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
 toml = { version = "0.5.9" }
 walkdir = { version = "2.3.2" }
-lazy_static = "1.4.0"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clearscreen = { version = "1.0.10" }
