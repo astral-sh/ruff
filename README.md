@@ -773,6 +773,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S108 | HardcodedTempFile | Probable insecure usage of temporary file or directory: "..." |  |
 | S113 | RequestWithoutTimeout | Probable use of requests call without timeout |  |
 | S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "..." |  |
+| S501 | RequestWithNoCertValidation | Probable use of `...` call with `verify=False` disabling SSL certificate checks |  |
 | S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 
 ### flake8-blind-except (BLE)
