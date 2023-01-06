@@ -1,0 +1,22 @@
+---
+source: src/flake8_simplify/mod.rs
+expression: checks
+---
+- kind:
+    UseTernaryOperator: b = c if a else d
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 5
+    column: 9
+  fix:
+    content: b = c if a else d
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 5
+      column: 9
+  parent: ~
+
