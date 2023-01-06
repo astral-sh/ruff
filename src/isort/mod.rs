@@ -586,7 +586,7 @@ pub fn format_imports(
 
         let mut is_first_statement = true;
 
-        let it = import_block
+        let mut it = import_block
             .import
             .into_iter()
             .map(AnyImport::Import)
@@ -596,13 +596,14 @@ pub fn format_imports(
                     .into_iter()
                     .map(AnyImport::ImportFrom),
             )
-            .sorted_by(|a, b| {
-                if force_sort_within_sections {
-                    cmp_any_import(a, b)
-                } else {
-                    Ordering::Greater
-                }
-            });
+            .collect::<Vec<AnyImport>>();
+
+        if force_sort_within_sections {
+            it = it
+                .into_iter()
+                .sorted_by(|a, b| cmp_any_import(a, b))
+                .collect::<Vec<AnyImport>>();
+        }
 
         for import in it {
             match import {
