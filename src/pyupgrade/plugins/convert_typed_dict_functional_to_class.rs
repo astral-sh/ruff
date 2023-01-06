@@ -13,6 +13,7 @@ use crate::python::keyword::KWLIST;
 use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::violations;
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
@@ -233,7 +234,7 @@ pub fn convert_typed_dict_functional_to_class(
         Ok(args) => args,
     };
     let mut check = Check::new(
-        CheckKind::ConvertTypedDictFunctionalToClass(class_name.to_string()),
+        violations::ConvertTypedDictFunctionalToClass(class_name.to_string()),
         Range::from_located(stmt),
     );
     if checker.patch(check.kind.code()) {

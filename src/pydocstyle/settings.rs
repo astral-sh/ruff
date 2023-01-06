@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::registry::CheckCodePrefix;
+use crate::violations;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]

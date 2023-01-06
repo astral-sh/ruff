@@ -11,6 +11,7 @@ use crate::python::keyword::KWLIST;
 use crate::registry::{Check, CheckKind};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::violations;
 
 /// Return the typename, args, keywords and mother class
 fn match_named_tuple_assign<'a>(
@@ -191,7 +192,7 @@ pub fn convert_named_tuple_functional_to_class(
         Ok(defaults) => match create_properties_from_args(args, defaults) {
             Ok(properties) => {
                 let mut check = Check::new(
-                    CheckKind::ConvertNamedTupleFunctionalToClass(typename.to_string()),
+                    violations::ConvertNamedTupleFunctionalToClass(typename.to_string()),
                     Range::from_located(stmt),
                 );
                 if checker.patch(check.kind.code()) {

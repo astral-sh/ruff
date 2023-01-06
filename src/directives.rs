@@ -6,7 +6,7 @@ use rustpython_ast::Location;
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::registry::LintSource;
-use crate::Settings;
+use crate::{violations, Settings};
 
 bitflags! {
     pub struct Flags: u32 {

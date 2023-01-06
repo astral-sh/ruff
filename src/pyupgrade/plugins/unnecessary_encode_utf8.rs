@@ -5,6 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
@@ -59,13 +60,13 @@ fn delete_default_encode_arg_or_kwarg(
     patch: bool,
 ) -> Option<Check> {
     if let Some(arg) = args.get(0) {
-        let mut check = Check::new(CheckKind::UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut check = Check::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
             check.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
         }
         Some(check)
     } else if let Some(kwarg) = kwargs.get(0) {
-        let mut check = Check::new(CheckKind::UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut check = Check::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
             check.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
@@ -82,7 +83,7 @@ fn replace_with_bytes_literal(
     locator: &SourceCodeLocator,
     patch: bool,
 ) -> Check {
-    let mut check = Check::new(CheckKind::UnnecessaryEncodeUTF8, Range::from_located(expr));
+    let mut check = Check::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
         let content = locator.slice_source_code_range(&Range::new(
             constant.location,

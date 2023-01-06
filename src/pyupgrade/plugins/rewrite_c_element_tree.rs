@@ -4,9 +4,10 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
-    let mut check = Check::new(CheckKind::RewriteCElementTree, Range::from_located(node));
+    let mut check = Check::new(violations::RewriteCElementTree, Range::from_located(node));
     if checker.patch(check.kind.code()) {
         let contents = checker
             .locator

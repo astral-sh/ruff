@@ -4,6 +4,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
     match &expr.node {
@@ -29,7 +30,7 @@ pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
-    let mut check = Check::new(CheckKind::RaiseNotImplemented, Range::from_located(expr));
+    let mut check = Check::new(violations::RaiseNotImplemented, Range::from_located(expr));
     if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             "NotImplementedError".to_string(),

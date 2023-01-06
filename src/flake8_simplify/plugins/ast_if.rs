@@ -5,6 +5,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
+use crate::violations;
 
 fn is_main_check(expr: &Expr) -> bool {
     if let ExprKind::Compare {
@@ -60,7 +61,7 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
     }
 
     checker.checks.push(Check::new(
-        CheckKind::NestedIfStatements,
+        violations::NestedIfStatements,
         Range::from_located(stmt),
     ));
 }
@@ -88,7 +89,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     }
     let condition = unparse_expr(test, checker.style);
     let mut check = Check::new(
-        CheckKind::ReturnBoolConditionDirectly(condition),
+        violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
     if checker.patch(&CheckCode::SIM103) {
@@ -178,7 +179,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     let ternary = ternary(target_var, body_value, test, orelse_value);
     let content = unparse_stmt(&ternary, checker.style);
     let mut check = Check::new(
-        CheckKind::UseTernaryOperator(content.clone()),
+        violations::UseTernaryOperator(content.clone()),
         Range::from_located(stmt),
     );
     if checker.patch(&CheckCode::SIM108) {

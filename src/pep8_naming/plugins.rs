@@ -4,7 +4,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::pep8_naming::helpers;
 use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Check};
 
 /// N806
 pub fn non_lowercase_variable_in_function(
@@ -17,7 +17,7 @@ pub fn non_lowercase_variable_in_function(
         && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
     {
         checker.checks.push(Check::new(
-            CheckKind::NonLowercaseVariableInFunction(name.to_string()),
+            violations::NonLowercaseVariableInFunction(name.to_string()),
             Range::from_located(expr),
         ));
     }
@@ -34,7 +34,7 @@ pub fn mixed_case_variable_in_class_scope(
         && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
     {
         checker.checks.push(Check::new(
-            CheckKind::MixedCaseVariableInClassScope(name.to_string()),
+            violations::MixedCaseVariableInClassScope(name.to_string()),
             Range::from_located(expr),
         ));
     }
@@ -51,7 +51,7 @@ pub fn mixed_case_variable_in_global_scope(
         && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
     {
         checker.checks.push(Check::new(
-            CheckKind::MixedCaseVariableInGlobalScope(name.to_string()),
+            violations::MixedCaseVariableInGlobalScope(name.to_string()),
             Range::from_located(expr),
         ));
     }

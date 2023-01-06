@@ -4,6 +4,7 @@ use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// B017
 pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[Withitem]) {
@@ -34,7 +35,7 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
     }
 
     checker.checks.push(Check::new(
-        CheckKind::NoAssertRaisesException,
+        violations::NoAssertRaisesException,
         Range::from_located(stmt),
     ));
 }

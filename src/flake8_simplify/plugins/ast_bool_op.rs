@@ -10,6 +10,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
+use crate::violations;
 
 /// Return `true` if two `Expr` instances are equivalent names.
 fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
@@ -62,7 +63,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     for (arg_name, indices) in duplicates {
         if indices.len() > 1 {
             let mut check = Check::new(
-                CheckKind::DuplicateIsinstanceCall(arg_name.to_string()),
+                violations::DuplicateIsinstanceCall(arg_name.to_string()),
                 Range::from_located(expr),
             );
             if checker.patch(&CheckCode::SIM101) {
@@ -171,7 +172,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             .map(|value| unparse_expr(value, checker.style))
             .collect();
         let mut check = Check::new(
-            CheckKind::CompareWithTuple(
+            violations::CompareWithTuple(
                 value.to_string(),
                 str_values,
                 unparse_expr(expr, checker.style),
@@ -233,7 +234,7 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut check = Check::new(
-                    CheckKind::AAndNotA(id.to_string()),
+                    violations::AAndNotA(id.to_string()),
                     Range::from_located(expr),
                 );
                 if checker.patch(&CheckCode::SIM220) {
@@ -281,7 +282,7 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut check = Check::new(
-                    CheckKind::AOrNotA(id.to_string()),
+                    violations::AOrNotA(id.to_string()),
                     Range::from_located(expr),
                 );
                 if checker.patch(&CheckCode::SIM220) {
@@ -308,7 +309,7 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut check = Check::new(CheckKind::OrTrue, Range::from_located(value));
+            let mut check = Check::new(violations::OrTrue, Range::from_located(value));
             if checker.patch(&CheckCode::SIM223) {
                 check.amend(Fix::replacement(
                     "True".to_string(),
@@ -332,7 +333,7 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut check = Check::new(CheckKind::AndFalse, Range::from_located(value));
+            let mut check = Check::new(violations::AndFalse, Range::from_located(value));
             if checker.patch(&CheckCode::SIM223) {
                 check.amend(Fix::replacement(
                     "False".to_string(),

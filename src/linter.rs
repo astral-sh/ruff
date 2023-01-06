@@ -25,7 +25,7 @@ use crate::registry::{Check, CheckCode, CheckKind, LintSource};
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::{cache, directives, fs, rustpython_helpers};
+use crate::{cache, directives, fs, rustpython_helpers, violations};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -119,7 +119,7 @@ pub(crate) fn check_path(
             Err(parse_error) => {
                 if settings.enabled.contains(&CheckCode::E999) {
                     checks.push(Check::new(
-                        CheckKind::SyntaxError(parse_error.error.to_string()),
+                        violations::SyntaxError(parse_error.error.to_string()),
                         Range::new(parse_error.location, parse_error.location),
                     ));
                 }

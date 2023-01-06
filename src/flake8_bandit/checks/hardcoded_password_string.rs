@@ -3,6 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 fn is_password_target(target: &Expr) -> bool {
     let target_name = match &target.node {
@@ -34,7 +35,7 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
                 return None;
             }
             Some(Check::new(
-                CheckKind::HardcodedPasswordString(string.to_string()),
+                violations::HardcodedPasswordString(string.to_string()),
                 Range::from_located(comp),
             ))
         })
@@ -47,7 +48,7 @@ pub fn assign_hardcoded_password_string(value: &Expr, targets: &[Expr]) -> Optio
         for target in targets {
             if is_password_target(target) {
                 return Some(Check::new(
-                    CheckKind::HardcodedPasswordString(string.to_string()),
+                    violations::HardcodedPasswordString(string.to_string()),
                     Range::from_located(value),
                 ));
             }

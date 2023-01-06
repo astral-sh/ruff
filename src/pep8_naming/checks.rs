@@ -9,6 +9,7 @@ use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
 use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 /// N801
 pub fn invalid_class_name(
@@ -19,7 +20,7 @@ pub fn invalid_class_name(
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
         return Some(Check::new(
-            CheckKind::InvalidClassName(name.to_string()),
+            violations::InvalidClassName(name.to_string()),
             identifier_range(class_def, locator),
         ));
     }
@@ -35,7 +36,7 @@ pub fn invalid_function_name(
 ) -> Option<Check> {
     if name.to_lowercase() != name && !ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return Some(Check::new(
-            CheckKind::InvalidFunctionName(name.to_string()),
+            violations::InvalidFunctionName(name.to_string()),
             identifier_range(func_def, locator),
         ));
     }
@@ -46,7 +47,7 @@ pub fn invalid_function_name(
 pub fn invalid_argument_name(name: &str, arg: &Arg) -> Option<Check> {
     if name.to_lowercase() != name {
         return Some(Check::new(
-            CheckKind::InvalidArgumentName(name.to_string()),
+            violations::InvalidArgumentName(name.to_string()),
             Range::from_located(arg),
         ));
     }
@@ -80,14 +81,14 @@ pub fn invalid_first_argument_name_for_class_method(
     if let Some(arg) = args.posonlyargs.first() {
         if arg.node.arg != "cls" {
             return Some(Check::new(
-                CheckKind::InvalidFirstArgumentNameForClassMethod,
+                violations::InvalidFirstArgumentNameForClassMethod,
                 Range::from_located(arg),
             ));
         }
     } else if let Some(arg) = args.args.first() {
         if arg.node.arg != "cls" {
             return Some(Check::new(
-                CheckKind::InvalidFirstArgumentNameForClassMethod,
+                violations::InvalidFirstArgumentNameForClassMethod,
                 Range::from_located(arg),
             ));
         }
@@ -124,7 +125,7 @@ pub fn invalid_first_argument_name_for_method(
         return None;
     }
     Some(Check::new(
-        CheckKind::InvalidFirstArgumentNameForMethod,
+        violations::InvalidFirstArgumentNameForMethod,
         Range::from_located(arg),
     ))
 }
@@ -148,7 +149,7 @@ pub fn dunder_function_name(
     }
 
     Some(Check::new(
-        CheckKind::DunderFunctionName,
+        violations::DunderFunctionName,
         identifier_range(stmt, locator),
     ))
 }
@@ -162,7 +163,7 @@ pub fn constant_imported_as_non_constant(
 ) -> Option<Check> {
     if string::is_upper(name) && !string::is_upper(asname) {
         return Some(Check::new(
-            CheckKind::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
+            violations::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
     }
@@ -178,7 +179,7 @@ pub fn lowercase_imported_as_non_lowercase(
 ) -> Option<Check> {
     if !string::is_upper(name) && string::is_lower(name) && asname.to_lowercase() != asname {
         return Some(Check::new(
-            CheckKind::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
+            violations::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
     }
@@ -194,7 +195,7 @@ pub fn camelcase_imported_as_lowercase(
 ) -> Option<Check> {
     if helpers::is_camelcase(name) && string::is_lower(asname) {
         return Some(Check::new(
-            CheckKind::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
+            violations::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
     }
@@ -214,7 +215,7 @@ pub fn camelcase_imported_as_constant(
         && !helpers::is_acronym(name, asname)
     {
         return Some(Check::new(
-            CheckKind::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
+            violations::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
     }
@@ -234,7 +235,7 @@ pub fn camelcase_imported_as_acronym(
         && helpers::is_acronym(name, asname)
     {
         return Some(Check::new(
-            CheckKind::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
+            violations::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
     }
@@ -262,7 +263,7 @@ pub fn error_suffix_on_exception_name(
         return None;
     }
     Some(Check::new(
-        CheckKind::ErrorSuffixOnExceptionName(name.to_string()),
+        violations::ErrorSuffixOnExceptionName(name.to_string()),
         identifier_range(class_def, locator),
     ))
 }

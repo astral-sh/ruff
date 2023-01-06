@@ -6,6 +6,7 @@ use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
+use crate::violations;
 
 fn is_literal_or_name(expr: &Expr, checker: &Checker) -> bool {
     // Accept any obvious literals or names.
@@ -169,7 +170,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
             && name != &"__traceback_supplement__"
         {
             let mut check = Check::new(
-                CheckKind::UnusedVariable((*name).to_string()),
+                violations::UnusedVariable((*name).to_string()),
                 binding.range,
             );
             if checker.patch(&CheckCode::F841) {

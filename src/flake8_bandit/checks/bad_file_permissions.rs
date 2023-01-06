@@ -6,6 +6,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Operator};
 use crate::ast::helpers::{compose_call_path, match_module_member, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 const WRITE_WORLD: u16 = 0o2;
 const EXECUTE_GROUP: u16 = 0o10;
@@ -97,7 +98,7 @@ pub fn bad_file_permissions(
             if let Some(int_value) = get_int_value(mode_arg) {
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     return Some(Check::new(
-                        CheckKind::BadFilePermissions(int_value),
+                        violations::BadFilePermissions(int_value),
                         Range::from_located(mode_arg),
                     ));
                 }

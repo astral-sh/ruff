@@ -3,6 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// B004
 pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
@@ -26,7 +27,7 @@ pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr
         return;
     }
     checker.checks.push(Check::new(
-        CheckKind::UnreliableCallableCheck,
+        violations::UnreliableCallableCheck,
         Range::from_located(expr),
     ));
 }

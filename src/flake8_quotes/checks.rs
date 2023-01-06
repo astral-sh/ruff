@@ -4,6 +4,7 @@ use crate::ast::types::Range;
 use crate::flake8_quotes::settings::{Quote, Settings};
 use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 fn good_single(quote: &Quote) -> char {
     match quote {
@@ -72,7 +73,7 @@ pub fn quotes(
         }
 
         Some(Check::new(
-            CheckKind::BadQuotesDocstring(settings.docstring_quotes.clone()),
+            violations::BadQuotesDocstring(settings.docstring_quotes.clone()),
             Range::new(start, end),
         ))
     } else if is_multiline {
@@ -87,7 +88,7 @@ pub fn quotes(
         }
 
         Some(Check::new(
-            CheckKind::BadQuotesMultilineString(settings.multiline_quotes.clone()),
+            violations::BadQuotesMultilineString(settings.multiline_quotes.clone()),
             Range::new(start, end),
         ))
     } else {
@@ -102,7 +103,7 @@ pub fn quotes(
                 && !string_contents.contains(bad_single(&settings.inline_quotes))
             {
                 return Some(Check::new(
-                    CheckKind::AvoidQuoteEscape,
+                    violations::AvoidQuoteEscape,
                     Range::new(start, end),
                 ));
             }
@@ -112,7 +113,7 @@ pub fn quotes(
         // If we're not using the preferred type, only allow use to avoid escapes.
         if !string_contents.contains(good_single(&settings.inline_quotes)) {
             return Some(Check::new(
-                CheckKind::BadQuotesInlineString(settings.inline_quotes.clone()),
+                violations::BadQuotesInlineString(settings.inline_quotes.clone()),
                 Range::new(start, end),
             ));
         }

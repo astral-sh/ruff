@@ -2,6 +2,7 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// S102
 pub fn exec_used(expr: &Expr, func: &Expr) -> Option<Check> {
@@ -11,5 +12,5 @@ pub fn exec_used(expr: &Expr, func: &Expr) -> Option<Check> {
     if id != "exec" {
         return None;
     }
-    Some(Check::new(CheckKind::ExecUsed, Range::from_located(expr)))
+    Some(Check::new(violations::ExecUsed, Range::from_located(expr)))
 }

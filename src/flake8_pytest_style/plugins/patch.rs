@@ -6,6 +6,7 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 const PATCH_NAMES: &[&str] = &[
     "mocker.patch",
@@ -72,7 +73,7 @@ fn check_patch_call(
 
             if !visitor.uses_args {
                 return Some(Check::new(
-                    CheckKind::PatchWithLambda,
+                    violations::PatchWithLambda,
                     Range::from_located(call),
                 ));
             }

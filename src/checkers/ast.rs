@@ -42,7 +42,8 @@ use crate::{
     flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
     flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, visibility,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, violations,
+    visibility,
 };
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
@@ -312,7 +313,7 @@ where
                         if !exists {
                             if self.settings.enabled.contains(&CheckCode::PLE0117) {
                                 self.checks.push(Check::new(
-                                    CheckKind::NonlocalWithoutBinding(name.to_string()),
+                                    violations::NonlocalWithoutBinding(name.to_string()),
                                     *range,
                                 ));
                             }
@@ -573,7 +574,7 @@ where
                             ScopeKind::Class(_) | ScopeKind::Module
                         ) {
                             self.checks.push(Check::new(
-                                CheckKind::ReturnOutsideFunction,
+                                violations::ReturnOutsideFunction,
                                 Range::from_located(stmt),
                             ));
                         }
@@ -656,7 +657,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::E401) {
                     if names.len() > 1 {
                         self.checks.push(Check::new(
-                            CheckKind::MultipleImportsOnOneLine,
+                            violations::MultipleImportsOnOneLine,
                             Range::from_located(stmt),
                         ));
                     }
@@ -665,7 +666,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
                         self.checks.push(Check::new(
-                            CheckKind::ModuleImportNotAtTopOfFile,
+                            violations::ModuleImportNotAtTopOfFile,
                             Range::from_located(stmt),
                         ));
                     }
@@ -886,7 +887,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
                         self.checks.push(Check::new(
-                            CheckKind::ModuleImportNotAtTopOfFile,
+                            violations::ModuleImportNotAtTopOfFile,
                             Range::from_located(stmt),
                         ));
                     }
@@ -965,7 +966,9 @@ where
                         if self.settings.enabled.contains(&CheckCode::F407) {
                             if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
                                 self.checks.push(Check::new(
-                                    CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
+                                    violations::FutureFeatureNotDefined(
+                                        alias.node.name.to_string(),
+                                    ),
                                     Range::from_located(alias),
                                 ));
                             }
@@ -974,7 +977,7 @@ where
                         if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
                         {
                             self.checks.push(Check::new(
-                                CheckKind::LateFutureImport,
+                                violations::LateFutureImport,
                                 Range::from_located(stmt),
                             ));
                         }
@@ -994,10 +997,12 @@ where
                                 [*(self.scope_stack.last().expect("No current scope found"))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.checks.push(Check::new(
-                                    CheckKind::ImportStarNotPermitted(helpers::format_import_from(
-                                        level.as_ref(),
-                                        module.as_deref(),
-                                    )),
+                                    violations::ImportStarNotPermitted(
+                                        helpers::format_import_from(
+                                            level.as_ref(),
+                                            module.as_deref(),
+                                        ),
+                                    ),
                                     Range::from_located(stmt),
                                 ));
                             }
@@ -1005,7 +1010,7 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::F403) {
                             self.checks.push(Check::new(
-                                CheckKind::ImportStarUsed(helpers::format_import_from(
+                                violations::ImportStarUsed(helpers::format_import_from(
                                     level.as_ref(),
                                     module.as_deref(),
                                 )),
@@ -1804,7 +1809,7 @@ where
                                     Err(e) => {
                                         if self.settings.enabled.contains(&CheckCode::F521) {
                                             self.checks.push(Check::new(
-                                                CheckKind::StringDotFormatInvalidFormat(
+                                                violations::StringDotFormatInvalidFormat(
                                                     pyflakes::format::error_to_string(&e),
                                                 ),
                                                 location,
@@ -2396,7 +2401,7 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.checks.push(Check::new(
-                            CheckKind::YieldOutsideFunction(DeferralKeyword::Yield),
+                            violations::YieldOutsideFunction(DeferralKeyword::Yield),
                             Range::from_located(expr),
                         ));
                     }
@@ -2407,7 +2412,7 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.checks.push(Check::new(
-                            CheckKind::YieldOutsideFunction(DeferralKeyword::YieldFrom),
+                            violations::YieldOutsideFunction(DeferralKeyword::YieldFrom),
                             Range::from_located(expr),
                         ));
                     }
@@ -2418,7 +2423,7 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.checks.push(Check::new(
-                            CheckKind::YieldOutsideFunction(DeferralKeyword::Await),
+                            violations::YieldOutsideFunction(DeferralKeyword::Await),
                             Range::from_located(expr),
                         ));
                     }
@@ -2469,7 +2474,7 @@ where
                             }) => {
                                 if self.settings.enabled.contains(&CheckCode::F509) {
                                     self.checks.push(Check::new(
-                                        CheckKind::PercentFormatUnsupportedFormatCharacter(c),
+                                        violations::PercentFormatUnsupportedFormatCharacter(c),
                                         location,
                                     ));
                                 }
@@ -2477,7 +2482,7 @@ where
                             Err(e) => {
                                 if self.settings.enabled.contains(&CheckCode::F501) {
                                     self.checks.push(Check::new(
-                                        CheckKind::PercentFormatInvalidFormat(e.to_string()),
+                                        violations::PercentFormatInvalidFormat(e.to_string()),
                                         location,
                                     ));
                                 }
@@ -3068,7 +3073,7 @@ where
                             if self.bindings[*index].used.is_none() {
                                 if self.settings.enabled.contains(&CheckCode::F841) {
                                     let mut check = Check::new(
-                                        CheckKind::UnusedVariable(name.to_string()),
+                                        violations::UnusedVariable(name.to_string()),
                                         name_range,
                                     );
                                     if self.patch(&CheckCode::F841) {
@@ -3354,7 +3359,7 @@ impl<'a> Checker<'a> {
                     overridden = Some((*scope_index, *existing_binding_index));
                     if self.settings.enabled.contains(&CheckCode::F402) {
                         self.checks.push(Check::new(
-                            CheckKind::ImportShadowedByLoopVar(
+                            violations::ImportShadowedByLoopVar(
                                 name.to_string(),
                                 existing.range.location.row(),
                             ),
@@ -3374,7 +3379,7 @@ impl<'a> Checker<'a> {
                         overridden = Some((*scope_index, *existing_binding_index));
                         if self.settings.enabled.contains(&CheckCode::F811) {
                             self.checks.push(Check::new(
-                                CheckKind::RedefinedWhileUnused(
+                                violations::RedefinedWhileUnused(
                                     name.to_string(),
                                     existing.range.location.row(),
                                 ),
@@ -3500,7 +3505,7 @@ impl<'a> Checker<'a> {
                     from_list.sort();
 
                     self.checks.push(Check::new(
-                        CheckKind::ImportStarUsage(id.to_string(), from_list),
+                        violations::ImportStarUsage(id.to_string(), from_list),
                         Range::from_located(expr),
                     ));
                 }
@@ -3531,7 +3536,7 @@ impl<'a> Checker<'a> {
                 }
 
                 self.checks.push(Check::new(
-                    CheckKind::UndefinedName(id.clone()),
+                    violations::UndefinedName(id.clone()),
                     Range::from_located(expr),
                 ));
             }
@@ -3702,7 +3707,7 @@ impl<'a> Checker<'a> {
                 && self.settings.enabled.contains(&CheckCode::F821)
             {
                 self.checks.push(Check::new(
-                    CheckKind::UndefinedName(id.to_string()),
+                    violations::UndefinedName(id.to_string()),
                     Range::from_located(expr),
                 ));
             }
@@ -3763,7 +3768,7 @@ impl<'a> Checker<'a> {
             } else {
                 if self.settings.enabled.contains(&CheckCode::F722) {
                     self.checks.push(Check::new(
-                        CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
+                        violations::ForwardAnnotationSyntaxError(expression.to_string()),
                         range,
                     ));
                 }
@@ -3869,7 +3874,7 @@ impl<'a> Checker<'a> {
                     let binding = &self.bindings[*index];
                     if matches!(binding.kind, BindingKind::Global) {
                         checks.push(Check::new(
-                            CheckKind::GlobalVariableNotAssigned((*name).to_string()),
+                            violations::GlobalVariableNotAssigned((*name).to_string()),
                             binding.range,
                         ));
                     }
@@ -3898,7 +3903,7 @@ impl<'a> Checker<'a> {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
                                     checks.push(Check::new(
-                                        CheckKind::UndefinedExport(name.to_string()),
+                                        violations::UndefinedExport(name.to_string()),
                                         all_binding.range,
                                     ));
                                 }
@@ -3936,7 +3941,7 @@ impl<'a> Checker<'a> {
                         if let Some(indices) = self.redefinitions.get(index) {
                             for index in indices {
                                 checks.push(Check::new(
-                                    CheckKind::RedefinedWhileUnused(
+                                    violations::RedefinedWhileUnused(
                                         (*name).to_string(),
                                         binding.range.location.row(),
                                     ),
@@ -3967,7 +3972,7 @@ impl<'a> Checker<'a> {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
                                     checks.push(Check::new(
-                                        CheckKind::ImportStarUsage(
+                                        violations::ImportStarUsage(
                                             name.to_string(),
                                             from_list.clone(),
                                         ),
@@ -4082,7 +4087,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.to_string(), ignore_init, multiple),
+                            violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -4104,7 +4109,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(
-                            CheckKind::UnusedImport(full_name.to_string(), ignore_init, multiple),
+                            violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })

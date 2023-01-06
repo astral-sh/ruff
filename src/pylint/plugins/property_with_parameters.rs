@@ -3,7 +3,7 @@ use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Check};
 
 /// PLR0206
 pub fn property_with_parameters(
@@ -28,7 +28,7 @@ pub fn property_with_parameters(
             > 1
     {
         checker.checks.push(Check::new(
-            CheckKind::PropertyWithParameters,
+            violations::PropertyWithParameters,
             Range::from_located(stmt),
         ));
     }

@@ -3,6 +3,7 @@ use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// BLE001
 pub fn blind_except(
@@ -36,7 +37,7 @@ pub fn blind_except(
                 }
             }) {
                 checker.checks.push(Check::new(
-                    CheckKind::BlindExcept(id.to_string()),
+                    violations::BlindExcept(id.to_string()),
                     Range::from_located(type_),
                 ));
             }

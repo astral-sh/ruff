@@ -2,6 +2,7 @@ use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 fn is_pytest_or_subpackage(imported_name: &str) -> bool {
     imported_name == "pytest" || imported_name.starts_with("pytest.")
@@ -13,7 +14,7 @@ pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Ch
         if let Some(alias) = asname {
             if alias != name {
                 return Some(Check::new(
-                    CheckKind::IncorrectPytestImport,
+                    violations::IncorrectPytestImport,
                     Range::from_located(import_from),
                 ));
             }
@@ -38,7 +39,7 @@ pub fn import_from(
     if let Some(module) = module {
         if is_pytest_or_subpackage(module) {
             return Some(Check::new(
-                CheckKind::IncorrectPytestImport,
+                violations::IncorrectPytestImport,
                 Range::from_located(import_from),
             ));
         }

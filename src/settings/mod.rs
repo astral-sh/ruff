@@ -25,7 +25,7 @@ use crate::settings::types::{
 use crate::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, one_time_warning, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, one_time_warning, pep8_naming, pycodestyle, pydocstyle, pyupgrade, violations,
 };
 
 pub mod configuration;
@@ -442,6 +442,7 @@ mod tests {
 
     use crate::registry::{CheckCode, CheckCodePrefix};
     use crate::settings::{resolve_codes, CheckCodeSpec};
+    use crate::violations;
 
     #[test]
     fn check_codes() {

@@ -26,7 +26,7 @@ use crate::registry::{CheckCode, CheckKind};
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{cache, fs, one_time_warning, packages, resolver};
+use crate::{cache, fs, one_time_warning, packages, resolver, violations};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -119,7 +119,7 @@ pub fn run(
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.enabled.contains(&CheckCode::E902) {
                         Diagnostics::new(vec![Message {
-                            kind: CheckKind::IOError(message),
+                            kind: violations::IOError(message),
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,

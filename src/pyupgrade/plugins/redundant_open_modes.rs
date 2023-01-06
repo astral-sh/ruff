@@ -12,6 +12,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
@@ -80,7 +81,7 @@ fn create_check(
     patch: bool,
 ) -> Check {
     let mut check = Check::new(
-        CheckKind::RedundantOpenModes(replacement_value.clone()),
+        violations::RedundantOpenModes(replacement_value.clone()),
         Range::from_located(expr),
     );
     if patch {

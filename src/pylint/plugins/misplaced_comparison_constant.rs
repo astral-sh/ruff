@@ -4,7 +4,7 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Check};
 
 /// PLC2201
 pub fn misplaced_comparison_constant(
@@ -42,7 +42,7 @@ pub fn misplaced_comparison_constant(
     };
     let suggestion = format!("{right} {reversed_op} {left}");
     let mut check = Check::new(
-        CheckKind::MisplacedComparisonConstant(suggestion.clone()),
+        violations::MisplacedComparisonConstant(suggestion.clone()),
         Range::from_located(expr),
     );
     if checker.patch(check.kind.code()) {

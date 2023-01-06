@@ -3,7 +3,7 @@ use rustpython_ast::Expr;
 use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Check};
 
 /// PLE0118
 pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
@@ -15,7 +15,7 @@ pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &E
     if let Some(stmt) = globals.get(name) {
         if expr.location < stmt.location {
             checker.checks.push(Check::new(
-                CheckKind::UsedPriorGlobalDeclaration(name.to_string(), stmt.location.row()),
+                violations::UsedPriorGlobalDeclaration(name.to_string(), stmt.location.row()),
                 Range::from_located(expr),
             ));
         }

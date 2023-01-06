@@ -9,7 +9,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::Settings;
+    use crate::{violations, Settings};
 
     #[test_case(CheckCode::PLC0414, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(CheckCode::PLC2201, Path::new("misplaced_comparison_constant.py"); "PLC2201")]

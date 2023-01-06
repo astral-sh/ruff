@@ -5,6 +5,7 @@ use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
+use crate::violations;
 
 fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
     match_module_member(
@@ -35,14 +36,14 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                         && checker.settings.enabled.contains(&CheckCode::YTT303)
                     {
                         checker.checks.push(Check::new(
-                            CheckKind::SysVersionSlice1Referenced,
+                            violations::SysVersionSlice1Referenced,
                             Range::from_located(value),
                         ));
                     } else if *i == BigInt::from(3)
                         && checker.settings.enabled.contains(&CheckCode::YTT101)
                     {
                         checker.checks.push(Check::new(
-                            CheckKind::SysVersionSlice3Referenced,
+                            violations::SysVersionSlice3Referenced,
                             Range::from_located(value),
                         ));
                     }
@@ -55,14 +56,14 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
             } => {
                 if *i == BigInt::from(2) && checker.settings.enabled.contains(&CheckCode::YTT102) {
                     checker.checks.push(Check::new(
-                        CheckKind::SysVersion2Referenced,
+                        violations::SysVersion2Referenced,
                         Range::from_located(value),
                     ));
                 } else if *i == BigInt::from(0)
                     && checker.settings.enabled.contains(&CheckCode::YTT301)
                 {
                     checker.checks.push(Check::new(
-                        CheckKind::SysVersion0Referenced,
+                        violations::SysVersion0Referenced,
                         Range::from_located(value),
                     ));
                 }
@@ -99,7 +100,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                             && checker.settings.enabled.contains(&CheckCode::YTT201)
                         {
                             checker.checks.push(Check::new(
-                                CheckKind::SysVersionInfo0Eq3Referenced,
+                                violations::SysVersionInfo0Eq3Referenced,
                                 Range::from_located(left),
                             ));
                         }
@@ -119,7 +120,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     {
                         if checker.settings.enabled.contains(&CheckCode::YTT203) {
                             checker.checks.push(Check::new(
-                                CheckKind::SysVersionInfo1CmpInt,
+                                violations::SysVersionInfo1CmpInt,
                                 Range::from_located(left),
                             ));
                         }
@@ -145,7 +146,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
             {
                 if checker.settings.enabled.contains(&CheckCode::YTT204) {
                     checker.checks.push(Check::new(
-                        CheckKind::SysVersionInfoMinorCmpInt,
+                        violations::SysVersionInfoMinorCmpInt,
                         Range::from_located(left),
                     ));
                 }
@@ -171,13 +172,13 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
             if s.len() == 1 {
                 if checker.settings.enabled.contains(&CheckCode::YTT302) {
                     checker.checks.push(Check::new(
-                        CheckKind::SysVersionCmpStr10,
+                        violations::SysVersionCmpStr10,
                         Range::from_located(left),
                     ));
                 }
             } else if checker.settings.enabled.contains(&CheckCode::YTT103) {
                 checker.checks.push(Check::new(
-                    CheckKind::SysVersionCmpStr3,
+                    violations::SysVersionCmpStr3,
                     Range::from_located(left),
                 ));
             }
@@ -195,7 +196,7 @@ pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
         &checker.import_aliases,
     ) {
         checker.checks.push(Check::new(
-            CheckKind::SixPY3Referenced,
+            violations::SixPY3Referenced,
             Range::from_located(expr),
         ));
     }

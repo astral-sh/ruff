@@ -4,6 +4,7 @@ use crate::ast::types::{BindingKind, Range};
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 /// Return `true` if the `module` was imported using a star import (e.g., `from
 /// sys import *`).
@@ -75,7 +76,7 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
             continue;
         }
         let mut check = Check::new(
-            CheckKind::UseSysExit(name.to_string()),
+            violations::UseSysExit(name.to_string()),
             Range::from_located(func),
         );
         if checker.patch(check.kind.code()) {

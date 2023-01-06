@@ -17,7 +17,7 @@ use crate::logging::LogLevel;
 use crate::message::Message;
 use crate::registry::CheckCode;
 use crate::settings::types::SerializationFormat;
-use crate::tell_user;
+use crate::{tell_user, violations};
 
 /// Enum to control whether lint violations are shown to the user.
 pub enum Violations {
