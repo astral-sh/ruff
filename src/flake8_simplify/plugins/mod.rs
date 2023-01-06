@@ -1,6 +1,8 @@
-pub use ast_bool_op::{a_and_not_a, a_or_not_a, and_false, duplicate_isinstance_call, or_true};
+pub use ast_bool_op::{
+    a_and_not_a, a_or_not_a, and_false, compare_with_tuple, duplicate_isinstance_call, or_true,
+};
 pub use ast_for::convert_loop_to_any_all;
-pub use ast_if::nested_if_statements;
+pub use ast_if::{nested_if_statements, use_ternary_operator};
 pub use ast_with::multiple_with_statements;
 pub use key_in_dict::{key_in_dict_compare, key_in_dict_for};
 pub use return_in_try_except_finally::return_in_try_except_finally;

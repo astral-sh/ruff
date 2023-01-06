@@ -247,17 +247,20 @@ impl<'a> SourceCodeGenerator<'a> {
                 });
             }
             StmtKind::Assign { targets, value, .. } => {
+                // TODO(charlie): Revisit precedence. In particular, look at how Astor handles
+                // precedence.
+                // See: https://github.com/berkerpeksag/astor/blob/8342d6aa5dcdcf20f89a19057527510c245c7a2e/astor/code_gen.py#L86
                 statement!({
                     for target in targets {
-                        self.unparse_expr(target, precedence::EXPR);
+                        self.unparse_expr(target, 1);
                         self.p(" = ");
                     }
-                    self.unparse_expr(value, precedence::EXPR);
+                    self.unparse_expr(value, 1);
                 });
             }
             StmtKind::AugAssign { target, op, value } => {
                 statement!({
-                    self.unparse_expr(target, precedence::EXPR);
+                    self.unparse_expr(target, 0);
                     self.p(" ");
                     self.p(match op {
                         Operator::Add => "+",
@@ -275,7 +278,7 @@ impl<'a> SourceCodeGenerator<'a> {
                         Operator::FloorDiv => "//",
                     });
                     self.p("= ");
-                    self.unparse_expr(value, precedence::EXPR);
+                    self.unparse_expr(value, 0);
                 });
             }
             StmtKind::AnnAssign {
@@ -287,13 +290,13 @@ impl<'a> SourceCodeGenerator<'a> {
                 statement!({
                     let need_parens = matches!(target.node, ExprKind::Name { .. }) && simple == &0;
                     self.p_if(need_parens, "(");
-                    self.unparse_expr(target, precedence::EXPR);
+                    self.unparse_expr(target, 1);
                     self.p_if(need_parens, ")");
                     self.p(": ");
-                    self.unparse_expr(annotation, precedence::EXPR);
+                    self.unparse_expr(annotation, 1);
                     if let Some(value) = value {
                         self.p(" = ");
-                        self.unparse_expr(value, precedence::EXPR);
+                        self.unparse_expr(value, 1);
                     }
                 });
             }

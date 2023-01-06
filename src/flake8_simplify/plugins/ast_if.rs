@@ -1,8 +1,10 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
+use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
+use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::{Check, CheckCode, CheckKind};
 
 fn is_main_check(expr: &Expr) -> bool {
     if let ExprKind::Compare {
@@ -61,4 +63,91 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
         CheckKind::NestedIfStatements,
         Range::from_located(stmt),
     ));
+}
+
+fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
+    create_stmt(StmtKind::Assign {
+        targets: vec![target_var.clone()],
+        value: Box::new(create_expr(ExprKind::IfExp {
+            test: Box::new(test.clone()),
+            body: Box::new(body_value.clone()),
+            orelse: Box::new(orelse_value.clone()),
+        })),
+        type_comment: None,
+    })
+}
+
+/// SIM108
+pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
+    let StmtKind::If { test, body, orelse } = &stmt.node else {
+        return;
+    };
+    if body.len() != 1 || orelse.len() != 1 {
+        return;
+    }
+    let StmtKind::Assign { targets: body_targets, value: body_value, .. } = &body[0].node else {
+        return;
+    };
+    let StmtKind::Assign { targets: orelse_targets, value: orelse_value, .. } = &orelse[0].node else {
+        return;
+    };
+    if body_targets.len() != 1 || orelse_targets.len() != 1 {
+        return;
+    }
+    let ExprKind::Name { id: body_id, .. } = &body_targets[0].node else {
+        return;
+    };
+    let ExprKind::Name { id: orelse_id, .. } = &orelse_targets[0].node else {
+        return;
+    };
+    if body_id != orelse_id {
+        return;
+    }
+
+    let target_var = &body_targets[0];
+
+    // It's part of a bigger if-elif block:
+    // https://github.com/MartinThoma/flake8-simplify/issues/115
+    if let Some(StmtKind::If {
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
+    {
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
+        }
+    }
+
+    let ternary = ternary(target_var, body_value, test, orelse_value);
+    let content = unparse_stmt(&ternary, checker.style);
+    let mut check = Check::new(
+        CheckKind::UseTernaryOperator(content.clone()),
+        Range::from_located(stmt),
+    );
+    if checker.patch(&CheckCode::SIM108) {
+        check.amend(Fix::replacement(
+            content,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+    }
+    checker.add_check(check);
 }
