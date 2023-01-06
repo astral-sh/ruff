@@ -222,6 +222,7 @@ pub enum CheckCode {
     SIM102,
     SIM105,
     SIM107,
+    SIM108,
     SIM110,
     SIM111,
     SIM117,
@@ -960,6 +961,7 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    UseTernaryOperator(String),
     DuplicateIsinstanceCall(String),
     AAndNotA(String),
     AOrNotA(String),
@@ -1406,6 +1408,7 @@ impl CheckCode {
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
+            CheckCode::SIM108 => CheckKind::UseTernaryOperator("..".to_string()),
             CheckCode::SIM110 => {
                 CheckKind::ConvertLoopToAny("return any(x for x in y)".to_string())
             }
@@ -1953,6 +1956,7 @@ impl CheckCode {
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM107 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM108 => CheckCategory::Flake8Simplify,
             CheckCode::SIM110 => CheckCategory::Flake8Simplify,
             CheckCode::SIM111 => CheckCategory::Flake8Simplify,
             CheckCode::SIM117 => CheckCategory::Flake8Simplify,
@@ -2220,6 +2224,7 @@ impl CheckKind {
             CheckKind::OrTrue => &CheckCode::SIM222,
             CheckKind::ReturnInTryExceptFinally => &CheckCode::SIM107,
             CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
+            CheckKind::UseTernaryOperator(..) => &CheckCode::SIM108,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
             CheckKind::ConvertNamedTupleFunctionalToClass(..) => &CheckCode::UP014,
@@ -2983,6 +2988,9 @@ impl CheckKind {
             CheckKind::UseContextlibSuppress(exception) => {
                 format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
             }
+            CheckKind::UseTernaryOperator(new_code) => {
+                format!("Use ternary operator `{new_code}` instead of if-else-block")
+            }
             CheckKind::ReturnInTryExceptFinally => {
                 "Don't use `return` in `try`/`except` and `finally`".to_string()
             }
@@ -3742,6 +3750,7 @@ impl CheckKind {
             | CheckKind::UsePEP585Annotation(..)
             | CheckKind::UsePEP604Annotation
             | CheckKind::UseSysExit(..)
+            | CheckKind::UseTernaryOperator(..)
             | CheckKind::UselessImportAlias
             | CheckKind::UselessMetaclassType
             | CheckKind::UselessObjectInheritance(..)
@@ -4018,6 +4027,9 @@ impl CheckKind {
             CheckKind::UsePEP604Annotation => Some("Convert to `X | Y`".to_string()),
             CheckKind::UseFixturesWithoutParameters => {
                 Some("Remove `usefixtures` decorator or pass parameters".to_string())
+            }
+            CheckKind::UseTernaryOperator(new_code) => {
+                Some(format!("Replace if-else-block with `{new_code}`"))
             }
             CheckKind::UseSysExit(name) => Some(format!("Replace `{name}` with `sys.exit()`")),
             CheckKind::UselessImportAlias => Some("Remove import alias".to_string()),
