@@ -303,6 +303,14 @@ impl AlwaysAutofixableViolation for InvalidEscapeSequence {
 define_violation!(
     pub struct UnusedImport(pub String, pub bool, pub bool);
 );
+fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
+    let UnusedImport(name, _, multiple) = unused_import;
+    if *multiple {
+        "Remove unused import".to_string()
+    } else {
+        format!("Remove unused import: `{name}`")
+    }
+}
 impl Violation for UnusedImport {
     fn message(&self) -> String {
         let UnusedImport(name, ignore_init, ..) = self;
@@ -317,7 +325,12 @@ impl Violation for UnusedImport {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        todo!()
+        let UnusedImport(_, ignore_init, _) = self;
+        if *ignore_init {
+            None
+        } else {
+            Some(fmt_unused_import_autofix_msg)
+        }
     }
 
     fn placeholder() -> Self {
@@ -3637,6 +3650,9 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 define_violation!(
     pub struct BlankLineAfterSummary(pub usize);
 );
+fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String {
+    "Insert single blank line".to_string()
+}
 impl Violation for BlankLineAfterSummary {
     fn message(&self) -> String {
         let BlankLineAfterSummary(num_lines) = self;
@@ -3650,7 +3666,11 @@ impl Violation for BlankLineAfterSummary {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        todo!()
+        let num_lines = self.0;
+        if num_lines > 0 {
+            return Some(fmt_blank_line_after_summary_autofix_msg);
+        }
+        None
     }
 
     fn placeholder() -> Self {
