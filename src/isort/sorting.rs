@@ -1,8 +1,8 @@
 /// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
 use std::cmp::Ordering;
 
-use crate::isort::types::AnyImport::{Import, ImportFrom};
-use crate::isort::types::{AliasData, AnyImport, ImportFromData};
+use crate::isort::types::EitherImport::{Import, ImportFrom};
+use crate::isort::types::{AliasData, EitherImport, ImportFromData};
 use crate::python::string;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
@@ -80,8 +80,9 @@ pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromD
     })
 }
 
-/// Compare two `AnyImport` enums which may be `Import` or `ImportFrom` structs.
-pub fn cmp_any_import(a: &AnyImport, b: &AnyImport) -> Ordering {
+/// Compare two `EitherImport` enums which may be `Import` or `ImportFrom`
+/// structs.
+pub fn cmp_either_import(a: &EitherImport, b: &EitherImport) -> Ordering {
     match (a, b) {
         (Import(import1), Import(import2)) => cmp_modules(&import1.0, &import2.0),
         (ImportFrom(import_from), Import(import)) => {

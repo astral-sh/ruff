@@ -11,12 +11,12 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::helpers::trailing_comma;
-use crate::isort::sorting::{cmp_any_import, cmp_import_from, cmp_members, cmp_modules};
+use crate::isort::sorting::{cmp_either_import, cmp_import_from, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
-use crate::isort::types::AnyImport::{Import, ImportFrom};
+use crate::isort::types::EitherImport::{Import, ImportFrom};
 use crate::isort::types::{
-    AliasData, AnyImport, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
-    TrailingComma,
+    AliasData, CommentSet, EitherImport, ImportBlock, ImportFromData, Importable,
+    OrderedImportBlock, TrailingComma,
 };
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::SourceCodeLocator;
@@ -592,13 +592,13 @@ pub fn format_imports(
             .into_iter()
             .map(Import)
             .chain(import_block.import_from.into_iter().map(ImportFrom))
-            .collect::<Vec<AnyImport>>();
+            .collect::<Vec<EitherImport>>();
 
         if force_sort_within_sections {
             it = it
                 .into_iter()
-                .sorted_by(cmp_any_import)
-                .collect::<Vec<AnyImport>>();
+                .sorted_by(cmp_either_import)
+                .collect::<Vec<EitherImport>>();
         }
 
         for import in it {

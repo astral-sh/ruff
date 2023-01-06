@@ -93,7 +93,7 @@ type ImportFrom<'a> = (
     Vec<AliasDataWithComments<'a>>,
 );
 
-pub enum AnyImport<'a> {
+pub enum EitherImport<'a> {
     Import(Import<'a>),
     ImportFrom(ImportFrom<'a>),
 }
