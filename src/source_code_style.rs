@@ -171,17 +171,17 @@ fn detect_quote(contents: &str, locator: &SourceCodeLocator) -> Option<Quote> {
 
 /// Detect the line ending style of the given contents.
 fn detect_line_ending(contents: &str) -> Option<LineEnding> {
-    if let Some(position) = contents.find('\n') {
-        let position = position.saturating_sub(1);
-        return if let Some('\r') = contents.chars().nth(position) {
+    return if let Some(position) = contents.find('\r') {
+        if let Some('\n') = contents.chars().nth(position + 1) {
             Some(LineEnding::CrLf)
         } else {
-            Some(LineEnding::Lf)
-        };
-    } else if contents.find('\r').is_some() {
-        return Some(LineEnding::Cr);
-    }
-    None
+            Some(LineEnding::Cr)
+        }
+    } else if contents.find('\n').is_some() {
+        Some(LineEnding::Lf)
+    } else {
+        None
+    };
 }
 
 #[cfg(test)]
@@ -271,6 +271,9 @@ def f():
         assert_eq!(detect_line_ending(contents), Some(LineEnding::Lf));
 
         let contents = "x = 1\r";
+        assert_eq!(detect_line_ending(contents), Some(LineEnding::Cr));
+
+        let contents = "x = 1\ry = 2\n";
         assert_eq!(detect_line_ending(contents), Some(LineEnding::Cr));
 
         let contents = "x = 1\r\n";
