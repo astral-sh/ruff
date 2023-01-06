@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
     Operator, Stmt, StmtKind,
 };
 
-use crate::source_code_style::{Indentation, LineEnding, Quote};
+use crate::source_code_style::{Indentation, LineEnding, Quote, SourceCodeStyleDetector};
 use crate::vendor::{bytes, str};
 
 mod precedence {
@@ -41,6 +41,20 @@ pub struct SourceCodeGenerator<'a> {
     indent_depth: usize,
     num_newlines: usize,
     initial: bool,
+}
+
+impl<'a> From<&'a SourceCodeStyleDetector<'a>> for SourceCodeGenerator<'a> {
+    fn from(stylist: &'a SourceCodeStyleDetector<'a>) -> Self {
+        Self {
+            indent: stylist.indentation(),
+            quote: stylist.quote(),
+            line_ending: stylist.line_ending(),
+            buffer: Vec::new(),
+            indent_depth: 0,
+            num_newlines: 0,
+            initial: true,
+        }
+    }
 }
 
 impl<'a> SourceCodeGenerator<'a> {

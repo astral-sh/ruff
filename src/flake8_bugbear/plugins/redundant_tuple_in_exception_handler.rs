@@ -23,11 +23,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             Range::from_located(type_),
         );
         if checker.patch(check.kind.code()) {
-            let mut generator = SourceCodeGenerator::new(
-                checker.style.indentation(),
-                checker.style.quote(),
-                checker.style.line_ending(),
-            );
+            let mut generator: SourceCodeGenerator = checker.style.into();
             generator.unparse_expr(elt, 0);
             check.amend(Fix::replacement(
                 generator.generate(),

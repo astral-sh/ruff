@@ -24,11 +24,7 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 
 /// Generate source code from an `Expr`.
 fn to_source(expr: &Expr, stylist: &SourceCodeStyleDetector) -> String {
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_expr(expr, 0);
     generator.generate()
 }

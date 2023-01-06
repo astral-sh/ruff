@@ -83,11 +83,7 @@ fn return_stmt(
     iter: &Expr,
     stylist: &SourceCodeStyleDetector,
 ) -> String {
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&create_stmt(StmtKind::Return {
         value: Some(Box::new(create_expr(ExprKind::Call {
             func: Box::new(create_expr(ExprKind::Name {

@@ -27,11 +27,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &SourceCodeStyleDet
             type_comment: None,
         },
     );
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&stmt);
     generator.generate()
 }

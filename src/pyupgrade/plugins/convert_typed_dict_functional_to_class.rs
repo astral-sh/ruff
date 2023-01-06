@@ -199,11 +199,7 @@ fn convert_to_class(
     base_class: &ExprKind,
     stylist: &SourceCodeStyleDetector,
 ) -> Fix {
-    let mut generator = SourceCodeGenerator::new(
-        stylist.indentation(),
-        stylist.quote(),
-        stylist.line_ending(),
-    );
+    let mut generator: SourceCodeGenerator = stylist.into();
     generator.unparse_stmt(&create_class_def_stmt(
         class_name,
         body,
