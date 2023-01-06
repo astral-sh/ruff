@@ -190,8 +190,8 @@ pub fn call_datetime_strptime_without_zone(
         return;
     };
 
-    if let ExprKind::Call { keywords, .. } = &grandparent.0.node {
-        if let ExprKind::Attribute { attr, .. } = &parent.0.node {
+    if let ExprKind::Call { keywords, .. } = &grandparent.node {
+        if let ExprKind::Attribute { attr, .. } = &parent.node {
             // Ex) `datetime.strptime(...).astimezone()`
             if attr == "astimezone" {
                 return;

@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path};
@@ -66,22 +65,13 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
     if checker.match_typing_call_path(&call_path, "Optional") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch(check.kind.code()) {
-            let mut generator = SourceCodeGenerator::new(
-                checker.style.indentation(),
-                checker.style.quote(),
-                checker.style.line_ending(),
-            );
+            let mut generator: SourceCodeGenerator = checker.style.into();
             generator.unparse_expr(&optional(slice), 0);
-            match generator.generate() {
-                Ok(content) => {
-                    check.amend(Fix::replacement(
-                        content,
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
-                }
-                Err(e) => error!("Failed to rewrite PEP604 annotation: {e}"),
-            };
+            check.amend(Fix::replacement(
+                generator.generate(),
+                expr.location,
+                expr.end_location.unwrap(),
+            ));
         }
         checker.add_check(check);
     } else if checker.match_typing_call_path(&call_path, "Union") {
@@ -92,41 +82,23 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     // Invalid type annotation.
                 }
                 ExprKind::Tuple { elts, .. } => {
-                    let mut generator = SourceCodeGenerator::new(
-                        checker.style.indentation(),
-                        checker.style.quote(),
-                        checker.style.line_ending(),
-                    );
+                    let mut generator: SourceCodeGenerator = checker.style.into();
                     generator.unparse_expr(&union(elts), 0);
-                    match generator.generate() {
-                        Ok(content) => {
-                            check.amend(Fix::replacement(
-                                content,
-                                expr.location,
-                                expr.end_location.unwrap(),
-                            ));
-                        }
-                        Err(e) => error!("Failed to rewrite PEP604 annotation: {e}"),
-                    }
+                    check.amend(Fix::replacement(
+                        generator.generate(),
+                        expr.location,
+                        expr.end_location.unwrap(),
+                    ));
                 }
                 _ => {
                     // Single argument.
-                    let mut generator = SourceCodeGenerator::new(
-                        checker.style.indentation(),
-                        checker.style.quote(),
-                        checker.style.line_ending(),
-                    );
+                    let mut generator: SourceCodeGenerator = checker.style.into();
                     generator.unparse_expr(slice, 0);
-                    match generator.generate() {
-                        Ok(content) => {
-                            check.amend(Fix::replacement(
-                                content,
-                                expr.location,
-                                expr.end_location.unwrap(),
-                            ));
-                        }
-                        Err(e) => error!("Failed to rewrite PEP604 annotation: {e}"),
-                    }
+                    check.amend(Fix::replacement(
+                        generator.generate(),
+                        expr.location,
+                        expr.end_location.unwrap(),
+                    ));
                 }
             }
         }

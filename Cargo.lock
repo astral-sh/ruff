@@ -368,15 +368,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codegen"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff61280aed771c3070e7dcc9e050c66f1eb1e3b96431ba66f9f74641d02fc41d"
-dependencies = [
- "indexmap",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -744,7 +735,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.210-dev.0"
+version = "0.0.212-dev.0"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
@@ -757,7 +748,7 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
- "toml",
+ "toml_edit",
 ]
 
 [[package]]
@@ -1295,6 +1286,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nom8"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae01545c9c7fc4486ab7debaf2aad7003ac19431791868fb2e8066df97fad2f8"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "notify"
 version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1365,9 +1365,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
 
 [[package]]
 name = "oorandom"
@@ -1873,7 +1873,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.210"
+version = "0.0.212"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1931,7 +1931,7 @@ dependencies = [
  "test-case",
  "textwrap",
  "titlecase",
- "toml",
+ "toml_edit",
  "update-informer",
  "ureq",
  "walkdir",
@@ -1941,11 +1941,10 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.210"
+version = "0.0.212"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
- "codegen",
  "itertools",
  "libcst",
  "once_cell",
@@ -1962,8 +1961,9 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.210"
+version = "0.0.212"
 dependencies = [
+ "once_cell",
  "proc-macro2",
  "quote",
  "syn",
@@ -2496,12 +2496,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "toml"
-version = "0.5.10"
+name = "toml_datetime"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1333c76748e868a4d9d1017b5ab53171dfd095f70c712fdb4653a406547f598f"
+checksum = "808b51e57d0ef8f71115d8f3a01e7d3750d01c79cac4b3eda910f4389fdf92fd"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a34cc558345efd7e88b9eda9626df2138b80bb46a7606f695e751c892bc7dac6"
+dependencies = [
+ "indexmap",
+ "itertools",
+ "nom8",
+ "serde",
+ "toml_datetime",
 ]
 
 [[package]]

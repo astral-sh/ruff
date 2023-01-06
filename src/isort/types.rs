@@ -18,14 +18,14 @@ impl Default for TrailingComma {
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct ImportFromData<'a> {
-    pub module: Option<&'a String>,
+    pub module: Option<&'a str>,
     pub level: Option<&'a usize>,
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct AliasData<'a> {
     pub name: &'a str,
-    pub asname: Option<&'a String>,
+    pub asname: Option<&'a str>,
 }
 
 #[derive(Debug, Default, Clone)]
