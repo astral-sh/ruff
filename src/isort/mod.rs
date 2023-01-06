@@ -46,7 +46,7 @@ pub enum AnnotatedImport<'a> {
         inline: Vec<Comment<'a>>,
     },
     ImportFrom {
-        module: Option<&'a String>,
+        module: Option<&'a str>,
         names: Vec<AnnotatedAliasData<'a>>,
         level: Option<&'a usize>,
         atop: Vec<Comment<'a>>,
@@ -152,7 +152,7 @@ fn annotate_imports<'a>(
                 }
 
                 annotated.push(AnnotatedImport::ImportFrom {
-                    module: module.as_ref(),
+                    module: module.as_deref(),
                     names: aliases,
                     level: level.as_ref(),
                     trailing_comma: if split_on_trailing_comma {
@@ -219,28 +219,19 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     let entry = if alias.name == "*" {
                         block
                             .import_from_star
-                            .entry(ImportFromData {
-                                module: module.map(String::as_str),
-                                level,
-                            })
+                            .entry(ImportFromData { module, level })
                             .or_default()
                     } else if alias.asname.is_none() || combine_as_imports {
                         &mut block
                             .import_from
-                            .entry(ImportFromData {
-                                module: module.map(String::as_str),
-                                level,
-                            })
+                            .entry(ImportFromData { module, level })
                             .or_default()
                             .0
                     } else {
                         block
                             .import_from_as
                             .entry((
-                                ImportFromData {
-                                    module: module.map(String::as_str),
-                                    level,
-                                },
+                                ImportFromData { module, level },
                                 AliasData {
                                     name: alias.name,
                                     asname: alias.asname,
@@ -263,18 +254,12 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                     let entry = if alias.name == "*" {
                         block
                             .import_from_star
-                            .entry(ImportFromData {
-                                module: module.map(String::as_str),
-                                level,
-                            })
+                            .entry(ImportFromData { module, level })
                             .or_default()
                     } else if alias.asname.is_none() || combine_as_imports {
                         block
                             .import_from
-                            .entry(ImportFromData {
-                                module: module.map(String::as_str),
-                                level,
-                            })
+                            .entry(ImportFromData { module, level })
                             .or_default()
                             .1
                             .entry(AliasData {
@@ -286,10 +271,7 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
                         block
                             .import_from_as
                             .entry((
-                                ImportFromData {
-                                    module: module.map(String::as_str),
-                                    level,
-                                },
+                                ImportFromData { module, level },
                                 AliasData {
                                     name: alias.name,
                                     asname: alias.asname,
@@ -308,10 +290,9 @@ fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) ->
 
                 // Propagate trailing commas.
                 if matches!(trailing_comma, TrailingComma::Present) {
-                    if let Some(entry) = block.import_from.get_mut(&ImportFromData {
-                        module: module.map(String::as_str),
-                        level,
-                    }) {
+                    if let Some(entry) =
+                        block.import_from.get_mut(&ImportFromData { module, level })
+                    {
                         entry.2 = trailing_comma;
                     }
                 }
