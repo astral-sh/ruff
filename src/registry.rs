@@ -218,6 +218,7 @@ pub enum CheckCode {
     YTT302,
     YTT303,
     // flake8-simplify
+    SIM101,
     SIM102,
     SIM105,
     SIM107,
@@ -959,6 +960,7 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    DuplicateIsinstanceCall(String),
     AAndNotA(String),
     AOrNotA(String),
     AndFalse,
@@ -1400,6 +1402,7 @@ impl CheckCode {
             // flake8-blind-except
             CheckCode::BLE001 => CheckKind::BlindExcept("Exception".to_string()),
             // flake8-simplify
+            CheckCode::SIM101 => CheckKind::DuplicateIsinstanceCall("...".to_string()),
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
@@ -1946,6 +1949,7 @@ impl CheckCode {
             CheckCode::S324 => CheckCategory::Flake8Bandit,
             CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM101 => CheckCategory::Flake8Simplify,
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM107 => CheckCategory::Flake8Simplify,
@@ -2204,6 +2208,7 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
+            CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
             CheckKind::AAndNotA(..) => &CheckCode::SIM220,
             CheckKind::AOrNotA(..) => &CheckCode::SIM221,
             CheckKind::AndFalse => &CheckCode::SIM223,
@@ -2972,6 +2977,9 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::DuplicateIsinstanceCall(name) => {
+                format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
+            }
             CheckKind::UseContextlibSuppress(exception) => {
                 format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
             }
@@ -3641,6 +3649,7 @@ impl CheckKind {
                 | CheckKind::DoNotAssignLambda(..)
                 | CheckKind::DupeClassFieldDefinitions(..)
                 | CheckKind::DuplicateHandlerException(..)
+                | CheckKind::DuplicateIsinstanceCall(..)
                 | CheckKind::EndsInPeriod
                 | CheckKind::EndsInPunctuation
                 | CheckKind::FStringMissingPlaceholders
@@ -3778,6 +3787,9 @@ impl CheckKind {
                 Some(format!("Remove duplicate field definition for `{name}`"))
             }
             CheckKind::DuplicateHandlerException(..) => Some("De-duplicate exceptions".to_string()),
+            CheckKind::DuplicateIsinstanceCall(name) => {
+                Some(format!("Merge `isinstance` calls for `{name}`"))
+            }
             CheckKind::EndsInPeriod => Some("Add period".to_string()),
             CheckKind::EndsInPunctuation => Some("Add closing punctuation".to_string()),
             CheckKind::ExtraneousScopeFunction => Some("Remove `scope=` argument".to_string()),
