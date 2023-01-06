@@ -84,9 +84,9 @@ pub struct ImportBlock<'a> {
 
 type AliasDataWithComments<'a> = (AliasData<'a>, CommentSet<'a>);
 
-pub type Import<'a> = AliasDataWithComments<'a>;
+type Import<'a> = AliasDataWithComments<'a>;
 
-pub type ImportFrom<'a> = (
+type ImportFrom<'a> = (
     ImportFromData<'a>,
     CommentSet<'a>,
     TrailingComma,

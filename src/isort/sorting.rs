@@ -1,6 +1,7 @@
 /// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
 use std::cmp::Ordering;
 
+use crate::isort::types::AnyImport::{Import, ImportFrom};
 use crate::isort::types::{AliasData, AnyImport, ImportFromData};
 use crate::python::string;
 
@@ -21,6 +22,15 @@ fn prefix(name: &str) -> Prefix {
     } else {
         // Ex) `variable`
         Prefix::Variables
+    }
+}
+
+fn cmp_option_ignore_case(a: Option<&String>, b: Option<&String>) -> Ordering {
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(a), Some(b)) => natord::compare_ignore_case(a, b),
     }
 }
 
@@ -72,14 +82,16 @@ pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromD
 
 /// Compare two `AnyImport` enums which may be `Import` or `ImportFrom` structs.
 pub fn cmp_any_import(a: &AnyImport, b: &AnyImport) -> Ordering {
-    match (&a, &b) {
-        (AnyImport::Import(x), AnyImport::Import(y)) => cmp_modules(&x.0, &y.0),
-        (AnyImport::ImportFrom(x), AnyImport::Import(y)) => {
-            natord::compare_ignore_case(x.0.module.unwrap(), y.0.name)
+    match (a, b) {
+        (Import(import1), Import(import2)) => cmp_modules(&import1.0, &import2.0),
+        (ImportFrom(import_from), Import(import)) => {
+            cmp_option_ignore_case(import_from.0.module, Some(&import.0.name.to_string()))
         }
-        (AnyImport::Import(x), AnyImport::ImportFrom(y)) => {
-            natord::compare_ignore_case(x.0.name, y.0.module.unwrap())
+        (Import(import), ImportFrom(import_from)) => {
+            cmp_option_ignore_case(Some(&import.0.name.to_string()), import_from.0.module)
         }
-        (AnyImport::ImportFrom(x), AnyImport::ImportFrom(y)) => cmp_import_from(&x.0, &y.0),
+        (ImportFrom(import_from1), ImportFrom(import_from2)) => {
+            cmp_import_from(&import_from1.0, &import_from2.0)
+        }
     }
 }

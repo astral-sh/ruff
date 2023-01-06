@@ -13,6 +13,7 @@ use crate::isort::comments::Comment;
 use crate::isort::helpers::trailing_comma;
 use crate::isort::sorting::{cmp_any_import, cmp_import_from, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
+use crate::isort::types::AnyImport::{Import, ImportFrom};
 use crate::isort::types::{
     AliasData, AnyImport, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
     TrailingComma,
@@ -589,25 +590,20 @@ pub fn format_imports(
         let mut it = import_block
             .import
             .into_iter()
-            .map(AnyImport::Import)
-            .chain(
-                import_block
-                    .import_from
-                    .into_iter()
-                    .map(AnyImport::ImportFrom),
-            )
+            .map(Import)
+            .chain(import_block.import_from.into_iter().map(ImportFrom))
             .collect::<Vec<AnyImport>>();
 
         if force_sort_within_sections {
             it = it
                 .into_iter()
-                .sorted_by(|a, b| cmp_any_import(a, b))
+                .sorted_by(cmp_any_import)
                 .collect::<Vec<AnyImport>>();
         }
 
         for import in it {
             match import {
-                AnyImport::Import((alias, comments)) => {
+                Import((alias, comments)) => {
                     output.append(&format::format_import(
                         &alias,
                         &comments,
@@ -615,7 +611,7 @@ pub fn format_imports(
                         stylist,
                     ));
                 }
-                AnyImport::ImportFrom((import_from, comments, trailing_comma, aliases)) => {
+                ImportFrom((import_from, comments, trailing_comma, aliases)) => {
                     output.append(&format::format_import_from(
                         &import_from,
                         &comments,
@@ -663,6 +659,7 @@ mod tests {
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
+    #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("inline_comments.py"))]
