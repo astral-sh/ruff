@@ -978,6 +978,9 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
 | SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
+| SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
+| SIM202 | NegateNotEqualOp | Use `left == right` instead of `not left != right` | 🛠 |
+| SIM208 | DoubleNegation | Use `expr` instead of `not (not expr)` | 🛠 |
 | SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |

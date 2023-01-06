@@ -2548,6 +2548,16 @@ where
                 if self.settings.enabled.contains(&CheckCode::B002) {
                     flake8_bugbear::plugins::unary_prefix_increment(self, expr, op, operand);
                 }
+
+                if self.settings.enabled.contains(&CheckCode::SIM201) {
+                    flake8_simplify::plugins::negation_with_equal_op(self, expr, op, operand);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM202) {
+                    flake8_simplify::plugins::negation_with_not_equal_op(self, expr, op, operand);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM208) {
+                    flake8_simplify::plugins::double_negation(self, expr, op, operand);
+                }
             }
             ExprKind::Compare {
                 left,
