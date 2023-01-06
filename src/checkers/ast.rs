@@ -173,8 +173,6 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: &CheckCode) -> bool {
-        // TODO(charlie): We can't fix errors in f-strings until RustPython adds
-        // location data.
         matches!(self.autofix, flags::Autofix::Enabled) && self.settings.fixable.contains(code)
     }
 
