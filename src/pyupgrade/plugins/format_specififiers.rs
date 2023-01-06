@@ -9,7 +9,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::checks::{Check, CheckKind};
+use crate::registry::{Check, CheckKind};
 use crate::cst::matchers::{match_call, match_expression};
 
 // The regex documentation says to do this because creating regexs is expensive:
