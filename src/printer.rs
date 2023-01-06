@@ -238,8 +238,8 @@ impl<'a> Printer<'a> {
                         message.kind.body(),
                     );
                     println!(
-                        "::error title=Ruff ({}),file={},line={},col={},endLine={},\
-                             endColumn={}::{}",
+                        "::error title=Ruff \
+                         ({}),file={},line={},col={},endLine={},endColumn={}::{}",
                         message.kind.code(),
                         relativize_path(Path::new(&message.filename)),
                         message.location.row(),
