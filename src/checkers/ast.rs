@@ -1938,6 +1938,17 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::S501) {
+                    if let Some(check) = flake8_bandit::checks::request_with_no_cert_validation(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
                 if self.settings.enabled.contains(&CheckCode::S506) {
                     if let Some(check) = flake8_bandit::checks::unsafe_yaml_load(
                         func,

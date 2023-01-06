@@ -342,6 +342,7 @@ pub enum CheckCode {
     S108,
     S113,
     S324,
+    S501,
     S506,
     // flake8-boolean-trap
     FBT001,
@@ -1090,6 +1091,7 @@ pub enum CheckKind {
     HardcodedTempFile(String),
     HashlibInsecureHashFunction(String),
     RequestWithoutTimeout(Option<String>),
+    RequestWithNoCertValidation(String),
     UnsafeYAMLLoad(Option<String>),
     // mccabe
     FunctionIsTooComplex(String, usize),
@@ -1567,6 +1569,7 @@ impl CheckCode {
             CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
             CheckCode::S113 => CheckKind::RequestWithoutTimeout(None),
             CheckCode::S324 => CheckKind::HashlibInsecureHashFunction("...".to_string()),
+            CheckCode::S501 => CheckKind::RequestWithNoCertValidation("...".to_string()),
             CheckCode::S506 => CheckKind::UnsafeYAMLLoad(None),
             // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
@@ -1972,6 +1975,7 @@ impl CheckCode {
             CheckCode::S108 => CheckCategory::Flake8Bandit,
             CheckCode::S113 => CheckCategory::Flake8Bandit,
             CheckCode::S324 => CheckCategory::Flake8Bandit,
+            CheckCode::S501 => CheckCategory::Flake8Bandit,
             CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
             CheckCode::SIM101 => CheckCategory::Flake8Simplify,
@@ -2362,6 +2366,7 @@ impl CheckKind {
             CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
             CheckKind::RequestWithoutTimeout(..) => &CheckCode::S113,
             CheckKind::HashlibInsecureHashFunction(..) => &CheckCode::S324,
+            CheckKind::RequestWithNoCertValidation(..) => &CheckCode::S501,
             CheckKind::UnsafeYAMLLoad(..) => &CheckCode::S506,
             // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
@@ -3344,6 +3349,12 @@ impl CheckKind {
                 format!(
                     "Probable use of insecure hash functions in `hashlib`: \"{}\"",
                     string.escape_debug()
+                )
+            }
+            CheckKind::RequestWithNoCertValidation(string) => {
+                format!(
+                    "Probable use of `{string}` call with `verify=False` disabling SSL \
+                     certificate checks"
                 )
             }
             CheckKind::UnsafeYAMLLoad(loader) => match loader {
