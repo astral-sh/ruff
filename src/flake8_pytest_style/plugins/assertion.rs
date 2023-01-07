@@ -4,13 +4,13 @@ use rustpython_ast::{
 
 use super::helpers::is_falsy_constant;
 use super::unittest_assert::UnittestAssert;
+use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
-use crate::source_code_generator::SourceCodeGenerator;
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
@@ -97,17 +97,15 @@ pub fn unittest_assertion(
 ) -> Option<Check> {
     match &func.node {
         ExprKind::Attribute { attr, .. } => {
-            if let Ok(uta) = UnittestAssert::try_from(attr.as_str()) {
+            if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 let mut check = Check::new(
-                    CheckKind::UnittestAssertion(uta.to_string()),
+                    CheckKind::UnittestAssertion(unittest_assert.to_string()),
                     Range::from_located(func),
                 );
                 if checker.patch(check.kind.code()) {
-                    if let Ok(stmt) = uta.generate_assert(args, keywords) {
-                        let mut generator: SourceCodeGenerator = checker.style.into();
-                        generator.unparse_stmt(&stmt);
+                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         check.amend(Fix::replacement(
-                            generator.generate(),
+                            unparse_stmt(&stmt, checker.style),
                             call.location,
                             call.end_location.unwrap(),
                         ));

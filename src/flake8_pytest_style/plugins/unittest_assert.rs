@@ -1,3 +1,6 @@
+use std::hash::BuildHasherDefault;
+
+use anyhow::{anyhow, bail, Result};
 use rustc_hash::FxHashMap;
 use rustpython_ast::ExprContext::Load;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop};
@@ -207,39 +210,43 @@ impl UnittestAssert {
         }
     }
 
-    pub fn arg_hashmap<'a>(
+    /// Create a map from argument name to value.
+    pub fn args_map<'a>(
         &'a self,
         args: &'a [Expr],
         keywords: &'a [Keyword],
-    ) -> Result<FxHashMap<&'a str, &'a Expr>, String> {
+    ) -> Result<FxHashMap<&'a str, &'a Expr>> {
         if args
             .iter()
             .any(|arg| matches!(arg.node, ExprKind::Starred { .. }))
             || keywords.iter().any(|kw| kw.node.arg.is_none())
         {
-            return Err("Contains variable-length arguments. Cannot autofix.".to_string());
+            bail!("Contains variable-length arguments. Cannot autofix.".to_string());
         }
 
+        let mut args_map: FxHashMap<&str, &Expr> = FxHashMap::with_capacity_and_hasher(
+            args.len() + keywords.len(),
+            BuildHasherDefault::default(),
+        );
         let arguments = self.arguments();
-        let mut arg_hashmap: FxHashMap<&str, &Expr> = FxHashMap::default();
         for (arg, value) in arguments.positional.iter().zip(args.iter()) {
-            arg_hashmap.insert(arg, value);
+            args_map.insert(arg, value);
         }
         for kw in keywords {
             let arg = kw.node.arg.as_ref().unwrap();
             if !arguments.contains((*arg).as_str()) {
-                return Err(format!("Unexpected keyword argument `{arg}`"));
+                bail!("Unexpected keyword argument `{arg}`");
             }
-            arg_hashmap.insert(kw.node.arg.as_ref().unwrap().as_str(), &kw.node.value);
+            args_map.insert(kw.node.arg.as_ref().unwrap().as_str(), &kw.node.value);
         }
-        Ok(arg_hashmap)
+        Ok(args_map)
     }
 
-    pub fn generate_assert(&self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt, String> {
-        let args = self.arg_hashmap(args, keywords)?;
+    pub fn generate_assert(&self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
+        let args = self.args_map(args, keywords)?;
         match self {
             UnittestAssert::True | UnittestAssert::False => {
-                let expr = args.get("expr").ok_or("Missing argument `expr`")?;
+                let expr = args.get("expr").ok_or(anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
                 let bool = create_expr(ExprKind::Constant {
                     value: Constant::Bool(matches!(self, UnittestAssert::True)),
@@ -256,8 +263,12 @@ impl UnittestAssert {
             | UnittestAssert::GreaterEqual
             | UnittestAssert::Less
             | UnittestAssert::LessEqual => {
-                let first = args.get("first").ok_or("Missing argument `first`")?;
-                let second = args.get("second").ok_or("Missing argument `second`")?;
+                let first = args
+                    .get("first")
+                    .ok_or(anyhow!("Missing argument `first`"))?;
+                let second = args
+                    .get("second")
+                    .ok_or(anyhow!("Missing argument `second`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = match self {
                     UnittestAssert::Equal | UnittestAssert::Equals => Cmpop::Eq,
@@ -272,8 +283,12 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::Is | UnittestAssert::IsNot => {
-                let expr1 = args.get("expr1").ok_or("Missing argument `expr1`")?;
-                let expr2 = args.get("expr2").ok_or("Missing argument `expr2`")?;
+                let expr1 = args
+                    .get("expr1")
+                    .ok_or(anyhow!("Missing argument `expr1`"))?;
+                let expr2 = args
+                    .get("expr2")
+                    .ok_or(anyhow!("Missing argument `expr2`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, UnittestAssert::Is) {
                     Cmpop::Is
@@ -284,10 +299,12 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::In | UnittestAssert::NotIn => {
-                let member = args.get("member").ok_or("Missing argument `member`")?;
+                let member = args
+                    .get("member")
+                    .ok_or(anyhow!("Missing argument `member`"))?;
                 let container = args
                     .get("container")
-                    .ok_or("Missing argument `container`")?;
+                    .ok_or(anyhow!("Missing argument `container`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, UnittestAssert::In) {
                     Cmpop::In
@@ -298,7 +315,7 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::IsNone | UnittestAssert::IsNotNone => {
-                let expr = args.get("expr").ok_or("Missing argument `expr`")?;
+                let expr = args.get("expr").ok_or(anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, UnittestAssert::IsNone) {
                     Cmpop::Is
@@ -316,8 +333,8 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::IsInstance | UnittestAssert::NotIsInstance => {
-                let obj = args.get("obj").ok_or("Missing argument `obj`")?;
-                let cls = args.get("cls").ok_or("Missing argument `cls`")?;
+                let obj = args.get("obj").ok_or(anyhow!("Missing argument `obj`"))?;
+                let cls = args.get("cls").ok_or(anyhow!("Missing argument `cls`"))?;
                 let msg = args.get("msg").copied();
                 let isinstance = create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Name {
@@ -341,8 +358,10 @@ impl UnittestAssert {
             | UnittestAssert::RegexpMatches
             | UnittestAssert::NotRegex
             | UnittestAssert::NotRegexpMatches => {
-                let regex = args.get("regex").ok_or("Missing argument `regex`")?;
-                let text = args.get("text").ok_or("Missing argument `text`")?;
+                let regex = args
+                    .get("regex")
+                    .ok_or(anyhow!("Missing argument `regex`"))?;
+                let text = args.get("text").ok_or(anyhow!("Missing argument `text`"))?;
                 let msg = args.get("msg").copied();
                 let re_search = create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Attribute {
@@ -359,14 +378,16 @@ impl UnittestAssert {
                 if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
                     Ok(assert(&re_search, msg))
                 } else {
-                    let expr = create_expr(ExprKind::UnaryOp {
-                        op: Unaryop::Not,
-                        operand: Box::new(re_search),
-                    });
-                    Ok(assert(&expr, msg))
+                    Ok(assert(
+                        &create_expr(ExprKind::UnaryOp {
+                            op: Unaryop::Not,
+                            operand: Box::new(re_search),
+                        }),
+                        msg,
+                    ))
                 }
             }
-            _ => Err(format!("Cannot autofix `{self}`")),
+            _ => bail!("Cannot autofix `{self}`"),
         }
     }
 }
