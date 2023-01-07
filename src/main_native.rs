@@ -18,7 +18,6 @@ use std::sync::mpsc::channel;
 
 use ::ruff::autofix::fixer;
 use ::ruff::cli::{extract_log_level, Cli, Overrides};
-use ::ruff::commands;
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::printer::{Printer, Violations};
 use ::ruff::resolver::{resolve_settings, FileDiscovery, PyprojectDiscovery, Relativity};
@@ -27,12 +26,12 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
+use ::ruff::{commands, one_time_warning};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
-use ruff::one_time_warning;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
@@ -216,6 +215,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
             &overrides,
             cache.into(),
             fixer::Mode::None,
+            log_level,
         )?;
         printer.write_continuously(&messages)?;
 
@@ -246,6 +246,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
                             &overrides,
                             cache.into(),
                             fixer::Mode::None,
+                            log_level,
                         )?;
                         printer.write_continuously(&messages)?;
                     }
@@ -257,7 +258,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         let modifications =
             commands::add_noqa(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
-            println!("Added {modifications} noqa directives.");
+            eprintln!("Added {modifications} noqa directives.");
         }
     } else {
         let is_stdin = cli.files == vec![PathBuf::from("-")];
@@ -279,6 +280,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
                 &overrides,
                 cache.into(),
                 autofix,
+                log_level,
             )?
         };
 

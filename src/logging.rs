@@ -25,7 +25,7 @@ macro_rules! tell_user {
     }
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum LogLevel {
     // No output (+ `log::LevelFilter::Off`).
     Silent,
@@ -38,7 +38,7 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    fn level_filter(&self) -> log::LevelFilter {
+    fn level_filter(self) -> log::LevelFilter {
         match self {
             LogLevel::Default => log::LevelFilter::Info,
             LogLevel::Verbose => log::LevelFilter::Debug,
