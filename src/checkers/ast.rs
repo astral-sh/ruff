@@ -2711,7 +2711,7 @@ where
             }
             ExprKind::IfExp { test, body, orelse } => {
                 if self.settings.enabled.contains(&CheckCode::SIM210) {
-                    flake8_simplify::plugins::explicit_ture_false_in_ifexpr(
+                    flake8_simplify::plugins::explicit_true_false_in_ifexpr(
                         self, expr, test, body, orelse,
                     )
                 }

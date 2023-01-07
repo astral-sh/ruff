@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
 
 /// SIM210
-pub fn explicit_ture_false_in_ifexpr(
+pub fn explicit_true_false_in_ifexpr(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,
