@@ -2,7 +2,8 @@
 source: src/flake8_errmsg/mod.rs
 expression: checks
 ---
-- kind: RawStringInException
+- kind:
+    RawStringInException: ~
   location:
     row: 5
     column: 23
@@ -11,7 +12,8 @@ expression: checks
     column: 53
   fix: ~
   parent: ~
-- kind: RawStringInException
+- kind:
+    RawStringInException: ~
   location:
     row: 9
     column: 23
@@ -20,7 +22,8 @@ expression: checks
     column: 30
   fix: ~
   parent: ~
-- kind: FStringInException
+- kind:
+    FStringInException: ~
   location:
     row: 14
     column: 23
@@ -29,7 +32,8 @@ expression: checks
     column: 56
   fix: ~
   parent: ~
-- kind: DotFormatInException
+- kind:
+    DotFormatInException: ~
   location:
     row: 18
     column: 23

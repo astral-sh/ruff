@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: RaiseNotImplemented
+- kind:
+    RaiseNotImplemented: ~
   location:
     row: 2
     column: 10
@@ -18,7 +19,8 @@ expression: checks
       row: 2
       column: 24
   parent: ~
-- kind: RaiseNotImplemented
+- kind:
+    RaiseNotImplemented: ~
   location:
     row: 6
     column: 10

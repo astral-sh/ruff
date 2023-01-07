@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: PublicInit
+- kind:
+    PublicInit: ~
   location:
     row: 60
     column: 8
@@ -11,7 +12,8 @@ expression: checks
     column: 16
   fix: ~
   parent: ~
-- kind: PublicInit
+- kind:
+    PublicInit: ~
   location:
     row: 534
     column: 8

@@ -2,7 +2,8 @@
 source: src/isort/mod.rs
 expression: checks
 ---
-- kind: UnsortedImports
+- kind:
+    UnsortedImports: ~
   location:
     row: 7
     column: 0
@@ -18,7 +19,8 @@ expression: checks
       row: 8
       column: 0
   parent: ~
-- kind: UnsortedImports
+- kind:
+    UnsortedImports: ~
   location:
     row: 9
     column: 0

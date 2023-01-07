@@ -2,7 +2,8 @@
 source: src/flake8_print/mod.rs
 expression: checks
 ---
-- kind: PPrintFound
+- kind:
+    PPrintFound: ~
   location:
     row: 3
     column: 0
@@ -18,7 +19,8 @@ expression: checks
       row: 4
       column: 0
   parent: ~
-- kind: PPrintFound
+- kind:
+    PPrintFound: ~
   location:
     row: 7
     column: 0

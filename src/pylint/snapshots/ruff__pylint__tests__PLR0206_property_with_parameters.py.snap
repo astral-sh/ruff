@@ -2,7 +2,8 @@
 source: src/pylint/mod.rs
 expression: checks
 ---
-- kind: PropertyWithParameters
+- kind:
+    PropertyWithParameters: ~
   location:
     row: 7
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 29
   fix: ~
   parent: ~
-- kind: PropertyWithParameters
+- kind:
+    PropertyWithParameters: ~
   location:
     row: 11
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 29
   fix: ~
   parent: ~
-- kind: PropertyWithParameters
+- kind:
+    PropertyWithParameters: ~
   location:
     row: 15
     column: 4

@@ -2,7 +2,8 @@
 source: src/pylint/mod.rs
 expression: checks
 ---
-- kind: UnnecessaryDirectLambdaCall
+- kind:
+    UnnecessaryDirectLambdaCall: ~
   location:
     row: 4
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 33
   fix: ~
   parent: ~
-- kind: UnnecessaryDirectLambdaCall
+- kind:
+    UnnecessaryDirectLambdaCall: ~
   location:
     row: 5
     column: 8
@@ -20,7 +22,8 @@ expression: checks
     column: 27
   fix: ~
   parent: ~
-- kind: UnnecessaryDirectLambdaCall
+- kind:
+    UnnecessaryDirectLambdaCall: ~
   location:
     row: 5
     column: 29

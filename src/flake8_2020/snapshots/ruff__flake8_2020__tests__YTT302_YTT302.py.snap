@@ -2,7 +2,8 @@
 source: src/flake8_2020/mod.rs
 expression: checks
 ---
-- kind: SysVersionCmpStr10
+- kind:
+    SysVersionCmpStr10: ~
   location:
     row: 4
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: SysVersionCmpStr10
+- kind:
+    SysVersionCmpStr10: ~
   location:
     row: 5
     column: 0
@@ -20,7 +22,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: SysVersionCmpStr10
+- kind:
+    SysVersionCmpStr10: ~
   location:
     row: 6
     column: 0
@@ -29,7 +32,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: SysVersionCmpStr10
+- kind:
+    SysVersionCmpStr10: ~
   location:
     row: 7
     column: 0
@@ -38,7 +42,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: SysVersionCmpStr10
+- kind:
+    SysVersionCmpStr10: ~
   location:
     row: 8
     column: 0

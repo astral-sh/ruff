@@ -2,7 +2,8 @@
 source: src/pycodestyle/mod.rs
 expression: checks
 ---
-- kind: MultipleImportsOnOneLine
+- kind:
+    MultipleImportsOnOneLine: ~
   location:
     row: 2
     column: 0

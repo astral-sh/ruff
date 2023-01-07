@@ -2,7 +2,8 @@
 source: src/flake8_comprehensions/mod.rs
 expression: checks
 ---
-- kind: UnnecessaryListComprehensionSet
+- kind:
+    UnnecessaryListComprehensionSet: ~
   location:
     row: 1
     column: 4
@@ -18,7 +19,8 @@ expression: checks
       row: 1
       column: 30
   parent: ~
-- kind: UnnecessaryListComprehensionSet
+- kind:
+    UnnecessaryListComprehensionSet: ~
   location:
     row: 2
     column: 4

@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: PublicClass
+- kind:
+    PublicClass: ~
   location:
     row: 15
     column: 6

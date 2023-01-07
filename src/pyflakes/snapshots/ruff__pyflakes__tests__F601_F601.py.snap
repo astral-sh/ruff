@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: MultiValueRepeatedKeyLiteral
+- kind:
+    MultiValueRepeatedKeyLiteral: ~
   location:
     row: 3
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiValueRepeatedKeyLiteral
+- kind:
+    MultiValueRepeatedKeyLiteral: ~
   location:
     row: 9
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 5
   fix: ~
   parent: ~
-- kind: MultiValueRepeatedKeyLiteral
+- kind:
+    MultiValueRepeatedKeyLiteral: ~
   location:
     row: 11
     column: 4

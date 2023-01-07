@@ -2,7 +2,8 @@
 source: src/pylint/mod.rs
 expression: checks
 ---
-- kind: UselessImportAlias
+- kind:
+    UselessImportAlias: ~
   location:
     row: 6
     column: 7
@@ -18,7 +19,8 @@ expression: checks
       row: 6
       column: 33
   parent: ~
-- kind: UselessImportAlias
+- kind:
+    UselessImportAlias: ~
   location:
     row: 7
     column: 24
@@ -34,7 +36,8 @@ expression: checks
       row: 7
       column: 50
   parent: ~
-- kind: UselessImportAlias
+- kind:
+    UselessImportAlias: ~
   location:
     row: 15
     column: 14
@@ -50,7 +53,8 @@ expression: checks
       row: 15
       column: 24
   parent: ~
-- kind: UselessImportAlias
+- kind:
+    UselessImportAlias: ~
   location:
     row: 18
     column: 18
@@ -66,7 +70,8 @@ expression: checks
       row: 18
       column: 28
   parent: ~
-- kind: UselessImportAlias
+- kind:
+    UselessImportAlias: ~
   location:
     row: 19
     column: 22
@@ -82,7 +87,8 @@ expression: checks
       row: 19
       column: 38
   parent: ~
-- kind: UselessImportAlias
+- kind:
+    UselessImportAlias: ~
   location:
     row: 21
     column: 14
@@ -98,7 +104,8 @@ expression: checks
       row: 21
       column: 24
   parent: ~
-- kind: UselessImportAlias
+- kind:
+    UselessImportAlias: ~
   location:
     row: 22
     column: 26
@@ -114,7 +121,8 @@ expression: checks
       row: 22
       column: 38
   parent: ~
-- kind: UselessImportAlias
+- kind:
+    UselessImportAlias: ~
   location:
     row: 24
     column: 20

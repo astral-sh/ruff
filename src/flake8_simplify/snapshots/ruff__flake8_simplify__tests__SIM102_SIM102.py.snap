@@ -2,7 +2,8 @@
 source: src/flake8_simplify/mod.rs
 expression: checks
 ---
-- kind: NestedIfStatements
+- kind:
+    NestedIfStatements: ~
   location:
     row: 1
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 9
   fix: ~
   parent: ~
-- kind: NestedIfStatements
+- kind:
+    NestedIfStatements: ~
   location:
     row: 8
     column: 0

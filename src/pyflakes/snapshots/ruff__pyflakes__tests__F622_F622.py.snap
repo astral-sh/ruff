@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: TwoStarredExpressions
+- kind:
+    TwoStarredExpressions: ~
   location:
     row: 1
     column: 0

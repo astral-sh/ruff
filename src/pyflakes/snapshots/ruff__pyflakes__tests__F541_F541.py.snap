@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 6
     column: 4
@@ -18,7 +19,8 @@ expression: checks
       row: 6
       column: 5
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 7
     column: 4
@@ -34,7 +36,8 @@ expression: checks
       row: 7
       column: 5
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 9
     column: 4
@@ -50,7 +53,8 @@ expression: checks
       row: 9
       column: 5
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 13
     column: 4
@@ -66,7 +70,8 @@ expression: checks
       row: 13
       column: 5
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 14
     column: 4
@@ -82,7 +87,8 @@ expression: checks
       row: 14
       column: 5
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 16
     column: 4
@@ -98,7 +104,8 @@ expression: checks
       row: 16
       column: 6
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 17
     column: 4
@@ -114,7 +121,8 @@ expression: checks
       row: 17
       column: 5
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 19
     column: 4
@@ -130,7 +138,8 @@ expression: checks
       row: 19
       column: 5
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 25
     column: 12
@@ -146,7 +155,8 @@ expression: checks
       row: 25
       column: 13
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 34
     column: 6
@@ -162,7 +172,8 @@ expression: checks
       row: 34
       column: 7
   parent: ~
-- kind: FStringMissingPlaceholders
+- kind:
+    FStringMissingPlaceholders: ~
   location:
     row: 35
     column: 3

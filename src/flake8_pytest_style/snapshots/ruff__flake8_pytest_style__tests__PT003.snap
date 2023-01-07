@@ -2,7 +2,8 @@
 source: src/flake8_pytest_style/mod.rs
 expression: checks
 ---
-- kind: ExtraneousScopeFunction
+- kind:
+    ExtraneousScopeFunction: ~
   location:
     row: 14
     column: 16

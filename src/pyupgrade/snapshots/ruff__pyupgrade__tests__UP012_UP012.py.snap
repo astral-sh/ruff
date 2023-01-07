@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 2
     column: 0
@@ -18,7 +19,8 @@ expression: checks
       row: 2
       column: 21
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 3
     column: 0
@@ -34,7 +36,8 @@ expression: checks
       row: 3
       column: 18
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 4
     column: 0
@@ -50,7 +53,8 @@ expression: checks
       row: 4
       column: 14
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 5
     column: 0
@@ -66,7 +70,8 @@ expression: checks
       row: 5
       column: 20
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 6
     column: 0
@@ -82,7 +87,8 @@ expression: checks
       row: 6
       column: 22
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 7
     column: 0
@@ -98,7 +104,8 @@ expression: checks
       row: 7
       column: 30
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 8
     column: 0
@@ -114,7 +121,8 @@ expression: checks
       row: 14
       column: 1
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 26
     column: 0
@@ -130,7 +138,8 @@ expression: checks
       row: 26
       column: 26
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 44
     column: 0
@@ -146,7 +155,8 @@ expression: checks
       row: 44
       column: 30
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 46
     column: 0
@@ -162,7 +172,8 @@ expression: checks
       row: 46
       column: 38
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 48
     column: 0
@@ -178,7 +189,8 @@ expression: checks
       row: 48
       column: 24
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 49
     column: 0
@@ -194,7 +206,8 @@ expression: checks
       row: 49
       column: 22
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 50
     column: 0
@@ -210,7 +223,8 @@ expression: checks
       row: 50
       column: 24
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 51
     column: 0
@@ -226,7 +240,8 @@ expression: checks
       row: 51
       column: 22
   parent: ~
-- kind: UnnecessaryEncodeUTF8
+- kind:
+    UnnecessaryEncodeUTF8: ~
   location:
     row: 52
     column: 6

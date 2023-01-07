@@ -2,7 +2,8 @@
 source: src/flake8_datetimez/mod.rs
 expression: checks
 ---
-- kind: CallDatetimeNowWithoutTzinfo
+- kind:
+    CallDatetimeNowWithoutTzinfo: ~
   location:
     row: 4
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 23
   fix: ~
   parent: ~
-- kind: CallDatetimeNowWithoutTzinfo
+- kind:
+    CallDatetimeNowWithoutTzinfo: ~
   location:
     row: 7
     column: 0
@@ -20,7 +22,8 @@ expression: checks
     column: 48
   fix: ~
   parent: ~
-- kind: CallDatetimeNowWithoutTzinfo
+- kind:
+    CallDatetimeNowWithoutTzinfo: ~
   location:
     row: 10
     column: 0
@@ -29,7 +32,8 @@ expression: checks
     column: 27
   fix: ~
   parent: ~
-- kind: CallDatetimeNowWithoutTzinfo
+- kind:
+    CallDatetimeNowWithoutTzinfo: ~
   location:
     row: 13
     column: 0
@@ -38,7 +42,8 @@ expression: checks
     column: 30
   fix: ~
   parent: ~
-- kind: CallDatetimeNowWithoutTzinfo
+- kind:
+    CallDatetimeNowWithoutTzinfo: ~
   location:
     row: 18
     column: 0
