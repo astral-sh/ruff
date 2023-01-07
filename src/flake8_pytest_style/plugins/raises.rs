@@ -8,7 +8,7 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::violations;
 
 fn is_pytest_raises(

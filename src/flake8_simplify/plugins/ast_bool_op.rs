@@ -9,7 +9,7 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::violations;
 
 /// Return `true` if two `Expr` instances are equivalent names.

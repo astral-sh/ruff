@@ -10,7 +10,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{settings, violations};
+    use crate::settings;
 
     #[test_case(CheckCode::BLE001, Path::new("BLE.py"); "BLE001")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {

@@ -9,7 +9,6 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::violations;
 
 #[derive(Debug, Copy, Clone, Hash)]
 pub enum Mode {

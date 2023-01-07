@@ -7,7 +7,7 @@ use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::pep8_naming::helpers;
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 

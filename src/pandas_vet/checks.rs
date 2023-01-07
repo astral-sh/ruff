@@ -1,7 +1,7 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// PD002

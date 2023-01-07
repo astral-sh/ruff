@@ -11,7 +11,6 @@ use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
-use crate::registry::CheckKind;
 use crate::settings::flags;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{violations, Check, Settings, SourceCodeLocator};

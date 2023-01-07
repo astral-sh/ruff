@@ -6,7 +6,7 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// Return `true` if the two expressions are equivalent, and consistent solely

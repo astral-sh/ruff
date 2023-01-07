@@ -2,7 +2,6 @@ use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::CheckKind;
 use crate::{violations, Check};
 
 fn loop_exits_early(body: &[Stmt]) -> bool {

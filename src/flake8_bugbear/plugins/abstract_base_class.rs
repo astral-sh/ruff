@@ -4,7 +4,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::violations;
 
 fn is_abc_class(

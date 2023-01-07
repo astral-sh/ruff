@@ -11,7 +11,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{flake8_annotations, violations, Settings};
+    use crate::{flake8_annotations, Settings};
 
     #[test]
     fn defaults() -> Result<()> {

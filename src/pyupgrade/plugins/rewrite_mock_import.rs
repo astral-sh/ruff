@@ -12,7 +12,7 @@ use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
-use crate::registry::{Check, CheckCode, CheckKind, MockReference};
+use crate::registry::{Check, CheckCode, MockReference};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;

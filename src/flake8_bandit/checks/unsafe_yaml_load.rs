@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::{match_module_member, SimpleCallArgs};
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// S506

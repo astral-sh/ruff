@@ -4,7 +4,7 @@ use crate::ast::helpers::{create_expr, create_stmt, unparse_expr, unparse_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::violations;
 
 fn is_main_check(expr: &Expr) -> bool {

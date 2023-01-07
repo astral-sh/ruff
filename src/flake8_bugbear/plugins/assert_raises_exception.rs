@@ -3,7 +3,7 @@ use rustpython_ast::{ExprKind, Stmt, Withitem};
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// B017

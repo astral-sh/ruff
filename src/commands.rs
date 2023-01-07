@@ -22,7 +22,7 @@ use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, lint_path, lint_stdin, Diagnostics};
 use crate::logging::LogLevel;
 use crate::message::Message;
-use crate::registry::{CheckCode, CheckKind};
+use crate::registry::CheckCode;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;

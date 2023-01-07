@@ -14,8 +14,8 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
+    use crate::settings;
     use crate::settings::types::PythonVersion;
-    use crate::{settings, violations};
 
     #[test_case(CheckCode::UP001, Path::new("UP001.py"); "UP001")]
     #[test_case(CheckCode::UP003, Path::new("UP003.py"); "UP003")]

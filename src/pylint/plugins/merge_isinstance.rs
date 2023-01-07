@@ -4,7 +4,6 @@ use rustpython_ast::{Boolop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::CheckKind;
 use crate::{violations, Check};
 
 /// PLR1701

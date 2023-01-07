@@ -21,7 +21,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
-use crate::registry::{Check, CheckCode, CheckKind, LintSource};
+use crate::registry::{Check, CheckCode, LintSource};
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;

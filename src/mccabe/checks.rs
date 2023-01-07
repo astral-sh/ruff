@@ -1,7 +1,7 @@
 use rustpython_ast::{ExcepthandlerKind, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::identifier_range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 

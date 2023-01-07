@@ -7,7 +7,7 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 use crate::ast::helpers::except_range;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;

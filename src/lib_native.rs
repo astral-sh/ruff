@@ -12,7 +12,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::{flags, pyproject, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::{directives, packages, resolver, violations};
+use crate::{directives, packages, resolver};
 
 /// Load the relevant `Settings` for a given `Path`.
 fn resolve(path: &Path) -> Result<Settings> {

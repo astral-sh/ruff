@@ -11,7 +11,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{flake8_bandit, violations, Settings};
+    use crate::{flake8_bandit, Settings};
 
     #[test_case(CheckCode::S101, Path::new("S101.py"); "S101")]
     #[test_case(CheckCode::S102, Path::new("S102.py"); "S102")]

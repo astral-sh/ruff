@@ -4,7 +4,7 @@ use rustpython_parser::ast::Constant;
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 const HTTP_VERBS: [&str; 7] = ["get", "options", "head", "post", "put", "patch", "delete"];

@@ -1,7 +1,7 @@
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 fn is_pytest_or_subpackage(imported_name: &str) -> bool {

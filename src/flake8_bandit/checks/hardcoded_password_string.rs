@@ -2,7 +2,7 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 fn is_password_target(target: &Expr) -> bool {

@@ -2,7 +2,7 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {

@@ -9,7 +9,6 @@ use path_absolutize::{path_dedot, Absolutize};
 use rustc_hash::FxHashSet;
 
 use crate::registry::CheckCode;
-use crate::violations;
 
 /// Extract the absolute path and basename (as strings) from a Path.
 pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {

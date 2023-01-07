@@ -13,7 +13,7 @@ mod tests {
     use crate::flake8_pytest_style::types;
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{settings, violations};
+    use crate::settings;
 
     #[test_case(CheckCode::PT001, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]
     #[test_case(

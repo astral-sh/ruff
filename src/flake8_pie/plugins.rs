@@ -6,7 +6,7 @@ use crate::ast::types::Range;
 use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::violations;
 
 /// PIE790

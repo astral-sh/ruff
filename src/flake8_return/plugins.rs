@@ -8,7 +8,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::flake8_return::helpers::result_exists;
 use crate::flake8_return::visitor::{ReturnVisitor, Stack};
-use crate::registry::{Branch, CheckCode, CheckKind};
+use crate::registry::{Branch, CheckCode};
 use crate::{violations, Check};
 
 /// RET501

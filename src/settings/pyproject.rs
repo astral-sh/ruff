@@ -138,7 +138,7 @@ mod tests {
     use crate::settings::types::PatternPrefixPair;
     use crate::{
         flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
-        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, violations,
+        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
     };
 
     #[test]

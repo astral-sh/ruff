@@ -8,7 +8,7 @@ use crate::ast::helpers::{self};
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::autofix::Fix;
 use crate::pyupgrade::types::Primitive;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::settings::types::PythonVersion;
 use crate::violations;
 

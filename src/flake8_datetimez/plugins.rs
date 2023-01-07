@@ -5,7 +5,7 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 pub fn call_datetime_without_tzinfo(

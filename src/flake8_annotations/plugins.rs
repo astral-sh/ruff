@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::flake8_annotations::fixes;
 use crate::flake8_annotations::helpers::match_function_def;
-use crate::registry::{CheckCode, CheckKind};
+use crate::registry::CheckCode;
 use crate::visibility::Visibility;
 use crate::{violations, visibility, Check};
 

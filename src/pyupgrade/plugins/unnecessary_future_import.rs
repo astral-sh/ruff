@@ -5,7 +5,7 @@ use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::settings::types::PythonVersion;
 use crate::{autofix, violations};
 

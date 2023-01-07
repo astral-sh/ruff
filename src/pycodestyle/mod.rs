@@ -13,7 +13,7 @@ mod tests {
     use super::settings::Settings;
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{settings, violations};
+    use crate::settings;
 
     #[test_case(CheckCode::E401, Path::new("E40.py"))]
     #[test_case(CheckCode::E402, Path::new("E40.py"))]

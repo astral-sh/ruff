@@ -2,7 +2,7 @@ use rustpython_ast::{ArgData, Arguments, Expr, Located};
 
 use crate::ast::types::Range;
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Check> {

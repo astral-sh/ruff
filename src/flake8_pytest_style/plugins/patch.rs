@@ -5,7 +5,7 @@ use crate::ast::helpers::{collect_arg_names, compose_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 const PATCH_NAMES: &[&str] = &[

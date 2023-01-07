@@ -10,7 +10,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{settings, violations};
+    use crate::settings;
 
     #[test_case(CheckCode::FBT001, Path::new("FBT.py"); "FBT001")]
     #[test_case(CheckCode::FBT002, Path::new("FBT.py"); "FBT002")]

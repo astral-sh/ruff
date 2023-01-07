@@ -3,7 +3,7 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::eradicate::detection::comment_contains_code;
-use crate::registry::{CheckCode, CheckKind};
+use crate::registry::CheckCode;
 use crate::settings::flags;
 use crate::{violations, Check, Settings, SourceCodeLocator};
 

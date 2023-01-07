@@ -4,7 +4,7 @@ use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::python::string::is_lower;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 struct RaiseVisitor {

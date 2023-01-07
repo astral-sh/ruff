@@ -12,7 +12,7 @@ use crate::pyflakes::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
 };
 use crate::pyflakes::format::FormatSummary;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {

@@ -4,7 +4,7 @@ use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// UP021
