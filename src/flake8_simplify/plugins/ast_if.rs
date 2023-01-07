@@ -1,6 +1,6 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use crate::ast::helpers::{create_expr, create_stmt, unparse_expr, unparse_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
@@ -63,6 +63,45 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
         CheckKind::NestedIfStatements,
         Range::from_located(stmt),
     ));
+}
+
+fn is_one_line_return_bool(stmts: &[Stmt]) -> bool {
+    if stmts.len() != 1 {
+        return false;
+    }
+    let StmtKind::Return { value } = &stmts[0].node else {
+        return false;
+    };
+    let Some(ExprKind::Constant { value, .. }) = value.as_ref().map(|value| &value.node) else {
+        return false;
+    };
+    matches!(value, Constant::Bool(_))
+}
+
+/// SIM103
+pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
+    let StmtKind::If { test, body, orelse } = &stmt.node else {
+        return;
+    };
+    if !(is_one_line_return_bool(body) && is_one_line_return_bool(orelse)) {
+        return;
+    }
+    let condition = unparse_expr(test, checker.style);
+    let mut check = Check::new(
+        CheckKind::ReturnBoolConditionDirectly(condition),
+        Range::from_located(stmt),
+    );
+    if checker.patch(&CheckCode::SIM103) {
+        let return_stmt = create_stmt(StmtKind::Return {
+            value: Some(test.clone()),
+        });
+        check.amend(Fix::replacement(
+            unparse_stmt(&return_stmt, checker.style),
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+    }
+    checker.checks.push(check);
 }
 
 fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {

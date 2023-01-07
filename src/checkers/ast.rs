@@ -1184,6 +1184,9 @@ where
                 if self.settings.enabled.contains(&CheckCode::SIM102) {
                     flake8_simplify::plugins::nested_if_statements(self, stmt);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM103) {
+                    flake8_simplify::plugins::return_bool_condition_directly(self, stmt);
+                }
                 if self.settings.enabled.contains(&CheckCode::SIM108) {
                     flake8_simplify::plugins::use_ternary_operator(
                         self,
