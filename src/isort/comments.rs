@@ -19,13 +19,16 @@ pub fn collect_comments<'a>(range: &Range, locator: &'a SourceCodeLocator) -> Ve
     let contents = locator.slice_source_code_range(range);
     lexer::make_tokenizer_located(&contents, range.location)
         .flatten()
-        .filter_map(|(start, tok, end)| match tok {
-            Tok::Comment(value) => Some(Comment {
-                value: value.into(),
-                location: start,
-                end_location: end,
-            }),
-            _ => None,
+        .filter_map(|(start, tok, end)| {
+            if let Tok::Comment(value) = tok {
+                Some(Comment {
+                    value: value.into(),
+                    location: start,
+                    end_location: end,
+                })
+            } else {
+                None
+            }
         })
         .collect()
 }
