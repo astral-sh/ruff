@@ -10,6 +10,7 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
+#![forbid(unsafe_code)]
 
 use cfg_if::cfg_if;
 
