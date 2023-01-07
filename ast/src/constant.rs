@@ -46,7 +46,7 @@ impl std::fmt::Display for Constant {
             Constant::Int(i) => i.fmt(f),
             Constant::Tuple(tup) => {
                 if let [elt] = &**tup {
-                    write!(f, "({},)", elt)
+                    write!(f, "({elt},)")
                 } else {
                     f.write_str("(")?;
                     for (i, elt) in tup.iter().enumerate() {
@@ -61,9 +61,9 @@ impl std::fmt::Display for Constant {
             Constant::Float(fp) => f.pad(&rustpython_common::float_ops::to_string(*fp)),
             Constant::Complex { real, imag } => {
                 if *real == 0.0 {
-                    write!(f, "{}j", imag)
+                    write!(f, "{imag}j")
                 } else {
-                    write!(f, "({}{:+}j)", real, imag)
+                    write!(f, "({real}{imag:+}j)")
                 }
             }
             Constant::Ellipsis => f.pad("..."),
