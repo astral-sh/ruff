@@ -3526,10 +3526,10 @@ impl CheckKind {
                 )
             }
             CheckKind::PatchWithLambda => {
-                "Use `return_value=` instead of patching with lambda".to_string()
+                "Use `return_value=` instead of patching with `lambda`".to_string()
             }
             CheckKind::UnittestAssertion(assertion) => {
-                format!("Use a regular assert instead of unittest-style '{assertion}'")
+                format!("Use a regular `assert` instead of unittest-style `{assertion}`")
             }
             CheckKind::RaisesWithoutException => {
                 "set the expected exception in `pytest.raises()`".to_string()
@@ -3552,7 +3552,7 @@ impl CheckKind {
             CheckKind::FailWithoutMessage => "No message passed to `pytest.fail()`".to_string(),
             CheckKind::AssertInExcept(name) => {
                 format!(
-                    "Found assertion on exception {name} in except block, use pytest.raises() \
+                    "Found assertion on exception `{name}` in except block, use `pytest.raises()` \
                      instead"
                 )
             }
@@ -3561,8 +3561,8 @@ impl CheckKind {
             }
             CheckKind::FixtureParamWithoutValue(name) => {
                 format!(
-                    "Fixture {name} without value is injected as parameter, use \
-                     @pytest.mark.usefixtures instead"
+                    "Fixture `{name}` without value is injected as parameter, use \
+                     `@pytest.mark.usefixtures` instead"
                 )
             }
             CheckKind::DeprecatedYieldFixture => {
@@ -3572,7 +3572,7 @@ impl CheckKind {
                 "Use `yield` instead of `request.addfinalizer`".to_string()
             }
             CheckKind::UselessYieldFixture(name) => {
-                format!("No teardown in fixture {name}, use `return` instead of `yield`")
+                format!("No teardown in fixture `{name}`, use `return` instead of `yield`")
             }
             CheckKind::IncorrectMarkParenthesesStyle(mark_name, expected_parens, actual_parens) => {
                 format!(
