@@ -3768,6 +3768,9 @@ impl CheckKind {
             | CheckKind::EndsInPunctuation
             | CheckKind::FStringMissingPlaceholders
             | CheckKind::GetAttrWithConstant
+            | CheckKind::IfExprWithFalseTrue(..)
+            | CheckKind::IfExprWithTrueFalse(..)
+            | CheckKind::IfExprWithTwistedArms(..)
             | CheckKind::ImplicitReturn
             | CheckKind::ImplicitReturnValue
             | CheckKind::IncorrectFixtureParenthesesStyle(..)
@@ -3926,6 +3929,11 @@ impl CheckKind {
             }
             CheckKind::GetAttrWithConstant => {
                 Some("Replace `getattr` with attribute access".to_string())
+            }
+            CheckKind::IfExprWithFalseTrue(expr) => Some(format!("Replace with `not {expr}`")),
+            CheckKind::IfExprWithTrueFalse(expr) => Some(format!("Replace with `bool({expr})`")),
+            CheckKind::IfExprWithTwistedArms(expr1, expr2) => {
+                Some(format!("Replace with `{expr1} if {expr1} else {expr2}`"))
             }
             CheckKind::ImplicitReturnValue => Some("Add explicit `None` return value".to_string()),
             CheckKind::ImplicitReturn => Some("Add explicit `return` statement".to_string()),

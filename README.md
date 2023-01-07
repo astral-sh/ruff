@@ -983,6 +983,9 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
 | SIM202 | NegateNotEqualOp | Use `left == right` instead of `not left != right` | 🛠 |
 | SIM208 | DoubleNegation | Use `expr` instead of `not (not expr)` | 🛠 |
+| SIM210 | IfExprWithTrueFalse | Use `bool(expr)` instead of `True if expr else False` | 🛠 |
+| SIM211 | IfExprWithFalseTrue | Use `not expr` instead of `False if expr else True` | 🛠 |
+| SIM212 | IfExprWithTwistedArms | Use `expr2 if expr2 else expr1` instead of `expr1 if not expr2 else expr2` | 🛠 |
 | SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
