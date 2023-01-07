@@ -400,7 +400,7 @@ impl<'a> Unparser<'a> {
                 .checked_sub(defaults_start)
                 .and_then(|i| args.kw_defaults.get(i))
             {
-                write!(self, "={}", default)?;
+                write!(self, "={default}")?;
             }
         }
         if let Some(kwarg) = &args.kwarg {
