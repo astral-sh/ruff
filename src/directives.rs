@@ -119,7 +119,7 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
                 off = None;
             }
         } else {
-            if comment_text == "# isort: skip" {
+            if comment_text.contains("isort: skip") {
                 exclusions.insert(start.row());
             } else if comment_text == "# isort: off" {
                 off = Some(start);
