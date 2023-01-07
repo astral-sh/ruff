@@ -41,12 +41,12 @@ impl Blackd {
             .spawn()
             .context("Starting blackd")?;
 
-        // Wait for `blackd` to be ready.
-        for _ in 0..10 {
+        // Wait up to four seconds for `blackd` to be ready.
+        for _ in 0..20 {
             match TcpStream::connect(address) {
                 Err(e) if e.kind() == ErrorKind::ConnectionRefused => {
                     info!("`blackd` not ready yet; retrying...");
-                    sleep(Duration::from_millis(100));
+                    sleep(Duration::from_millis(200));
                 }
                 Err(e) => return Err(e.into()),
                 Ok(_) => {
