@@ -25,7 +25,7 @@ pub fn return_in_try_except_finally(
 
     if let Some(finally_return) = find_return(finalbody) {
         if try_has_return || except_has_return {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::ReturnInTryExceptFinally,
                 Range::from_located(finally_return),
             ));

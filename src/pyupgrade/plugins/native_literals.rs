@@ -46,7 +46,7 @@ pub fn native_literals(
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
             return;
         };
 
@@ -106,6 +106,6 @@ pub fn native_literals(
                 expr.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }

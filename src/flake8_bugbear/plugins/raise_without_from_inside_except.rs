@@ -49,5 +49,5 @@ pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
-    checker.add_checks(visitor.checks.into_iter());
+    checker.checks.extend(visitor.checks);
 }

@@ -122,7 +122,7 @@ pub fn unnecessary_encode_utf8(
             if is_default_encode(args, kwargs) {
                 if literal.is_ascii() {
                     // "foo".encode()
-                    checker.add_check(replace_with_bytes_literal(
+                    checker.checks.push(replace_with_bytes_literal(
                         expr,
                         variable,
                         checker.locator,
@@ -136,7 +136,7 @@ pub fn unnecessary_encode_utf8(
                         kwargs,
                         checker.patch(&CheckCode::UP012),
                     ) {
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                 }
             }
@@ -150,7 +150,7 @@ pub fn unnecessary_encode_utf8(
                     kwargs,
                     checker.patch(&CheckCode::UP012),
                 ) {
-                    checker.add_check(check);
+                    checker.checks.push(check);
                 }
             }
         }

@@ -57,7 +57,7 @@ where
     F: FnOnce() -> String,
 {
     if checker.match_typing_expr(annotation, "Any") {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::DynamicallyTypedExpression(func()),
             Range::from_located(annotation),
         ));
@@ -93,7 +93,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN001) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::MissingTypeFunctionArgument(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
@@ -116,7 +116,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN002) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::MissingTypeArgs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
@@ -139,7 +139,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN003) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::MissingTypeKwargs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
@@ -165,7 +165,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 match visibility {
                     Visibility::Public => {
                         if checker.settings.enabled.contains(&CheckCode::ANN201) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::MissingReturnTypePublicFunction(name.to_string()),
                                 helpers::identifier_range(stmt, checker.locator),
                             ));
@@ -173,7 +173,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     }
                     Visibility::Private => {
                         if checker.settings.enabled.contains(&CheckCode::ANN202) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::MissingReturnTypePrivateFunction(name.to_string()),
                                 helpers::identifier_range(stmt, checker.locator),
                             ));
@@ -211,7 +211,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN001) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::MissingTypeFunctionArgument(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
@@ -235,7 +235,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN002) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::MissingTypeArgs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
@@ -259,7 +259,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
                         if checker.settings.enabled.contains(&CheckCode::ANN003) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::MissingTypeKwargs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
                             ));
@@ -274,14 +274,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if arg.node.annotation.is_none() {
                         if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                             if checker.settings.enabled.contains(&CheckCode::ANN102) {
-                                checker.add_check(Check::new(
+                                checker.checks.push(Check::new(
                                     CheckKind::MissingTypeCls(arg.node.arg.to_string()),
                                     Range::from_located(arg),
                                 ));
                             }
                         } else {
                             if checker.settings.enabled.contains(&CheckCode::ANN101) {
-                                checker.add_check(Check::new(
+                                checker.checks.push(Check::new(
                                     CheckKind::MissingTypeSelf(arg.node.arg.to_string()),
                                     Range::from_located(arg),
                                 ));
@@ -307,14 +307,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
                 if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                     if checker.settings.enabled.contains(&CheckCode::ANN206) {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::MissingReturnTypeClassMethod(name.to_string()),
                             helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
                 } else if visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
                     if checker.settings.enabled.contains(&CheckCode::ANN205) {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::MissingReturnTypeStaticMethod(name.to_string()),
                             helpers::identifier_range(stmt, checker.locator),
                         ));
@@ -338,12 +338,12 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                     Err(e) => error!("Failed to generate fix: {e}"),
                                 }
                             }
-                            checker.add_check(check);
+                            checker.checks.push(check);
                         }
                     }
                 } else if visibility::is_magic(stmt) {
                     if checker.settings.enabled.contains(&CheckCode::ANN204) {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::MissingReturnTypeSpecialMethod(name.to_string()),
                             helpers::identifier_range(stmt, checker.locator),
                         ));
@@ -352,7 +352,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     match visibility {
                         Visibility::Public => {
                             if checker.settings.enabled.contains(&CheckCode::ANN201) {
-                                checker.add_check(Check::new(
+                                checker.checks.push(Check::new(
                                     CheckKind::MissingReturnTypePublicFunction(name.to_string()),
                                     helpers::identifier_range(stmt, checker.locator),
                                 ));
@@ -360,7 +360,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         }
                         Visibility::Private => {
                             if checker.settings.enabled.contains(&CheckCode::ANN202) {
-                                checker.add_check(Check::new(
+                                checker.checks.push(Check::new(
                                     CheckKind::MissingReturnTypePrivateFunction(name.to_string()),
                                     helpers::identifier_range(stmt, checker.locator),
                                 ));

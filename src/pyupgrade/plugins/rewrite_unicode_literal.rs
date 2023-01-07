@@ -16,7 +16,7 @@ pub fn rewrite_unicode_literal(checker: &mut Checker, expr: &Expr, kind: Option<
                     Location::new(expr.location.row(), expr.location.column() + 1),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }

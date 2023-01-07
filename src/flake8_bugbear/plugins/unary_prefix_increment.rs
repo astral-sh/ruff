@@ -15,7 +15,7 @@ pub fn unary_prefix_increment(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     if !matches!(op, Unaryop::UAdd) {
         return;
     }
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::UnaryPrefixIncrement,
         Range::from_located(expr),
     ));

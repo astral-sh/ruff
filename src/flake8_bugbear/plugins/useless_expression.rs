@@ -10,7 +10,7 @@ pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {
         if let StmtKind::Expr { value } = &stmt.node {
             match &value.node {
                 ExprKind::List { .. } | ExprKind::Dict { .. } | ExprKind::Set { .. } => {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::UselessExpression,
                         Range::from_located(value),
                     ));
@@ -18,7 +18,7 @@ pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {
                 ExprKind::Constant { value: val, .. } => match &val {
                     Constant::Str { .. } | Constant::Ellipsis => {}
                     _ => {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::UselessExpression,
                             Range::from_located(value),
                         ));

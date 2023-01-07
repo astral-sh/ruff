@@ -164,7 +164,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
                 !is_immutable_annotation(expr, &checker.from_imports, &checker.import_aliases)
             })
         {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::MutableArgumentDefault,
                 Range::from_located(default),
             ));

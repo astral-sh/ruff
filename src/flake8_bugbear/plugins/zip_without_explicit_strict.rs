@@ -22,7 +22,7 @@ pub fn zip_without_explicit_strict(
                     .map_or(false, |name| name == "strict")
             })
         {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::ZipWithoutExplicitStrict,
                 Range::from_located(expr),
             ));

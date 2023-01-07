@@ -19,5 +19,5 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr, id: &str) {
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }

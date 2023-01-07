@@ -33,7 +33,7 @@ pub fn use_contextlib_suppress(
                 CheckKind::UseContextlibSuppress(exception),
                 Range::from_located(stmt),
             );
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }

@@ -73,7 +73,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 expr.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     } else if checker.match_typing_call_path(&call_path, "Union") {
         let mut check = Check::new(CheckKind::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch(check.kind.code()) {
@@ -102,6 +102,6 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 }
             }
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }

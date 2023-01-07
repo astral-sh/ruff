@@ -14,7 +14,7 @@ pub fn useless_contextlib_suppress(checker: &mut Checker, expr: &Expr, args: &[E
         &checker.from_imports,
     ) && args.is_empty()
     {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::UselessContextlibSuppress,
             Range::from_located(expr),
         ));

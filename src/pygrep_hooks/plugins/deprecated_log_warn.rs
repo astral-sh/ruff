@@ -11,7 +11,7 @@ pub fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
     if call_path == ["log", "warn"]
         || match_call_path(&call_path, "logging", "warn", &checker.from_imports)
     {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::DeprecatedLogWarn,
             Range::from_located(func),
         ));

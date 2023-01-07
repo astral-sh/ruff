@@ -246,5 +246,5 @@ pub fn convert_typed_dict_functional_to_class(
             checker.style,
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
