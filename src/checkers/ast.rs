@@ -2385,15 +2385,12 @@ where
                         ));
                 }
             }
-            ExprKind::Dict { keys, .. } => {
-                let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
-                let check_repeated_variables = self.settings.enabled.contains(&CheckCode::F602);
-                if check_repeated_literals || check_repeated_variables {
-                    self.checks.extend(pyflakes::checks::repeated_keys(
-                        keys,
-                        check_repeated_literals,
-                        check_repeated_variables,
-                    ));
+            ExprKind::Dict { keys, values } => {
+                if self.settings.enabled.contains(&CheckCode::F601) {
+                    pyflakes::plugins::repeated_literal_keys(self, keys, values);
+                }
+                if self.settings.enabled.contains(&CheckCode::F602) {
+                    pyflakes::plugins::repeated_variable_keys(self, keys, values);
                 }
             }
             ExprKind::Yield { .. } => {

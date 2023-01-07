@@ -651,29 +651,48 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
 }
 
 define_violation!(
-    pub struct MultiValueRepeatedKeyLiteral;
+    pub struct MultiValueRepeatedKeyLiteral(pub String, pub bool);
 );
 impl Violation for MultiValueRepeatedKeyLiteral {
     fn message(&self) -> String {
-        "Dictionary key literal repeated".to_string()
+        let MultiValueRepeatedKeyLiteral(name, ..) = self;
+        format!("Dictionary key literal `{name}` repeated")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let MultiValueRepeatedKeyLiteral(name, repeated_value) = self;
+        if repeated_value {
+            Some(|_| format!("Remove repeated key literal `{name}`"))
+        } else {
+            None
+        }
     }
 
     fn placeholder() -> Self {
-        MultiValueRepeatedKeyLiteral
+        MultiValueRepeatedKeyLiteral("...".to_string(), false)
     }
 }
 
 define_violation!(
-    pub struct MultiValueRepeatedKeyVariable(pub String);
+    pub struct MultiValueRepeatedKeyVariable(pub String, pub bool);
 );
 impl Violation for MultiValueRepeatedKeyVariable {
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyVariable(name) = self;
+        let MultiValueRepeatedKeyVariable(name, ..) = self;
         format!("Dictionary key `{name}` repeated")
     }
 
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let MultiValueRepeatedKeyVariable(name, repeated_value) = self;
+        if repeated_value {
+            Some(|_| format!("Remove repeated key `{name}`"))
+        } else {
+            None
+        }
+    }
+
     fn placeholder() -> Self {
-        MultiValueRepeatedKeyVariable("...".to_string())
+        MultiValueRepeatedKeyVariable("...".to_string(), false)
     }
 }
 
