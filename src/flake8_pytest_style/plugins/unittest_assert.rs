@@ -122,7 +122,7 @@ impl TryFrom<&str> for UnittestAssert {
             "assertSetEqual" => Ok(UnittestAssert::SetEqual),
             "assertTrue" => Ok(UnittestAssert::True),
             "assert_" => Ok(UnittestAssert::Underscore),
-            _ => Err(format!("Unknown unittest assert name: {value}")),
+            _ => Err(format!("Unknown unittest assert method: {value}")),
         }
     }
 }
