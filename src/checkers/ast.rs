@@ -15,7 +15,7 @@ use rustpython_parser::ast::{
 use rustpython_parser::parser;
 
 use crate::ast::helpers::{
-    collect_call_paths, dealias_call_path, extract_handler_names, match_call_path,
+    binding_range, collect_call_paths, dealias_call_path, extract_handler_names, match_call_path,
 };
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
@@ -560,7 +560,7 @@ where
                     Binding {
                         kind: BindingKind::FunctionDefinition,
                         used: None,
-                        range: helpers::identifier_range(stmt, self.locator),
+                        range: Range::from_located(stmt),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -1544,7 +1544,7 @@ where
                     Binding {
                         kind: BindingKind::ClassDefinition,
                         used: None,
-                        range: helpers::identifier_range(stmt, self.locator),
+                        range: Range::from_located(stmt),
                         source: Some(self.current_stmt().clone()),
                     },
                 );
@@ -3373,7 +3373,7 @@ impl<'a> Checker<'a> {
                                     name.to_string(),
                                     existing.range.location.row(),
                                 ),
-                                binding.range,
+                                binding_range(&binding, self.locator),
                             ));
                         }
                     }
@@ -3935,7 +3935,7 @@ impl<'a> Checker<'a> {
                                         (*name).to_string(),
                                         binding.range.location.row(),
                                     ),
-                                    self.bindings[*index].range,
+                                    binding_range(&self.bindings[*index], self.locator),
                                 ));
                             }
                         }
