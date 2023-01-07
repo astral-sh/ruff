@@ -247,7 +247,9 @@ impl UnittestAssert {
         let args = self.args_map(args, keywords)?;
         match self {
             UnittestAssert::True | UnittestAssert::False => {
-                let expr = args.get("expr").ok_or(anyhow!("Missing argument `expr`"))?;
+                let expr = args
+                    .get("expr")
+                    .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
                 let bool = create_expr(ExprKind::Constant {
                     value: Constant::Bool(matches!(self, UnittestAssert::True)),
@@ -266,10 +268,10 @@ impl UnittestAssert {
             | UnittestAssert::LessEqual => {
                 let first = args
                     .get("first")
-                    .ok_or(anyhow!("Missing argument `first`"))?;
+                    .ok_or_else(|| anyhow!("Missing argument `first`"))?;
                 let second = args
                     .get("second")
-                    .ok_or(anyhow!("Missing argument `second`"))?;
+                    .ok_or_else(|| anyhow!("Missing argument `second`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = match self {
                     UnittestAssert::Equal | UnittestAssert::Equals => Cmpop::Eq,
@@ -286,10 +288,10 @@ impl UnittestAssert {
             UnittestAssert::Is | UnittestAssert::IsNot => {
                 let expr1 = args
                     .get("expr1")
-                    .ok_or(anyhow!("Missing argument `expr1`"))?;
+                    .ok_or_else(|| anyhow!("Missing argument `expr1`"))?;
                 let expr2 = args
                     .get("expr2")
-                    .ok_or(anyhow!("Missing argument `expr2`"))?;
+                    .ok_or_else(|| anyhow!("Missing argument `expr2`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, UnittestAssert::Is) {
                     Cmpop::Is
@@ -302,10 +304,10 @@ impl UnittestAssert {
             UnittestAssert::In | UnittestAssert::NotIn => {
                 let member = args
                     .get("member")
-                    .ok_or(anyhow!("Missing argument `member`"))?;
+                    .ok_or_else(|| anyhow!("Missing argument `member`"))?;
                 let container = args
                     .get("container")
-                    .ok_or(anyhow!("Missing argument `container`"))?;
+                    .ok_or_else(|| anyhow!("Missing argument `container`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, UnittestAssert::In) {
                     Cmpop::In
@@ -316,7 +318,9 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::IsNone | UnittestAssert::IsNotNone => {
-                let expr = args.get("expr").ok_or(anyhow!("Missing argument `expr`"))?;
+                let expr = args
+                    .get("expr")
+                    .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, UnittestAssert::IsNone) {
                     Cmpop::Is
@@ -334,8 +338,12 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::IsInstance | UnittestAssert::NotIsInstance => {
-                let obj = args.get("obj").ok_or(anyhow!("Missing argument `obj`"))?;
-                let cls = args.get("cls").ok_or(anyhow!("Missing argument `cls`"))?;
+                let obj = args
+                    .get("obj")
+                    .ok_or_else(|| anyhow!("Missing argument `obj`"))?;
+                let cls = args
+                    .get("cls")
+                    .ok_or_else(|| anyhow!("Missing argument `cls`"))?;
                 let msg = args.get("msg").copied();
                 let isinstance = create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Name {
@@ -361,8 +369,10 @@ impl UnittestAssert {
             | UnittestAssert::NotRegexpMatches => {
                 let regex = args
                     .get("regex")
-                    .ok_or(anyhow!("Missing argument `regex`"))?;
-                let text = args.get("text").ok_or(anyhow!("Missing argument `text`"))?;
+                    .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
+                let text = args
+                    .get("text")
+                    .ok_or_else(|| anyhow!("Missing argument `text`"))?;
                 let msg = args.get("msg").copied();
                 let re_search = create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Attribute {
