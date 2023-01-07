@@ -5,52 +5,52 @@ expression: checks
 - kind:
     IfExprWithTrueFalse: b
   location:
-    row: 2
+    row: 1
     column: 4
   end_location:
-    row: 2
+    row: 1
     column: 24
   fix:
     content: bool(b)
     location:
-      row: 2
+      row: 1
       column: 4
     end_location:
-      row: 2
+      row: 1
       column: 24
   parent: ~
 - kind:
     IfExprWithTrueFalse: b != c
   location:
-    row: 4
+    row: 3
     column: 4
   end_location:
-    row: 4
-    column: 27
+    row: 3
+    column: 29
   fix:
     content: bool(b != c)
     location:
-      row: 4
+      row: 3
       column: 4
     end_location:
-      row: 4
-      column: 27
+      row: 3
+      column: 29
   parent: ~
 - kind:
     IfExprWithTrueFalse: b + c
   location:
-    row: 6
+    row: 5
     column: 4
   end_location:
-    row: 6
-    column: 26
+    row: 5
+    column: 28
   fix:
     content: bool(b + c)
     location:
-      row: 6
+      row: 5
       column: 4
     end_location:
-      row: 6
-      column: 26
+      row: 5
+      column: 28
   parent: ~
 

@@ -985,7 +985,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM208 | DoubleNegation | Use `expr` instead of `not (not expr)` | 🛠 |
 | SIM210 | IfExprWithTrueFalse | Use `bool(expr)` instead of `True if expr else False` | 🛠 |
 | SIM211 | IfExprWithFalseTrue | Use `not expr` instead of `False if expr else True` | 🛠 |
-| SIM212 | IfExprWithTwistedArms | Use `body if body else else` instead of `else if not body else body` | 🛠 |
+| SIM212 | IfExprWithTwistedArms | Use `b if b else a` instead of `a if not b else b` | 🛠 |
 | SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |

@@ -107,7 +107,8 @@ pub fn twisted_arms_in_ifexpr(
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    // Check if test operand and else branch is the same named variable
+
+    // Check if the test operand and else branch use the same variable.
     let ExprKind::Name { id: test_id, .. } = &test_operand.node else {
         return;
     };

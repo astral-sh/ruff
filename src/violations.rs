@@ -2985,7 +2985,7 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
     }
 
     fn placeholder() -> Self {
-        IfExprWithTwistedArms("else".to_string(), "body".to_string())
+        IfExprWithTwistedArms("a".to_string(), "b".to_string())
     }
 }
 
