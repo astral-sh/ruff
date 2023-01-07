@@ -1,0 +1,29 @@
+---
+source: src/flake8_simplify/mod.rs
+expression: checks
+---
+- kind:
+    NegateEqualOp:
+      - b
+      - a
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    NegateEqualOp:
+      - b + c
+      - a
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 23
+  fix: ~
+  parent: ~
+

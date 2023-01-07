@@ -1,0 +1,56 @@
+---
+source: src/flake8_simplify/mod.rs
+expression: checks
+---
+- kind:
+    IfExprWithFalseTrue: b
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 24
+  fix:
+    content: not b
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 24
+  parent: ~
+- kind:
+    IfExprWithFalseTrue: b != c
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 27
+  fix:
+    content: not b != c
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 27
+  parent: ~
+- kind:
+    IfExprWithFalseTrue: b + c
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 26
+  fix:
+    content: not b + c
+    location:
+      row: 6
+      column: 4
+    end_location:
+      row: 6
+      column: 26
+  parent: ~
+

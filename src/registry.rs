@@ -3071,7 +3071,10 @@ impl CheckKind {
                 format!("Use `not {expr}` instead of `False if {expr} else True`")
             }
             CheckKind::IfExprWithTwistedArms(expr_body, expr_else) => {
-                format!("Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not {expr_else} else {expr_else}`")
+                format!(
+                    "Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if \
+                     not {expr_else} else {expr_else}`"
+                )
             }
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
