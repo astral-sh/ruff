@@ -231,6 +231,9 @@ pub enum CheckCode {
     SIM201,
     SIM202,
     SIM208,
+    SIM210,
+    SIM211,
+    SIM212,
     SIM220,
     SIM221,
     SIM222,
@@ -974,6 +977,9 @@ pub enum CheckKind {
     NegateEqualOp(String, String),
     NegateNotEqualOp(String, String),
     DoubleNegation(String),
+    IfExprWithTrueFalse(String),
+    IfExprWithFalseTrue(String),
+    IfExprWithTwistedArms(String, String),
     AndFalse,
     ConvertLoopToAll(String),
     ConvertLoopToAny(String),
@@ -1437,6 +1443,11 @@ impl CheckCode {
                 CheckKind::NegateNotEqualOp("left".to_string(), "right".to_string())
             }
             CheckCode::SIM208 => CheckKind::DoubleNegation("expr".to_string()),
+            CheckCode::SIM210 => CheckKind::IfExprWithTrueFalse("expr".to_string()),
+            CheckCode::SIM211 => CheckKind::IfExprWithFalseTrue("expr".to_string()),
+            CheckCode::SIM212 => {
+                CheckKind::IfExprWithTwistedArms("expr1".to_string(), "expr2".to_string())
+            }
             CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
             CheckCode::SIM221 => CheckKind::AOrNotA("...".to_string()),
             CheckCode::SIM222 => CheckKind::OrTrue,
@@ -1987,6 +1998,9 @@ impl CheckCode {
             CheckCode::SIM201 => CheckCategory::Flake8Simplify,
             CheckCode::SIM202 => CheckCategory::Flake8Simplify,
             CheckCode::SIM208 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM210 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM211 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM212 => CheckCategory::Flake8Simplify,
             CheckCode::SIM220 => CheckCategory::Flake8Simplify,
             CheckCode::SIM221 => CheckCategory::Flake8Simplify,
             CheckCode::SIM222 => CheckCategory::Flake8Simplify,
@@ -2246,6 +2260,9 @@ impl CheckKind {
             CheckKind::ConvertLoopToAny(..) => &CheckCode::SIM110,
             CheckKind::DoubleNegation(..) => &CheckCode::SIM208,
             CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
+            CheckKind::IfExprWithFalseTrue(..) => &CheckCode::SIM211,
+            CheckKind::IfExprWithTrueFalse(..) => &CheckCode::SIM210,
+            CheckKind::IfExprWithTwistedArms(..) => &CheckCode::SIM212,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::MultipleWithStatements => &CheckCode::SIM117,
             CheckKind::NegateEqualOp(..) => &CheckCode::SIM201,
@@ -3046,6 +3063,15 @@ impl CheckKind {
             }
             CheckKind::DoubleNegation(expr) => {
                 format!("Use `{expr}` instead of `not (not {expr})`")
+            }
+            CheckKind::IfExprWithTrueFalse(expr) => {
+                format!("Use `bool({expr})` instead of `True if {expr} else False`")
+            }
+            CheckKind::IfExprWithFalseTrue(expr) => {
+                format!("Use `not {expr}` instead of `False if {expr} else True`")
+            }
+            CheckKind::IfExprWithTwistedArms(expr_body, expr_else) => {
+                format!("Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not {expr_else} else {expr_else}`")
             }
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
