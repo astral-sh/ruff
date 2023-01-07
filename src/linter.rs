@@ -19,7 +19,6 @@ use crate::checkers::lines::check_lines;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
-use crate::logging::LogLevel;
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::registry::{Check, CheckCode, CheckKind, LintSource};
@@ -182,7 +181,6 @@ pub fn lint_path(
     settings: &Settings,
     cache: flags::Cache,
     autofix: fixer::Mode,
-    level: LogLevel,
 ) -> Result<Diagnostics> {
     // Validate the `Settings` and return any errors.
     settings.validate()?;
@@ -214,9 +212,6 @@ pub fn lint_path(
         let (transformed, fixed, messages) = lint_fix(&contents, path, package, settings)?;
         if fixed > 0 {
             if matches!(autofix, fixer::Mode::Apply) {
-                if level >= LogLevel::Default {
-                    eprintln!("Fixing {fixed} error(s) in {}", fs::relativize_path(path));
-                }
                 write(path, transformed)?;
             } else if matches!(autofix, fixer::Mode::Diff) {
                 let mut stdout = io::stdout().lock();

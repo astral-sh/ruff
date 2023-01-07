@@ -36,7 +36,6 @@ pub fn run(
     overrides: &Overrides,
     cache: flags::Cache,
     autofix: fixer::Mode,
-    level: LogLevel,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -102,7 +101,7 @@ pub fn run(
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    lint_path(path, package, settings, cache, autofix, level)
+                    lint_path(path, package, settings, cache, autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
                 Err(e) => Err((
