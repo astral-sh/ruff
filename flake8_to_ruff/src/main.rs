@@ -11,6 +11,7 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
+#![forbid(unsafe_code)]
 
 use std::path::PathBuf;
 
