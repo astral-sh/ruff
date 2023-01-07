@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: MultiLineSummaryFirstLine
+- kind:
+    MultiLineSummaryFirstLine: ~
   location:
     row: 129
     column: 4

@@ -2,7 +2,8 @@
 source: src/flake8_simplify/mod.rs
 expression: checks
 ---
-- kind: ReturnInTryExceptFinally
+- kind:
+    ReturnInTryExceptFinally: ~
   location:
     row: 9
     column: 8

@@ -2,7 +2,8 @@
 source: src/flake8_quotes/mod.rs
 expression: checks
 ---
-- kind: AvoidQuoteEscape
+- kind:
+    AvoidQuoteEscape: ~
   location:
     row: 1
     column: 25

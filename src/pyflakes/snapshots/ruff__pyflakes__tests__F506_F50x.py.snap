@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: PercentFormatMixedPositionalAndNamed
+- kind:
+    PercentFormatMixedPositionalAndNamed: ~
   location:
     row: 2
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 29
   fix: ~
   parent: ~
-- kind: PercentFormatMixedPositionalAndNamed
+- kind:
+    PercentFormatMixedPositionalAndNamed: ~
   location:
     row: 3
     column: 0
@@ -20,7 +22,8 @@ expression: checks
     column: 29
   fix: ~
   parent: ~
-- kind: PercentFormatMixedPositionalAndNamed
+- kind:
+    PercentFormatMixedPositionalAndNamed: ~
   location:
     row: 11
     column: 0

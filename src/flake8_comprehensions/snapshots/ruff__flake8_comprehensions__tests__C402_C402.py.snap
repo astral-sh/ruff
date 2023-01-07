@@ -2,7 +2,8 @@
 source: src/flake8_comprehensions/mod.rs
 expression: checks
 ---
-- kind: UnnecessaryGeneratorDict
+- kind:
+    UnnecessaryGeneratorDict: ~
   location:
     row: 1
     column: 0
@@ -18,7 +19,8 @@ expression: checks
       row: 1
       column: 30
   parent: ~
-- kind: UnnecessaryGeneratorDict
+- kind:
+    UnnecessaryGeneratorDict: ~
   location:
     row: 2
     column: 0

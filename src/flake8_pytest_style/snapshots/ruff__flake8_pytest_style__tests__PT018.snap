@@ -2,7 +2,8 @@
 source: src/flake8_pytest_style/mod.rs
 expression: checks
 ---
-- kind: CompositeAssertion
+- kind:
+    CompositeAssertion: ~
   location:
     row: 12
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 39
   fix: ~
   parent: ~
-- kind: CompositeAssertion
+- kind:
+    CompositeAssertion: ~
   location:
     row: 13
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 59
   fix: ~
   parent: ~
-- kind: CompositeAssertion
+- kind:
+    CompositeAssertion: ~
   location:
     row: 14
     column: 4
@@ -29,7 +32,8 @@ expression: checks
     column: 43
   fix: ~
   parent: ~
-- kind: CompositeAssertion
+- kind:
+    CompositeAssertion: ~
   location:
     row: 15
     column: 4
@@ -38,7 +42,8 @@ expression: checks
     column: 60
   fix: ~
   parent: ~
-- kind: CompositeAssertion
+- kind:
+    CompositeAssertion: ~
   location:
     row: 16
     column: 4
@@ -47,7 +52,8 @@ expression: checks
     column: 44
   fix: ~
   parent: ~
-- kind: CompositeAssertion
+- kind:
+    CompositeAssertion: ~
   location:
     row: 17
     column: 4
@@ -56,7 +62,8 @@ expression: checks
     column: 63
   fix: ~
   parent: ~
-- kind: CompositeAssertion
+- kind:
+    CompositeAssertion: ~
   location:
     row: 18
     column: 4

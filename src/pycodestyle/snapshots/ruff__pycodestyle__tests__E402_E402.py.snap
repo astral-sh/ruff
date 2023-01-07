@@ -2,7 +2,8 @@
 source: src/pycodestyle/mod.rs
 expression: checks
 ---
-- kind: ModuleImportNotAtTopOfFile
+- kind:
+    ModuleImportNotAtTopOfFile: ~
   location:
     row: 24
     column: 0

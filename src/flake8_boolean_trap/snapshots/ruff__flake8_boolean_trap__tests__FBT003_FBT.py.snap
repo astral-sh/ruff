@@ -2,7 +2,8 @@
 source: src/flake8_boolean_trap/mod.rs
 expression: checks
 ---
-- kind: BooleanPositionalValueInFunctionCall
+- kind:
+    BooleanPositionalValueInFunctionCall: ~
   location:
     row: 42
     column: 10
@@ -11,7 +12,8 @@ expression: checks
     column: 14
   fix: ~
   parent: ~
-- kind: BooleanPositionalValueInFunctionCall
+- kind:
+    BooleanPositionalValueInFunctionCall: ~
   location:
     row: 57
     column: 10
@@ -20,7 +22,8 @@ expression: checks
     column: 14
   fix: ~
   parent: ~
-- kind: BooleanPositionalValueInFunctionCall
+- kind:
+    BooleanPositionalValueInFunctionCall: ~
   location:
     row: 57
     column: 16

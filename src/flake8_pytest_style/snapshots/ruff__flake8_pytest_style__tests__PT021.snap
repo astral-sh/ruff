@@ -2,7 +2,8 @@
 source: src/flake8_pytest_style/mod.rs
 expression: checks
 ---
-- kind: FixtureFinalizerCallback
+- kind:
+    FixtureFinalizerCallback: ~
   location:
     row: 49
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 42
   fix: ~
   parent: ~
-- kind: FixtureFinalizerCallback
+- kind:
+    FixtureFinalizerCallback: ~
   location:
     row: 56
     column: 4

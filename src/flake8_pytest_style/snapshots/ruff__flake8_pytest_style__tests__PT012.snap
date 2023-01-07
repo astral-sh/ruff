@@ -2,7 +2,8 @@
 source: src/flake8_pytest_style/mod.rs
 expression: checks
 ---
-- kind: RaisesWithMultipleStatements
+- kind:
+    RaisesWithMultipleStatements: ~
   location:
     row: 28
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 15
   fix: ~
   parent: ~
-- kind: RaisesWithMultipleStatements
+- kind:
+    RaisesWithMultipleStatements: ~
   location:
     row: 34
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: RaisesWithMultipleStatements
+- kind:
+    RaisesWithMultipleStatements: ~
   location:
     row: 38
     column: 4
@@ -29,7 +32,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: RaisesWithMultipleStatements
+- kind:
+    RaisesWithMultipleStatements: ~
   location:
     row: 42
     column: 4
@@ -38,7 +42,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: RaisesWithMultipleStatements
+- kind:
+    RaisesWithMultipleStatements: ~
   location:
     row: 46
     column: 4
@@ -47,7 +52,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: RaisesWithMultipleStatements
+- kind:
+    RaisesWithMultipleStatements: ~
   location:
     row: 50
     column: 4
@@ -56,7 +62,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: RaisesWithMultipleStatements
+- kind:
+    RaisesWithMultipleStatements: ~
   location:
     row: 54
     column: 4
@@ -65,7 +72,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: RaisesWithMultipleStatements
+- kind:
+    RaisesWithMultipleStatements: ~
   location:
     row: 60
     column: 4

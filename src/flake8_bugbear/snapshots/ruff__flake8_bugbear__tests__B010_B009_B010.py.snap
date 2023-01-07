@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: SetAttrWithConstant
+- kind:
+    SetAttrWithConstant: ~
   location:
     row: 37
     column: 0
@@ -18,7 +19,8 @@ expression: checks
       row: 37
       column: 25
   parent: ~
-- kind: SetAttrWithConstant
+- kind:
+    SetAttrWithConstant: ~
   location:
     row: 38
     column: 0
@@ -34,7 +36,8 @@ expression: checks
       row: 38
       column: 29
   parent: ~
-- kind: SetAttrWithConstant
+- kind:
+    SetAttrWithConstant: ~
   location:
     row: 39
     column: 0
@@ -50,7 +53,8 @@ expression: checks
       row: 39
       column: 28
   parent: ~
-- kind: SetAttrWithConstant
+- kind:
+    SetAttrWithConstant: ~
   location:
     row: 40
     column: 0
@@ -66,7 +70,8 @@ expression: checks
       row: 40
       column: 29
   parent: ~
-- kind: SetAttrWithConstant
+- kind:
+    SetAttrWithConstant: ~
   location:
     row: 41
     column: 0

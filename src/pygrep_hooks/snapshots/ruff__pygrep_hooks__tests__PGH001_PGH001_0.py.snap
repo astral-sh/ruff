@@ -2,7 +2,8 @@
 source: src/pygrep_hooks/mod.rs
 expression: checks
 ---
-- kind: NoEval
+- kind:
+    NoEval: ~
   location:
     row: 3
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 4
   fix: ~
   parent: ~
-- kind: NoEval
+- kind:
+    NoEval: ~
   location:
     row: 9
     column: 4

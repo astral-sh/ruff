@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: DoNotAssertFalse
+- kind:
+    DoNotAssertFalse: ~
   location:
     row: 8
     column: 7
@@ -18,7 +19,8 @@ expression: checks
       row: 8
       column: 12
   parent: ~
-- kind: DoNotAssertFalse
+- kind:
+    DoNotAssertFalse: ~
   location:
     row: 10
     column: 7

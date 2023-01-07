@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: NoAssertRaisesException
+- kind:
+    NoAssertRaisesException: ~
   location:
     row: 22
     column: 8

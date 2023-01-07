@@ -2,7 +2,8 @@
 source: src/flake8_datetimez/mod.rs
 expression: checks
 ---
-- kind: CallDateToday
+- kind:
+    CallDateToday: ~
   location:
     row: 4
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 21
   fix: ~
   parent: ~
-- kind: CallDateToday
+- kind:
+    CallDateToday: ~
   location:
     row: 9
     column: 0

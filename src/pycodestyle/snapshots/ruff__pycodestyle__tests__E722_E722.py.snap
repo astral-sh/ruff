@@ -2,7 +2,8 @@
 source: src/pycodestyle/mod.rs
 expression: checks
 ---
-- kind: DoNotUseBareExcept
+- kind:
+    DoNotUseBareExcept: ~
   location:
     row: 4
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 6
   fix: ~
   parent: ~
-- kind: DoNotUseBareExcept
+- kind:
+    DoNotUseBareExcept: ~
   location:
     row: 11
     column: 0
@@ -20,7 +22,8 @@ expression: checks
     column: 6
   fix: ~
   parent: ~
-- kind: DoNotUseBareExcept
+- kind:
+    DoNotUseBareExcept: ~
   location:
     row: 16
     column: 0

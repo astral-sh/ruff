@@ -2,7 +2,8 @@
 source: src/eradicate/mod.rs
 expression: checks
 ---
-- kind: CommentedOutCode
+- kind:
+    CommentedOutCode: ~
   location:
     row: 1
     column: 0
@@ -18,7 +19,8 @@ expression: checks
       row: 2
       column: 0
   parent: ~
-- kind: CommentedOutCode
+- kind:
+    CommentedOutCode: ~
   location:
     row: 2
     column: 0
@@ -34,7 +36,8 @@ expression: checks
       row: 3
       column: 0
   parent: ~
-- kind: CommentedOutCode
+- kind:
+    CommentedOutCode: ~
   location:
     row: 3
     column: 0
@@ -50,7 +53,8 @@ expression: checks
       row: 4
       column: 0
   parent: ~
-- kind: CommentedOutCode
+- kind:
+    CommentedOutCode: ~
   location:
     row: 5
     column: 0
@@ -66,7 +70,8 @@ expression: checks
       row: 6
       column: 0
   parent: ~
-- kind: CommentedOutCode
+- kind:
+    CommentedOutCode: ~
   location:
     row: 12
     column: 4

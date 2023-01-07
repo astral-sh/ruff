@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: DatetimeTimezoneUTC
+- kind:
+    DatetimeTimezoneUTC: ~
   location:
     row: 10
     column: 6
@@ -18,7 +19,8 @@ expression: checks
       row: 10
       column: 27
   parent: ~
-- kind: DatetimeTimezoneUTC
+- kind:
+    DatetimeTimezoneUTC: ~
   location:
     row: 11
     column: 6

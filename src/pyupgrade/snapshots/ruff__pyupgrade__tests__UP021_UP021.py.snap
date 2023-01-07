@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: ReplaceUniversalNewlines
+- kind:
+    ReplaceUniversalNewlines: ~
   location:
     row: 6
     column: 24
@@ -18,7 +19,8 @@ expression: checks
       row: 6
       column: 42
   parent: ~
-- kind: ReplaceUniversalNewlines
+- kind:
+    ReplaceUniversalNewlines: ~
   location:
     row: 7
     column: 22
@@ -34,7 +36,8 @@ expression: checks
       row: 7
       column: 40
   parent: ~
-- kind: ReplaceUniversalNewlines
+- kind:
+    ReplaceUniversalNewlines: ~
   location:
     row: 9
     column: 13
@@ -50,7 +53,8 @@ expression: checks
       row: 9
       column: 31
   parent: ~
-- kind: ReplaceUniversalNewlines
+- kind:
+    ReplaceUniversalNewlines: ~
   location:
     row: 10
     column: 21

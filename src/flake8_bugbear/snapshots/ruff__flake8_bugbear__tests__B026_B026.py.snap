@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: StarArgUnpackingAfterKeywordArg
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
   location:
     row: 16
     column: 15
@@ -11,7 +12,8 @@ expression: checks
     column: 30
   fix: ~
   parent: ~
-- kind: StarArgUnpackingAfterKeywordArg
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
   location:
     row: 17
     column: 15
@@ -20,7 +22,8 @@ expression: checks
     column: 23
   fix: ~
   parent: ~
-- kind: StarArgUnpackingAfterKeywordArg
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
   location:
     row: 18
     column: 26
@@ -29,7 +32,8 @@ expression: checks
     column: 34
   fix: ~
   parent: ~
-- kind: StarArgUnpackingAfterKeywordArg
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
   location:
     row: 19
     column: 37
@@ -38,7 +42,8 @@ expression: checks
     column: 40
   fix: ~
   parent: ~
-- kind: StarArgUnpackingAfterKeywordArg
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
   location:
     row: 20
     column: 15
@@ -47,7 +52,8 @@ expression: checks
     column: 23
   fix: ~
   parent: ~
-- kind: StarArgUnpackingAfterKeywordArg
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
   location:
     row: 20
     column: 25
@@ -56,7 +62,8 @@ expression: checks
     column: 33
   fix: ~
   parent: ~
-- kind: StarArgUnpackingAfterKeywordArg
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
   location:
     row: 21
     column: 25

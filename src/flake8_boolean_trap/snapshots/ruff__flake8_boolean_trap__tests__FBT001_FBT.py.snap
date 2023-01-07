@@ -2,7 +2,8 @@
 source: src/flake8_boolean_trap/mod.rs
 expression: checks
 ---
-- kind: BooleanPositionalArgInFunctionDefinition
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
   location:
     row: 4
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 26
   fix: ~
   parent: ~
-- kind: BooleanPositionalArgInFunctionDefinition
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
   location:
     row: 5
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 31
   fix: ~
   parent: ~
-- kind: BooleanPositionalArgInFunctionDefinition
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
   location:
     row: 10
     column: 4
@@ -29,7 +32,8 @@ expression: checks
     column: 36
   fix: ~
   parent: ~
-- kind: BooleanPositionalArgInFunctionDefinition
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
   location:
     row: 11
     column: 4
@@ -38,7 +42,8 @@ expression: checks
     column: 41
   fix: ~
   parent: ~
-- kind: BooleanPositionalArgInFunctionDefinition
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
   location:
     row: 14
     column: 4
@@ -47,7 +52,8 @@ expression: checks
     column: 37
   fix: ~
   parent: ~
-- kind: BooleanPositionalArgInFunctionDefinition
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
   location:
     row: 15
     column: 4
@@ -56,7 +62,8 @@ expression: checks
     column: 42
   fix: ~
   parent: ~
-- kind: BooleanPositionalArgInFunctionDefinition
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
   location:
     row: 18
     column: 4
@@ -65,7 +72,8 @@ expression: checks
     column: 40
   fix: ~
   parent: ~
-- kind: BooleanPositionalArgInFunctionDefinition
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
   location:
     row: 19
     column: 4
