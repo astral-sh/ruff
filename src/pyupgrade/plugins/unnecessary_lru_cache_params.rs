@@ -17,5 +17,5 @@ pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Exp
     if checker.patch(check.kind.code()) {
         check.amend(Fix::deletion(check.location, check.end_location));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }

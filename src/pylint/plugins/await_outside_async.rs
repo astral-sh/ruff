@@ -18,7 +18,7 @@ pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
         })
         .unwrap_or(true)
     {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::AwaitOutsideAsync,
             Range::from_located(expr),
         ));

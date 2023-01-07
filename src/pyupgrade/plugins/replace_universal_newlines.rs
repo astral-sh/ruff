@@ -31,6 +31,6 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
                 range.end_location,
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }

@@ -44,7 +44,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
             right.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
 
 /// SIM118 in a for loop

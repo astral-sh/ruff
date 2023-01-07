@@ -32,7 +32,7 @@ pub fn not_missing(
     match definition.kind {
         DefinitionKind::Module => {
             if checker.settings.enabled.contains(&CheckCode::D100) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::PublicModule,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
@@ -41,7 +41,7 @@ pub fn not_missing(
         }
         DefinitionKind::Package => {
             if checker.settings.enabled.contains(&CheckCode::D104) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::PublicPackage,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
@@ -50,7 +50,7 @@ pub fn not_missing(
         }
         DefinitionKind::Class(stmt) => {
             if checker.settings.enabled.contains(&CheckCode::D101) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::PublicClass,
                     identifier_range(stmt, checker.locator),
                 ));
@@ -59,7 +59,7 @@ pub fn not_missing(
         }
         DefinitionKind::NestedClass(stmt) => {
             if checker.settings.enabled.contains(&CheckCode::D106) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::PublicNestedClass,
                     identifier_range(stmt, checker.locator),
                 ));
@@ -71,7 +71,7 @@ pub fn not_missing(
                 true
             } else {
                 if checker.settings.enabled.contains(&CheckCode::D103) {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::PublicFunction,
                         identifier_range(stmt, checker.locator),
                     ));
@@ -86,7 +86,7 @@ pub fn not_missing(
                 true
             } else if is_magic(stmt) {
                 if checker.settings.enabled.contains(&CheckCode::D105) {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::MagicMethod,
                         identifier_range(stmt, checker.locator),
                     ));
@@ -94,7 +94,7 @@ pub fn not_missing(
                 true
             } else if is_init(stmt) {
                 if checker.settings.enabled.contains(&CheckCode::D107) {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::PublicInit,
                         identifier_range(stmt, checker.locator),
                     ));
@@ -102,7 +102,7 @@ pub fn not_missing(
                 true
             } else {
                 if checker.settings.enabled.contains(&CheckCode::D102) {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::PublicMethod,
                         identifier_range(stmt, checker.locator),
                     ));
@@ -130,7 +130,7 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
     }
 
     if non_empty_line_count == 1 && line_count > 1 {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::FitsOnOneLine,
             Range::from_located(docstring.expr),
         ));
@@ -176,7 +176,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
                     Location::new(docstring.expr.location.row(), 0),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 
@@ -220,7 +220,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
                     ),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }
@@ -258,7 +258,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row(), 0),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
         if checker.settings.enabled.contains(&CheckCode::D203) {
@@ -275,7 +275,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row(), 0),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }
@@ -315,7 +315,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                     ),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }
@@ -362,7 +362,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
                 ));
             }
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }
 
@@ -418,7 +418,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row() + i, line_indent.len()),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
 
@@ -439,7 +439,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
 
     if checker.settings.enabled.contains(&CheckCode::D206) {
         if has_seen_tab {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::IndentWithSpaces,
                 Range::from_located(docstring.expr),
             ));
@@ -468,7 +468,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                             Location::new(docstring.expr.location.row() + i, line_indent.len()),
                         ));
                     }
-                    checker.add_check(check);
+                    checker.checks.push(check);
                 }
             }
         }
@@ -492,7 +492,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row() + i, line_indent.len()),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }
@@ -526,7 +526,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                             ),
                         ));
                     }
-                    checker.add_check(check);
+                    checker.checks.push(check);
                 }
             }
             return;
@@ -575,7 +575,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
             }
         }
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
 
 /// D212, D213
@@ -595,14 +595,14 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     };
     if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
         if checker.settings.enabled.contains(&CheckCode::D212) {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::MultiLineSummaryFirstLine,
                 Range::from_located(docstring.expr),
             ));
         }
     } else {
         if checker.settings.enabled.contains(&CheckCode::D213) {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::MultiLineSummarySecondLine,
                 Range::from_located(docstring.expr),
             ));
@@ -634,7 +634,7 @@ pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
             || first_line.starts_with("ur\"\"\"")
     };
     if !starts_with_triple {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::UsesTripleQuotes,
             Range::from_located(docstring.expr),
         ));
@@ -653,7 +653,7 @@ pub fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     }
 
     if BACKSLASH_REGEX.is_match(contents) {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::UsesRPrefixForBackslashedContent,
             Range::from_located(docstring.expr),
         ));
@@ -718,7 +718,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
                     check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         };
     }
 }
@@ -744,7 +744,7 @@ pub fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     if !first_line.contains(&format!("{name}(")) {
         return;
     };
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::NoSignature,
         Range::from_located(docstring.expr),
     ));
@@ -775,7 +775,7 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     if first_char.is_uppercase() {
         return;
     };
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::FirstLineCapitalized,
         Range::from_located(docstring.expr),
     ));
@@ -800,7 +800,7 @@ pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     {
         return;
     }
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::NoThisPrefix,
         Range::from_located(docstring.expr),
     ));
@@ -865,7 +865,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
                     check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         };
     }
 }
@@ -882,7 +882,7 @@ pub fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     if !is_overload(checker, cast::decorator_list(stmt)) {
         return;
     }
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::SkipDocstring,
         identifier_range(stmt, checker.locator),
     ));
@@ -895,7 +895,7 @@ pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
     }
 
     if checker.settings.enabled.contains(&CheckCode::D419) {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::NonEmpty,
             Range::from_located(docstring.expr),
         ));
@@ -977,10 +977,10 @@ fn blanks_and_section_underline(
                     ),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
         if checker.settings.enabled.contains(&CheckCode::D414) {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::NonEmptySection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             ));
@@ -1016,7 +1016,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
 
@@ -1060,7 +1060,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 };
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
 
@@ -1091,7 +1091,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 };
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
 
@@ -1107,7 +1107,7 @@ fn blanks_and_section_underline(
                     .count();
                 if blank_lines_after_dashes == rest_of_lines.len() {
                     if checker.settings.enabled.contains(&CheckCode::D414) {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::NonEmptySection(context.section_name.to_string()),
                             Range::from_located(docstring.expr),
                         ));
@@ -1140,13 +1140,13 @@ fn blanks_and_section_underline(
                                 ),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                 }
             }
         } else {
             if checker.settings.enabled.contains(&CheckCode::D414) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::NonEmptySection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 ));
@@ -1173,7 +1173,7 @@ fn blanks_and_section_underline(
                     ),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
         if blank_lines_after_header > 0 {
             if checker.settings.enabled.contains(&CheckCode::D412) {
@@ -1199,7 +1199,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }
@@ -1242,7 +1242,7 @@ fn common_section(
                         ));
                     }
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }
@@ -1265,7 +1265,7 @@ fn common_section(
                     ),
                 ));
             };
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 
@@ -1293,7 +1293,7 @@ fn common_section(
                         ),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         } else {
             if checker.settings.enabled.contains(&CheckCode::D410) {
@@ -1314,7 +1314,7 @@ fn common_section(
                         ),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }
@@ -1332,7 +1332,7 @@ fn common_section(
                     Location::new(docstring.expr.location.row() + context.original_index, 0),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 
@@ -1404,7 +1404,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     if !missing_arg_names.is_empty() {
         let names = missing_arg_names.into_iter().sorted().collect();
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::DocumentAllArguments(names),
             Range::from_located(parent),
         ));
@@ -1534,7 +1534,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
                     ));
                 }
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 
@@ -1581,7 +1581,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                     ));
                 }
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 

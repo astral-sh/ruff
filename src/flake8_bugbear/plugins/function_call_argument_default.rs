@@ -117,6 +117,6 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         visitor.visit_expr(expr);
     }
     for (check, range) in visitor.checks {
-        checker.add_check(Check::new(check, range));
+        checker.checks.push(Check::new(check, range));
     }
 }

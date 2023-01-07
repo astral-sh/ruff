@@ -109,6 +109,6 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
                 last.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }

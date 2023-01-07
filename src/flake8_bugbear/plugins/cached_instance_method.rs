@@ -33,7 +33,7 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
                 _ => decorator,
             },
         ) {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::CachedInstanceMethod,
                 Range::from_located(decorator),
             ));

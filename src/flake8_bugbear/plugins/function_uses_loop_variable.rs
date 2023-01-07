@@ -211,7 +211,7 @@ where
             if reassigned_in_loop.contains(name) {
                 if !checker.flake8_bugbear_seen.contains(&expr) {
                     checker.flake8_bugbear_seen.push(expr);
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::FunctionUsesLoopVariable(name.to_string()),
                         range,
                     ));

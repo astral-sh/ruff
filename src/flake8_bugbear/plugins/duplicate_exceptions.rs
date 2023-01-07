@@ -66,7 +66,7 @@ fn duplicate_handler_exceptions<'a>(
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 
@@ -107,7 +107,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
     if checker.settings.enabled.contains(&CheckCode::B025) {
         for (name, exprs) in duplicates {
             for expr in exprs {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::DuplicateTryBlockException(name.join(".")),
                     Range::from_located(expr),
                 ));

@@ -60,7 +60,7 @@ pub struct Checker<'a> {
     pub(crate) locator: &'a SourceCodeLocator<'a>,
     pub(crate) style: &'a SourceCodeStyleDetector<'a>,
     // Computed checks.
-    checks: Vec<Check>,
+    pub(crate) checks: Vec<Check>,
     // Function and class definition tracking (e.g., for docstring enforcement).
     definitions: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
@@ -155,18 +155,6 @@ impl<'a> Checker<'a> {
             except_handlers: vec![],
             // Check-specific state.
             flake8_bugbear_seen: vec![],
-        }
-    }
-
-    /// Add a `Check` to the `Checker`.
-    pub(crate) fn add_check(&mut self, check: Check) {
-        self.checks.push(check);
-    }
-
-    /// Add multiple `Check` items to the `Checker`.
-    pub(crate) fn add_checks(&mut self, checks: impl Iterator<Item = Check>) {
-        for check in checks {
-            self.add_check(check);
         }
     }
 
@@ -285,9 +273,10 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    self.add_checks(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                        pycodestyle::checks::ambiguous_variable_name(name, *range)
-                    }));
+                    self.checks
+                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                            pycodestyle::checks::ambiguous_variable_name(name, *range)
+                        }));
                 }
             }
             StmtKind::Nonlocal { names } => {
@@ -322,7 +311,7 @@ where
                         // Ensure that every nonlocal has an existing binding from a parent scope.
                         if !exists {
                             if self.settings.enabled.contains(&CheckCode::PLE0117) {
-                                self.add_check(Check::new(
+                                self.checks.push(Check::new(
                                     CheckKind::NonlocalWithoutBinding(name.to_string()),
                                     *range,
                                 ));
@@ -332,9 +321,10 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E741) {
-                    self.add_checks(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                        pycodestyle::checks::ambiguous_variable_name(name, *range)
-                    }));
+                    self.checks
+                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                            pycodestyle::checks::ambiguous_variable_name(name, *range)
+                        }));
                 }
             }
             StmtKind::Break => {
@@ -348,7 +338,7 @@ where
                             .map(std::convert::Into::into)
                             .skip(1),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
             }
@@ -363,7 +353,7 @@ where
                             .map(std::convert::Into::into)
                             .skip(1),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
             }
@@ -387,7 +377,7 @@ where
                     if let Some(check) = pycodestyle::checks::ambiguous_function_name(name, || {
                         helpers::identifier_range(stmt, self.locator)
                     }) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -398,7 +388,7 @@ where
                         &self.settings.pep8_naming.ignore_names,
                         self.locator,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -414,7 +404,7 @@ where
                             &self.settings.pep8_naming,
                         )
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -428,7 +418,7 @@ where
                         &self.import_aliases,
                         &self.settings.pep8_naming,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -439,7 +429,7 @@ where
                         name,
                         self.locator,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -477,14 +467,13 @@ where
                         self.settings.mccabe.max_complexity,
                         self.locator,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
                 if self.settings.enabled.contains(&CheckCode::S107) {
-                    self.add_checks(
-                        flake8_bandit::checks::hardcoded_password_default(args).into_iter(),
-                    );
+                    self.checks
+                        .extend(flake8_bandit::checks::hardcoded_password_default(args));
                 }
 
                 if self.settings.enabled.contains(&CheckCode::PLR0206) {
@@ -583,7 +572,7 @@ where
                             self.scopes[index].kind,
                             ScopeKind::Class(_) | ScopeKind::Module
                         ) {
-                            self.add_check(Check::new(
+                            self.checks.push(Check::new(
                                 CheckKind::ReturnOutsideFunction,
                                 Range::from_located(stmt),
                             ));
@@ -608,7 +597,7 @@ where
                     if let Some(check) = pycodestyle::checks::ambiguous_class_name(name, || {
                         helpers::identifier_range(stmt, self.locator)
                     }) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -616,7 +605,7 @@ where
                     if let Some(check) =
                         pep8_naming::checks::invalid_class_name(stmt, name, self.locator)
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -627,7 +616,7 @@ where
                         name,
                         self.locator,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -666,7 +655,7 @@ where
             StmtKind::Import { names } => {
                 if self.settings.enabled.contains(&CheckCode::E401) {
                     if names.len() > 1 {
-                        self.add_check(Check::new(
+                        self.checks.push(Check::new(
                             CheckKind::MultipleImportsOnOneLine,
                             Range::from_located(stmt),
                         ));
@@ -675,7 +664,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
-                        self.add_check(Check::new(
+                        self.checks.push(Check::new(
                             CheckKind::ModuleImportNotAtTopOfFile,
                             Range::from_located(stmt),
                         ));
@@ -753,7 +742,7 @@ where
                         if let Some(check) =
                             flake8_debugger::checks::debugger_import(stmt, None, &alias.node.name)
                         {
-                            self.add_check(check);
+                            self.checks.push(check);
                         }
                     }
 
@@ -764,7 +753,7 @@ where
                             &alias.node.name,
                             &self.settings.flake8_tidy_imports.banned_api,
                         ) {
-                            self.add_check(check);
+                            self.checks.push(check);
                         }
                     }
 
@@ -793,7 +782,7 @@ where
                                     self.locator,
                                 )
                             {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -806,7 +795,7 @@ where
                                     self.locator,
                                 )
                             {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -819,7 +808,7 @@ where
                                     self.locator,
                                 )
                             {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -830,7 +819,7 @@ where
                                 asname,
                                 self.locator,
                             ) {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -841,7 +830,7 @@ where
                                 asname,
                                 self.locator,
                             ) {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
                     }
@@ -855,7 +844,7 @@ where
                                 &self.settings.flake8_import_conventions.aliases,
                             )
                         {
-                            self.add_check(check);
+                            self.checks.push(check);
                         }
                     }
 
@@ -865,7 +854,7 @@ where
                             &alias.node.name,
                             alias.node.asname.as_deref(),
                         ) {
-                            self.add_check(check);
+                            self.checks.push(check);
                         }
                     }
                 }
@@ -896,7 +885,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
-                        self.add_check(Check::new(
+                        self.checks.push(Check::new(
                             CheckKind::ModuleImportNotAtTopOfFile,
                             Range::from_located(stmt),
                         ));
@@ -925,7 +914,7 @@ where
                                 name,
                                 &self.settings.flake8_tidy_imports.banned_api,
                             ) {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
                         if let Some(check) = flake8_tidy_imports::checks::name_or_parent_is_banned(
@@ -933,7 +922,7 @@ where
                             module,
                             &self.settings.flake8_tidy_imports.banned_api,
                         ) {
-                            self.add_check(check);
+                            self.checks.push(check);
                         }
                     }
                 }
@@ -944,7 +933,7 @@ where
                         module.as_deref(),
                         level.as_ref(),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -975,7 +964,7 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::F407) {
                             if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
-                                self.add_check(Check::new(
+                                self.checks.push(Check::new(
                                     CheckKind::FutureFeatureNotDefined(alias.node.name.to_string()),
                                     Range::from_located(alias),
                                 ));
@@ -984,7 +973,7 @@ where
 
                         if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
                         {
-                            self.add_check(Check::new(
+                            self.checks.push(Check::new(
                                 CheckKind::LateFutureImport,
                                 Range::from_located(stmt),
                             ));
@@ -1004,7 +993,7 @@ where
                             let scope = &self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found"))];
                             if !matches!(scope.kind, ScopeKind::Module) {
-                                self.add_check(Check::new(
+                                self.checks.push(Check::new(
                                     CheckKind::ImportStarNotPermitted(helpers::format_import_from(
                                         level.as_ref(),
                                         module.as_deref(),
@@ -1015,7 +1004,7 @@ where
                         }
 
                         if self.settings.enabled.contains(&CheckCode::F403) {
-                            self.add_check(Check::new(
+                            self.checks.push(Check::new(
                                 CheckKind::ImportStarUsed(helpers::format_import_from(
                                     level.as_ref(),
                                     module.as_deref(),
@@ -1076,7 +1065,7 @@ where
                             level.as_ref(),
                             &self.settings.flake8_tidy_imports.ban_relative_imports,
                         ) {
-                            self.add_check(check);
+                            self.checks.push(check);
                         }
                     }
 
@@ -1087,7 +1076,7 @@ where
                             module.as_deref(),
                             &alias.node.name,
                         ) {
-                            self.add_check(check);
+                            self.checks.push(check);
                         }
                     }
 
@@ -1101,7 +1090,7 @@ where
                                     self.locator,
                                 )
                             {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -1114,7 +1103,7 @@ where
                                     self.locator,
                                 )
                             {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -1127,7 +1116,7 @@ where
                                     self.locator,
                                 )
                             {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -1138,7 +1127,7 @@ where
                                 asname,
                                 self.locator,
                             ) {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -1149,7 +1138,7 @@ where
                                 asname,
                                 self.locator,
                             ) {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -1216,18 +1205,18 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&CheckCode::S101) {
-                    self.add_check(flake8_bandit::checks::assert_used(stmt));
+                    self.checks.push(flake8_bandit::checks::assert_used(stmt));
                 }
                 if self.settings.enabled.contains(&CheckCode::PT015) {
                     if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::PT018) {
                     if let Some(check) =
                         flake8_pytest_style::plugins::composite_condition(stmt, test)
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
             }
@@ -1291,7 +1280,7 @@ where
                     if let Some(check) =
                         pyflakes::checks::default_except_not_last(handlers, self.locator)
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::B014)
@@ -1306,10 +1295,10 @@ where
                     pyupgrade::plugins::os_error_alias(self, handlers);
                 }
                 if self.settings.enabled.contains(&CheckCode::PT017) {
-                    self.add_checks(
-                        flake8_pytest_style::plugins::assert_in_exception_handler(handlers)
-                            .into_iter(),
-                    );
+                    self.checks
+                        .extend(flake8_pytest_style::plugins::assert_in_exception_handler(
+                            handlers,
+                        ));
                 }
                 if self.settings.enabled.contains(&CheckCode::SIM105) {
                     flake8_simplify::plugins::use_contextlib_suppress(
@@ -1337,7 +1326,7 @@ where
                     if let Some(check) =
                         flake8_bandit::checks::assign_hardcoded_password_string(value, targets)
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -1360,7 +1349,7 @@ where
 
                 if self.settings.enabled.contains(&CheckCode::PD901) {
                     if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
             }
@@ -1646,7 +1635,7 @@ where
                         check_two_starred_expressions,
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
             }
@@ -1682,7 +1671,7 @@ where
                                 id,
                                 Range::from_located(expr),
                             ) {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -1771,7 +1760,8 @@ where
                                     }
                                 }
 
-                                self.add_check(Check::new(code.kind(), Range::from_located(expr)));
+                                self.checks
+                                    .push(Check::new(code.kind(), Range::from_located(expr)));
                             }
                         };
                     }
@@ -1810,7 +1800,7 @@ where
                                 match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
                                     Err(e) => {
                                         if self.settings.enabled.contains(&CheckCode::F521) {
-                                            self.add_check(Check::new(
+                                            self.checks.push(Check::new(
                                                 CheckKind::StringDotFormatInvalidFormat(
                                                     pyflakes::format::error_to_string(&e),
                                                 ),
@@ -1924,7 +1914,7 @@ where
                 // flake8-bandit
                 if self.settings.enabled.contains(&CheckCode::S102) {
                     if let Some(check) = flake8_bandit::checks::exec_used(expr, func) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S103) {
@@ -1935,7 +1925,7 @@ where
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S501) {
@@ -1946,7 +1936,7 @@ where
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S506) {
@@ -1957,13 +1947,12 @@ where
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S106) {
-                    self.add_checks(
-                        flake8_bandit::checks::hardcoded_password_func_arg(keywords).into_iter(),
-                    );
+                    self.checks
+                        .extend(flake8_bandit::checks::hardcoded_password_func_arg(keywords));
                 }
                 if self.settings.enabled.contains(&CheckCode::S324) {
                     if let Some(check) = flake8_bandit::checks::hashlib_insecure_hash_functions(
@@ -1973,7 +1962,7 @@ where
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S113) {
@@ -1984,7 +1973,7 @@ where
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -1999,7 +1988,7 @@ where
                         self.patch(&CheckCode::C400),
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C401) {
@@ -2012,7 +2001,7 @@ where
                         self.patch(&CheckCode::C401),
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C402) {
@@ -2025,7 +2014,7 @@ where
                         self.patch(&CheckCode::C402),
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C403) {
@@ -2040,7 +2029,7 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C404) {
@@ -2055,7 +2044,7 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C405) {
@@ -2068,7 +2057,7 @@ where
                         self.patch(&CheckCode::C405),
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C406) {
@@ -2081,7 +2070,7 @@ where
                         self.patch(&CheckCode::C406),
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C408) {
@@ -2094,7 +2083,7 @@ where
                         self.patch(&CheckCode::C408),
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C409) {
@@ -2108,7 +2097,7 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C410) {
@@ -2122,7 +2111,7 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C411) {
@@ -2134,7 +2123,7 @@ where
                         self.patch(&CheckCode::C411),
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C413) {
@@ -2148,7 +2137,7 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C414) {
@@ -2159,7 +2148,7 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C415) {
@@ -2170,7 +2159,7 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::C417) {
@@ -2179,7 +2168,7 @@ where
                         args,
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
 
@@ -2205,13 +2194,14 @@ where
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
                 // pandas-vet
                 if self.settings.enabled.contains(&CheckCode::PD002) {
-                    self.add_checks(pandas_vet::checks::inplace_argument(keywords).into_iter());
+                    self.checks
+                        .extend(pandas_vet::checks::inplace_argument(keywords).into_iter());
                 }
                 for (code, name) in vec![
                     (CheckCode::PD003, "isnull"),
@@ -2252,10 +2242,8 @@ where
                                         }
                                     }
 
-                                    self.add_check(Check::new(
-                                        code.kind(),
-                                        Range::from_located(func),
-                                    ));
+                                    self.checks
+                                        .push(Check::new(code.kind(), Range::from_located(func)));
                                 }
                             };
                         }
@@ -2263,7 +2251,7 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::PD015) {
                     if let Some(check) = pandas_vet::checks::use_of_pd_merge(func) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
 
@@ -2360,12 +2348,12 @@ where
                     if let Some(check) =
                         flake8_pytest_style::plugins::patch_with_lambda(func, args, keywords)
                     {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::PT009) {
                     if let Some(check) = flake8_pytest_style::plugins::unittest_assertion(func) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
 
@@ -2381,31 +2369,28 @@ where
 
                 // ruff
                 if self.settings.enabled.contains(&CheckCode::RUF004) {
-                    self.add_checks(
-                        ruff::checks::keyword_argument_before_star_argument(args, keywords)
-                            .into_iter(),
-                    );
+                    self.checks
+                        .extend(ruff::checks::keyword_argument_before_star_argument(
+                            args, keywords,
+                        ));
                 }
             }
             ExprKind::Dict { keys, .. } => {
                 let check_repeated_literals = self.settings.enabled.contains(&CheckCode::F601);
                 let check_repeated_variables = self.settings.enabled.contains(&CheckCode::F602);
                 if check_repeated_literals || check_repeated_variables {
-                    self.add_checks(
-                        pyflakes::checks::repeated_keys(
-                            keys,
-                            check_repeated_literals,
-                            check_repeated_variables,
-                        )
-                        .into_iter(),
-                    );
+                    self.checks.extend(pyflakes::checks::repeated_keys(
+                        keys,
+                        check_repeated_literals,
+                        check_repeated_variables,
+                    ));
                 }
             }
             ExprKind::Yield { .. } => {
                 if self.settings.enabled.contains(&CheckCode::F704) {
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.add_check(Check::new(
+                        self.checks.push(Check::new(
                             CheckKind::YieldOutsideFunction(DeferralKeyword::Yield),
                             Range::from_located(expr),
                         ));
@@ -2416,7 +2401,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::F704) {
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.add_check(Check::new(
+                        self.checks.push(Check::new(
                             CheckKind::YieldOutsideFunction(DeferralKeyword::YieldFrom),
                             Range::from_located(expr),
                         ));
@@ -2427,7 +2412,7 @@ where
                 if self.settings.enabled.contains(&CheckCode::F704) {
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.add_check(Check::new(
+                        self.checks.push(Check::new(
                             CheckKind::YieldOutsideFunction(DeferralKeyword::Await),
                             Range::from_located(expr),
                         ));
@@ -2478,7 +2463,7 @@ where
                                 ..
                             }) => {
                                 if self.settings.enabled.contains(&CheckCode::F509) {
-                                    self.add_check(Check::new(
+                                    self.checks.push(Check::new(
                                         CheckKind::PercentFormatUnsupportedFormatCharacter(c),
                                         location,
                                     ));
@@ -2486,7 +2471,7 @@ where
                             }
                             Err(e) => {
                                 if self.settings.enabled.contains(&CheckCode::F501) {
-                                    self.add_check(Check::new(
+                                    self.checks.push(Check::new(
                                         CheckKind::PercentFormatInvalidFormat(e.to_string()),
                                         location,
                                     ));
@@ -2538,7 +2523,7 @@ where
             } => {
                 if self.settings.enabled.contains(&CheckCode::ISC003) {
                     if let Some(check) = flake8_implicit_str_concat::checks::explicit(expr) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
             }
@@ -2600,14 +2585,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::E721) {
-                    self.add_checks(
-                        pycodestyle::checks::type_comparison(
-                            ops,
-                            comparators,
-                            Range::from_located(expr),
-                        )
-                        .into_iter(),
-                    );
+                    self.checks.extend(pycodestyle::checks::type_comparison(
+                        ops,
+                        comparators,
+                        Range::from_located(expr),
+                    ));
                 }
 
                 if self.settings.enabled.contains(&CheckCode::YTT103)
@@ -2620,12 +2602,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&CheckCode::S105) {
-                    self.add_checks(
+                    self.checks.extend(
                         flake8_bandit::checks::compare_to_hardcoded_password_string(
                             left,
                             comparators,
-                        )
-                        .into_iter(),
+                        ),
                     );
                 }
 
@@ -2670,7 +2651,7 @@ where
                         value,
                         &Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::S108) {
@@ -2679,7 +2660,7 @@ where
                         value,
                         &self.settings.flake8_bandit.hardcoded_tmp_directory,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::UP025) {
@@ -2735,7 +2716,7 @@ where
                         self.patch(&CheckCode::C416),
                         Range::from_located(expr),
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     };
                 }
                 if self.settings.enabled.contains(&CheckCode::B023) {
@@ -3014,7 +2995,7 @@ where
                         excepthandler,
                         self.locator,
                     ) {
-                        self.add_check(check);
+                        self.checks.push(check);
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::B904) {
@@ -3036,7 +3017,7 @@ where
                                 helpers::excepthandler_name_range(excepthandler, self.locator)
                                     .expect("Failed to find `name` range"),
                             ) {
-                                self.add_check(check);
+                                self.checks.push(check);
                             }
                         }
 
@@ -3081,7 +3062,7 @@ where
                         } {
                             if self.bindings[*index].used.is_none() {
                                 if self.settings.enabled.contains(&CheckCode::F841) {
-                                    self.add_check(Check::new(
+                                    self.checks.push(Check::new(
                                         CheckKind::UnusedVariable(name.to_string()),
                                         name_range,
                                     ));
@@ -3178,13 +3159,13 @@ where
                 &arg.node.arg,
                 Range::from_located(arg),
             ) {
-                self.add_check(check);
+                self.checks.push(check);
             }
         }
 
         if self.settings.enabled.contains(&CheckCode::N803) {
             if let Some(check) = pep8_naming::checks::invalid_argument_name(&arg.node.arg, arg) {
-                self.add_check(check);
+                self.checks.push(check);
             }
         }
 
@@ -3349,7 +3330,7 @@ impl<'a> Checker<'a> {
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
                     overridden = Some((*scope_index, *existing_binding_index));
                     if self.settings.enabled.contains(&CheckCode::F402) {
-                        self.add_check(Check::new(
+                        self.checks.push(Check::new(
                             CheckKind::ImportShadowedByLoopVar(
                                 name.to_string(),
                                 existing.range.location.row(),
@@ -3369,7 +3350,7 @@ impl<'a> Checker<'a> {
                     {
                         overridden = Some((*scope_index, *existing_binding_index));
                         if self.settings.enabled.contains(&CheckCode::F811) {
-                            self.add_check(Check::new(
+                            self.checks.push(Check::new(
                                 CheckKind::RedefinedWhileUnused(
                                     name.to_string(),
                                     existing.range.location.row(),
@@ -3495,7 +3476,7 @@ impl<'a> Checker<'a> {
                     }
                     from_list.sort();
 
-                    self.add_check(Check::new(
+                    self.checks.push(Check::new(
                         CheckKind::ImportStarUsage(id.to_string(), from_list),
                         Range::from_located(expr),
                     ));
@@ -3526,7 +3507,7 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                self.add_check(Check::new(
+                self.checks.push(Check::new(
                     CheckKind::UndefinedName(id.clone()),
                     Range::from_located(expr),
                 ));
@@ -3547,7 +3528,7 @@ impl<'a> Checker<'a> {
                 .map(|index| &self.scopes[*index])
                 .collect();
             if let Some(check) = pyflakes::checks::undefined_local(id, &scopes, &self.bindings) {
-                self.add_check(check);
+                self.checks.push(check);
             }
         }
 
@@ -3697,7 +3678,7 @@ impl<'a> Checker<'a> {
             if scope.values.remove(&id.as_str()).is_none()
                 && self.settings.enabled.contains(&CheckCode::F821)
             {
-                self.add_check(Check::new(
+                self.checks.push(Check::new(
                     CheckKind::UndefinedName(id.to_string()),
                     Range::from_located(expr),
                 ));
@@ -3758,7 +3739,7 @@ impl<'a> Checker<'a> {
                 stacks.push((in_annotation, context));
             } else {
                 if self.settings.enabled.contains(&CheckCode::F722) {
-                    self.add_check(Check::new(
+                    self.checks.push(Check::new(
                         CheckKind::ForwardAnnotationSyntaxError(expression.to_string()),
                         range,
                     ));
@@ -3820,24 +3801,18 @@ impl<'a> Checker<'a> {
             let scope_index = scopes[scopes.len() - 1];
             let parent_scope_index = scopes[scopes.len() - 2];
             if self.settings.enabled.contains(&CheckCode::F841) {
-                self.add_checks(
-                    pyflakes::checks::unused_variable(
-                        &self.scopes[scope_index],
-                        &self.bindings,
-                        &self.settings.dummy_variable_rgx,
-                    )
-                    .into_iter(),
-                );
+                self.checks.extend(pyflakes::checks::unused_variable(
+                    &self.scopes[scope_index],
+                    &self.bindings,
+                    &self.settings.dummy_variable_rgx,
+                ));
             }
             if self.settings.enabled.contains(&CheckCode::F842) {
-                self.add_checks(
-                    pyflakes::checks::unused_annotation(
-                        &self.scopes[scope_index],
-                        &self.bindings,
-                        &self.settings.dummy_variable_rgx,
-                    )
-                    .into_iter(),
-                );
+                self.checks.extend(pyflakes::checks::unused_annotation(
+                    &self.scopes[scope_index],
+                    &self.bindings,
+                    &self.settings.dummy_variable_rgx,
+                ));
             }
             if self.settings.enabled.contains(&CheckCode::ARG001)
                 || self.settings.enabled.contains(&CheckCode::ARG002)
@@ -3845,15 +3820,13 @@ impl<'a> Checker<'a> {
                 || self.settings.enabled.contains(&CheckCode::ARG004)
                 || self.settings.enabled.contains(&CheckCode::ARG005)
             {
-                self.add_checks(
-                    flake8_unused_arguments::plugins::unused_arguments(
+                self.checks
+                    .extend(flake8_unused_arguments::plugins::unused_arguments(
                         self,
                         &self.scopes[parent_scope_index],
                         &self.scopes[scope_index],
                         &self.bindings,
-                    )
-                    .into_iter(),
-                );
+                    ));
             }
         }
     }
@@ -4129,7 +4102,7 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        self.add_checks(checks.into_iter());
+        self.checks.extend(checks);
     }
 
     fn check_definitions(&mut self) {
@@ -4333,7 +4306,7 @@ impl<'a> Checker<'a> {
                     located,
                     flake8_builtins::types::ShadowingType::Attribute,
                 ) {
-                    self.add_check(check);
+                    self.checks.push(check);
                 }
             }
         } else {
@@ -4343,7 +4316,7 @@ impl<'a> Checker<'a> {
                     located,
                     flake8_builtins::types::ShadowingType::Variable,
                 ) {
-                    self.add_check(check);
+                    self.checks.push(check);
                 }
             }
         }
@@ -4356,7 +4329,7 @@ impl<'a> Checker<'a> {
                 arg,
                 flake8_builtins::types::ShadowingType::Argument,
             ) {
-                self.add_check(check);
+                self.checks.push(check);
             }
         }
     }

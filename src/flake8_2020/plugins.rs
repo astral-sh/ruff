@@ -34,14 +34,14 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     if *i == BigInt::from(1)
                         && checker.settings.enabled.contains(&CheckCode::YTT303)
                     {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::SysVersionSlice1Referenced,
                             Range::from_located(value),
                         ));
                     } else if *i == BigInt::from(3)
                         && checker.settings.enabled.contains(&CheckCode::YTT101)
                     {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::SysVersionSlice3Referenced,
                             Range::from_located(value),
                         ));
@@ -54,14 +54,14 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 ..
             } => {
                 if *i == BigInt::from(2) && checker.settings.enabled.contains(&CheckCode::YTT102) {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::SysVersion2Referenced,
                         Range::from_located(value),
                     ));
                 } else if *i == BigInt::from(0)
                     && checker.settings.enabled.contains(&CheckCode::YTT301)
                 {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::SysVersion0Referenced,
                         Range::from_located(value),
                     ));
@@ -98,7 +98,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         if *n == BigInt::from(3)
                             && checker.settings.enabled.contains(&CheckCode::YTT201)
                         {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::SysVersionInfo0Eq3Referenced,
                                 Range::from_located(left),
                             ));
@@ -118,7 +118,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     ) = (ops, comparators)
                     {
                         if checker.settings.enabled.contains(&CheckCode::YTT203) {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::SysVersionInfo1CmpInt,
                                 Range::from_located(left),
                             ));
@@ -144,7 +144,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
             ) = (ops, comparators)
             {
                 if checker.settings.enabled.contains(&CheckCode::YTT204) {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::SysVersionInfoMinorCmpInt,
                         Range::from_located(left),
                     ));
@@ -170,13 +170,13 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
         {
             if s.len() == 1 {
                 if checker.settings.enabled.contains(&CheckCode::YTT302) {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::SysVersionCmpStr10,
                         Range::from_located(left),
                     ));
                 }
             } else if checker.settings.enabled.contains(&CheckCode::YTT103) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::SysVersionCmpStr3,
                     Range::from_located(left),
                 ));
@@ -194,7 +194,7 @@ pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
         &checker.from_imports,
         &checker.import_aliases,
     ) {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::SixPY3Referenced,
             Range::from_located(expr),
         ));

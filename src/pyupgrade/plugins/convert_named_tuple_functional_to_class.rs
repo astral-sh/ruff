@@ -203,7 +203,7 @@ pub fn convert_named_tuple_functional_to_class(
                         checker.style,
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
             Err(err) => error!("Failed to create properties: {err}"),
         },

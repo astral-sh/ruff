@@ -13,13 +13,13 @@ pub fn fail_call(checker: &mut Checker, call: &Expr, args: &[Expr], keywords: &[
 
         if let Some(msg) = msg {
             if is_empty_or_null_string(msg) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::FailWithoutMessage,
                     Range::from_located(call),
                 ));
             }
         } else {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::FailWithoutMessage,
                 Range::from_located(call),
             ));
