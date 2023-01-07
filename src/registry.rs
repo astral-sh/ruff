@@ -222,10 +222,15 @@ pub enum CheckCode {
     SIM102,
     SIM105,
     SIM107,
+    SIM108,
+    SIM109,
     SIM110,
     SIM111,
     SIM117,
     SIM118,
+    SIM201,
+    SIM202,
+    SIM208,
     SIM220,
     SIM221,
     SIM222,
@@ -335,7 +340,9 @@ pub enum CheckCode {
     S106,
     S107,
     S108,
+    S113,
     S324,
+    S501,
     S506,
     // flake8-boolean-trap
     FBT001,
@@ -960,9 +967,14 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    UseTernaryOperator(String),
+    CompareWithTuple(String, Vec<String>, String),
     DuplicateIsinstanceCall(String),
     AAndNotA(String),
     AOrNotA(String),
+    NegateEqualOp(String, String),
+    NegateNotEqualOp(String, String),
+    DoubleNegation(String),
     AndFalse,
     ConvertLoopToAll(String),
     ConvertLoopToAny(String),
@@ -1078,6 +1090,8 @@ pub enum CheckKind {
     HardcodedPasswordDefault(String),
     HardcodedTempFile(String),
     HashlibInsecureHashFunction(String),
+    RequestWithoutTimeout(Option<String>),
+    RequestWithNoCertValidation(String),
     UnsafeYAMLLoad(Option<String>),
     // mccabe
     FunctionIsTooComplex(String, usize),
@@ -1406,6 +1420,12 @@ impl CheckCode {
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
+            CheckCode::SIM108 => CheckKind::UseTernaryOperator("..".to_string()),
+            CheckCode::SIM109 => CheckKind::CompareWithTuple(
+                "value".to_string(),
+                vec!["...".to_string(), "...".to_string()],
+                "value == ... or value == ...".to_string(),
+            ),
             CheckCode::SIM110 => {
                 CheckKind::ConvertLoopToAny("return any(x for x in y)".to_string())
             }
@@ -1414,6 +1434,11 @@ impl CheckCode {
             }
             CheckCode::SIM117 => CheckKind::MultipleWithStatements,
             CheckCode::SIM118 => CheckKind::KeyInDict("key".to_string(), "dict".to_string()),
+            CheckCode::SIM201 => CheckKind::NegateEqualOp("left".to_string(), "right".to_string()),
+            CheckCode::SIM202 => {
+                CheckKind::NegateNotEqualOp("left".to_string(), "right".to_string())
+            }
+            CheckCode::SIM208 => CheckKind::DoubleNegation("expr".to_string()),
             CheckCode::SIM220 => CheckKind::AAndNotA("...".to_string()),
             CheckCode::SIM221 => CheckKind::AOrNotA("...".to_string()),
             CheckCode::SIM222 => CheckKind::OrTrue,
@@ -1542,7 +1567,9 @@ impl CheckCode {
             CheckCode::S106 => CheckKind::HardcodedPasswordFuncArg("...".to_string()),
             CheckCode::S107 => CheckKind::HardcodedPasswordDefault("...".to_string()),
             CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
+            CheckCode::S113 => CheckKind::RequestWithoutTimeout(None),
             CheckCode::S324 => CheckKind::HashlibInsecureHashFunction("...".to_string()),
+            CheckCode::S501 => CheckKind::RequestWithNoCertValidation("...".to_string()),
             CheckCode::S506 => CheckKind::UnsafeYAMLLoad(None),
             // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
@@ -1946,17 +1973,24 @@ impl CheckCode {
             CheckCode::S106 => CheckCategory::Flake8Bandit,
             CheckCode::S107 => CheckCategory::Flake8Bandit,
             CheckCode::S108 => CheckCategory::Flake8Bandit,
+            CheckCode::S113 => CheckCategory::Flake8Bandit,
             CheckCode::S324 => CheckCategory::Flake8Bandit,
+            CheckCode::S501 => CheckCategory::Flake8Bandit,
             CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
             CheckCode::SIM101 => CheckCategory::Flake8Simplify,
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
             CheckCode::SIM107 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM108 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM109 => CheckCategory::Flake8Simplify,
             CheckCode::SIM110 => CheckCategory::Flake8Simplify,
             CheckCode::SIM111 => CheckCategory::Flake8Simplify,
             CheckCode::SIM117 => CheckCategory::Flake8Simplify,
             CheckCode::SIM118 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM201 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM202 => CheckCategory::Flake8Simplify,
+            CheckCode::SIM208 => CheckCategory::Flake8Simplify,
             CheckCode::SIM220 => CheckCategory::Flake8Simplify,
             CheckCode::SIM221 => CheckCategory::Flake8Simplify,
             CheckCode::SIM222 => CheckCategory::Flake8Simplify,
@@ -2208,18 +2242,23 @@ impl CheckKind {
             CheckKind::SysVersionCmpStr10 => &CheckCode::YTT302,
             CheckKind::SysVersionSlice1Referenced => &CheckCode::YTT303,
             // flake8-simplify
-            CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
             CheckKind::AAndNotA(..) => &CheckCode::SIM220,
             CheckKind::AOrNotA(..) => &CheckCode::SIM221,
             CheckKind::AndFalse => &CheckCode::SIM223,
+            CheckKind::CompareWithTuple(..) => &CheckCode::SIM109,
             CheckKind::ConvertLoopToAll(..) => &CheckCode::SIM111,
             CheckKind::ConvertLoopToAny(..) => &CheckCode::SIM110,
+            CheckKind::DoubleNegation(..) => &CheckCode::SIM208,
+            CheckKind::DuplicateIsinstanceCall(..) => &CheckCode::SIM101,
             CheckKind::KeyInDict(..) => &CheckCode::SIM118,
             CheckKind::MultipleWithStatements => &CheckCode::SIM117,
+            CheckKind::NegateEqualOp(..) => &CheckCode::SIM201,
+            CheckKind::NegateNotEqualOp(..) => &CheckCode::SIM202,
             CheckKind::NestedIfStatements => &CheckCode::SIM102,
             CheckKind::OrTrue => &CheckCode::SIM222,
             CheckKind::ReturnInTryExceptFinally => &CheckCode::SIM107,
             CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
+            CheckKind::UseTernaryOperator(..) => &CheckCode::SIM108,
             CheckKind::YodaConditions(..) => &CheckCode::SIM300,
             // pyupgrade
             CheckKind::ConvertNamedTupleFunctionalToClass(..) => &CheckCode::UP014,
@@ -2325,7 +2364,9 @@ impl CheckKind {
             CheckKind::HardcodedPasswordFuncArg(..) => &CheckCode::S106,
             CheckKind::HardcodedPasswordDefault(..) => &CheckCode::S107,
             CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
+            CheckKind::RequestWithoutTimeout(..) => &CheckCode::S113,
             CheckKind::HashlibInsecureHashFunction(..) => &CheckCode::S324,
+            CheckKind::RequestWithNoCertValidation(..) => &CheckCode::S501,
             CheckKind::UnsafeYAMLLoad(..) => &CheckCode::S506,
             // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
@@ -2977,11 +3018,18 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::CompareWithTuple(value, values, or_op) => {
+                let values = values.join(", ");
+                format!("Use `{value} in ({values})` instead of `{or_op}`")
+            }
             CheckKind::DuplicateIsinstanceCall(name) => {
                 format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
             }
             CheckKind::UseContextlibSuppress(exception) => {
                 format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
+            }
+            CheckKind::UseTernaryOperator(new_code) => {
+                format!("Use ternary operator `{new_code}` instead of if-else-block")
             }
             CheckKind::ReturnInTryExceptFinally => {
                 "Don't use `return` in `try`/`except` and `finally`".to_string()
@@ -2994,6 +3042,15 @@ impl CheckKind {
             }
             CheckKind::ConvertLoopToAny(any) => {
                 format!("Use `{any}` instead of `for` loop")
+            }
+            CheckKind::NegateEqualOp(left, right) => {
+                format!("Use `{left} != {right}` instead of `not {left} == {right}`")
+            }
+            CheckKind::NegateNotEqualOp(left, right) => {
+                format!("Use `{left} == {right}` instead of `not {left} != {right}`")
+            }
+            CheckKind::DoubleNegation(expr) => {
+                format!("Use `{expr}` instead of `not (not {expr})`")
             }
             CheckKind::KeyInDict(key, dict) => {
                 format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
@@ -3294,6 +3351,12 @@ impl CheckKind {
                     string.escape_debug()
                 )
             }
+            CheckKind::RequestWithNoCertValidation(string) => {
+                format!(
+                    "Probable use of `{string}` call with `verify=False` disabling SSL \
+                     certificate checks"
+                )
+            }
             CheckKind::UnsafeYAMLLoad(loader) => match loader {
                 Some(name) => {
                     format!(
@@ -3304,6 +3367,12 @@ impl CheckKind {
                 None => "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary \
                          objects. Consider `yaml.safe_load`."
                     .to_string(),
+            },
+            CheckKind::RequestWithoutTimeout(timeout) => match timeout {
+                Some(value) => {
+                    format!("Probable use of requests call with timeout set to `{value}`")
+                }
+                None => "Probable use of requests call without timeout".to_string(),
             },
             // flake8-blind-except
             CheckKind::BlindExcept(name) => format!("Do not catch blind exception: `{name}`"),
@@ -3644,6 +3713,7 @@ impl CheckKind {
             | CheckKind::BlankLineBeforeSection(..)
             | CheckKind::CapitalizeSectionName(..)
             | CheckKind::CommentedOutCode
+            | CheckKind::CompareWithTuple(..)
             | CheckKind::ConvertLoopToAll(..)
             | CheckKind::ConvertLoopToAny(..)
             | CheckKind::ConvertNamedTupleFunctionalToClass(..)
@@ -3653,6 +3723,7 @@ impl CheckKind {
             | CheckKind::DeprecatedUnittestAlias(..)
             | CheckKind::DoNotAssertFalse
             | CheckKind::DoNotAssignLambda(..)
+            | CheckKind::DoubleNegation(..)
             | CheckKind::DupeClassFieldDefinitions(..)
             | CheckKind::DuplicateHandlerException(..)
             | CheckKind::DuplicateIsinstanceCall(..)
@@ -3670,6 +3741,8 @@ impl CheckKind {
             | CheckKind::MisplacedComparisonConstant(..)
             | CheckKind::MissingReturnTypeSpecialMethod(..)
             | CheckKind::NativeLiterals(..)
+            | CheckKind::NegateEqualOp(..)
+            | CheckKind::NegateNotEqualOp(..)
             | CheckKind::NewLineAfterLastParagraph
             | CheckKind::NewLineAfterSectionName(..)
             | CheckKind::NoBlankLineAfterFunction(..)
@@ -3743,6 +3816,7 @@ impl CheckKind {
             | CheckKind::UsePEP585Annotation(..)
             | CheckKind::UsePEP604Annotation
             | CheckKind::UseSysExit(..)
+            | CheckKind::UseTernaryOperator(..)
             | CheckKind::UselessImportAlias
             | CheckKind::UselessMetaclassType
             | CheckKind::UselessObjectInheritance(..)
@@ -3779,6 +3853,10 @@ impl CheckKind {
             }
             CheckKind::CapitalizeSectionName(name) => Some(format!("Capitalize \"{name}\"")),
             CheckKind::CommentedOutCode => Some("Remove commented-out code".to_string()),
+            CheckKind::CompareWithTuple(value, values, or_op) => {
+                let values = values.join(", ");
+                Some(format!("Replace `{or_op}` with `{value} in {values}`"))
+            }
             CheckKind::ConvertLoopToAll(all) => Some(format!("Replace with `{all}`")),
             CheckKind::ConvertLoopToAny(any) => Some(format!("Replace with `{any}`")),
             CheckKind::ConvertTypedDictFunctionalToClass(name)
@@ -3794,6 +3872,7 @@ impl CheckKind {
             }
             CheckKind::DoNotAssertFalse => Some("Replace `assert False`".to_string()),
             CheckKind::DoNotAssignLambda(name) => Some(format!("Rewrite `{name}` as a `def`")),
+            CheckKind::DoubleNegation(expr) => Some(format!("Replace with `{expr}`")),
             CheckKind::DupeClassFieldDefinitions(name) => {
                 Some(format!("Remove duplicate field definition for `{name}`"))
             }
@@ -3835,11 +3914,13 @@ impl CheckKind {
             CheckKind::NativeLiterals(literal_type) => {
                 Some(format!("Replace with `{literal_type}`"))
             }
-            CheckKind::OpenAlias => Some("Replace with builtin `open`".to_string()),
-            CheckKind::OrTrue => Some("Replace with `True`".to_string()),
+            CheckKind::NegateEqualOp(..) => Some("Replace with `!=` operator".to_string()),
+            CheckKind::NegateNotEqualOp(..) => Some("Replace with `==` operator".to_string()),
             CheckKind::NewLineAfterLastParagraph => {
                 Some("Move closing quotes to new line".to_string())
             }
+            CheckKind::OpenAlias => Some("Replace with builtin `open`".to_string()),
+            CheckKind::OrTrue => Some("Replace with `True`".to_string()),
             CheckKind::ReplaceUniversalNewlines => {
                 Some("Replace with `text` keyword argument".to_string())
             }
@@ -4022,6 +4103,9 @@ impl CheckKind {
             CheckKind::UsePEP604Annotation => Some("Convert to `X | Y`".to_string()),
             CheckKind::UseFixturesWithoutParameters => {
                 Some("Remove `usefixtures` decorator or pass parameters".to_string())
+            }
+            CheckKind::UseTernaryOperator(new_code) => {
+                Some(format!("Replace if-else-block with `{new_code}`"))
             }
             CheckKind::UseSysExit(name) => Some(format!("Replace `{name}` with `sys.exit()`")),
             CheckKind::UselessImportAlias => Some("Remove import alias".to_string()),

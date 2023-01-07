@@ -771,7 +771,9 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S106 | HardcodedPasswordFuncArg | Possible hardcoded password: "..." |  |
 | S107 | HardcodedPasswordDefault | Possible hardcoded password: "..." |  |
 | S108 | HardcodedTempFile | Probable insecure usage of temporary file or directory: "..." |  |
+| S113 | RequestWithoutTimeout | Probable use of requests call without timeout |  |
 | S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "..." |  |
+| S501 | RequestWithNoCertValidation | Probable use of `...` call with `verify=False` disabling SSL certificate checks |  |
 | S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 
 ### flake8-blind-except (BLE)
@@ -971,10 +973,15 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
 | SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
 | SIM107 | ReturnInTryExceptFinally | Don't use `return` in `try`/`except` and `finally` |  |
+| SIM108 | UseTernaryOperator | Use ternary operator `..` instead of if-else-block | 🛠 |
+| SIM109 | CompareWithTuple | Use `value in (..., ...)` instead of `value == ... or value == ...` | 🛠 |
 | SIM110 | ConvertLoopToAny | Use `return any(x for x in y)` instead of `for` loop | 🛠 |
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
 | SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
+| SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
+| SIM202 | NegateNotEqualOp | Use `left == right` instead of `not left != right` | 🛠 |
+| SIM208 | DoubleNegation | Use `expr` instead of `not (not expr)` | 🛠 |
 | SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
@@ -1320,8 +1327,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff
+      # Include `--format=github` to enable automatic inline annotations.
       - name: Run Ruff
-        run: ruff .
+        run: ruff --format=github .
 ```
 
 ## FAQ
@@ -3116,4 +3124,4 @@ MIT
 ## Contributing
 
 Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
+[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/.github/CONTRIBUTING.md).

@@ -120,7 +120,7 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
 }
 
 /// Check if a node is in a nested block.
-pub fn in_nested_block<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
+pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {
         matches!(
             parent.node,

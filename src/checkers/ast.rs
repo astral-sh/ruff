@@ -60,7 +60,7 @@ pub struct Checker<'a> {
     pub(crate) locator: &'a SourceCodeLocator<'a>,
     pub(crate) style: &'a SourceCodeStyleDetector<'a>,
     // Computed checks.
-    checks: Vec<Check>,
+    pub(crate) checks: Vec<Check>,
     // Function and class definition tracking (e.g., for docstring enforcement).
     definitions: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
@@ -173,8 +173,6 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: &CheckCode) -> bool {
-        // TODO(charlie): We can't fix errors in f-strings until RustPython adds
-        // location data.
         matches!(self.autofix, flags::Autofix::Enabled) && self.settings.fixable.contains(code)
     }
 
@@ -257,7 +255,7 @@ where
                 if !self.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(stmt)
                     && !operations::in_nested_block(
-                        &mut self.parents.iter().rev().map(|node| node.0),
+                        self.parents.iter().rev().map(std::convert::Into::into),
                     )
                 {
                     self.seen_import_boundary = true;
@@ -343,7 +341,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::F701) {
                     if let Some(check) = pyflakes::checks::break_outside_loop(
                         stmt,
-                        &mut self.parents.iter().rev().map(|node| node.0).skip(1),
+                        &mut self
+                            .parents
+                            .iter()
+                            .rev()
+                            .map(std::convert::Into::into)
+                            .skip(1),
                     ) {
                         self.add_check(check);
                     }
@@ -353,7 +356,12 @@ where
                 if self.settings.enabled.contains(&CheckCode::F702) {
                     if let Some(check) = pyflakes::checks::continue_outside_loop(
                         stmt,
-                        &mut self.parents.iter().rev().map(|node| node.0).skip(1),
+                        &mut self
+                            .parents
+                            .iter()
+                            .rev()
+                            .map(std::convert::Into::into)
+                            .skip(1),
                     ) {
                         self.add_check(check);
                     }
@@ -1187,6 +1195,13 @@ where
                 if self.settings.enabled.contains(&CheckCode::SIM102) {
                     flake8_simplify::plugins::nested_if_statements(self, stmt);
                 }
+                if self.settings.enabled.contains(&CheckCode::SIM108) {
+                    flake8_simplify::plugins::use_ternary_operator(
+                        self,
+                        stmt,
+                        self.current_stmt_parent().map(|parent| parent.0),
+                    );
+                }
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.enabled.contains(&CheckCode::F631) {
@@ -1729,7 +1744,7 @@ where
                         if attr == name {
                             // Avoid flagging on function calls (e.g., `df.values()`).
                             if let Some(parent) = self.current_expr_parent() {
-                                if matches!(parent.0.node, ExprKind::Call { .. }) {
+                                if matches!(parent.node, ExprKind::Call { .. }) {
                                     continue;
                                 }
                             }
@@ -1923,6 +1938,17 @@ where
                         self.add_check(check);
                     }
                 }
+                if self.settings.enabled.contains(&CheckCode::S501) {
+                    if let Some(check) = flake8_bandit::checks::request_with_no_cert_validation(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
                 if self.settings.enabled.contains(&CheckCode::S506) {
                     if let Some(check) = flake8_bandit::checks::unsafe_yaml_load(
                         func,
@@ -1941,6 +1967,17 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::S324) {
                     if let Some(check) = flake8_bandit::checks::hashlib_insecure_hash_functions(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.add_check(check);
+                    }
+                }
+                if self.settings.enabled.contains(&CheckCode::S113) {
+                    if let Some(check) = flake8_bandit::checks::request_without_timeout(
                         func,
                         args,
                         keywords,
@@ -2522,6 +2559,16 @@ where
                 if self.settings.enabled.contains(&CheckCode::B002) {
                     flake8_bugbear::plugins::unary_prefix_increment(self, expr, op, operand);
                 }
+
+                if self.settings.enabled.contains(&CheckCode::SIM201) {
+                    flake8_simplify::plugins::negation_with_equal_op(self, expr, op, operand);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM202) {
+                    flake8_simplify::plugins::negation_with_not_equal_op(self, expr, op, operand);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM208) {
+                    flake8_simplify::plugins::double_negation(self, expr, op, operand);
+                }
             }
             ExprKind::Compare {
                 left,
@@ -2708,6 +2755,9 @@ where
                 }
                 if self.settings.enabled.contains(&CheckCode::SIM101) {
                     flake8_simplify::plugins::duplicate_isinstance_call(self, expr);
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM109) {
+                    flake8_simplify::plugins::compare_with_tuple(self, expr);
                 }
                 if self.settings.enabled.contains(&CheckCode::SIM220) {
                     flake8_simplify::plugins::a_and_not_a(self, expr);
@@ -3031,10 +3081,28 @@ where
                         } {
                             if self.bindings[*index].used.is_none() {
                                 if self.settings.enabled.contains(&CheckCode::F841) {
-                                    self.add_check(Check::new(
+                                    let mut check = Check::new(
                                         CheckKind::UnusedVariable(name.to_string()),
                                         name_range,
-                                    ));
+                                    );
+                                    if self.patch(&CheckCode::F841) {
+                                        match pyflakes::fixes::remove_exception_handler_assignment(
+                                            excepthandler,
+                                            self.locator,
+                                        ) {
+                                            Ok(fix) => {
+                                                check.amend(fix);
+                                            }
+                                            Err(e) => {
+                                                error!(
+                                                    "Failed to remove exception handler \
+                                                     assignment: {}",
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    }
+                                    self.add_check(check);
                                 }
                             }
                         }
@@ -3314,7 +3382,7 @@ impl<'a> Checker<'a> {
                         && !(matches!(existing.kind, BindingKind::FunctionDefinition)
                             && visibility::is_overload(
                                 self,
-                                cast::decorator_list(existing.source.as_ref().unwrap().0),
+                                cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
                         overridden = Some((*scope_index, *existing_binding_index));
@@ -3636,8 +3704,9 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         if let ExprKind::Name { id, .. } = &expr.node {
-            if operations::on_conditional_branch(&mut self.parents.iter().rev().map(|node| node.0))
-            {
+            if operations::on_conditional_branch(
+                &mut self.parents.iter().rev().map(std::convert::Into::into),
+            ) {
                 return;
             }
 
@@ -3772,14 +3841,7 @@ impl<'a> Checker<'a> {
                 pyflakes::plugins::unused_variable(self, scope_index);
             }
             if self.settings.enabled.contains(&CheckCode::F842) {
-                self.add_checks(
-                    pyflakes::checks::unused_annotation(
-                        &self.scopes[scope_index],
-                        &self.bindings,
-                        &self.settings.dummy_variable_rgx,
-                    )
-                    .into_iter(),
-                );
+                pyflakes::plugins::unused_annotation(self, scope_index);
             }
             if self.settings.enabled.contains(&CheckCode::ARG001)
                 || self.settings.enabled.contains(&CheckCode::ARG002)
@@ -3968,7 +4030,7 @@ impl<'a> Checker<'a> {
 
                     let defined_by = binding.source.as_ref().unwrap();
                     let defined_in = self.child_to_parent.get(defined_by);
-                    let child = defined_by.0;
+                    let child: &Stmt = defined_by.into();
 
                     let check_lineno = binding.range.location.row();
                     let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -4000,14 +4062,17 @@ impl<'a> Checker<'a> {
                     self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
                 for ((defined_by, defined_in), unused_imports) in unused
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
+                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
                 {
-                    let child = defined_by.0;
-                    let parent = defined_in.map(|defined_in| defined_in.0);
+                    let child: &Stmt = defined_by.into();
+                    let parent: Option<&Stmt> = defined_in.map(std::convert::Into::into);
 
                     let fix = if !ignore_init && self.patch(&CheckCode::F401) {
-                        let deleted: Vec<&Stmt> =
-                            self.deletions.iter().map(|node| node.0).collect();
+                        let deleted: Vec<&Stmt> = self
+                            .deletions
+                            .iter()
+                            .map(std::convert::Into::into)
+                            .collect();
                         match autofix::helpers::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
@@ -4049,9 +4114,9 @@ impl<'a> Checker<'a> {
                 }
                 for ((defined_by, ..), unused_imports) in ignored
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.0.location)
+                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
                 {
-                    let child = defined_by.0;
+                    let child: &Stmt = defined_by.into();
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut check = Check::new(

@@ -1,13 +1,13 @@
 use log::error;
 use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::types::{BindingKind, RefEquality, ScopeKind};
+use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckCode, CheckKind};
 
-fn is_literal_or_name(expr: &Expr) -> bool {
+fn is_literal_or_name(expr: &Expr, checker: &Checker) -> bool {
     // Accept any obvious literals or names.
     if matches!(
         expr.node,
@@ -29,11 +29,12 @@ fn is_literal_or_name(expr: &Expr) -> bool {
     {
         if args.is_empty() && keywords.is_empty() {
             if let ExprKind::Name { id, .. } = &func.node {
-                return id == "set"
+                return (id == "set"
                     || id == "list"
                     || id == "tuple"
                     || id == "dict"
-                    || id == "frozenset";
+                    || id == "frozenset")
+                    && checker.is_builtin(id);
             }
         }
     }
@@ -46,67 +47,101 @@ enum DeletionKind {
     Partial,
 }
 
-fn remove_unused_variable(stmt: &Stmt, checker: &Checker) -> Option<(DeletionKind, Fix)> {
+/// Generate a `Fix` to remove an unused variable assignment, given the
+/// enclosing `Stmt` and the `Range` of the variable binding.
+fn remove_unused_variable(
+    stmt: &Stmt,
+    range: &Range,
+    checker: &Checker,
+) -> Option<(DeletionKind, Fix)> {
     // First case: simple assignment (`x = 1`)
-    // TODO(charlie): For tuple assignments, we can replace names with underscores.
-    // TODO(charlie): For context managers, we can get rid of the `as` clause.
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
-        if targets.len() == 1 {
-            if matches!(targets[0].node, ExprKind::Name { .. }) {
-                return if is_literal_or_name(value) {
-                    // If assigning to a constant (`x = 1`), delete the entire statement.
-                    let parent = checker
-                        .child_to_parent
-                        .get(&RefEquality(stmt))
-                        .map(|parent| parent.0);
-                    let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
-                    let locator = checker.locator;
-                    match delete_stmt(stmt, parent, &deleted, locator) {
-                        Ok(fix) => Some((DeletionKind::Whole, fix)),
-                        Err(err) => {
-                            error!("Failed to delete unused variable: {}", err);
-                            None
-                        }
+        if targets.len() == 1 && matches!(targets[0].node, ExprKind::Name { .. }) {
+            return if is_literal_or_name(value, checker) {
+                // If assigning to a constant (`x = 1`), delete the entire statement.
+                let parent = checker
+                    .child_to_parent
+                    .get(&RefEquality(stmt))
+                    .map(std::convert::Into::into);
+                let deleted: Vec<&Stmt> = checker
+                    .deletions
+                    .iter()
+                    .map(std::convert::Into::into)
+                    .collect();
+                let locator = checker.locator;
+                match delete_stmt(stmt, parent, &deleted, locator) {
+                    Ok(fix) => Some((DeletionKind::Whole, fix)),
+                    Err(err) => {
+                        error!("Failed to delete unused variable: {}", err);
+                        None
                     }
-                } else {
-                    // If the expression is more complex (`x = foo()`), remove the assignment,
-                    // but preserve the right-hand side.
-                    Some((
-                        DeletionKind::Partial,
-                        Fix::deletion(stmt.location, value.location),
-                    ))
-                };
-            }
+                }
+            } else {
+                // If the expression is more complex (`x = foo()`), remove the assignment,
+                // but preserve the right-hand side.
+                Some((
+                    DeletionKind::Partial,
+                    Fix::deletion(stmt.location, value.location),
+                ))
+            };
         }
     }
 
     // Second case: simple annotated assignment (`x: int = 1`)
-    if let StmtKind::AnnAssign { target, value, .. } = &stmt.node {
-        if let Some(value) = value {
-            if matches!(targets[0].node, ExprKind::Name { .. }) {
-                return if is_literal_or_name(value) {
-                    // If assigning to a constant (`x = 1`), delete the entire statement.
-                    let parent = checker
-                        .child_to_parent
-                        .get(&RefEquality(stmt))
-                        .map(|parent| parent.0);
-                    let deleted: Vec<&Stmt> = checker.deletions.iter().map(|node| node.0).collect();
-                    let locator = checker.locator;
-                    match delete_stmt(stmt, parent, &deleted, locator) {
-                        Ok(fix) => Some((DeletionKind::Whole, fix)),
-                        Err(err) => {
-                            error!("Failed to delete unused variable: {}", err);
-                            None
-                        }
+    if let StmtKind::AnnAssign {
+        target,
+        value: Some(value),
+        ..
+    } = &stmt.node
+    {
+        if matches!(target.node, ExprKind::Name { .. }) {
+            return if is_literal_or_name(value, checker) {
+                // If assigning to a constant (`x = 1`), delete the entire statement.
+                let parent = checker
+                    .child_to_parent
+                    .get(&RefEquality(stmt))
+                    .map(std::convert::Into::into);
+                let deleted: Vec<&Stmt> = checker
+                    .deletions
+                    .iter()
+                    .map(std::convert::Into::into)
+                    .collect();
+                let locator = checker.locator;
+                match delete_stmt(stmt, parent, &deleted, locator) {
+                    Ok(fix) => Some((DeletionKind::Whole, fix)),
+                    Err(err) => {
+                        error!("Failed to delete unused variable: {}", err);
+                        None
                     }
-                } else {
-                    // If the expression is more complex (`x = foo()`), remove the assignment,
-                    // but preserve the right-hand side.
-                    Some((
+                }
+            } else {
+                // If the expression is more complex (`x = foo()`), remove the assignment,
+                // but preserve the right-hand side.
+                Some((
+                    DeletionKind::Partial,
+                    Fix::deletion(stmt.location, value.location),
+                ))
+            };
+        }
+    }
+
+    // Third case: withitem (`with foo() as x:`)
+    if let StmtKind::With { items, .. } = &stmt.node {
+        // Find the binding that matches the given `Range`.
+        // TODO(charlie): Store the `Withitem` in the `Binding`.
+        for item in items {
+            if let Some(optional_vars) = &item.optional_vars {
+                if optional_vars.location == range.location
+                    && optional_vars.end_location.unwrap() == range.end_location
+                {
+                    return Some((
                         DeletionKind::Partial,
-                        Fix::deletion(stmt.location, value.location),
-                    ))
-                };
+                        Fix::deletion(
+                            item.context_expr.end_location.unwrap(),
+                            optional_vars.end_location.unwrap(),
+                        ),
+                    ));
+                }
             }
         }
     }
@@ -121,9 +156,6 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
         return;
     }
 
-    // TODO(charlie): It's really bad that this check is reaching into so much
-    // internal `Checker` state.
-    let mut checks = vec![];
     for (name, binding) in scope
         .values
         .iter()
@@ -141,8 +173,9 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
                 binding.range,
             );
             if checker.patch(&CheckCode::F841) {
-                if let Some(stmt) = binding.source.as_ref().map(|source| source.0) {
-                    if let Some((kind, fix)) = remove_unused_variable(stmt, checker) {
+                if let Some(stmt) = binding.source.as_ref().map(std::convert::Into::into) {
+                    if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
+                    {
                         if matches!(kind, DeletionKind::Whole) {
                             checker.deletions.insert(RefEquality(stmt));
                         }
@@ -150,8 +183,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
                     }
                 }
             }
-            checks.push(check);
+            checker.checks.push(check);
         }
     }
-    checker.add_checks(checks.into_iter());
 }

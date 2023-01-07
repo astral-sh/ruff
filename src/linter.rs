@@ -522,7 +522,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
 
     // Detect autofixes that don't converge after multiple iterations.
     if checks.iter().any(|check| check.fix.is_some()) {
-        let max_iterations = 3;
+        let max_iterations = 10;
 
         let mut contents = contents.clone();
         let mut iterations = 0;

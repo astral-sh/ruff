@@ -12,6 +12,8 @@ use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
 
 use crate::ast::types::Range;
+use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::SourceCodeLocator;
 
 /// Create an `Expr` with default location from an `ExprKind`.
@@ -22,6 +24,20 @@ pub fn create_expr(node: ExprKind) -> Expr {
 /// Create a `Stmt` with a default location from a `StmtKind`.
 pub fn create_stmt(node: StmtKind) -> Stmt {
     Stmt::new(Location::default(), Location::default(), node)
+}
+
+/// Generate source code from an `Expr`.
+pub fn unparse_expr(expr: &Expr, stylist: &SourceCodeStyleDetector) -> String {
+    let mut generator: SourceCodeGenerator = stylist.into();
+    generator.unparse_expr(expr, 0);
+    generator.generate()
+}
+
+/// Generate source code from an `Stmt`.
+pub fn unparse_stmt(stmt: &Stmt, stylist: &SourceCodeStyleDetector) -> String {
+    let mut generator: SourceCodeGenerator = stylist.into();
+    generator.unparse_stmt(stmt);
+    generator.generate()
 }
 
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
