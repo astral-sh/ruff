@@ -150,9 +150,6 @@ fn compare(left: &Expr, cmpop: Cmpop, right: &Expr) -> Expr {
     )
 }
 
-/// Represents the signature of an assert method.
-/// For example, `assertTrue` signature is expressed as
-/// `Arguments::( args: vec!["expr"], keywords: vec!["msg"])`.
 pub struct Arguments<'a> {
     positional: Vec<&'a str>,
     keyword: Vec<&'a str>,
