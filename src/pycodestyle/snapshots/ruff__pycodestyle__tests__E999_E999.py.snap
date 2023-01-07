@@ -3,7 +3,7 @@ source: src/pycodestyle/mod.rs
 expression: checks
 ---
 - kind:
-    SyntaxError: Got unexpected EOF
+    SyntaxError: unindent does not match any outer indentation level
   location:
     row: 2
     column: 0

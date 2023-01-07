@@ -39,7 +39,7 @@ pub fn check_tokens(
 
         // RUF001, RUF002, RUF003
         if enforce_ambiguous_unicode_character {
-            if matches!(tok, Tok::String { .. } | Tok::Comment) {
+            if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
                 checks.extend(ruff::checks::ambiguous_unicode_character(
                     locator,
                     start,
@@ -78,7 +78,7 @@ pub fn check_tokens(
 
         // eradicate
         if enforce_commented_out_code {
-            if matches!(tok, Tok::Comment) {
+            if matches!(tok, Tok::Comment(_)) {
                 if let Some(check) =
                     eradicate::checks::commented_out_code(locator, start, end, settings, autofix)
                 {

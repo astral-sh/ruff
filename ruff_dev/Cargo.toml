@@ -10,9 +10,9 @@ itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
 once_cell = { version = "1.16.0" }
 ruff = { path = ".." }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "4d53c7cb27c0379adf8b51c4d3d0d2174f41d590" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "4d53c7cb27c0379adf8b51c4d3d0d2174f41d590" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "4d53c7cb27c0379adf8b51c4d3d0d2174f41d590" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
 schemars = { version = "0.8.11" }
 serde_json = {version="1.0.91"}
 strum = { version = "0.24.1", features = ["strum_macros"] }
