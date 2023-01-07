@@ -157,7 +157,7 @@ impl<'a> Arguments<'a> {
         }
     }
 
-    pub fn is_valid_arg(&self, arg: &str) -> bool {
+    pub fn contains(&self, arg: &str) -> bool {
         self.positional.contains(&arg) || self.keyword.contains(&arg)
     }
 }
@@ -227,7 +227,7 @@ impl UnittestAssert {
         }
         for kw in keywords {
             let arg = kw.node.arg.as_ref().unwrap();
-            if !arguments.is_valid_arg((*arg).as_str()) {
+            if !arguments.contains((*arg).as_str()) {
                 return Err(format!("Unexpected keyword argument `{arg}`"));
             }
             arg_hashmap.insert(kw.node.arg.as_ref().unwrap().as_str(), &kw.node.value);
