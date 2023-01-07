@@ -3,7 +3,9 @@ source: src/pyflakes/mod.rs
 expression: checks
 ---
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 3
     column: 4
@@ -13,7 +15,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "1"
+    MultiValueRepeatedKeyLiteral:
+      - "1"
+      - false
   location:
     row: 9
     column: 4
@@ -23,7 +27,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "b\"123\""
+    MultiValueRepeatedKeyLiteral:
+      - "b\"123\""
+      - false
   location:
     row: 11
     column: 4
@@ -33,7 +39,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 16
     column: 4
@@ -43,7 +51,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 17
     column: 4
@@ -53,7 +63,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - true
   location:
     row: 18
     column: 4
@@ -70,7 +82,9 @@ expression: checks
       column: 10
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 23
     column: 4
@@ -80,7 +94,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 24
     column: 4
@@ -90,7 +106,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - true
   location:
     row: 25
     column: 4
@@ -107,7 +125,9 @@ expression: checks
       column: 10
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 26
     column: 4
@@ -117,7 +137,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - true
   location:
     row: 31
     column: 4
@@ -134,7 +156,9 @@ expression: checks
       column: 10
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 32
     column: 4
@@ -144,7 +168,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 33
     column: 4
@@ -154,7 +180,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 34
     column: 4
@@ -164,7 +192,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 41
     column: 4
@@ -174,7 +204,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - false
   location:
     row: 43
     column: 4
@@ -184,7 +216,9 @@ expression: checks
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - true
   location:
     row: 45
     column: 4
@@ -201,7 +235,9 @@ expression: checks
       column: 10
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - true
   location:
     row: 49
     column: 13
@@ -218,7 +254,9 @@ expression: checks
       column: 19
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral: "\"a\""
+    MultiValueRepeatedKeyLiteral:
+      - "\"a\""
+      - true
   location:
     row: 50
     column: 21

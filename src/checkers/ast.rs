@@ -2386,11 +2386,10 @@ where
                 }
             }
             ExprKind::Dict { keys, values } => {
-                if self.settings.enabled.contains(&CheckCode::F601) {
-                    pyflakes::plugins::repeated_literal_keys(self, keys, values);
-                }
-                if self.settings.enabled.contains(&CheckCode::F602) {
-                    pyflakes::plugins::repeated_variable_keys(self, keys, values);
+                if self.settings.enabled.contains(&CheckCode::F601)
+                    || self.settings.enabled.contains(&CheckCode::F602)
+                {
+                    pyflakes::plugins::repeated_keys(self, keys, values);
                 }
             }
             ExprKind::Yield { .. } => {

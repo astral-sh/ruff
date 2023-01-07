@@ -1,97 +1,93 @@
-use rustpython_ast::{Constant, Expr, ExprKind};
+use std::hash::{BuildHasherDefault, Hash};
+
+use rustc_hash::FxHashMap;
+use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::cmp;
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
+use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 enum DictionaryKey<'a> {
-    Constant(&'a Constant),
+    Constant(String),
     Variable(&'a str),
 }
 
-impl<'a> TryFrom<&'a Expr> for DictionaryKey<'a> {
-    type Error = ();
-
-    fn try_from(expr: &'a Expr) -> Result<Self, Self::Error> {
-        match &expr.node {
-            ExprKind::Constant { value, .. } => Ok(DictionaryKey::Constant(value)),
-            ExprKind::Name { id, .. } => Ok(DictionaryKey::Variable(id)),
-            _ => Err(()),
-        }
+fn into_dictionary_key<'a>(
+    expr: &'a Expr,
+    stylist: &SourceCodeStyleDetector,
+) -> Option<DictionaryKey<'a>> {
+    match &expr.node {
+        ExprKind::Constant { .. } => Some(DictionaryKey::Constant(unparse_expr(expr, stylist))),
+        ExprKind::Name { id, .. } => Some(DictionaryKey::Variable(id)),
+        _ => None,
     }
 }
 
-/// F601
-pub fn repeated_literal_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
-    let num_keys = keys.len();
-    for i in 0..num_keys {
-        let k1: Option<DictionaryKey> = (&keys[i]).try_into().ok();
-        for j in i + 1..num_keys {
-            let k2: Option<DictionaryKey> = (&keys[j]).try_into().ok();
-            if let (Some(DictionaryKey::Constant(v1)), Some(DictionaryKey::Constant(v2))) =
-                (&k1, &k2)
-            {
-                if v1 == v2 {
-                    let mut check = Check::new(
-                        violations::MultiValueRepeatedKeyLiteral(unparse_expr(
-                            &keys[j],
-                            checker.style,
-                        )),
-                        Range::from_located(&keys[j]),
-                    );
-                    if checker.patch(&CheckCode::F601) {
-                        if cmp::expr(&values[i], &values[j]) {
-                            check.amend(if j < num_keys - 1 {
-                                Fix::deletion(keys[j].location, keys[j + 1].location)
-                            } else {
-                                Fix::deletion(
-                                    values[j - 1].end_location.unwrap(),
-                                    values[j].end_location.unwrap(),
-                                )
-                            });
-                        }
-                    }
-                    checker.checks.push(check);
-                }
-            }
-        }
-    }
-}
+/// F601, F602
+pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
+    // Generate a map from key to (index, value).
+    let mut seen: FxHashMap<DictionaryKey, Vec<&Expr>> =
+        FxHashMap::with_capacity_and_hasher(keys.len(), BuildHasherDefault::default());
 
-/// F602
-pub fn repeated_variable_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
-    let num_keys = keys.len();
-    for i in 0..num_keys {
-        let k1: Option<DictionaryKey> = (&keys[i]).try_into().ok();
-        for j in i + 1..num_keys {
-            let k2: Option<DictionaryKey> = (&keys[j]).try_into().ok();
-            if let (Some(DictionaryKey::Variable(v1)), Some(DictionaryKey::Variable(v2))) =
-                (&k1, &k2)
-            {
-                if v1 == v2 {
-                    let mut check = Check::new(
-                        violations::MultiValueRepeatedKeyVariable((*v2).to_string()),
-                        Range::from_located(&keys[j]),
-                    );
-                    if checker.patch(&CheckCode::F602) {
-                        if cmp::expr(&values[i], &values[j]) {
-                            check.amend(if j < num_keys - 1 {
-                                Fix::deletion(keys[j].location, keys[j + 1].location)
+    // Detect duplicate keys.
+    for (i, key) in keys.iter().enumerate() {
+        if let Some(key) = into_dictionary_key(key, checker.style) {
+            if let Some(seen_values) = seen.get_mut(&key) {
+                match key {
+                    DictionaryKey::Constant(key) => {
+                        if checker.settings.enabled.contains(&CheckCode::F601) {
+                            let repeated_value =
+                                seen_values.iter().any(|value| cmp::expr(value, &values[i]));
+                            let mut check = Check::new(
+                                violations::MultiValueRepeatedKeyLiteral(key, repeated_value),
+                                Range::from_located(&keys[i]),
+                            );
+                            if repeated_value {
+                                if checker.patch(&CheckCode::F601) {
+                                    check.amend(Fix::deletion(
+                                        values[i - 1].end_location.unwrap(),
+                                        values[i].end_location.unwrap(),
+                                    ));
+                                }
                             } else {
-                                Fix::deletion(
-                                    values[j - 1].end_location.unwrap(),
-                                    values[j].end_location.unwrap(),
-                                )
-                            });
+                                seen_values.push(&values[i]);
+                            }
+                            checker.checks.push(check);
                         }
                     }
-                    checker.checks.push(check);
+                    DictionaryKey::Variable(key) => {
+                        if checker.settings.enabled.contains(&CheckCode::F602) {
+                            let repeated_value =
+                                seen_values.iter().any(|value| cmp::expr(value, &values[i]));
+                            let mut check = Check::new(
+                                violations::MultiValueRepeatedKeyVariable(
+                                    key.to_string(),
+                                    repeated_value,
+                                ),
+                                Range::from_located(&keys[i]),
+                            );
+                            if repeated_value {
+                                if checker.patch(&CheckCode::F602) {
+                                    check.amend(Fix::deletion(
+                                        values[i - 1].end_location.unwrap(),
+                                        values[i].end_location.unwrap(),
+                                    ));
+                                }
+                            } else {
+                                seen_values.push(&values[i]);
+                            }
+                            checker.checks.push(check);
+                        }
+                    }
                 }
+            } else {
+                seen.insert(key, vec![&values[i]]);
             }
         }
     }

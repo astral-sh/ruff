@@ -660,16 +660,18 @@ impl Violation for MultiValueRepeatedKeyLiteral {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyLiteral(name, repeated_value) = self;
-        if repeated_value {
-            Some(|_| format!("Remove repeated key literal `{name}`"))
+        let MultiValueRepeatedKeyLiteral(.., repeated_value) = self;
+        if *repeated_value {
+            Some(|MultiValueRepeatedKeyLiteral(name, ..)| {
+                format!("Remove repeated key literal `{name}`")
+            })
         } else {
             None
         }
     }
 
     fn placeholder() -> Self {
-        MultiValueRepeatedKeyLiteral("...".to_string(), false)
+        MultiValueRepeatedKeyLiteral("...".to_string(), true)
     }
 }
 
@@ -683,16 +685,16 @@ impl Violation for MultiValueRepeatedKeyVariable {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyVariable(name, repeated_value) = self;
-        if repeated_value {
-            Some(|_| format!("Remove repeated key `{name}`"))
+        let MultiValueRepeatedKeyVariable(.., repeated_value) = self;
+        if *repeated_value {
+            Some(|MultiValueRepeatedKeyVariable(name, ..)| format!("Remove repeated key `{name}`"))
         } else {
             None
         }
     }
 
     fn placeholder() -> Self {
-        MultiValueRepeatedKeyVariable("...".to_string(), false)
+        MultiValueRepeatedKeyVariable("...".to_string(), true)
     }
 }
 

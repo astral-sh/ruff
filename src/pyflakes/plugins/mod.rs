@@ -4,7 +4,7 @@ pub use if_tuple::if_tuple;
 pub use invalid_literal_comparisons::invalid_literal_comparison;
 pub use invalid_print_syntax::invalid_print_syntax;
 pub use raise_not_implemented::raise_not_implemented;
-pub use repeated_keys::{repeated_literal_keys, repeated_variable_keys};
+pub use repeated_keys::repeated_keys;
 pub(crate) use strings::{
     percent_format_expected_mapping, percent_format_expected_sequence,
     percent_format_extra_named_arguments, percent_format_missing_arguments,
