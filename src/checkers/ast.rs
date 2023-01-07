@@ -76,10 +76,10 @@ pub struct Checker<'a> {
     pub(crate) child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     pub(crate) bindings: Vec<Binding<'a>>,
     pub(crate) redefinitions: IntMap<usize, Vec<usize>>,
-    exprs: Vec<RefEquality<'a, Expr>>,
-    scopes: Vec<Scope<'a>>,
-    scope_stack: Vec<usize>,
-    dead_scopes: Vec<usize>,
+    pub(crate) exprs: Vec<RefEquality<'a, Expr>>,
+    pub(crate) scopes: Vec<Scope<'a>>,
+    pub(crate) scope_stack: Vec<usize>,
+    pub(crate) dead_scopes: Vec<usize>,
     deferred_string_type_definitions: Vec<(Range, &'a str, bool, DeferralContext<'a>)>,
     deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext<'a>)>,
     deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
@@ -3062,10 +3062,28 @@ where
                         } {
                             if self.bindings[*index].used.is_none() {
                                 if self.settings.enabled.contains(&CheckCode::F841) {
-                                    self.checks.push(Check::new(
+                                    let mut check = Check::new(
                                         CheckKind::UnusedVariable(name.to_string()),
                                         name_range,
-                                    ));
+                                    );
+                                    if self.patch(&CheckCode::F841) {
+                                        match pyflakes::fixes::remove_exception_handler_assignment(
+                                            excepthandler,
+                                            self.locator,
+                                        ) {
+                                            Ok(fix) => {
+                                                check.amend(fix);
+                                            }
+                                            Err(e) => {
+                                                error!(
+                                                    "Failed to remove exception handler \
+                                                     assignment: {}",
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    }
+                                    self.checks.push(check);
                                 }
                             }
                         }
@@ -3801,18 +3819,10 @@ impl<'a> Checker<'a> {
             let scope_index = scopes[scopes.len() - 1];
             let parent_scope_index = scopes[scopes.len() - 2];
             if self.settings.enabled.contains(&CheckCode::F841) {
-                self.checks.extend(pyflakes::checks::unused_variable(
-                    &self.scopes[scope_index],
-                    &self.bindings,
-                    &self.settings.dummy_variable_rgx,
-                ));
+                pyflakes::plugins::unused_variable(self, scope_index);
             }
             if self.settings.enabled.contains(&CheckCode::F842) {
-                self.checks.extend(pyflakes::checks::unused_annotation(
-                    &self.scopes[scope_index],
-                    &self.bindings,
-                    &self.settings.dummy_variable_rgx,
-                ));
+                pyflakes::plugins::unused_annotation(self, scope_index);
             }
             if self.settings.enabled.contains(&CheckCode::ARG001)
                 || self.settings.enabled.contains(&CheckCode::ARG002)

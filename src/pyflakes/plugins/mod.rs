@@ -12,6 +12,8 @@ pub(crate) use strings::{
     string_dot_format_extra_positional_arguments, string_dot_format_missing_argument,
     string_dot_format_mixing_automatic,
 };
+pub use unused_annotation::unused_annotation;
+pub use unused_variable::unused_variable;
 
 mod assert_tuple;
 mod f_string_missing_placeholders;
@@ -20,3 +22,5 @@ mod invalid_literal_comparisons;
 mod invalid_print_syntax;
 mod raise_not_implemented;
 mod strings;
+mod unused_annotation;
+mod unused_variable;

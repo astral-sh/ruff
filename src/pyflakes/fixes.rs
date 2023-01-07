@@ -1,6 +1,8 @@
 use anyhow::{bail, Result};
 use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
-use rustpython_ast::Expr;
+use rustpython_ast::{Excepthandler, Expr};
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -96,4 +98,35 @@ pub fn remove_unused_keyword_arguments_from_format_call(
         location.location,
         location.end_location,
     ))
+}
+
+/// Generate a `Fix` to remove the binding from an exception handler.
+pub fn remove_exception_handler_assignment(
+    excepthandler: &Excepthandler,
+    locator: &SourceCodeLocator,
+) -> Result<Fix> {
+    let contents = locator.slice_source_code_range(&Range::from_located(excepthandler));
+    let mut fix_start = None;
+    let mut fix_end = None;
+
+    // End of the token just before the `as` to the semicolon.
+    let mut prev = None;
+    for (start, tok, end) in
+        lexer::make_tokenizer_located(&contents, excepthandler.location).flatten()
+    {
+        if matches!(tok, Tok::As) {
+            fix_start = prev;
+        }
+        if matches!(tok, Tok::Colon) {
+            fix_end = Some(start);
+            break;
+        }
+        prev = Some(end);
+    }
+
+    if let (Some(start), Some(end)) = (fix_start, fix_end) {
+        Ok(Fix::deletion(start, end))
+    } else {
+        bail!("Could not find span of exception handler")
+    }
 }

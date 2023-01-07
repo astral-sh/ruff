@@ -569,7 +569,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F821 | UndefinedName | Undefined name `...` |  |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |  |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
-| F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
+| F841 | UnusedVariable | Local variable `...` is assigned to but never used | 🛠 |
 | F842 | UnusedAnnotation | Local variable `...` is annotated but never used |  |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
