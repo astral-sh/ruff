@@ -10,13 +10,13 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::settings;
 
-    #[test_case(CheckCode::A001, Path::new("A001.py"); "A001")]
-    #[test_case(CheckCode::A002, Path::new("A002.py"); "A002")]
-    #[test_case(CheckCode::A003, Path::new("A003.py"); "A003")]
-    fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
+    #[test_case(DiagnosticCode::A001, Path::new("A001.py"); "A001")]
+    #[test_case(DiagnosticCode::A002, Path::new("A002.py"); "A002")]
+    #[test_case(DiagnosticCode::A003, Path::new("A003.py"); "A003")]
+    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_builtins")

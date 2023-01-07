@@ -4,7 +4,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, DiagnosticCode};
 use crate::violations;
 
 fn is_abc_class(
@@ -108,7 +108,7 @@ pub fn abstract_base_class(
 
         has_abstract_method |= has_abstract_decorator;
 
-        if !checker.settings.enabled.contains(&CheckCode::B027) {
+        if !checker.settings.enabled.contains(&DiagnosticCode::B027) {
             continue;
         }
 
@@ -118,15 +118,15 @@ pub fn abstract_base_class(
                 .iter()
                 .any(|d| is_overload(d, &checker.from_imports, &checker.import_aliases))
         {
-            checker.checks.push(Check::new(
+            checker.checks.push(Diagnostic::new(
                 violations::EmptyMethodWithoutAbstractDecorator(name.to_string()),
                 Range::from_located(stmt),
             ));
         }
     }
-    if checker.settings.enabled.contains(&CheckCode::B024) {
+    if checker.settings.enabled.contains(&DiagnosticCode::B024) {
         if !has_abstract_method {
-            checker.checks.push(Check::new(
+            checker.checks.push(Diagnostic::new(
                 violations::AbstractBaseClassWithoutAbstractMethod(name.to_string()),
                 Range::from_located(stmt),
             ));

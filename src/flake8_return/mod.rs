@@ -10,18 +10,18 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::Settings;
 
-    #[test_case(CheckCode::RET501, Path::new("RET501.py"); "RET501")]
-    #[test_case(CheckCode::RET502, Path::new("RET502.py"); "RET502")]
-    #[test_case(CheckCode::RET503, Path::new("RET503.py"); "RET503")]
-    #[test_case(CheckCode::RET504, Path::new("RET504.py"); "RET504")]
-    #[test_case(CheckCode::RET505, Path::new("RET505.py"); "RET505")]
-    #[test_case(CheckCode::RET506, Path::new("RET506.py"); "RET506")]
-    #[test_case(CheckCode::RET507, Path::new("RET507.py"); "RET507")]
-    #[test_case(CheckCode::RET508, Path::new("RET508.py"); "RET508")]
-    fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
+    #[test_case(DiagnosticCode::RET501, Path::new("RET501.py"); "RET501")]
+    #[test_case(DiagnosticCode::RET502, Path::new("RET502.py"); "RET502")]
+    #[test_case(DiagnosticCode::RET503, Path::new("RET503.py"); "RET503")]
+    #[test_case(DiagnosticCode::RET504, Path::new("RET504.py"); "RET504")]
+    #[test_case(DiagnosticCode::RET505, Path::new("RET505.py"); "RET505")]
+    #[test_case(DiagnosticCode::RET506, Path::new("RET506.py"); "RET506")]
+    #[test_case(DiagnosticCode::RET507, Path::new("RET507.py"); "RET507")]
+    #[test_case(DiagnosticCode::RET508, Path::new("RET508.py"); "RET508")]
+    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_return")

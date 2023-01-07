@@ -4,7 +4,7 @@ use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// UP021
@@ -24,7 +24,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
                 kwarg.location.column() + "universal_newlines".len(),
             ),
         );
-        let mut check = Check::new(violations::ReplaceUniversalNewlines, range);
+        let mut check = Diagnostic::new(violations::ReplaceUniversalNewlines, range);
         if checker.patch(check.kind.code()) {
             check.amend(Fix::replacement(
                 "text".to_string(),

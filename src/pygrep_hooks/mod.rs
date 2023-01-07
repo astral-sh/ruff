@@ -9,16 +9,16 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::settings;
 
-    #[test_case(CheckCode::PGH001, Path::new("PGH001_0.py"); "PGH001_0")]
-    #[test_case(CheckCode::PGH001, Path::new("PGH001_1.py"); "PGH001_1")]
-    #[test_case(CheckCode::PGH002, Path::new("PGH002_0.py"); "PGH002_0")]
-    #[test_case(CheckCode::PGH002, Path::new("PGH002_1.py"); "PGH002_1")]
-    #[test_case(CheckCode::PGH003, Path::new("PGH003_0.py"); "PGH003_0")]
-    #[test_case(CheckCode::PGH004, Path::new("PGH004_0.py"); "PGH004_0")]
-    fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
+    #[test_case(DiagnosticCode::PGH001, Path::new("PGH001_0.py"); "PGH001_0")]
+    #[test_case(DiagnosticCode::PGH001, Path::new("PGH001_1.py"); "PGH001_1")]
+    #[test_case(DiagnosticCode::PGH002, Path::new("PGH002_0.py"); "PGH002_0")]
+    #[test_case(DiagnosticCode::PGH002, Path::new("PGH002_1.py"); "PGH002_1")]
+    #[test_case(DiagnosticCode::PGH003, Path::new("PGH003_0.py"); "PGH003_0")]
+    #[test_case(DiagnosticCode::PGH004, Path::new("PGH004_0.py"); "PGH004_0")]
+    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(
             Path::new("./resources/test/fixtures/pygrep-hooks")

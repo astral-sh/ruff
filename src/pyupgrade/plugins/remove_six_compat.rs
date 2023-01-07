@@ -4,7 +4,7 @@ use crate::ast::helpers::{collect_call_paths, create_expr, create_stmt, dealias_
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, DiagnosticCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{violations, SourceCodeLocator};
@@ -16,7 +16,7 @@ fn is_module_member(call_path: &[&str], module: &str) -> bool {
         .map_or(false, |module_name| *module_name == module)
 }
 
-fn map_name(name: &str, expr: &Expr, patch: bool) -> Option<Check> {
+fn map_name(name: &str, expr: &Expr, patch: bool) -> Option<Diagnostic> {
     let replacement = match name {
         "text_type" => Some("str"),
         "binary_type" => Some("bytes"),
@@ -35,7 +35,7 @@ fn map_name(name: &str, expr: &Expr, patch: bool) -> Option<Check> {
         _ => None,
     };
     if let Some(replacement) = replacement {
-        let mut check = Check::new(violations::RemoveSixCompat, Range::from_located(expr));
+        let mut check = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
         if patch {
             check.amend(Fix::replacement(
                 replacement.to_string(),
@@ -55,10 +55,10 @@ fn replace_by_str_literal(
     expr: &Expr,
     patch: bool,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     match &arg.node {
         ExprKind::Constant { .. } => {
-            let mut check = Check::new(violations::RemoveSixCompat, Range::from_located(expr));
+            let mut check = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
             if patch {
                 let content = format!(
                     "{}{}",
@@ -87,7 +87,7 @@ fn replace_call_on_arg_by_arg_attribute(
     expr: &Expr,
     patch: bool,
     stylist: &SourceCodeStyleDetector,
-) -> Check {
+) -> Diagnostic {
     let attribute = ExprKind::Attribute {
         value: Box::new(arg.clone()),
         attr: attr.to_string(),
@@ -103,7 +103,7 @@ fn replace_call_on_arg_by_arg_method_call(
     expr: &Expr,
     patch: bool,
     stylist: &SourceCodeStyleDetector,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if args.is_empty() {
         None
     } else if let ([arg], other_args) = args.split_at(1) {
@@ -131,8 +131,8 @@ fn replace_by_expr_kind(
     expr: &Expr,
     patch: bool,
     stylist: &SourceCodeStyleDetector,
-) -> Check {
-    let mut check = Check::new(violations::RemoveSixCompat, Range::from_located(expr));
+) -> Diagnostic {
+    let mut check = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
         let mut generator: SourceCodeGenerator = stylist.into();
         generator.unparse_expr(&create_expr(node), 0);
@@ -150,8 +150,8 @@ fn replace_by_stmt_kind(
     expr: &Expr,
     patch: bool,
     stylist: &SourceCodeStyleDetector,
-) -> Check {
-    let mut check = Check::new(violations::RemoveSixCompat, Range::from_located(expr));
+) -> Diagnostic {
+    let mut check = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
         let mut generator: SourceCodeGenerator = stylist.into();
         generator.unparse_stmt(&create_stmt(node));
@@ -171,7 +171,7 @@ fn replace_by_raise_from(
     expr: &Expr,
     patch: bool,
     stylist: &SourceCodeStyleDetector,
-) -> Check {
+) -> Diagnostic {
     let stmt_kind = StmtKind::Raise {
         exc: exc.map(|exc| Box::new(create_expr(exc))),
         cause: cause.map(|cause| Box::new(create_expr(cause))),
@@ -185,7 +185,7 @@ fn replace_by_index_on_arg(
     expr: &Expr,
     patch: bool,
     stylist: &SourceCodeStyleDetector,
-) -> Check {
+) -> Diagnostic {
     let index = ExprKind::Subscript {
         value: Box::new(create_expr(arg.node.clone())),
         slice: Box::new(create_expr(index.clone())),
@@ -199,7 +199,7 @@ fn handle_reraise(
     expr: &Expr,
     patch: bool,
     stylist: &SourceCodeStyleDetector,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if let [_, exc, tb] = args {
         let check = replace_by_raise_from(
             Some(ExprKind::Call {
@@ -244,7 +244,7 @@ fn handle_func(
     patch: bool,
     stylist: &SourceCodeStyleDetector,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let func_name = match &func.node {
         ExprKind::Attribute { attr, .. } => attr,
         ExprKind::Name { id, .. } => id,
@@ -365,7 +365,7 @@ fn handle_func(
     check
 }
 
-fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Option<Check> {
+fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Option<Diagnostic> {
     let ExprKind::Call { func, args, .. } = &expr.node else {
         return None;
     };
@@ -414,14 +414,16 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
 
 /// UP016
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
-    if let Some(check) = handle_next_on_six_dict(expr, checker.patch(&CheckCode::UP016), checker) {
+    if let Some(check) =
+        handle_next_on_six_dict(expr, checker.patch(&DiagnosticCode::UP016), checker)
+    {
         checker.checks.push(check);
         return;
     }
 
     let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
     if is_module_member(&call_path, "six") {
-        let patch = checker.patch(&CheckCode::UP016);
+        let patch = checker.patch(&DiagnosticCode::UP016);
         let check = match &expr.node {
             ExprKind::Call {
                 func,

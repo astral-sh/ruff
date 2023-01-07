@@ -30,7 +30,7 @@ use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::python::typing::SubscriptKind;
-use crate::registry::{Check, CheckCode, DeferralKeyword};
+use crate::registry::{DeferralKeyword, Diagnostic, DiagnosticCode};
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
@@ -61,7 +61,7 @@ pub struct Checker<'a> {
     pub(crate) locator: &'a SourceCodeLocator<'a>,
     pub(crate) style: &'a SourceCodeStyleDetector<'a>,
     // Computed checks.
-    pub(crate) checks: Vec<Check>,
+    pub(crate) checks: Vec<Diagnostic>,
     // Function and class definition tracking (e.g., for docstring enforcement).
     definitions: Vec<(Definition<'a>, Visibility)>,
     // Edit tracking.
@@ -161,7 +161,7 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
-    pub fn patch(&self, code: &CheckCode) -> bool {
+    pub fn patch(&self, code: &DiagnosticCode) -> bool {
         matches!(self.autofix, flags::Autofix::Enabled) && self.settings.fixable.contains(code)
     }
 
@@ -192,8 +192,8 @@ impl<'a> Checker<'a> {
         })
     }
 
-    /// Return `true` if a `CheckCode` is disabled by a `noqa` directive.
-    pub fn is_ignored(&self, code: &CheckCode, lineno: usize) -> bool {
+    /// Return `true` if a `DiagnosticCode` is disabled by a `noqa` directive.
+    pub fn is_ignored(&self, code: &DiagnosticCode, lineno: usize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
@@ -273,7 +273,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E741) {
+                if self.settings.enabled.contains(&DiagnosticCode::E741) {
                     self.checks
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
                             pycodestyle::checks::ambiguous_variable_name(name, *range)
@@ -311,8 +311,8 @@ where
 
                         // Ensure that every nonlocal has an existing binding from a parent scope.
                         if !exists {
-                            if self.settings.enabled.contains(&CheckCode::PLE0117) {
-                                self.checks.push(Check::new(
+                            if self.settings.enabled.contains(&DiagnosticCode::PLE0117) {
+                                self.checks.push(Diagnostic::new(
                                     violations::NonlocalWithoutBinding(name.to_string()),
                                     *range,
                                 ));
@@ -321,7 +321,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E741) {
+                if self.settings.enabled.contains(&DiagnosticCode::E741) {
                     self.checks
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
                             pycodestyle::checks::ambiguous_variable_name(name, *range)
@@ -329,7 +329,7 @@ where
                 }
             }
             StmtKind::Break => {
-                if self.settings.enabled.contains(&CheckCode::F701) {
+                if self.settings.enabled.contains(&DiagnosticCode::F701) {
                     if let Some(check) = pyflakes::checks::break_outside_loop(
                         stmt,
                         &mut self
@@ -344,7 +344,7 @@ where
                 }
             }
             StmtKind::Continue => {
-                if self.settings.enabled.contains(&CheckCode::F702) {
+                if self.settings.enabled.contains(&DiagnosticCode::F702) {
                     if let Some(check) = pyflakes::checks::continue_outside_loop(
                         stmt,
                         &mut self
@@ -374,7 +374,7 @@ where
                 body,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::E743) {
+                if self.settings.enabled.contains(&DiagnosticCode::E743) {
                     if let Some(check) = pycodestyle::checks::ambiguous_function_name(name, || {
                         helpers::identifier_range(stmt, self.locator)
                     }) {
@@ -382,7 +382,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N802) {
+                if self.settings.enabled.contains(&DiagnosticCode::N802) {
                     if let Some(check) = pep8_naming::checks::invalid_function_name(
                         stmt,
                         name,
@@ -393,7 +393,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N804) {
+                if self.settings.enabled.contains(&DiagnosticCode::N804) {
                     if let Some(check) =
                         pep8_naming::checks::invalid_first_argument_name_for_class_method(
                             self.current_scope(),
@@ -409,7 +409,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N805) {
+                if self.settings.enabled.contains(&DiagnosticCode::N805) {
                     if let Some(check) = pep8_naming::checks::invalid_first_argument_name_for_method(
                         self.current_scope(),
                         name,
@@ -423,7 +423,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N807) {
+                if self.settings.enabled.contains(&DiagnosticCode::N807) {
                     if let Some(check) = pep8_naming::checks::dunder_function_name(
                         self.current_scope(),
                         stmt,
@@ -434,33 +434,33 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::UP011)
+                if self.settings.enabled.contains(&DiagnosticCode::UP011)
                     && self.settings.target_version >= PythonVersion::Py38
                 {
                     pyupgrade::plugins::unnecessary_lru_cache_params(self, decorator_list);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B018) {
+                if self.settings.enabled.contains(&DiagnosticCode::B018) {
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B019) {
+                if self.settings.enabled.contains(&DiagnosticCode::B019) {
                     flake8_bugbear::plugins::cached_instance_method(self, decorator_list);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::RET501)
-                    || self.settings.enabled.contains(&CheckCode::RET502)
-                    || self.settings.enabled.contains(&CheckCode::RET503)
-                    || self.settings.enabled.contains(&CheckCode::RET504)
-                    || self.settings.enabled.contains(&CheckCode::RET505)
-                    || self.settings.enabled.contains(&CheckCode::RET506)
-                    || self.settings.enabled.contains(&CheckCode::RET507)
-                    || self.settings.enabled.contains(&CheckCode::RET508)
+                if self.settings.enabled.contains(&DiagnosticCode::RET501)
+                    || self.settings.enabled.contains(&DiagnosticCode::RET502)
+                    || self.settings.enabled.contains(&DiagnosticCode::RET503)
+                    || self.settings.enabled.contains(&DiagnosticCode::RET504)
+                    || self.settings.enabled.contains(&DiagnosticCode::RET505)
+                    || self.settings.enabled.contains(&DiagnosticCode::RET506)
+                    || self.settings.enabled.contains(&DiagnosticCode::RET507)
+                    || self.settings.enabled.contains(&DiagnosticCode::RET508)
                 {
                     flake8_return::plugins::function(self, body);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::C901) {
+                if self.settings.enabled.contains(&DiagnosticCode::C901) {
                     if let Some(check) = mccabe::checks::function_is_too_complex(
                         stmt,
                         name,
@@ -472,26 +472,26 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::S107) {
+                if self.settings.enabled.contains(&DiagnosticCode::S107) {
                     self.checks
                         .extend(flake8_bandit::checks::hardcoded_password_default(args));
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PLR0206) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLR0206) {
                     pylint::plugins::property_with_parameters(self, stmt, decorator_list, args);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PT001)
-                    || self.settings.enabled.contains(&CheckCode::PT002)
-                    || self.settings.enabled.contains(&CheckCode::PT003)
-                    || self.settings.enabled.contains(&CheckCode::PT004)
-                    || self.settings.enabled.contains(&CheckCode::PT005)
-                    || self.settings.enabled.contains(&CheckCode::PT019)
-                    || self.settings.enabled.contains(&CheckCode::PT020)
-                    || self.settings.enabled.contains(&CheckCode::PT021)
-                    || self.settings.enabled.contains(&CheckCode::PT022)
-                    || self.settings.enabled.contains(&CheckCode::PT024)
-                    || self.settings.enabled.contains(&CheckCode::PT025)
+                if self.settings.enabled.contains(&DiagnosticCode::PT001)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT002)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT003)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT004)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT005)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT019)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT020)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT021)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT022)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT024)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT025)
                 {
                     flake8_pytest_style::plugins::fixture(
                         self,
@@ -503,14 +503,14 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PT006)
-                    || self.settings.enabled.contains(&CheckCode::PT007)
+                if self.settings.enabled.contains(&DiagnosticCode::PT006)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT007)
                 {
                     flake8_pytest_style::plugins::parametrize(self, decorator_list);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PT023)
-                    || self.settings.enabled.contains(&CheckCode::PT026)
+                if self.settings.enabled.contains(&DiagnosticCode::PT023)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT026)
                 {
                     flake8_pytest_style::plugins::marks(self, decorator_list);
                 }
@@ -567,13 +567,13 @@ where
                 );
             }
             StmtKind::Return { .. } => {
-                if self.settings.enabled.contains(&CheckCode::F706) {
+                if self.settings.enabled.contains(&DiagnosticCode::F706) {
                     if let Some(&index) = self.scope_stack.last() {
                         if matches!(
                             self.scopes[index].kind,
                             ScopeKind::Class(_) | ScopeKind::Module
                         ) {
-                            self.checks.push(Check::new(
+                            self.checks.push(Diagnostic::new(
                                 violations::ReturnOutsideFunction,
                                 Range::from_located(stmt),
                             ));
@@ -588,13 +588,13 @@ where
                 decorator_list,
                 body,
             } => {
-                if self.settings.enabled.contains(&CheckCode::UP004) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP004) {
                     pyupgrade::plugins::useless_object_inheritance(
                         self, stmt, name, bases, keywords,
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E742) {
+                if self.settings.enabled.contains(&DiagnosticCode::E742) {
                     if let Some(check) = pycodestyle::checks::ambiguous_class_name(name, || {
                         helpers::identifier_range(stmt, self.locator)
                     }) {
@@ -602,7 +602,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N801) {
+                if self.settings.enabled.contains(&DiagnosticCode::N801) {
                     if let Some(check) =
                         pep8_naming::checks::invalid_class_name(stmt, name, self.locator)
                     {
@@ -610,7 +610,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::N818) {
+                if self.settings.enabled.contains(&DiagnosticCode::N818) {
                     if let Some(check) = pep8_naming::checks::error_suffix_on_exception_name(
                         stmt,
                         bases,
@@ -621,23 +621,23 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B018) {
+                if self.settings.enabled.contains(&DiagnosticCode::B018) {
                     flake8_bugbear::plugins::useless_expression(self, body);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B024)
-                    || self.settings.enabled.contains(&CheckCode::B027)
+                if self.settings.enabled.contains(&DiagnosticCode::B024)
+                    || self.settings.enabled.contains(&DiagnosticCode::B027)
                 {
                     flake8_bugbear::plugins::abstract_base_class(
                         self, stmt, name, bases, keywords, body,
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PT023) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT023) {
                     flake8_pytest_style::plugins::marks(self, decorator_list);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PIE794) {
+                if self.settings.enabled.contains(&DiagnosticCode::PIE794) {
                     flake8_pie::plugins::dupe_class_field_definitions(self, bases, body);
                 }
 
@@ -654,27 +654,27 @@ where
                 }
             }
             StmtKind::Import { names } => {
-                if self.settings.enabled.contains(&CheckCode::E401) {
+                if self.settings.enabled.contains(&DiagnosticCode::E401) {
                     if names.len() > 1 {
-                        self.checks.push(Check::new(
+                        self.checks.push(Diagnostic::new(
                             violations::MultipleImportsOnOneLine,
                             Range::from_located(stmt),
                         ));
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E402) {
+                if self.settings.enabled.contains(&DiagnosticCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
-                        self.checks.push(Check::new(
+                        self.checks.push(Diagnostic::new(
                             violations::ModuleImportNotAtTopOfFile,
                             Range::from_located(stmt),
                         ));
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::UP023) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP023) {
                     pyupgrade::plugins::replace_c_element_tree(self, stmt);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP026) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP026) {
                     pyupgrade::plugins::rewrite_mock_import(self, stmt);
                 }
 
@@ -739,7 +739,7 @@ where
                     }
 
                     // flake8-debugger
-                    if self.settings.enabled.contains(&CheckCode::T100) {
+                    if self.settings.enabled.contains(&DiagnosticCode::T100) {
                         if let Some(check) =
                             flake8_debugger::checks::debugger_import(stmt, None, &alias.node.name)
                         {
@@ -748,7 +748,7 @@ where
                     }
 
                     // flake8_tidy_imports
-                    if self.settings.enabled.contains(&CheckCode::TID251) {
+                    if self.settings.enabled.contains(&DiagnosticCode::TID251) {
                         if let Some(check) = flake8_tidy_imports::checks::name_or_parent_is_banned(
                             alias,
                             &alias.node.name,
@@ -759,10 +759,10 @@ where
                     }
 
                     // pylint
-                    if self.settings.enabled.contains(&CheckCode::PLC0414) {
+                    if self.settings.enabled.contains(&DiagnosticCode::PLC0414) {
                         pylint::plugins::useless_import_alias(self, alias);
                     }
-                    if self.settings.enabled.contains(&CheckCode::PLR0402) {
+                    if self.settings.enabled.contains(&DiagnosticCode::PLR0402) {
                         pylint::plugins::use_from_import(self, alias);
                     }
 
@@ -774,7 +774,7 @@ where
                         }
 
                         let name = alias.node.name.split('.').last().unwrap();
-                        if self.settings.enabled.contains(&CheckCode::N811) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N811) {
                             if let Some(check) =
                                 pep8_naming::checks::constant_imported_as_non_constant(
                                     stmt,
@@ -787,7 +787,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N812) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N812) {
                             if let Some(check) =
                                 pep8_naming::checks::lowercase_imported_as_non_lowercase(
                                     stmt,
@@ -800,7 +800,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N813) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N813) {
                             if let Some(check) =
                                 pep8_naming::checks::camelcase_imported_as_lowercase(
                                     stmt,
@@ -813,7 +813,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N814) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N814) {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
                                 stmt,
                                 name,
@@ -824,7 +824,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N817) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N817) {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
                                 stmt,
                                 name,
@@ -836,7 +836,7 @@ where
                         }
                     }
 
-                    if self.settings.enabled.contains(&CheckCode::ICN001) {
+                    if self.settings.enabled.contains(&DiagnosticCode::ICN001) {
                         if let Some(check) =
                             flake8_import_conventions::checks::check_conventional_import(
                                 stmt,
@@ -849,7 +849,7 @@ where
                         }
                     }
 
-                    if self.settings.enabled.contains(&CheckCode::PT013) {
+                    if self.settings.enabled.contains(&DiagnosticCode::PT013) {
                         if let Some(check) = flake8_pytest_style::plugins::import(
                             stmt,
                             &alias.node.name,
@@ -867,7 +867,7 @@ where
             } => {
                 // Track `import from` statements, to ensure that we can correctly attribute
                 // references like `from typing import Union`.
-                if self.settings.enabled.contains(&CheckCode::UP023) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP023) {
                     pyupgrade::plugins::replace_c_element_tree(self, stmt);
                 }
                 if level.map(|level| level == 0).unwrap_or(true) {
@@ -884,30 +884,30 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E402) {
+                if self.settings.enabled.contains(&DiagnosticCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
-                        self.checks.push(Check::new(
+                        self.checks.push(Diagnostic::new(
                             violations::ModuleImportNotAtTopOfFile,
                             Range::from_located(stmt),
                         ));
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::UP010) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP010) {
                     if let Some("__future__") = module.as_deref() {
                         pyupgrade::plugins::unnecessary_future_import(self, stmt, names);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::UP026) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP026) {
                     pyupgrade::plugins::rewrite_mock_import(self, stmt);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP029) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP029) {
                     if let Some(module) = module.as_deref() {
                         pyupgrade::plugins::unnecessary_builtin_import(self, stmt, module, names);
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::TID251) {
+                if self.settings.enabled.contains(&DiagnosticCode::TID251) {
                     if let Some(module) = module {
                         for name in names {
                             if let Some(check) = flake8_tidy_imports::checks::name_is_banned(
@@ -928,7 +928,7 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PT013) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT013) {
                     if let Some(check) = flake8_pytest_style::plugins::import_from(
                         stmt,
                         module.as_deref(),
@@ -963,9 +963,9 @@ where
                             self.annotations_future_enabled = true;
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::F407) {
+                        if self.settings.enabled.contains(&DiagnosticCode::F407) {
                             if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
-                                self.checks.push(Check::new(
+                                self.checks.push(Diagnostic::new(
                                     violations::FutureFeatureNotDefined(
                                         alias.node.name.to_string(),
                                     ),
@@ -974,9 +974,10 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::F404) && !self.futures_allowed
+                        if self.settings.enabled.contains(&DiagnosticCode::F404)
+                            && !self.futures_allowed
                         {
-                            self.checks.push(Check::new(
+                            self.checks.push(Diagnostic::new(
                                 violations::LateFutureImport,
                                 Range::from_located(stmt),
                             ));
@@ -992,11 +993,11 @@ where
                             },
                         );
 
-                        if self.settings.enabled.contains(&CheckCode::F406) {
+                        if self.settings.enabled.contains(&DiagnosticCode::F406) {
                             let scope = &self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found"))];
                             if !matches!(scope.kind, ScopeKind::Module) {
-                                self.checks.push(Check::new(
+                                self.checks.push(Diagnostic::new(
                                     violations::ImportStarNotPermitted(
                                         helpers::format_import_from(
                                             level.as_ref(),
@@ -1008,8 +1009,8 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::F403) {
-                            self.checks.push(Check::new(
+                        if self.settings.enabled.contains(&DiagnosticCode::F403) {
+                            self.checks.push(Diagnostic::new(
                                 violations::ImportStarUsed(helpers::format_import_from(
                                     level.as_ref(),
                                     module.as_deref(),
@@ -1064,7 +1065,7 @@ where
                         );
                     }
 
-                    if self.settings.enabled.contains(&CheckCode::TID252) {
+                    if self.settings.enabled.contains(&DiagnosticCode::TID252) {
                         if let Some(check) = flake8_tidy_imports::checks::banned_relative_import(
                             stmt,
                             level.as_ref(),
@@ -1075,7 +1076,7 @@ where
                     }
 
                     // flake8-debugger
-                    if self.settings.enabled.contains(&CheckCode::T100) {
+                    if self.settings.enabled.contains(&DiagnosticCode::T100) {
                         if let Some(check) = flake8_debugger::checks::debugger_import(
                             stmt,
                             module.as_deref(),
@@ -1086,7 +1087,7 @@ where
                     }
 
                     if let Some(asname) = &alias.node.asname {
-                        if self.settings.enabled.contains(&CheckCode::N811) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N811) {
                             if let Some(check) =
                                 pep8_naming::checks::constant_imported_as_non_constant(
                                     stmt,
@@ -1099,7 +1100,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N812) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N812) {
                             if let Some(check) =
                                 pep8_naming::checks::lowercase_imported_as_non_lowercase(
                                     stmt,
@@ -1112,7 +1113,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N813) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N813) {
                             if let Some(check) =
                                 pep8_naming::checks::camelcase_imported_as_lowercase(
                                     stmt,
@@ -1125,7 +1126,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N814) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N814) {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
                                 stmt,
                                 &alias.node.name,
@@ -1136,7 +1137,7 @@ where
                             }
                         }
 
-                        if self.settings.enabled.contains(&CheckCode::N817) {
+                        if self.settings.enabled.contains(&DiagnosticCode::N817) {
                             if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
                                 stmt,
                                 &alias.node.name,
@@ -1148,32 +1149,32 @@ where
                         }
 
                         // pylint
-                        if self.settings.enabled.contains(&CheckCode::PLC0414) {
+                        if self.settings.enabled.contains(&DiagnosticCode::PLC0414) {
                             pylint::plugins::useless_import_alias(self, alias);
                         }
                     }
                 }
             }
             StmtKind::Raise { exc, .. } => {
-                if self.settings.enabled.contains(&CheckCode::F901) {
+                if self.settings.enabled.contains(&DiagnosticCode::F901) {
                     if let Some(expr) = exc {
                         pyflakes::plugins::raise_not_implemented(self, expr);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::B016) {
+                if self.settings.enabled.contains(&DiagnosticCode::B016) {
                     if let Some(exc) = exc {
                         flake8_bugbear::plugins::cannot_raise_literal(self, exc);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::EM101)
-                    || self.settings.enabled.contains(&CheckCode::EM102)
-                    || self.settings.enabled.contains(&CheckCode::EM103)
+                if self.settings.enabled.contains(&DiagnosticCode::EM101)
+                    || self.settings.enabled.contains(&DiagnosticCode::EM102)
+                    || self.settings.enabled.contains(&DiagnosticCode::EM103)
                 {
                     if let Some(exc) = exc {
                         flake8_errmsg::plugins::string_in_exception(self, exc);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::UP024) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP024) {
                     if let Some(item) = exc {
                         pyupgrade::plugins::os_error_alias(self, item);
                     }
@@ -1183,16 +1184,16 @@ where
                 self.handle_node_load(target);
             }
             StmtKind::If { test, .. } => {
-                if self.settings.enabled.contains(&CheckCode::F634) {
+                if self.settings.enabled.contains(&DiagnosticCode::F634) {
                     pyflakes::plugins::if_tuple(self, stmt, test);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM102) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM102) {
                     flake8_simplify::plugins::nested_if_statements(self, stmt);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM103) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM103) {
                     flake8_simplify::plugins::return_bool_condition_directly(self, stmt);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM108) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM108) {
                     flake8_simplify::plugins::use_ternary_operator(
                         self,
                         stmt,
@@ -1201,10 +1202,10 @@ where
                 }
             }
             StmtKind::Assert { test, msg } => {
-                if self.settings.enabled.contains(&CheckCode::F631) {
+                if self.settings.enabled.contains(&DiagnosticCode::F631) {
                     pyflakes::plugins::assert_tuple(self, stmt, test);
                 }
-                if self.settings.enabled.contains(&CheckCode::B011) {
+                if self.settings.enabled.contains(&DiagnosticCode::B011) {
                     flake8_bugbear::plugins::assert_false(
                         self,
                         stmt,
@@ -1212,15 +1213,15 @@ where
                         msg.as_ref().map(|expr| &**expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::S101) {
+                if self.settings.enabled.contains(&DiagnosticCode::S101) {
                     self.checks.push(flake8_bandit::checks::assert_used(stmt));
                 }
-                if self.settings.enabled.contains(&CheckCode::PT015) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT015) {
                     if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::PT018) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT018) {
                     if let Some(check) =
                         flake8_pytest_style::plugins::composite_condition(stmt, test)
                     {
@@ -1229,21 +1230,21 @@ where
                 }
             }
             StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
-                if self.settings.enabled.contains(&CheckCode::B017) {
+                if self.settings.enabled.contains(&DiagnosticCode::B017) {
                     flake8_bugbear::plugins::assert_raises_exception(self, stmt, items);
                 }
-                if self.settings.enabled.contains(&CheckCode::PT012) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT012) {
                     flake8_pytest_style::plugins::complex_raises(self, stmt, items, body);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM117) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM117) {
                     flake8_simplify::plugins::multiple_with_statements(self, stmt);
                 }
             }
             StmtKind::While { body, orelse, .. } => {
-                if self.settings.enabled.contains(&CheckCode::B023) {
+                if self.settings.enabled.contains(&DiagnosticCode::B023) {
                     flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
-                if self.settings.enabled.contains(&CheckCode::PLW0120) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLW0120) {
                     pylint::plugins::useless_else_on_loop(self, stmt, body, orelse);
                 }
             }
@@ -1261,19 +1262,19 @@ where
                 orelse,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::B007) {
+                if self.settings.enabled.contains(&DiagnosticCode::B007) {
                     flake8_bugbear::plugins::unused_loop_control_variable(self, target, body);
                 }
-                if self.settings.enabled.contains(&CheckCode::B020) {
+                if self.settings.enabled.contains(&DiagnosticCode::B020) {
                     flake8_bugbear::plugins::loop_variable_overrides_iterator(self, target, iter);
                 }
-                if self.settings.enabled.contains(&CheckCode::B023) {
+                if self.settings.enabled.contains(&DiagnosticCode::B023) {
                     flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
-                if self.settings.enabled.contains(&CheckCode::PLW0120) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLW0120) {
                     pylint::plugins::useless_else_on_loop(self, stmt, body, orelse);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM118) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM118) {
                     flake8_simplify::plugins::key_in_dict_for(self, target, iter);
                 }
             }
@@ -1284,53 +1285,53 @@ where
                 finalbody,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::F707) {
+                if self.settings.enabled.contains(&DiagnosticCode::F707) {
                     if let Some(check) =
                         pyflakes::checks::default_except_not_last(handlers, self.locator)
                     {
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::B014)
-                    || self.settings.enabled.contains(&CheckCode::B025)
+                if self.settings.enabled.contains(&DiagnosticCode::B014)
+                    || self.settings.enabled.contains(&DiagnosticCode::B025)
                 {
                     flake8_bugbear::plugins::duplicate_exceptions(self, handlers);
                 }
-                if self.settings.enabled.contains(&CheckCode::B013) {
+                if self.settings.enabled.contains(&DiagnosticCode::B013) {
                     flake8_bugbear::plugins::redundant_tuple_in_exception_handler(self, handlers);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP024) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP024) {
                     pyupgrade::plugins::os_error_alias(self, handlers);
                 }
-                if self.settings.enabled.contains(&CheckCode::PT017) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT017) {
                     self.checks
                         .extend(flake8_pytest_style::plugins::assert_in_exception_handler(
                             handlers,
                         ));
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM105) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM105) {
                     flake8_simplify::plugins::use_contextlib_suppress(
                         self, stmt, handlers, orelse, finalbody,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM107) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM107) {
                     flake8_simplify::plugins::return_in_try_except_finally(
                         self, body, handlers, finalbody,
                     );
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
-                if self.settings.enabled.contains(&CheckCode::E731) {
+                if self.settings.enabled.contains(&DiagnosticCode::E731) {
                     if let [target] = &targets[..] {
                         pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B003) {
+                if self.settings.enabled.contains(&DiagnosticCode::B003) {
                     flake8_bugbear::plugins::assignment_to_os_environ(self, targets);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::S105) {
+                if self.settings.enabled.contains(&DiagnosticCode::S105) {
                     if let Some(check) =
                         flake8_bandit::checks::assign_hardcoded_password_string(value, targets)
                     {
@@ -1338,31 +1339,31 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::UP001) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP001) {
                     pyupgrade::plugins::useless_metaclass_type(self, stmt, value, targets);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP013) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP013) {
                     pyupgrade::plugins::convert_typed_dict_functional_to_class(
                         self, stmt, targets, value,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::UP014) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP014) {
                     pyupgrade::plugins::convert_named_tuple_functional_to_class(
                         self, stmt, targets, value,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::UP027) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP027) {
                     pyupgrade::plugins::unpack_list_comprehension(self, targets, value);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PD901) {
+                if self.settings.enabled.contains(&DiagnosticCode::PD901) {
                     if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
                         self.checks.push(check);
                     }
                 }
             }
             StmtKind::AnnAssign { target, value, .. } => {
-                if self.settings.enabled.contains(&CheckCode::E731) {
+                if self.settings.enabled.contains(&DiagnosticCode::E731) {
                     if let Some(value) = value {
                         pycodestyle::plugins::do_not_assign_lambda(self, target, value, stmt);
                     }
@@ -1370,7 +1371,7 @@ where
             }
             StmtKind::Delete { .. } => {}
             StmtKind::Expr { value, .. } => {
-                if self.settings.enabled.contains(&CheckCode::B015) {
+                if self.settings.enabled.contains(&DiagnosticCode::B015) {
                     flake8_bugbear::plugins::useless_comparison(self, value);
                 }
             }
@@ -1394,7 +1395,7 @@ where
                 decorator_list,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::B021) {
+                if self.settings.enabled.contains(&DiagnosticCode::B021) {
                     flake8_bugbear::plugins::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
@@ -1403,7 +1404,7 @@ where
                     body,
                     &Documentable::Function,
                 );
-                if self.settings.enabled.contains(&CheckCode::UP028) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP028) {
                     pyupgrade::plugins::rewrite_yield_from(self, stmt);
                 }
                 let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Function);
@@ -1455,7 +1456,7 @@ where
                 decorator_list,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::B021) {
+                if self.settings.enabled.contains(&DiagnosticCode::B021) {
                     flake8_bugbear::plugins::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
@@ -1507,7 +1508,7 @@ where
                 finalbody,
             } => {
                 self.except_handlers.push(extract_handler_names(handlers));
-                if self.settings.enabled.contains(&CheckCode::B012) {
+                if self.settings.enabled.contains(&DiagnosticCode::B012) {
                     flake8_bugbear::plugins::jump_statement_in_finally(self, finalbody);
                 }
                 self.visit_body(body);
@@ -1610,7 +1611,7 @@ where
                 // Ex) Optional[...]
                 if !self.in_deferred_string_type_definition
                     && self.in_annotation
-                    && self.settings.enabled.contains(&CheckCode::UP007)
+                    && self.settings.enabled.contains(&DiagnosticCode::UP007)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && !self.settings.pyupgrade.keep_runtime_typing
@@ -1623,10 +1624,10 @@ where
                     self.in_literal = true;
                 }
 
-                if self.settings.enabled.contains(&CheckCode::YTT101)
-                    || self.settings.enabled.contains(&CheckCode::YTT102)
-                    || self.settings.enabled.contains(&CheckCode::YTT301)
-                    || self.settings.enabled.contains(&CheckCode::YTT303)
+                if self.settings.enabled.contains(&DiagnosticCode::YTT101)
+                    || self.settings.enabled.contains(&DiagnosticCode::YTT102)
+                    || self.settings.enabled.contains(&DiagnosticCode::YTT301)
+                    || self.settings.enabled.contains(&DiagnosticCode::YTT303)
                 {
                     flake8_2020::plugins::subscript(self, value, slice);
                 }
@@ -1634,9 +1635,9 @@ where
             ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
                 if matches!(ctx, ExprContext::Store) {
                     let check_too_many_expressions =
-                        self.settings.enabled.contains(&CheckCode::F621);
+                        self.settings.enabled.contains(&DiagnosticCode::F621);
                     let check_two_starred_expressions =
-                        self.settings.enabled.contains(&CheckCode::F622);
+                        self.settings.enabled.contains(&DiagnosticCode::F622);
                     if let Some(check) = pyflakes::checks::starred_expressions(
                         elts,
                         check_too_many_expressions,
@@ -1650,13 +1651,13 @@ where
             ExprKind::Name { id, ctx } => {
                 match ctx {
                     ExprContext::Load => {
-                        if self.settings.enabled.contains(&CheckCode::UP019) {
+                        if self.settings.enabled.contains(&DiagnosticCode::UP019) {
                             pyupgrade::plugins::typing_text_str_alias(self, expr);
                         }
 
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
-                            && self.settings.enabled.contains(&CheckCode::UP006)
+                            && self.settings.enabled.contains(&DiagnosticCode::UP006)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && !self.settings.pyupgrade.keep_runtime_typing
@@ -1674,7 +1675,7 @@ where
                         self.handle_node_load(expr);
                     }
                     ExprContext::Store => {
-                        if self.settings.enabled.contains(&CheckCode::E741) {
+                        if self.settings.enabled.contains(&DiagnosticCode::E741) {
                             if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                                 id,
                                 Range::from_located(expr),
@@ -1690,18 +1691,18 @@ where
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
 
-                if self.settings.enabled.contains(&CheckCode::YTT202) {
+                if self.settings.enabled.contains(&DiagnosticCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PLE0118) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLE0118) {
                     pylint::plugins::used_prior_global_declaration(self, id, expr);
                 }
             }
             ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
-                    && self.settings.enabled.contains(&CheckCode::UP006)
+                    && self.settings.enabled.contains(&DiagnosticCode::UP006)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled
@@ -1711,31 +1712,31 @@ where
                     pyupgrade::plugins::use_pep585_annotation(self, expr, attr);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::UP016) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP016) {
                     pyupgrade::plugins::remove_six_compat(self, expr);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::UP017)
+                if self.settings.enabled.contains(&DiagnosticCode::UP017)
                     && self.settings.target_version >= PythonVersion::Py311
                 {
                     pyupgrade::plugins::datetime_utc_alias(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP019) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP019) {
                     pyupgrade::plugins::typing_text_str_alias(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP026) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP026) {
                     pyupgrade::plugins::rewrite_mock_attribute(self, expr);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::YTT202) {
+                if self.settings.enabled.contains(&DiagnosticCode::YTT202) {
                     flake8_2020::plugins::name_or_attribute(self, expr);
                 }
 
                 for (code, name) in vec![
-                    (CheckCode::PD007, "ix"),
-                    (CheckCode::PD008, "at"),
-                    (CheckCode::PD009, "iat"),
-                    (CheckCode::PD011, "values"),
+                    (DiagnosticCode::PD007, "ix"),
+                    (DiagnosticCode::PD008, "at"),
+                    (DiagnosticCode::PD009, "iat"),
+                    (DiagnosticCode::PD011, "values"),
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if attr == name {
@@ -1769,13 +1770,13 @@ where
                                 }
 
                                 self.checks
-                                    .push(Check::new(code.kind(), Range::from_located(expr)));
+                                    .push(Diagnostic::new(code.kind(), Range::from_located(expr)));
                             }
                         };
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::TID251) {
+                if self.settings.enabled.contains(&DiagnosticCode::TID251) {
                     flake8_tidy_imports::checks::banned_attribute_access(
                         self,
                         &dealias_call_path(collect_call_paths(expr), &self.import_aliases),
@@ -1790,11 +1791,11 @@ where
                 keywords,
             } => {
                 // pyflakes
-                if self.settings.enabled.contains(&CheckCode::F521)
-                    || self.settings.enabled.contains(&CheckCode::F522)
-                    || self.settings.enabled.contains(&CheckCode::F523)
-                    || self.settings.enabled.contains(&CheckCode::F524)
-                    || self.settings.enabled.contains(&CheckCode::F525)
+                if self.settings.enabled.contains(&DiagnosticCode::F521)
+                    || self.settings.enabled.contains(&DiagnosticCode::F522)
+                    || self.settings.enabled.contains(&DiagnosticCode::F523)
+                    || self.settings.enabled.contains(&DiagnosticCode::F524)
+                    || self.settings.enabled.contains(&DiagnosticCode::F525)
                 {
                     if let ExprKind::Attribute { value, attr, .. } = &func.node {
                         if let ExprKind::Constant {
@@ -1807,8 +1808,8 @@ where
                                 let location = Range::from_located(expr);
                                 match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
                                     Err(e) => {
-                                        if self.settings.enabled.contains(&CheckCode::F521) {
-                                            self.checks.push(Check::new(
+                                        if self.settings.enabled.contains(&DiagnosticCode::F521) {
+                                            self.checks.push(Diagnostic::new(
                                                 violations::StringDotFormatInvalidFormat(
                                                     pyflakes::format::error_to_string(&e),
                                                 ),
@@ -1817,26 +1818,26 @@ where
                                         }
                                     }
                                     Ok(summary) => {
-                                        if self.settings.enabled.contains(&CheckCode::F522) {
+                                        if self.settings.enabled.contains(&DiagnosticCode::F522) {
                                             pyflakes::plugins::string_dot_format_extra_named_arguments(self,
                                                 &summary, keywords, location,
                                             );
                                         }
 
-                                        if self.settings.enabled.contains(&CheckCode::F523) {
+                                        if self.settings.enabled.contains(&DiagnosticCode::F523) {
                                             pyflakes::plugins::string_dot_format_extra_positional_arguments(
                                                 self,
                                                 &summary, args, location,
                                             );
                                         }
 
-                                        if self.settings.enabled.contains(&CheckCode::F524) {
+                                        if self.settings.enabled.contains(&DiagnosticCode::F524) {
                                             pyflakes::plugins::string_dot_format_missing_argument(
                                                 self, &summary, args, keywords, location,
                                             );
                                         }
 
-                                        if self.settings.enabled.contains(&CheckCode::F525) {
+                                        if self.settings.enabled.contains(&DiagnosticCode::F525) {
                                             pyflakes::plugins::string_dot_format_mixing_automatic(
                                                 self, &summary, location,
                                             );
@@ -1849,69 +1850,69 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.enabled.contains(&CheckCode::UP003) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP003) {
                     pyupgrade::plugins::type_of_primitive(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP005) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP005) {
                     pyupgrade::plugins::deprecated_unittest_alias(self, func);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP008) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP008) {
                     pyupgrade::plugins::super_call_with_parameters(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP012) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP012) {
                     pyupgrade::plugins::unnecessary_encode_utf8(self, expr, func, args, keywords);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP015) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP015) {
                     pyupgrade::plugins::redundant_open_modes(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP016) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP016) {
                     pyupgrade::plugins::remove_six_compat(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP018) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP018) {
                     pyupgrade::plugins::native_literals(self, expr, func, args, keywords);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP020) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP020) {
                     pyupgrade::plugins::open_alias(self, expr, func);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP021) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP021) {
                     pyupgrade::plugins::replace_universal_newlines(self, expr, keywords);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP022) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP022) {
                     pyupgrade::plugins::replace_stdout_stderr(self, expr, keywords);
                 }
-                if self.settings.enabled.contains(&CheckCode::UP024) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP024) {
                     pyupgrade::plugins::os_error_alias(self, expr);
                 }
 
                 // flake8-print
-                if self.settings.enabled.contains(&CheckCode::T201)
-                    || self.settings.enabled.contains(&CheckCode::T203)
+                if self.settings.enabled.contains(&DiagnosticCode::T201)
+                    || self.settings.enabled.contains(&DiagnosticCode::T203)
                 {
                     flake8_print::plugins::print_call(self, func, keywords);
                 }
 
                 // flake8-bugbear
-                if self.settings.enabled.contains(&CheckCode::B004) {
+                if self.settings.enabled.contains(&DiagnosticCode::B004) {
                     flake8_bugbear::plugins::unreliable_callable_check(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B005) {
+                if self.settings.enabled.contains(&DiagnosticCode::B005) {
                     flake8_bugbear::plugins::strip_with_multi_characters(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B009) {
+                if self.settings.enabled.contains(&DiagnosticCode::B009) {
                     flake8_bugbear::plugins::getattr_with_constant(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B010) {
+                if self.settings.enabled.contains(&DiagnosticCode::B010) {
                     flake8_bugbear::plugins::setattr_with_constant(self, expr, func, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B022) {
+                if self.settings.enabled.contains(&DiagnosticCode::B022) {
                     flake8_bugbear::plugins::useless_contextlib_suppress(self, expr, args);
                 }
-                if self.settings.enabled.contains(&CheckCode::B026) {
+                if self.settings.enabled.contains(&DiagnosticCode::B026) {
                     flake8_bugbear::plugins::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::B905)
+                if self.settings.enabled.contains(&DiagnosticCode::B905)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
                     flake8_bugbear::plugins::zip_without_explicit_strict(
@@ -1920,12 +1921,12 @@ where
                 }
 
                 // flake8-bandit
-                if self.settings.enabled.contains(&CheckCode::S102) {
+                if self.settings.enabled.contains(&DiagnosticCode::S102) {
                     if let Some(check) = flake8_bandit::checks::exec_used(expr, func) {
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::S103) {
+                if self.settings.enabled.contains(&DiagnosticCode::S103) {
                     if let Some(check) = flake8_bandit::checks::bad_file_permissions(
                         func,
                         args,
@@ -1936,7 +1937,7 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::S501) {
+                if self.settings.enabled.contains(&DiagnosticCode::S501) {
                     if let Some(check) = flake8_bandit::checks::request_with_no_cert_validation(
                         func,
                         args,
@@ -1947,7 +1948,7 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::S506) {
+                if self.settings.enabled.contains(&DiagnosticCode::S506) {
                     if let Some(check) = flake8_bandit::checks::unsafe_yaml_load(
                         func,
                         args,
@@ -1958,11 +1959,11 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::S106) {
+                if self.settings.enabled.contains(&DiagnosticCode::S106) {
                     self.checks
                         .extend(flake8_bandit::checks::hardcoded_password_func_arg(keywords));
                 }
-                if self.settings.enabled.contains(&CheckCode::S324) {
+                if self.settings.enabled.contains(&DiagnosticCode::S324) {
                     if let Some(check) = flake8_bandit::checks::hashlib_insecure_hash_functions(
                         func,
                         args,
@@ -1973,7 +1974,7 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::S113) {
+                if self.settings.enabled.contains(&DiagnosticCode::S113) {
                     if let Some(check) = flake8_bandit::checks::request_without_timeout(
                         func,
                         args,
@@ -1986,46 +1987,46 @@ where
                 }
 
                 // flake8-comprehensions
-                if self.settings.enabled.contains(&CheckCode::C400) {
+                if self.settings.enabled.contains(&DiagnosticCode::C400) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_list(
                         expr,
                         func,
                         args,
                         keywords,
                         self.locator,
-                        self.patch(&CheckCode::C400),
+                        self.patch(&DiagnosticCode::C400),
                         Range::from_located(expr),
                     ) {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C401) {
+                if self.settings.enabled.contains(&DiagnosticCode::C401) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_set(
                         expr,
                         func,
                         args,
                         keywords,
                         self.locator,
-                        self.patch(&CheckCode::C401),
+                        self.patch(&DiagnosticCode::C401),
                         Range::from_located(expr),
                     ) {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C402) {
+                if self.settings.enabled.contains(&DiagnosticCode::C402) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_dict(
                         expr,
                         func,
                         args,
                         keywords,
                         self.locator,
-                        self.patch(&CheckCode::C402),
+                        self.patch(&DiagnosticCode::C402),
                         Range::from_located(expr),
                     ) {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C403) {
+                if self.settings.enabled.contains(&DiagnosticCode::C403) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_set(
                             expr,
@@ -2033,14 +2034,14 @@ where
                             args,
                             keywords,
                             self.locator,
-                            self.patch(&CheckCode::C403),
+                            self.patch(&DiagnosticCode::C403),
                             Range::from_located(expr),
                         )
                     {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C404) {
+                if self.settings.enabled.contains(&DiagnosticCode::C404) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_dict(
                             expr,
@@ -2048,107 +2049,107 @@ where
                             args,
                             keywords,
                             self.locator,
-                            self.patch(&CheckCode::C404),
+                            self.patch(&DiagnosticCode::C404),
                             Range::from_located(expr),
                         )
                     {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C405) {
+                if self.settings.enabled.contains(&DiagnosticCode::C405) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_set(
                         expr,
                         func,
                         args,
                         keywords,
                         self.locator,
-                        self.patch(&CheckCode::C405),
+                        self.patch(&DiagnosticCode::C405),
                         Range::from_located(expr),
                     ) {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C406) {
+                if self.settings.enabled.contains(&DiagnosticCode::C406) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_dict(
                         expr,
                         func,
                         args,
                         keywords,
                         self.locator,
-                        self.patch(&CheckCode::C406),
+                        self.patch(&DiagnosticCode::C406),
                         Range::from_located(expr),
                     ) {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C408) {
+                if self.settings.enabled.contains(&DiagnosticCode::C408) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_collection_call(
                         expr,
                         func,
                         args,
                         keywords,
                         self.locator,
-                        self.patch(&CheckCode::C408),
+                        self.patch(&DiagnosticCode::C408),
                         Range::from_located(expr),
                     ) {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C409) {
+                if self.settings.enabled.contains(&DiagnosticCode::C409) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_literal_within_tuple_call(
                             expr,
                             func,
                             args,
                             self.locator,
-                            self.patch(&CheckCode::C409),
+                            self.patch(&DiagnosticCode::C409),
                             Range::from_located(expr),
                         )
                     {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C410) {
+                if self.settings.enabled.contains(&DiagnosticCode::C410) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_literal_within_list_call(
                             expr,
                             func,
                             args,
                             self.locator,
-                            self.patch(&CheckCode::C410),
+                            self.patch(&DiagnosticCode::C410),
                             Range::from_located(expr),
                         )
                     {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C411) {
+                if self.settings.enabled.contains(&DiagnosticCode::C411) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_list_call(
                         expr,
                         func,
                         args,
                         self.locator,
-                        self.patch(&CheckCode::C411),
+                        self.patch(&DiagnosticCode::C411),
                         Range::from_located(expr),
                     ) {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C413) {
+                if self.settings.enabled.contains(&DiagnosticCode::C413) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_call_around_sorted(
                             expr,
                             func,
                             args,
                             self.locator,
-                            self.patch(&CheckCode::C413),
+                            self.patch(&DiagnosticCode::C413),
                             Range::from_located(expr),
                         )
                     {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C414) {
+                if self.settings.enabled.contains(&DiagnosticCode::C414) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_double_cast_or_process(
                             func,
@@ -2159,7 +2160,7 @@ where
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C415) {
+                if self.settings.enabled.contains(&DiagnosticCode::C415) {
                     if let Some(check) =
                         flake8_comprehensions::checks::unnecessary_subscript_reversal(
                             func,
@@ -2170,7 +2171,7 @@ where
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::C417) {
+                if self.settings.enabled.contains(&DiagnosticCode::C417) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_map(
                         func,
                         args,
@@ -2181,7 +2182,7 @@ where
                 }
 
                 // flake8-boolean-trap
-                if self.settings.enabled.contains(&CheckCode::FBT003) {
+                if self.settings.enabled.contains(&DiagnosticCode::FBT003) {
                     flake8_boolean_trap::plugins::check_boolean_positional_value_in_function_call(
                         self, args, func,
                     );
@@ -2195,7 +2196,7 @@ where
                 }
 
                 // flake8-debugger
-                if self.settings.enabled.contains(&CheckCode::T100) {
+                if self.settings.enabled.contains(&DiagnosticCode::T100) {
                     if let Some(check) = flake8_debugger::checks::debugger_call(
                         expr,
                         func,
@@ -2207,17 +2208,17 @@ where
                 }
 
                 // pandas-vet
-                if self.settings.enabled.contains(&CheckCode::PD002) {
+                if self.settings.enabled.contains(&DiagnosticCode::PD002) {
                     self.checks
                         .extend(pandas_vet::checks::inplace_argument(keywords).into_iter());
                 }
                 for (code, name) in vec![
-                    (CheckCode::PD003, "isnull"),
-                    (CheckCode::PD004, "notnull"),
-                    (CheckCode::PD010, "pivot"),
-                    (CheckCode::PD010, "unstack"),
-                    (CheckCode::PD012, "read_table"),
-                    (CheckCode::PD013, "stack"),
+                    (DiagnosticCode::PD003, "isnull"),
+                    (DiagnosticCode::PD004, "notnull"),
+                    (DiagnosticCode::PD010, "pivot"),
+                    (DiagnosticCode::PD010, "unstack"),
+                    (DiagnosticCode::PD012, "read_table"),
+                    (DiagnosticCode::PD013, "stack"),
                 ] {
                     if self.settings.enabled.contains(&code) {
                         if let ExprKind::Attribute { value, attr, .. } = &func.node {
@@ -2250,21 +2251,23 @@ where
                                         }
                                     }
 
-                                    self.checks
-                                        .push(Check::new(code.kind(), Range::from_located(func)));
+                                    self.checks.push(Diagnostic::new(
+                                        code.kind(),
+                                        Range::from_located(func),
+                                    ));
                                 }
                             };
                         }
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::PD015) {
+                if self.settings.enabled.contains(&DiagnosticCode::PD015) {
                     if let Some(check) = pandas_vet::checks::use_of_pd_merge(func) {
                         self.checks.push(check);
                     };
                 }
 
                 // flake8-datetimez
-                if self.settings.enabled.contains(&CheckCode::DTZ001) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ001) {
                     flake8_datetimez::plugins::call_datetime_without_tzinfo(
                         self,
                         func,
@@ -2273,28 +2276,28 @@ where
                         Range::from_located(expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::DTZ002) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ002) {
                     flake8_datetimez::plugins::call_datetime_today(
                         self,
                         func,
                         Range::from_located(expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::DTZ003) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ003) {
                     flake8_datetimez::plugins::call_datetime_utcnow(
                         self,
                         func,
                         Range::from_located(expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::DTZ004) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ004) {
                     flake8_datetimez::plugins::call_datetime_utcfromtimestamp(
                         self,
                         func,
                         Range::from_located(expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::DTZ005) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ005) {
                     flake8_datetimez::plugins::call_datetime_now_without_tzinfo(
                         self,
                         func,
@@ -2303,7 +2306,7 @@ where
                         Range::from_located(expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::DTZ006) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ006) {
                     flake8_datetimez::plugins::call_datetime_fromtimestamp(
                         self,
                         func,
@@ -2312,7 +2315,7 @@ where
                         Range::from_located(expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::DTZ007) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ007) {
                     flake8_datetimez::plugins::call_datetime_strptime_without_zone(
                         self,
                         func,
@@ -2320,14 +2323,14 @@ where
                         Range::from_located(expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::DTZ011) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ011) {
                     flake8_datetimez::plugins::call_date_today(
                         self,
                         func,
                         Range::from_located(expr),
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::DTZ012) {
+                if self.settings.enabled.contains(&DiagnosticCode::DTZ012) {
                     flake8_datetimez::plugins::call_date_fromtimestamp(
                         self,
                         func,
@@ -2336,30 +2339,30 @@ where
                 }
 
                 // pygrep-hooks
-                if self.settings.enabled.contains(&CheckCode::PGH001) {
+                if self.settings.enabled.contains(&DiagnosticCode::PGH001) {
                     pygrep_hooks::plugins::no_eval(self, func);
                 }
-                if self.settings.enabled.contains(&CheckCode::PGH002) {
+                if self.settings.enabled.contains(&DiagnosticCode::PGH002) {
                     pygrep_hooks::plugins::deprecated_log_warn(self, func);
                 }
 
                 // pylint
-                if self.settings.enabled.contains(&CheckCode::PLC3002) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLC3002) {
                     pylint::plugins::unnecessary_direct_lambda_call(self, expr, func);
                 }
-                if self.settings.enabled.contains(&CheckCode::PLR1722) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLR1722) {
                     pylint::plugins::use_sys_exit(self, func);
                 }
 
                 // flake8-pytest-style
-                if self.settings.enabled.contains(&CheckCode::PT008) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT008) {
                     if let Some(check) =
                         flake8_pytest_style::plugins::patch_with_lambda(func, args, keywords)
                     {
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::PT009) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT009) {
                     if let Some(check) = flake8_pytest_style::plugins::unittest_assertion(
                         self, expr, func, args, keywords,
                     ) {
@@ -2367,18 +2370,18 @@ where
                     }
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PT010)
-                    || self.settings.enabled.contains(&CheckCode::PT011)
+                if self.settings.enabled.contains(&DiagnosticCode::PT010)
+                    || self.settings.enabled.contains(&DiagnosticCode::PT011)
                 {
                     flake8_pytest_style::plugins::raises_call(self, func, args, keywords);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PT016) {
+                if self.settings.enabled.contains(&DiagnosticCode::PT016) {
                     flake8_pytest_style::plugins::fail_call(self, func, args, keywords);
                 }
 
                 // ruff
-                if self.settings.enabled.contains(&CheckCode::RUF004) {
+                if self.settings.enabled.contains(&DiagnosticCode::RUF004) {
                     self.checks
                         .extend(ruff::checks::keyword_argument_before_star_argument(
                             args, keywords,
@@ -2386,17 +2389,17 @@ where
                 }
             }
             ExprKind::Dict { keys, values } => {
-                if self.settings.enabled.contains(&CheckCode::F601)
-                    || self.settings.enabled.contains(&CheckCode::F602)
+                if self.settings.enabled.contains(&DiagnosticCode::F601)
+                    || self.settings.enabled.contains(&DiagnosticCode::F602)
                 {
                     pyflakes::plugins::repeated_keys(self, keys, values);
                 }
             }
             ExprKind::Yield { .. } => {
-                if self.settings.enabled.contains(&CheckCode::F704) {
+                if self.settings.enabled.contains(&DiagnosticCode::F704) {
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.checks.push(Check::new(
+                        self.checks.push(Diagnostic::new(
                             violations::YieldOutsideFunction(DeferralKeyword::Yield),
                             Range::from_located(expr),
                         ));
@@ -2404,10 +2407,10 @@ where
                 }
             }
             ExprKind::YieldFrom { .. } => {
-                if self.settings.enabled.contains(&CheckCode::F704) {
+                if self.settings.enabled.contains(&DiagnosticCode::F704) {
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.checks.push(Check::new(
+                        self.checks.push(Diagnostic::new(
                             violations::YieldOutsideFunction(DeferralKeyword::YieldFrom),
                             Range::from_located(expr),
                         ));
@@ -2415,21 +2418,21 @@ where
                 }
             }
             ExprKind::Await { .. } => {
-                if self.settings.enabled.contains(&CheckCode::F704) {
+                if self.settings.enabled.contains(&DiagnosticCode::F704) {
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.checks.push(Check::new(
+                        self.checks.push(Diagnostic::new(
                             violations::YieldOutsideFunction(DeferralKeyword::Await),
                             Range::from_located(expr),
                         ));
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::PLE1142) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLE1142) {
                     pylint::plugins::await_outside_async(self, expr);
                 }
             }
             ExprKind::JoinedStr { values } => {
-                if self.settings.enabled.contains(&CheckCode::F541) {
+                if self.settings.enabled.contains(&DiagnosticCode::F541) {
                     pyflakes::plugins::f_string_missing_placeholders(expr, values, self);
                 }
             }
@@ -2438,7 +2441,7 @@ where
                 op: Operator::RShift,
                 ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::F633) {
+                if self.settings.enabled.contains(&DiagnosticCode::F633) {
                     pyflakes::plugins::invalid_print_syntax(self, left);
                 }
             }
@@ -2452,15 +2455,15 @@ where
                     ..
                 } = &left.node
                 {
-                    if self.settings.enabled.contains(&CheckCode::F501)
-                        || self.settings.enabled.contains(&CheckCode::F502)
-                        || self.settings.enabled.contains(&CheckCode::F503)
-                        || self.settings.enabled.contains(&CheckCode::F504)
-                        || self.settings.enabled.contains(&CheckCode::F505)
-                        || self.settings.enabled.contains(&CheckCode::F506)
-                        || self.settings.enabled.contains(&CheckCode::F507)
-                        || self.settings.enabled.contains(&CheckCode::F508)
-                        || self.settings.enabled.contains(&CheckCode::F509)
+                    if self.settings.enabled.contains(&DiagnosticCode::F501)
+                        || self.settings.enabled.contains(&DiagnosticCode::F502)
+                        || self.settings.enabled.contains(&DiagnosticCode::F503)
+                        || self.settings.enabled.contains(&DiagnosticCode::F504)
+                        || self.settings.enabled.contains(&DiagnosticCode::F505)
+                        || self.settings.enabled.contains(&DiagnosticCode::F506)
+                        || self.settings.enabled.contains(&DiagnosticCode::F507)
+                        || self.settings.enabled.contains(&DiagnosticCode::F508)
+                        || self.settings.enabled.contains(&DiagnosticCode::F509)
                     {
                         let location = Range::from_located(expr);
                         match pyflakes::cformat::CFormatSummary::try_from(value.as_ref()) {
@@ -2468,53 +2471,53 @@ where
                                 typ: CFormatErrorType::UnsupportedFormatChar(c),
                                 ..
                             }) => {
-                                if self.settings.enabled.contains(&CheckCode::F509) {
-                                    self.checks.push(Check::new(
+                                if self.settings.enabled.contains(&DiagnosticCode::F509) {
+                                    self.checks.push(Diagnostic::new(
                                         violations::PercentFormatUnsupportedFormatCharacter(c),
                                         location,
                                     ));
                                 }
                             }
                             Err(e) => {
-                                if self.settings.enabled.contains(&CheckCode::F501) {
-                                    self.checks.push(Check::new(
+                                if self.settings.enabled.contains(&DiagnosticCode::F501) {
+                                    self.checks.push(Diagnostic::new(
                                         violations::PercentFormatInvalidFormat(e.to_string()),
                                         location,
                                     ));
                                 }
                             }
                             Ok(summary) => {
-                                if self.settings.enabled.contains(&CheckCode::F502) {
+                                if self.settings.enabled.contains(&DiagnosticCode::F502) {
                                     pyflakes::plugins::percent_format_expected_mapping(
                                         self, &summary, right, location,
                                     );
                                 }
-                                if self.settings.enabled.contains(&CheckCode::F503) {
+                                if self.settings.enabled.contains(&DiagnosticCode::F503) {
                                     pyflakes::plugins::percent_format_expected_sequence(
                                         self, &summary, right, location,
                                     );
                                 }
-                                if self.settings.enabled.contains(&CheckCode::F504) {
+                                if self.settings.enabled.contains(&DiagnosticCode::F504) {
                                     pyflakes::plugins::percent_format_extra_named_arguments(
                                         self, &summary, right, location,
                                     );
                                 }
-                                if self.settings.enabled.contains(&CheckCode::F505) {
+                                if self.settings.enabled.contains(&DiagnosticCode::F505) {
                                     pyflakes::plugins::percent_format_missing_arguments(
                                         self, &summary, right, location,
                                     );
                                 }
-                                if self.settings.enabled.contains(&CheckCode::F506) {
+                                if self.settings.enabled.contains(&DiagnosticCode::F506) {
                                     pyflakes::plugins::percent_format_mixed_positional_and_named(
                                         self, &summary, location,
                                     );
                                 }
-                                if self.settings.enabled.contains(&CheckCode::F507) {
+                                if self.settings.enabled.contains(&DiagnosticCode::F507) {
                                     pyflakes::plugins::percent_format_positional_count_mismatch(
                                         self, &summary, right, location,
                                     );
                                 }
-                                if self.settings.enabled.contains(&CheckCode::F508) {
+                                if self.settings.enabled.contains(&DiagnosticCode::F508) {
                                     pyflakes::plugins::percent_format_star_requires_sequence(
                                         self, &summary, right, location,
                                     );
@@ -2527,15 +2530,15 @@ where
             ExprKind::BinOp {
                 op: Operator::Add, ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::ISC003) {
+                if self.settings.enabled.contains(&DiagnosticCode::ISC003) {
                     if let Some(check) = flake8_implicit_str_concat::checks::explicit(expr) {
                         self.checks.push(check);
                     }
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
-                let check_not_in = self.settings.enabled.contains(&CheckCode::E713);
-                let check_not_is = self.settings.enabled.contains(&CheckCode::E714);
+                let check_not_in = self.settings.enabled.contains(&DiagnosticCode::E713);
+                let check_not_is = self.settings.enabled.contains(&DiagnosticCode::E714);
                 if check_not_in || check_not_is {
                     pycodestyle::plugins::not_tests(
                         self,
@@ -2547,17 +2550,17 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::B002) {
+                if self.settings.enabled.contains(&DiagnosticCode::B002) {
                     flake8_bugbear::plugins::unary_prefix_increment(self, expr, op, operand);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::SIM201) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM201) {
                     flake8_simplify::plugins::negation_with_equal_op(self, expr, op, operand);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM202) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM202) {
                     flake8_simplify::plugins::negation_with_not_equal_op(self, expr, op, operand);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM208) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM208) {
                     flake8_simplify::plugins::double_negation(self, expr, op, operand);
                 }
             }
@@ -2566,8 +2569,9 @@ where
                 ops,
                 comparators,
             } => {
-                let check_none_comparisons = self.settings.enabled.contains(&CheckCode::E711);
-                let check_true_false_comparisons = self.settings.enabled.contains(&CheckCode::E712);
+                let check_none_comparisons = self.settings.enabled.contains(&DiagnosticCode::E711);
+                let check_true_false_comparisons =
+                    self.settings.enabled.contains(&DiagnosticCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
                     pycodestyle::plugins::literal_comparisons(
                         self,
@@ -2580,7 +2584,7 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::F632) {
+                if self.settings.enabled.contains(&DiagnosticCode::F632) {
                     pyflakes::plugins::invalid_literal_comparison(
                         self,
                         left,
@@ -2590,7 +2594,7 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::E721) {
+                if self.settings.enabled.contains(&DiagnosticCode::E721) {
                     self.checks.extend(pycodestyle::checks::type_comparison(
                         ops,
                         comparators,
@@ -2598,16 +2602,16 @@ where
                     ));
                 }
 
-                if self.settings.enabled.contains(&CheckCode::YTT103)
-                    || self.settings.enabled.contains(&CheckCode::YTT201)
-                    || self.settings.enabled.contains(&CheckCode::YTT203)
-                    || self.settings.enabled.contains(&CheckCode::YTT204)
-                    || self.settings.enabled.contains(&CheckCode::YTT302)
+                if self.settings.enabled.contains(&DiagnosticCode::YTT103)
+                    || self.settings.enabled.contains(&DiagnosticCode::YTT201)
+                    || self.settings.enabled.contains(&DiagnosticCode::YTT203)
+                    || self.settings.enabled.contains(&DiagnosticCode::YTT204)
+                    || self.settings.enabled.contains(&DiagnosticCode::YTT302)
                 {
                     flake8_2020::plugins::compare(self, left, ops, comparators);
                 }
 
-                if self.settings.enabled.contains(&CheckCode::S105) {
+                if self.settings.enabled.contains(&DiagnosticCode::S105) {
                     self.checks.extend(
                         flake8_bandit::checks::compare_to_hardcoded_password_string(
                             left,
@@ -2616,7 +2620,7 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::PLC2201) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLC2201) {
                     pylint::plugins::misplaced_comparison_constant(
                         self,
                         expr,
@@ -2626,7 +2630,7 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::SIM118) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM118) {
                     flake8_simplify::plugins::key_in_dict_compare(
                         self,
                         expr,
@@ -2636,7 +2640,7 @@ where
                     );
                 }
 
-                if self.settings.enabled.contains(&CheckCode::SIM300) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM300) {
                     flake8_simplify::plugins::yoda_conditions(self, expr, left, ops, comparators);
                 }
             }
@@ -2652,7 +2656,7 @@ where
                         (self.scope_stack.clone(), self.parents.clone()),
                     ));
                 }
-                if self.settings.enabled.contains(&CheckCode::S104) {
+                if self.settings.enabled.contains(&DiagnosticCode::S104) {
                     if let Some(check) = flake8_bandit::checks::hardcoded_bind_all_interfaces(
                         value,
                         &Range::from_located(expr),
@@ -2660,7 +2664,7 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::S108) {
+                if self.settings.enabled.contains(&DiagnosticCode::S108) {
                     if let Some(check) = flake8_bandit::checks::hardcoded_tmp_directory(
                         expr,
                         value,
@@ -2669,12 +2673,12 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::UP025) {
+                if self.settings.enabled.contains(&DiagnosticCode::UP025) {
                     pyupgrade::plugins::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
-                if self.settings.enabled.contains(&CheckCode::PIE807) {
+                if self.settings.enabled.contains(&DiagnosticCode::PIE807) {
                     flake8_pie::plugins::prefer_list_builtin(self, expr);
                 }
 
@@ -2713,66 +2717,66 @@ where
                 self.push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
             }
             ExprKind::IfExp { test, body, orelse } => {
-                if self.settings.enabled.contains(&CheckCode::SIM210) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM210) {
                     flake8_simplify::plugins::explicit_true_false_in_ifexpr(
                         self, expr, test, body, orelse,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM211) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM211) {
                     flake8_simplify::plugins::explicit_false_true_in_ifexpr(
                         self, expr, test, body, orelse,
                     );
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM212) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM212) {
                     flake8_simplify::plugins::twisted_arms_in_ifexpr(
                         self, expr, test, body, orelse,
                     );
                 }
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
-                if self.settings.enabled.contains(&CheckCode::C416) {
+                if self.settings.enabled.contains(&DiagnosticCode::C416) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_comprehension(
                         expr,
                         elt,
                         generators,
                         self.locator,
-                        self.patch(&CheckCode::C416),
+                        self.patch(&DiagnosticCode::C416),
                         Range::from_located(expr),
                     ) {
                         self.checks.push(check);
                     };
                 }
-                if self.settings.enabled.contains(&CheckCode::B023) {
+                if self.settings.enabled.contains(&DiagnosticCode::B023) {
                     flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
                 self.push_scope(Scope::new(ScopeKind::Generator));
             }
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
-                if self.settings.enabled.contains(&CheckCode::B023) {
+                if self.settings.enabled.contains(&DiagnosticCode::B023) {
                     flake8_bugbear::plugins::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
                 self.push_scope(Scope::new(ScopeKind::Generator));
             }
             ExprKind::BoolOp { op, values } => {
-                if self.settings.enabled.contains(&CheckCode::PLR1701) {
+                if self.settings.enabled.contains(&DiagnosticCode::PLR1701) {
                     pylint::plugins::merge_isinstance(self, expr, op, values);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM101) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM101) {
                     flake8_simplify::plugins::duplicate_isinstance_call(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM109) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM109) {
                     flake8_simplify::plugins::compare_with_tuple(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM220) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM220) {
                     flake8_simplify::plugins::a_and_not_a(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM221) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM221) {
                     flake8_simplify::plugins::a_or_not_a(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM222) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM222) {
                     flake8_simplify::plugins::or_true(self, expr);
                 }
-                if self.settings.enabled.contains(&CheckCode::SIM223) {
+                if self.settings.enabled.contains(&DiagnosticCode::SIM223) {
                     flake8_simplify::plugins::and_false(self, expr);
                 }
             }
@@ -3011,7 +3015,7 @@ where
             ExcepthandlerKind::ExceptHandler {
                 type_, name, body, ..
             } => {
-                if self.settings.enabled.contains(&CheckCode::E722) {
+                if self.settings.enabled.contains(&DiagnosticCode::E722) {
                     if let Some(check) = pycodestyle::checks::do_not_use_bare_except(
                         type_.as_deref(),
                         body,
@@ -3021,10 +3025,10 @@ where
                         self.checks.push(check);
                     }
                 }
-                if self.settings.enabled.contains(&CheckCode::B904) {
+                if self.settings.enabled.contains(&DiagnosticCode::B904) {
                     flake8_bugbear::plugins::raise_without_from_inside_except(self, body);
                 }
-                if self.settings.enabled.contains(&CheckCode::BLE001) {
+                if self.settings.enabled.contains(&DiagnosticCode::BLE001) {
                     flake8_blind_except::plugins::blind_except(
                         self,
                         type_.as_deref(),
@@ -3034,7 +3038,7 @@ where
                 }
                 match name {
                     Some(name) => {
-                        if self.settings.enabled.contains(&CheckCode::E741) {
+                        if self.settings.enabled.contains(&DiagnosticCode::E741) {
                             if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                                 name,
                                 helpers::excepthandler_name_range(excepthandler, self.locator)
@@ -3084,12 +3088,12 @@ where
                             &scope.values.remove(&name.as_str())
                         } {
                             if self.bindings[*index].used.is_none() {
-                                if self.settings.enabled.contains(&CheckCode::F841) {
-                                    let mut check = Check::new(
+                                if self.settings.enabled.contains(&DiagnosticCode::F841) {
+                                    let mut check = Diagnostic::new(
                                         violations::UnusedVariable(name.to_string()),
                                         name_range,
                                     );
-                                    if self.patch(&CheckCode::F841) {
+                                    if self.patch(&DiagnosticCode::F841) {
                                         match pyflakes::fixes::remove_exception_handler_assignment(
                                             excepthandler,
                                             self.locator,
@@ -3135,7 +3139,7 @@ where
     }
 
     fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
-        if self.settings.enabled.contains(&CheckCode::SIM118) {
+        if self.settings.enabled.contains(&DiagnosticCode::SIM118) {
             flake8_simplify::plugins::key_in_dict_for(
                 self,
                 &comprehension.target,
@@ -3146,18 +3150,18 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        if self.settings.enabled.contains(&CheckCode::B006) {
+        if self.settings.enabled.contains(&DiagnosticCode::B006) {
             flake8_bugbear::plugins::mutable_argument_default(self, arguments);
         }
-        if self.settings.enabled.contains(&CheckCode::B008) {
+        if self.settings.enabled.contains(&DiagnosticCode::B008) {
             flake8_bugbear::plugins::function_call_argument_default(self, arguments);
         }
 
         // flake8-boolean-trap
-        if self.settings.enabled.contains(&CheckCode::FBT001) {
+        if self.settings.enabled.contains(&DiagnosticCode::FBT001) {
             flake8_boolean_trap::plugins::check_positional_boolean_in_def(self, arguments);
         }
-        if self.settings.enabled.contains(&CheckCode::FBT002) {
+        if self.settings.enabled.contains(&DiagnosticCode::FBT002) {
             flake8_boolean_trap::plugins::check_boolean_default_value_in_function_definition(
                 self, arguments,
             );
@@ -3195,7 +3199,7 @@ where
             },
         );
 
-        if self.settings.enabled.contains(&CheckCode::E741) {
+        if self.settings.enabled.contains(&DiagnosticCode::E741) {
             if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
                 &arg.node.arg,
                 Range::from_located(arg),
@@ -3204,7 +3208,7 @@ where
             }
         }
 
-        if self.settings.enabled.contains(&CheckCode::N803) {
+        if self.settings.enabled.contains(&DiagnosticCode::N803) {
             if let Some(check) = pep8_naming::checks::invalid_argument_name(&arg.node.arg, arg) {
                 self.checks.push(check);
             }
@@ -3214,12 +3218,12 @@ where
     }
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
-        if self.settings.enabled.contains(&CheckCode::PIE790) {
+        if self.settings.enabled.contains(&DiagnosticCode::PIE790) {
             flake8_pie::plugins::no_unnecessary_pass(self, body);
         }
 
-        if self.settings.enabled.contains(&CheckCode::SIM110)
-            || self.settings.enabled.contains(&CheckCode::SIM111)
+        if self.settings.enabled.contains(&DiagnosticCode::SIM110)
+            || self.settings.enabled.contains(&DiagnosticCode::SIM111)
         {
             for (stmt, sibling) in body.iter().tuple_windows() {
                 if matches!(stmt.node, StmtKind::For { .. })
@@ -3370,8 +3374,8 @@ impl<'a> Checker<'a> {
                 );
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
                     overridden = Some((*scope_index, *existing_binding_index));
-                    if self.settings.enabled.contains(&CheckCode::F402) {
-                        self.checks.push(Check::new(
+                    if self.settings.enabled.contains(&DiagnosticCode::F402) {
+                        self.checks.push(Diagnostic::new(
                             violations::ImportShadowedByLoopVar(
                                 name.to_string(),
                                 existing.range.location.row(),
@@ -3390,8 +3394,8 @@ impl<'a> Checker<'a> {
                             ))
                     {
                         overridden = Some((*scope_index, *existing_binding_index));
-                        if self.settings.enabled.contains(&CheckCode::F811) {
-                            self.checks.push(Check::new(
+                        if self.settings.enabled.contains(&DiagnosticCode::F811) {
+                            self.checks.push(Diagnostic::new(
                                 violations::RedefinedWhileUnused(
                                     name.to_string(),
                                     existing.range.location.row(),
@@ -3502,7 +3506,7 @@ impl<'a> Checker<'a> {
             }
 
             if import_starred {
-                if self.settings.enabled.contains(&CheckCode::F405) {
+                if self.settings.enabled.contains(&DiagnosticCode::F405) {
                     let mut from_list = vec![];
                     for scope_index in self.scope_stack.iter().rev() {
                         let scope = &self.scopes[*scope_index];
@@ -3517,7 +3521,7 @@ impl<'a> Checker<'a> {
                     }
                     from_list.sort();
 
-                    self.checks.push(Check::new(
+                    self.checks.push(Diagnostic::new(
                         violations::ImportStarUsage(id.to_string(), from_list),
                         Range::from_located(expr),
                     ));
@@ -3525,7 +3529,7 @@ impl<'a> Checker<'a> {
                 return;
             }
 
-            if self.settings.enabled.contains(&CheckCode::F821) {
+            if self.settings.enabled.contains(&DiagnosticCode::F821) {
                 // Allow __path__.
                 if self.path.ends_with("__init__.py") && id == "__path__" {
                     return;
@@ -3548,7 +3552,7 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                self.checks.push(Check::new(
+                self.checks.push(Diagnostic::new(
                     violations::UndefinedName(id.clone()),
                     Range::from_located(expr),
                 ));
@@ -3562,7 +3566,7 @@ impl<'a> Checker<'a> {
     {
         let parent = self.current_stmt().0;
 
-        if self.settings.enabled.contains(&CheckCode::F823) {
+        if self.settings.enabled.contains(&DiagnosticCode::F823) {
             let scopes: Vec<&Scope> = self
                 .scope_stack
                 .iter()
@@ -3573,7 +3577,7 @@ impl<'a> Checker<'a> {
             }
         }
 
-        if self.settings.enabled.contains(&CheckCode::N806) {
+        if self.settings.enabled.contains(&DiagnosticCode::N806) {
             if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
                 if !self.current_scope().values.get(id).map_or(false, |index| {
@@ -3586,13 +3590,13 @@ impl<'a> Checker<'a> {
             }
         }
 
-        if self.settings.enabled.contains(&CheckCode::N815) {
+        if self.settings.enabled.contains(&DiagnosticCode::N815) {
             if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
                 pep8_naming::plugins::mixed_case_variable_in_class_scope(self, expr, parent, id);
             }
         }
 
-        if self.settings.enabled.contains(&CheckCode::N816) {
+        if self.settings.enabled.contains(&DiagnosticCode::N816) {
             if matches!(self.current_scope().kind, ScopeKind::Module) {
                 pep8_naming::plugins::mixed_case_variable_in_global_scope(self, expr, parent, id);
             }
@@ -3717,9 +3721,9 @@ impl<'a> Checker<'a> {
             let scope =
                 &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
             if scope.values.remove(&id.as_str()).is_none()
-                && self.settings.enabled.contains(&CheckCode::F821)
+                && self.settings.enabled.contains(&DiagnosticCode::F821)
             {
-                self.checks.push(Check::new(
+                self.checks.push(Diagnostic::new(
                     violations::UndefinedName(id.to_string()),
                     Range::from_located(expr),
                 ));
@@ -3731,7 +3735,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        if self.settings.enabled.contains(&CheckCode::B021) {
+        if self.settings.enabled.contains(&DiagnosticCode::B021) {
             flake8_bugbear::plugins::f_string_docstring(self, python_ast);
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
@@ -3779,8 +3783,8 @@ impl<'a> Checker<'a> {
                 allocator.push(expr);
                 stacks.push((in_annotation, context));
             } else {
-                if self.settings.enabled.contains(&CheckCode::F722) {
-                    self.checks.push(Check::new(
+                if self.settings.enabled.contains(&DiagnosticCode::F722) {
+                    self.checks.push(Diagnostic::new(
                         violations::ForwardAnnotationSyntaxError(expression.to_string()),
                         range,
                     ));
@@ -3841,17 +3845,17 @@ impl<'a> Checker<'a> {
         while let Some((scopes, _parents)) = self.deferred_assignments.pop() {
             let scope_index = scopes[scopes.len() - 1];
             let parent_scope_index = scopes[scopes.len() - 2];
-            if self.settings.enabled.contains(&CheckCode::F841) {
+            if self.settings.enabled.contains(&DiagnosticCode::F841) {
                 pyflakes::plugins::unused_variable(self, scope_index);
             }
-            if self.settings.enabled.contains(&CheckCode::F842) {
+            if self.settings.enabled.contains(&DiagnosticCode::F842) {
                 pyflakes::plugins::unused_annotation(self, scope_index);
             }
-            if self.settings.enabled.contains(&CheckCode::ARG001)
-                || self.settings.enabled.contains(&CheckCode::ARG002)
-                || self.settings.enabled.contains(&CheckCode::ARG003)
-                || self.settings.enabled.contains(&CheckCode::ARG004)
-                || self.settings.enabled.contains(&CheckCode::ARG005)
+            if self.settings.enabled.contains(&DiagnosticCode::ARG001)
+                || self.settings.enabled.contains(&DiagnosticCode::ARG002)
+                || self.settings.enabled.contains(&DiagnosticCode::ARG003)
+                || self.settings.enabled.contains(&DiagnosticCode::ARG004)
+                || self.settings.enabled.contains(&DiagnosticCode::ARG005)
             {
                 self.checks
                     .extend(flake8_unused_arguments::plugins::unused_arguments(
@@ -3865,16 +3869,16 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
-        if !self.settings.enabled.contains(&CheckCode::F401)
-            && !self.settings.enabled.contains(&CheckCode::F405)
-            && !self.settings.enabled.contains(&CheckCode::F811)
-            && !self.settings.enabled.contains(&CheckCode::F822)
-            && !self.settings.enabled.contains(&CheckCode::PLW0602)
+        if !self.settings.enabled.contains(&DiagnosticCode::F401)
+            && !self.settings.enabled.contains(&DiagnosticCode::F405)
+            && !self.settings.enabled.contains(&DiagnosticCode::F811)
+            && !self.settings.enabled.contains(&DiagnosticCode::F822)
+            && !self.settings.enabled.contains(&DiagnosticCode::PLW0602)
         {
             return;
         }
 
-        let mut checks: Vec<Check> = vec![];
+        let mut checks: Vec<Diagnostic> = vec![];
         for scope in self
             .dead_scopes
             .iter()
@@ -3882,11 +3886,11 @@ impl<'a> Checker<'a> {
             .map(|index| &self.scopes[*index])
         {
             // PLW0602
-            if self.settings.enabled.contains(&CheckCode::PLW0602) {
+            if self.settings.enabled.contains(&DiagnosticCode::PLW0602) {
                 for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
                     if matches!(binding.kind, BindingKind::Global) {
-                        checks.push(Check::new(
+                        checks.push(Diagnostic::new(
                             violations::GlobalVariableNotAssigned((*name).to_string()),
                             binding.range,
                         ));
@@ -3909,13 +3913,13 @@ impl<'a> Checker<'a> {
                     _ => None,
                 });
 
-            if self.settings.enabled.contains(&CheckCode::F822) {
+            if self.settings.enabled.contains(&DiagnosticCode::F822) {
                 if !scope.import_starred && !self.path.ends_with("__init__.py") {
                     if let Some(all_binding) = all_binding {
                         if let Some(names) = &all_names {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
-                                    checks.push(Check::new(
+                                    checks.push(Diagnostic::new(
                                         violations::UndefinedExport(name.to_string()),
                                         all_binding.range,
                                     ));
@@ -3929,7 +3933,7 @@ impl<'a> Checker<'a> {
             // Look for any bindings that were redefined in another scope, and remain
             // unused. Note that we only store references in `redefinitions` if
             // the bindings are in different scopes.
-            if self.settings.enabled.contains(&CheckCode::F811) {
+            if self.settings.enabled.contains(&DiagnosticCode::F811) {
                 for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
 
@@ -3953,7 +3957,7 @@ impl<'a> Checker<'a> {
 
                         if let Some(indices) = self.redefinitions.get(index) {
                             for index in indices {
-                                checks.push(Check::new(
+                                checks.push(Diagnostic::new(
                                     violations::RedefinedWhileUnused(
                                         (*name).to_string(),
                                         binding.range.location.row(),
@@ -3966,7 +3970,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.enabled.contains(&CheckCode::F405) {
+            if self.settings.enabled.contains(&DiagnosticCode::F405) {
                 if scope.import_starred {
                     if let Some(all_binding) = all_binding {
                         if let Some(names) = &all_names {
@@ -3984,7 +3988,7 @@ impl<'a> Checker<'a> {
 
                             for &name in names {
                                 if !scope.values.contains_key(name) {
-                                    checks.push(Check::new(
+                                    checks.push(Diagnostic::new(
                                         violations::ImportStarUsage(
                                             name.to_string(),
                                             from_list.clone(),
@@ -3998,7 +4002,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.enabled.contains(&CheckCode::F401) {
+            if self.settings.enabled.contains(&DiagnosticCode::F401) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 type UnusedImport<'a> = (&'a str, &'a Range);
@@ -4043,9 +4047,9 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    if self.is_ignored(&CheckCode::F401, check_lineno)
+                    if self.is_ignored(&DiagnosticCode::F401, check_lineno)
                         || parent_lineno.map_or(false, |parent_lineno| {
-                            self.is_ignored(&CheckCode::F401, parent_lineno)
+                            self.is_ignored(&DiagnosticCode::F401, parent_lineno)
                         })
                     {
                         ignored
@@ -4069,7 +4073,7 @@ impl<'a> Checker<'a> {
                     let child: &Stmt = defined_by.into();
                     let parent: Option<&Stmt> = defined_in.map(std::convert::Into::into);
 
-                    let fix = if !ignore_init && self.patch(&CheckCode::F401) {
+                    let fix = if !ignore_init && self.patch(&DiagnosticCode::F401) {
                         let deleted: Vec<&Stmt> = self
                             .deletions
                             .iter()
@@ -4099,7 +4103,7 @@ impl<'a> Checker<'a> {
 
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
-                        let mut check = Check::new(
+                        let mut check = Diagnostic::new(
                             violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
@@ -4121,7 +4125,7 @@ impl<'a> Checker<'a> {
                     let child: &Stmt = defined_by.into();
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
-                        let mut check = Check::new(
+                        let mut check = Diagnostic::new(
                             violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
@@ -4139,62 +4143,62 @@ impl<'a> Checker<'a> {
     }
 
     fn check_definitions(&mut self) {
-        let enforce_annotations = self.settings.enabled.contains(&CheckCode::ANN001)
-            || self.settings.enabled.contains(&CheckCode::ANN002)
-            || self.settings.enabled.contains(&CheckCode::ANN003)
-            || self.settings.enabled.contains(&CheckCode::ANN101)
-            || self.settings.enabled.contains(&CheckCode::ANN102)
-            || self.settings.enabled.contains(&CheckCode::ANN201)
-            || self.settings.enabled.contains(&CheckCode::ANN202)
-            || self.settings.enabled.contains(&CheckCode::ANN204)
-            || self.settings.enabled.contains(&CheckCode::ANN205)
-            || self.settings.enabled.contains(&CheckCode::ANN206)
-            || self.settings.enabled.contains(&CheckCode::ANN401);
-        let enforce_docstrings = self.settings.enabled.contains(&CheckCode::D100)
-            || self.settings.enabled.contains(&CheckCode::D101)
-            || self.settings.enabled.contains(&CheckCode::D102)
-            || self.settings.enabled.contains(&CheckCode::D103)
-            || self.settings.enabled.contains(&CheckCode::D104)
-            || self.settings.enabled.contains(&CheckCode::D105)
-            || self.settings.enabled.contains(&CheckCode::D106)
-            || self.settings.enabled.contains(&CheckCode::D107)
-            || self.settings.enabled.contains(&CheckCode::D200)
-            || self.settings.enabled.contains(&CheckCode::D201)
-            || self.settings.enabled.contains(&CheckCode::D202)
-            || self.settings.enabled.contains(&CheckCode::D203)
-            || self.settings.enabled.contains(&CheckCode::D204)
-            || self.settings.enabled.contains(&CheckCode::D205)
-            || self.settings.enabled.contains(&CheckCode::D206)
-            || self.settings.enabled.contains(&CheckCode::D207)
-            || self.settings.enabled.contains(&CheckCode::D208)
-            || self.settings.enabled.contains(&CheckCode::D209)
-            || self.settings.enabled.contains(&CheckCode::D210)
-            || self.settings.enabled.contains(&CheckCode::D211)
-            || self.settings.enabled.contains(&CheckCode::D212)
-            || self.settings.enabled.contains(&CheckCode::D213)
-            || self.settings.enabled.contains(&CheckCode::D214)
-            || self.settings.enabled.contains(&CheckCode::D215)
-            || self.settings.enabled.contains(&CheckCode::D300)
-            || self.settings.enabled.contains(&CheckCode::D301)
-            || self.settings.enabled.contains(&CheckCode::D400)
-            || self.settings.enabled.contains(&CheckCode::D402)
-            || self.settings.enabled.contains(&CheckCode::D403)
-            || self.settings.enabled.contains(&CheckCode::D404)
-            || self.settings.enabled.contains(&CheckCode::D405)
-            || self.settings.enabled.contains(&CheckCode::D406)
-            || self.settings.enabled.contains(&CheckCode::D407)
-            || self.settings.enabled.contains(&CheckCode::D408)
-            || self.settings.enabled.contains(&CheckCode::D409)
-            || self.settings.enabled.contains(&CheckCode::D410)
-            || self.settings.enabled.contains(&CheckCode::D411)
-            || self.settings.enabled.contains(&CheckCode::D412)
-            || self.settings.enabled.contains(&CheckCode::D413)
-            || self.settings.enabled.contains(&CheckCode::D414)
-            || self.settings.enabled.contains(&CheckCode::D415)
-            || self.settings.enabled.contains(&CheckCode::D416)
-            || self.settings.enabled.contains(&CheckCode::D417)
-            || self.settings.enabled.contains(&CheckCode::D418)
-            || self.settings.enabled.contains(&CheckCode::D419);
+        let enforce_annotations = self.settings.enabled.contains(&DiagnosticCode::ANN001)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN002)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN003)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN101)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN102)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN201)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN202)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN204)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN205)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN206)
+            || self.settings.enabled.contains(&DiagnosticCode::ANN401);
+        let enforce_docstrings = self.settings.enabled.contains(&DiagnosticCode::D100)
+            || self.settings.enabled.contains(&DiagnosticCode::D101)
+            || self.settings.enabled.contains(&DiagnosticCode::D102)
+            || self.settings.enabled.contains(&DiagnosticCode::D103)
+            || self.settings.enabled.contains(&DiagnosticCode::D104)
+            || self.settings.enabled.contains(&DiagnosticCode::D105)
+            || self.settings.enabled.contains(&DiagnosticCode::D106)
+            || self.settings.enabled.contains(&DiagnosticCode::D107)
+            || self.settings.enabled.contains(&DiagnosticCode::D200)
+            || self.settings.enabled.contains(&DiagnosticCode::D201)
+            || self.settings.enabled.contains(&DiagnosticCode::D202)
+            || self.settings.enabled.contains(&DiagnosticCode::D203)
+            || self.settings.enabled.contains(&DiagnosticCode::D204)
+            || self.settings.enabled.contains(&DiagnosticCode::D205)
+            || self.settings.enabled.contains(&DiagnosticCode::D206)
+            || self.settings.enabled.contains(&DiagnosticCode::D207)
+            || self.settings.enabled.contains(&DiagnosticCode::D208)
+            || self.settings.enabled.contains(&DiagnosticCode::D209)
+            || self.settings.enabled.contains(&DiagnosticCode::D210)
+            || self.settings.enabled.contains(&DiagnosticCode::D211)
+            || self.settings.enabled.contains(&DiagnosticCode::D212)
+            || self.settings.enabled.contains(&DiagnosticCode::D213)
+            || self.settings.enabled.contains(&DiagnosticCode::D214)
+            || self.settings.enabled.contains(&DiagnosticCode::D215)
+            || self.settings.enabled.contains(&DiagnosticCode::D300)
+            || self.settings.enabled.contains(&DiagnosticCode::D301)
+            || self.settings.enabled.contains(&DiagnosticCode::D400)
+            || self.settings.enabled.contains(&DiagnosticCode::D402)
+            || self.settings.enabled.contains(&DiagnosticCode::D403)
+            || self.settings.enabled.contains(&DiagnosticCode::D404)
+            || self.settings.enabled.contains(&DiagnosticCode::D405)
+            || self.settings.enabled.contains(&DiagnosticCode::D406)
+            || self.settings.enabled.contains(&DiagnosticCode::D407)
+            || self.settings.enabled.contains(&DiagnosticCode::D408)
+            || self.settings.enabled.contains(&DiagnosticCode::D409)
+            || self.settings.enabled.contains(&DiagnosticCode::D410)
+            || self.settings.enabled.contains(&DiagnosticCode::D411)
+            || self.settings.enabled.contains(&DiagnosticCode::D412)
+            || self.settings.enabled.contains(&DiagnosticCode::D413)
+            || self.settings.enabled.contains(&DiagnosticCode::D414)
+            || self.settings.enabled.contains(&DiagnosticCode::D415)
+            || self.settings.enabled.contains(&DiagnosticCode::D416)
+            || self.settings.enabled.contains(&DiagnosticCode::D417)
+            || self.settings.enabled.contains(&DiagnosticCode::D418)
+            || self.settings.enabled.contains(&DiagnosticCode::D419);
 
         let mut overloaded_name: Option<String> = None;
         self.definitions.reverse();
@@ -4247,79 +4251,79 @@ impl<'a> Checker<'a> {
                     continue;
                 }
 
-                if self.settings.enabled.contains(&CheckCode::D200) {
+                if self.settings.enabled.contains(&DiagnosticCode::D200) {
                     pydocstyle::plugins::one_liner(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D201)
-                    || self.settings.enabled.contains(&CheckCode::D202)
+                if self.settings.enabled.contains(&DiagnosticCode::D201)
+                    || self.settings.enabled.contains(&DiagnosticCode::D202)
                 {
                     pydocstyle::plugins::blank_before_after_function(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D203)
-                    || self.settings.enabled.contains(&CheckCode::D204)
-                    || self.settings.enabled.contains(&CheckCode::D211)
+                if self.settings.enabled.contains(&DiagnosticCode::D203)
+                    || self.settings.enabled.contains(&DiagnosticCode::D204)
+                    || self.settings.enabled.contains(&DiagnosticCode::D211)
                 {
                     pydocstyle::plugins::blank_before_after_class(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D205) {
+                if self.settings.enabled.contains(&DiagnosticCode::D205) {
                     pydocstyle::plugins::blank_after_summary(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D206)
-                    || self.settings.enabled.contains(&CheckCode::D207)
-                    || self.settings.enabled.contains(&CheckCode::D208)
+                if self.settings.enabled.contains(&DiagnosticCode::D206)
+                    || self.settings.enabled.contains(&DiagnosticCode::D207)
+                    || self.settings.enabled.contains(&DiagnosticCode::D208)
                 {
                     pydocstyle::plugins::indent(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D209) {
+                if self.settings.enabled.contains(&DiagnosticCode::D209) {
                     pydocstyle::plugins::newline_after_last_paragraph(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D210) {
+                if self.settings.enabled.contains(&DiagnosticCode::D210) {
                     pydocstyle::plugins::no_surrounding_whitespace(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D212)
-                    || self.settings.enabled.contains(&CheckCode::D213)
+                if self.settings.enabled.contains(&DiagnosticCode::D212)
+                    || self.settings.enabled.contains(&DiagnosticCode::D213)
                 {
                     pydocstyle::plugins::multi_line_summary_start(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D300) {
+                if self.settings.enabled.contains(&DiagnosticCode::D300) {
                     pydocstyle::plugins::triple_quotes(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D301) {
+                if self.settings.enabled.contains(&DiagnosticCode::D301) {
                     pydocstyle::plugins::backslashes(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D400) {
+                if self.settings.enabled.contains(&DiagnosticCode::D400) {
                     pydocstyle::plugins::ends_with_period(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D402) {
+                if self.settings.enabled.contains(&DiagnosticCode::D402) {
                     pydocstyle::plugins::no_signature(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D403) {
+                if self.settings.enabled.contains(&DiagnosticCode::D403) {
                     pydocstyle::plugins::capitalized(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D404) {
+                if self.settings.enabled.contains(&DiagnosticCode::D404) {
                     pydocstyle::plugins::starts_with_this(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D415) {
+                if self.settings.enabled.contains(&DiagnosticCode::D415) {
                     pydocstyle::plugins::ends_with_punctuation(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D418) {
+                if self.settings.enabled.contains(&DiagnosticCode::D418) {
                     pydocstyle::plugins::if_needed(self, &docstring);
                 }
-                if self.settings.enabled.contains(&CheckCode::D212)
-                    || self.settings.enabled.contains(&CheckCode::D214)
-                    || self.settings.enabled.contains(&CheckCode::D215)
-                    || self.settings.enabled.contains(&CheckCode::D405)
-                    || self.settings.enabled.contains(&CheckCode::D406)
-                    || self.settings.enabled.contains(&CheckCode::D407)
-                    || self.settings.enabled.contains(&CheckCode::D408)
-                    || self.settings.enabled.contains(&CheckCode::D409)
-                    || self.settings.enabled.contains(&CheckCode::D410)
-                    || self.settings.enabled.contains(&CheckCode::D411)
-                    || self.settings.enabled.contains(&CheckCode::D412)
-                    || self.settings.enabled.contains(&CheckCode::D413)
-                    || self.settings.enabled.contains(&CheckCode::D414)
-                    || self.settings.enabled.contains(&CheckCode::D416)
-                    || self.settings.enabled.contains(&CheckCode::D417)
+                if self.settings.enabled.contains(&DiagnosticCode::D212)
+                    || self.settings.enabled.contains(&DiagnosticCode::D214)
+                    || self.settings.enabled.contains(&DiagnosticCode::D215)
+                    || self.settings.enabled.contains(&DiagnosticCode::D405)
+                    || self.settings.enabled.contains(&DiagnosticCode::D406)
+                    || self.settings.enabled.contains(&DiagnosticCode::D407)
+                    || self.settings.enabled.contains(&DiagnosticCode::D408)
+                    || self.settings.enabled.contains(&DiagnosticCode::D409)
+                    || self.settings.enabled.contains(&DiagnosticCode::D410)
+                    || self.settings.enabled.contains(&DiagnosticCode::D411)
+                    || self.settings.enabled.contains(&DiagnosticCode::D412)
+                    || self.settings.enabled.contains(&DiagnosticCode::D413)
+                    || self.settings.enabled.contains(&DiagnosticCode::D414)
+                    || self.settings.enabled.contains(&DiagnosticCode::D416)
+                    || self.settings.enabled.contains(&DiagnosticCode::D417)
                 {
                     pydocstyle::plugins::sections(
                         self,
@@ -4333,7 +4337,7 @@ impl<'a> Checker<'a> {
 
     fn check_builtin_shadowing<T>(&mut self, name: &str, located: &Located<T>, is_attribute: bool) {
         if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class(_)) {
-            if self.settings.enabled.contains(&CheckCode::A003) {
+            if self.settings.enabled.contains(&DiagnosticCode::A003) {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
                     located,
@@ -4343,7 +4347,7 @@ impl<'a> Checker<'a> {
                 }
             }
         } else {
-            if self.settings.enabled.contains(&CheckCode::A001) {
+            if self.settings.enabled.contains(&DiagnosticCode::A001) {
                 if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                     name,
                     located,
@@ -4356,7 +4360,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_arg_shadowing(&mut self, name: &str, arg: &Arg) {
-        if self.settings.enabled.contains(&CheckCode::A002) {
+        if self.settings.enabled.contains(&DiagnosticCode::A002) {
             if let Some(check) = flake8_builtins::checks::builtin_shadowing(
                 name,
                 arg,
@@ -4378,7 +4382,7 @@ pub fn check_ast(
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     path: &Path,
-) -> Vec<Check> {
+) -> Vec<Diagnostic> {
     let mut checker = Checker::new(
         settings,
         noqa_line_for,

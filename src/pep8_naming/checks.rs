@@ -7,7 +7,7 @@ use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::pep8_naming::helpers;
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 
@@ -16,10 +16,10 @@ pub fn invalid_class_name(
     class_def: &Stmt,
     name: &str,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::InvalidClassName(name.to_string()),
             identifier_range(class_def, locator),
         ));
@@ -33,9 +33,9 @@ pub fn invalid_function_name(
     name: &str,
     ignore_names: &[String],
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if name.to_lowercase() != name && !ignore_names.iter().any(|ignore_name| ignore_name == name) {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::InvalidFunctionName(name.to_string()),
             identifier_range(func_def, locator),
         ));
@@ -44,9 +44,9 @@ pub fn invalid_function_name(
 }
 
 /// N803
-pub fn invalid_argument_name(name: &str, arg: &Arg) -> Option<Check> {
+pub fn invalid_argument_name(name: &str, arg: &Arg) -> Option<Diagnostic> {
     if name.to_lowercase() != name {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::InvalidArgumentName(name.to_string()),
             Range::from_located(arg),
         ));
@@ -63,7 +63,7 @@ pub fn invalid_first_argument_name_for_class_method(
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
             scope,
@@ -80,14 +80,14 @@ pub fn invalid_first_argument_name_for_class_method(
     }
     if let Some(arg) = args.posonlyargs.first() {
         if arg.node.arg != "cls" {
-            return Some(Check::new(
+            return Some(Diagnostic::new(
                 violations::InvalidFirstArgumentNameForClassMethod,
                 Range::from_located(arg),
             ));
         }
     } else if let Some(arg) = args.args.first() {
         if arg.node.arg != "cls" {
-            return Some(Check::new(
+            return Some(Diagnostic::new(
                 violations::InvalidFirstArgumentNameForClassMethod,
                 Range::from_located(arg),
             ));
@@ -105,7 +105,7 @@ pub fn invalid_first_argument_name_for_method(
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
     settings: &Settings,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
             scope,
@@ -124,7 +124,7 @@ pub fn invalid_first_argument_name_for_method(
     if arg.node.arg == "self" {
         return None;
     }
-    Some(Check::new(
+    Some(Diagnostic::new(
         violations::InvalidFirstArgumentNameForMethod,
         Range::from_located(arg),
     ))
@@ -136,7 +136,7 @@ pub fn dunder_function_name(
     stmt: &Stmt,
     name: &str,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
     }
@@ -148,7 +148,7 @@ pub fn dunder_function_name(
         return None;
     }
 
-    Some(Check::new(
+    Some(Diagnostic::new(
         violations::DunderFunctionName,
         identifier_range(stmt, locator),
     ))
@@ -160,9 +160,9 @@ pub fn constant_imported_as_non_constant(
     name: &str,
     asname: &str,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if string::is_upper(name) && !string::is_upper(asname) {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
@@ -176,9 +176,9 @@ pub fn lowercase_imported_as_non_lowercase(
     name: &str,
     asname: &str,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if !string::is_upper(name) && string::is_lower(name) && asname.to_lowercase() != asname {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
@@ -192,9 +192,9 @@ pub fn camelcase_imported_as_lowercase(
     name: &str,
     asname: &str,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if helpers::is_camelcase(name) && string::is_lower(asname) {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
@@ -208,13 +208,13 @@ pub fn camelcase_imported_as_constant(
     name: &str,
     asname: &str,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if helpers::is_camelcase(name)
         && !string::is_lower(asname)
         && string::is_upper(asname)
         && !helpers::is_acronym(name, asname)
     {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
@@ -228,13 +228,13 @@ pub fn camelcase_imported_as_acronym(
     name: &str,
     asname: &str,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if helpers::is_camelcase(name)
         && !string::is_lower(asname)
         && string::is_upper(asname)
         && helpers::is_acronym(name, asname)
     {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
             identifier_range(import_from, locator),
         ));
@@ -248,7 +248,7 @@ pub fn error_suffix_on_exception_name(
     bases: &[Expr],
     name: &str,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if !bases.iter().any(|base| {
         if let ExprKind::Name { id, .. } = &base.node {
             id == "Exception" || id.ends_with("Error")
@@ -262,7 +262,7 @@ pub fn error_suffix_on_exception_name(
     if name.ends_with("Error") {
         return None;
     }
-    Some(Check::new(
+    Some(Diagnostic::new(
         violations::ErrorSuffixOnExceptionName(name.to_string()),
         identifier_range(class_def, locator),
     ))

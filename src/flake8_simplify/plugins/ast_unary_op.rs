@@ -4,7 +4,7 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 fn is_exception_check(stmt: &Stmt) -> bool {
@@ -35,7 +35,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         return;
     }
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::NegateEqualOp(
             unparse_expr(left, checker.style),
             unparse_expr(&comparators[0], checker.style),
@@ -79,7 +79,7 @@ pub fn negation_with_not_equal_op(
         return;
     }
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::NegateNotEqualOp(
             unparse_expr(left, checker.style),
             unparse_expr(&comparators[0], checker.style),
@@ -115,7 +115,7 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
         return;
     }
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::DoubleNegation(operand.to_string()),
         Range::from_located(operand),
     );

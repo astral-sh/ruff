@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::fs;
-use crate::registry::{CheckCode, CheckCodePrefix};
+use crate::registry::{DiagnosticCode, DiagnosticCodePrefix};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
@@ -94,12 +94,15 @@ impl FromStr for FilePattern {
 pub struct PerFileIgnore {
     pub basename: String,
     pub absolute: PathBuf,
-    pub codes: FxHashSet<CheckCode>,
+    pub codes: FxHashSet<DiagnosticCode>,
 }
 
 impl PerFileIgnore {
-    pub fn new(basename: String, absolute: PathBuf, prefixes: &[CheckCodePrefix]) -> Self {
-        let codes = prefixes.iter().flat_map(CheckCodePrefix::codes).collect();
+    pub fn new(basename: String, absolute: PathBuf, prefixes: &[DiagnosticCodePrefix]) -> Self {
+        let codes = prefixes
+            .iter()
+            .flat_map(DiagnosticCodePrefix::codes)
+            .collect();
         Self {
             basename,
             absolute,
@@ -111,11 +114,11 @@ impl PerFileIgnore {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PatternPrefixPair {
     pub pattern: String,
-    pub prefix: CheckCodePrefix,
+    pub prefix: DiagnosticCodePrefix,
 }
 
 impl PatternPrefixPair {
-    const EXPECTED_PATTERN: &'static str = "<FilePattern>:<CheckCode> pattern";
+    const EXPECTED_PATTERN: &'static str = "<FilePattern>:<DiagnosticCode> pattern";
 }
 
 impl<'de> Deserialize<'de> for PatternPrefixPair {
@@ -145,7 +148,7 @@ impl FromStr for PatternPrefixPair {
             (tokens[0].trim(), tokens[1].trim())
         };
         let pattern = pattern_str.into();
-        let prefix = CheckCodePrefix::from_str(code_string)?;
+        let prefix = DiagnosticCodePrefix::from_str(code_string)?;
         Ok(Self { pattern, prefix })
     }
 }

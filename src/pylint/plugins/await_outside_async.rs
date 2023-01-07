@@ -2,7 +2,7 @@ use rustpython_ast::Expr;
 
 use crate::ast::types::{FunctionDef, Range, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::{violations, Check};
+use crate::{violations, Diagnostic};
 
 /// PLE1142
 pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
@@ -17,7 +17,7 @@ pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
         })
         .unwrap_or(true)
     {
-        checker.checks.push(Check::new(
+        checker.checks.push(Diagnostic::new(
             violations::AwaitOutsideAsync,
             Range::from_located(expr),
         ));

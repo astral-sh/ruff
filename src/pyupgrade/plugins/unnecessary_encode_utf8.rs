@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, DiagnosticCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 
@@ -58,15 +58,17 @@ fn delete_default_encode_arg_or_kwarg(
     args: &[Expr],
     kwargs: &[Keyword],
     patch: bool,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if let Some(arg) = args.get(0) {
-        let mut check = Check::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut check =
+            Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
             check.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
         }
         Some(check)
     } else if let Some(kwarg) = kwargs.get(0) {
-        let mut check = Check::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut check =
+            Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
             check.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
@@ -82,8 +84,8 @@ fn replace_with_bytes_literal(
     constant: &Expr,
     locator: &SourceCodeLocator,
     patch: bool,
-) -> Check {
-    let mut check = Check::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
+) -> Diagnostic {
+    let mut check = Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
         let content = locator.slice_source_code_range(&Range::new(
             constant.location,
@@ -127,7 +129,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         variable,
                         checker.locator,
-                        checker.patch(&CheckCode::UP012),
+                        checker.patch(&DiagnosticCode::UP012),
                     ));
                 } else {
                     // "unicode text©".encode("utf-8")
@@ -135,7 +137,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         args,
                         kwargs,
-                        checker.patch(&CheckCode::UP012),
+                        checker.patch(&DiagnosticCode::UP012),
                     ) {
                         checker.checks.push(check);
                     }
@@ -149,7 +151,7 @@ pub fn unnecessary_encode_utf8(
                     expr,
                     args,
                     kwargs,
-                    checker.patch(&CheckCode::UP012),
+                    checker.patch(&DiagnosticCode::UP012),
                 ) {
                     checker.checks.push(check);
                 }

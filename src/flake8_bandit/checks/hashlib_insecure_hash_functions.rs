@@ -4,7 +4,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use crate::ast::helpers::{match_module_member, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::flake8_bandit::helpers::string_literal;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 const WEAK_HASHES: [&str; 4] = ["md4", "md5", "sha", "sha1"];
@@ -29,7 +29,7 @@ pub fn hashlib_insecure_hash_functions(
     keywords: &[Keyword],
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if match_module_member(func, "hashlib", "new", from_imports, import_aliases) {
         let call_args = SimpleCallArgs::new(args, keywords);
 
@@ -41,7 +41,7 @@ pub fn hashlib_insecure_hash_functions(
             let hash_func_name = string_literal(name_arg)?;
 
             if WEAK_HASHES.contains(&hash_func_name.to_lowercase().as_str()) {
-                return Some(Check::new(
+                return Some(Diagnostic::new(
                     violations::HashlibInsecureHashFunction(hash_func_name.to_string()),
                     Range::from_located(name_arg),
                 ));
@@ -56,7 +56,7 @@ pub fn hashlib_insecure_hash_functions(
                     return None;
                 }
 
-                return Some(Check::new(
+                return Some(Diagnostic::new(
                     violations::HashlibInsecureHashFunction((*func_name).to_string()),
                     Range::from_located(func),
                 ));

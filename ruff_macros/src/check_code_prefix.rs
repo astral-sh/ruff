@@ -9,7 +9,8 @@ use syn::{DataEnum, DeriveInput, Ident, Variant};
 
 const ALL: &str = "ALL";
 
-/// A hash map from deprecated `CheckCodePrefix` to latest `CheckCodePrefix`.
+/// A hash map from deprecated `DiagnosticCodePrefix` to latest
+/// `DiagnosticCodePrefix`.
 pub static PREFIX_REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
@@ -90,7 +91,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let syn::Data::Enum(DataEnum { variants, .. }) = data else {
         return Err(syn::Error::new(
             ident.span(),
-            "Can only derive `CheckCodePrefix` from enums.",
+            "Can only derive `DiagnosticCodePrefix` from enums.",
         ));
     };
 
@@ -117,7 +118,7 @@ fn expand(
     prefix_ident: &Ident,
     variants: &Punctuated<Variant, Comma>,
 ) -> proc_macro2::TokenStream {
-    // Build up a map from prefix to matching CheckCodes.
+    // Build up a map from prefix to matching DiagnosticCodes.
     let mut prefix_to_codes: BTreeMap<Ident, BTreeSet<String>> = BTreeMap::default();
     for variant in variants {
         let span = variant.ident.span();
@@ -146,7 +147,7 @@ fn expand(
             Ident::new(alias, Span::call_site()),
             prefix_to_codes
                 .get(&Ident::new(check_code, Span::call_site()))
-                .unwrap_or_else(|| panic!("Unknown CheckCode: {alias:?}"))
+                .unwrap_or_else(|| panic!("Unknown DiagnosticCode: {alias:?}"))
                 .clone(),
         );
     }
@@ -186,7 +187,7 @@ fn expand(
 
         #prefix_impl
 
-        /// A hash map from deprecated `CheckCodePrefix` to latest `CheckCodePrefix`.
+        /// A hash map from deprecated `DiagnosticCodePrefix` to latest `DiagnosticCodePrefix`.
         pub static PREFIX_REDIRECTS: ::once_cell::sync::Lazy<::rustc_hash::FxHashMap<&'static str, #prefix_ident>> = ::once_cell::sync::Lazy::new(|| {
             ::rustc_hash::FxHashMap::from_iter([
                 #(#prefix_redirects),*

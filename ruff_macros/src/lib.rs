@@ -26,7 +26,7 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
         .into()
 }
 
-#[proc_macro_derive(CheckCodePrefix)]
+#[proc_macro_derive(DiagnosticCodePrefix)]
 pub fn derive_check_code_prefix(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

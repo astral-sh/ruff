@@ -6,7 +6,7 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// Identify all `ExprKind::Name` nodes in an AST.
@@ -62,7 +62,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
             continue;
         }
 
-        let mut check = Check::new(
+        let mut check = Diagnostic::new(
             violations::UnusedLoopControlVariable(name.to_string()),
             Range::from_located(expr),
         );

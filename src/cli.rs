@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 
 use crate::fs;
 use crate::logging::LogLevel;
-use crate::registry::{CheckCode, CheckCodePrefix};
+use crate::registry::{DiagnosticCode, DiagnosticCodePrefix};
 use crate::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
@@ -62,18 +62,18 @@ pub struct Cli {
     /// Comma-separated list of error codes to enable (or ALL, to enable all
     /// checks).
     #[arg(long, value_delimiter = ',')]
-    pub select: Option<Vec<CheckCodePrefix>>,
+    pub select: Option<Vec<DiagnosticCodePrefix>>,
     /// Like --select, but adds additional error codes on top of the selected
     /// ones.
     #[arg(long, value_delimiter = ',')]
-    pub extend_select: Option<Vec<CheckCodePrefix>>,
+    pub extend_select: Option<Vec<DiagnosticCodePrefix>>,
     /// Comma-separated list of error codes to disable.
     #[arg(long, value_delimiter = ',')]
-    pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub ignore: Option<Vec<DiagnosticCodePrefix>>,
     /// Like --ignore, but adds additional error codes on top of the ignored
     /// ones.
     #[arg(long, value_delimiter = ',')]
-    pub extend_ignore: Option<Vec<CheckCodePrefix>>,
+    pub extend_ignore: Option<Vec<DiagnosticCodePrefix>>,
     /// List of paths, used to exclude files and/or directories from checks.
     #[arg(long, value_delimiter = ',')]
     pub exclude: Option<Vec<FilePattern>>,
@@ -84,11 +84,11 @@ pub struct Cli {
     /// List of error codes to treat as eligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',')]
-    pub fixable: Option<Vec<CheckCodePrefix>>,
+    pub fixable: Option<Vec<DiagnosticCodePrefix>>,
     /// List of error codes to treat as ineligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',')]
-    pub unfixable: Option<Vec<CheckCodePrefix>>,
+    pub unfixable: Option<Vec<DiagnosticCodePrefix>>,
     /// List of mappings from file pattern to code to exclude
     #[arg(long, value_delimiter = ',')]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
@@ -179,7 +179,7 @@ pub struct Cli {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
-    pub explain: Option<CheckCode>,
+    pub explain: Option<DiagnosticCode>,
     /// Generate shell completion
     #[arg(
         long,
@@ -302,7 +302,7 @@ pub struct Arguments {
     pub config: Option<PathBuf>,
     pub diff: bool,
     pub exit_zero: bool,
-    pub explain: Option<CheckCode>,
+    pub explain: Option<DiagnosticCode>,
     pub files: Vec<PathBuf>,
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
     pub isolated: bool,
@@ -323,18 +323,18 @@ pub struct Overrides {
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend_exclude: Option<Vec<FilePattern>>,
-    pub extend_ignore: Option<Vec<CheckCodePrefix>>,
-    pub extend_select: Option<Vec<CheckCodePrefix>>,
-    pub fixable: Option<Vec<CheckCodePrefix>>,
-    pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub extend_ignore: Option<Vec<DiagnosticCodePrefix>>,
+    pub extend_select: Option<Vec<DiagnosticCodePrefix>>,
+    pub fixable: Option<Vec<DiagnosticCodePrefix>>,
+    pub ignore: Option<Vec<DiagnosticCodePrefix>>,
     pub line_length: Option<usize>,
     pub max_complexity: Option<usize>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub respect_gitignore: Option<bool>,
-    pub select: Option<Vec<CheckCodePrefix>>,
+    pub select: Option<Vec<DiagnosticCodePrefix>>,
     pub show_source: Option<bool>,
     pub target_version: Option<PythonVersion>,
-    pub unfixable: Option<Vec<CheckCodePrefix>>,
+    pub unfixable: Option<Vec<DiagnosticCodePrefix>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
@@ -359,7 +359,7 @@ pub fn extract_log_level(cli: &Arguments) -> LogLevel {
 
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
 pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgnore> {
-    let mut per_file_ignores: FxHashMap<String, Vec<CheckCodePrefix>> = FxHashMap::default();
+    let mut per_file_ignores: FxHashMap<String, Vec<DiagnosticCodePrefix>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)

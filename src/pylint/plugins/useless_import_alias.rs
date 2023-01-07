@@ -3,7 +3,7 @@ use rustpython_ast::Alias;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::{violations, Check};
+use crate::{violations, Diagnostic};
 
 /// PLC0414
 pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
@@ -17,7 +17,7 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
         return;
     }
 
-    let mut check = Check::new(violations::UselessImportAlias, Range::from_located(alias));
+    let mut check = Diagnostic::new(violations::UselessImportAlias, Range::from_located(alias));
     if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             asname.to_string(),

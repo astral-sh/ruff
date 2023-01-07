@@ -10,7 +10,7 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// Visitor that tracks assert statements and checks if they reference
@@ -18,7 +18,7 @@ use crate::violations;
 struct ExceptionHandlerVisitor<'a> {
     exception_name: &'a str,
     current_assert: Option<&'a Stmt>,
-    errors: Vec<Check>,
+    errors: Vec<Diagnostic>,
 }
 
 impl<'a> ExceptionHandlerVisitor<'a> {
@@ -51,7 +51,7 @@ where
             ExprKind::Name { id, .. } => {
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
-                        self.errors.push(Check::new(
+                        self.errors.push(Diagnostic::new(
                             violations::AssertInExcept(id.to_string()),
                             Range::from_located(current_assert),
                         ));
@@ -79,7 +79,7 @@ fn is_composite_condition(test: &Expr) -> bool {
     }
 }
 
-fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Check> {
+fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
     // Walk body to find assert statements that reference the exception name
     let mut visitor = ExceptionHandlerVisitor::new(name);
     for stmt in body {
@@ -95,11 +95,11 @@ pub fn unittest_assertion(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     match &func.node {
         ExprKind::Attribute { attr, .. } => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
-                let mut check = Check::new(
+                let mut check = Diagnostic::new(
                     violations::UnittestAssertion(unittest_assert.to_string()),
                     Range::from_located(func),
                 );
@@ -122,9 +122,9 @@ pub fn unittest_assertion(
 }
 
 /// PT015
-pub fn assert_falsy(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Check> {
+pub fn assert_falsy(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Diagnostic> {
     if is_falsy_constant(test_expr) {
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::AssertAlwaysFalse,
             Range::from_located(assert_stmt),
         ))
@@ -134,7 +134,7 @@ pub fn assert_falsy(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Check> {
 }
 
 /// PT017
-pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Check> {
+pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic> {
     handlers
         .iter()
         .flat_map(|handler| match &handler.node {
@@ -150,9 +150,9 @@ pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Check> {
 }
 
 /// PT018
-pub fn composite_condition(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Check> {
+pub fn composite_condition(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Diagnostic> {
     if is_composite_condition(test_expr) {
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::CompositeAssertion,
             Range::from_located(assert_stmt),
         ))

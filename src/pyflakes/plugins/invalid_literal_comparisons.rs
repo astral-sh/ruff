@@ -7,7 +7,7 @@ use crate::ast::operations::locate_cmpops;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// F632
@@ -25,7 +25,7 @@ pub fn invalid_literal_comparison(
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right))
         {
-            let mut check = Check::new(violations::IsLiteral(op.into()), location);
+            let mut check = Diagnostic::new(violations::IsLiteral(op.into()), location);
             if checker.patch(check.kind.code()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(&located_op.node, op);

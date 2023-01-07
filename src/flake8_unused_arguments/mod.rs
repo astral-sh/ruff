@@ -12,15 +12,15 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::{flake8_unused_arguments, settings};
 
-    #[test_case(CheckCode::ARG001, Path::new("ARG.py"); "ARG001")]
-    #[test_case(CheckCode::ARG002, Path::new("ARG.py"); "ARG002")]
-    #[test_case(CheckCode::ARG003, Path::new("ARG.py"); "ARG003")]
-    #[test_case(CheckCode::ARG004, Path::new("ARG.py"); "ARG004")]
-    #[test_case(CheckCode::ARG005, Path::new("ARG.py"); "ARG005")]
-    fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
+    #[test_case(DiagnosticCode::ARG001, Path::new("ARG.py"); "ARG001")]
+    #[test_case(DiagnosticCode::ARG002, Path::new("ARG.py"); "ARG002")]
+    #[test_case(DiagnosticCode::ARG003, Path::new("ARG.py"); "ARG003")]
+    #[test_case(DiagnosticCode::ARG004, Path::new("ARG.py"); "ARG004")]
+    #[test_case(DiagnosticCode::ARG005, Path::new("ARG.py"); "ARG005")]
+    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_unused_arguments")
@@ -41,11 +41,11 @@ mod tests {
                     ignore_variadic_names: true,
                 },
                 ..settings::Settings::for_rules(vec![
-                    CheckCode::ARG001,
-                    CheckCode::ARG002,
-                    CheckCode::ARG003,
-                    CheckCode::ARG004,
-                    CheckCode::ARG005,
+                    DiagnosticCode::ARG001,
+                    DiagnosticCode::ARG002,
+                    DiagnosticCode::ARG003,
+                    DiagnosticCode::ARG004,
+                    DiagnosticCode::ARG005,
                 ])
             },
         )?;
@@ -62,11 +62,11 @@ mod tests {
                     ignore_variadic_names: false,
                 },
                 ..settings::Settings::for_rules(vec![
-                    CheckCode::ARG001,
-                    CheckCode::ARG002,
-                    CheckCode::ARG003,
-                    CheckCode::ARG004,
-                    CheckCode::ARG005,
+                    DiagnosticCode::ARG001,
+                    DiagnosticCode::ARG002,
+                    DiagnosticCode::ARG003,
+                    DiagnosticCode::ARG004,
+                    DiagnosticCode::ARG005,
                 ])
             },
         )?;

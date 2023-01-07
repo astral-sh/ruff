@@ -14,7 +14,7 @@
 
 use cfg_if::cfg_if;
 
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 

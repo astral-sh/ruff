@@ -22,7 +22,7 @@ use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, lint_path, lint_stdin, Diagnostics};
 use crate::logging::LogLevel;
 use crate::message::Message;
-use crate::registry::CheckCode;
+use crate::registry::DiagnosticCode;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
@@ -117,7 +117,7 @@ pub fn run(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    if settings.enabled.contains(&CheckCode::E902) {
+                    if settings.enabled.contains(&DiagnosticCode::E902) {
                         Diagnostics::new(vec![Message {
                             kind: violations::IOError(message).into(),
                             location: Location::default(),
@@ -302,8 +302,8 @@ struct Explanation<'a> {
     summary: &'a str,
 }
 
-/// Explain a `CheckCode` to the user.
-pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
+/// Explain a `DiagnosticCode` to the user.
+pub fn explain(code: &DiagnosticCode, format: &SerializationFormat) -> Result<()> {
     match format {
         SerializationFormat::Text | SerializationFormat::Grouped => {
             println!(

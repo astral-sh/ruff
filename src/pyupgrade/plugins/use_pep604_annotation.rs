@@ -4,7 +4,7 @@ use crate::ast::helpers::{collect_call_paths, dealias_call_path};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
 
@@ -64,7 +64,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
 
     let call_path = dealias_call_path(collect_call_paths(value), &checker.import_aliases);
     if checker.match_typing_call_path(&call_path, "Optional") {
-        let mut check = Check::new(violations::UsePEP604Annotation, Range::from_located(expr));
+        let mut check = Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch(check.kind.code()) {
             let mut generator: SourceCodeGenerator = checker.style.into();
             generator.unparse_expr(&optional(slice), 0);
@@ -76,7 +76,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         }
         checker.checks.push(check);
     } else if checker.match_typing_call_path(&call_path, "Union") {
-        let mut check = Check::new(violations::UsePEP604Annotation, Range::from_located(expr));
+        let mut check = Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch(check.kind.code()) {
             match &slice.node {
                 ExprKind::Slice { .. } => {

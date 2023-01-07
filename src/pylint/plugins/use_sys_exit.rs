@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::types::{BindingKind, Range};
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// Return `true` if the `module` was imported using a star import (e.g., `from
@@ -75,7 +75,7 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
         if !checker.is_builtin(name) {
             continue;
         }
-        let mut check = Check::new(
+        let mut check = Diagnostic::new(
             violations::UseSysExit(name.to_string()),
             Range::from_located(func),
         );

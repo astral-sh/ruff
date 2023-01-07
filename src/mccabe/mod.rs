@@ -9,7 +9,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::{mccabe, Settings};
 
     #[test_case(0)]
@@ -21,7 +21,7 @@ mod tests {
             Path::new("./resources/test/fixtures/mccabe/C901.py"),
             &Settings {
                 mccabe: mccabe::settings::Settings { max_complexity },
-                ..Settings::for_rules(vec![CheckCode::C901])
+                ..Settings::for_rules(vec![DiagnosticCode::C901])
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, checks);

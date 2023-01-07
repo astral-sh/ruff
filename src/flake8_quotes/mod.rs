@@ -10,7 +10,7 @@ mod tests {
 
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::{flake8_quotes, Settings};
 
     #[test_case(Path::new("doubles.py"))]
@@ -32,10 +32,10 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    CheckCode::Q000,
-                    CheckCode::Q001,
-                    CheckCode::Q002,
-                    CheckCode::Q003,
+                    DiagnosticCode::Q000,
+                    DiagnosticCode::Q001,
+                    DiagnosticCode::Q002,
+                    DiagnosticCode::Q003,
                 ])
             },
         )?;
@@ -62,10 +62,10 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    CheckCode::Q000,
-                    CheckCode::Q001,
-                    CheckCode::Q002,
-                    CheckCode::Q003,
+                    DiagnosticCode::Q000,
+                    DiagnosticCode::Q001,
+                    DiagnosticCode::Q002,
+                    DiagnosticCode::Q003,
                 ])
             },
         )?;
@@ -97,10 +97,10 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    CheckCode::Q000,
-                    CheckCode::Q001,
-                    CheckCode::Q002,
-                    CheckCode::Q003,
+                    DiagnosticCode::Q000,
+                    DiagnosticCode::Q001,
+                    DiagnosticCode::Q002,
+                    DiagnosticCode::Q003,
                 ])
             },
         )?;
@@ -132,10 +132,10 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    CheckCode::Q000,
-                    CheckCode::Q001,
-                    CheckCode::Q002,
-                    CheckCode::Q003,
+                    DiagnosticCode::Q000,
+                    DiagnosticCode::Q001,
+                    DiagnosticCode::Q002,
+                    DiagnosticCode::Q003,
                 ])
             },
         )?;

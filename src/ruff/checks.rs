@@ -4,10 +4,10 @@ use rustpython_ast::{Expr, ExprKind, Keyword, KeywordData, Location};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::registry::CheckKind;
+use crate::registry::DiagnosticKind;
 use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::{violations, Check, Settings};
+use crate::{violations, Diagnostic, Settings};
 
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
 static CONFUSABLES: Lazy<FxHashMap<u32, u32>> = Lazy::new(|| {
@@ -1611,7 +1611,7 @@ pub fn ambiguous_unicode_character(
     context: Context,
     settings: &Settings,
     autofix: flags::Autofix,
-) -> Vec<Check> {
+) -> Vec<Diagnostic> {
     let mut checks = vec![];
 
     let text = locator.slice_source_code_range(&Range::new(start, end));
@@ -1630,7 +1630,7 @@ pub fn ambiguous_unicode_character(
                     };
                     let location = Location::new(start.row() + row_offset, col);
                     let end_location = Location::new(location.row(), location.column() + 1);
-                    let mut check = Check::new::<CheckKind>(
+                    let mut check = Diagnostic::new::<DiagnosticKind>(
                         match context {
                             Context::String => violations::AmbiguousUnicodeCharacterString(
                                 current_char,
@@ -1679,7 +1679,10 @@ pub fn ambiguous_unicode_character(
 }
 
 /// RUF004
-pub fn keyword_argument_before_star_argument(args: &[Expr], keywords: &[Keyword]) -> Vec<Check> {
+pub fn keyword_argument_before_star_argument(
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Vec<Diagnostic> {
     let mut checks = vec![];
     if let Some(arg) = args
         .iter()
@@ -1689,7 +1692,7 @@ pub fn keyword_argument_before_star_argument(args: &[Expr], keywords: &[Keyword]
             if keyword.location < arg.location {
                 let KeywordData { arg, .. } = &keyword.node;
                 if let Some(arg) = arg {
-                    checks.push(Check::new(
+                    checks.push(Diagnostic::new(
                         violations::KeywordArgumentBeforeStarArgument(arg.to_string()),
                         Range::from_located(keyword),
                     ));

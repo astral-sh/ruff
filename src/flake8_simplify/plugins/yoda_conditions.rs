@@ -3,7 +3,7 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// SIM300
@@ -41,7 +41,7 @@ pub fn yoda_conditions(
         .locator
         .slice_source_code_range(&Range::from_located(right));
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::YodaConditions(left_content.to_string(), right_content.to_string()),
         Range::from_located(expr),
     );

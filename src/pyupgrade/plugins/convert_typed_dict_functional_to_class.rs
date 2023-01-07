@@ -8,7 +8,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
 
@@ -200,7 +200,7 @@ pub fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::ConvertTypedDictFunctionalToClass(class_name.to_string()),
         Range::from_located(stmt),
     );

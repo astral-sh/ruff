@@ -6,7 +6,7 @@ use rustpython_ast::{
 
 use crate::ast::types::Range;
 use crate::flake8_comprehensions::fixes;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 
@@ -56,10 +56,10 @@ pub fn unnecessary_generator_list(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("list", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut check = Check::new(violations::UnnecessaryGeneratorList, location);
+        let mut check = Diagnostic::new(violations::UnnecessaryGeneratorList, location);
         if fix {
             match fixes::fix_unnecessary_generator_list(locator, expr) {
                 Ok(fix) => {
@@ -82,10 +82,10 @@ pub fn unnecessary_generator_set(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut check = Check::new(violations::UnnecessaryGeneratorSet, location);
+        let mut check = Diagnostic::new(violations::UnnecessaryGeneratorSet, location);
         if fix {
             match fixes::fix_unnecessary_generator_set(locator, expr) {
                 Ok(fix) => {
@@ -108,12 +108,12 @@ pub fn unnecessary_generator_dict(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     if let ExprKind::GeneratorExp { elt, .. } = argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                let mut check = Check::new(violations::UnnecessaryGeneratorDict, location);
+                let mut check = Diagnostic::new(violations::UnnecessaryGeneratorDict, location);
                 if fix {
                     match fixes::fix_unnecessary_generator_dict(locator, expr) {
                         Ok(fix) => {
@@ -139,10 +139,10 @@ pub fn unnecessary_list_comprehension_set(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::ListComp { .. } = &argument {
-        let mut check = Check::new(violations::UnnecessaryListComprehensionSet, location);
+        let mut check = Diagnostic::new(violations::UnnecessaryListComprehensionSet, location);
         if fix {
             match fixes::fix_unnecessary_list_comprehension_set(locator, expr) {
                 Ok(fix) => {
@@ -165,7 +165,7 @@ pub fn unnecessary_list_comprehension_dict(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     let ExprKind::ListComp { elt, .. } = &argument else {
         return None;
@@ -176,7 +176,7 @@ pub fn unnecessary_list_comprehension_dict(
     if elts.len() != 2 {
         return None;
     }
-    let mut check = Check::new(violations::UnnecessaryListComprehensionDict, location);
+    let mut check = Diagnostic::new(violations::UnnecessaryListComprehensionDict, location);
     if fix {
         match fixes::fix_unnecessary_list_comprehension_dict(locator, expr) {
             Ok(fix) => {
@@ -197,14 +197,14 @@ pub fn unnecessary_literal_set(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     let kind = match argument {
         ExprKind::List { .. } => "list",
         ExprKind::Tuple { .. } => "tuple",
         _ => return None,
     };
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryLiteralSet(kind.to_string()),
         location,
     );
@@ -228,7 +228,7 @@ pub fn unnecessary_literal_dict(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("dict", func, args, keywords)?;
     let (kind, elts) = match argument {
         ExprKind::Tuple { elts, .. } => ("tuple", elts),
@@ -242,7 +242,7 @@ pub fn unnecessary_literal_dict(
     {
         return None;
     }
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryLiteralDict(kind.to_string()),
         location,
     );
@@ -266,7 +266,7 @@ pub fn unnecessary_collection_call(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if !args.is_empty() {
         return None;
     }
@@ -280,7 +280,7 @@ pub fn unnecessary_collection_call(
         }
         _ => return None,
     };
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryCollectionCall(id.to_string()),
         location,
     );
@@ -303,14 +303,14 @@ pub fn unnecessary_literal_within_tuple_call(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = first_argument_with_matching_function("tuple", func, args)?;
     let argument_kind = match argument {
         ExprKind::Tuple { .. } => "tuple",
         ExprKind::List { .. } => "list",
         _ => return None,
     };
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
         location,
     );
@@ -333,14 +333,14 @@ pub fn unnecessary_literal_within_list_call(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = first_argument_with_matching_function("list", func, args)?;
     let argument_kind = match argument {
         ExprKind::Tuple { .. } => "tuple",
         ExprKind::List { .. } => "list",
         _ => return None,
     };
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
         location,
     );
@@ -363,12 +363,12 @@ pub fn unnecessary_list_call(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let argument = first_argument_with_matching_function("list", func, args)?;
     if !matches!(argument, ExprKind::ListComp { .. }) {
         return None;
     }
-    let mut check = Check::new(violations::UnnecessaryListCall, location);
+    let mut check = Diagnostic::new(violations::UnnecessaryListCall, location);
     if fix {
         match fixes::fix_unnecessary_list_call(locator, expr) {
             Ok(fix) => {
@@ -388,7 +388,7 @@ pub fn unnecessary_call_around_sorted(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let outer = function_name(func)?;
     if !(outer == "list" || outer == "reversed") {
         return None;
@@ -400,7 +400,7 @@ pub fn unnecessary_call_around_sorted(
         return None;
     }
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryCallAroundSorted(outer.to_string()),
         location,
     );
@@ -420,9 +420,9 @@ pub fn unnecessary_double_cast_or_process(
     func: &Expr,
     args: &[Expr],
     location: Range,
-) -> Option<Check> {
-    fn new_check(inner: &str, outer: &str, location: Range) -> Check {
-        Check::new(
+) -> Option<Diagnostic> {
+    fn new_check(inner: &str, outer: &str, location: Range) -> Diagnostic {
+        Diagnostic::new(
             violations::UnnecessaryDoubleCastOrProcess(inner.to_string(), outer.to_string()),
             location,
         )
@@ -463,7 +463,7 @@ pub fn unnecessary_subscript_reversal(
     func: &Expr,
     args: &[Expr],
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let first_arg = args.first()?;
     let id = function_name(func)?;
     if !["set", "sorted", "reversed"].contains(&id) {
@@ -493,7 +493,7 @@ pub fn unnecessary_subscript_reversal(
     if *val != BigInt::from(1) {
         return None;
     };
-    Some(Check::new(
+    Some(Diagnostic::new(
         violations::UnnecessarySubscriptReversal(id.to_string()),
         location,
     ))
@@ -507,7 +507,7 @@ pub fn unnecessary_comprehension(
     locator: &SourceCodeLocator,
     fix: bool,
     location: Range,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if generators.len() != 1 {
         return None;
     }
@@ -525,7 +525,7 @@ pub fn unnecessary_comprehension(
         ExprKind::SetComp { .. } => "set",
         _ => return None,
     };
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryComprehension(expr_kind.to_string()),
         location,
     );
@@ -541,9 +541,9 @@ pub fn unnecessary_comprehension(
 }
 
 /// C417
-pub fn unnecessary_map(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
-    fn new_check(kind: &str, location: Range) -> Check {
-        Check::new(violations::UnnecessaryMap(kind.to_string()), location)
+pub fn unnecessary_map(func: &Expr, args: &[Expr], location: Range) -> Option<Diagnostic> {
+    fn new_check(kind: &str, location: Range) -> Diagnostic {
+        Diagnostic::new(violations::UnnecessaryMap(kind.to_string()), location)
     }
     let id = function_name(func)?;
     match id {

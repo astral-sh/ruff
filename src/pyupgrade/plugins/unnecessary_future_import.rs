@@ -5,7 +5,7 @@ use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
 use crate::{autofix, violations};
 
@@ -53,7 +53,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
     if unused_imports.is_empty() {
         return;
     }
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryFutureImport(
             unused_imports
                 .iter()

@@ -11,7 +11,7 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
@@ -47,7 +47,7 @@ pub fn literal_comparisons(
     // then replace the entire expression at the end with one "real" fix, to
     // avoid conflicts.
     let mut bad_ops: FxHashMap<usize, Cmpop> = FxHashMap::default();
-    let mut checks: Vec<Check> = vec![];
+    let mut checks: Vec<Diagnostic> = vec![];
 
     let op = ops.first().unwrap();
 
@@ -64,7 +64,7 @@ pub fn literal_comparisons(
         )
     {
         if matches!(op, Cmpop::Eq) {
-            let check = Check::new(
+            let check = Diagnostic::new(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
@@ -74,7 +74,7 @@ pub fn literal_comparisons(
             checks.push(check);
         }
         if matches!(op, Cmpop::NotEq) {
-            let check = Check::new(
+            let check = Diagnostic::new(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
@@ -92,7 +92,7 @@ pub fn literal_comparisons(
         } = comparator.node
         {
             if matches!(op, Cmpop::Eq) {
-                let check = Check::new(
+                let check = Diagnostic::new(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
@@ -102,7 +102,7 @@ pub fn literal_comparisons(
                 checks.push(check);
             }
             if matches!(op, Cmpop::NotEq) {
-                let check = Check::new(
+                let check = Diagnostic::new(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
@@ -126,7 +126,7 @@ pub fn literal_comparisons(
             )
         {
             if matches!(op, Cmpop::Eq) {
-                let check = Check::new(
+                let check = Diagnostic::new(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
@@ -138,7 +138,7 @@ pub fn literal_comparisons(
                 checks.push(check);
             }
             if matches!(op, Cmpop::NotEq) {
-                let check = Check::new(
+                let check = Diagnostic::new(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
@@ -158,7 +158,7 @@ pub fn literal_comparisons(
             } = next.node
             {
                 if matches!(op, Cmpop::Eq) {
-                    let check = Check::new(
+                    let check = Diagnostic::new(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
@@ -170,7 +170,7 @@ pub fn literal_comparisons(
                     checks.push(check);
                 }
                 if matches!(op, Cmpop::NotEq) {
-                    let check = Check::new(
+                    let check = Diagnostic::new(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
@@ -232,8 +232,10 @@ pub fn not_tests(
                 match op {
                     Cmpop::In => {
                         if check_not_in {
-                            let mut check =
-                                Check::new(violations::NotInTest, Range::from_located(operand));
+                            let mut check = Diagnostic::new(
+                                violations::NotInTest,
+                                Range::from_located(operand),
+                            );
                             if checker.patch(check.kind.code()) && should_fix {
                                 check.amend(Fix::replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.style),
@@ -246,8 +248,10 @@ pub fn not_tests(
                     }
                     Cmpop::Is => {
                         if check_not_is {
-                            let mut check =
-                                Check::new(violations::NotIsTest, Range::from_located(operand));
+                            let mut check = Diagnostic::new(
+                                violations::NotIsTest,
+                                Range::from_located(operand),
+                            );
                             if checker.patch(check.kind.code()) && should_fix {
                                 check.amend(Fix::replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.style),
@@ -299,7 +303,7 @@ fn function(
 pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
     if let ExprKind::Name { id, .. } = &target.node {
         if let ExprKind::Lambda { args, body } = &value.node {
-            let mut check = Check::new(
+            let mut check = Diagnostic::new(
                 violations::DoNotAssignLambda(id.to_string()),
                 Range::from_located(stmt),
             );

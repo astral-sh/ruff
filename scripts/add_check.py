@@ -43,9 +43,9 @@ def main(*, name: str, code: str, plugin: str) -> None:
 
     with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/mod.rs"), "w") as fp:
         for line in content.splitlines():
-            if line.strip() == "fn checks(check_code: CheckCode, path: &Path) -> Result<()> {":
-                indent = line.split("fn checks(check_code: CheckCode, path: &Path) -> Result<()> {")[0]
-                fp.write(f'{indent}#[test_case(CheckCode::{code}, Path::new("{code}.py"); "{code}")]')
+            if line.strip() == "fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {":
+                indent = line.split("fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {")[0]
+                fp.write(f'{indent}#[test_case(DiagnosticCode::{code}, Path::new("{code}.py"); "{code}")]')
                 fp.write("\n")
 
             fp.write(line)
@@ -73,39 +73,39 @@ pub fn {snake_case(name)}(checker: &mut Checker) {{}}
 
             if line.strip() == f"// {plugin}":
                 if index == 0:
-                    # `CheckCode` definition
+                    # `DiagnosticCode` definition
                     indent = line.split(f"// {plugin}")[0]
                     fp.write(f"{indent}{code},")
                     fp.write("\n")
 
                 elif index == 1:
-                    # `CheckKind` definition
+                    # `DiagnosticKind` definition
                     indent = line.split(f"// {plugin}")[0]
                     fp.write(f"{indent}{name},")
                     fp.write("\n")
 
                 elif index == 2:
-                    # `CheckCode#kind()`
+                    # `DiagnosticCode#kind()`
                     indent = line.split(f"// {plugin}")[0]
-                    fp.write(f"{indent}CheckCode::{code} => CheckKind::{name},")
+                    fp.write(f"{indent}DiagnosticCode::{code} => DiagnosticKind::{name},")
                     fp.write("\n")
 
                 elif index == 3:
-                    # `CheckCode#category()`
+                    # `DiagnosticCode#category()`
                     indent = line.split(f"// {plugin}")[0]
-                    fp.write(f"{indent}CheckCode::{code} => CheckCategory::{pascal_case(plugin)},")
+                    fp.write(f"{indent}DiagnosticCode::{code} => CheckCategory::{pascal_case(plugin)},")
                     fp.write("\n")
 
                 elif index == 4:
-                    # `CheckKind#code()`
+                    # `DiagnosticKind#code()`
                     indent = line.split(f"// {plugin}")[0]
-                    fp.write(f"{indent}CheckKind::{name} => &CheckCode::{code},")
+                    fp.write(f"{indent}DiagnosticKind::{name} => &DiagnosticCode::{code},")
                     fp.write("\n")
 
                 elif index == 5:
-                    # `CheckCode#body`
+                    # `DiagnosticCode#body`
                     indent = line.split(f"// {plugin}")[0]
-                    fp.write(f'{indent}CheckKind::{name} => todo!("Write message body for {code}"),')
+                    fp.write(f'{indent}DiagnosticKind::{name} => todo!("Write message body for {code}"),')
                     fp.write("\n")
 
                 index += 1

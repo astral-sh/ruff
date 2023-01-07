@@ -4,7 +4,7 @@ use crate::ast::helpers::{create_expr, create_stmt, unparse_expr, unparse_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, DiagnosticCode};
 use crate::violations;
 
 fn is_main_check(expr: &Expr) -> bool {
@@ -60,7 +60,7 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.checks.push(Check::new(
+    checker.checks.push(Diagnostic::new(
         violations::NestedIfStatements,
         Range::from_located(stmt),
     ));
@@ -88,11 +88,11 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
     let condition = unparse_expr(test, checker.style);
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
-    if checker.patch(&CheckCode::SIM103) {
+    if checker.patch(&DiagnosticCode::SIM103) {
         let return_stmt = create_stmt(StmtKind::Return {
             value: Some(test.clone()),
         });
@@ -178,11 +178,11 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let ternary = ternary(target_var, body_value, test, orelse_value);
     let content = unparse_stmt(&ternary, checker.style);
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UseTernaryOperator(content.clone()),
         Range::from_located(stmt),
     );
-    if checker.patch(&CheckCode::SIM108) {
+    if checker.patch(&DiagnosticCode::SIM108) {
         check.amend(Fix::replacement(
             content,
             stmt.location,

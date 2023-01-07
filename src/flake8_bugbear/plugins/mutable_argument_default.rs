@@ -4,7 +4,7 @@ use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Operator};
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 const MUTABLE_FUNCS: &[(&str, &str)] = &[
@@ -165,7 +165,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
                 !is_immutable_annotation(expr, &checker.from_imports, &checker.import_aliases)
             })
         {
-            checker.checks.push(Check::new(
+            checker.checks.push(Diagnostic::new(
                 violations::MutableArgumentDefault,
                 Range::from_located(default),
             ));

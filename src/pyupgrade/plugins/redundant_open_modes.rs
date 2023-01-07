@@ -10,7 +10,7 @@ use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, DiagnosticCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 
@@ -79,8 +79,8 @@ fn create_check(
     replacement_value: Option<String>,
     locator: &SourceCodeLocator,
     patch: bool,
-) -> Check {
-    let mut check = Check::new(
+) -> Diagnostic {
+    let mut check = Diagnostic::new(
         violations::RedundantOpenModes(replacement_value.clone()),
         Range::from_located(expr),
     );
@@ -168,7 +168,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         &keyword.node.value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&CheckCode::UP015),
+                        checker.patch(&DiagnosticCode::UP015),
                     ));
                 }
             }
@@ -185,7 +185,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&CheckCode::UP015),
+                    checker.patch(&DiagnosticCode::UP015),
                 ));
             }
         }

@@ -5,7 +5,7 @@ use crate::ast::helpers::{collect_arg_names, compose_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 const PATCH_NAMES: &[&str] = &[
@@ -56,7 +56,7 @@ fn check_patch_call(
     args: &[Expr],
     keywords: &[Keyword],
     new_arg_number: usize,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let simple_args = SimpleCallArgs::new(args, keywords);
     if simple_args.get_argument("return_value", None).is_some() {
         return None;
@@ -72,7 +72,7 @@ fn check_patch_call(
             visitor.visit_expr(body);
 
             if !visitor.uses_args {
-                return Some(Check::new(
+                return Some(Diagnostic::new(
                     violations::PatchWithLambda,
                     Range::from_located(call),
                 ));
@@ -82,7 +82,7 @@ fn check_patch_call(
     None
 }
 
-pub fn patch_with_lambda(call: &Expr, args: &[Expr], keywords: &[Keyword]) -> Option<Check> {
+pub fn patch_with_lambda(call: &Expr, args: &[Expr], keywords: &[Keyword]) -> Option<Diagnostic> {
     if let Some(call_path) = compose_call_path(call) {
         if PATCH_NAMES.contains(&call_path.as_str()) {
             check_patch_call(call, args, keywords, 1)

@@ -3,16 +3,16 @@ use std::str::FromStr;
 use anyhow::{bail, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff::registry::{CheckCodePrefix, PREFIX_REDIRECTS};
+use ruff::registry::{DiagnosticCodePrefix, PREFIX_REDIRECTS};
 use ruff::settings::types::PatternPrefixPair;
 use rustc_hash::FxHashMap;
 
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
-/// Parse a comma-separated list of `CheckCodePrefix` values (e.g.,
+/// Parse a comma-separated list of `DiagnosticCodePrefix` values (e.g.,
 /// "F401,E501").
-pub fn parse_prefix_codes(value: &str) -> Vec<CheckCodePrefix> {
-    let mut codes: Vec<CheckCodePrefix> = vec![];
+pub fn parse_prefix_codes(value: &str) -> Vec<DiagnosticCodePrefix> {
+    let mut codes: Vec<DiagnosticCodePrefix> = vec![];
     for code in COMMA_SEPARATED_LIST_RE.split(value) {
         let code = code.trim();
         if code.is_empty() {
@@ -20,7 +20,7 @@ pub fn parse_prefix_codes(value: &str) -> Vec<CheckCodePrefix> {
         }
         if let Some(code) = PREFIX_REDIRECTS.get(code) {
             codes.push(code.clone());
-        } else if let Ok(code) = CheckCodePrefix::from_str(code) {
+        } else if let Ok(code) = DiagnosticCodePrefix::from_str(code) {
             codes.push(code);
         } else {
             eprintln!("Unsupported prefix code: {code}");
@@ -81,7 +81,8 @@ impl State {
         }
     }
 
-    /// Generate the list of `StrCheckCodePair` pairs for the current state.
+    /// Generate the list of `StrDiagnosticCodePair` pairs for the current
+    /// state.
     fn parse(&self) -> Vec<PatternPrefixPair> {
         let mut codes: Vec<PatternPrefixPair> = vec![];
         for code in &self.codes {
@@ -92,7 +93,7 @@ impl State {
                         prefix: code.clone(),
                     });
                 }
-            } else if let Ok(code) = CheckCodePrefix::from_str(code) {
+            } else if let Ok(code) = DiagnosticCodePrefix::from_str(code) {
                 for filename in &self.filenames {
                     codes.push(PatternPrefixPair {
                         pattern: filename.clone(),
@@ -186,8 +187,8 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair
 /// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
-) -> FxHashMap<String, Vec<CheckCodePrefix>> {
-    let mut per_file_ignores: FxHashMap<String, Vec<CheckCodePrefix>> = FxHashMap::default();
+) -> FxHashMap<String, Vec<DiagnosticCodePrefix>> {
+    let mut per_file_ignores: FxHashMap<String, Vec<DiagnosticCodePrefix>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
@@ -200,7 +201,7 @@ pub fn collect_per_file_ignores(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff::registry::CheckCodePrefix;
+    use ruff::registry::DiagnosticCodePrefix;
     use ruff::settings::types::PatternPrefixPair;
 
     use crate::parser::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
@@ -208,27 +209,27 @@ mod tests {
     #[test]
     fn it_parses_prefix_codes() {
         let actual = parse_prefix_codes("");
-        let expected: Vec<CheckCodePrefix> = vec![];
+        let expected: Vec<DiagnosticCodePrefix> = vec![];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes(" ");
-        let expected: Vec<CheckCodePrefix> = vec![];
+        let expected: Vec<DiagnosticCodePrefix> = vec![];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401");
-        let expected = vec![CheckCodePrefix::F401];
+        let expected = vec![DiagnosticCodePrefix::F401];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401,");
-        let expected = vec![CheckCodePrefix::F401];
+        let expected = vec![DiagnosticCodePrefix::F401];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401,E501");
-        let expected = vec![CheckCodePrefix::F401, CheckCodePrefix::E501];
+        let expected = vec![DiagnosticCodePrefix::F401, DiagnosticCodePrefix::E501];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401, E501");
-        let expected = vec![CheckCodePrefix::F401, CheckCodePrefix::E501];
+        let expected = vec![DiagnosticCodePrefix::F401, DiagnosticCodePrefix::E501];
         assert_eq!(actual, expected);
     }
 
@@ -281,11 +282,11 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "locust/test/*".to_string(),
-                prefix: CheckCodePrefix::F841,
+                prefix: DiagnosticCodePrefix::F841,
             },
             PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                prefix: CheckCodePrefix::F841,
+                prefix: DiagnosticCodePrefix::F841,
             },
         ];
         assert_eq!(actual, expected);
@@ -301,23 +302,23 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "t/*".to_string(),
-                prefix: CheckCodePrefix::D,
+                prefix: DiagnosticCodePrefix::D,
             },
             PatternPrefixPair {
                 pattern: "setup.py".to_string(),
-                prefix: CheckCodePrefix::D,
+                prefix: DiagnosticCodePrefix::D,
             },
             PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                prefix: CheckCodePrefix::D,
+                prefix: DiagnosticCodePrefix::D,
             },
             PatternPrefixPair {
                 pattern: "docs/*".to_string(),
-                prefix: CheckCodePrefix::D,
+                prefix: DiagnosticCodePrefix::D,
             },
             PatternPrefixPair {
                 pattern: "extra/*".to_string(),
-                prefix: CheckCodePrefix::D,
+                prefix: DiagnosticCodePrefix::D,
             },
         ];
         assert_eq!(actual, expected);
@@ -339,47 +340,47 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "scrapy/__init__.py".to_string(),
-                prefix: CheckCodePrefix::E402,
+                prefix: DiagnosticCodePrefix::E402,
             },
             PatternPrefixPair {
                 pattern: "scrapy/core/downloader/handlers/http.py".to_string(),
-                prefix: CheckCodePrefix::F401,
+                prefix: DiagnosticCodePrefix::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/http/__init__.py".to_string(),
-                prefix: CheckCodePrefix::F401,
+                prefix: DiagnosticCodePrefix::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/linkextractors/__init__.py".to_string(),
-                prefix: CheckCodePrefix::E402,
+                prefix: DiagnosticCodePrefix::E402,
             },
             PatternPrefixPair {
                 pattern: "scrapy/linkextractors/__init__.py".to_string(),
-                prefix: CheckCodePrefix::F401,
+                prefix: DiagnosticCodePrefix::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/selector/__init__.py".to_string(),
-                prefix: CheckCodePrefix::F401,
+                prefix: DiagnosticCodePrefix::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/spiders/__init__.py".to_string(),
-                prefix: CheckCodePrefix::E402,
+                prefix: DiagnosticCodePrefix::E402,
             },
             PatternPrefixPair {
                 pattern: "scrapy/spiders/__init__.py".to_string(),
-                prefix: CheckCodePrefix::F401,
+                prefix: DiagnosticCodePrefix::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/utils/url.py".to_string(),
-                prefix: CheckCodePrefix::F403,
+                prefix: DiagnosticCodePrefix::F403,
             },
             PatternPrefixPair {
                 pattern: "scrapy/utils/url.py".to_string(),
-                prefix: CheckCodePrefix::F405,
+                prefix: DiagnosticCodePrefix::F405,
             },
             PatternPrefixPair {
                 pattern: "tests/test_loader.py".to_string(),
-                prefix: CheckCodePrefix::E741,
+                prefix: DiagnosticCodePrefix::E741,
             },
         ];
         assert_eq!(actual, expected);

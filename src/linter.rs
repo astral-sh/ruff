@@ -21,7 +21,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
-use crate::registry::{Check, CheckCode, LintSource};
+use crate::registry::{Diagnostic, DiagnosticCode, LintSource};
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
@@ -63,12 +63,12 @@ pub(crate) fn check_path(
     settings: &Settings,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
-) -> Result<Vec<Check>> {
+) -> Result<Vec<Diagnostic>> {
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
     // Aggregate all checks.
-    let mut checks: Vec<Check> = vec![];
+    let mut checks: Vec<Diagnostic> = vec![];
 
     // Run the token-based checks.
     if settings
@@ -117,8 +117,8 @@ pub(crate) fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.enabled.contains(&CheckCode::E999) {
-                    checks.push(Check::new(
+                if settings.enabled.contains(&DiagnosticCode::E999) {
+                    checks.push(Diagnostic::new(
                         violations::SyntaxError(parse_error.error.to_string()),
                         Range::new(parse_error.location, parse_error.location),
                     ));
@@ -488,7 +488,7 @@ quoting the contents of `{}`, along with the `pyproject.toml` settings and execu
 }
 
 #[cfg(test)]
-pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
+pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);

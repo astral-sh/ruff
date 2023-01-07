@@ -5,7 +5,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, LiteralType};
+use crate::registry::{Diagnostic, DiagnosticCode, LiteralType};
 use crate::violations;
 
 /// UP018
@@ -24,12 +24,12 @@ pub fn native_literals(
 
     if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let mut check = Check::new(violations::NativeLiterals(if id == "str" {
+            let mut check = Diagnostic::new(violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
             }), Range::from_located(expr));
-            if checker.patch(&CheckCode::UP018) {
+            if checker.patch(&DiagnosticCode::UP018) {
                 check.amend(Fix::replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
@@ -92,7 +92,7 @@ pub fn native_literals(
             return;
         }
 
-        let mut check = Check::new(
+        let mut check = Diagnostic::new(
             violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
@@ -100,7 +100,7 @@ pub fn native_literals(
             }),
             Range::from_located(expr),
         );
-        if checker.patch(&CheckCode::UP018) {
+        if checker.patch(&DiagnosticCode::UP018) {
             check.amend(Fix::replacement(
                 arg_code.to_string(),
                 expr.location,

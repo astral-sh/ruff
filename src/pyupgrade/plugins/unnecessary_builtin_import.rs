@@ -5,7 +5,7 @@ use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::{autofix, violations};
 
 const BUILTINS: &[&str] = &[
@@ -68,7 +68,7 @@ pub fn unnecessary_builtin_import(
     if unused_imports.is_empty() {
         return;
     }
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::UnnecessaryBuiltinImport(
             unused_imports
                 .iter()

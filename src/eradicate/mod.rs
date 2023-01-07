@@ -10,11 +10,11 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::settings;
 
-    #[test_case(CheckCode::ERA001, Path::new("ERA001.py"); "ERA001")]
-    fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
+    #[test_case(DiagnosticCode::ERA001, Path::new("ERA001.py"); "ERA001")]
+    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(
             Path::new("./resources/test/fixtures/eradicate")

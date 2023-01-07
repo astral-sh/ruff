@@ -2,7 +2,7 @@ use rustpython_ast::{ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// B021
@@ -16,7 +16,7 @@ pub fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     let ExprKind::JoinedStr { .. } = value.node else {
         return;
     };
-    checker.checks.push(Check::new(
+    checker.checks.push(Diagnostic::new(
         violations::FStringDocstring,
         helpers::identifier_range(stmt, checker.locator),
     ));

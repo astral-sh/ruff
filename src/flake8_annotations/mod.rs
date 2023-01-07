@@ -10,7 +10,7 @@ mod tests {
     use anyhow::Result;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::{flake8_annotations, Settings};
 
     #[test]
@@ -19,17 +19,17 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_annotations/annotation_presence.py"),
             &Settings {
                 ..Settings::for_rules(vec![
-                    CheckCode::ANN001,
-                    CheckCode::ANN002,
-                    CheckCode::ANN003,
-                    CheckCode::ANN101,
-                    CheckCode::ANN102,
-                    CheckCode::ANN201,
-                    CheckCode::ANN202,
-                    CheckCode::ANN204,
-                    CheckCode::ANN205,
-                    CheckCode::ANN206,
-                    CheckCode::ANN401,
+                    DiagnosticCode::ANN001,
+                    DiagnosticCode::ANN002,
+                    DiagnosticCode::ANN003,
+                    DiagnosticCode::ANN101,
+                    DiagnosticCode::ANN102,
+                    DiagnosticCode::ANN201,
+                    DiagnosticCode::ANN202,
+                    DiagnosticCode::ANN204,
+                    DiagnosticCode::ANN205,
+                    DiagnosticCode::ANN206,
+                    DiagnosticCode::ANN401,
                 ])
             },
         )?;
@@ -49,11 +49,11 @@ mod tests {
                     allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
-                    CheckCode::ANN001,
-                    CheckCode::ANN002,
-                    CheckCode::ANN003,
-                    CheckCode::ANN101,
-                    CheckCode::ANN102,
+                    DiagnosticCode::ANN001,
+                    DiagnosticCode::ANN002,
+                    DiagnosticCode::ANN003,
+                    DiagnosticCode::ANN101,
+                    DiagnosticCode::ANN102,
                 ])
             },
         )?;
@@ -73,11 +73,11 @@ mod tests {
                     allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
-                    CheckCode::ANN201,
-                    CheckCode::ANN202,
-                    CheckCode::ANN204,
-                    CheckCode::ANN205,
-                    CheckCode::ANN206,
+                    DiagnosticCode::ANN201,
+                    DiagnosticCode::ANN202,
+                    DiagnosticCode::ANN204,
+                    DiagnosticCode::ANN205,
+                    DiagnosticCode::ANN206,
                 ])
             },
         )?;
@@ -97,11 +97,11 @@ mod tests {
                     allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
-                    CheckCode::ANN201,
-                    CheckCode::ANN202,
-                    CheckCode::ANN204,
-                    CheckCode::ANN205,
-                    CheckCode::ANN206,
+                    DiagnosticCode::ANN201,
+                    DiagnosticCode::ANN202,
+                    DiagnosticCode::ANN204,
+                    DiagnosticCode::ANN205,
+                    DiagnosticCode::ANN206,
                 ])
             },
         )?;
@@ -120,7 +120,7 @@ mod tests {
                     suppress_none_returning: false,
                     allow_star_arg_any: true,
                 },
-                ..Settings::for_rules(vec![CheckCode::ANN401])
+                ..Settings::for_rules(vec![DiagnosticCode::ANN401])
             },
         )?;
         insta::assert_yaml_snapshot!(checks);
@@ -133,11 +133,11 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_annotations/allow_overload.py"),
             &Settings {
                 ..Settings::for_rules(vec![
-                    CheckCode::ANN201,
-                    CheckCode::ANN202,
-                    CheckCode::ANN204,
-                    CheckCode::ANN205,
-                    CheckCode::ANN206,
+                    DiagnosticCode::ANN201,
+                    DiagnosticCode::ANN202,
+                    DiagnosticCode::ANN204,
+                    DiagnosticCode::ANN205,
+                    DiagnosticCode::ANN206,
                 ])
             },
         )?;

@@ -9,7 +9,7 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, DiagnosticCode};
 use crate::violations;
 
 /// Return `true` if two `Expr` instances are equivalent names.
@@ -62,11 +62,11 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     // Generate a `Check` for each duplicate.
     for (arg_name, indices) in duplicates {
         if indices.len() > 1 {
-            let mut check = Check::new(
+            let mut check = Diagnostic::new(
                 violations::DuplicateIsinstanceCall(arg_name.to_string()),
                 Range::from_located(expr),
             );
-            if checker.patch(&CheckCode::SIM101) {
+            if checker.patch(&DiagnosticCode::SIM101) {
                 // Grab the types used in each duplicate `isinstance` call.
                 let types: Vec<&Expr> = indices
                     .iter()
@@ -171,7 +171,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             .iter()
             .map(|value| unparse_expr(value, checker.style))
             .collect();
-        let mut check = Check::new(
+        let mut check = Diagnostic::new(
             violations::CompareWithTuple(
                 value.to_string(),
                 str_values,
@@ -179,7 +179,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             ),
             Range::from_located(expr),
         );
-        if checker.patch(&CheckCode::SIM109) {
+        if checker.patch(&DiagnosticCode::SIM109) {
             // Create a `x in (a, b)` compare expr.
             let in_expr = create_expr(ExprKind::Compare {
                 left: Box::new(create_expr(ExprKind::Name {
@@ -233,11 +233,11 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut check = Check::new(
+                let mut check = Diagnostic::new(
                     violations::AAndNotA(id.to_string()),
                     Range::from_located(expr),
                 );
-                if checker.patch(&CheckCode::SIM220) {
+                if checker.patch(&DiagnosticCode::SIM220) {
                     check.amend(Fix::replacement(
                         "False".to_string(),
                         expr.location,
@@ -281,11 +281,11 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut check = Check::new(
+                let mut check = Diagnostic::new(
                     violations::AOrNotA(id.to_string()),
                     Range::from_located(expr),
                 );
-                if checker.patch(&CheckCode::SIM220) {
+                if checker.patch(&DiagnosticCode::SIM220) {
                     check.amend(Fix::replacement(
                         "True".to_string(),
                         expr.location,
@@ -309,8 +309,8 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut check = Check::new(violations::OrTrue, Range::from_located(value));
-            if checker.patch(&CheckCode::SIM223) {
+            let mut check = Diagnostic::new(violations::OrTrue, Range::from_located(value));
+            if checker.patch(&DiagnosticCode::SIM223) {
                 check.amend(Fix::replacement(
                     "True".to_string(),
                     expr.location,
@@ -333,8 +333,8 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut check = Check::new(violations::AndFalse, Range::from_located(value));
-            if checker.patch(&CheckCode::SIM223) {
+            let mut check = Diagnostic::new(violations::AndFalse, Range::from_located(value));
+            if checker.patch(&DiagnosticCode::SIM223) {
                 check.amend(Fix::replacement(
                     "False".to_string(),
                     expr.location,

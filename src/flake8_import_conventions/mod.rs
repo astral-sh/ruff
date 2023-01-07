@@ -10,14 +10,14 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::{flake8_import_conventions, Settings};
 
     #[test]
     fn defaults() -> Result<()> {
         let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
-            &Settings::for_rule(CheckCode::ICN001),
+            &Settings::for_rule(DiagnosticCode::ICN001),
         )?;
         insta::assert_yaml_snapshot!("defaults", checks);
         Ok(())
@@ -36,7 +36,7 @@ mod tests {
                     ])),
                 }
                 .into(),
-                ..Settings::for_rule(CheckCode::ICN001)
+                ..Settings::for_rule(DiagnosticCode::ICN001)
             },
         )?;
         insta::assert_yaml_snapshot!("custom", checks);
@@ -58,7 +58,7 @@ mod tests {
                     extend_aliases: None,
                 }
                 .into(),
-                ..Settings::for_rule(CheckCode::ICN001)
+                ..Settings::for_rule(DiagnosticCode::ICN001)
             },
         )?;
         insta::assert_yaml_snapshot!("remove_default", checks);
@@ -78,7 +78,7 @@ mod tests {
                     )])),
                 }
                 .into(),
-                ..Settings::for_rule(CheckCode::ICN001)
+                ..Settings::for_rule(DiagnosticCode::ICN001)
             },
         )?;
         insta::assert_yaml_snapshot!("override_default", checks);

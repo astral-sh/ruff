@@ -10,7 +10,7 @@ mod tests {
 
     use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::{flake8_tidy_imports, Settings};
 
     #[test]
@@ -22,7 +22,7 @@ mod tests {
                     ban_relative_imports: Strictness::Parents,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![CheckCode::TID252])
+                ..Settings::for_rules(vec![DiagnosticCode::TID252])
             },
         )?;
         insta::assert_yaml_snapshot!(checks);
@@ -38,7 +38,7 @@ mod tests {
                     ban_relative_imports: Strictness::All,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![CheckCode::TID252])
+                ..Settings::for_rules(vec![DiagnosticCode::TID252])
             },
         )?;
         insta::assert_yaml_snapshot!(checks);
@@ -67,7 +67,7 @@ mod tests {
                     ]),
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![CheckCode::TID251])
+                ..Settings::for_rules(vec![DiagnosticCode::TID251])
             },
         )?;
         insta::assert_yaml_snapshot!(checks);
@@ -88,7 +88,7 @@ mod tests {
                     )]),
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![CheckCode::TID251])
+                ..Settings::for_rules(vec![DiagnosticCode::TID251])
             },
         )?;
         insta::assert_yaml_snapshot!(checks);

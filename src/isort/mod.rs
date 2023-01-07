@@ -633,7 +633,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::{isort, Settings};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
@@ -680,7 +680,7 @@ mod tests {
                 .as_path(),
             &Settings {
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(DiagnosticCode::I001)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -700,7 +700,7 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(DiagnosticCode::I001)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -721,7 +721,7 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(DiagnosticCode::I001)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -741,7 +741,7 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(DiagnosticCode::I001)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -764,7 +764,7 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(DiagnosticCode::I001)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, checks);
@@ -784,7 +784,7 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(DiagnosticCode::I001)
             },
         )?;
         checks.sort_by_key(|check| check.location);

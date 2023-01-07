@@ -8,12 +8,12 @@ use rustpython_parser::ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::registry::{Check, CheckCode, CheckKind, UnusedCodes, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, DiagnosticCode, DiagnosticKind, UnusedCodes, CODE_REDIRECTS};
 use crate::settings::{flags, Settings};
 use crate::{noqa, violations};
 
 pub fn check_noqa(
-    checks: &mut Vec<Check>,
+    checks: &mut Vec<Diagnostic>,
     contents: &str,
     commented_lines: &[usize],
     noqa_line_for: &IntMap<usize, usize>,
@@ -23,7 +23,7 @@ pub fn check_noqa(
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut ignored = vec![];
 
-    let enforce_noqa = settings.enabled.contains(&CheckCode::RUF100);
+    let enforce_noqa = settings.enabled.contains(&DiagnosticCode::RUF100);
 
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {
@@ -42,7 +42,7 @@ pub fn check_noqa(
 
     // Remove any ignored checks.
     for (index, check) in checks.iter().enumerate() {
-        if matches!(check.kind, CheckKind::BlanketNOQA(..)) {
+        if matches!(check.kind, DiagnosticKind::BlanketNOQA(..)) {
             continue;
         }
 
@@ -100,7 +100,7 @@ pub fn check_noqa(
             match directive {
                 Directive::All(spaces, start, end) => {
                     if matches.is_empty() {
-                        let mut check = Check::new(
+                        let mut check = Diagnostic::new(
                             violations::UnusedNOQA(None),
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
@@ -123,7 +123,7 @@ pub fn check_noqa(
                     let mut self_ignore = false;
                     for code in codes {
                         let code = CODE_REDIRECTS.get(code).map_or(code, AsRef::as_ref);
-                        if code == CheckCode::RUF100.as_ref() {
+                        if code == DiagnosticCode::RUF100.as_ref() {
                             self_ignore = true;
                             break;
                         }
@@ -131,7 +131,7 @@ pub fn check_noqa(
                         if matches.contains(&code) || settings.external.contains(code) {
                             valid_codes.push(code);
                         } else {
-                            if let Ok(check_code) = CheckCode::from_str(code) {
+                            if let Ok(check_code) = DiagnosticCode::from_str(code) {
                                 if settings.enabled.contains(&check_code) {
                                     unmatched_codes.push(code);
                                 } else {
@@ -151,7 +151,7 @@ pub fn check_noqa(
                         && unknown_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
-                        let mut check = Check::new(
+                        let mut check = Diagnostic::new(
                             violations::UnusedNOQA(Some(UnusedCodes {
                                 disabled: disabled_codes
                                     .iter()

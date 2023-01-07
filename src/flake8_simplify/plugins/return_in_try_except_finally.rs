@@ -2,7 +2,7 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
@@ -26,7 +26,7 @@ pub fn return_in_try_except_finally(
 
     if let Some(finally_return) = find_return(finalbody) {
         if try_has_return || except_has_return {
-            checker.checks.push(Check::new(
+            checker.checks.push(Diagnostic::new(
                 violations::ReturnInTryExceptFinally,
                 Range::from_located(finally_return),
             ));

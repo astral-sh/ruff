@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// B003
@@ -23,7 +23,7 @@ pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
     if id != "os" {
         return;
     }
-    checker.checks.push(Check::new(
+    checker.checks.push(Diagnostic::new(
         violations::AssignmentToOsEnviron,
         Range::from_located(target),
     ));

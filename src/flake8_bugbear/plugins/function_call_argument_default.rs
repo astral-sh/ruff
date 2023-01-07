@@ -9,7 +9,7 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::flake8_bugbear::plugins::mutable_argument_default::is_mutable_func;
-use crate::registry::{Check, CheckKind};
+use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violations;
 
 const IMMUTABLE_FUNCS: [(&str, &str); 7] = [
@@ -36,7 +36,7 @@ fn is_immutable_func(
 }
 
 struct ArgumentDefaultVisitor<'a> {
-    checks: Vec<(CheckKind, Range)>,
+    checks: Vec<(DiagnosticKind, Range)>,
     extend_immutable_calls: &'a [(&'a str, &'a str)],
     from_imports: &'a FxHashMap<&'a str, FxHashSet<&'a str>>,
     import_aliases: &'a FxHashMap<&'a str, &'a str>,
@@ -118,6 +118,6 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         visitor.visit_expr(expr);
     }
     for (check, range) in visitor.checks {
-        checker.checks.push(Check::new(check, range));
+        checker.checks.push(Diagnostic::new(check, range));
     }
 }

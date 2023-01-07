@@ -6,7 +6,7 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// Return `true` if the two expressions are equivalent, and consistent solely
@@ -158,7 +158,7 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
             }
 
             let mut check =
-                Check::new(violations::RewriteYieldFrom, Range::from_located(item.stmt));
+                Diagnostic::new(violations::RewriteYieldFrom, Range::from_located(item.stmt));
             if checker.patch(check.kind.code()) {
                 let contents = checker
                     .locator

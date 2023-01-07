@@ -7,7 +7,7 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 use crate::ast::helpers::except_range;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
@@ -15,7 +15,7 @@ use crate::violations;
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
 
 /// E501
-pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Check> {
+pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
     let line_length = line.chars().count();
 
     if line_length <= settings.line_length {
@@ -43,7 +43,7 @@ pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<C
         }
     }
 
-    Some(Check::new(
+    Some(Diagnostic::new(
         violations::LineTooLong(line_length, settings.line_length),
         Range::new(
             Location::new(lineno + 1, settings.line_length),
@@ -53,8 +53,8 @@ pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<C
 }
 
 /// E721
-pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
+pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Diagnostic> {
+    let mut checks: Vec<Diagnostic> = vec![];
 
     for (op, right) in izip!(ops, comparators) {
         if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
@@ -75,7 +75,7 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                                         kind: None
                                     }
                             ) {
-                                checks.push(Check::new(violations::TypeComparison, location));
+                                checks.push(Diagnostic::new(violations::TypeComparison, location));
                             }
                         }
                     }
@@ -85,7 +85,7 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                 if let ExprKind::Name { id, .. } = &value.node {
                     // Ex) types.IntType
                     if id == "types" {
-                        checks.push(Check::new(violations::TypeComparison, location));
+                        checks.push(Diagnostic::new(violations::TypeComparison, location));
                     }
                 }
             }
@@ -102,13 +102,13 @@ pub fn do_not_use_bare_except(
     body: &[Stmt],
     handler: &Excepthandler,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if type_.is_none()
         && !body
             .iter()
             .any(|stmt| matches!(stmt.node, StmtKind::Raise { exc: None, .. }))
     {
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::DoNotUseBareExcept,
             except_range(handler, locator),
         ))
@@ -122,9 +122,9 @@ fn is_ambiguous_name(name: &str) -> bool {
 }
 
 /// E741
-pub fn ambiguous_variable_name(name: &str, range: Range) -> Option<Check> {
+pub fn ambiguous_variable_name(name: &str, range: Range) -> Option<Diagnostic> {
     if is_ambiguous_name(name) {
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::AmbiguousVariableName(name.to_string()),
             range,
         ))
@@ -134,12 +134,12 @@ pub fn ambiguous_variable_name(name: &str, range: Range) -> Option<Check> {
 }
 
 /// E742
-pub fn ambiguous_class_name<F>(name: &str, locate: F) -> Option<Check>
+pub fn ambiguous_class_name<F>(name: &str, locate: F) -> Option<Diagnostic>
 where
     F: FnOnce() -> Range,
 {
     if is_ambiguous_name(name) {
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::AmbiguousClassName(name.to_string()),
             locate(),
         ))
@@ -149,12 +149,12 @@ where
 }
 
 /// E743
-pub fn ambiguous_function_name<F>(name: &str, locate: F) -> Option<Check>
+pub fn ambiguous_function_name<F>(name: &str, locate: F) -> Option<Diagnostic>
 where
     F: FnOnce() -> Range,
 {
     if is_ambiguous_name(name) {
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::AmbiguousFunctionName(name.to_string()),
             locate(),
         ))
@@ -164,14 +164,14 @@ where
 }
 
 /// W292
-pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Check> {
+pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Diagnostic> {
     if !contents.ends_with('\n') {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
         if let Some(line) = contents.lines().last() {
             // Both locations are at the end of the file (and thus the same).
             let location = Location::new(contents.lines().count(), line.len());
-            let mut check = Check::new(
+            let mut check = Diagnostic::new(
                 violations::NoNewLineAtEndOfFile,
                 Range::new(location, location),
             );
@@ -208,7 +208,7 @@ pub fn invalid_escape_sequence(
     start: Location,
     end: Location,
     autofix: bool,
-) -> Vec<Check> {
+) -> Vec<Diagnostic> {
     let mut checks = vec![];
 
     let text = locator.slice_source_code_range(&Range::new(start, end));
@@ -252,7 +252,7 @@ pub fn invalid_escape_sequence(
                 };
                 let location = Location::new(start.row() + row_offset, col);
                 let end_location = Location::new(location.row(), location.column() + 2);
-                let mut check = Check::new(
+                let mut check = Diagnostic::new(
                     violations::InvalidEscapeSequence(next_char),
                     Range::new(location, end_location),
                 );

@@ -4,7 +4,7 @@ use rustpython_ast::{Expr, Stmt};
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::Range;
 use crate::flake8_debugger::types::DebuggerUsingType;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 const DEBUGGERS: &[(&str, &str)] = &[
@@ -25,13 +25,13 @@ pub fn debugger_call(
     func: &Expr,
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let call_path = dealias_call_path(collect_call_paths(func), import_aliases);
     if DEBUGGERS
         .iter()
         .any(|(module, member)| match_call_path(&call_path, module, member, from_imports))
     {
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::Debugger(DebuggerUsingType::Call(call_path.join("."))),
             Range::from_located(expr),
         ))
@@ -41,7 +41,7 @@ pub fn debugger_call(
 }
 
 /// Checks for the presence of a debugger import.
-pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Check> {
+pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
     // Special-case: allow `import builtins`, which is far more general than (e.g.)
     // `import celery.contrib.rdb`).
     if module.is_none() && name == "builtins" {
@@ -53,7 +53,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
             .iter()
             .find(|(module_name, member)| module_name == &module && member == &name)
         {
-            return Some(Check::new(
+            return Some(Diagnostic::new(
                 violations::Debugger(DebuggerUsingType::Import(format!("{module_name}.{member}"))),
                 Range::from_located(stmt),
             ));
@@ -62,7 +62,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
         .iter()
         .any(|(module_name, ..)| module_name == &name)
     {
-        return Some(Check::new(
+        return Some(Diagnostic::new(
             violations::Debugger(DebuggerUsingType::Import(name.to_string())),
             Range::from_located(stmt),
         ));

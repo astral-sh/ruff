@@ -2,11 +2,11 @@ use rustpython_ast::Keyword;
 
 use crate::ast::types::Range;
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// S106
-pub fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Check> {
+pub fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnostic> {
     keywords
         .iter()
         .filter_map(|keyword| {
@@ -15,7 +15,7 @@ pub fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Check> {
             if !matches_password_name(arg) {
                 return None;
             }
-            Some(Check::new(
+            Some(Diagnostic::new(
                 violations::HardcodedPasswordFuncArg(string.to_string()),
                 Range::from_located(keyword),
             ))

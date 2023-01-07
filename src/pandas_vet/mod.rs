@@ -11,15 +11,15 @@ mod tests {
     use textwrap::dedent;
 
     use crate::linter::check_path;
-    use crate::registry::{CheckCode, CheckCodePrefix};
+    use crate::registry::{DiagnosticCode, DiagnosticCodePrefix};
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::source_code_style::SourceCodeStyleDetector;
     use crate::{directives, rustpython_helpers, settings};
 
-    fn check_code(contents: &str, expected: &[CheckCode]) -> Result<()> {
+    fn check_code(contents: &str, expected: &[DiagnosticCode]) -> Result<()> {
         let contents = dedent(contents);
-        let settings = settings::Settings::for_rules(CheckCodePrefix::PD.codes());
+        let settings = settings::Settings::for_rules(DiagnosticCodePrefix::PD.codes());
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = SourceCodeLocator::new(&contents);
         let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
@@ -54,7 +54,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         x.drop(['a'], axis=1, inplace=True)
-    "#, &[CheckCode::PD002]; "PD002_fail")]
+    "#, &[DiagnosticCode::PD002]; "PD002_fail")]
     #[test_case(r#"
         import pandas as pd
         nas = pd.isna(val)
@@ -62,7 +62,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         nulls = pd.isnull(val)
-    "#, &[CheckCode::PD003]; "PD003_fail")]
+    "#, &[DiagnosticCode::PD003]; "PD003_fail")]
     #[test_case(r#"
         import pandas as pd
         print('bah humbug')
@@ -74,7 +74,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         not_nulls = pd.notnull(val)
-    "#, &[CheckCode::PD004]; "PD004_fail")]
+    "#, &[DiagnosticCode::PD004]; "PD004_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -89,7 +89,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         y = x.ix[[0, 2], 'A']
-    "#, &[CheckCode::PD007]; "PD007_fail")]
+    "#, &[DiagnosticCode::PD007]; "PD007_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -99,7 +99,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         index = x.at[:, ['B', 'A']]
-    "#, &[CheckCode::PD008]; "PD008_fail")]
+    "#, &[DiagnosticCode::PD008]; "PD008_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -109,7 +109,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         index = x.iat[:, 1:3]
-    "#, &[CheckCode::PD009]; "PD009_fail")]
+    "#, &[DiagnosticCode::PD009]; "PD009_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -131,7 +131,7 @@ mod tests {
             columns='bar',
             values='baz'
         )
-    "#, &[CheckCode::PD010]; "PD010_fail_pivot")]
+    "#, &[DiagnosticCode::PD010]; "PD010_fail_pivot")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -146,7 +146,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         result = x.values
-    "#, &[CheckCode::PD011]; "PD011_fail_values")]
+    "#, &[DiagnosticCode::PD011]; "PD011_fail_values")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -175,7 +175,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         employees = pd.read_table(input_file)
-    "#, &[CheckCode::PD012]; "PD012_fail_read_table")]
+    "#, &[DiagnosticCode::PD012]; "PD012_fail_read_table")]
     #[test_case(r#"
         import pandas as pd
         employees = read_table
@@ -202,7 +202,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         y = x.stack(level=-1, dropna=True)
-    "#, &[CheckCode::PD013]; "PD013_fail_stack")]
+    "#, &[DiagnosticCode::PD013]; "PD013_fail_stack")]
     #[test_case(r#"
         import pandas as pd
         pd.stack(
@@ -218,7 +218,7 @@ mod tests {
         x = pd.DataFrame()
         y = pd.DataFrame()
         pd.merge(x, y)
-    "#, &[CheckCode::PD015]; "PD015_fail_merge_on_pandas_object")]
+    "#, &[DiagnosticCode::PD015]; "PD015_fail_merge_on_pandas_object")]
     #[test_case(
         "pd.to_datetime(timestamp * 10 ** 9).strftime('%Y-%m-%d %H:%M:%S.%f')",
         &[];
@@ -239,8 +239,8 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         df = pd.DataFrame()
-    "#, &[CheckCode::PD901]; "PD901_fail_df_var")]
-    fn test_pandas_vet(code: &str, expected: &[CheckCode]) -> Result<()> {
+    "#, &[DiagnosticCode::PD901]; "PD901_fail_df_var")]
+    fn test_pandas_vet(code: &str, expected: &[DiagnosticCode]) -> Result<()> {
         check_code(code, expected)?;
         Ok(())
     }

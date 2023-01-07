@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
@@ -34,7 +34,7 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
                 _ => decorator,
             },
         ) {
-            checker.checks.push(Check::new(
+            checker.checks.push(Diagnostic::new(
                 violations::CachedInstanceMethod,
                 Range::from_located(decorator),
             ));

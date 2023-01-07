@@ -11,10 +11,10 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::settings;
-    #[test_case(CheckCode::RUF004, Path::new("RUF004.py"); "RUF004")]
-    fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
+    #[test_case(DiagnosticCode::RUF004, Path::new("RUF004.py"); "RUF004")]
+    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let checks = test_path(
             Path::new("./resources/test/fixtures/ruff")
@@ -33,9 +33,9 @@ mod tests {
             &settings::Settings {
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::Settings::for_rules(vec![
-                    CheckCode::RUF001,
-                    CheckCode::RUF002,
-                    CheckCode::RUF003,
+                    DiagnosticCode::RUF001,
+                    DiagnosticCode::RUF002,
+                    DiagnosticCode::RUF003,
                 ])
             },
         )?;
@@ -48,10 +48,10 @@ mod tests {
         let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/RUF100_0.py"),
             &settings::Settings::for_rules(vec![
-                CheckCode::RUF100,
-                CheckCode::E501,
-                CheckCode::F401,
-                CheckCode::F841,
+                DiagnosticCode::RUF100,
+                DiagnosticCode::E501,
+                DiagnosticCode::F401,
+                DiagnosticCode::F841,
             ]),
         )?;
         insta::assert_yaml_snapshot!(checks);
@@ -62,7 +62,7 @@ mod tests {
     fn ruf100_1() -> Result<()> {
         let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/RUF100_1.py"),
-            &settings::Settings::for_rules(vec![CheckCode::RUF100, CheckCode::F401]),
+            &settings::Settings::for_rules(vec![DiagnosticCode::RUF100, DiagnosticCode::F401]),
         )?;
         insta::assert_yaml_snapshot!(checks);
         Ok(())
@@ -72,7 +72,7 @@ mod tests {
     fn flake8_noqa() -> Result<()> {
         let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/flake8_noqa.py"),
-            &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F841]),
+            &settings::Settings::for_rules(vec![DiagnosticCode::F401, DiagnosticCode::F841]),
         )?;
         insta::assert_yaml_snapshot!(checks);
         Ok(())
@@ -82,7 +82,7 @@ mod tests {
     fn ruff_noqa() -> Result<()> {
         let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/ruff_noqa.py"),
-            &settings::Settings::for_rules(vec![CheckCode::F401, CheckCode::F841]),
+            &settings::Settings::for_rules(vec![DiagnosticCode::F401, DiagnosticCode::F841]),
         )?;
         insta::assert_yaml_snapshot!(checks);
         Ok(())
@@ -92,7 +92,7 @@ mod tests {
     fn redirects() -> Result<()> {
         let checks = test_path(
             Path::new("./resources/test/fixtures/ruff/redirects.py"),
-            &settings::Settings::for_rules(vec![CheckCode::UP007]),
+            &settings::Settings::for_rules(vec![DiagnosticCode::UP007]),
         )?;
         insta::assert_yaml_snapshot!(checks);
         Ok(())

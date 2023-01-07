@@ -1,9 +1,9 @@
-//! Registry of all supported `CheckCode` and `CheckKind` types.
+//! Registry to `DiagnosticCode` to `DiagnosticKind` mappings.
 
 use std::fmt;
 
 use once_cell::sync::Lazy;
-use ruff_macros::CheckCodePrefix;
+use ruff_macros::DiagnosticCodePrefix;
 use rustc_hash::FxHashMap;
 use rustpython_ast::Cmpop;
 use rustpython_parser::ast::Location;
@@ -19,7 +19,7 @@ macro_rules! define_rule_mapping {
     ($($code:ident => $mod:ident::$name:ident,)+) => {
         #[derive(
             AsRefStr,
-            CheckCodePrefix,
+            DiagnosticCodePrefix,
             EnumIter,
             EnumString,
             Debug,
@@ -33,76 +33,72 @@ macro_rules! define_rule_mapping {
             PartialOrd,
             Ord,
         )]
-        pub enum CheckCode {
+        pub enum DiagnosticCode {
             $(
                 $code,
             )+
         }
 
-
         #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
-        pub enum CheckKind {
+        pub enum DiagnosticKind {
             $(
                 $name($mod::$name),
             )+
         }
 
-        impl CheckCode {
-            /// A placeholder representation of the `CheckKind` for the check.
-            pub fn kind(&self) -> CheckKind {
+        impl DiagnosticCode {
+            /// A placeholder representation of the `DiagnosticKind` for the diagnostic.
+            pub fn kind(&self) -> DiagnosticKind {
                 match self {
                     $(
-                        CheckCode::$code => CheckKind::$name(<$mod::$name as Violation>::placeholder()),
+                        DiagnosticCode::$code => DiagnosticKind::$name(<$mod::$name as Violation>::placeholder()),
                     )+
                 }
             }
         }
 
-        impl CheckKind {
-            /// A four-letter shorthand code for the check.
-            pub fn code(&self) -> &'static CheckCode {
+        impl DiagnosticKind {
+            /// A four-letter shorthand code for the diagnostic.
+            pub fn code(&self) -> &'static DiagnosticCode {
                 match self {
                     $(
-                        CheckKind::$name(..) => &CheckCode::$code,
+                        DiagnosticKind::$name(..) => &DiagnosticCode::$code,
                     )+
                 }
             }
 
-
-            /// The body text for the check.
+            /// The body text for the diagnostic.
             pub fn body(&self) -> String {
                 match self {
                     $(
-                        CheckKind::$name(x) => Violation::message(x),
+                        DiagnosticKind::$name(x) => Violation::message(x),
                     )+
                 }
             }
-
 
             /// Whether the check kind is (potentially) fixable.
             pub fn fixable(&self) -> bool {
                 match self {
                     $(
-                        CheckKind::$name(x) => x.autofix_title_formatter().is_some(),
+                        DiagnosticKind::$name(x) => x.autofix_title_formatter().is_some(),
                     )+
                 }
             }
 
-
-            /// The message used to describe the fix action for a given `CheckKind`.
+            /// The message used to describe the fix action for a given `DiagnosticKind`.
             pub fn commit(&self) -> Option<String> {
                 match self {
                     $(
-                        CheckKind::$name(x) => x.autofix_title_formatter().map(|f| f(x)),
+                        DiagnosticKind::$name(x) => x.autofix_title_formatter().map(|f| f(x)),
                     )+
                 }
             }
         }
 
         $(
-            impl From<$mod::$name> for CheckKind {
+            impl From<$mod::$name> for DiagnosticKind {
                 fn from(x: $mod::$name) -> Self {
-                    CheckKind::$name(x)
+                    DiagnosticKind::$name(x)
                 }
             }
         )+
@@ -593,46 +589,46 @@ impl CheckCategory {
         }
     }
 
-    pub fn codes(&self) -> Vec<CheckCodePrefix> {
+    pub fn codes(&self) -> Vec<DiagnosticCodePrefix> {
         match self {
-            CheckCategory::Eradicate => vec![CheckCodePrefix::ERA],
-            CheckCategory::Flake82020 => vec![CheckCodePrefix::YTT],
-            CheckCategory::Flake8Annotations => vec![CheckCodePrefix::ANN],
-            CheckCategory::Flake8Bandit => vec![CheckCodePrefix::S],
-            CheckCategory::Flake8BlindExcept => vec![CheckCodePrefix::BLE],
-            CheckCategory::Flake8BooleanTrap => vec![CheckCodePrefix::FBT],
-            CheckCategory::Flake8Bugbear => vec![CheckCodePrefix::B],
-            CheckCategory::Flake8Builtins => vec![CheckCodePrefix::A],
-            CheckCategory::Flake8Comprehensions => vec![CheckCodePrefix::C4],
-            CheckCategory::Flake8Datetimez => vec![CheckCodePrefix::DTZ],
-            CheckCategory::Flake8Debugger => vec![CheckCodePrefix::T10],
-            CheckCategory::Flake8ErrMsg => vec![CheckCodePrefix::EM],
-            CheckCategory::Flake8ImplicitStrConcat => vec![CheckCodePrefix::ISC],
-            CheckCategory::Flake8ImportConventions => vec![CheckCodePrefix::ICN],
-            CheckCategory::Flake8Print => vec![CheckCodePrefix::T20],
-            CheckCategory::Flake8PytestStyle => vec![CheckCodePrefix::PT],
-            CheckCategory::Flake8Quotes => vec![CheckCodePrefix::Q],
-            CheckCategory::Flake8Return => vec![CheckCodePrefix::RET],
-            CheckCategory::Flake8Simplify => vec![CheckCodePrefix::SIM],
-            CheckCategory::Flake8TidyImports => vec![CheckCodePrefix::TID],
-            CheckCategory::Flake8UnusedArguments => vec![CheckCodePrefix::ARG],
-            CheckCategory::Isort => vec![CheckCodePrefix::I],
-            CheckCategory::McCabe => vec![CheckCodePrefix::C90],
-            CheckCategory::PEP8Naming => vec![CheckCodePrefix::N],
-            CheckCategory::PandasVet => vec![CheckCodePrefix::PD],
-            CheckCategory::Pycodestyle => vec![CheckCodePrefix::E, CheckCodePrefix::W],
-            CheckCategory::Pydocstyle => vec![CheckCodePrefix::D],
-            CheckCategory::Pyflakes => vec![CheckCodePrefix::F],
-            CheckCategory::PygrepHooks => vec![CheckCodePrefix::PGH],
+            CheckCategory::Eradicate => vec![DiagnosticCodePrefix::ERA],
+            CheckCategory::Flake82020 => vec![DiagnosticCodePrefix::YTT],
+            CheckCategory::Flake8Annotations => vec![DiagnosticCodePrefix::ANN],
+            CheckCategory::Flake8Bandit => vec![DiagnosticCodePrefix::S],
+            CheckCategory::Flake8BlindExcept => vec![DiagnosticCodePrefix::BLE],
+            CheckCategory::Flake8BooleanTrap => vec![DiagnosticCodePrefix::FBT],
+            CheckCategory::Flake8Bugbear => vec![DiagnosticCodePrefix::B],
+            CheckCategory::Flake8Builtins => vec![DiagnosticCodePrefix::A],
+            CheckCategory::Flake8Comprehensions => vec![DiagnosticCodePrefix::C4],
+            CheckCategory::Flake8Datetimez => vec![DiagnosticCodePrefix::DTZ],
+            CheckCategory::Flake8Debugger => vec![DiagnosticCodePrefix::T10],
+            CheckCategory::Flake8ErrMsg => vec![DiagnosticCodePrefix::EM],
+            CheckCategory::Flake8ImplicitStrConcat => vec![DiagnosticCodePrefix::ISC],
+            CheckCategory::Flake8ImportConventions => vec![DiagnosticCodePrefix::ICN],
+            CheckCategory::Flake8Print => vec![DiagnosticCodePrefix::T20],
+            CheckCategory::Flake8PytestStyle => vec![DiagnosticCodePrefix::PT],
+            CheckCategory::Flake8Quotes => vec![DiagnosticCodePrefix::Q],
+            CheckCategory::Flake8Return => vec![DiagnosticCodePrefix::RET],
+            CheckCategory::Flake8Simplify => vec![DiagnosticCodePrefix::SIM],
+            CheckCategory::Flake8TidyImports => vec![DiagnosticCodePrefix::TID],
+            CheckCategory::Flake8UnusedArguments => vec![DiagnosticCodePrefix::ARG],
+            CheckCategory::Isort => vec![DiagnosticCodePrefix::I],
+            CheckCategory::McCabe => vec![DiagnosticCodePrefix::C90],
+            CheckCategory::PEP8Naming => vec![DiagnosticCodePrefix::N],
+            CheckCategory::PandasVet => vec![DiagnosticCodePrefix::PD],
+            CheckCategory::Pycodestyle => vec![DiagnosticCodePrefix::E, DiagnosticCodePrefix::W],
+            CheckCategory::Pydocstyle => vec![DiagnosticCodePrefix::D],
+            CheckCategory::Pyflakes => vec![DiagnosticCodePrefix::F],
+            CheckCategory::PygrepHooks => vec![DiagnosticCodePrefix::PGH],
             CheckCategory::Pylint => vec![
-                CheckCodePrefix::PLC,
-                CheckCodePrefix::PLE,
-                CheckCodePrefix::PLR,
-                CheckCodePrefix::PLW,
+                DiagnosticCodePrefix::PLC,
+                DiagnosticCodePrefix::PLE,
+                DiagnosticCodePrefix::PLR,
+                DiagnosticCodePrefix::PLW,
             ],
-            CheckCategory::Pyupgrade => vec![CheckCodePrefix::UP],
-            CheckCategory::Flake8Pie => vec![CheckCodePrefix::PIE],
-            CheckCategory::Ruff => vec![CheckCodePrefix::RUF],
+            CheckCategory::Pyupgrade => vec![DiagnosticCodePrefix::UP],
+            CheckCategory::Flake8Pie => vec![DiagnosticCodePrefix::PIE],
+            CheckCategory::Ruff => vec![DiagnosticCodePrefix::RUF],
         }
     }
 
@@ -864,30 +860,30 @@ pub enum MockReference {
     Attribute,
 }
 
-impl CheckCode {
-    /// The source for the check (either the AST, the filesystem, or the
+impl DiagnosticCode {
+    /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            CheckCode::RUF100 => &LintSource::NoQA,
-            CheckCode::E501
-            | CheckCode::W292
-            | CheckCode::UP009
-            | CheckCode::PGH003
-            | CheckCode::PGH004 => &LintSource::Lines,
-            CheckCode::ERA001
-            | CheckCode::ISC001
-            | CheckCode::ISC002
-            | CheckCode::Q000
-            | CheckCode::Q001
-            | CheckCode::Q002
-            | CheckCode::Q003
-            | CheckCode::W605
-            | CheckCode::RUF001
-            | CheckCode::RUF002
-            | CheckCode::RUF003 => &LintSource::Tokens,
-            CheckCode::E902 => &LintSource::FileSystem,
-            CheckCode::I001 => &LintSource::Imports,
+            DiagnosticCode::RUF100 => &LintSource::NoQA,
+            DiagnosticCode::E501
+            | DiagnosticCode::W292
+            | DiagnosticCode::UP009
+            | DiagnosticCode::PGH003
+            | DiagnosticCode::PGH004 => &LintSource::Lines,
+            DiagnosticCode::ERA001
+            | DiagnosticCode::ISC001
+            | DiagnosticCode::ISC002
+            | DiagnosticCode::Q000
+            | DiagnosticCode::Q001
+            | DiagnosticCode::Q002
+            | DiagnosticCode::Q003
+            | DiagnosticCode::W605
+            | DiagnosticCode::RUF001
+            | DiagnosticCode::RUF002
+            | DiagnosticCode::RUF003 => &LintSource::Tokens,
+            DiagnosticCode::E902 => &LintSource::FileSystem,
+            DiagnosticCode::I001 => &LintSource::Imports,
             _ => &LintSource::AST,
         }
     }
@@ -896,431 +892,433 @@ impl CheckCode {
         #[allow(clippy::match_same_arms)]
         match self {
             // flake8-builtins
-            CheckCode::A001 => CheckCategory::Flake8Builtins,
-            CheckCode::A002 => CheckCategory::Flake8Builtins,
-            CheckCode::A003 => CheckCategory::Flake8Builtins,
+            DiagnosticCode::A001 => CheckCategory::Flake8Builtins,
+            DiagnosticCode::A002 => CheckCategory::Flake8Builtins,
+            DiagnosticCode::A003 => CheckCategory::Flake8Builtins,
             // flake8-annotations
-            CheckCode::ANN001 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN002 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN003 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN101 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN102 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN201 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN202 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN204 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN205 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN206 => CheckCategory::Flake8Annotations,
-            CheckCode::ANN401 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN001 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN002 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN003 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN101 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN102 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN201 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN202 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN204 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN205 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN206 => CheckCategory::Flake8Annotations,
+            DiagnosticCode::ANN401 => CheckCategory::Flake8Annotations,
             // flake8-unused-arguments
-            CheckCode::ARG001 => CheckCategory::Flake8UnusedArguments,
-            CheckCode::ARG002 => CheckCategory::Flake8UnusedArguments,
-            CheckCode::ARG003 => CheckCategory::Flake8UnusedArguments,
-            CheckCode::ARG004 => CheckCategory::Flake8UnusedArguments,
-            CheckCode::ARG005 => CheckCategory::Flake8UnusedArguments,
+            DiagnosticCode::ARG001 => CheckCategory::Flake8UnusedArguments,
+            DiagnosticCode::ARG002 => CheckCategory::Flake8UnusedArguments,
+            DiagnosticCode::ARG003 => CheckCategory::Flake8UnusedArguments,
+            DiagnosticCode::ARG004 => CheckCategory::Flake8UnusedArguments,
+            DiagnosticCode::ARG005 => CheckCategory::Flake8UnusedArguments,
             // flake8-bugbear
-            CheckCode::B002 => CheckCategory::Flake8Bugbear,
-            CheckCode::B003 => CheckCategory::Flake8Bugbear,
-            CheckCode::B004 => CheckCategory::Flake8Bugbear,
-            CheckCode::B005 => CheckCategory::Flake8Bugbear,
-            CheckCode::B006 => CheckCategory::Flake8Bugbear,
-            CheckCode::B007 => CheckCategory::Flake8Bugbear,
-            CheckCode::B008 => CheckCategory::Flake8Bugbear,
-            CheckCode::B009 => CheckCategory::Flake8Bugbear,
-            CheckCode::B010 => CheckCategory::Flake8Bugbear,
-            CheckCode::B011 => CheckCategory::Flake8Bugbear,
-            CheckCode::B012 => CheckCategory::Flake8Bugbear,
-            CheckCode::B013 => CheckCategory::Flake8Bugbear,
-            CheckCode::B014 => CheckCategory::Flake8Bugbear,
-            CheckCode::B015 => CheckCategory::Flake8Bugbear,
-            CheckCode::B016 => CheckCategory::Flake8Bugbear,
-            CheckCode::B017 => CheckCategory::Flake8Bugbear,
-            CheckCode::B018 => CheckCategory::Flake8Bugbear,
-            CheckCode::B019 => CheckCategory::Flake8Bugbear,
-            CheckCode::B020 => CheckCategory::Flake8Bugbear,
-            CheckCode::B021 => CheckCategory::Flake8Bugbear,
-            CheckCode::B022 => CheckCategory::Flake8Bugbear,
-            CheckCode::B023 => CheckCategory::Flake8Bugbear,
-            CheckCode::B024 => CheckCategory::Flake8Bugbear,
-            CheckCode::B025 => CheckCategory::Flake8Bugbear,
-            CheckCode::B026 => CheckCategory::Flake8Bugbear,
-            CheckCode::B027 => CheckCategory::Flake8Bugbear,
-            CheckCode::B904 => CheckCategory::Flake8Bugbear,
-            CheckCode::B905 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B002 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B003 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B004 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B005 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B006 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B007 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B008 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B009 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B010 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B011 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B012 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B013 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B014 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B015 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B016 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B017 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B018 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B019 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B020 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B021 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B022 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B023 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B024 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B025 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B026 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B027 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B904 => CheckCategory::Flake8Bugbear,
+            DiagnosticCode::B905 => CheckCategory::Flake8Bugbear,
             // flake8-blind-except
-            CheckCode::BLE001 => CheckCategory::Flake8BlindExcept,
+            DiagnosticCode::BLE001 => CheckCategory::Flake8BlindExcept,
             // flake8-comprehensions
-            CheckCode::C400 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C401 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C402 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C403 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C404 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C405 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C406 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C408 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C409 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C410 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C411 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C413 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C414 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C415 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C416 => CheckCategory::Flake8Comprehensions,
-            CheckCode::C417 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C400 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C401 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C402 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C403 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C404 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C405 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C406 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C408 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C409 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C410 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C411 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C413 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C414 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C415 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C416 => CheckCategory::Flake8Comprehensions,
+            DiagnosticCode::C417 => CheckCategory::Flake8Comprehensions,
             // mccabe
-            CheckCode::C901 => CheckCategory::McCabe,
+            DiagnosticCode::C901 => CheckCategory::McCabe,
             // pydocstyle
-            CheckCode::D100 => CheckCategory::Pydocstyle,
-            CheckCode::D101 => CheckCategory::Pydocstyle,
-            CheckCode::D102 => CheckCategory::Pydocstyle,
-            CheckCode::D103 => CheckCategory::Pydocstyle,
-            CheckCode::D104 => CheckCategory::Pydocstyle,
-            CheckCode::D105 => CheckCategory::Pydocstyle,
-            CheckCode::D106 => CheckCategory::Pydocstyle,
-            CheckCode::D107 => CheckCategory::Pydocstyle,
-            CheckCode::D200 => CheckCategory::Pydocstyle,
-            CheckCode::D201 => CheckCategory::Pydocstyle,
-            CheckCode::D202 => CheckCategory::Pydocstyle,
-            CheckCode::D203 => CheckCategory::Pydocstyle,
-            CheckCode::D204 => CheckCategory::Pydocstyle,
-            CheckCode::D205 => CheckCategory::Pydocstyle,
-            CheckCode::D206 => CheckCategory::Pydocstyle,
-            CheckCode::D207 => CheckCategory::Pydocstyle,
-            CheckCode::D208 => CheckCategory::Pydocstyle,
-            CheckCode::D209 => CheckCategory::Pydocstyle,
-            CheckCode::D210 => CheckCategory::Pydocstyle,
-            CheckCode::D211 => CheckCategory::Pydocstyle,
-            CheckCode::D212 => CheckCategory::Pydocstyle,
-            CheckCode::D213 => CheckCategory::Pydocstyle,
-            CheckCode::D214 => CheckCategory::Pydocstyle,
-            CheckCode::D215 => CheckCategory::Pydocstyle,
-            CheckCode::D300 => CheckCategory::Pydocstyle,
-            CheckCode::D301 => CheckCategory::Pydocstyle,
-            CheckCode::D400 => CheckCategory::Pydocstyle,
-            CheckCode::D402 => CheckCategory::Pydocstyle,
-            CheckCode::D403 => CheckCategory::Pydocstyle,
-            CheckCode::D404 => CheckCategory::Pydocstyle,
-            CheckCode::D405 => CheckCategory::Pydocstyle,
-            CheckCode::D406 => CheckCategory::Pydocstyle,
-            CheckCode::D407 => CheckCategory::Pydocstyle,
-            CheckCode::D408 => CheckCategory::Pydocstyle,
-            CheckCode::D409 => CheckCategory::Pydocstyle,
-            CheckCode::D410 => CheckCategory::Pydocstyle,
-            CheckCode::D411 => CheckCategory::Pydocstyle,
-            CheckCode::D412 => CheckCategory::Pydocstyle,
-            CheckCode::D413 => CheckCategory::Pydocstyle,
-            CheckCode::D414 => CheckCategory::Pydocstyle,
-            CheckCode::D415 => CheckCategory::Pydocstyle,
-            CheckCode::D416 => CheckCategory::Pydocstyle,
-            CheckCode::D417 => CheckCategory::Pydocstyle,
-            CheckCode::D418 => CheckCategory::Pydocstyle,
-            CheckCode::D419 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D100 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D101 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D102 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D103 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D104 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D105 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D106 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D107 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D200 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D201 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D202 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D203 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D204 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D205 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D206 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D207 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D208 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D209 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D210 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D211 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D212 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D213 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D214 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D215 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D300 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D301 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D400 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D402 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D403 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D404 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D405 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D406 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D407 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D408 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D409 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D410 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D411 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D412 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D413 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D414 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D415 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D416 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D417 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D418 => CheckCategory::Pydocstyle,
+            DiagnosticCode::D419 => CheckCategory::Pydocstyle,
             // flake8-datetimez
-            CheckCode::DTZ001 => CheckCategory::Flake8Datetimez,
-            CheckCode::DTZ002 => CheckCategory::Flake8Datetimez,
-            CheckCode::DTZ003 => CheckCategory::Flake8Datetimez,
-            CheckCode::DTZ004 => CheckCategory::Flake8Datetimez,
-            CheckCode::DTZ005 => CheckCategory::Flake8Datetimez,
-            CheckCode::DTZ006 => CheckCategory::Flake8Datetimez,
-            CheckCode::DTZ007 => CheckCategory::Flake8Datetimez,
-            CheckCode::DTZ011 => CheckCategory::Flake8Datetimez,
-            CheckCode::DTZ012 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ001 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ002 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ003 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ004 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ005 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ006 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ007 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ011 => CheckCategory::Flake8Datetimez,
+            DiagnosticCode::DTZ012 => CheckCategory::Flake8Datetimez,
             // pycodestyle (errors)
-            CheckCode::E401 => CheckCategory::Pycodestyle,
-            CheckCode::E402 => CheckCategory::Pycodestyle,
-            CheckCode::E501 => CheckCategory::Pycodestyle,
-            CheckCode::E711 => CheckCategory::Pycodestyle,
-            CheckCode::E712 => CheckCategory::Pycodestyle,
-            CheckCode::E713 => CheckCategory::Pycodestyle,
-            CheckCode::E714 => CheckCategory::Pycodestyle,
-            CheckCode::E721 => CheckCategory::Pycodestyle,
-            CheckCode::E722 => CheckCategory::Pycodestyle,
-            CheckCode::E731 => CheckCategory::Pycodestyle,
-            CheckCode::E741 => CheckCategory::Pycodestyle,
-            CheckCode::E742 => CheckCategory::Pycodestyle,
-            CheckCode::E743 => CheckCategory::Pycodestyle,
-            CheckCode::E902 => CheckCategory::Pycodestyle,
-            CheckCode::E999 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E401 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E402 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E501 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E711 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E712 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E713 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E714 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E721 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E722 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E731 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E741 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E742 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E743 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E902 => CheckCategory::Pycodestyle,
+            DiagnosticCode::E999 => CheckCategory::Pycodestyle,
             // flake8-errmsg
-            CheckCode::EM101 => CheckCategory::Flake8ErrMsg,
-            CheckCode::EM102 => CheckCategory::Flake8ErrMsg,
-            CheckCode::EM103 => CheckCategory::Flake8ErrMsg,
+            DiagnosticCode::EM101 => CheckCategory::Flake8ErrMsg,
+            DiagnosticCode::EM102 => CheckCategory::Flake8ErrMsg,
+            DiagnosticCode::EM103 => CheckCategory::Flake8ErrMsg,
             // eradicate
-            CheckCode::ERA001 => CheckCategory::Eradicate,
+            DiagnosticCode::ERA001 => CheckCategory::Eradicate,
             // pyflakes
-            CheckCode::F401 => CheckCategory::Pyflakes,
-            CheckCode::F402 => CheckCategory::Pyflakes,
-            CheckCode::F403 => CheckCategory::Pyflakes,
-            CheckCode::F404 => CheckCategory::Pyflakes,
-            CheckCode::F405 => CheckCategory::Pyflakes,
-            CheckCode::F406 => CheckCategory::Pyflakes,
-            CheckCode::F407 => CheckCategory::Pyflakes,
-            CheckCode::F501 => CheckCategory::Pyflakes,
-            CheckCode::F502 => CheckCategory::Pyflakes,
-            CheckCode::F503 => CheckCategory::Pyflakes,
-            CheckCode::F504 => CheckCategory::Pyflakes,
-            CheckCode::F505 => CheckCategory::Pyflakes,
-            CheckCode::F506 => CheckCategory::Pyflakes,
-            CheckCode::F507 => CheckCategory::Pyflakes,
-            CheckCode::F508 => CheckCategory::Pyflakes,
-            CheckCode::F509 => CheckCategory::Pyflakes,
-            CheckCode::F521 => CheckCategory::Pyflakes,
-            CheckCode::F522 => CheckCategory::Pyflakes,
-            CheckCode::F523 => CheckCategory::Pyflakes,
-            CheckCode::F524 => CheckCategory::Pyflakes,
-            CheckCode::F525 => CheckCategory::Pyflakes,
-            CheckCode::F541 => CheckCategory::Pyflakes,
-            CheckCode::F601 => CheckCategory::Pyflakes,
-            CheckCode::F602 => CheckCategory::Pyflakes,
-            CheckCode::F621 => CheckCategory::Pyflakes,
-            CheckCode::F622 => CheckCategory::Pyflakes,
-            CheckCode::F631 => CheckCategory::Pyflakes,
-            CheckCode::F632 => CheckCategory::Pyflakes,
-            CheckCode::F633 => CheckCategory::Pyflakes,
-            CheckCode::F634 => CheckCategory::Pyflakes,
-            CheckCode::F701 => CheckCategory::Pyflakes,
-            CheckCode::F702 => CheckCategory::Pyflakes,
-            CheckCode::F704 => CheckCategory::Pyflakes,
-            CheckCode::F706 => CheckCategory::Pyflakes,
-            CheckCode::F707 => CheckCategory::Pyflakes,
-            CheckCode::F722 => CheckCategory::Pyflakes,
-            CheckCode::F811 => CheckCategory::Pyflakes,
-            CheckCode::F821 => CheckCategory::Pyflakes,
-            CheckCode::F822 => CheckCategory::Pyflakes,
-            CheckCode::F823 => CheckCategory::Pyflakes,
-            CheckCode::F841 => CheckCategory::Pyflakes,
-            CheckCode::F842 => CheckCategory::Pyflakes,
-            CheckCode::F901 => CheckCategory::Pyflakes,
+            DiagnosticCode::F401 => CheckCategory::Pyflakes,
+            DiagnosticCode::F402 => CheckCategory::Pyflakes,
+            DiagnosticCode::F403 => CheckCategory::Pyflakes,
+            DiagnosticCode::F404 => CheckCategory::Pyflakes,
+            DiagnosticCode::F405 => CheckCategory::Pyflakes,
+            DiagnosticCode::F406 => CheckCategory::Pyflakes,
+            DiagnosticCode::F407 => CheckCategory::Pyflakes,
+            DiagnosticCode::F501 => CheckCategory::Pyflakes,
+            DiagnosticCode::F502 => CheckCategory::Pyflakes,
+            DiagnosticCode::F503 => CheckCategory::Pyflakes,
+            DiagnosticCode::F504 => CheckCategory::Pyflakes,
+            DiagnosticCode::F505 => CheckCategory::Pyflakes,
+            DiagnosticCode::F506 => CheckCategory::Pyflakes,
+            DiagnosticCode::F507 => CheckCategory::Pyflakes,
+            DiagnosticCode::F508 => CheckCategory::Pyflakes,
+            DiagnosticCode::F509 => CheckCategory::Pyflakes,
+            DiagnosticCode::F521 => CheckCategory::Pyflakes,
+            DiagnosticCode::F522 => CheckCategory::Pyflakes,
+            DiagnosticCode::F523 => CheckCategory::Pyflakes,
+            DiagnosticCode::F524 => CheckCategory::Pyflakes,
+            DiagnosticCode::F525 => CheckCategory::Pyflakes,
+            DiagnosticCode::F541 => CheckCategory::Pyflakes,
+            DiagnosticCode::F601 => CheckCategory::Pyflakes,
+            DiagnosticCode::F602 => CheckCategory::Pyflakes,
+            DiagnosticCode::F621 => CheckCategory::Pyflakes,
+            DiagnosticCode::F622 => CheckCategory::Pyflakes,
+            DiagnosticCode::F631 => CheckCategory::Pyflakes,
+            DiagnosticCode::F632 => CheckCategory::Pyflakes,
+            DiagnosticCode::F633 => CheckCategory::Pyflakes,
+            DiagnosticCode::F634 => CheckCategory::Pyflakes,
+            DiagnosticCode::F701 => CheckCategory::Pyflakes,
+            DiagnosticCode::F702 => CheckCategory::Pyflakes,
+            DiagnosticCode::F704 => CheckCategory::Pyflakes,
+            DiagnosticCode::F706 => CheckCategory::Pyflakes,
+            DiagnosticCode::F707 => CheckCategory::Pyflakes,
+            DiagnosticCode::F722 => CheckCategory::Pyflakes,
+            DiagnosticCode::F811 => CheckCategory::Pyflakes,
+            DiagnosticCode::F821 => CheckCategory::Pyflakes,
+            DiagnosticCode::F822 => CheckCategory::Pyflakes,
+            DiagnosticCode::F823 => CheckCategory::Pyflakes,
+            DiagnosticCode::F841 => CheckCategory::Pyflakes,
+            DiagnosticCode::F842 => CheckCategory::Pyflakes,
+            DiagnosticCode::F901 => CheckCategory::Pyflakes,
             // flake8-boolean-trap
-            CheckCode::FBT001 => CheckCategory::Flake8BooleanTrap,
-            CheckCode::FBT002 => CheckCategory::Flake8BooleanTrap,
-            CheckCode::FBT003 => CheckCategory::Flake8BooleanTrap,
+            DiagnosticCode::FBT001 => CheckCategory::Flake8BooleanTrap,
+            DiagnosticCode::FBT002 => CheckCategory::Flake8BooleanTrap,
+            DiagnosticCode::FBT003 => CheckCategory::Flake8BooleanTrap,
             // isort
-            CheckCode::I001 => CheckCategory::Isort,
+            DiagnosticCode::I001 => CheckCategory::Isort,
             // flake8-import-conventions
-            CheckCode::ICN001 => CheckCategory::Flake8ImportConventions,
+            DiagnosticCode::ICN001 => CheckCategory::Flake8ImportConventions,
             // flake8-implicit-str-concat
-            CheckCode::ISC001 => CheckCategory::Flake8ImplicitStrConcat,
-            CheckCode::ISC002 => CheckCategory::Flake8ImplicitStrConcat,
-            CheckCode::ISC003 => CheckCategory::Flake8ImplicitStrConcat,
+            DiagnosticCode::ISC001 => CheckCategory::Flake8ImplicitStrConcat,
+            DiagnosticCode::ISC002 => CheckCategory::Flake8ImplicitStrConcat,
+            DiagnosticCode::ISC003 => CheckCategory::Flake8ImplicitStrConcat,
             // pep8-naming
-            CheckCode::N801 => CheckCategory::PEP8Naming,
-            CheckCode::N802 => CheckCategory::PEP8Naming,
-            CheckCode::N803 => CheckCategory::PEP8Naming,
-            CheckCode::N804 => CheckCategory::PEP8Naming,
-            CheckCode::N805 => CheckCategory::PEP8Naming,
-            CheckCode::N806 => CheckCategory::PEP8Naming,
-            CheckCode::N807 => CheckCategory::PEP8Naming,
-            CheckCode::N811 => CheckCategory::PEP8Naming,
-            CheckCode::N812 => CheckCategory::PEP8Naming,
-            CheckCode::N813 => CheckCategory::PEP8Naming,
-            CheckCode::N814 => CheckCategory::PEP8Naming,
-            CheckCode::N815 => CheckCategory::PEP8Naming,
-            CheckCode::N816 => CheckCategory::PEP8Naming,
-            CheckCode::N817 => CheckCategory::PEP8Naming,
-            CheckCode::N818 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N801 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N802 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N803 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N804 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N805 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N806 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N807 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N811 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N812 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N813 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N814 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N815 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N816 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N817 => CheckCategory::PEP8Naming,
+            DiagnosticCode::N818 => CheckCategory::PEP8Naming,
             // pandas-vet
-            CheckCode::PD002 => CheckCategory::PandasVet,
-            CheckCode::PD003 => CheckCategory::PandasVet,
-            CheckCode::PD004 => CheckCategory::PandasVet,
-            CheckCode::PD007 => CheckCategory::PandasVet,
-            CheckCode::PD008 => CheckCategory::PandasVet,
-            CheckCode::PD009 => CheckCategory::PandasVet,
-            CheckCode::PD010 => CheckCategory::PandasVet,
-            CheckCode::PD011 => CheckCategory::PandasVet,
-            CheckCode::PD012 => CheckCategory::PandasVet,
-            CheckCode::PD013 => CheckCategory::PandasVet,
-            CheckCode::PD015 => CheckCategory::PandasVet,
-            CheckCode::PD901 => CheckCategory::PandasVet,
+            DiagnosticCode::PD002 => CheckCategory::PandasVet,
+            DiagnosticCode::PD003 => CheckCategory::PandasVet,
+            DiagnosticCode::PD004 => CheckCategory::PandasVet,
+            DiagnosticCode::PD007 => CheckCategory::PandasVet,
+            DiagnosticCode::PD008 => CheckCategory::PandasVet,
+            DiagnosticCode::PD009 => CheckCategory::PandasVet,
+            DiagnosticCode::PD010 => CheckCategory::PandasVet,
+            DiagnosticCode::PD011 => CheckCategory::PandasVet,
+            DiagnosticCode::PD012 => CheckCategory::PandasVet,
+            DiagnosticCode::PD013 => CheckCategory::PandasVet,
+            DiagnosticCode::PD015 => CheckCategory::PandasVet,
+            DiagnosticCode::PD901 => CheckCategory::PandasVet,
             // pygrep-hooks
-            CheckCode::PGH001 => CheckCategory::PygrepHooks,
-            CheckCode::PGH002 => CheckCategory::PygrepHooks,
-            CheckCode::PGH003 => CheckCategory::PygrepHooks,
-            CheckCode::PGH004 => CheckCategory::PygrepHooks,
+            DiagnosticCode::PGH001 => CheckCategory::PygrepHooks,
+            DiagnosticCode::PGH002 => CheckCategory::PygrepHooks,
+            DiagnosticCode::PGH003 => CheckCategory::PygrepHooks,
+            DiagnosticCode::PGH004 => CheckCategory::PygrepHooks,
             // pylint
-            CheckCode::PLC0414 => CheckCategory::Pylint,
-            CheckCode::PLC2201 => CheckCategory::Pylint,
-            CheckCode::PLC3002 => CheckCategory::Pylint,
-            CheckCode::PLE0117 => CheckCategory::Pylint,
-            CheckCode::PLE0118 => CheckCategory::Pylint,
-            CheckCode::PLE1142 => CheckCategory::Pylint,
-            CheckCode::PLR0206 => CheckCategory::Pylint,
-            CheckCode::PLR0402 => CheckCategory::Pylint,
-            CheckCode::PLR1701 => CheckCategory::Pylint,
-            CheckCode::PLR1722 => CheckCategory::Pylint,
-            CheckCode::PLW0120 => CheckCategory::Pylint,
-            CheckCode::PLW0602 => CheckCategory::Pylint,
+            DiagnosticCode::PLC0414 => CheckCategory::Pylint,
+            DiagnosticCode::PLC2201 => CheckCategory::Pylint,
+            DiagnosticCode::PLC3002 => CheckCategory::Pylint,
+            DiagnosticCode::PLE0117 => CheckCategory::Pylint,
+            DiagnosticCode::PLE0118 => CheckCategory::Pylint,
+            DiagnosticCode::PLE1142 => CheckCategory::Pylint,
+            DiagnosticCode::PLR0206 => CheckCategory::Pylint,
+            DiagnosticCode::PLR0402 => CheckCategory::Pylint,
+            DiagnosticCode::PLR1701 => CheckCategory::Pylint,
+            DiagnosticCode::PLR1722 => CheckCategory::Pylint,
+            DiagnosticCode::PLW0120 => CheckCategory::Pylint,
+            DiagnosticCode::PLW0602 => CheckCategory::Pylint,
             // flake8-pytest-style
-            CheckCode::PT001 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT002 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT003 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT004 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT005 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT006 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT007 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT008 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT009 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT010 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT011 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT012 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT013 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT015 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT016 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT017 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT018 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT019 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT020 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT021 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT022 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT023 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT024 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT025 => CheckCategory::Flake8PytestStyle,
-            CheckCode::PT026 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT001 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT002 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT003 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT004 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT005 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT006 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT007 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT008 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT009 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT010 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT011 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT012 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT013 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT015 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT016 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT017 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT018 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT019 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT020 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT021 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT022 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT023 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT024 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT025 => CheckCategory::Flake8PytestStyle,
+            DiagnosticCode::PT026 => CheckCategory::Flake8PytestStyle,
             // flake8-quotes
-            CheckCode::Q000 => CheckCategory::Flake8Quotes,
-            CheckCode::Q001 => CheckCategory::Flake8Quotes,
-            CheckCode::Q002 => CheckCategory::Flake8Quotes,
-            CheckCode::Q003 => CheckCategory::Flake8Quotes,
+            DiagnosticCode::Q000 => CheckCategory::Flake8Quotes,
+            DiagnosticCode::Q001 => CheckCategory::Flake8Quotes,
+            DiagnosticCode::Q002 => CheckCategory::Flake8Quotes,
+            DiagnosticCode::Q003 => CheckCategory::Flake8Quotes,
             // flake8-return
-            CheckCode::RET501 => CheckCategory::Flake8Return,
-            CheckCode::RET502 => CheckCategory::Flake8Return,
-            CheckCode::RET503 => CheckCategory::Flake8Return,
-            CheckCode::RET504 => CheckCategory::Flake8Return,
-            CheckCode::RET505 => CheckCategory::Flake8Return,
-            CheckCode::RET506 => CheckCategory::Flake8Return,
-            CheckCode::RET507 => CheckCategory::Flake8Return,
-            CheckCode::RET508 => CheckCategory::Flake8Return,
+            DiagnosticCode::RET501 => CheckCategory::Flake8Return,
+            DiagnosticCode::RET502 => CheckCategory::Flake8Return,
+            DiagnosticCode::RET503 => CheckCategory::Flake8Return,
+            DiagnosticCode::RET504 => CheckCategory::Flake8Return,
+            DiagnosticCode::RET505 => CheckCategory::Flake8Return,
+            DiagnosticCode::RET506 => CheckCategory::Flake8Return,
+            DiagnosticCode::RET507 => CheckCategory::Flake8Return,
+            DiagnosticCode::RET508 => CheckCategory::Flake8Return,
             // flake8-bandit
-            CheckCode::S101 => CheckCategory::Flake8Bandit,
-            CheckCode::S102 => CheckCategory::Flake8Bandit,
-            CheckCode::S103 => CheckCategory::Flake8Bandit,
-            CheckCode::S104 => CheckCategory::Flake8Bandit,
-            CheckCode::S105 => CheckCategory::Flake8Bandit,
-            CheckCode::S106 => CheckCategory::Flake8Bandit,
-            CheckCode::S107 => CheckCategory::Flake8Bandit,
-            CheckCode::S108 => CheckCategory::Flake8Bandit,
-            CheckCode::S113 => CheckCategory::Flake8Bandit,
-            CheckCode::S324 => CheckCategory::Flake8Bandit,
-            CheckCode::S501 => CheckCategory::Flake8Bandit,
-            CheckCode::S506 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S101 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S102 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S103 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S104 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S105 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S106 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S107 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S108 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S113 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S324 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S501 => CheckCategory::Flake8Bandit,
+            DiagnosticCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
-            CheckCode::SIM103 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM101 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM102 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM105 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM107 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM108 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM109 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM110 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM111 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM117 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM118 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM201 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM202 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM208 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM210 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM211 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM212 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM220 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM221 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM222 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM223 => CheckCategory::Flake8Simplify,
-            CheckCode::SIM300 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM103 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM101 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM102 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM105 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM107 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM108 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM109 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM110 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM111 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM117 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM118 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM201 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM202 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM208 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM210 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM211 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM212 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM220 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM221 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM222 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM223 => CheckCategory::Flake8Simplify,
+            DiagnosticCode::SIM300 => CheckCategory::Flake8Simplify,
             // flake8-debugger
-            CheckCode::T100 => CheckCategory::Flake8Debugger,
+            DiagnosticCode::T100 => CheckCategory::Flake8Debugger,
             // flake8-print
-            CheckCode::T201 => CheckCategory::Flake8Print,
-            CheckCode::T203 => CheckCategory::Flake8Print,
+            DiagnosticCode::T201 => CheckCategory::Flake8Print,
+            DiagnosticCode::T203 => CheckCategory::Flake8Print,
             // flake8-tidy-imports
-            CheckCode::TID251 => CheckCategory::Flake8TidyImports,
-            CheckCode::TID252 => CheckCategory::Flake8TidyImports,
+            DiagnosticCode::TID251 => CheckCategory::Flake8TidyImports,
+            DiagnosticCode::TID252 => CheckCategory::Flake8TidyImports,
             // pyupgrade
-            CheckCode::UP001 => CheckCategory::Pyupgrade,
-            CheckCode::UP003 => CheckCategory::Pyupgrade,
-            CheckCode::UP004 => CheckCategory::Pyupgrade,
-            CheckCode::UP005 => CheckCategory::Pyupgrade,
-            CheckCode::UP006 => CheckCategory::Pyupgrade,
-            CheckCode::UP007 => CheckCategory::Pyupgrade,
-            CheckCode::UP008 => CheckCategory::Pyupgrade,
-            CheckCode::UP009 => CheckCategory::Pyupgrade,
-            CheckCode::UP010 => CheckCategory::Pyupgrade,
-            CheckCode::UP011 => CheckCategory::Pyupgrade,
-            CheckCode::UP012 => CheckCategory::Pyupgrade,
-            CheckCode::UP013 => CheckCategory::Pyupgrade,
-            CheckCode::UP014 => CheckCategory::Pyupgrade,
-            CheckCode::UP015 => CheckCategory::Pyupgrade,
-            CheckCode::UP016 => CheckCategory::Pyupgrade,
-            CheckCode::UP017 => CheckCategory::Pyupgrade,
-            CheckCode::UP018 => CheckCategory::Pyupgrade,
-            CheckCode::UP019 => CheckCategory::Pyupgrade,
-            CheckCode::UP020 => CheckCategory::Pyupgrade,
-            CheckCode::UP021 => CheckCategory::Pyupgrade,
-            CheckCode::UP022 => CheckCategory::Pyupgrade,
-            CheckCode::UP023 => CheckCategory::Pyupgrade,
-            CheckCode::UP024 => CheckCategory::Pyupgrade,
-            CheckCode::UP025 => CheckCategory::Pyupgrade,
-            CheckCode::UP026 => CheckCategory::Pyupgrade,
-            CheckCode::UP027 => CheckCategory::Pyupgrade,
-            CheckCode::UP028 => CheckCategory::Pyupgrade,
-            CheckCode::UP029 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP001 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP003 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP004 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP005 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP006 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP007 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP008 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP009 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP010 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP011 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP012 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP013 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP014 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP015 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP016 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP017 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP018 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP019 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP020 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP021 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP022 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP023 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP024 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP025 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP026 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP027 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP028 => CheckCategory::Pyupgrade,
+            DiagnosticCode::UP029 => CheckCategory::Pyupgrade,
             // pycodestyle (warnings)
-            CheckCode::W292 => CheckCategory::Pycodestyle,
-            CheckCode::W605 => CheckCategory::Pycodestyle,
+            DiagnosticCode::W292 => CheckCategory::Pycodestyle,
+            DiagnosticCode::W605 => CheckCategory::Pycodestyle,
             // flake8-2020
-            CheckCode::YTT101 => CheckCategory::Flake82020,
-            CheckCode::YTT102 => CheckCategory::Flake82020,
-            CheckCode::YTT103 => CheckCategory::Flake82020,
-            CheckCode::YTT201 => CheckCategory::Flake82020,
-            CheckCode::YTT202 => CheckCategory::Flake82020,
-            CheckCode::YTT203 => CheckCategory::Flake82020,
-            CheckCode::YTT204 => CheckCategory::Flake82020,
-            CheckCode::YTT301 => CheckCategory::Flake82020,
-            CheckCode::YTT302 => CheckCategory::Flake82020,
-            CheckCode::YTT303 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT101 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT102 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT103 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT201 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT202 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT203 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT204 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT301 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT302 => CheckCategory::Flake82020,
+            DiagnosticCode::YTT303 => CheckCategory::Flake82020,
             // flake8-pie
-            CheckCode::PIE790 => CheckCategory::Flake8Pie,
-            CheckCode::PIE794 => CheckCategory::Flake8Pie,
-            CheckCode::PIE807 => CheckCategory::Flake8Pie,
+            DiagnosticCode::PIE790 => CheckCategory::Flake8Pie,
+            DiagnosticCode::PIE794 => CheckCategory::Flake8Pie,
+            DiagnosticCode::PIE807 => CheckCategory::Flake8Pie,
             // Ruff
-            CheckCode::RUF001 => CheckCategory::Ruff,
-            CheckCode::RUF002 => CheckCategory::Ruff,
-            CheckCode::RUF003 => CheckCategory::Ruff,
-            CheckCode::RUF004 => CheckCategory::Ruff,
-            CheckCode::RUF100 => CheckCategory::Ruff,
+            DiagnosticCode::RUF001 => CheckCategory::Ruff,
+            DiagnosticCode::RUF002 => CheckCategory::Ruff,
+            DiagnosticCode::RUF003 => CheckCategory::Ruff,
+            DiagnosticCode::RUF004 => CheckCategory::Ruff,
+            DiagnosticCode::RUF100 => CheckCategory::Ruff,
         }
     }
 }
 
-impl CheckKind {
-    /// The summary text for the check. Typically a truncated form of the body
-    /// text.
+impl DiagnosticKind {
+    /// The summary text for the diagnostic. Typically a truncated form of the
+    /// body text.
     pub fn summary(&self) -> String {
         match self {
-            CheckKind::UnaryPrefixIncrement(..) => {
+            DiagnosticKind::UnaryPrefixIncrement(..) => {
                 "Python does not support the unary prefix increment".to_string()
             }
-            CheckKind::UnusedLoopControlVariable(violations::UnusedLoopControlVariable(name)) => {
+            DiagnosticKind::UnusedLoopControlVariable(violations::UnusedLoopControlVariable(
+                name,
+            )) => {
                 format!("Loop control variable `{name}` not used within the loop body")
             }
-            CheckKind::NoAssertRaisesException(..) => {
+            DiagnosticKind::NoAssertRaisesException(..) => {
                 "`assertRaises(Exception)` should be considered evil".to_string()
             }
-            CheckKind::StarArgUnpackingAfterKeywordArg(..) => {
+            DiagnosticKind::StarArgUnpackingAfterKeywordArg(..) => {
                 "Star-arg unpacking after a keyword argument is strongly discouraged".to_string()
             }
 
             // flake8-datetimez
-            CheckKind::CallDatetimeToday(..) => {
+            DiagnosticKind::CallDatetimeToday(..) => {
                 "The use of `datetime.datetime.today()` is not allowed".to_string()
             }
-            CheckKind::CallDatetimeUtcnow(..) => {
+            DiagnosticKind::CallDatetimeUtcnow(..) => {
                 "The use of `datetime.datetime.utcnow()` is not allowed".to_string()
             }
-            CheckKind::CallDatetimeUtcfromtimestamp(..) => {
+            DiagnosticKind::CallDatetimeUtcfromtimestamp(..) => {
                 "The use of `datetime.datetime.utcfromtimestamp()` is not allowed".to_string()
             }
-            CheckKind::CallDateToday(..) => {
+            DiagnosticKind::CallDateToday(..) => {
                 "The use of `datetime.date.today()` is not allowed.".to_string()
             }
-            CheckKind::CallDateFromtimestamp(..) => {
+            DiagnosticKind::CallDateFromtimestamp(..) => {
                 "The use of `datetime.date.fromtimestamp()` is not allowed".to_string()
             }
             _ => self.body(),
@@ -1329,16 +1327,16 @@ impl CheckKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Check {
-    pub kind: CheckKind,
+pub struct Diagnostic {
+    pub kind: DiagnosticKind,
     pub location: Location,
     pub end_location: Location,
     pub fix: Option<Fix>,
     pub parent: Option<Location>,
 }
 
-impl Check {
-    pub fn new<K: Into<CheckKind>>(kind: K, range: Range) -> Self {
+impl Diagnostic {
+    pub fn new<K: Into<DiagnosticKind>>(kind: K, range: Range) -> Self {
         Self {
             kind: kind.into(),
             location: range.location,
@@ -1360,64 +1358,64 @@ impl Check {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(CheckCode, CheckCode, &str)] = &[(
-    CheckCode::D203,
-    CheckCode::D211,
+pub const INCOMPATIBLE_CODES: &[(DiagnosticCode, DiagnosticCode, &str)] = &[(
+    DiagnosticCode::D203,
+    DiagnosticCode::D211,
     "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
      Consider adding `D203` to `ignore`.",
 )];
 
-/// A hash map from deprecated to latest `CheckCode`.
-pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, CheckCode>> = Lazy::new(|| {
+/// A hash map from deprecated to latest `DiagnosticCode`.
+pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, DiagnosticCode>> = Lazy::new(|| {
     FxHashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
-        ("U001", CheckCode::UP001),
-        ("U003", CheckCode::UP003),
-        ("U004", CheckCode::UP004),
-        ("U005", CheckCode::UP005),
-        ("U006", CheckCode::UP006),
-        ("U007", CheckCode::UP007),
-        ("U008", CheckCode::UP008),
-        ("U009", CheckCode::UP009),
-        ("U010", CheckCode::UP010),
-        ("U011", CheckCode::UP011),
-        ("U012", CheckCode::UP012),
-        ("U013", CheckCode::UP013),
-        ("U014", CheckCode::UP014),
-        ("U015", CheckCode::UP015),
-        ("U016", CheckCode::UP016),
-        ("U017", CheckCode::UP017),
-        ("U019", CheckCode::UP019),
+        ("U001", DiagnosticCode::UP001),
+        ("U003", DiagnosticCode::UP003),
+        ("U004", DiagnosticCode::UP004),
+        ("U005", DiagnosticCode::UP005),
+        ("U006", DiagnosticCode::UP006),
+        ("U007", DiagnosticCode::UP007),
+        ("U008", DiagnosticCode::UP008),
+        ("U009", DiagnosticCode::UP009),
+        ("U010", DiagnosticCode::UP010),
+        ("U011", DiagnosticCode::UP011),
+        ("U012", DiagnosticCode::UP012),
+        ("U013", DiagnosticCode::UP013),
+        ("U014", DiagnosticCode::UP014),
+        ("U015", DiagnosticCode::UP015),
+        ("U016", DiagnosticCode::UP016),
+        ("U017", DiagnosticCode::UP017),
+        ("U019", DiagnosticCode::UP019),
         // TODO(charlie): Remove by 2023-02-01.
-        ("I252", CheckCode::TID252),
-        ("M001", CheckCode::RUF100),
+        ("I252", DiagnosticCode::TID252),
+        ("M001", DiagnosticCode::RUF100),
         // TODO(charlie): Remove by 2023-02-01.
-        ("PDV002", CheckCode::PD002),
-        ("PDV003", CheckCode::PD003),
-        ("PDV004", CheckCode::PD004),
-        ("PDV007", CheckCode::PD007),
-        ("PDV008", CheckCode::PD008),
-        ("PDV009", CheckCode::PD009),
-        ("PDV010", CheckCode::PD010),
-        ("PDV011", CheckCode::PD011),
-        ("PDV012", CheckCode::PD012),
-        ("PDV013", CheckCode::PD013),
-        ("PDV015", CheckCode::PD015),
-        ("PDV901", CheckCode::PD901),
+        ("PDV002", DiagnosticCode::PD002),
+        ("PDV003", DiagnosticCode::PD003),
+        ("PDV004", DiagnosticCode::PD004),
+        ("PDV007", DiagnosticCode::PD007),
+        ("PDV008", DiagnosticCode::PD008),
+        ("PDV009", DiagnosticCode::PD009),
+        ("PDV010", DiagnosticCode::PD010),
+        ("PDV011", DiagnosticCode::PD011),
+        ("PDV012", DiagnosticCode::PD012),
+        ("PDV013", DiagnosticCode::PD013),
+        ("PDV015", DiagnosticCode::PD015),
+        ("PDV901", DiagnosticCode::PD901),
         // TODO(charlie): Remove by 2023-02-01.
-        ("R501", CheckCode::RET501),
-        ("R502", CheckCode::RET502),
-        ("R503", CheckCode::RET503),
-        ("R504", CheckCode::RET504),
-        ("R505", CheckCode::RET505),
-        ("R506", CheckCode::RET506),
-        ("R507", CheckCode::RET507),
-        ("R508", CheckCode::RET508),
+        ("R501", DiagnosticCode::RET501),
+        ("R502", DiagnosticCode::RET502),
+        ("R503", DiagnosticCode::RET503),
+        ("R504", DiagnosticCode::RET504),
+        ("R505", DiagnosticCode::RET505),
+        ("R506", DiagnosticCode::RET506),
+        ("R507", DiagnosticCode::RET507),
+        ("R508", DiagnosticCode::RET508),
         // TODO(charlie): Remove by 2023-02-01.
-        ("IC001", CheckCode::ICN001),
-        ("IC002", CheckCode::ICN001),
-        ("IC003", CheckCode::ICN001),
-        ("IC004", CheckCode::ICN001),
+        ("IC001", DiagnosticCode::ICN001),
+        ("IC002", DiagnosticCode::ICN001),
+        ("IC003", DiagnosticCode::ICN001),
+        ("IC004", DiagnosticCode::ICN001),
     ])
 });
 
@@ -1427,13 +1425,13 @@ mod tests {
 
     use strum::IntoEnumIterator;
 
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
 
     #[test]
     fn check_code_serialization() {
-        for check_code in CheckCode::iter() {
+        for check_code in DiagnosticCode::iter() {
             assert!(
-                CheckCode::from_str(check_code.as_ref()).is_ok(),
+                DiagnosticCode::from_str(check_code.as_ref()).is_ok(),
                 "{check_code:?} could not be round-trip serialized."
             );
         }
@@ -1441,7 +1439,7 @@ mod tests {
 
     #[test]
     fn fixable_codes() {
-        for check_code in CheckCode::iter() {
+        for check_code in DiagnosticCode::iter() {
             let kind = check_code.kind();
             if kind.fixable() {
                 assert!(

@@ -13,7 +13,7 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::cli::{collect_per_file_ignores, Overrides};
-use crate::registry::CheckCodePrefix;
+use crate::registry::DiagnosticCodePrefix;
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{
@@ -33,25 +33,25 @@ pub struct Configuration {
     pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
     pub extend_exclude: Vec<FilePattern>,
-    pub extend_ignore: Vec<Vec<CheckCodePrefix>>,
-    pub extend_select: Vec<Vec<CheckCodePrefix>>,
+    pub extend_ignore: Vec<Vec<DiagnosticCodePrefix>>,
+    pub extend_select: Vec<Vec<DiagnosticCodePrefix>>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
-    pub fixable: Option<Vec<CheckCodePrefix>>,
+    pub fixable: Option<Vec<DiagnosticCodePrefix>>,
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
-    pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub ignore: Option<Vec<DiagnosticCodePrefix>>,
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
-    pub select: Option<Vec<CheckCodePrefix>>,
+    pub select: Option<Vec<DiagnosticCodePrefix>>,
     pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
-    pub unfixable: Option<Vec<CheckCodePrefix>>,
+    pub unfixable: Option<Vec<DiagnosticCodePrefix>>,
     pub task_tags: Option<Vec<String>>,
     pub update_check: Option<bool>,
     // Plugins

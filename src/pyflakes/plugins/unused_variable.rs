@@ -5,7 +5,7 @@ use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, DiagnosticCode};
 use crate::violations;
 
 fn is_literal_or_name(expr: &Expr, checker: &Checker) -> bool {
@@ -169,11 +169,11 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
             && name != &"__traceback_info__"
             && name != &"__traceback_supplement__"
         {
-            let mut check = Check::new(
+            let mut check = Diagnostic::new(
                 violations::UnusedVariable((*name).to_string()),
                 binding.range,
             );
-            if checker.patch(&CheckCode::F841) {
+            if checker.patch(&DiagnosticCode::F841) {
                 if let Some(stmt) = binding.source.as_ref().map(std::convert::Into::into) {
                     if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
                     {

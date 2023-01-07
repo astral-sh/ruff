@@ -8,7 +8,7 @@ use globset::GlobMatcher;
 use path_absolutize::{path_dedot, Absolutize};
 use rustc_hash::FxHashSet;
 
-use crate::registry::CheckCode;
+use crate::registry::DiagnosticCode;
 
 /// Extract the absolute path and basename (as strings) from a Path.
 pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -26,8 +26,8 @@ pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
 /// Create a set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path<'a>(
     path: &Path,
-    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)],
-) -> Result<FxHashSet<&'a CheckCode>> {
+    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, FxHashSet<DiagnosticCode>)],
+) -> Result<FxHashSet<&'a DiagnosticCode>> {
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()

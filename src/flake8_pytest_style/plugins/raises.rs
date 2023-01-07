@@ -8,7 +8,7 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, DiagnosticCode};
 use crate::violations;
 
 fn is_pytest_raises(
@@ -31,16 +31,16 @@ fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(func, &checker.from_imports, &checker.import_aliases) {
-        if checker.settings.enabled.contains(&CheckCode::PT010) {
+        if checker.settings.enabled.contains(&DiagnosticCode::PT010) {
             if args.is_empty() && keywords.is_empty() {
-                checker.checks.push(Check::new(
+                checker.checks.push(Diagnostic::new(
                     violations::RaisesWithoutException,
                     Range::from_located(func),
                 ));
             }
         }
 
-        if checker.settings.enabled.contains(&CheckCode::PT011) {
+        if checker.settings.enabled.contains(&DiagnosticCode::PT011) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.node.arg == Some("match".to_string()));
@@ -91,7 +91,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
         }
 
         if is_too_complex {
-            checker.checks.push(Check::new(
+            checker.checks.push(Diagnostic::new(
                 violations::RaisesWithMultipleStatements,
                 Range::from_located(stmt),
             ));
@@ -118,7 +118,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
         .any(|(module, member)| match_call_path(&call_path, module, member, &checker.from_imports));
 
     if is_broad_exception {
-        checker.checks.push(Check::new(
+        checker.checks.push(Diagnostic::new(
             violations::RaisesTooBroad(call_path.join(".")),
             Range::from_located(exception),
         ));

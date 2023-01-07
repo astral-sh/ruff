@@ -7,7 +7,7 @@ use crate::ast::helpers::{compose_call_path, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 const ERROR_NAMES: &[&str] = &["EnvironmentError", "IOError", "WindowsError"];
@@ -158,7 +158,7 @@ fn handle_making_changes(
             final_str.insert(0, '(');
             final_str.push(')');
         }
-        let mut check = Check::new(violations::OSErrorAlias(compose_call_path(target)), range);
+        let mut check = Diagnostic::new(violations::OSErrorAlias(compose_call_path(target)), range);
         if checker.patch(check.kind.code()) {
             check.amend(Fix::replacement(
                 final_str,

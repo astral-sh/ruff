@@ -12,12 +12,12 @@ mod tests {
     use crate::flake8_pytest_style::settings::Settings;
     use crate::flake8_pytest_style::types;
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::settings;
 
-    #[test_case(CheckCode::PT001, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]
+    #[test_case(DiagnosticCode::PT001, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]
     #[test_case(
-        CheckCode::PT001,
+        DiagnosticCode::PT001,
         Path::new("PT001.py"),
         Settings {
             fixture_parentheses: false,
@@ -26,13 +26,13 @@ mod tests {
         "PT001_no_parentheses";
         "PT001_1"
     )]
-    #[test_case(CheckCode::PT002, Path::new("PT002.py"), Settings::default(), "PT002"; "PT002")]
-    #[test_case(CheckCode::PT003, Path::new("PT003.py"), Settings::default(), "PT003"; "PT003")]
-    #[test_case(CheckCode::PT004, Path::new("PT004.py"), Settings::default(), "PT004"; "PT004")]
-    #[test_case(CheckCode::PT005, Path::new("PT005.py"), Settings::default(), "PT005"; "PT005")]
-    #[test_case(CheckCode::PT006, Path::new("PT006.py"), Settings::default(), "PT006_default"; "PT006_0")]
+    #[test_case(DiagnosticCode::PT002, Path::new("PT002.py"), Settings::default(), "PT002"; "PT002")]
+    #[test_case(DiagnosticCode::PT003, Path::new("PT003.py"), Settings::default(), "PT003"; "PT003")]
+    #[test_case(DiagnosticCode::PT004, Path::new("PT004.py"), Settings::default(), "PT004"; "PT004")]
+    #[test_case(DiagnosticCode::PT005, Path::new("PT005.py"), Settings::default(), "PT005"; "PT005")]
+    #[test_case(DiagnosticCode::PT006, Path::new("PT006.py"), Settings::default(), "PT006_default"; "PT006_0")]
     #[test_case(
-        CheckCode::PT006,
+        DiagnosticCode::PT006,
         Path::new("PT006.py"),
         Settings {
             parametrize_names_type: types::ParametrizeNameType::CSV,
@@ -42,7 +42,7 @@ mod tests {
         "PT006_1"
     )]
     #[test_case(
-        CheckCode::PT006,
+        DiagnosticCode::PT006,
         Path::new("PT006.py"),
         Settings {
             parametrize_names_type: types::ParametrizeNameType::List,
@@ -52,14 +52,14 @@ mod tests {
         "PT006_2"
     )]
     #[test_case(
-        CheckCode::PT007,
+        DiagnosticCode::PT007,
         Path::new("PT007.py"),
         Settings::default(),
         "PT007_list_of_tuples";
         "PT007_0"
     )]
     #[test_case(
-        CheckCode::PT007,
+        DiagnosticCode::PT007,
         Path::new("PT007.py"),
         Settings {
             parametrize_values_type: types::ParametrizeValuesType::Tuple,
@@ -69,7 +69,7 @@ mod tests {
         "PT007_1"
     )]
     #[test_case(
-        CheckCode::PT007,
+        DiagnosticCode::PT007,
         Path::new("PT007.py"),
         Settings {
             parametrize_values_type: types::ParametrizeValuesType::Tuple,
@@ -80,7 +80,7 @@ mod tests {
         "PT007_2"
     )]
     #[test_case(
-        CheckCode::PT007,
+        DiagnosticCode::PT007,
         Path::new("PT007.py"),
         Settings {
             parametrize_values_row_type: types::ParametrizeValuesRowType::List,
@@ -90,29 +90,29 @@ mod tests {
         "PT007_3"
     )]
     #[test_case(
-        CheckCode::PT008,
+        DiagnosticCode::PT008,
         Path::new("PT008.py"),
         Settings::default(),
         "PT008";
         "PT008"
     )]
     #[test_case(
-        CheckCode::PT009,
+        DiagnosticCode::PT009,
         Path::new("PT009.py"),
         Settings::default(),
         "PT009";
         "PT009"
     )]
-    #[test_case(CheckCode::PT010, Path::new("PT010.py"), Settings::default(), "PT010"; "PT0010")]
+    #[test_case(DiagnosticCode::PT010, Path::new("PT010.py"), Settings::default(), "PT010"; "PT0010")]
     #[test_case(
-        CheckCode::PT011,
+        DiagnosticCode::PT011,
         Path::new("PT011.py"),
         Settings::default(),
         "PT011_default";
         "PT011_0"
     )]
     #[test_case(
-        CheckCode::PT011,
+        DiagnosticCode::PT011,
         Path::new("PT011.py"),
         Settings {
             raises_extend_require_match_for: vec!["ZeroDivisionError".to_string()],
@@ -122,7 +122,7 @@ mod tests {
         "PT011_1"
     )]
     #[test_case(
-        CheckCode::PT011,
+        DiagnosticCode::PT011,
         Path::new("PT011.py"),
         Settings {
             raises_require_match_for: vec!["ZeroDivisionError".to_string()],
@@ -132,84 +132,84 @@ mod tests {
         "PT011_2"
     )]
     #[test_case(
-        CheckCode::PT012,
+        DiagnosticCode::PT012,
         Path::new("PT012.py"),
         Settings::default(),
         "PT012";
         "PT012"
     )]
     #[test_case(
-        CheckCode::PT013,
+        DiagnosticCode::PT013,
         Path::new("PT013.py"),
         Settings::default(),
         "PT013";
         "PT013"
     )]
     #[test_case(
-        CheckCode::PT015,
+        DiagnosticCode::PT015,
         Path::new("PT015.py"),
         Settings::default(),
         "PT015";
         "PT015"
     )]
     #[test_case(
-        CheckCode::PT016,
+        DiagnosticCode::PT016,
         Path::new("PT016.py"),
         Settings::default(),
         "PT016";
         "PT016"
     )]
     #[test_case(
-        CheckCode::PT017,
+        DiagnosticCode::PT017,
         Path::new("PT017.py"),
         Settings::default(),
         "PT017";
         "PT017"
     )]
     #[test_case(
-        CheckCode::PT018,
+        DiagnosticCode::PT018,
         Path::new("PT018.py"),
         Settings::default(),
         "PT018";
         "PT018"
     )]
     #[test_case(
-        CheckCode::PT019,
+        DiagnosticCode::PT019,
         Path::new("PT019.py"),
         Settings::default(),
         "PT019";
         "PT019"
     )]
     #[test_case(
-        CheckCode::PT020,
+        DiagnosticCode::PT020,
         Path::new("PT020.py"),
         Settings::default(),
         "PT020";
         "PT020"
     )]
     #[test_case(
-        CheckCode::PT021,
+        DiagnosticCode::PT021,
         Path::new("PT021.py"),
         Settings::default(),
         "PT021";
         "PT021"
     )]
     #[test_case(
-        CheckCode::PT022,
+        DiagnosticCode::PT022,
         Path::new("PT022.py"),
         Settings::default(),
         "PT022";
         "PT022"
     )]
     #[test_case(
-        CheckCode::PT023,
+        DiagnosticCode::PT023,
         Path::new("PT023.py"),
         Settings::default(),
         "PT023_default";
         "PT023_0"
     )]
     #[test_case(
-        CheckCode::PT023,
+        DiagnosticCode::PT023,
         Path::new("PT023.py"),
         Settings {
             mark_parentheses: false,
@@ -219,28 +219,28 @@ mod tests {
         "PT023_1"
     )]
     #[test_case(
-        CheckCode::PT024,
+        DiagnosticCode::PT024,
         Path::new("PT024.py"),
         Settings::default(),
         "PT024";
         "PT024"
     )]
     #[test_case(
-        CheckCode::PT025,
+        DiagnosticCode::PT025,
         Path::new("PT025.py"),
         Settings::default(),
         "PT025";
         "PT025"
     )]
     #[test_case(
-        CheckCode::PT026,
+        DiagnosticCode::PT026,
         Path::new("PT026.py"),
         Settings::default(),
         "PT026";
         "PT026"
     )]
     fn test_pytest_style(
-        check_code: CheckCode,
+        check_code: DiagnosticCode,
         path: &Path,
         plugin_settings: Settings,
         name: &str,

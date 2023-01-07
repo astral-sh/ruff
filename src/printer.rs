@@ -15,7 +15,7 @@ use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
-use crate::registry::CheckCode;
+use crate::registry::DiagnosticCode;
 use crate::settings::types::SerializationFormat;
 use crate::tell_user;
 
@@ -35,7 +35,7 @@ struct ExpandedFix<'a> {
 
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {
-    code: &'a CheckCode,
+    code: &'a DiagnosticCode,
     message: String,
     fix: Option<ExpandedFix<'a>>,
     location: Location,

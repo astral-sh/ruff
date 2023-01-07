@@ -63,7 +63,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/DiagnosticCodePrefix"
       }
     },
     "extend-select": {
@@ -73,7 +73,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/DiagnosticCodePrefix"
       }
     },
     "external": {
@@ -107,7 +107,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/DiagnosticCodePrefix"
       }
     },
     "flake8-annotations": {
@@ -234,7 +234,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/DiagnosticCodePrefix"
       }
     },
     "ignore-init-module-imports": {
@@ -295,7 +295,7 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "$ref": "#/definitions/CheckCodePrefix"
+          "$ref": "#/definitions/DiagnosticCodePrefix"
         }
       }
     },
@@ -357,7 +357,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/DiagnosticCodePrefix"
       }
     },
     "show-source": {
@@ -405,7 +405,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/DiagnosticCodePrefix"
       }
     },
     "update-check": {
@@ -431,7 +431,32 @@
       },
       "additionalProperties": false
     },
-    "CheckCodePrefix": {
+    "Convention": {
+      "oneOf": [
+        {
+          "description": "Use Google-style docstrings.",
+          "type": "string",
+          "enum": [
+            "google"
+          ]
+        },
+        {
+          "description": "Use NumPy-style docstrings.",
+          "type": "string",
+          "enum": [
+            "numpy"
+          ]
+        },
+        {
+          "description": "Use PEP257-style docstrings.",
+          "type": "string",
+          "enum": [
+            "pep257"
+          ]
+        }
+      ]
+    },
+    "DiagnosticCodePrefix": {
       "type": "string",
       "enum": [
         "A",
@@ -1059,31 +1084,6 @@
         "YTT301",
         "YTT302",
         "YTT303"
-      ]
-    },
-    "Convention": {
-      "oneOf": [
-        {
-          "description": "Use Google-style docstrings.",
-          "type": "string",
-          "enum": [
-            "google"
-          ]
-        },
-        {
-          "description": "Use NumPy-style docstrings.",
-          "type": "string",
-          "enum": [
-            "numpy"
-          ]
-        },
-        {
-          "description": "Use PEP257-style docstrings.",
-          "type": "string",
-          "enum": [
-            "pep257"
-          ]
-        }
       ]
     },
     "Flake8AnnotationsOptions": {

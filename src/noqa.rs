@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::registry::{Check, CheckCode, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, DiagnosticCode, CODE_REDIRECTS};
 use crate::source_code_style::LineEnding;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -68,7 +68,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
-pub fn includes(needle: &CheckCode, haystack: &[&str]) -> bool {
+pub fn includes(needle: &DiagnosticCode, haystack: &[&str]) -> bool {
     let needle: &str = needle.as_ref();
     haystack.iter().any(|candidate| {
         if let Some(candidate) = CODE_REDIRECTS.get(candidate) {
@@ -81,7 +81,7 @@ pub fn includes(needle: &CheckCode, haystack: &[&str]) -> bool {
 
 pub fn add_noqa(
     path: &Path,
-    checks: &[Check],
+    checks: &[Diagnostic],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
     external: &FxHashSet<String>,
@@ -93,20 +93,20 @@ pub fn add_noqa(
 }
 
 fn add_noqa_inner(
-    checks: &[Check],
+    checks: &[Diagnostic],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
     external: &FxHashSet<String>,
     line_ending: &LineEnding,
 ) -> (usize, String) {
-    let mut matches_by_line: FxHashMap<usize, FxHashSet<&CheckCode>> = FxHashMap::default();
+    let mut matches_by_line: FxHashMap<usize, FxHashSet<&DiagnosticCode>> = FxHashMap::default();
     for (lineno, line) in contents.lines().enumerate() {
         // If we hit an exemption for the entire file, bail.
         if is_file_exempt(line) {
             return (0, contents.to_string());
         }
 
-        let mut codes: FxHashSet<&CheckCode> = FxHashSet::default();
+        let mut codes: FxHashSet<&DiagnosticCode> = FxHashSet::default();
         for check in checks {
             // TODO(charlie): Consider respecting parent `noqa` directives. For now, we'll
             // add a `noqa` for every check, on its own line. This could lead to
@@ -213,7 +213,7 @@ mod tests {
 
     use crate::ast::types::Range;
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
-    use crate::registry::Check;
+    use crate::registry::Diagnostic;
     use crate::source_code_style::LineEnding;
     use crate::violations;
 
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}\n"));
 
-        let checks = vec![Check::new(
+        let checks = vec![Diagnostic::new(
             violations::UnusedVariable("x".to_string()),
             Range::new(Location::new(1, 0), Location::new(1, 0)),
         )];
@@ -265,11 +265,11 @@ mod tests {
         assert_eq!(output, "x = 1  # noqa: F841\n");
 
         let checks = vec![
-            Check::new(
+            Diagnostic::new(
                 violations::AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
-            Check::new(
+            Diagnostic::new(
                 violations::UnusedVariable("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
@@ -288,11 +288,11 @@ mod tests {
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
 
         let checks = vec![
-            Check::new(
+            Diagnostic::new(
                 violations::AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
-            Check::new(
+            Diagnostic::new(
                 violations::UnusedVariable("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),

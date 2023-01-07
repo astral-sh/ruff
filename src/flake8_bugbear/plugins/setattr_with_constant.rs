@@ -5,7 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
@@ -61,7 +61,8 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // (i.e., it's directly within an `StmtKind::Expr`).
     if let StmtKind::Expr { value: child } = &checker.current_stmt().node {
         if expr == child.as_ref() {
-            let mut check = Check::new(violations::SetAttrWithConstant, Range::from_located(expr));
+            let mut check =
+                Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
             if checker.patch(check.kind.code()) {
                 check.amend(Fix::replacement(
                     assignment(obj, name, value, checker.style),

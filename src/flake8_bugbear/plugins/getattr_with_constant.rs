@@ -5,7 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
 
@@ -45,7 +45,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         return;
     }
 
-    let mut check = Check::new(violations::GetAttrWithConstant, Range::from_located(expr));
+    let mut check = Diagnostic::new(violations::GetAttrWithConstant, Range::from_located(expr));
     if checker.patch(check.kind.code()) {
         let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_expr(&attribute(obj, value), 0);

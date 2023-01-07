@@ -7,7 +7,7 @@ use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_locator::SourceCodeLocator;
 
 #[derive(Debug, Copy, Clone, Hash)]
@@ -30,7 +30,7 @@ impl From<bool> for Mode {
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub fn fix_file<'a>(
-    checks: &'a [Check],
+    checks: &'a [Diagnostic],
     locator: &'a SourceCodeLocator<'a>,
 ) -> Option<(Cow<'a, str>, usize)> {
     if checks.iter().all(|check| check.fix.is_none()) {

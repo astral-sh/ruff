@@ -1,7 +1,7 @@
 use rustpython_ast::{ExcepthandlerKind, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::identifier_range;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 
@@ -62,10 +62,10 @@ pub fn function_is_too_complex(
     body: &[Stmt],
     max_complexity: usize,
     locator: &SourceCodeLocator,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::FunctionIsTooComplex(name.to_string(), complexity),
             identifier_range(stmt, locator),
         ))

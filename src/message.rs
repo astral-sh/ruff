@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::registry::{Check, CheckKind};
+use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
-    pub kind: CheckKind,
+    pub kind: DiagnosticKind,
     pub location: Location,
     pub end_location: Location,
     pub fix: Option<Fix>,
@@ -19,7 +19,7 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn from_check(check: Check, filename: String, source: Option<Source>) -> Self {
+    pub fn from_check(check: Diagnostic, filename: String, source: Option<Source>) -> Self {
         Self {
             kind: check.kind,
             location: Location::new(check.location.row(), check.location.column() + 1),
@@ -54,7 +54,7 @@ pub struct Source {
 }
 
 impl Source {
-    pub fn from_check(check: &Check, locator: &SourceCodeLocator) -> Self {
+    pub fn from_check(check: &Diagnostic, locator: &SourceCodeLocator) -> Self {
         let location = Location::new(check.location.row(), 0);
         // Checks can already extend one-past-the-end per Ropey's semantics. If they do,
         // though, then they'll end at the start of a line. We need to avoid

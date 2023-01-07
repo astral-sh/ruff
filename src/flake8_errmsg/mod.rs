@@ -8,7 +8,7 @@ mod tests {
     use anyhow::Result;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::DiagnosticCode;
     use crate::{flake8_errmsg, settings};
 
     #[test]
@@ -16,9 +16,9 @@ mod tests {
         let checks = test_path(
             Path::new("./resources/test/fixtures/flake8_errmsg/EM.py"),
             &settings::Settings::for_rules(vec![
-                CheckCode::EM101,
-                CheckCode::EM102,
-                CheckCode::EM103,
+                DiagnosticCode::EM101,
+                DiagnosticCode::EM102,
+                DiagnosticCode::EM103,
             ]),
         )?;
         insta::assert_yaml_snapshot!("defaults", checks);
@@ -34,9 +34,9 @@ mod tests {
                     max_string_length: 20,
                 },
                 ..settings::Settings::for_rules(vec![
-                    CheckCode::EM101,
-                    CheckCode::EM102,
-                    CheckCode::EM103,
+                    DiagnosticCode::EM101,
+                    DiagnosticCode::EM102,
+                    DiagnosticCode::EM103,
                 ])
             },
         )?;

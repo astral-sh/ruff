@@ -4,11 +4,11 @@ use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::python::string::is_lower;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 struct RaiseVisitor {
-    checks: Vec<Check>,
+    checks: Vec<Diagnostic>,
 }
 
 impl<'a> Visitor<'a> for RaiseVisitor {
@@ -20,7 +20,7 @@ impl<'a> Visitor<'a> for RaiseVisitor {
             } => match &exc.node {
                 ExprKind::Name { id, .. } if is_lower(id) => {}
                 _ => {
-                    self.checks.push(Check::new(
+                    self.checks.push(Diagnostic::new(
                         violations::RaiseWithoutFromInsideExcept,
                         Range::from_located(stmt),
                     ));

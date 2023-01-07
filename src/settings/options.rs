@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::registry::CheckCodePrefix;
+use crate::registry::DiagnosticCodePrefix;
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 use crate::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
@@ -111,7 +111,7 @@ pub struct Options {
     pub extend_exclude: Option<Vec<String>>,
     #[option(
         default = "[]",
-        value_type = "Vec<CheckCodePrefix>",
+        value_type = "Vec<DiagnosticCodePrefix>",
         example = r#"
             # Skip unused variable checks (`F841`).
             extend-ignore = ["F841"]
@@ -119,10 +119,10 @@ pub struct Options {
     )]
     /// A list of check code prefixes to ignore, in addition to those specified
     /// by `ignore`.
-    pub extend_ignore: Option<Vec<CheckCodePrefix>>,
+    pub extend_ignore: Option<Vec<DiagnosticCodePrefix>>,
     #[option(
         default = "[]",
-        value_type = "Vec<CheckCodePrefix>",
+        value_type = "Vec<DiagnosticCodePrefix>",
         example = r#"
             # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
@@ -130,7 +130,7 @@ pub struct Options {
     )]
     /// A list of check code prefixes to enable, in addition to those specified
     /// by `select`.
-    pub extend_select: Option<Vec<CheckCodePrefix>>,
+    pub extend_select: Option<Vec<DiagnosticCodePrefix>>,
     #[option(
         default = "[]",
         value_type = "Vec<String>",
@@ -154,14 +154,14 @@ pub struct Options {
     pub fix_only: Option<bool>,
     #[option(
         default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]"#,
-        value_type = "Vec<CheckCodePrefix>",
+        value_type = "Vec<DiagnosticCodePrefix>",
         example = r#"
             # Only allow autofix behavior for `E` and `F` checks.
             fixable = ["E", "F"]
         "#
     )]
     /// A list of check code prefixes to consider autofix-able.
-    pub fixable: Option<Vec<CheckCodePrefix>>,
+    pub fixable: Option<Vec<DiagnosticCodePrefix>>,
     #[option(
         default = r#""text""#,
         value_type = "SerializationType",
@@ -196,7 +196,7 @@ pub struct Options {
     pub force_exclude: Option<bool>,
     #[option(
         default = "[]",
-        value_type = "Vec<CheckCodePrefix>",
+        value_type = "Vec<DiagnosticCodePrefix>",
         example = r#"
             # Skip unused variable checks (`F841`).
             ignore = ["F841"]
@@ -209,7 +209,7 @@ pub struct Options {
     /// When breaking ties between enabled and disabled checks (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
-    pub ignore: Option<Vec<CheckCodePrefix>>,
+    pub ignore: Option<Vec<DiagnosticCodePrefix>>,
     #[option(
         default = "false",
         value_type = "bool",
@@ -258,7 +258,7 @@ pub struct Options {
     pub respect_gitignore: Option<bool>,
     #[option(
         default = r#"["E", "F"]"#,
-        value_type = "Vec<CheckCodePrefix>",
+        value_type = "Vec<DiagnosticCodePrefix>",
         example = r#"
             # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             select = ["E", "F", "B", "Q"]
@@ -271,7 +271,7 @@ pub struct Options {
     /// When breaking ties between enabled and disabled checks (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
-    pub select: Option<Vec<CheckCodePrefix>>,
+    pub select: Option<Vec<DiagnosticCodePrefix>>,
     #[option(
         default = "false",
         value_type = "bool",
@@ -331,14 +331,14 @@ pub struct Options {
     pub target_version: Option<PythonVersion>,
     #[option(
         default = "[]",
-        value_type = "Vec<CheckCodePrefix>",
+        value_type = "Vec<DiagnosticCodePrefix>",
         example = r#"
             # Disable autofix for unused imports (`F401`).
             unfixable = ["F401"]
         "#
     )]
     /// A list of check code prefixes to consider un-autofix-able.
-    pub unfixable: Option<Vec<CheckCodePrefix>>,
+    pub unfixable: Option<Vec<DiagnosticCodePrefix>>,
     #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
         value_type = "Vec<String>",
@@ -406,7 +406,7 @@ pub struct Options {
     // Tables are required to go last.
     #[option(
         default = "{}",
-        value_type = "HashMap<String, Vec<CheckCodePrefix>>",
+        value_type = "HashMap<String, Vec<DiagnosticCodePrefix>>",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
             [tool.ruff.per-file-ignores]
@@ -416,5 +416,5 @@ pub struct Options {
     )]
     /// A list of mappings from file pattern to check code prefixes to exclude,
     /// when considering any matching files.
-    pub per_file_ignores: Option<FxHashMap<String, Vec<CheckCodePrefix>>>,
+    pub per_file_ignores: Option<FxHashMap<String, Vec<DiagnosticCodePrefix>>>,
 }

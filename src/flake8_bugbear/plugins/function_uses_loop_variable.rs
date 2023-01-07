@@ -6,7 +6,7 @@ use crate::ast::types::{Node, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 #[derive(Default)]
@@ -212,7 +212,7 @@ where
             if reassigned_in_loop.contains(name) {
                 if !checker.flake8_bugbear_seen.contains(&expr) {
                     checker.flake8_bugbear_seen.push(expr);
-                    checker.checks.push(Check::new(
+                    checker.checks.push(Diagnostic::new(
                         violations::FunctionUsesLoopVariable(name.to_string()),
                         range,
                     ));

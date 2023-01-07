@@ -10,7 +10,7 @@ use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeK
 use crate::checkers::ast::Checker;
 use crate::flake8_unused_arguments::helpers;
 use crate::flake8_unused_arguments::types::Argumentable;
-use crate::{visibility, Check};
+use crate::{visibility, Diagnostic};
 
 /// Check a plain function for unused arguments.
 fn function(
@@ -20,8 +20,8 @@ fn function(
     bindings: &[Binding],
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
-) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
+) -> Vec<Diagnostic> {
+    let mut checks: Vec<Diagnostic> = vec![];
     for arg in args
         .posonlyargs
         .iter()
@@ -46,7 +46,7 @@ fn function(
                 && matches!(binding.kind, BindingKind::Argument)
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
-                checks.push(Check::new(
+                checks.push(Diagnostic::new(
                     argumentable.check_for(arg.node.arg.to_string()),
                     binding.range,
                 ));
@@ -64,8 +64,8 @@ fn method(
     bindings: &[Binding],
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
-) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
+) -> Vec<Diagnostic> {
+    let mut checks: Vec<Diagnostic> = vec![];
     for arg in args
         .posonlyargs
         .iter()
@@ -91,7 +91,7 @@ fn method(
                 && matches!(binding.kind, BindingKind::Argument)
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
-                checks.push(Check::new(
+                checks.push(Diagnostic::new(
                     argumentable.check_for(arg.node.arg.to_string()),
                     binding.range,
                 ));
@@ -107,7 +107,7 @@ pub fn unused_arguments(
     parent: &Scope,
     scope: &Scope,
     bindings: &[Binding],
-) -> Vec<Check> {
+) -> Vec<Diagnostic> {
     match &scope.kind {
         ScopeKind::Function(FunctionDef {
             name,

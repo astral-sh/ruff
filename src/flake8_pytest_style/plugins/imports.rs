@@ -1,7 +1,7 @@
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 fn is_pytest_or_subpackage(imported_name: &str) -> bool {
@@ -9,11 +9,11 @@ fn is_pytest_or_subpackage(imported_name: &str) -> bool {
 }
 
 /// PT013
-pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Check> {
+pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Diagnostic> {
     if is_pytest_or_subpackage(name) {
         if let Some(alias) = asname {
             if alias != name {
-                return Some(Check::new(
+                return Some(Diagnostic::new(
                     violations::IncorrectPytestImport,
                     Range::from_located(import_from),
                 ));
@@ -28,7 +28,7 @@ pub fn import_from(
     import_from: &Stmt,
     module: Option<&str>,
     level: Option<&usize>,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     // If level is not zero or module is none, return
     if let Some(level) = level {
         if *level != 0 {
@@ -38,7 +38,7 @@ pub fn import_from(
 
     if let Some(module) = module {
         if is_pytest_or_subpackage(module) {
-            return Some(Check::new(
+            return Some(Diagnostic::new(
                 violations::IncorrectPytestImport,
                 Range::from_located(import_from),
             ));

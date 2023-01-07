@@ -2,7 +2,7 @@ use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::{violations, Check};
+use crate::{violations, Diagnostic};
 
 /// PLR0206
 pub fn property_with_parameters(
@@ -26,7 +26,7 @@ pub fn property_with_parameters(
             .count()
             > 1
     {
-        checker.checks.push(Check::new(
+        checker.checks.push(Diagnostic::new(
             violations::PropertyWithParameters,
             Range::from_located(stmt),
         ));

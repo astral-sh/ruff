@@ -6,7 +6,7 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::linter::check_path;
-use crate::registry::{CheckCode, CheckCodePrefix};
+use crate::registry::{DiagnosticCode, DiagnosticCodePrefix};
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
@@ -52,7 +52,7 @@ export interface Check {
 
 #[derive(Serialize)]
 struct ExpandedMessage {
-    code: CheckCode,
+    code: DiagnosticCode,
     message: String,
     location: Location,
     end_location: Location,
@@ -92,7 +92,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
         line_length: Some(88),
-        select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+        select: Some(vec![DiagnosticCodePrefix::E, DiagnosticCodePrefix::F]),
         target_version: Some(PythonVersion::default()),
         // Ignore a bunch of options that don't make sense in a single-file editor.
         cache_dir: None,
@@ -217,7 +217,7 @@ mod test {
             "if (1, 2): pass",
             r#"{}"#,
             [ExpandedMessage {
-                code: CheckCode::F634,
+                code: DiagnosticCode::F634,
                 message: "If test is a tuple, which is always `True`".to_string(),
                 location: Location::new(1, 0),
                 end_location: Location::new(1, 15),

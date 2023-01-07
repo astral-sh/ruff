@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::Args;
 use itertools::Itertools;
-use ruff::registry::{CheckCategory, CheckCode};
+use ruff::registry::{CheckCategory, DiagnosticCode};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -55,7 +55,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         table_out.push_str("| ---- | ---- | ------- | --- |");
         table_out.push('\n');
 
-        for check_code in CheckCode::iter() {
+        for check_code in DiagnosticCode::iter() {
             if check_code.category() == check_category {
                 let check_kind = check_code.kind();
                 let fix_token = if check_kind.fixable() { "🛠" } else { "" };
