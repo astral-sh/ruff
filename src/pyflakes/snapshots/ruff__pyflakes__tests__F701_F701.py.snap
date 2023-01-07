@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: BreakOutsideLoop
+- kind:
+    BreakOutsideLoop: ~
   location:
     row: 4
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 9
   fix: ~
   parent: ~
-- kind: BreakOutsideLoop
+- kind:
+    BreakOutsideLoop: ~
   location:
     row: 16
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 9
   fix: ~
   parent: ~
-- kind: BreakOutsideLoop
+- kind:
+    BreakOutsideLoop: ~
   location:
     row: 20
     column: 4
@@ -29,7 +32,8 @@ expression: checks
     column: 9
   fix: ~
   parent: ~
-- kind: BreakOutsideLoop
+- kind:
+    BreakOutsideLoop: ~
   location:
     row: 23
     column: 0

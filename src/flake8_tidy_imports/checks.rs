@@ -6,7 +6,8 @@ use crate::ast::helpers::match_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::flake8_tidy_imports::settings::Strictness;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// TID252
 pub fn banned_relative_import(
@@ -20,7 +21,7 @@ pub fn banned_relative_import(
     };
     if level? > &strictness_level {
         Some(Check::new(
-            CheckKind::BannedRelativeImport(strictness.clone()),
+            violations::BannedRelativeImport(strictness.clone()),
             Range::from_located(stmt),
         ))
     } else {
@@ -37,7 +38,7 @@ pub fn name_is_banned(
     let full_name = format!("{module}.{}", &name.node.name);
     if let Some(ban) = banned_apis.get(&full_name) {
         return Some(Check::new(
-            CheckKind::BannedApi {
+            violations::BannedApi {
                 name: full_name,
                 message: ban.msg.to_string(),
             },
@@ -57,7 +58,7 @@ pub fn name_or_parent_is_banned<T>(
     loop {
         if let Some(ban) = banned_apis.get(name) {
             return Some(Check::new(
-                CheckKind::BannedApi {
+                violations::BannedApi {
                     name: name.to_string(),
                     message: ban.msg.to_string(),
                 },
@@ -84,7 +85,7 @@ pub fn banned_attribute_access(
         if let Some((module, member)) = banned_path.rsplit_once('.') {
             if match_call_path(call_path, module, member, &checker.from_imports) {
                 checker.checks.push(Check::new(
-                    CheckKind::BannedApi {
+                    violations::BannedApi {
                         name: banned_path.to_string(),
                         message: ban.msg.to_string(),
                     },

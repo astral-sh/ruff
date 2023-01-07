@@ -3,7 +3,8 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// SIM105
 pub fn use_contextlib_suppress(
@@ -30,7 +31,7 @@ pub fn use_contextlib_suppress(
                 handler_names.join(", ")
             };
             let check = Check::new(
-                CheckKind::UseContextlibSuppress(exception),
+                violations::UseContextlibSuppress(exception),
                 Range::from_located(stmt),
             );
             checker.checks.push(check);

@@ -3,9 +3,9 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::eradicate::detection::comment_contains_code;
-use crate::registry::{CheckCode, CheckKind};
+use crate::registry::CheckCode;
 use crate::settings::flags;
-use crate::{Check, Settings, SourceCodeLocator};
+use crate::{violations, Check, Settings, SourceCodeLocator};
 
 fn is_standalone_comment(line: &str) -> bool {
     for char in line.chars() {
@@ -32,7 +32,7 @@ pub fn commented_out_code(
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(&line) && comment_contains_code(&line, &settings.task_tags[..]) {
-        let mut check = Check::new(CheckKind::CommentedOutCode, Range::new(start, end));
+        let mut check = Check::new(violations::CommentedOutCode, Range::new(start, end));
         if matches!(autofix, flags::Autofix::Enabled)
             && settings.fixable.contains(&CheckCode::ERA001)
         {

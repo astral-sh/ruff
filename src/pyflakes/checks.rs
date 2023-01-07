@@ -6,14 +6,15 @@ use rustpython_parser::ast::{
 
 use crate::ast::helpers::except_range;
 use crate::ast::types::{Binding, Range, Scope, ScopeKind};
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 /// F631
 pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
-            return Some(Check::new(CheckKind::AssertTuple, location));
+            return Some(Check::new(violations::AssertTuple, location));
         }
     }
     None
@@ -23,7 +24,7 @@ pub fn assert_tuple(test: &Expr, location: Range) -> Option<Check> {
 pub fn if_tuple(test: &Expr, location: Range) -> Option<Check> {
     if let ExprKind::Tuple { elts, .. } = &test.node {
         if !elts.is_empty() {
-            return Some(Check::new(CheckKind::IfTuple, location));
+            return Some(Check::new(violations::IfTuple, location));
         }
     }
     None
@@ -39,7 +40,7 @@ pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &[Binding]) -> O
                     if let Some((scope_id, location)) = binding.used {
                         if scope_id == current.id {
                             return Some(Check::new(
-                                CheckKind::UndefinedLocal(name.to_string()),
+                                violations::UndefinedLocal(name.to_string()),
                                 location,
                             ));
                         }
@@ -60,7 +61,7 @@ pub fn default_except_not_last(
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
         if type_.is_none() && idx < handlers.len() - 1 {
             return Some(Check::new(
-                CheckKind::DefaultExceptNotLast,
+                violations::DefaultExceptNotLast,
                 except_range(handler, locator),
             ));
         }
@@ -101,7 +102,7 @@ pub fn repeated_keys(
                 (Some(DictionaryKey::Constant(v1)), Some(DictionaryKey::Constant(v2))) => {
                     if check_repeated_literals && v1 == v2 {
                         checks.push(Check::new(
-                            CheckKind::MultiValueRepeatedKeyLiteral,
+                            violations::MultiValueRepeatedKeyLiteral,
                             Range::from_located(k2),
                         ));
                     }
@@ -109,7 +110,7 @@ pub fn repeated_keys(
                 (Some(DictionaryKey::Variable(v1)), Some(DictionaryKey::Variable(v2))) => {
                     if check_repeated_variables && v1 == v2 {
                         checks.push(Check::new(
-                            CheckKind::MultiValueRepeatedKeyVariable((*v2).to_string()),
+                            violations::MultiValueRepeatedKeyVariable((*v2).to_string()),
                             Range::from_located(k2),
                         ));
                     }
@@ -134,7 +135,7 @@ pub fn starred_expressions(
     for (index, elt) in elts.iter().enumerate() {
         if matches!(elt.node, ExprKind::Starred { .. }) {
             if has_starred && check_two_starred_expressions {
-                return Some(Check::new(CheckKind::TwoStarredExpressions, location));
+                return Some(Check::new(violations::TwoStarredExpressions, location));
             }
             has_starred = true;
             starred_index = Some(index);
@@ -144,7 +145,10 @@ pub fn starred_expressions(
     if check_too_many_expressions {
         if let Some(starred_index) = starred_index {
             if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
-                return Some(Check::new(CheckKind::ExpressionsInStarAssignment, location));
+                return Some(Check::new(
+                    violations::ExpressionsInStarAssignment,
+                    location,
+                ));
             }
         }
     }
@@ -183,7 +187,7 @@ pub fn break_outside_loop<'a>(
         None
     } else {
         Some(Check::new(
-            CheckKind::BreakOutsideLoop,
+            violations::BreakOutsideLoop,
             Range::from_located(stmt),
         ))
     }
@@ -220,7 +224,7 @@ pub fn continue_outside_loop<'a>(
         None
     } else {
         Some(Check::new(
-            CheckKind::ContinueOutsideLoop,
+            violations::ContinueOutsideLoop,
             Range::from_located(stmt),
         ))
     }

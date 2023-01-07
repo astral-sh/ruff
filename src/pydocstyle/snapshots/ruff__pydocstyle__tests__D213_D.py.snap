@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 200
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 210
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 220
     column: 4
@@ -29,7 +32,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 230
     column: 4
@@ -38,7 +42,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 240
     column: 4
@@ -47,7 +52,8 @@ expression: checks
     column: 3
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 250
     column: 4
@@ -56,7 +62,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 260
     column: 4
@@ -65,7 +72,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 270
     column: 4
@@ -74,7 +82,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 281
     column: 4
@@ -83,7 +92,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 299
     column: 4
@@ -92,7 +102,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 343
     column: 4
@@ -101,7 +112,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 383
     column: 4
@@ -110,7 +122,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 392
     column: 4
@@ -119,7 +132,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 438
     column: 36
@@ -128,7 +142,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 450
     column: 4
@@ -137,7 +152,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 526
     column: 4
@@ -146,7 +162,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 546
     column: 4
@@ -155,7 +172,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 555
     column: 4
@@ -164,7 +182,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: MultiLineSummarySecondLine
+- kind:
+    MultiLineSummarySecondLine: ~
   location:
     row: 568
     column: 4

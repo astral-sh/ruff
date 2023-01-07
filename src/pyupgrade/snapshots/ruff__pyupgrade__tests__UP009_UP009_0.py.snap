@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: PEP3120UnnecessaryCodingComment
+- kind:
+    PEP3120UnnecessaryCodingComment: ~
   location:
     row: 1
     column: 0

@@ -3,7 +3,8 @@ use regex::Regex;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 static BLANKET_NOQA_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)# noqa($|\s|:[^ ])").unwrap());
@@ -12,7 +13,7 @@ static BLANKET_NOQA_REGEX: Lazy<Regex> =
 pub fn blanket_noqa(lineno: usize, line: &str) -> Option<Check> {
     BLANKET_NOQA_REGEX.find(line).map(|m| {
         Check::new(
-            CheckKind::BlanketNOQA,
+            violations::BlanketNOQA,
             Range::new(
                 Location::new(lineno + 1, m.start()),
                 Location::new(lineno + 1, m.end()),

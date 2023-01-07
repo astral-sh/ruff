@@ -4,8 +4,7 @@ use rustpython_ast::{Boolop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Check};
 
 /// PLR1701
 pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values: &[Expr]) {
@@ -42,7 +41,7 @@ pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values:
     for (obj, (num_calls, types)) in obj_to_types {
         if num_calls > 1 && types.len() > 1 {
             checker.checks.push(Check::new(
-                CheckKind::ConsiderMergingIsinstance(obj, types.into_iter().sorted().collect()),
+                violations::ConsiderMergingIsinstance(obj, types.into_iter().sorted().collect()),
                 Range::from_located(expr),
             ));
         }

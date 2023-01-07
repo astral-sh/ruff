@@ -5,7 +5,8 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
     FxHashMap::from_iter([
@@ -42,7 +43,7 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         return;
     }
     let mut check = Check::new(
-        CheckKind::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
+        violations::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
         Range::from_located(expr),
     );
     if checker.patch(check.kind.code()) {

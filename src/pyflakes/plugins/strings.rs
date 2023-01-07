@@ -12,7 +12,8 @@ use crate::pyflakes::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
 };
 use crate::pyflakes::format::FormatSummary;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
     keywords.iter().any(|k| {
@@ -42,7 +43,7 @@ pub(crate) fn percent_format_expected_mapping(
             | ExprKind::ListComp { .. }
             | ExprKind::SetComp { .. }
             | ExprKind::GeneratorExp { .. } => checker.checks.push(Check::new(
-                CheckKind::PercentFormatExpectedMapping,
+                violations::PercentFormatExpectedMapping,
                 location,
             )),
             _ => {}
@@ -64,7 +65,7 @@ pub(crate) fn percent_format_expected_sequence(
         )
     {
         checker.checks.push(Check::new(
-            CheckKind::PercentFormatExpectedSequence,
+            violations::PercentFormatExpectedSequence,
             location,
         ));
     }
@@ -110,7 +111,7 @@ pub(crate) fn percent_format_extra_named_arguments(
     }
 
     let mut check = Check::new(
-        CheckKind::PercentFormatExtraNamedArguments(
+        violations::PercentFormatExtraNamedArguments(
             missing.iter().map(|&arg| arg.to_string()).collect(),
         ),
         location,
@@ -165,7 +166,7 @@ pub(crate) fn percent_format_missing_arguments(
 
         if !missing.is_empty() {
             checker.checks.push(Check::new(
-                CheckKind::PercentFormatMissingArgument(
+                violations::PercentFormatMissingArgument(
                     missing.iter().map(|&s| s.clone()).collect(),
                 ),
                 location,
@@ -182,7 +183,7 @@ pub(crate) fn percent_format_mixed_positional_and_named(
 ) {
     if !(summary.num_positional == 0 || summary.keywords.is_empty()) {
         checker.checks.push(Check::new(
-            CheckKind::PercentFormatMixedPositionalAndNamed,
+            violations::PercentFormatMixedPositionalAndNamed,
             location,
         ));
     }
@@ -211,7 +212,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
 
             if found != summary.num_positional {
                 checker.checks.push(Check::new(
-                    CheckKind::PercentFormatPositionalCountMismatch(summary.num_positional, found),
+                    violations::PercentFormatPositionalCountMismatch(summary.num_positional, found),
                     location,
                 ));
             }
@@ -230,7 +231,7 @@ pub(crate) fn percent_format_star_requires_sequence(
     if summary.starred {
         match &right.node {
             ExprKind::Dict { .. } | ExprKind::DictComp { .. } => checker.checks.push(Check::new(
-                CheckKind::PercentFormatStarRequiresSequence,
+                violations::PercentFormatStarRequiresSequence,
                 location,
             )),
             _ => {}
@@ -269,7 +270,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     }
 
     let mut check = Check::new(
-        CheckKind::StringDotFormatExtraNamedArguments(
+        violations::StringDotFormatExtraNamedArguments(
             missing.iter().map(|&arg| arg.to_string()).collect(),
         ),
         location,
@@ -306,7 +307,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     }
 
     checker.checks.push(Check::new(
-        CheckKind::StringDotFormatExtraPositionalArguments(
+        violations::StringDotFormatExtraPositionalArguments(
             missing
                 .iter()
                 .map(std::string::ToString::to_string)
@@ -353,7 +354,7 @@ pub(crate) fn string_dot_format_missing_argument(
 
     if !missing.is_empty() {
         checker.checks.push(Check::new(
-            CheckKind::StringDotFormatMissingArguments(missing),
+            violations::StringDotFormatMissingArguments(missing),
             location,
         ));
     }
@@ -367,7 +368,7 @@ pub(crate) fn string_dot_format_mixing_automatic(
 ) {
     if !(summary.autos.is_empty() || summary.indexes.is_empty()) {
         checker.checks.push(Check::new(
-            CheckKind::StringDotFormatMixingAutomatic,
+            violations::StringDotFormatMixingAutomatic,
             location,
         ));
     }

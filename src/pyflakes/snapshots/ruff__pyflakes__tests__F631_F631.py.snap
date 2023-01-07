@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: AssertTuple
+- kind:
+    AssertTuple: ~
   location:
     row: 1
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: AssertTuple
+- kind:
+    AssertTuple: ~
   location:
     row: 2
     column: 0

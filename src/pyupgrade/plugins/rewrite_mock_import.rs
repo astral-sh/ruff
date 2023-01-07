@@ -12,9 +12,10 @@ use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
-use crate::registry::{Check, CheckCode, CheckKind, MockReference};
+use crate::registry::{Check, CheckCode, MockReference};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::violations;
 
 /// Return a vector of all non-`mock` imports.
 fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Option<AsName>>) {
@@ -204,7 +205,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
         if collect_call_paths(value) == ["mock", "mock"] {
             let mut check = Check::new(
-                CheckKind::RewriteMockImport(MockReference::Attribute),
+                violations::RewriteMockImport(MockReference::Attribute),
                 Range::from_located(value),
             );
             if checker.patch(&CheckCode::UP026) {
@@ -246,7 +247,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 for name in names {
                     if name.node.name == "mock" || name.node.name == "mock.mock" {
                         let mut check = Check::new(
-                            CheckKind::RewriteMockImport(MockReference::Import),
+                            violations::RewriteMockImport(MockReference::Import),
                             Range::from_located(name),
                         );
                         if let Some(content) = content.as_ref() {
@@ -272,7 +273,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
 
             if module == "mock" {
                 let mut check = Check::new(
-                    CheckKind::RewriteMockImport(MockReference::Import),
+                    violations::RewriteMockImport(MockReference::Import),
                     Range::from_located(stmt),
                 );
                 if checker.patch(&CheckCode::UP026) {

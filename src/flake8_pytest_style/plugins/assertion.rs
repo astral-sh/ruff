@@ -1,12 +1,17 @@
 use rustpython_ast::{
-    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind, Unaryop,
+    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
 
 use super::helpers::is_falsy_constant;
+use super::unittest_assert::UnittestAssert;
+use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::registry::{Check, CheckKind};
+use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
+use crate::registry::Check;
+use crate::violations;
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
@@ -47,7 +52,7 @@ where
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
                         self.errors.push(Check::new(
-                            CheckKind::AssertInExcept(id.to_string()),
+                            violations::AssertInExcept(id.to_string()),
                             Range::from_located(current_assert),
                         ));
                     }
@@ -57,42 +62,6 @@ where
         }
     }
 }
-
-const UNITTEST_ASSERT_NAMES: &[&str] = &[
-    "assertAlmostEqual",
-    "assertAlmostEquals",
-    "assertDictEqual",
-    "assertEqual",
-    "assertEquals",
-    "assertFalse",
-    "assertGreater",
-    "assertGreaterEqual",
-    "assertIn",
-    "assertIs",
-    "assertIsInstance",
-    "assertIsNone",
-    "assertIsNot",
-    "assertIsNotNone",
-    "assertItemsEqual",
-    "assertLess",
-    "assertLessEqual",
-    "assertMultiLineEqual",
-    "assertNotAlmostEqual",
-    "assertNotAlmostEquals",
-    "assertNotContains",
-    "assertNotEqual",
-    "assertNotEquals",
-    "assertNotIn",
-    "assertNotIsInstance",
-    "assertNotRegexpMatches",
-    "assertRaises",
-    "assertRaisesMessage",
-    "assertRaisesRegexp",
-    "assertRegexpMatches",
-    "assertSetEqual",
-    "assertTrue",
-    "assert_",
-];
 
 /// Check if the test expression is a composite condition.
 /// For example, `a and b` or `not (a or b)`. The latter is equivalent
@@ -120,14 +89,30 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Check> {
 }
 
 /// PT009
-pub fn unittest_assertion(call: &Expr) -> Option<Check> {
-    match &call.node {
+pub fn unittest_assertion(
+    checker: &Checker,
+    call: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Check> {
+    match &func.node {
         ExprKind::Attribute { attr, .. } => {
-            if UNITTEST_ASSERT_NAMES.contains(&attr.as_str()) {
-                Some(Check::new(
-                    CheckKind::UnittestAssertion(attr.to_string()),
-                    Range::from_located(call),
-                ))
+            if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
+                let mut check = Check::new(
+                    violations::UnittestAssertion(unittest_assert.to_string()),
+                    Range::from_located(func),
+                );
+                if checker.patch(check.kind.code()) {
+                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+                        check.amend(Fix::replacement(
+                            unparse_stmt(&stmt, checker.style),
+                            call.location,
+                            call.end_location.unwrap(),
+                        ));
+                    }
+                }
+                Some(check)
             } else {
                 None
             }
@@ -140,7 +125,7 @@ pub fn unittest_assertion(call: &Expr) -> Option<Check> {
 pub fn assert_falsy(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Check> {
     if is_falsy_constant(test_expr) {
         Some(Check::new(
-            CheckKind::AssertAlwaysFalse,
+            violations::AssertAlwaysFalse,
             Range::from_located(assert_stmt),
         ))
     } else {
@@ -168,7 +153,7 @@ pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Check> {
 pub fn composite_condition(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Check> {
     if is_composite_condition(test_expr) {
         Some(Check::new(
-            CheckKind::CompositeAssertion,
+            violations::CompositeAssertion,
             Range::from_located(assert_stmt),
         ))
     } else {

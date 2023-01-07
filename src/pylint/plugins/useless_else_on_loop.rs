@@ -2,8 +2,7 @@ use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Check};
 
 fn loop_exits_early(body: &[Stmt]) -> bool {
     body.iter().any(|stmt| match &stmt.node {
@@ -34,7 +33,7 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
 pub fn useless_else_on_loop(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
     if !orelse.is_empty() && !loop_exits_early(body) {
         checker.checks.push(Check::new(
-            CheckKind::UselessElseOnLoop,
+            violations::UselessElseOnLoop,
             helpers::else_range(stmt, checker.locator).unwrap(),
         ));
     }

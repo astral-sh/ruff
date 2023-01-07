@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: AssignmentToOsEnviron
+- kind:
+    AssignmentToOsEnviron: ~
   location:
     row: 9
     column: 0

@@ -213,8 +213,9 @@ mod tests {
 
     use crate::ast::types::Range;
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
-    use crate::registry::{Check, CheckKind};
+    use crate::registry::Check;
     use crate::source_code_style::LineEnding;
+    use crate::violations;
 
     #[test]
     fn regex() {
@@ -247,7 +248,7 @@ mod tests {
         assert_eq!(output, format!("{contents}\n"));
 
         let checks = vec![Check::new(
-            CheckKind::UnusedVariable("x".to_string()),
+            violations::UnusedVariable("x".to_string()),
             Range::new(Location::new(1, 0), Location::new(1, 0)),
         )];
         let contents = "x = 1";
@@ -265,11 +266,11 @@ mod tests {
 
         let checks = vec![
             Check::new(
-                CheckKind::AmbiguousVariableName("x".to_string()),
+                violations::AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Check::new(
-                CheckKind::UnusedVariable("x".to_string()),
+                violations::UnusedVariable("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];
@@ -288,11 +289,11 @@ mod tests {
 
         let checks = vec![
             Check::new(
-                CheckKind::AmbiguousVariableName("x".to_string()),
+                violations::AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Check::new(
-                CheckKind::UnusedVariable("x".to_string()),
+                violations::UnusedVariable("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];

@@ -3,8 +3,9 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, Stmt
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::violations;
 
 fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::new(
@@ -45,7 +46,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
         return;
     };
 
-    let mut check = Check::new(CheckKind::DoNotAssertFalse, Range::from_located(test));
+    let mut check = Check::new(violations::DoNotAssertFalse, Range::from_located(test));
     if checker.patch(check.kind.code()) {
         let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_stmt(&assertion_error(msg));

@@ -2,7 +2,8 @@
 source: src/flake8_datetimez/mod.rs
 expression: checks
 ---
-- kind: CallDatetimeFromtimestamp
+- kind:
+    CallDatetimeFromtimestamp: ~
   location:
     row: 4
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 37
   fix: ~
   parent: ~
-- kind: CallDatetimeFromtimestamp
+- kind:
+    CallDatetimeFromtimestamp: ~
   location:
     row: 7
     column: 0
@@ -20,7 +22,8 @@ expression: checks
     column: 64
   fix: ~
   parent: ~
-- kind: CallDatetimeFromtimestamp
+- kind:
+    CallDatetimeFromtimestamp: ~
   location:
     row: 10
     column: 0
@@ -29,7 +32,8 @@ expression: checks
     column: 43
   fix: ~
   parent: ~
-- kind: CallDatetimeFromtimestamp
+- kind:
+    CallDatetimeFromtimestamp: ~
   location:
     row: 13
     column: 0
@@ -38,7 +42,8 @@ expression: checks
     column: 46
   fix: ~
   parent: ~
-- kind: CallDatetimeFromtimestamp
+- kind:
+    CallDatetimeFromtimestamp: ~
   location:
     row: 18
     column: 0

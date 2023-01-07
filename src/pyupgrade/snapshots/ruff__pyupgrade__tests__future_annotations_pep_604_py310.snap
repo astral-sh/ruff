@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: UsePEP604Annotation
+- kind:
+    UsePEP604Annotation: ~
   location:
     row: 40
     column: 3

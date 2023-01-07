@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: UsesRPrefixForBackslashedContent
+- kind:
+    UsesRPrefixForBackslashedContent: ~
   location:
     row: 328
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 16
   fix: ~
   parent: ~
-- kind: UsesRPrefixForBackslashedContent
+- kind:
+    UsesRPrefixForBackslashedContent: ~
   location:
     row: 333
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 20
   fix: ~
   parent: ~
-- kind: UsesRPrefixForBackslashedContent
+- kind:
+    UsesRPrefixForBackslashedContent: ~
   location:
     row: 338
     column: 4

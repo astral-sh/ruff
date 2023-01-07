@@ -8,7 +8,8 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
+use crate::violations;
 
 fn is_pytest_raises(
     func: &Expr,
@@ -33,7 +34,7 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
         if checker.settings.enabled.contains(&CheckCode::PT010) {
             if args.is_empty() && keywords.is_empty() {
                 checker.checks.push(Check::new(
-                    CheckKind::RaisesWithoutException,
+                    violations::RaisesWithoutException,
                     Range::from_located(func),
                 ));
             }
@@ -91,7 +92,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
 
         if is_too_complex {
             checker.checks.push(Check::new(
-                CheckKind::RaisesWithMultipleStatements,
+                violations::RaisesWithMultipleStatements,
                 Range::from_located(stmt),
             ));
         }
@@ -118,7 +119,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
 
     if is_broad_exception {
         checker.checks.push(Check::new(
-            CheckKind::RaisesTooBroad(call_path.join(".")),
+            violations::RaisesTooBroad(call_path.join(".")),
             Range::from_located(exception),
         ));
     }

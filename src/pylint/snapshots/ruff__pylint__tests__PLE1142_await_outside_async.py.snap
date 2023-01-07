@@ -2,7 +2,8 @@
 source: src/pylint/mod.rs
 expression: checks
 ---
-- kind: AwaitOutsideAsync
+- kind:
+    AwaitOutsideAsync: ~
   location:
     row: 12
     column: 10
@@ -11,7 +12,8 @@ expression: checks
     column: 24
   fix: ~
   parent: ~
-- kind: AwaitOutsideAsync
+- kind:
+    AwaitOutsideAsync: ~
   location:
     row: 25
     column: 8

@@ -1,7 +1,8 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// PD002
 pub fn inplace_argument(keywords: &[Keyword]) -> Option<Check> {
@@ -18,7 +19,7 @@ pub fn inplace_argument(keywords: &[Keyword]) -> Option<Check> {
             };
             if is_true_literal {
                 return Some(Check::new(
-                    CheckKind::UseOfInplaceArgument,
+                    violations::UseOfInplaceArgument,
                     Range::from_located(keyword),
                 ));
             }
@@ -33,7 +34,7 @@ pub fn use_of_pd_merge(func: &Expr) -> Option<Check> {
         if let ExprKind::Name { id, .. } = &value.node {
             if id == "pd" && attr == "merge" {
                 return Some(Check::new(
-                    CheckKind::UseOfPdMerge,
+                    violations::UseOfPdMerge,
                     Range::from_located(func),
                 ));
             }
@@ -55,7 +56,7 @@ pub fn assignment_to_df(targets: &[Expr]) -> Option<Check> {
         return None;
     }
     Some(Check::new(
-        CheckKind::DfIsABadVariableName,
+        violations::DfIsABadVariableName,
         Range::from_located(target),
     ))
 }

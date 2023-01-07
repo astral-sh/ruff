@@ -5,7 +5,8 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind, LiteralType};
+use crate::registry::{Check, CheckCode, LiteralType};
+use crate::violations;
 
 /// UP018
 pub fn native_literals(
@@ -23,7 +24,7 @@ pub fn native_literals(
 
     if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let mut check = Check::new(CheckKind::NativeLiterals(if id == "str" {
+            let mut check = Check::new(violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
@@ -92,7 +93,7 @@ pub fn native_literals(
         }
 
         let mut check = Check::new(
-            CheckKind::NativeLiterals(if id == "str" {
+            violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes

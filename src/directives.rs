@@ -104,6 +104,7 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
             continue;
         };
 
+        let comment_text = comment_text.trim_end();
         if comment_text == "# isort: split" {
             splits.push(start.row());
         } else if comment_text == "# isort: skip_file" {

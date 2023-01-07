@@ -4,7 +4,8 @@ use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Operator};
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 const MUTABLE_FUNCS: &[(&str, &str)] = &[
     ("", "dict"),
@@ -165,7 +166,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
             })
         {
             checker.checks.push(Check::new(
-                CheckKind::MutableArgumentDefault,
+                violations::MutableArgumentDefault,
                 Range::from_located(default),
             ));
         }

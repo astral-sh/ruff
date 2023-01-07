@@ -2,7 +2,8 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
+use crate::violations;
 
 /// EM101, EM102, EM103
 pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
@@ -17,7 +18,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                     if checker.settings.enabled.contains(&CheckCode::EM101) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
                             checker.checks.push(Check::new(
-                                CheckKind::RawStringInException,
+                                violations::RawStringInException,
                                 Range::from_located(first),
                             ));
                         }
@@ -27,7 +28,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                 ExprKind::JoinedStr { .. } => {
                     if checker.settings.enabled.contains(&CheckCode::EM102) {
                         checker.checks.push(Check::new(
-                            CheckKind::FStringInException,
+                            violations::FStringInException,
                             Range::from_located(first),
                         ));
                     }
@@ -38,7 +39,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                         if let ExprKind::Attribute { value, attr, .. } = &func.node {
                             if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
                                 checker.checks.push(Check::new(
-                                    CheckKind::DotFormatInException,
+                                    violations::DotFormatInException,
                                     Range::from_located(first),
                                 ));
                             }

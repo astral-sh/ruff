@@ -2,8 +2,7 @@ use rustpython_ast::Alias;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Check};
 
 /// PLR0402
 pub fn use_from_import(checker: &mut Checker, alias: &Alias) {
@@ -17,7 +16,7 @@ pub fn use_from_import(checker: &mut Checker, alias: &Alias) {
         return;
     }
     checker.checks.push(Check::new(
-        CheckKind::ConsiderUsingFromImport(module.to_string(), name.to_string()),
+        violations::ConsiderUsingFromImport(module.to_string(), name.to_string()),
         Range::from_located(alias),
     ));
 }

@@ -2,7 +2,8 @@ use rustpython_ast::{Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// SIM117
 pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt) {
@@ -14,7 +15,7 @@ pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt) {
     }
     if matches!(body[0].node, StmtKind::With { .. }) {
         checker.checks.push(Check::new(
-            CheckKind::MultipleWithStatements,
+            violations::MultipleWithStatements,
             Range::from_located(stmt),
         ));
     }

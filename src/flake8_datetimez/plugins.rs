@@ -5,7 +5,8 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 pub fn call_datetime_without_tzinfo(
     checker: &mut Checker,
@@ -23,7 +24,7 @@ pub fn call_datetime_without_tzinfo(
     if args.len() < 8 && !has_non_none_keyword(keywords, "tzinfo") {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
+            .push(Check::new(violations::CallDatetimeWithoutTzinfo, location));
         return;
     }
 
@@ -31,7 +32,7 @@ pub fn call_datetime_without_tzinfo(
     if args.len() >= 8 && is_const_none(&args[7]) {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDatetimeWithoutTzinfo, location));
+            .push(Check::new(violations::CallDatetimeWithoutTzinfo, location));
     }
 }
 
@@ -46,7 +47,7 @@ pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) 
     ) {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDatetimeToday, location));
+            .push(Check::new(violations::CallDatetimeToday, location));
     }
 }
 
@@ -61,7 +62,7 @@ pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range)
     ) {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDatetimeUtcnow, location));
+            .push(Check::new(violations::CallDatetimeUtcnow, location));
     }
 }
 
@@ -75,7 +76,7 @@ pub fn call_datetime_utcfromtimestamp(checker: &mut Checker, func: &Expr, locati
         &checker.from_imports,
     ) {
         checker.checks.push(Check::new(
-            CheckKind::CallDatetimeUtcfromtimestamp,
+            violations::CallDatetimeUtcfromtimestamp,
             location,
         ));
     }
@@ -102,7 +103,7 @@ pub fn call_datetime_now_without_tzinfo(
     // no args / no args unqualified
     if args.is_empty() && keywords.is_empty() {
         checker.checks.push(Check::new(
-            CheckKind::CallDatetimeNowWithoutTzinfo,
+            violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
         return;
@@ -111,7 +112,7 @@ pub fn call_datetime_now_without_tzinfo(
     // none args
     if !args.is_empty() && is_const_none(&args[0]) {
         checker.checks.push(Check::new(
-            CheckKind::CallDatetimeNowWithoutTzinfo,
+            violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
         return;
@@ -120,7 +121,7 @@ pub fn call_datetime_now_without_tzinfo(
     // wrong keywords / none keyword
     if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
         checker.checks.push(Check::new(
-            CheckKind::CallDatetimeNowWithoutTzinfo,
+            violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
     }
@@ -148,7 +149,7 @@ pub fn call_datetime_fromtimestamp(
     if args.len() < 2 && keywords.is_empty() {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDatetimeFromtimestamp, location));
+            .push(Check::new(violations::CallDatetimeFromtimestamp, location));
         return;
     }
 
@@ -156,7 +157,7 @@ pub fn call_datetime_fromtimestamp(
     if args.len() > 1 && is_const_none(&args[1]) {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDatetimeFromtimestamp, location));
+            .push(Check::new(violations::CallDatetimeFromtimestamp, location));
         return;
     }
 
@@ -164,7 +165,7 @@ pub fn call_datetime_fromtimestamp(
     if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDatetimeFromtimestamp, location));
+            .push(Check::new(violations::CallDatetimeFromtimestamp, location));
     }
 }
 
@@ -198,7 +199,7 @@ pub fn call_datetime_strptime_without_zone(
 
     let (Some(grandparent), Some(parent)) = (checker.current_expr_grandparent(), checker.current_expr_parent()) else {
         checker.checks.push(Check::new(
-            CheckKind::CallDatetimeStrptimeWithoutZone,
+            violations::CallDatetimeStrptimeWithoutZone,
             location,
         ));
         return;
@@ -221,7 +222,7 @@ pub fn call_datetime_strptime_without_zone(
     }
 
     checker.checks.push(Check::new(
-        CheckKind::CallDatetimeStrptimeWithoutZone,
+        violations::CallDatetimeStrptimeWithoutZone,
         location,
     ));
 }
@@ -232,7 +233,7 @@ pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
     if match_call_path(&call_path, "datetime.date", "today", &checker.from_imports) {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDateToday, location));
+            .push(Check::new(violations::CallDateToday, location));
     }
 }
 
@@ -247,6 +248,6 @@ pub fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: Ran
     ) {
         checker
             .checks
-            .push(Check::new(CheckKind::CallDateFromtimestamp, location));
+            .push(Check::new(violations::CallDateFromtimestamp, location));
     }
 }

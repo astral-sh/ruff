@@ -3,7 +3,8 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// SIM118
 fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
@@ -34,7 +35,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
         .slice_source_code_range(&Range::from_located(value));
 
     let mut check = Check::new(
-        CheckKind::KeyInDict(left_content.to_string(), value_content.to_string()),
+        violations::KeyInDict(left_content.to_string(), value_content.to_string()),
         range,
     );
     if checker.patch(check.kind.code()) {

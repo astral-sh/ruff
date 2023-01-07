@@ -4,6 +4,7 @@ use rustpython_parser::ast::{Constant, Expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::violations;
 
 const FUNC_NAME_ALLOWLIST: &[&str] = &[
     "assertEqual",
@@ -76,7 +77,7 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Argume
             continue;
         }
         checker.checks.push(Check::new(
-            CheckKind::BooleanPositionalArgInFunctionDefinition,
+            violations::BooleanPositionalArgInFunctionDefinition,
             Range::from_located(arg),
         ));
     }
@@ -90,7 +91,7 @@ pub fn check_boolean_default_value_in_function_definition(
         add_if_boolean(
             checker,
             arg,
-            CheckKind::BooleanDefaultValueInFunctionDefinition,
+            violations::BooleanDefaultValueInFunctionDefinition.into(),
         );
     }
 }
@@ -107,7 +108,7 @@ pub fn check_boolean_positional_value_in_function_call(
         add_if_boolean(
             checker,
             arg,
-            CheckKind::BooleanPositionalValueInFunctionCall,
+            violations::BooleanPositionalValueInFunctionCall.into(),
         );
     }
 }

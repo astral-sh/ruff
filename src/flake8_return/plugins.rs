@@ -8,8 +8,8 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::flake8_return::helpers::result_exists;
 use crate::flake8_return::visitor::{ReturnVisitor, Stack};
-use crate::registry::{Branch, CheckCode, CheckKind};
-use crate::Check;
+use crate::registry::{Branch, CheckCode};
+use crate::{violations, Check};
 
 /// RET501
 fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
@@ -26,7 +26,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         ) {
             continue;
         }
-        let mut check = Check::new(CheckKind::UnnecessaryReturnNone, Range::from_located(stmt));
+        let mut check = Check::new(violations::UnnecessaryReturnNone, Range::from_located(stmt));
         if checker.patch(&CheckCode::RET501) {
             check.amend(Fix::replacement(
                 "return".to_string(),
@@ -44,7 +44,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if expr.is_some() {
             continue;
         }
-        let mut check = Check::new(CheckKind::ImplicitReturnValue, Range::from_located(stmt));
+        let mut check = Check::new(violations::ImplicitReturnValue, Range::from_located(stmt));
         if checker.patch(&CheckCode::RET502) {
             check.amend(Fix::replacement(
                 "return None".to_string(),
@@ -62,7 +62,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         StmtKind::If { body, orelse, .. } => {
             if body.is_empty() || orelse.is_empty() {
                 checker.checks.push(Check::new(
-                    CheckKind::ImplicitReturn,
+                    violations::ImplicitReturn,
                     Range::from_located(last_stmt),
                 ));
                 return;
@@ -100,7 +100,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         | StmtKind::Raise { .. }
         | StmtKind::Try { .. } => {}
         _ => {
-            let mut check = Check::new(CheckKind::ImplicitReturn, Range::from_located(last_stmt));
+            let mut check = Check::new(violations::ImplicitReturn, Range::from_located(last_stmt));
             if checker.patch(&CheckCode::RET503) {
                 let mut content = String::new();
                 content.push_str(&indentation(checker, last_stmt));
@@ -191,7 +191,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
 
         if !stack.refs.contains_key(id.as_str()) {
             checker.checks.push(Check::new(
-                CheckKind::UnnecessaryAssign,
+                violations::UnnecessaryAssign,
                 Range::from_located(expr),
             ));
             return;
@@ -208,7 +208,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         }
 
         checker.checks.push(Check::new(
-            CheckKind::UnnecessaryAssign,
+            violations::UnnecessaryAssign,
             Range::from_located(expr),
         ));
     }
@@ -223,7 +223,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Return { .. }) {
             if checker.settings.enabled.contains(&CheckCode::RET505) {
                 checker.checks.push(Check::new(
-                    CheckKind::SuperfluousElseReturn(branch),
+                    violations::SuperfluousElseReturn(branch),
                     Range::from_located(stmt),
                 ));
             }
@@ -232,7 +232,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Break) {
             if checker.settings.enabled.contains(&CheckCode::RET508) {
                 checker.checks.push(Check::new(
-                    CheckKind::SuperfluousElseBreak(branch),
+                    violations::SuperfluousElseBreak(branch),
                     Range::from_located(stmt),
                 ));
             }
@@ -241,7 +241,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Raise { .. }) {
             if checker.settings.enabled.contains(&CheckCode::RET506) {
                 checker.checks.push(Check::new(
-                    CheckKind::SuperfluousElseRaise(branch),
+                    violations::SuperfluousElseRaise(branch),
                     Range::from_located(stmt),
                 ));
             }
@@ -250,7 +250,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Continue) {
             if checker.settings.enabled.contains(&CheckCode::RET507) {
                 checker.checks.push(Check::new(
-                    CheckKind::SuperfluousElseContinue(branch),
+                    violations::SuperfluousElseContinue(branch),
                     Range::from_located(stmt),
                 ));
             }

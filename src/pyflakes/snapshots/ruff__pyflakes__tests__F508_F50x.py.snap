@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: PercentFormatStarRequiresSequence
+- kind:
+    PercentFormatStarRequiresSequence: ~
   location:
     row: 11
     column: 0

@@ -2,7 +2,8 @@
 source: src/flake8_return/mod.rs
 expression: checks
 ---
-- kind: ImplicitReturnValue
+- kind:
+    ImplicitReturnValue: ~
   location:
     row: 3
     column: 8

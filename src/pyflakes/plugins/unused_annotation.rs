@@ -1,6 +1,7 @@
 use crate::ast::types::BindingKind;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// F842
 pub fn unused_annotation(checker: &mut Checker, scope: usize) {
@@ -15,7 +16,7 @@ pub fn unused_annotation(checker: &mut Checker, scope: usize) {
             && !checker.settings.dummy_variable_rgx.is_match(name)
         {
             checker.checks.push(Check::new(
-                CheckKind::UnusedAnnotation((*name).to_string()),
+                violations::UnusedAnnotation((*name).to_string()),
                 binding.range,
             ));
         }

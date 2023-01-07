@@ -5,7 +5,8 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 #[derive(Default)]
 struct NameFinder<'a> {
@@ -56,7 +57,7 @@ pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, it
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
             checker.checks.push(Check::new(
-                CheckKind::LoopVariableOverridesIterator(name.to_string()),
+                violations::LoopVariableOverridesIterator(name.to_string()),
                 Range::from_located(expr),
             ));
         }

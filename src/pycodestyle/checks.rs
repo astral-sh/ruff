@@ -7,9 +7,10 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 use crate::ast::helpers::except_range;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
 
@@ -43,7 +44,7 @@ pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<C
     }
 
     Some(Check::new(
-        CheckKind::LineTooLong(line_length, settings.line_length),
+        violations::LineTooLong(line_length, settings.line_length),
         Range::new(
             Location::new(lineno + 1, settings.line_length),
             Location::new(lineno + 1, line_length),
@@ -74,7 +75,7 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                                         kind: None
                                     }
                             ) {
-                                checks.push(Check::new(CheckKind::TypeComparison, location));
+                                checks.push(Check::new(violations::TypeComparison, location));
                             }
                         }
                     }
@@ -84,7 +85,7 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                 if let ExprKind::Name { id, .. } = &value.node {
                     // Ex) types.IntType
                     if id == "types" {
-                        checks.push(Check::new(CheckKind::TypeComparison, location));
+                        checks.push(Check::new(violations::TypeComparison, location));
                     }
                 }
             }
@@ -108,7 +109,7 @@ pub fn do_not_use_bare_except(
             .any(|stmt| matches!(stmt.node, StmtKind::Raise { exc: None, .. }))
     {
         Some(Check::new(
-            CheckKind::DoNotUseBareExcept,
+            violations::DoNotUseBareExcept,
             except_range(handler, locator),
         ))
     } else {
@@ -124,7 +125,7 @@ fn is_ambiguous_name(name: &str) -> bool {
 pub fn ambiguous_variable_name(name: &str, range: Range) -> Option<Check> {
     if is_ambiguous_name(name) {
         Some(Check::new(
-            CheckKind::AmbiguousVariableName(name.to_string()),
+            violations::AmbiguousVariableName(name.to_string()),
             range,
         ))
     } else {
@@ -139,7 +140,7 @@ where
 {
     if is_ambiguous_name(name) {
         Some(Check::new(
-            CheckKind::AmbiguousClassName(name.to_string()),
+            violations::AmbiguousClassName(name.to_string()),
             locate(),
         ))
     } else {
@@ -154,7 +155,7 @@ where
 {
     if is_ambiguous_name(name) {
         Some(Check::new(
-            CheckKind::AmbiguousFunctionName(name.to_string()),
+            violations::AmbiguousFunctionName(name.to_string()),
             locate(),
         ))
     } else {
@@ -171,7 +172,7 @@ pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Check>
             // Both locations are at the end of the file (and thus the same).
             let location = Location::new(contents.lines().count(), line.len());
             let mut check = Check::new(
-                CheckKind::NoNewLineAtEndOfFile,
+                violations::NoNewLineAtEndOfFile,
                 Range::new(location, location),
             );
             if autofix {
@@ -252,7 +253,7 @@ pub fn invalid_escape_sequence(
                 let location = Location::new(start.row() + row_offset, col);
                 let end_location = Location::new(location.row(), location.column() + 2);
                 let mut check = Check::new(
-                    CheckKind::InvalidEscapeSequence(next_char),
+                    violations::InvalidEscapeSequence(next_char),
                     Range::new(location, end_location),
                 );
                 if autofix {

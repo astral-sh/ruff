@@ -919,7 +919,7 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
 | PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
-| PT009 | UnittestAssertion | Use a regular `assert` instead of unittest-style `...` |  |
+| PT009 | UnittestAssertion | Use a regular `assert` instead of unittest-style `...` | 🛠 |
 | PT010 | RaisesWithoutException | set the expected exception in `pytest.raises()` |  |
 | PT011 | RaisesTooBroad | `pytest.raises(...)` is too broad, set the `match` parameter or use a more specific exception |  |
 | PT012 | RaisesWithMultipleStatements | `pytest.raises()` block should contain a single simple statement |  |
@@ -985,7 +985,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM208 | DoubleNegation | Use `expr` instead of `not (not expr)` | 🛠 |
 | SIM210 | IfExprWithTrueFalse | Use `bool(expr)` instead of `True if expr else False` | 🛠 |
 | SIM211 | IfExprWithFalseTrue | Use `not expr` instead of `False if expr else True` | 🛠 |
-| SIM212 | IfExprWithTwistedArms | Use `expr2 if expr2 else expr1` instead of `expr1 if not expr2 else expr2` | 🛠 |
+| SIM212 | IfExprWithTwistedArms | Use `body if body else else` instead of `else if not body else body` | 🛠 |
 | SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |

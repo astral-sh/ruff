@@ -4,7 +4,8 @@ use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
+use crate::violations;
 
 fn pytest_mark_parentheses(
     checker: &mut Checker,
@@ -14,7 +15,7 @@ fn pytest_mark_parentheses(
     actual: &str,
 ) {
     let mut check = Check::new(
-        CheckKind::IncorrectMarkParenthesesStyle(
+        violations::IncorrectMarkParenthesesStyle(
             get_mark_name(decorator).to_string(),
             preferred.to_string(),
             actual.to_string(),
@@ -71,7 +72,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
 
     if !has_parameters {
         let mut check = Check::new(
-            CheckKind::UseFixturesWithoutParameters,
+            violations::UseFixturesWithoutParameters,
             Range::from_located(decorator),
         );
         if checker.patch(check.kind.code()) {

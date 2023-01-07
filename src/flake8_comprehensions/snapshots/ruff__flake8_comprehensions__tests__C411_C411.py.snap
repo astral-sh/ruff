@@ -2,7 +2,8 @@
 source: src/flake8_comprehensions/mod.rs
 expression: checks
 ---
-- kind: UnnecessaryListCall
+- kind:
+    UnnecessaryListCall: ~
   location:
     row: 2
     column: 0

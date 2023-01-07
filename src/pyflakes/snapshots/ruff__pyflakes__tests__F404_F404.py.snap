@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: LateFutureImport
+- kind:
+    LateFutureImport: ~
   location:
     row: 6
     column: 0

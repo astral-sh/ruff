@@ -3,8 +3,9 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::violations;
 
 /// B013
 pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[Excepthandler]) {
@@ -19,7 +20,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             continue;
         };
         let mut check = Check::new(
-            CheckKind::RedundantTupleInExceptionHandler(elt.to_string()),
+            violations::RedundantTupleInExceptionHandler(elt.to_string()),
             Range::from_located(type_),
         );
         if checker.patch(check.kind.code()) {

@@ -5,7 +5,8 @@ use crate::ast::helpers::{collect_call_paths, dealias_call_path, is_const_none, 
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// T201, T203
 pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
@@ -27,9 +28,9 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                     }
                 }
             }
-            Check::new(CheckKind::PrintFound, Range::from_located(func))
+            Check::new(violations::PrintFound, Range::from_located(func))
         } else if match_call_path(&call_path, "pprint", "pprint", &checker.from_imports) {
-            Check::new(CheckKind::PPrintFound, Range::from_located(func))
+            Check::new(violations::PPrintFound, Range::from_located(func))
         } else {
             return;
         }

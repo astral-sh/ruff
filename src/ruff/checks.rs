@@ -7,7 +7,7 @@ use crate::autofix::Fix;
 use crate::registry::CheckKind;
 use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::{Check, Settings};
+use crate::{violations, Check, Settings};
 
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
 static CONFUSABLES: Lazy<FxHashMap<u32, u32>> = Lazy::new(|| {
@@ -1630,20 +1630,23 @@ pub fn ambiguous_unicode_character(
                     };
                     let location = Location::new(start.row() + row_offset, col);
                     let end_location = Location::new(location.row(), location.column() + 1);
-                    let mut check = Check::new(
+                    let mut check = Check::new::<CheckKind>(
                         match context {
-                            Context::String => CheckKind::AmbiguousUnicodeCharacterString(
+                            Context::String => violations::AmbiguousUnicodeCharacterString(
                                 current_char,
                                 representant,
-                            ),
-                            Context::Docstring => CheckKind::AmbiguousUnicodeCharacterDocstring(
+                            )
+                            .into(),
+                            Context::Docstring => violations::AmbiguousUnicodeCharacterDocstring(
                                 current_char,
                                 representant,
-                            ),
-                            Context::Comment => CheckKind::AmbiguousUnicodeCharacterComment(
+                            )
+                            .into(),
+                            Context::Comment => violations::AmbiguousUnicodeCharacterComment(
                                 current_char,
                                 representant,
-                            ),
+                            )
+                            .into(),
                         },
                         Range::new(location, end_location),
                     );
@@ -1687,7 +1690,7 @@ pub fn keyword_argument_before_star_argument(args: &[Expr], keywords: &[Keyword]
                 let KeywordData { arg, .. } = &keyword.node;
                 if let Some(arg) = arg {
                     checks.push(Check::new(
-                        CheckKind::KeywordArgumentBeforeStarArgument(arg.to_string()),
+                        violations::KeywordArgumentBeforeStarArgument(arg.to_string()),
                         Range::from_located(keyword),
                     ));
                 }

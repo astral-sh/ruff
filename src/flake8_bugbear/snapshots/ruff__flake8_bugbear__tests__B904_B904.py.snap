@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: RaiseWithoutFromInsideExcept
+- kind:
+    RaiseWithoutFromInsideExcept: ~
   location:
     row: 10
     column: 8
@@ -11,7 +12,8 @@ expression: checks
     column: 23
   fix: ~
   parent: ~
-- kind: RaiseWithoutFromInsideExcept
+- kind:
+    RaiseWithoutFromInsideExcept: ~
   location:
     row: 11
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 21
   fix: ~
   parent: ~
-- kind: RaiseWithoutFromInsideExcept
+- kind:
+    RaiseWithoutFromInsideExcept: ~
   location:
     row: 16
     column: 4

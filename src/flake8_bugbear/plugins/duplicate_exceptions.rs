@@ -6,8 +6,9 @@ use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::violations;
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
     Expr::new(
@@ -44,7 +45,7 @@ fn duplicate_handler_exceptions<'a>(
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut check = Check::new(
-                CheckKind::DuplicateHandlerException(
+                violations::DuplicateHandlerException(
                     duplicates
                         .into_iter()
                         .map(|call_path| call_path.join("."))
@@ -108,7 +109,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
         for (name, exprs) in duplicates {
             for expr in exprs {
                 checker.checks.push(Check::new(
-                    CheckKind::DuplicateTryBlockException(name.join(".")),
+                    violations::DuplicateTryBlockException(name.join(".")),
                     Range::from_located(expr),
                 ));
             }

@@ -10,7 +10,8 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
+use crate::violations;
 
 #[derive(Default)]
 /// Visitor that skips functions
@@ -79,7 +80,7 @@ fn pytest_fixture_parentheses(
     actual: &str,
 ) {
     let mut check = Check::new(
-        CheckKind::IncorrectFixtureParenthesesStyle(preferred.to_string(), actual.to_string()),
+        violations::IncorrectFixtureParenthesesStyle(preferred.to_string(), actual.to_string()),
         Range::from_located(decorator),
     );
     if checker.patch(check.kind.code()) {
@@ -112,7 +113,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
 
             if checker.settings.enabled.contains(&CheckCode::PT002) && !args.is_empty() {
                 checker.checks.push(Check::new(
-                    CheckKind::FixturePositionalArgs(func_name.to_string()),
+                    violations::FixturePositionalArgs(func_name.to_string()),
                     Range::from_located(decorator),
                 ));
             }
@@ -125,7 +126,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 if let Some(scope_keyword) = scope_keyword {
                     if keyword_is_literal(scope_keyword, "function") {
                         checker.checks.push(Check::new(
-                            CheckKind::ExtraneousScopeFunction,
+                            violations::ExtraneousScopeFunction,
                             Range::from_located(scope_keyword),
                         ));
                     }
@@ -156,7 +157,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && func_name.starts_with('_')
     {
         checker.checks.push(Check::new(
-            CheckKind::IncorrectFixtureNameUnderscore(func_name.to_string()),
+            violations::IncorrectFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
         ));
     } else if checker.settings.enabled.contains(&CheckCode::PT004)
@@ -165,7 +166,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && !func_name.starts_with('_')
     {
         checker.checks.push(Check::new(
-            CheckKind::MissingFixtureNameUnderscore(func_name.to_string()),
+            violations::MissingFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
         ));
     }
@@ -176,7 +177,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                 if let ExprKind::Yield { .. } = value.node {
                     if visitor.yield_statements.len() == 1 {
                         let mut check = Check::new(
-                            CheckKind::UselessYieldFixture(func_name.to_string()),
+                            violations::UselessYieldFixture(func_name.to_string()),
                             Range::from_located(stmt),
                         );
                         if checker.patch(check.kind.code()) {
@@ -203,7 +204,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
         let name = arg.node.arg.to_string();
         if name.starts_with('_') {
             checker.checks.push(Check::new(
-                CheckKind::FixtureParamWithoutValue(name),
+                violations::FixtureParamWithoutValue(name),
                 Range::from_located(arg),
             ));
         }
@@ -214,7 +215,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
 fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
     if is_pytest_yield_fixture(decorator, checker) {
         checker.checks.push(Check::new(
-            CheckKind::DeprecatedYieldFixture,
+            violations::DeprecatedYieldFixture,
             Range::from_located(decorator),
         ));
     }
@@ -234,7 +235,7 @@ fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[S
 
     if let Some(addfinalizer) = visitor.addfinalizer_call {
         checker.checks.push(Check::new(
-            CheckKind::FixtureFinalizerCallback,
+            violations::FixtureFinalizerCallback,
             Range::from_located(addfinalizer),
         ));
     }
@@ -248,7 +249,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
         if checker.settings.enabled.contains(&CheckCode::PT024) {
             if name == "asyncio" {
                 checker.checks.push(Check::new(
-                    CheckKind::UnnecessaryAsyncioMarkOnFixture,
+                    violations::UnnecessaryAsyncioMarkOnFixture,
                     Range::from_located(mark),
                 ));
             }
@@ -257,7 +258,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
         if checker.settings.enabled.contains(&CheckCode::PT025) {
             if name == "usefixtures" {
                 checker.checks.push(Check::new(
-                    CheckKind::ErroneousUseFixturesOnFixture,
+                    violations::ErroneousUseFixturesOnFixture,
                     Range::from_located(mark),
                 ));
             }

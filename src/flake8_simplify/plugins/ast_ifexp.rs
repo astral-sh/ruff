@@ -4,7 +4,8 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// SIM210
 pub fn explicit_true_false_in_ifexpr(
@@ -28,7 +29,7 @@ pub fn explicit_true_false_in_ifexpr(
     }
 
     let mut check = Check::new(
-        CheckKind::IfExprWithTrueFalse(unparse_expr(test, checker.style)),
+        violations::IfExprWithTrueFalse(unparse_expr(test, checker.style)),
         Range::from_located(expr),
     );
     if checker.patch(check.kind.code()) {
@@ -73,7 +74,7 @@ pub fn explicit_false_true_in_ifexpr(
     }
 
     let mut check = Check::new(
-        CheckKind::IfExprWithFalseTrue(unparse_expr(test, checker.style)),
+        violations::IfExprWithFalseTrue(unparse_expr(test, checker.style)),
         Range::from_located(expr),
     );
     if checker.patch(check.kind.code()) {
@@ -118,7 +119,7 @@ pub fn twisted_arms_in_ifexpr(
     }
 
     let mut check = Check::new(
-        CheckKind::NegateEqualOp(
+        violations::NegateEqualOp(
             unparse_expr(body, checker.style),
             unparse_expr(orelse, checker.style),
         ),

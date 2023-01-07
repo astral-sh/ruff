@@ -2,7 +2,8 @@ use rustc_hash::FxHashMap;
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// ICN001
 pub fn check_conventional_import(
@@ -24,7 +25,7 @@ pub fn check_conventional_import(
         }
         if !is_valid_import {
             return Some(Check::new(
-                CheckKind::ImportAliasIsNotConventional(
+                violations::ImportAliasIsNotConventional(
                     name.to_string(),
                     expected_alias.to_string(),
                 ),

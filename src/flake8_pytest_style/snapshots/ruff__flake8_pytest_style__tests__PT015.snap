@@ -2,7 +2,8 @@
 source: src/flake8_pytest_style/mod.rs
 expression: checks
 ---
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 9
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 15
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 10
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 16
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 11
     column: 4
@@ -29,7 +32,8 @@ expression: checks
     column: 12
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 12
     column: 4
@@ -38,7 +42,8 @@ expression: checks
     column: 14
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 13
     column: 4
@@ -47,7 +52,8 @@ expression: checks
     column: 13
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 14
     column: 4
@@ -56,7 +62,8 @@ expression: checks
     column: 14
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 15
     column: 4
@@ -65,7 +72,8 @@ expression: checks
     column: 13
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 16
     column: 4
@@ -74,7 +82,8 @@ expression: checks
     column: 13
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 17
     column: 4
@@ -83,7 +92,8 @@ expression: checks
     column: 13
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 18
     column: 4
@@ -92,7 +102,8 @@ expression: checks
     column: 17
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 19
     column: 4
@@ -101,7 +112,8 @@ expression: checks
     column: 16
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 20
     column: 4
@@ -110,7 +122,8 @@ expression: checks
     column: 18
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 21
     column: 4
@@ -119,7 +132,8 @@ expression: checks
     column: 17
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 22
     column: 4
@@ -128,7 +142,8 @@ expression: checks
     column: 22
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 23
     column: 4
@@ -137,7 +152,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 24
     column: 4
@@ -146,7 +162,8 @@ expression: checks
     column: 21
   fix: ~
   parent: ~
-- kind: AssertAlwaysFalse
+- kind:
+    AssertAlwaysFalse: ~
   location:
     row: 25
     column: 4

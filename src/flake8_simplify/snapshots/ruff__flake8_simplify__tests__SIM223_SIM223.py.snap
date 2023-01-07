@@ -2,7 +2,8 @@
 source: src/flake8_simplify/mod.rs
 expression: checks
 ---
-- kind: AndFalse
+- kind:
+    AndFalse: ~
   location:
     row: 1
     column: 9
@@ -18,7 +19,8 @@ expression: checks
       row: 1
       column: 14
   parent: ~
-- kind: AndFalse
+- kind:
+    AndFalse: ~
   location:
     row: 4
     column: 16
@@ -34,7 +36,8 @@ expression: checks
       row: 4
       column: 21
   parent: ~
-- kind: AndFalse
+- kind:
+    AndFalse: ~
   location:
     row: 7
     column: 15

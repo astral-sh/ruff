@@ -2,7 +2,8 @@ use rustpython_ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// B905
 pub fn zip_without_explicit_strict(
@@ -23,7 +24,7 @@ pub fn zip_without_explicit_strict(
             })
         {
             checker.checks.push(Check::new(
-                CheckKind::ZipWithoutExplicitStrict,
+                violations::ZipWithoutExplicitStrict,
                 Range::from_located(expr),
             ));
         }

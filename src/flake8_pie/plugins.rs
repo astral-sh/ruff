@@ -6,7 +6,8 @@ use crate::ast::types::Range;
 use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
+use crate::violations;
 
 /// PIE790
 pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
@@ -26,8 +27,10 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             }
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
-                let mut check =
-                    Check::new(CheckKind::NoUnnecessaryPass, Range::from_located(pass_stmt));
+                let mut check = Check::new(
+                    violations::NoUnnecessaryPass,
+                    Range::from_located(pass_stmt),
+                );
                 if checker.patch(&CheckCode::PIE790) {
                     match delete_stmt(pass_stmt, None, &[], checker.locator) {
                         Ok(fix) => {
@@ -76,7 +79,7 @@ pub fn dupe_class_field_definitions(checker: &mut Checker, bases: &[Expr], body:
 
         if seen_targets.contains(target) {
             let mut check = Check::new(
-                CheckKind::DupeClassFieldDefinitions(target.to_string()),
+                violations::DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
             if checker.patch(&CheckCode::PIE794) {
@@ -97,7 +100,8 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     if args.args.is_empty() {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
-                let mut check = Check::new(CheckKind::PreferListBuiltin, Range::from_located(expr));
+                let mut check =
+                    Check::new(violations::PreferListBuiltin, Range::from_located(expr));
                 if checker.patch(&CheckCode::PIE807) {
                     check.amend(Fix::replacement(
                         "list".to_string(),

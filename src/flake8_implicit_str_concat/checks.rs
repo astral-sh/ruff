@@ -3,8 +3,9 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 /// ISC001, ISC002
 pub fn implicit(tokens: &[LexResult], locator: &SourceCodeLocator) -> Vec<Check> {
@@ -15,7 +16,7 @@ pub fn implicit(tokens: &[LexResult], locator: &SourceCodeLocator) -> Vec<Check>
         if matches!(a_tok, Tok::String { .. }) && matches!(b_tok, Tok::String { .. }) {
             if a_end.row() == b_start.row() {
                 checks.push(Check::new(
-                    CheckKind::SingleLineImplicitStringConcatenation,
+                    violations::SingleLineImplicitStringConcatenation,
                     Range {
                         location: *a_start,
                         end_location: *b_end,
@@ -30,7 +31,7 @@ pub fn implicit(tokens: &[LexResult], locator: &SourceCodeLocator) -> Vec<Check>
                 });
                 if contents.trim_end().ends_with('\\') {
                     checks.push(Check::new(
-                        CheckKind::MultiLineImplicitStringConcatenation,
+                        violations::MultiLineImplicitStringConcatenation,
                         Range {
                             location: *a_start,
                             end_location: *b_end,
@@ -63,7 +64,7 @@ pub fn explicit(expr: &Expr) -> Option<Check> {
                     }
             ) {
                 return Some(Check::new(
-                    CheckKind::ExplicitStringConcatenation,
+                    violations::ExplicitStringConcatenation,
                     Range::from_located(expr),
                 ));
             }

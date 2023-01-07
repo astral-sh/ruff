@@ -4,10 +4,10 @@ use crate::ast::helpers::{collect_call_paths, create_expr, create_stmt, dealias_
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::SourceCodeLocator;
+use crate::{violations, SourceCodeLocator};
 
 /// Return `true` if the `Expr` is a reference to `${module}.${any}`.
 fn is_module_member(call_path: &[&str], module: &str) -> bool {
@@ -35,7 +35,7 @@ fn map_name(name: &str, expr: &Expr, patch: bool) -> Option<Check> {
         _ => None,
     };
     if let Some(replacement) = replacement {
-        let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
+        let mut check = Check::new(violations::RemoveSixCompat, Range::from_located(expr));
         if patch {
             check.amend(Fix::replacement(
                 replacement.to_string(),
@@ -58,7 +58,7 @@ fn replace_by_str_literal(
 ) -> Option<Check> {
     match &arg.node {
         ExprKind::Constant { .. } => {
-            let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
+            let mut check = Check::new(violations::RemoveSixCompat, Range::from_located(expr));
             if patch {
                 let content = format!(
                     "{}{}",
@@ -132,7 +132,7 @@ fn replace_by_expr_kind(
     patch: bool,
     stylist: &SourceCodeStyleDetector,
 ) -> Check {
-    let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
+    let mut check = Check::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
         let mut generator: SourceCodeGenerator = stylist.into();
         generator.unparse_expr(&create_expr(node), 0);
@@ -151,7 +151,7 @@ fn replace_by_stmt_kind(
     patch: bool,
     stylist: &SourceCodeStyleDetector,
 ) -> Check {
-    let mut check = Check::new(CheckKind::RemoveSixCompat, Range::from_located(expr));
+    let mut check = Check::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
         let mut generator: SourceCodeGenerator = stylist.into();
         generator.unparse_stmt(&create_stmt(node));

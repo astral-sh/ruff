@@ -2,7 +2,8 @@
 source: src/pycodestyle/mod.rs
 expression: checks
 ---
-- kind: NoNewLineAtEndOfFile
+- kind:
+    NoNewLineAtEndOfFile: ~
   location:
     row: 2
     column: 8

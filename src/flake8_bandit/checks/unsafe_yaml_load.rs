@@ -3,7 +3,8 @@ use rustpython_ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::{match_module_member, SimpleCallArgs};
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 /// S506
 pub fn unsafe_yaml_load(
@@ -35,13 +36,13 @@ pub fn unsafe_yaml_load(
                     _ => None,
                 };
                 return Some(Check::new(
-                    CheckKind::UnsafeYAMLLoad(loader),
+                    violations::UnsafeYAMLLoad(loader),
                     Range::from_located(loader_arg),
                 ));
             }
         } else {
             return Some(Check::new(
-                CheckKind::UnsafeYAMLLoad(None),
+                violations::UnsafeYAMLLoad(None),
                 Range::from_located(func),
             ));
         }

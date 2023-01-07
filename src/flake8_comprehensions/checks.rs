@@ -6,8 +6,9 @@ use rustpython_ast::{
 
 use crate::ast::types::Range;
 use crate::flake8_comprehensions::fixes;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 fn function_name(func: &Expr) -> Option<&str> {
     if let ExprKind::Name { id, .. } = &func.node {
@@ -58,7 +59,7 @@ pub fn unnecessary_generator_list(
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("list", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut check = Check::new(CheckKind::UnnecessaryGeneratorList, location);
+        let mut check = Check::new(violations::UnnecessaryGeneratorList, location);
         if fix {
             match fixes::fix_unnecessary_generator_list(locator, expr) {
                 Ok(fix) => {
@@ -84,7 +85,7 @@ pub fn unnecessary_generator_set(
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut check = Check::new(CheckKind::UnnecessaryGeneratorSet, location);
+        let mut check = Check::new(violations::UnnecessaryGeneratorSet, location);
         if fix {
             match fixes::fix_unnecessary_generator_set(locator, expr) {
                 Ok(fix) => {
@@ -112,7 +113,7 @@ pub fn unnecessary_generator_dict(
     if let ExprKind::GeneratorExp { elt, .. } = argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                let mut check = Check::new(CheckKind::UnnecessaryGeneratorDict, location);
+                let mut check = Check::new(violations::UnnecessaryGeneratorDict, location);
                 if fix {
                     match fixes::fix_unnecessary_generator_dict(locator, expr) {
                         Ok(fix) => {
@@ -141,7 +142,7 @@ pub fn unnecessary_list_comprehension_set(
 ) -> Option<Check> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::ListComp { .. } = &argument {
-        let mut check = Check::new(CheckKind::UnnecessaryListComprehensionSet, location);
+        let mut check = Check::new(violations::UnnecessaryListComprehensionSet, location);
         if fix {
             match fixes::fix_unnecessary_list_comprehension_set(locator, expr) {
                 Ok(fix) => {
@@ -175,7 +176,7 @@ pub fn unnecessary_list_comprehension_dict(
     if elts.len() != 2 {
         return None;
     }
-    let mut check = Check::new(CheckKind::UnnecessaryListComprehensionDict, location);
+    let mut check = Check::new(violations::UnnecessaryListComprehensionDict, location);
     if fix {
         match fixes::fix_unnecessary_list_comprehension_dict(locator, expr) {
             Ok(fix) => {
@@ -203,7 +204,10 @@ pub fn unnecessary_literal_set(
         ExprKind::Tuple { .. } => "tuple",
         _ => return None,
     };
-    let mut check = Check::new(CheckKind::UnnecessaryLiteralSet(kind.to_string()), location);
+    let mut check = Check::new(
+        violations::UnnecessaryLiteralSet(kind.to_string()),
+        location,
+    );
     if fix {
         match fixes::fix_unnecessary_literal_set(locator, expr) {
             Ok(fix) => {
@@ -239,7 +243,7 @@ pub fn unnecessary_literal_dict(
         return None;
     }
     let mut check = Check::new(
-        CheckKind::UnnecessaryLiteralDict(kind.to_string()),
+        violations::UnnecessaryLiteralDict(kind.to_string()),
         location,
     );
     if fix {
@@ -277,7 +281,7 @@ pub fn unnecessary_collection_call(
         _ => return None,
     };
     let mut check = Check::new(
-        CheckKind::UnnecessaryCollectionCall(id.to_string()),
+        violations::UnnecessaryCollectionCall(id.to_string()),
         location,
     );
     if fix {
@@ -307,7 +311,7 @@ pub fn unnecessary_literal_within_tuple_call(
         _ => return None,
     };
     let mut check = Check::new(
-        CheckKind::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
+        violations::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
         location,
     );
     if fix {
@@ -337,7 +341,7 @@ pub fn unnecessary_literal_within_list_call(
         _ => return None,
     };
     let mut check = Check::new(
-        CheckKind::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
+        violations::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
         location,
     );
     if fix {
@@ -364,7 +368,7 @@ pub fn unnecessary_list_call(
     if !matches!(argument, ExprKind::ListComp { .. }) {
         return None;
     }
-    let mut check = Check::new(CheckKind::UnnecessaryListCall, location);
+    let mut check = Check::new(violations::UnnecessaryListCall, location);
     if fix {
         match fixes::fix_unnecessary_list_call(locator, expr) {
             Ok(fix) => {
@@ -397,7 +401,7 @@ pub fn unnecessary_call_around_sorted(
     }
 
     let mut check = Check::new(
-        CheckKind::UnnecessaryCallAroundSorted(outer.to_string()),
+        violations::UnnecessaryCallAroundSorted(outer.to_string()),
         location,
     );
     if fix {
@@ -419,7 +423,7 @@ pub fn unnecessary_double_cast_or_process(
 ) -> Option<Check> {
     fn new_check(inner: &str, outer: &str, location: Range) -> Check {
         Check::new(
-            CheckKind::UnnecessaryDoubleCastOrProcess(inner.to_string(), outer.to_string()),
+            violations::UnnecessaryDoubleCastOrProcess(inner.to_string(), outer.to_string()),
             location,
         )
     }
@@ -490,7 +494,7 @@ pub fn unnecessary_subscript_reversal(
         return None;
     };
     Some(Check::new(
-        CheckKind::UnnecessarySubscriptReversal(id.to_string()),
+        violations::UnnecessarySubscriptReversal(id.to_string()),
         location,
     ))
 }
@@ -522,7 +526,7 @@ pub fn unnecessary_comprehension(
         _ => return None,
     };
     let mut check = Check::new(
-        CheckKind::UnnecessaryComprehension(expr_kind.to_string()),
+        violations::UnnecessaryComprehension(expr_kind.to_string()),
         location,
     );
     if fix {
@@ -539,7 +543,7 @@ pub fn unnecessary_comprehension(
 /// C417
 pub fn unnecessary_map(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
     fn new_check(kind: &str, location: Range) -> Check {
-        Check::new(CheckKind::UnnecessaryMap(kind.to_string()), location)
+        Check::new(violations::UnnecessaryMap(kind.to_string()), location)
     }
     let id = function_name(func)?;
     match id {

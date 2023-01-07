@@ -2,7 +2,8 @@
 source: src/flake8_implicit_str_concat/mod.rs
 expression: checks
 ---
-- kind: SingleLineImplicitStringConcatenation
+- kind:
+    SingleLineImplicitStringConcatenation: ~
   location:
     row: 1
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: SingleLineImplicitStringConcatenation
+- kind:
+    SingleLineImplicitStringConcatenation: ~
   location:
     row: 1
     column: 8

@@ -5,7 +5,8 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
+use crate::violations;
 
 #[derive(Debug)]
 struct MiddleContent<'a> {
@@ -74,7 +75,7 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
             return;
         }
 
-        let mut check = Check::new(CheckKind::ReplaceStdoutStderr, Range::from_located(expr));
+        let mut check = Check::new(violations::ReplaceStdoutStderr, Range::from_located(expr));
         if checker.patch(check.kind.code()) {
             let first = if stdout.location < stderr.location {
                 stdout
