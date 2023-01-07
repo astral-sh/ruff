@@ -169,11 +169,8 @@ mod tests {
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = SourceCodeLocator::new(&contents);
         let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
-        let directives = directives::extract_directives(
-            &tokens,
-            &locator,
-            directives::Flags::from_settings(&settings),
-        );
+        let directives =
+            directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
         let mut checks = check_path(
             Path::new("<filename>"),
             None,

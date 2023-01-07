@@ -20,7 +20,10 @@ pub fn trailing_comma(stmt: &Stmt, locator: &SourceCodeLocator) -> TrailingComma
             count -= 1;
         }
         if count == 1 {
-            if matches!(tok, Tok::Newline | Tok::Indent | Tok::Dedent | Tok::Comment) {
+            if matches!(
+                tok,
+                Tok::Newline | Tok::Indent | Tok::Dedent | Tok::Comment(_)
+            ) {
                 continue;
             } else if matches!(tok, Tok::Comma) {
                 trailing_comma = TrailingComma::Present;

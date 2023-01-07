@@ -155,7 +155,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(&tokens, &locator, directives::Flags::empty());
+    let directives = directives::extract_directives(&tokens, directives::Flags::empty());
 
     // Generate checks.
     let checks = check_path(
