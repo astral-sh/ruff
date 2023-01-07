@@ -1,6 +1,8 @@
 use rustc_hash::FxHashMap;
 use rustpython_ast::ExprContext::Load;
-use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Keyword, Location, Stmt, StmtKind, Unaryop};
+use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop};
+
+use crate::ast::helpers::{create_expr, create_stmt};
 
 pub enum UnittestAssert {
     AlmostEqual,
@@ -128,26 +130,18 @@ impl TryFrom<&str> for UnittestAssert {
 }
 
 fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
-    Stmt::new(
-        Location::default(),
-        Location::default(),
-        StmtKind::Assert {
-            test: Box::new(expr.clone()),
-            msg: msg.map(|msg| Box::new(msg.clone())),
-        },
-    )
+    create_stmt(StmtKind::Assert {
+        test: Box::new(expr.clone()),
+        msg: msg.map(|msg| Box::new(msg.clone())),
+    })
 }
 
 fn compare(left: &Expr, cmpop: Cmpop, right: &Expr) -> Expr {
-    Expr::new(
-        Location::default(),
-        Location::default(),
-        ExprKind::Compare {
-            left: Box::new(left.clone()),
-            ops: vec![cmpop],
-            comparators: vec![right.clone()],
-        },
-    )
+    create_expr(ExprKind::Compare {
+        left: Box::new(left.clone()),
+        ops: vec![cmpop],
+        comparators: vec![right.clone()],
+    })
 }
 
 pub struct Arguments<'a> {
@@ -242,19 +236,15 @@ impl UnittestAssert {
     }
 
     pub fn generate_assert(&self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt, String> {
+        let args = self.arg_hashmap(args, keywords)?;
         match self {
             UnittestAssert::True | UnittestAssert::False => {
-                let args = self.arg_hashmap(args, keywords)?;
                 let expr = args.get("expr").ok_or("Missing argument `expr`")?;
                 let msg = args.get("msg").copied();
-                let bool = Expr::new(
-                    Location::default(),
-                    Location::default(),
-                    ExprKind::Constant {
-                        value: Constant::Bool(matches!(self, UnittestAssert::True)),
-                        kind: None,
-                    },
-                );
+                let bool = create_expr(ExprKind::Constant {
+                    value: Constant::Bool(matches!(self, UnittestAssert::True)),
+                    kind: None,
+                });
                 let expr = compare(expr, Cmpop::Is, &bool);
                 Ok(assert(&expr, msg))
             }
@@ -266,7 +256,6 @@ impl UnittestAssert {
             | UnittestAssert::GreaterEqual
             | UnittestAssert::Less
             | UnittestAssert::LessEqual => {
-                let args = self.arg_hashmap(args, keywords)?;
                 let first = args.get("first").ok_or("Missing argument `first`")?;
                 let second = args.get("second").ok_or("Missing argument `second`")?;
                 let msg = args.get("msg").copied();
@@ -283,7 +272,6 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::Is | UnittestAssert::IsNot => {
-                let args = self.arg_hashmap(args, keywords)?;
                 let expr1 = args.get("expr1").ok_or("Missing argument `expr1`")?;
                 let expr2 = args.get("expr2").ok_or("Missing argument `expr2`")?;
                 let msg = args.get("msg").copied();
@@ -296,7 +284,6 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::In | UnittestAssert::NotIn => {
-                let args = self.arg_hashmap(args, keywords)?;
                 let member = args.get("member").ok_or("Missing argument `member`")?;
                 let container = args
                     .get("container")
@@ -311,7 +298,6 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::IsNone | UnittestAssert::IsNotNone => {
-                let args = self.arg_hashmap(args, keywords)?;
                 let expr = args.get("expr").ok_or("Missing argument `expr`")?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, UnittestAssert::IsNone) {
@@ -322,49 +308,32 @@ impl UnittestAssert {
                 let expr = compare(
                     expr,
                     cmpop,
-                    &Expr::new(
-                        Location::default(),
-                        Location::default(),
-                        ExprKind::Constant {
-                            value: Constant::None,
-                            kind: None,
-                        },
-                    ),
+                    &create_expr(ExprKind::Constant {
+                        value: Constant::None,
+                        kind: None,
+                    }),
                 );
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::IsInstance | UnittestAssert::NotIsInstance => {
-                let args = self.arg_hashmap(args, keywords)?;
                 let obj = args.get("obj").ok_or("Missing argument `obj`")?;
                 let cls = args.get("cls").ok_or("Missing argument `cls`")?;
                 let msg = args.get("msg").copied();
-                let isinstance = Expr::new(
-                    Location::default(),
-                    Location::default(),
-                    ExprKind::Call {
-                        func: Box::new(Expr::new(
-                            Location::default(),
-                            Location::default(),
-                            ExprKind::Name {
-                                id: "isinstance".to_string(),
-                                ctx: Load,
-                            },
-                        )),
-                        args: vec![(**obj).clone(), (**cls).clone()],
-                        keywords: vec![],
-                    },
-                );
+                let isinstance = create_expr(ExprKind::Call {
+                    func: Box::new(create_expr(ExprKind::Name {
+                        id: "isinstance".to_string(),
+                        ctx: Load,
+                    })),
+                    args: vec![(**obj).clone(), (**cls).clone()],
+                    keywords: vec![],
+                });
                 if matches!(self, UnittestAssert::IsInstance) {
                     Ok(assert(&isinstance, msg))
                 } else {
-                    let expr = Expr::new(
-                        Location::default(),
-                        Location::default(),
-                        ExprKind::UnaryOp {
-                            op: Unaryop::Not,
-                            operand: Box::new(isinstance),
-                        },
-                    );
+                    let expr = create_expr(ExprKind::UnaryOp {
+                        op: Unaryop::Not,
+                        operand: Box::new(isinstance),
+                    });
                     Ok(assert(&expr, msg))
                 }
             }
@@ -372,45 +341,28 @@ impl UnittestAssert {
             | UnittestAssert::RegexpMatches
             | UnittestAssert::NotRegex
             | UnittestAssert::NotRegexpMatches => {
-                let args = self.arg_hashmap(args, keywords)?;
                 let regex = args.get("regex").ok_or("Missing argument `regex`")?;
                 let text = args.get("text").ok_or("Missing argument `text`")?;
                 let msg = args.get("msg").copied();
-                let re_search = Expr::new(
-                    Location::default(),
-                    Location::default(),
-                    ExprKind::Call {
-                        func: Box::new(Expr::new(
-                            Location::default(),
-                            Location::default(),
-                            ExprKind::Attribute {
-                                value: Box::new(Expr::new(
-                                    Location::default(),
-                                    Location::default(),
-                                    ExprKind::Name {
-                                        id: "re".to_string(),
-                                        ctx: Load,
-                                    },
-                                )),
-                                attr: "search".to_string(),
-                                ctx: Load,
-                            },
-                        )),
-                        args: vec![(**regex).clone(), (**text).clone()],
-                        keywords: vec![],
-                    },
-                );
+                let re_search = create_expr(ExprKind::Call {
+                    func: Box::new(create_expr(ExprKind::Attribute {
+                        value: Box::new(create_expr(ExprKind::Name {
+                            id: "re".to_string(),
+                            ctx: Load,
+                        })),
+                        attr: "search".to_string(),
+                        ctx: Load,
+                    })),
+                    args: vec![(**regex).clone(), (**text).clone()],
+                    keywords: vec![],
+                });
                 if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
                     Ok(assert(&re_search, msg))
                 } else {
-                    let expr = Expr::new(
-                        Location::default(),
-                        Location::default(),
-                        ExprKind::UnaryOp {
-                            op: Unaryop::Not,
-                            operand: Box::new(re_search),
-                        },
-                    );
+                    let expr = create_expr(ExprKind::UnaryOp {
+                        op: Unaryop::Not,
+                        operand: Box::new(re_search),
+                    });
                     Ok(assert(&expr, msg))
                 }
             }
