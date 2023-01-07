@@ -1,12 +1,16 @@
 use rustpython_ast::{
-    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind, Unaryop,
+    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
 
 use super::helpers::is_falsy_constant;
+use super::unittest_assert::UnittestAssert;
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::{Check, CheckKind};
+use crate::source_code_generator::SourceCodeGenerator;
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
@@ -58,42 +62,6 @@ where
     }
 }
 
-const UNITTEST_ASSERT_NAMES: &[&str] = &[
-    "assertAlmostEqual",
-    "assertAlmostEquals",
-    "assertDictEqual",
-    "assertEqual",
-    "assertEquals",
-    "assertFalse",
-    "assertGreater",
-    "assertGreaterEqual",
-    "assertIn",
-    "assertIs",
-    "assertIsInstance",
-    "assertIsNone",
-    "assertIsNot",
-    "assertIsNotNone",
-    "assertItemsEqual",
-    "assertLess",
-    "assertLessEqual",
-    "assertMultiLineEqual",
-    "assertNotAlmostEqual",
-    "assertNotAlmostEquals",
-    "assertNotContains",
-    "assertNotEqual",
-    "assertNotEquals",
-    "assertNotIn",
-    "assertNotIsInstance",
-    "assertNotRegexpMatches",
-    "assertRaises",
-    "assertRaisesMessage",
-    "assertRaisesRegexp",
-    "assertRegexpMatches",
-    "assertSetEqual",
-    "assertTrue",
-    "assert_",
-];
-
 /// Check if the test expression is a composite condition.
 /// For example, `a and b` or `not (a or b)`. The latter is equivalent
 /// to `not a and not b` by De Morgan's laws.
@@ -120,14 +88,32 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Check> {
 }
 
 /// PT009
-pub fn unittest_assertion(call: &Expr) -> Option<Check> {
-    match &call.node {
+pub fn unittest_assertion(
+    checker: &Checker,
+    call: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Check> {
+    match &func.node {
         ExprKind::Attribute { attr, .. } => {
-            if UNITTEST_ASSERT_NAMES.contains(&attr.as_str()) {
-                Some(Check::new(
-                    CheckKind::UnittestAssertion(attr.to_string()),
-                    Range::from_located(call),
-                ))
+            if let Ok(uta) = UnittestAssert::try_from(attr.as_str()) {
+                let mut check = Check::new(
+                    CheckKind::UnittestAssertion(uta.to_string()),
+                    Range::from_located(func),
+                );
+                if checker.patch(check.kind.code()) {
+                    if let Ok(stmt) = uta.generate_assert(args, keywords) {
+                        let mut generator: SourceCodeGenerator = checker.style.into();
+                        generator.unparse_stmt(&stmt);
+                        check.amend(Fix::replacement(
+                            generator.generate(),
+                            call.location,
+                            call.end_location.unwrap(),
+                        ));
+                    }
+                }
+                Some(check)
             } else {
                 None
             }

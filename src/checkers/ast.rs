@@ -2352,7 +2352,9 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&CheckCode::PT009) {
-                    if let Some(check) = flake8_pytest_style::plugins::unittest_assertion(func) {
+                    if let Some(check) = flake8_pytest_style::plugins::unittest_assertion(
+                        self, expr, func, args, keywords,
+                    ) {
                         self.checks.push(check);
                     }
                 }
