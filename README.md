@@ -918,20 +918,20 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
-| PT008 | PatchWithLambda | Use `return_value=` instead of patching with lambda |  |
-| PT009 | UnittestAssertion | Use a regular assert instead of unittest-style '...' |  |
+| PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
+| PT009 | UnittestAssertion | Use a regular `assert` instead of unittest-style `...` |  |
 | PT010 | RaisesWithoutException | set the expected exception in `pytest.raises()` |  |
 | PT011 | RaisesTooBroad | `pytest.raises(...)` is too broad, set the `match` parameter or use a more specific exception |  |
 | PT012 | RaisesWithMultipleStatements | `pytest.raises()` block should contain a single simple statement |  |
 | PT013 | IncorrectPytestImport | Found incorrect import of pytest, use simple `import pytest` instead |  |
 | PT015 | AssertAlwaysFalse | Assertion always fails, replace with `pytest.fail()` |  |
 | PT016 | FailWithoutMessage | No message passed to `pytest.fail()` |  |
-| PT017 | AssertInExcept | Found assertion on exception ... in except block, use pytest.raises() instead |  |
+| PT017 | AssertInExcept | Found assertion on exception `...` in except block, use `pytest.raises()` instead |  |
 | PT018 | CompositeAssertion | Assertion should be broken down into multiple parts |  |
-| PT019 | FixtureParamWithoutValue | Fixture ... without value is injected as parameter, use @pytest.mark.usefixtures instead |  |
+| PT019 | FixtureParamWithoutValue | Fixture `...` without value is injected as parameter, use `@pytest.mark.usefixtures` instead |  |
 | PT020 | DeprecatedYieldFixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
 | PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
-| PT022 | UselessYieldFixture | No teardown in fixture ..., use `return` instead of `yield` | 🛠 |
+| PT022 | UselessYieldFixture | No teardown in fixture `...`, use `return` instead of `yield` | 🛠 |
 | PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark....` over `@pytest.mark....()` | 🛠 |
 | PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures |  |
 | PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures |  |
