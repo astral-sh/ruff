@@ -28,7 +28,7 @@ pub fn implicit(tokens: &[LexResult], locator: &SourceCodeLocator) -> Vec<Check>
                     location: *a_end,
                     end_location: Location::new(a_end.row() + 1, 0),
                 });
-                if contents.trim().ends_with('\\') {
+                if contents.trim_end().ends_with('\\') {
                     checks.push(Check::new(
                         CheckKind::MultiLineImplicitStringConcatenation,
                         Range {
