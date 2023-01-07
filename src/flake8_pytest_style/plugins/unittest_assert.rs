@@ -214,7 +214,7 @@ impl UnittestAssert {
         }
     }
 
-    pub fn extract_args<'a>(
+    pub fn arg_hashmap<'a>(
         &'a self,
         args: &'a [Expr],
         keywords: &'a [Keyword],
@@ -228,25 +228,25 @@ impl UnittestAssert {
         }
 
         let sig = self.signature();
-        let mut arg_map: FxHashMap<&str, &Expr> = FxHashMap::default();
+        let mut arg_hashmap: FxHashMap<&str, &Expr> = FxHashMap::default();
         for (arg, value) in sig.pos_args.iter().zip(args.iter()) {
-            arg_map.insert(arg, value);
+            arg_hashmap.insert(arg, value);
         }
         for kw in keywords {
             let arg = kw.node.arg.as_ref().unwrap();
             if !sig.is_valid_arg((*arg).as_str()) {
                 return Err(format!("Unexpected keyword argument `{arg}`"));
             }
-            arg_map.insert(kw.node.arg.as_ref().unwrap().as_str(), &kw.node.value);
+            arg_hashmap.insert(kw.node.arg.as_ref().unwrap().as_str(), &kw.node.value);
         }
-        Ok(arg_map)
+        Ok(arg_hashmap)
     }
 
     pub fn generate_assert(&self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt, String> {
         use UnittestAssert::*;
         match self {
             True | False => {
-                let args = self.extract_args(args, keywords)?;
+                let args = self.arg_hashmap(args, keywords)?;
                 let expr = args.get("expr").ok_or("Missing argument `expr`")?;
                 let msg = args.get("msg").copied();
                 let bool = Expr::new(
@@ -261,7 +261,7 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             Equal | Equals | NotEqual | NotEquals | Greater | GreaterEqual | Less | LessEqual => {
-                let args = self.extract_args(args, keywords)?;
+                let args = self.arg_hashmap(args, keywords)?;
                 let first = args.get("first").ok_or("Missing argument `first`")?;
                 let second = args.get("second").ok_or("Missing argument `second`")?;
                 let msg = args.get("msg").copied();
@@ -278,7 +278,7 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             Is | IsNot => {
-                let args = self.extract_args(args, keywords)?;
+                let args = self.arg_hashmap(args, keywords)?;
                 let expr1 = args.get("expr1").ok_or("Missing argument `expr1`")?;
                 let expr2 = args.get("expr2").ok_or("Missing argument `expr2`")?;
                 let msg = args.get("msg").copied();
@@ -291,7 +291,7 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             In | NotIn => {
-                let args = self.extract_args(args, keywords)?;
+                let args = self.arg_hashmap(args, keywords)?;
                 let member = args.get("member").ok_or("Missing argument `member`")?;
                 let container = args
                     .get("container")
@@ -306,7 +306,7 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             IsNone | IsNotNone => {
-                let args = self.extract_args(args, keywords)?;
+                let args = self.arg_hashmap(args, keywords)?;
                 let expr = args.get("expr").ok_or("Missing argument `expr`")?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, IsNone) {
@@ -329,7 +329,7 @@ impl UnittestAssert {
                 Ok(assert(&expr, msg))
             }
             IsInstance | NotIsInstance => {
-                let args = self.extract_args(args, keywords)?;
+                let args = self.arg_hashmap(args, keywords)?;
                 let obj = args.get("obj").ok_or("Missing argument `obj`")?;
                 let cls = args.get("cls").ok_or("Missing argument `cls`")?;
                 let msg = args.get("msg").copied();
@@ -364,7 +364,7 @@ impl UnittestAssert {
                 }
             }
             Regex | RegexpMatches | NotRegex | NotRegexpMatches => {
-                let args = self.extract_args(args, keywords)?;
+                let args = self.arg_hashmap(args, keywords)?;
                 let regex = args.get("regex").ok_or("Missing argument `regex`")?;
                 let text = args.get("text").ok_or("Missing argument `text`")?;
                 let msg = args.get("msg").copied();
