@@ -100,32 +100,32 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
             continue;
         }
 
-        match tok {
-            Tok::Comment(comment_text) => {
-                if comment_text == "# isort: split" {
-                    splits.push(start.row());
-                } else if comment_text == "# isort: skip_file" {
-                    skip_file = true;
-                } else if off.is_some() {
-                    if comment_text == "# isort: on" {
-                        if let Some(start) = off {
-                            for row in start.row() + 1..=end.row() {
-                                exclusions.insert(row);
-                            }
-                        }
-                        off = None;
-                    }
-                } else {
-                    if comment_text.contains("isort: skip") {
-                        exclusions.insert(start.row());
-                    } else if comment_text == "# isort: off" {
-                        off = Some(start);
+        let Tok::Comment(comment_text) = tok else {
+            continue;
+        };
+
+        if comment_text == "# isort: split" {
+            splits.push(start.row());
+        } else if comment_text == "# isort: skip_file" {
+            skip_file = true;
+        } else if off.is_some() {
+            if comment_text == "# isort: on" {
+                if let Some(start) = off {
+                    for row in start.row() + 1..=end.row() {
+                        exclusions.insert(row);
                     }
                 }
+                off = None;
             }
-            _ => continue,
+        } else {
+            if comment_text.contains("isort: skip") {
+                exclusions.insert(start.row());
+            } else if comment_text == "# isort: off" {
+                off = Some(start);
+            }
         }
     }
+
     if skip_file {
         // Enforce `isort: skip_file`.
         if let Some(end) = last {
