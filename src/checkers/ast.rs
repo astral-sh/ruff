@@ -30,7 +30,7 @@ use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::python::typing::SubscriptKind;
-use crate::registry::{Check, CheckCode, CheckKind, DeferralKeyword};
+use crate::registry::{Check, CheckCode, DeferralKeyword};
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;

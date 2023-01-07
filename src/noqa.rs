@@ -10,7 +10,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::registry::{Check, CheckCode, CODE_REDIRECTS};
 use crate::source_code_style::LineEnding;
-use crate::violations;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -214,7 +213,7 @@ mod tests {
 
     use crate::ast::types::Range;
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
-    use crate::registry::{Check, CheckKind};
+    use crate::registry::Check;
     use crate::source_code_style::LineEnding;
     use crate::violations;
 

@@ -7,7 +7,6 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::registry::{Check, CheckKind};
 use crate::source_code_locator::SourceCodeLocator;
-use crate::violations;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {

@@ -3,7 +3,7 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
 

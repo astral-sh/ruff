@@ -20,7 +20,7 @@ mod tests {
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::source_code_style::SourceCodeStyleDetector;
-    use crate::{directives, rustpython_helpers, settings, violations};
+    use crate::{directives, rustpython_helpers, settings};
 
     #[test_case(CheckCode::F401, Path::new("F401_0.py"); "F401_0")]
     #[test_case(CheckCode::F401, Path::new("F401_1.py"); "F401_1")]

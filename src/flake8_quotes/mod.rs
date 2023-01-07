@@ -11,7 +11,7 @@ mod tests {
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{flake8_quotes, violations, Settings};
+    use crate::{flake8_quotes, Settings};
 
     #[test_case(Path::new("doubles.py"))]
     #[test_case(Path::new("doubles_escaped.py"))]

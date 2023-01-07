@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::violations;
 
 /// Returns `true` if `expr` contains an `ExprKind::Await`.

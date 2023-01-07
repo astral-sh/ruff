@@ -11,7 +11,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{settings, violations};
+    use crate::settings;
 
     #[test_case(CheckCode::A001, Path::new("A001.py"); "A001")]
     #[test_case(CheckCode::A002, Path::new("A002.py"); "A002")]

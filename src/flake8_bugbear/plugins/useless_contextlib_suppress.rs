@@ -3,7 +3,7 @@ use rustpython_ast::Expr;
 use crate::ast::helpers::{collect_call_paths, match_call_path};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// B005

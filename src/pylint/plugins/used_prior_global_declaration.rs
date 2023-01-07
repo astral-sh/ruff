@@ -2,7 +2,6 @@ use rustpython_ast::Expr;
 
 use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::registry::CheckKind;
 use crate::{violations, Check};
 
 /// PLE0118

@@ -4,7 +4,7 @@ use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::violations;
 
 /// UP020

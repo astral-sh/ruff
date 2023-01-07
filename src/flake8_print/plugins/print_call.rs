@@ -5,7 +5,7 @@ use crate::ast::helpers::{collect_call_paths, dealias_call_path, is_const_none, 
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// T201, T203

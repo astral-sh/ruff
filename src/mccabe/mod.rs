@@ -10,7 +10,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{mccabe, violations, Settings};
+    use crate::{mccabe, Settings};
 
     #[test_case(0)]
     #[test_case(3)]

@@ -5,7 +5,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind, LiteralType};
+use crate::registry::{Check, CheckCode, LiteralType};
 use crate::violations;
 
 /// UP018

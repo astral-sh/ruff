@@ -10,7 +10,7 @@ use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 

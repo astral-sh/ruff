@@ -1,6 +1,6 @@
 use crate::ast::types::BindingKind;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// F842

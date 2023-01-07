@@ -5,7 +5,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
 

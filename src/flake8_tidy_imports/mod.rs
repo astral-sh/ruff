@@ -11,7 +11,7 @@ mod tests {
     use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{flake8_tidy_imports, violations, Settings};
+    use crate::{flake8_tidy_imports, Settings};
 
     #[test]
     fn ban_parent_imports() -> Result<()> {

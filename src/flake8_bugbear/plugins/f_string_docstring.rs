@@ -2,7 +2,7 @@ use rustpython_ast::{ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// B021

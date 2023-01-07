@@ -10,7 +10,7 @@ use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 use crate::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade, violations,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 #[derive(

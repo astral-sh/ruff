@@ -6,7 +6,7 @@ use rustpython_parser::ast::{
 
 use crate::ast::helpers::except_range;
 use crate::ast::types::{Binding, Range, Scope, ScopeKind};
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 

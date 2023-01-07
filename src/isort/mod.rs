@@ -634,7 +634,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{isort, violations, Settings};
+    use crate::{isort, Settings};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]

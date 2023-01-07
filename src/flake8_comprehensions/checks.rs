@@ -6,7 +6,7 @@ use rustpython_ast::{
 
 use crate::ast::types::Range;
 use crate::flake8_comprehensions::fixes;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 

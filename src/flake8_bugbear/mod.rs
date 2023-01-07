@@ -10,7 +10,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{flake8_bugbear, violations, Settings};
+    use crate::{flake8_bugbear, Settings};
 
     #[test_case(CheckCode::B002, Path::new("B002.py"); "B002")]
     #[test_case(CheckCode::B003, Path::new("B003.py"); "B003")]

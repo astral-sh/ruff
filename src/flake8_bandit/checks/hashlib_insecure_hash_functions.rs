@@ -4,7 +4,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use crate::ast::helpers::{match_module_member, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::flake8_bandit::helpers::string_literal;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 const WEAK_HASHES: [&str; 4] = ["md4", "md5", "sha", "sha1"];

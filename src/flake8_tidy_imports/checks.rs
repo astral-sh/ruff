@@ -6,7 +6,7 @@ use crate::ast::helpers::match_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::flake8_tidy_imports::settings::Strictness;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 /// TID252

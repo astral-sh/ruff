@@ -10,8 +10,8 @@ use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
+use crate::fs;
 use crate::registry::{CheckCode, CheckCodePrefix};
-use crate::{fs, violations};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,

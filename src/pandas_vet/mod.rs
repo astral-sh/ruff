@@ -15,7 +15,7 @@ mod tests {
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::source_code_style::SourceCodeStyleDetector;
-    use crate::{directives, rustpython_helpers, settings, violations};
+    use crate::{directives, rustpython_helpers, settings};
 
     fn check_code(contents: &str, expected: &[CheckCode]) -> Result<()> {
         let contents = dedent(contents);

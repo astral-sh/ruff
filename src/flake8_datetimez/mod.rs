@@ -10,7 +10,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::CheckCode;
-    use crate::{settings, violations};
+    use crate::settings;
 
     #[test_case(CheckCode::DTZ001, Path::new("DTZ001.py"); "DTZ001")]
     #[test_case(CheckCode::DTZ002, Path::new("DTZ002.py"); "DTZ002")]

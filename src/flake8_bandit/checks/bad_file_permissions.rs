@@ -5,7 +5,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
 use crate::ast::helpers::{compose_call_path, match_module_member, SimpleCallArgs};
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 const WRITE_WORLD: u16 = 0o2;

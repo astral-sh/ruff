@@ -16,7 +16,7 @@ use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
 use crate::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::pydocstyle::settings::Convention;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Check, CheckCode};
 use crate::violations;
 use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
 

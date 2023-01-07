@@ -5,7 +5,7 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Check;
 use crate::violations;
 
 #[derive(Debug)]
