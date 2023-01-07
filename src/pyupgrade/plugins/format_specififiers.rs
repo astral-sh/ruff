@@ -1,4 +1,4 @@
-use libcst_native::{Arg, Codegen, CodegenState, Expression};
+use libcst_native::{Arg, Codegen, CodegenState, Expression, parse_expression};
 use num_bigint::{BigInt, Sign};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -54,10 +54,11 @@ fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Vec<Arg> {
 fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Option<String> {
     println!("MINI 1");
     println!("{:?}", module_text);
-    let mut expression = match match_expression(&module_text) {
+    let mut expression = parse_expression(&module_text).unwrap();/* {
         Err(_) => return None,
         Ok(item) => item,
     };
+                                                                      */
     println!("MINI 2");
     let mut call = match match_call(&mut expression) {
         Err(_) => return None,
@@ -113,11 +114,9 @@ fn get_specifier_order(value_str: &str) -> Vec<u32> {
 /// Returns a string without the format specifiers. Ex. "Hello {0} {1}" ->
 /// "Hello {} {}"
 fn remove_specifiers(raw_specifiers: &str) -> String {
-    println!("BEFORE: {}", raw_specifiers);
     let new_str = FORMAT_SPECIFIER
         .replace_all(raw_specifiers, "{$fmt}")
         .to_string();
-    println!("AFTER: {}\n", new_str);
     new_str
 }
 
@@ -138,12 +137,10 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
             println!("STARTING");
             if let Constant::Str(provided_string) = cons_value {
                 if attr == "format" && has_specifiers(provided_string) {
+                    println!("{:?}", expr);
                     let as_ints = get_specifier_order(provided_string);
                     let call_range = Range::from_located(expr);
-                    println!("Checkpoint 1");
                     let call_text = checker.locator.slice_source_code_range(&call_range);
-                    println!("Call text: {}", call_text);
-                    println!("Checkpoint 2");
                     let new_call = match get_new_call(&call_text, as_ints) {
                         None => return,
                         Some(item) => item,
