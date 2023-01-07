@@ -2,8 +2,9 @@ use std::hash::BuildHasherDefault;
 
 use anyhow::{anyhow, bail, Result};
 use rustc_hash::FxHashMap;
-use rustpython_ast::ExprContext::Load;
-use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop};
+use rustpython_ast::{
+    Cmpop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
+};
 
 use crate::ast::helpers::{create_expr, create_stmt};
 
@@ -339,7 +340,7 @@ impl UnittestAssert {
                 let isinstance = create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Name {
                         id: "isinstance".to_string(),
-                        ctx: Load,
+                        ctx: ExprContext::Load,
                     })),
                     args: vec![(**obj).clone(), (**cls).clone()],
                     keywords: vec![],
@@ -367,10 +368,10 @@ impl UnittestAssert {
                     func: Box::new(create_expr(ExprKind::Attribute {
                         value: Box::new(create_expr(ExprKind::Name {
                             id: "re".to_string(),
-                            ctx: Load,
+                            ctx: ExprContext::Load,
                         })),
                         attr: "search".to_string(),
-                        ctx: Load,
+                        ctx: ExprContext::Load,
                     })),
                     args: vec![(**regex).clone(), (**text).clone()],
                     keywords: vec![],
