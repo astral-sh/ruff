@@ -5,7 +5,6 @@ use std::sync::mpsc::channel;
 
 use ::ruff::autofix::fixer;
 use ::ruff::cli::{extract_log_level, Cli, Overrides};
-use ::ruff::commands;
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::printer::{Printer, Violations};
 use ::ruff::resolver::{resolve_settings, FileDiscovery, PyprojectDiscovery, Relativity};
@@ -14,22 +13,29 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
+use ::ruff::{commands, one_time_warning};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
-use ruff::one_time_warning;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
 fn resolve(
+    isolated: bool,
     config: Option<&Path>,
     overrides: &Overrides,
     stdin_filename: Option<&Path>,
 ) -> Result<PyprojectDiscovery> {
-    if let Some(pyproject) = config {
-        // First priority: the user specified a `pyproject.toml` file. Use that
+    if isolated {
+        // First priority: if we're running in isolated mode, use the default settings.
+        let mut config = Configuration::default();
+        config.apply(overrides.clone());
+        let settings = Settings::from_configuration(config, &path_dedot::CWD)?;
+        Ok(PyprojectDiscovery::Fixed(settings))
+    } else if let Some(pyproject) = config {
+        // Second priority: the user specified a `pyproject.toml` file. Use that
         // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
         // current working directory. (This matches ESLint's behavior.)
         let settings = resolve_settings(pyproject, &Relativity::Cwd, Some(overrides))?;
@@ -39,7 +45,7 @@ fn resolve(
             .as_ref()
             .unwrap_or(&path_dedot::CWD.as_path()),
     )? {
-        // Second priority: find a `pyproject.toml` file in either an ancestor of
+        // Third priority: find a `pyproject.toml` file in either an ancestor of
         // `stdin_filename` (if set) or the current working path all paths relative to
         // that directory. (With `Strategy::Hierarchical`, we'll end up finding
         // the "closest" `pyproject.toml` file for every Python file later on,
@@ -47,7 +53,7 @@ fn resolve(
         let settings = resolve_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
         Ok(PyprojectDiscovery::Hierarchical(settings))
     } else if let Some(pyproject) = pyproject::find_user_settings_toml() {
-        // Third priority: find a user-specific `pyproject.toml`, but resolve all paths
+        // Fourth priority: find a user-specific `pyproject.toml`, but resolve all paths
         // relative the current working directory. (With `Strategy::Hierarchical`, we'll
         // end up the "closest" `pyproject.toml` file for every Python file later on, so
         // these act as the "default" settings.)
@@ -59,7 +65,6 @@ fn resolve(
         // "closest" `pyproject.toml` file for every Python file later on, so these act
         // as the "default" settings.)
         let mut config = Configuration::default();
-        // Apply command-line options that override defaults.
         config.apply(overrides.clone());
         let settings = Settings::from_configuration(config, &path_dedot::CWD)?;
         Ok(PyprojectDiscovery::Hierarchical(settings))
@@ -84,6 +89,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
     let pyproject_strategy = resolve(
+        cli.isolated,
         cli.config.as_deref(),
         &overrides,
         cli.stdin_filename.as_deref(),

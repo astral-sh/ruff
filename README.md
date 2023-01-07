@@ -341,6 +341,8 @@ Options:
           Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
   -n, --no-cache
           Disable cache reads
+      --isolated
+          Ignore all configuration files
       --select <SELECT>
           Comma-separated list of error codes to enable (or ALL, to enable all checks)
       --extend-select <EXTEND_SELECT>
