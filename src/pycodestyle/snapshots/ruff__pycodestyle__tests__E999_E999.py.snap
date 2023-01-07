@@ -5,10 +5,10 @@ expression: checks
 - kind:
     SyntaxError: unindent does not match any outer indentation level
   location:
-    row: 2
+    row: 3
     column: 0
   end_location:
-    row: 2
+    row: 3
     column: 0
   fix: ~
   parent: ~
