@@ -104,10 +104,13 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
             continue;
         };
 
+        // `isort` allows for `# isort: skip` and `# isort: skip_file` to include or
+        // omit a space after the colon. The remaining action comments are
+        // required to include the space, and must appear on their own lines.
         let comment_text = comment_text.trim_end();
         if comment_text == "# isort: split" {
             splits.push(start.row());
-        } else if comment_text == "# isort: skip_file" {
+        } else if comment_text == "# isort: skip_file" || comment_text == "# isort:skip_file" {
             skip_file = true;
         } else if off.is_some() {
             if comment_text == "# isort: on" {
@@ -119,7 +122,7 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
                 off = None;
             }
         } else {
-            if comment_text.contains("isort: skip") {
+            if comment_text.contains("isort: skip") || comment_text.contains("isort:skip") {
                 exclusions.insert(start.row());
             } else if comment_text == "# isort: off" {
                 off = Some(start);
