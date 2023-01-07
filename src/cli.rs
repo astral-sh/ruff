@@ -20,7 +20,7 @@ pub struct Cli {
     pub files: Vec<PathBuf>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for
     /// configuration.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
     /// Enable verbose logging.
     #[arg(short, long, group = "verbosity")]
@@ -56,6 +56,9 @@ pub struct Cli {
     /// Disable cache reads.
     #[arg(short, long)]
     pub no_cache: bool,
+    /// Ignore all configuration files.
+    #[arg(long, conflicts_with = "config")]
+    pub isolated: bool,
     /// Comma-separated list of error codes to enable (or ALL, to enable all
     /// checks).
     #[arg(long, value_delimiter = ',')]
@@ -240,6 +243,7 @@ impl Cli {
                 explain: self.explain,
                 files: self.files,
                 generate_shell_completion: self.generate_shell_completion,
+                isolated: self.isolated,
                 no_cache: self.no_cache,
                 quiet: self.quiet,
                 show_files: self.show_files,
@@ -301,6 +305,7 @@ pub struct Arguments {
     pub explain: Option<CheckCode>,
     pub files: Vec<PathBuf>,
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
+    pub isolated: bool,
     pub no_cache: bool,
     pub quiet: bool,
     pub show_files: bool,
