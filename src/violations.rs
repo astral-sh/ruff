@@ -2929,6 +2929,66 @@ impl AlwaysAutofixableViolation for YodaConditions {
     }
 }
 
+define_violation!(
+    pub struct IfExprWithTrueFalse(pub String);
+);
+impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
+    fn message(&self) -> String {
+        let IfExprWithTrueFalse(expr) = self;
+        format!("Use `bool({expr})` instead of `True if {expr} else False`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let IfExprWithTrueFalse(expr) = self;
+        format!("Replace with `not {expr}")
+    }
+
+    fn placeholder() -> Self {
+        IfExprWithTrueFalse("expr".to_string())
+    }
+}
+
+define_violation!(
+    pub struct IfExprWithFalseTrue(pub String);
+);
+impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
+    fn message(&self) -> String {
+        let IfExprWithFalseTrue(expr) = self;
+        format!("Use `not {expr}` instead of `False if {expr} else True`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let IfExprWithFalseTrue(expr) = self;
+        format!("Replace with `bool({expr})")
+    }
+
+    fn placeholder() -> Self {
+        IfExprWithFalseTrue("expr".to_string())
+    }
+}
+
+define_violation!(
+    pub struct IfExprWithTwistedArms(pub String, pub String);
+);
+impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
+    fn message(&self) -> String {
+        let IfExprWithTwistedArms(expr_body, expr_else) = self;
+        format!(
+            "Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not \
+             {expr_else} else {expr_else}`"
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        let IfExprWithTwistedArms(expr_body, expr_else) = self;
+        format!("Replace with `{expr_else} if {expr_else} else {expr_body}`")
+    }
+
+    fn placeholder() -> Self {
+        IfExprWithTwistedArms("a".to_string(), "b".to_string())
+    }
+}
+
 // pyupgrade
 
 define_violation!(

@@ -2716,6 +2716,21 @@ where
                 }
                 self.push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
             }
+            ExprKind::IfExp { test, body, orelse } => {
+                if self.settings.enabled.contains(&CheckCode::SIM210) {
+                    flake8_simplify::plugins::explicit_true_false_in_ifexpr(
+                        self, expr, test, body, orelse,
+                    )
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM211) {
+                    flake8_simplify::plugins::explicit_false_true_in_ifexpr(
+                        self, expr, test, body, orelse,
+                    )
+                }
+                if self.settings.enabled.contains(&CheckCode::SIM212) {
+                    flake8_simplify::plugins::twisted_arms_in_ifexpr(self, expr, test, body, orelse)
+                }
+            }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&CheckCode::C416) {
                     if let Some(check) = flake8_comprehensions::checks::unnecessary_comprehension(
