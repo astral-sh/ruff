@@ -6,17 +6,17 @@ expression: checks
     ReturnBoolConditionDirectly: a
   location:
     row: 2
-    column: 0
+    column: 4
   end_location:
     row: 5
-    column: 16
+    column: 20
   fix:
     content: return a
     location:
       row: 2
-      column: 0
+      column: 4
     end_location:
       row: 5
-      column: 16
+      column: 20
   parent: ~
 

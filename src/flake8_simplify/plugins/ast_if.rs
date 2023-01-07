@@ -72,7 +72,7 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> bool {
     let StmtKind::Return { value } = &stmts[0].node else {
         return false;
     };
-    let Some(ExprKind::Constant { value, .. }) = value.as_ref().map(|v| &v.node) else {
+    let Some(ExprKind::Constant { value, .. }) = value.as_ref().map(|value| &value.node) else {
         return false;
     };
     matches!(value, Constant::Bool(_))
@@ -86,9 +86,9 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     if !(is_one_line_return_bool(body) && is_one_line_return_bool(orelse)) {
         return;
     }
-    let cond = unparse_expr(test, checker.style);
+    let condition = unparse_expr(test, checker.style);
     let mut check = Check::new(
-        CheckKind::ReturnBoolConditionDirectly(cond),
+        CheckKind::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
     if checker.patch(&CheckCode::SIM103) {
