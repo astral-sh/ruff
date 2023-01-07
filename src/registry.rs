@@ -220,6 +220,7 @@ pub enum CheckCode {
     // flake8-simplify
     SIM101,
     SIM102,
+    SIM103,
     SIM105,
     SIM107,
     SIM108,
@@ -967,6 +968,7 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    ReturnBoolConditionDirectly(String),
     UseTernaryOperator(String),
     CompareWithTuple(String, Vec<String>, String),
     DuplicateIsinstanceCall(String),
@@ -1418,9 +1420,10 @@ impl CheckCode {
             // flake8-simplify
             CheckCode::SIM101 => CheckKind::DuplicateIsinstanceCall("...".to_string()),
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
+            CheckCode::SIM103 => CheckKind::ReturnBoolConditionDirectly("...".to_string()),
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
-            CheckCode::SIM108 => CheckKind::UseTernaryOperator("..".to_string()),
+            CheckCode::SIM108 => CheckKind::UseTernaryOperator("...".to_string()),
             CheckCode::SIM109 => CheckKind::CompareWithTuple(
                 "value".to_string(),
                 vec!["...".to_string(), "...".to_string()],
@@ -1978,6 +1981,7 @@ impl CheckCode {
             CheckCode::S501 => CheckCategory::Flake8Bandit,
             CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM103 => CheckCategory::Flake8Simplify,
             CheckCode::SIM101 => CheckCategory::Flake8Simplify,
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
@@ -2256,6 +2260,7 @@ impl CheckKind {
             CheckKind::NegateNotEqualOp(..) => &CheckCode::SIM202,
             CheckKind::NestedIfStatements => &CheckCode::SIM102,
             CheckKind::OrTrue => &CheckCode::SIM222,
+            CheckKind::ReturnBoolConditionDirectly(..) => &CheckCode::SIM103,
             CheckKind::ReturnInTryExceptFinally => &CheckCode::SIM107,
             CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
             CheckKind::UseTernaryOperator(..) => &CheckCode::SIM108,
@@ -3018,6 +3023,9 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::ReturnBoolConditionDirectly(cond) => {
+                format!("Return the condition `{cond}` directly")
+            }
             CheckKind::CompareWithTuple(value, values, or_op) => {
                 let values = values.join(", ");
                 format!("Use `{value} in ({values})` instead of `{or_op}`")
@@ -3774,6 +3782,7 @@ impl CheckKind {
             | CheckKind::RemoveSixCompat
             | CheckKind::ReplaceStdoutStderr
             | CheckKind::ReplaceUniversalNewlines
+            | CheckKind::ReturnBoolConditionDirectly(..)
             | CheckKind::RewriteCElementTree
             | CheckKind::RewriteListComprehension
             | CheckKind::RewriteMockImport(..)
@@ -3998,6 +4007,9 @@ impl CheckKind {
                 Some(format!("Replace with `except {name}`"))
             }
             CheckKind::RemoveSixCompat => Some("Remove `six` usage".to_string()),
+            CheckKind::ReturnBoolConditionDirectly(cond) => {
+                Some(format!("Replace with `return {cond}`"))
+            }
             CheckKind::SectionNameEndsInColon(name) => Some(format!("Add colon to \"{name}\"")),
             CheckKind::SectionNotOverIndented(name) => {
                 Some(format!("Remove over-indentation from \"{name}\""))
