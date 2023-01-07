@@ -103,6 +103,7 @@ mod tests {
     #[test_case(CheckCode::F841, Path::new("F841_0.py"); "F841_0")]
     #[test_case(CheckCode::F841, Path::new("F841_1.py"); "F841_1")]
     #[test_case(CheckCode::F841, Path::new("F841_2.py"); "F841_2")]
+    #[test_case(CheckCode::F841, Path::new("F841_3.py"); "F841_3")]
     #[test_case(CheckCode::F842, Path::new("F842.py"); "F842")]
     #[test_case(CheckCode::F901, Path::new("F901.py"); "F901")]
     fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
@@ -168,11 +169,8 @@ mod tests {
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = SourceCodeLocator::new(&contents);
         let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
-        let directives = directives::extract_directives(
-            &tokens,
-            &locator,
-            directives::Flags::from_settings(&settings),
-        );
+        let directives =
+            directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
         let mut checks = check_path(
             Path::new("<filename>"),
             None,

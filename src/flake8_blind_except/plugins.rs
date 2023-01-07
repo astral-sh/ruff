@@ -35,7 +35,7 @@ pub fn blind_except(
                     false
                 }
             }) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::BlindExcept(id.to_string()),
                     Range::from_located(type_),
                 ));

@@ -19,6 +19,6 @@ pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
                 func.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }

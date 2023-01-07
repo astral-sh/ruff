@@ -85,7 +85,7 @@ fn pytest_fixture_parentheses(
     if checker.patch(check.kind.code()) {
         check.amend(fix);
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
 
 /// PT001, PT002, PT003
@@ -111,7 +111,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
             }
 
             if checker.settings.enabled.contains(&CheckCode::PT002) && !args.is_empty() {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::FixturePositionalArgs(func_name.to_string()),
                     Range::from_located(decorator),
                 ));
@@ -124,7 +124,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
 
                 if let Some(scope_keyword) = scope_keyword {
                     if keyword_is_literal(scope_keyword, "function") {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::ExtraneousScopeFunction,
                             Range::from_located(scope_keyword),
                         ));
@@ -155,7 +155,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && visitor.has_return_with_value
         && func_name.starts_with('_')
     {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::IncorrectFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
         ));
@@ -164,7 +164,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && !visitor.has_yield_from
         && !func_name.starts_with('_')
     {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::MissingFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
         ));
@@ -189,7 +189,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                                 ),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                 }
             }
@@ -202,7 +202,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
     args.args.iter().chain(&args.kwonlyargs).for_each(|arg| {
         let name = arg.node.arg.to_string();
         if name.starts_with('_') {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::FixtureParamWithoutValue(name),
                 Range::from_located(arg),
             ));
@@ -213,7 +213,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
 /// PT020
 fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
     if is_pytest_yield_fixture(decorator, checker) {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::DeprecatedYieldFixture,
             Range::from_located(decorator),
         ));
@@ -233,7 +233,7 @@ fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[S
     }
 
     if let Some(addfinalizer) = visitor.addfinalizer_call {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::FixtureFinalizerCallback,
             Range::from_located(addfinalizer),
         ));
@@ -247,7 +247,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
 
         if checker.settings.enabled.contains(&CheckCode::PT024) {
             if name == "asyncio" {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::UnnecessaryAsyncioMarkOnFixture,
                     Range::from_located(mark),
                 ));
@@ -256,7 +256,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
 
         if checker.settings.enabled.contains(&CheckCode::PT025) {
             if name == "usefixtures" {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::ErroneousUseFixturesOnFixture,
                     Range::from_located(mark),
                 ));

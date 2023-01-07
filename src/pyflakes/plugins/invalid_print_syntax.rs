@@ -15,7 +15,7 @@ pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     if !checker.is_builtin("print") {
         return;
     };
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::InvalidPrintSyntax,
         Range::from_located(left),
     ));

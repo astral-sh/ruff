@@ -415,7 +415,7 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
 /// UP016
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
     if let Some(check) = handle_next_on_six_dict(expr, checker.patch(&CheckCode::UP016), checker) {
-        checker.add_check(check);
+        checker.checks.push(check);
         return;
     }
 
@@ -441,7 +441,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
             _ => return,
         };
         if let Some(check) = check {
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }

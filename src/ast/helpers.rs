@@ -11,7 +11,7 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
 
-use crate::ast::types::Range;
+use crate::ast::types::{Binding, BindingKind, Range};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::SourceCodeLocator;
@@ -406,6 +406,22 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
     Range::from_located(stmt)
 }
 
+/// Like `identifier_range`, but accepts a `Binding`.
+pub fn binding_range(binding: &Binding, locator: &SourceCodeLocator) -> Range {
+    if matches!(
+        binding.kind,
+        BindingKind::ClassDefinition | BindingKind::FunctionDefinition
+    ) {
+        if let Some(source) = &binding.source {
+            identifier_range(source, locator)
+        } else {
+            binding.range
+        }
+    } else {
+        binding.range
+    }
+}
+
 // Return the ranges of `Name` tokens within a specified node.
 pub fn find_names<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Vec<Range> {
     let contents = locator.slice_source_code_range(&Range::from_located(located));
@@ -554,7 +570,7 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> boo
             Location::new(stmt.location.row(), 0),
         );
         let line = locator.slice_source_code_range(&range);
-        if line.trim().ends_with('\\') {
+        if line.trim_end().ends_with('\\') {
             return true;
         }
     }

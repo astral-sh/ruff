@@ -48,7 +48,7 @@ pub fn explicit_ture_false_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
 
 /// SIM211
@@ -89,7 +89,7 @@ pub fn explicit_false_true_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
 
 /// SIM212
@@ -138,5 +138,5 @@ pub fn twisted_arms_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }

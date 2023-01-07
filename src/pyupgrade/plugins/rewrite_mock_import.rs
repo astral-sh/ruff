@@ -214,7 +214,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
                     value.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }
@@ -256,7 +256,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                                 stmt.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                 }
             }
@@ -288,7 +288,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                         Err(e) => error!("Failed to rewrite `mock` import: {e}"),
                     }
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
         _ => (),

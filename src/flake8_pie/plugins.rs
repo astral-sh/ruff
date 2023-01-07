@@ -38,7 +38,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                         }
                     }
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }
@@ -82,7 +82,7 @@ pub fn dupe_class_field_definitions(checker: &mut Checker, bases: &[Expr], body:
             if checker.patch(&CheckCode::PIE794) {
                 check.amend(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         } else {
             seen_targets.insert(target);
         }
@@ -105,7 +105,7 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }

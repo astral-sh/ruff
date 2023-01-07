@@ -20,5 +20,5 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
             ));
         }
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }

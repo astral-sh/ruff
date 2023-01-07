@@ -19,7 +19,7 @@ pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut
                     prefix_range.end_location,
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }

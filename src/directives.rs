@@ -5,9 +5,8 @@ use nohash_hasher::{IntMap, IntSet};
 use rustpython_ast::Location;
 use rustpython_parser::lexer::{LexResult, Tok};
 
-use crate::ast::types::Range;
 use crate::registry::LintSource;
-use crate::{Settings, SourceCodeLocator};
+use crate::Settings;
 
 bitflags! {
     pub struct Flags: u32 {
@@ -42,11 +41,7 @@ pub struct Directives {
     pub isort: IsortDirectives,
 }
 
-pub fn extract_directives(
-    lxr: &[LexResult],
-    locator: &SourceCodeLocator,
-    flags: Flags,
-) -> Directives {
+pub fn extract_directives(lxr: &[LexResult], flags: Flags) -> Directives {
     Directives {
         commented_lines: extract_commented_lines(lxr),
         noqa_line_for: if flags.contains(Flags::NOQA) {
@@ -55,7 +50,7 @@ pub fn extract_directives(
             IntMap::default()
         },
         isort: if flags.contains(Flags::ISORT) {
-            extract_isort_directives(lxr, locator)
+            extract_isort_directives(lxr)
         } else {
             IsortDirectives::default()
         },
@@ -65,7 +60,7 @@ pub fn extract_directives(
 pub fn extract_commented_lines(lxr: &[LexResult]) -> Vec<usize> {
     let mut commented_lines = Vec::new();
     for (start, tok, ..) in lxr.iter().flatten() {
-        if matches!(tok, Tok::Comment) {
+        if matches!(tok, Tok::Comment(_)) {
             commented_lines.push(start.row());
         }
     }
@@ -91,7 +86,7 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
 }
 
 /// Extract a set of lines over which to disable isort.
-pub fn extract_isort_directives(lxr: &[LexResult], locator: &SourceCodeLocator) -> IsortDirectives {
+pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
     let mut exclusions: IntSet<usize> = IntSet::default();
     let mut splits: Vec<usize> = Vec::default();
     let mut skip_file: bool = false;
@@ -105,12 +100,9 @@ pub fn extract_isort_directives(lxr: &[LexResult], locator: &SourceCodeLocator) 
             continue;
         }
 
-        if !matches!(tok, Tok::Comment) {
+        let Tok::Comment(comment_text) = tok else {
             continue;
-        }
-
-        // TODO(charlie): Modify RustPython to include the comment text in the token.
-        let comment_text = locator.slice_source_code_range(&Range::new(start, end));
+        };
 
         if comment_text == "# isort: split" {
             splits.push(start.row());
@@ -133,6 +125,7 @@ pub fn extract_isort_directives(lxr: &[LexResult], locator: &SourceCodeLocator) 
             }
         }
     }
+
     if skip_file {
         // Enforce `isort: skip_file`.
         if let Some(end) = last {
@@ -158,7 +151,6 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
 
     use crate::directives::{extract_isort_directives, extract_noqa_line_for};
-    use crate::SourceCodeLocator;
 
     #[test]
     fn noqa_extraction() {
@@ -246,11 +238,7 @@ z = x + 1",
 y = 2
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
-        assert_eq!(
-            extract_isort_directives(&lxr, &locator).exclusions,
-            IntSet::default()
-        );
+        assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
 
         let contents = "# isort: off
 x = 1
@@ -258,9 +246,8 @@ y = 2
 # isort: on
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
         assert_eq!(
-            extract_isort_directives(&lxr, &locator).exclusions,
+            extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4])
         );
 
@@ -272,9 +259,8 @@ y = 2
 z = x + 1
 # isort: on";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
         assert_eq!(
-            extract_isort_directives(&lxr, &locator).exclusions,
+            extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4, 5])
         );
 
@@ -283,9 +269,8 @@ x = 1
 y = 2
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
         assert_eq!(
-            extract_isort_directives(&lxr, &locator).exclusions,
+            extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4])
         );
 
@@ -294,9 +279,8 @@ x = 1
 y = 2
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
         assert_eq!(
-            extract_isort_directives(&lxr, &locator).exclusions,
+            extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([1, 2, 3, 4])
         );
 
@@ -307,9 +291,8 @@ y = 2
 # isort: skip_file
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
         assert_eq!(
-            extract_isort_directives(&lxr, &locator).exclusions,
+            extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([1, 2, 3, 4, 5, 6])
         );
     }
@@ -320,25 +303,19 @@ z = x + 1";
 y = 2
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
-        assert_eq!(
-            extract_isort_directives(&lxr, &locator).splits,
-            Vec::<usize>::new()
-        );
+        assert_eq!(extract_isort_directives(&lxr).splits, Vec::<usize>::new());
 
         let contents = "x = 1
 y = 2
 # isort: split
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
-        assert_eq!(extract_isort_directives(&lxr, &locator).splits, vec![3]);
+        assert_eq!(extract_isort_directives(&lxr).splits, vec![3]);
 
         let contents = "x = 1
 y = 2  # isort: split
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        let locator = SourceCodeLocator::new(contents);
-        assert_eq!(extract_isort_directives(&lxr, &locator).splits, vec![2]);
+        assert_eq!(extract_isort_directives(&lxr).splits, vec![2]);
     }
 }

@@ -106,7 +106,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                     types::ParametrizeNameType::List => {
                         let mut check = Check::new(
@@ -136,7 +136,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                     types::ParametrizeNameType::CSV => {}
                 }
@@ -170,7 +170,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                     types::ParametrizeNameType::CSV => {
                         let mut check = Check::new(
@@ -186,7 +186,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 ));
                             }
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                 }
             };
@@ -219,7 +219,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                     types::ParametrizeNameType::CSV => {
                         let mut check = Check::new(
@@ -235,7 +235,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 ));
                             }
                         }
-                        checker.add_check(check);
+                        checker.checks.push(check);
                     }
                 }
             };
@@ -256,7 +256,7 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
     match &expr.node {
         ExprKind::List { elts, .. } => {
             if values_type != types::ParametrizeValuesType::List {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::ParametrizeValuesWrongType(values_type, values_row_type),
                     Range::from_located(expr),
                 ));
@@ -265,7 +265,7 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
         }
         ExprKind::Tuple { elts, .. } => {
             if values_type != types::ParametrizeValuesType::Tuple {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::ParametrizeValuesWrongType(values_type, values_row_type),
                     Range::from_located(expr),
                 ));
@@ -291,7 +291,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
 
 fn handle_value_rows(
@@ -304,7 +304,7 @@ fn handle_value_rows(
         match &elt.node {
             ExprKind::Tuple { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::ParametrizeValuesWrongType(values_type, values_row_type),
                         Range::from_located(elt),
                     ));
@@ -312,7 +312,7 @@ fn handle_value_rows(
             }
             ExprKind::List { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
-                    checker.add_check(Check::new(
+                    checker.checks.push(Check::new(
                         CheckKind::ParametrizeValuesWrongType(values_type, values_row_type),
                         Range::from_located(elt),
                     ));

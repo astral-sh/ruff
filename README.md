@@ -180,7 +180,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.212'
+  rev: 'v0.0.213'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -569,7 +569,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F821 | UndefinedName | Undefined name `...` |  |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |  |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
-| F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
+| F841 | UnusedVariable | Local variable `...` is assigned to but never used | 🛠 |
 | F842 | UnusedAnnotation | Local variable `...` is annotated but never used |  |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
@@ -773,6 +773,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S108 | HardcodedTempFile | Probable insecure usage of temporary file or directory: "..." |  |
 | S113 | RequestWithoutTimeout | Probable use of requests call without timeout |  |
 | S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "..." |  |
+| S501 | RequestWithNoCertValidation | Probable use of `...` call with `verify=False` disabling SSL certificate checks |  |
 | S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 
 ### flake8-blind-except (BLE)
@@ -917,20 +918,20 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
-| PT008 | PatchWithLambda | Use `return_value=` instead of patching with lambda |  |
-| PT009 | UnittestAssertion | Use a regular assert instead of unittest-style '...' |  |
+| PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
+| PT009 | UnittestAssertion | Use a regular `assert` instead of unittest-style `...` |  |
 | PT010 | RaisesWithoutException | set the expected exception in `pytest.raises()` |  |
 | PT011 | RaisesTooBroad | `pytest.raises(...)` is too broad, set the `match` parameter or use a more specific exception |  |
 | PT012 | RaisesWithMultipleStatements | `pytest.raises()` block should contain a single simple statement |  |
 | PT013 | IncorrectPytestImport | Found incorrect import of pytest, use simple `import pytest` instead |  |
 | PT015 | AssertAlwaysFalse | Assertion always fails, replace with `pytest.fail()` |  |
 | PT016 | FailWithoutMessage | No message passed to `pytest.fail()` |  |
-| PT017 | AssertInExcept | Found assertion on exception ... in except block, use pytest.raises() instead |  |
+| PT017 | AssertInExcept | Found assertion on exception `...` in except block, use `pytest.raises()` instead |  |
 | PT018 | CompositeAssertion | Assertion should be broken down into multiple parts |  |
-| PT019 | FixtureParamWithoutValue | Fixture ... without value is injected as parameter, use @pytest.mark.usefixtures instead |  |
+| PT019 | FixtureParamWithoutValue | Fixture `...` without value is injected as parameter, use `@pytest.mark.usefixtures` instead |  |
 | PT020 | DeprecatedYieldFixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
 | PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
-| PT022 | UselessYieldFixture | No teardown in fixture ..., use `return` instead of `yield` | 🛠 |
+| PT022 | UselessYieldFixture | No teardown in fixture `...`, use `return` instead of `yield` | 🛠 |
 | PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark....` over `@pytest.mark....()` | 🛠 |
 | PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures |  |
 | PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures |  |
@@ -970,9 +971,10 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | ---- | ---- | ------- | --- |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
+| SIM103 | ReturnBoolConditionDirectly | Return the condition `...` directly | 🛠 |
 | SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
 | SIM107 | ReturnInTryExceptFinally | Don't use `return` in `try`/`except` and `finally` |  |
-| SIM108 | UseTernaryOperator | Use ternary operator `..` instead of if-else-block | 🛠 |
+| SIM108 | UseTernaryOperator | Use ternary operator `...` instead of if-else-block | 🛠 |
 | SIM109 | CompareWithTuple | Use `value in (..., ...)` instead of `value == ... or value == ...` | 🛠 |
 | SIM110 | ConvertLoopToAny | Use `return any(x for x in y)` instead of `for` loop | 🛠 |
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
@@ -1326,8 +1328,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff
+      # Include `--format=github` to enable automatic inline annotations.
       - name: Run Ruff
-        run: ruff .
+        run: ruff --format=github .
 ```
 
 ## FAQ

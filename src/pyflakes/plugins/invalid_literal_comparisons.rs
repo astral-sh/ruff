@@ -49,7 +49,7 @@ pub fn invalid_literal_comparison(
                     eprintln!("Failed to fix invalid comparison due to missing op");
                 }
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
         left = right;
     }

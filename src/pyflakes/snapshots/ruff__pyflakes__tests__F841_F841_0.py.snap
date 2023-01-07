@@ -10,7 +10,14 @@ expression: checks
   end_location:
     row: 3
     column: 22
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 3
+      column: 17
+    end_location:
+      row: 3
+      column: 22
   parent: ~
 - kind:
     UnusedVariable: z
@@ -20,7 +27,14 @@ expression: checks
   end_location:
     row: 16
     column: 5
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 16
+      column: 8
   parent: ~
 - kind:
     UnusedVariable: foo
@@ -30,7 +44,14 @@ expression: checks
   end_location:
     row: 20
     column: 7
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 21
+      column: 0
   parent: ~
 - kind:
     UnusedVariable: a
@@ -70,7 +91,14 @@ expression: checks
   end_location:
     row: 51
     column: 9
-  fix: ~
+  fix:
+    content: pass
+    location:
+      row: 51
+      column: 8
+    end_location:
+      row: 51
+      column: 13
   parent: ~
 - kind:
     UnusedVariable: my_file
@@ -80,7 +108,14 @@ expression: checks
   end_location:
     row: 79
     column: 32
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 79
+      column: 21
+    end_location:
+      row: 79
+      column: 32
   parent: ~
 - kind:
     UnusedVariable: my_file
@@ -90,6 +125,13 @@ expression: checks
   end_location:
     row: 85
     column: 31
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 85
+      column: 20
+    end_location:
+      row: 85
+      column: 31
   parent: ~
 

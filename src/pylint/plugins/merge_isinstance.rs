@@ -41,7 +41,7 @@ pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values:
 
     for (obj, (num_calls, types)) in obj_to_types {
         if num_calls > 1 && types.len() > 1 {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::ConsiderMergingIsinstance(obj, types.into_iter().sorted().collect()),
                 Range::from_located(expr),
             ));

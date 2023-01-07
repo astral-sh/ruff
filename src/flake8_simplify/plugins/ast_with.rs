@@ -13,7 +13,7 @@ pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
     if matches!(body[0].node, StmtKind::With { .. }) {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::MultipleWithStatements,
             Range::from_located(stmt),
         ));

@@ -128,7 +128,7 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                         sibling.end_location.unwrap(),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
 
@@ -167,7 +167,7 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                         sibling.end_location.unwrap(),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }

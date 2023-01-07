@@ -65,5 +65,5 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
         }
     }
 
-    checker.add_check(check);
+    checker.checks.push(check);
 }

@@ -206,7 +206,7 @@ pub fn literal_comparisons(
         }
     }
 
-    checker.add_checks(checks.into_iter());
+    checker.checks.extend(checks);
 }
 
 /// E713, E714
@@ -240,7 +240,7 @@ pub fn not_tests(
                                     expr.end_location.unwrap(),
                                 ));
                             }
-                            checker.add_check(check);
+                            checker.checks.push(check);
                         }
                     }
                     Cmpop::Is => {
@@ -254,7 +254,7 @@ pub fn not_tests(
                                     expr.end_location.unwrap(),
                                 ));
                             }
-                            checker.add_check(check);
+                            checker.checks.push(check);
                         }
                     }
                     _ => {}
@@ -328,7 +328,7 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                     ));
                 }
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }

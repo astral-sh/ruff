@@ -117,7 +117,7 @@ pub fn abstract_base_class(
                 .iter()
                 .any(|d| is_overload(d, &checker.from_imports, &checker.import_aliases))
         {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::EmptyMethodWithoutAbstractDecorator(name.to_string()),
                 Range::from_located(stmt),
             ));
@@ -125,7 +125,7 @@ pub fn abstract_base_class(
     }
     if checker.settings.enabled.contains(&CheckCode::B024) {
         if !has_abstract_method {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::AbstractBaseClassWithoutAbstractMethod(name.to_string()),
                 Range::from_located(stmt),
             ));

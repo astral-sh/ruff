@@ -33,7 +33,7 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
         return;
     }
 
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::NoAssertRaisesException,
         Range::from_located(stmt),
     ));

@@ -17,7 +17,7 @@ fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
             node.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
 
 /// UP023

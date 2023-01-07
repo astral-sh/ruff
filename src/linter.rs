@@ -256,11 +256,8 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(
-        &tokens,
-        &locator,
-        directives::Flags::from_settings(settings),
-    );
+    let directives =
+        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
     // Generate checks, ignoring any existing `noqa` directives.
     let checks = check_path(
@@ -361,11 +358,8 @@ fn lint_only(
     let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(
-        &tokens,
-        &locator,
-        directives::Flags::from_settings(settings),
-    );
+    let directives =
+        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
     // Generate checks.
     let checks = check_path(
@@ -424,11 +418,8 @@ fn lint_fix(
         let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
-        let directives = directives::extract_directives(
-            &tokens,
-            &locator,
-            directives::Flags::from_settings(settings),
-        );
+        let directives =
+            directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
         // Generate checks.
         let checks = check_path(
@@ -502,11 +493,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
     let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
-    let directives = directives::extract_directives(
-        &tokens,
-        &locator,
-        directives::Flags::from_settings(settings),
-    );
+    let directives =
+        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
     let mut checks = check_path(
         path,
         None,
@@ -522,7 +510,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
 
     // Detect autofixes that don't converge after multiple iterations.
     if checks.iter().any(|check| check.fix.is_some()) {
-        let max_iterations = 3;
+        let max_iterations = 10;
 
         let mut contents = contents.clone();
         let mut iterations = 0;
@@ -531,11 +519,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
             let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
             let locator = SourceCodeLocator::new(&contents);
             let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
-            let directives = directives::extract_directives(
-                &tokens,
-                &locator,
-                directives::Flags::from_settings(settings),
-            );
+            let directives =
+                directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
             let checks = check_path(
                 path,
                 None,

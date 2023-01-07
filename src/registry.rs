@@ -220,6 +220,7 @@ pub enum CheckCode {
     // flake8-simplify
     SIM101,
     SIM102,
+    SIM103,
     SIM105,
     SIM107,
     SIM108,
@@ -345,6 +346,7 @@ pub enum CheckCode {
     S108,
     S113,
     S324,
+    S501,
     S506,
     // flake8-boolean-trap
     FBT001,
@@ -969,6 +971,7 @@ pub enum CheckKind {
     SysVersionCmpStr10,
     SysVersionSlice1Referenced,
     // flake8-simplify
+    ReturnBoolConditionDirectly(String),
     UseTernaryOperator(String),
     CompareWithTuple(String, Vec<String>, String),
     DuplicateIsinstanceCall(String),
@@ -1096,6 +1099,7 @@ pub enum CheckKind {
     HardcodedTempFile(String),
     HashlibInsecureHashFunction(String),
     RequestWithoutTimeout(Option<String>),
+    RequestWithNoCertValidation(String),
     UnsafeYAMLLoad(Option<String>),
     // mccabe
     FunctionIsTooComplex(String, usize),
@@ -1422,9 +1426,10 @@ impl CheckCode {
             // flake8-simplify
             CheckCode::SIM101 => CheckKind::DuplicateIsinstanceCall("...".to_string()),
             CheckCode::SIM102 => CheckKind::NestedIfStatements,
+            CheckCode::SIM103 => CheckKind::ReturnBoolConditionDirectly("...".to_string()),
             CheckCode::SIM105 => CheckKind::UseContextlibSuppress("...".to_string()),
             CheckCode::SIM107 => CheckKind::ReturnInTryExceptFinally,
-            CheckCode::SIM108 => CheckKind::UseTernaryOperator("..".to_string()),
+            CheckCode::SIM108 => CheckKind::UseTernaryOperator("...".to_string()),
             CheckCode::SIM109 => CheckKind::CompareWithTuple(
                 "value".to_string(),
                 vec!["...".to_string(), "...".to_string()],
@@ -1578,6 +1583,7 @@ impl CheckCode {
             CheckCode::S108 => CheckKind::HardcodedTempFile("...".to_string()),
             CheckCode::S113 => CheckKind::RequestWithoutTimeout(None),
             CheckCode::S324 => CheckKind::HashlibInsecureHashFunction("...".to_string()),
+            CheckCode::S501 => CheckKind::RequestWithNoCertValidation("...".to_string()),
             CheckCode::S506 => CheckKind::UnsafeYAMLLoad(None),
             // mccabe
             CheckCode::C901 => CheckKind::FunctionIsTooComplex("...".to_string(), 10),
@@ -1983,8 +1989,10 @@ impl CheckCode {
             CheckCode::S108 => CheckCategory::Flake8Bandit,
             CheckCode::S113 => CheckCategory::Flake8Bandit,
             CheckCode::S324 => CheckCategory::Flake8Bandit,
+            CheckCode::S501 => CheckCategory::Flake8Bandit,
             CheckCode::S506 => CheckCategory::Flake8Bandit,
             // flake8-simplify
+            CheckCode::SIM103 => CheckCategory::Flake8Simplify,
             CheckCode::SIM101 => CheckCategory::Flake8Simplify,
             CheckCode::SIM102 => CheckCategory::Flake8Simplify,
             CheckCode::SIM105 => CheckCategory::Flake8Simplify,
@@ -2269,6 +2277,7 @@ impl CheckKind {
             CheckKind::NegateNotEqualOp(..) => &CheckCode::SIM202,
             CheckKind::NestedIfStatements => &CheckCode::SIM102,
             CheckKind::OrTrue => &CheckCode::SIM222,
+            CheckKind::ReturnBoolConditionDirectly(..) => &CheckCode::SIM103,
             CheckKind::ReturnInTryExceptFinally => &CheckCode::SIM107,
             CheckKind::UseContextlibSuppress(..) => &CheckCode::SIM105,
             CheckKind::UseTernaryOperator(..) => &CheckCode::SIM108,
@@ -2379,6 +2388,7 @@ impl CheckKind {
             CheckKind::HardcodedTempFile(..) => &CheckCode::S108,
             CheckKind::RequestWithoutTimeout(..) => &CheckCode::S113,
             CheckKind::HashlibInsecureHashFunction(..) => &CheckCode::S324,
+            CheckKind::RequestWithNoCertValidation(..) => &CheckCode::S501,
             CheckKind::UnsafeYAMLLoad(..) => &CheckCode::S506,
             // mccabe
             CheckKind::FunctionIsTooComplex(..) => &CheckCode::C901,
@@ -3030,6 +3040,9 @@ impl CheckKind {
                 "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
             }
             // flake8-simplify
+            CheckKind::ReturnBoolConditionDirectly(cond) => {
+                format!("Return the condition `{cond}` directly")
+            }
             CheckKind::CompareWithTuple(value, values, or_op) => {
                 let values = values.join(", ");
                 format!("Use `{value} in ({values})` instead of `{or_op}`")
@@ -3375,6 +3388,12 @@ impl CheckKind {
                     string.escape_debug()
                 )
             }
+            CheckKind::RequestWithNoCertValidation(string) => {
+                format!(
+                    "Probable use of `{string}` call with `verify=False` disabling SSL \
+                     certificate checks"
+                )
+            }
             CheckKind::UnsafeYAMLLoad(loader) => match loader {
                 Some(name) => {
                     format!(
@@ -3544,10 +3563,10 @@ impl CheckKind {
                 )
             }
             CheckKind::PatchWithLambda => {
-                "Use `return_value=` instead of patching with lambda".to_string()
+                "Use `return_value=` instead of patching with `lambda`".to_string()
             }
             CheckKind::UnittestAssertion(assertion) => {
-                format!("Use a regular assert instead of unittest-style '{assertion}'")
+                format!("Use a regular `assert` instead of unittest-style `{assertion}`")
             }
             CheckKind::RaisesWithoutException => {
                 "set the expected exception in `pytest.raises()`".to_string()
@@ -3570,7 +3589,7 @@ impl CheckKind {
             CheckKind::FailWithoutMessage => "No message passed to `pytest.fail()`".to_string(),
             CheckKind::AssertInExcept(name) => {
                 format!(
-                    "Found assertion on exception {name} in except block, use pytest.raises() \
+                    "Found assertion on exception `{name}` in except block, use `pytest.raises()` \
                      instead"
                 )
             }
@@ -3579,8 +3598,8 @@ impl CheckKind {
             }
             CheckKind::FixtureParamWithoutValue(name) => {
                 format!(
-                    "Fixture {name} without value is injected as parameter, use \
-                     @pytest.mark.usefixtures instead"
+                    "Fixture `{name}` without value is injected as parameter, use \
+                     `@pytest.mark.usefixtures` instead"
                 )
             }
             CheckKind::DeprecatedYieldFixture => {
@@ -3590,7 +3609,7 @@ impl CheckKind {
                 "Use `yield` instead of `request.addfinalizer`".to_string()
             }
             CheckKind::UselessYieldFixture(name) => {
-                format!("No teardown in fixture {name}, use `return` instead of `yield`")
+                format!("No teardown in fixture `{name}`, use `return` instead of `yield`")
             }
             CheckKind::IncorrectMarkParenthesesStyle(mark_name, expected_parens, actual_parens) => {
                 format!(
@@ -3792,6 +3811,7 @@ impl CheckKind {
             | CheckKind::RemoveSixCompat
             | CheckKind::ReplaceStdoutStderr
             | CheckKind::ReplaceUniversalNewlines
+            | CheckKind::ReturnBoolConditionDirectly(..)
             | CheckKind::RewriteCElementTree
             | CheckKind::RewriteListComprehension
             | CheckKind::RewriteMockImport(..)
@@ -3829,6 +3849,7 @@ impl CheckKind {
             | CheckKind::UnsortedImports
             | CheckKind::UnusedLoopControlVariable(..)
             | CheckKind::UnusedNOQA(..)
+            | CheckKind::UnusedVariable(..)
             | CheckKind::UseFixturesWithoutParameters
             | CheckKind::UsePEP585Annotation(..)
             | CheckKind::UsePEP604Annotation
@@ -4015,6 +4036,9 @@ impl CheckKind {
                 Some(format!("Replace with `except {name}`"))
             }
             CheckKind::RemoveSixCompat => Some("Remove `six` usage".to_string()),
+            CheckKind::ReturnBoolConditionDirectly(cond) => {
+                Some(format!("Replace with `return {cond}`"))
+            }
             CheckKind::SectionNameEndsInColon(name) => Some(format!("Add colon to \"{name}\"")),
             CheckKind::SectionNotOverIndented(name) => {
                 Some(format!("Remove over-indentation from \"{name}\""))
@@ -4111,6 +4135,9 @@ impl CheckKind {
                 Some(format!("Rename unused `{name}` to `_{name}`"))
             }
             CheckKind::UnusedNOQA(..) => Some("Remove unused `noqa` directive".to_string()),
+            CheckKind::UnusedVariable(name) => {
+                Some(format!("Remove assignment to unused variable `{name}`"))
+            }
             CheckKind::UsePEP585Annotation(name) => {
                 Some(format!("Replace `{name}` with `{}`", name.to_lowercase(),))
             }

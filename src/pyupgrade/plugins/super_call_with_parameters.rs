@@ -26,5 +26,5 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
             check.amend(fix);
         }
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }

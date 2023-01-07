@@ -93,7 +93,7 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
                     value.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }
