@@ -1,8 +1,6 @@
 use std::string::ToString;
 
-use rustpython_parser::ast::{
-    Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
-};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::except_range;
 use crate::ast::types::{Binding, Range, Scope, ScopeKind};
@@ -68,59 +66,6 @@ pub fn default_except_not_last(
     }
 
     None
-}
-
-#[derive(Debug, PartialEq)]
-enum DictionaryKey<'a> {
-    Constant(&'a Constant),
-    Variable(&'a str),
-}
-
-fn convert_to_value(expr: &Expr) -> Option<DictionaryKey> {
-    match &expr.node {
-        ExprKind::Constant { value, .. } => Some(DictionaryKey::Constant(value)),
-        ExprKind::Name { id, .. } => Some(DictionaryKey::Variable(id)),
-        _ => None,
-    }
-}
-
-/// F601, F602
-pub fn repeated_keys(
-    keys: &[Expr],
-    check_repeated_literals: bool,
-    check_repeated_variables: bool,
-) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
-
-    let num_keys = keys.len();
-    for i in 0..num_keys {
-        let k1 = &keys[i];
-        let v1 = convert_to_value(k1);
-        for k2 in keys.iter().take(num_keys).skip(i + 1) {
-            let v2 = convert_to_value(k2);
-            match (&v1, &v2) {
-                (Some(DictionaryKey::Constant(v1)), Some(DictionaryKey::Constant(v2))) => {
-                    if check_repeated_literals && v1 == v2 {
-                        checks.push(Check::new(
-                            violations::MultiValueRepeatedKeyLiteral,
-                            Range::from_located(k2),
-                        ));
-                    }
-                }
-                (Some(DictionaryKey::Variable(v1)), Some(DictionaryKey::Variable(v2))) => {
-                    if check_repeated_variables && v1 == v2 {
-                        checks.push(Check::new(
-                            violations::MultiValueRepeatedKeyVariable((*v2).to_string()),
-                            Range::from_located(k2),
-                        ));
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    checks
 }
 
 /// F621, F622

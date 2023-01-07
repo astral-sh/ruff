@@ -551,8 +551,8 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): ... |  |
 | F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders | 🛠 |
-| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
-| F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
+| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal `...` repeated | 🛠 |
+| F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated | 🛠 |
 | F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |  |
 | F622 | TwoStarredExpressions | Two starred expressions in assignment |  |
 | F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |  |
