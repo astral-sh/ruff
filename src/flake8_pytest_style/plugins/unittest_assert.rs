@@ -42,43 +42,42 @@ pub enum UnittestAssert {
 
 impl std::fmt::Display for UnittestAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use UnittestAssert::*;
         match self {
-            AlmostEqual => write!(f, "assertAlmostEqual"),
-            AlmostEquals => write!(f, "assertAlmostEquals"),
-            DictEqual => write!(f, "assertDictEqual"),
-            Equal => write!(f, "assertEqual"),
-            Equals => write!(f, "assertEquals"),
-            False => write!(f, "assertFalse"),
-            Greater => write!(f, "assertGreater"),
-            GreaterEqual => write!(f, "assertGreaterEqual"),
-            In => write!(f, "assertIn"),
-            Is => write!(f, "assertIs"),
-            IsInstance => write!(f, "assertIsInstance"),
-            IsNone => write!(f, "assertIsNone"),
-            IsNot => write!(f, "assertIsNot"),
-            IsNotNone => write!(f, "assertIsNotNone"),
-            ItemsEqual => write!(f, "assertItemsEqual"),
-            Less => write!(f, "assertLess"),
-            LessEqual => write!(f, "assertLessEqual"),
-            MultiLineEqual => write!(f, "assertMultiLineEqual"),
-            NotAlmostEqual => write!(f, "assertNotAlmostEqual"),
-            NotAlmostEquals => write!(f, "assertNotAlmostEquals"),
-            NotContains => write!(f, "assertNotContains"),
-            NotEqual => write!(f, "assertNotEqual"),
-            NotEquals => write!(f, "assertNotEquals"),
-            NotIn => write!(f, "assertNotIn"),
-            NotIsInstance => write!(f, "assertNotIsInstance"),
-            NotRegex => write!(f, "assertNotRegex"),
-            NotRegexpMatches => write!(f, "assertNotRegexpMatches"),
-            Raises => write!(f, "assertRaises"),
-            RaisesMessage => write!(f, "assertRaisesMessage"),
-            RaisesRegexp => write!(f, "assertRaisesRegexp"),
-            Regex => write!(f, "assertRegex"),
-            RegexpMatches => write!(f, "assertRegexpMatches"),
-            SetEqual => write!(f, "assertSetEqual"),
-            True => write!(f, "assertTrue"),
-            Underscore => write!(f, "assert_"),
+            UnittestAssert::AlmostEqual => write!(f, "assertAlmostEqual"),
+            UnittestAssert::AlmostEquals => write!(f, "assertAlmostEquals"),
+            UnittestAssert::DictEqual => write!(f, "assertDictEqual"),
+            UnittestAssert::Equal => write!(f, "assertEqual"),
+            UnittestAssert::Equals => write!(f, "assertEquals"),
+            UnittestAssert::False => write!(f, "assertFalse"),
+            UnittestAssert::Greater => write!(f, "assertGreater"),
+            UnittestAssert::GreaterEqual => write!(f, "assertGreaterEqual"),
+            UnittestAssert::In => write!(f, "assertIn"),
+            UnittestAssert::Is => write!(f, "assertIs"),
+            UnittestAssert::IsInstance => write!(f, "assertIsInstance"),
+            UnittestAssert::IsNone => write!(f, "assertIsNone"),
+            UnittestAssert::IsNot => write!(f, "assertIsNot"),
+            UnittestAssert::IsNotNone => write!(f, "assertIsNotNone"),
+            UnittestAssert::ItemsEqual => write!(f, "assertItemsEqual"),
+            UnittestAssert::Less => write!(f, "assertLess"),
+            UnittestAssert::LessEqual => write!(f, "assertLessEqual"),
+            UnittestAssert::MultiLineEqual => write!(f, "assertMultiLineEqual"),
+            UnittestAssert::NotAlmostEqual => write!(f, "assertNotAlmostEqual"),
+            UnittestAssert::NotAlmostEquals => write!(f, "assertNotAlmostEquals"),
+            UnittestAssert::NotContains => write!(f, "assertNotContains"),
+            UnittestAssert::NotEqual => write!(f, "assertNotEqual"),
+            UnittestAssert::NotEquals => write!(f, "assertNotEquals"),
+            UnittestAssert::NotIn => write!(f, "assertNotIn"),
+            UnittestAssert::NotIsInstance => write!(f, "assertNotIsInstance"),
+            UnittestAssert::NotRegex => write!(f, "assertNotRegex"),
+            UnittestAssert::NotRegexpMatches => write!(f, "assertNotRegexpMatches"),
+            UnittestAssert::Raises => write!(f, "assertRaises"),
+            UnittestAssert::RaisesMessage => write!(f, "assertRaisesMessage"),
+            UnittestAssert::RaisesRegexp => write!(f, "assertRaisesRegexp"),
+            UnittestAssert::Regex => write!(f, "assertRegex"),
+            UnittestAssert::RegexpMatches => write!(f, "assertRegexpMatches"),
+            UnittestAssert::SetEqual => write!(f, "assertSetEqual"),
+            UnittestAssert::True => write!(f, "assertTrue"),
+            UnittestAssert::Underscore => write!(f, "assert_"),
         }
     }
 }
@@ -87,43 +86,42 @@ impl TryFrom<&str> for UnittestAssert {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        use UnittestAssert::*;
         match value {
-            "assertAlmostEqual" => Ok(AlmostEqual),
-            "assertAlmostEquals" => Ok(AlmostEquals),
-            "assertDictEqual" => Ok(DictEqual),
-            "assertEqual" => Ok(Equal),
-            "assertEquals" => Ok(Equals),
-            "assertFalse" => Ok(False),
-            "assertGreater" => Ok(Greater),
-            "assertGreaterEqual" => Ok(GreaterEqual),
-            "assertIn" => Ok(In),
-            "assertIs" => Ok(Is),
-            "assertIsInstance" => Ok(IsInstance),
-            "assertIsNone" => Ok(IsNone),
-            "assertIsNot" => Ok(IsNot),
-            "assertIsNotNone" => Ok(IsNotNone),
-            "assertItemsEqual" => Ok(ItemsEqual),
-            "assertLess" => Ok(Less),
-            "assertLessEqual" => Ok(LessEqual),
-            "assertMultiLineEqual" => Ok(MultiLineEqual),
-            "assertNotAlmostEqual" => Ok(NotAlmostEqual),
-            "assertNotAlmostEquals" => Ok(NotAlmostEquals),
-            "assertNotContains" => Ok(NotContains),
-            "assertNotEqual" => Ok(NotEqual),
-            "assertNotEquals" => Ok(NotEquals),
-            "assertNotIn" => Ok(NotIn),
-            "assertNotIsInstance" => Ok(NotIsInstance),
-            "assertNotRegex" => Ok(NotRegex),
-            "assertNotRegexpMatches" => Ok(NotRegexpMatches),
-            "assertRaises" => Ok(Raises),
-            "assertRaisesMessage" => Ok(RaisesMessage),
-            "assertRaisesRegexp" => Ok(RaisesRegexp),
-            "assertRegex" => Ok(Regex),
-            "assertRegexpMatches" => Ok(RegexpMatches),
-            "assertSetEqual" => Ok(SetEqual),
-            "assertTrue" => Ok(True),
-            "assert_" => Ok(Underscore),
+            "assertAlmostEqual" => Ok(UnittestAssert::AlmostEqual),
+            "assertAlmostEquals" => Ok(UnittestAssert::AlmostEquals),
+            "assertDictEqual" => Ok(UnittestAssert::DictEqual),
+            "assertEqual" => Ok(UnittestAssert::Equal),
+            "assertEquals" => Ok(UnittestAssert::Equals),
+            "assertFalse" => Ok(UnittestAssert::False),
+            "assertGreater" => Ok(UnittestAssert::Greater),
+            "assertGreaterEqual" => Ok(UnittestAssert::GreaterEqual),
+            "assertIn" => Ok(UnittestAssert::In),
+            "assertIs" => Ok(UnittestAssert::Is),
+            "assertIsInstance" => Ok(UnittestAssert::IsInstance),
+            "assertIsNone" => Ok(UnittestAssert::IsNone),
+            "assertIsNot" => Ok(UnittestAssert::IsNot),
+            "assertIsNotNone" => Ok(UnittestAssert::IsNotNone),
+            "assertItemsEqual" => Ok(UnittestAssert::ItemsEqual),
+            "assertLess" => Ok(UnittestAssert::Less),
+            "assertLessEqual" => Ok(UnittestAssert::LessEqual),
+            "assertMultiLineEqual" => Ok(UnittestAssert::MultiLineEqual),
+            "assertNotAlmostEqual" => Ok(UnittestAssert::NotAlmostEqual),
+            "assertNotAlmostEquals" => Ok(UnittestAssert::NotAlmostEquals),
+            "assertNotContains" => Ok(UnittestAssert::NotContains),
+            "assertNotEqual" => Ok(UnittestAssert::NotEqual),
+            "assertNotEquals" => Ok(UnittestAssert::NotEquals),
+            "assertNotIn" => Ok(UnittestAssert::NotIn),
+            "assertNotIsInstance" => Ok(UnittestAssert::NotIsInstance),
+            "assertNotRegex" => Ok(UnittestAssert::NotRegex),
+            "assertNotRegexpMatches" => Ok(UnittestAssert::NotRegexpMatches),
+            "assertRaises" => Ok(UnittestAssert::Raises),
+            "assertRaisesMessage" => Ok(UnittestAssert::RaisesMessage),
+            "assertRaisesRegexp" => Ok(UnittestAssert::RaisesRegexp),
+            "assertRegex" => Ok(UnittestAssert::Regex),
+            "assertRegexpMatches" => Ok(UnittestAssert::RegexpMatches),
+            "assertSetEqual" => Ok(UnittestAssert::SetEqual),
+            "assertTrue" => Ok(UnittestAssert::True),
+            "assert_" => Ok(UnittestAssert::Underscore),
             _ => Err(format!("Unknown unittest assert name: {value}")),
         }
     }
@@ -154,62 +152,67 @@ fn compare(left: &Expr, cmpop: Cmpop, right: &Expr) -> Expr {
 
 /// Represents the signature of an assert method.
 /// For example, `assertTrue` signature is expressed as
-/// `Signature::new( args: vec!["expr"], keywords: vec!["msg"])`.
-pub struct Signature<'a> {
-    pos_args: Vec<&'a str>,
-    kw_args: Vec<&'a str>,
+/// `Arguments::( args: vec!["expr"], keywords: vec!["msg"])`.
+pub struct Arguments<'a> {
+    positional: Vec<&'a str>,
+    keyword: Vec<&'a str>,
 }
 
-impl<'a> Signature<'a> {
-    pub fn new(pos_args: Vec<&'a str>, kw_args: Vec<&'a str>) -> Self {
-        Self { pos_args, kw_args }
+impl<'a> Arguments<'a> {
+    pub fn new(positional: Vec<&'a str>, keyword: Vec<&'a str>) -> Self {
+        Self {
+            positional,
+            keyword,
+        }
     }
 
     pub fn is_valid_arg(&self, arg: &str) -> bool {
-        self.pos_args.contains(&arg) || self.kw_args.contains(&arg)
+        self.positional.contains(&arg) || self.keyword.contains(&arg)
     }
 }
 
 impl UnittestAssert {
-    pub fn signature(&self) -> Signature {
-        use UnittestAssert::*;
-
+    pub fn arguments(&self) -> Arguments {
         match self {
-            AlmostEqual => Signature::new(vec!["first", "second"], vec!["places", "msg", "delta"]),
-            AlmostEquals => Signature::new(vec!["first", "second"], vec!["places", "msg", "delta"]),
-            DictEqual => Signature::new(vec!["d1", "d2"], vec!["msg"]),
-            Equal => Signature::new(vec!["first", "second"], vec!["msg"]),
-            Equals => Signature::new(vec!["first", "second"], vec!["msg"]),
-            False => Signature::new(vec!["expr"], vec!["msg"]),
-            Greater => Signature::new(vec!["first", "second"], vec!["msg"]),
-            GreaterEqual => Signature::new(vec!["first", "second"], vec!["msg"]),
-            In => Signature::new(vec!["member", "container"], vec!["msg"]),
-            Is => Signature::new(vec!["expr1", "expr2"], vec!["msg"]),
-            IsInstance => Signature::new(vec!["obj", "cls"], vec!["msg"]),
-            IsNone => Signature::new(vec!["expr"], vec!["msg"]),
-            IsNot => Signature::new(vec!["expr1", "expr2"], vec!["msg"]),
-            IsNotNone => Signature::new(vec!["expr"], vec!["msg"]),
-            ItemsEqual => Signature::new(vec!["first", "second"], vec!["msg"]),
-            Less => Signature::new(vec!["first", "second"], vec!["msg"]),
-            LessEqual => Signature::new(vec!["first", "second"], vec!["msg"]),
-            MultiLineEqual => Signature::new(vec!["first", "second"], vec!["msg"]),
-            NotAlmostEqual => Signature::new(vec!["first", "second"], vec!["msg"]),
-            NotAlmostEquals => Signature::new(vec!["first", "second"], vec!["msg"]),
-            NotContains => Signature::new(vec!["container", "member"], vec!["msg"]),
-            NotEqual => Signature::new(vec!["first", "second"], vec!["msg"]),
-            NotEquals => Signature::new(vec!["first", "second"], vec!["msg"]),
-            NotIn => Signature::new(vec!["member", "container"], vec!["msg"]),
-            NotIsInstance => Signature::new(vec!["obj", "cls"], vec!["msg"]),
-            NotRegex => Signature::new(vec!["text", "regex"], vec!["msg"]),
-            NotRegexpMatches => Signature::new(vec!["text", "regex"], vec!["msg"]),
-            Raises => Signature::new(vec!["exception"], vec!["msg"]),
-            RaisesMessage => Signature::new(vec!["exception", "msg"], vec!["msg"]),
-            RaisesRegexp => Signature::new(vec!["exception", "regex"], vec!["msg"]),
-            Regex => Signature::new(vec!["text", "regex"], vec!["msg"]),
-            RegexpMatches => Signature::new(vec!["text", "regex"], vec!["msg"]),
-            SetEqual => Signature::new(vec!["set1", "set2"], vec!["msg"]),
-            True => Signature::new(vec!["expr"], vec!["msg"]),
-            Underscore => Signature::new(vec!["expr"], vec!["msg"]),
+            UnittestAssert::AlmostEqual => {
+                Arguments::new(vec!["first", "second"], vec!["places", "msg", "delta"])
+            }
+            UnittestAssert::AlmostEquals => {
+                Arguments::new(vec!["first", "second"], vec!["places", "msg", "delta"])
+            }
+            UnittestAssert::DictEqual => Arguments::new(vec!["d1", "d2"], vec!["msg"]),
+            UnittestAssert::Equal => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::Equals => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::False => Arguments::new(vec!["expr"], vec!["msg"]),
+            UnittestAssert::Greater => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::GreaterEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::In => Arguments::new(vec!["member", "container"], vec!["msg"]),
+            UnittestAssert::Is => Arguments::new(vec!["expr1", "expr2"], vec!["msg"]),
+            UnittestAssert::IsInstance => Arguments::new(vec!["obj", "cls"], vec!["msg"]),
+            UnittestAssert::IsNone => Arguments::new(vec!["expr"], vec!["msg"]),
+            UnittestAssert::IsNot => Arguments::new(vec!["expr1", "expr2"], vec!["msg"]),
+            UnittestAssert::IsNotNone => Arguments::new(vec!["expr"], vec!["msg"]),
+            UnittestAssert::ItemsEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::Less => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::LessEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::MultiLineEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::NotAlmostEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::NotAlmostEquals => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::NotContains => Arguments::new(vec!["container", "member"], vec!["msg"]),
+            UnittestAssert::NotEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::NotEquals => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::NotIn => Arguments::new(vec!["member", "container"], vec!["msg"]),
+            UnittestAssert::NotIsInstance => Arguments::new(vec!["obj", "cls"], vec!["msg"]),
+            UnittestAssert::NotRegex => Arguments::new(vec!["text", "regex"], vec!["msg"]),
+            UnittestAssert::NotRegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
+            UnittestAssert::Raises => Arguments::new(vec!["exception"], vec!["msg"]),
+            UnittestAssert::RaisesMessage => Arguments::new(vec!["exception", "msg"], vec!["msg"]),
+            UnittestAssert::RaisesRegexp => Arguments::new(vec!["exception", "regex"], vec!["msg"]),
+            UnittestAssert::Regex => Arguments::new(vec!["text", "regex"], vec!["msg"]),
+            UnittestAssert::RegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
+            UnittestAssert::SetEqual => Arguments::new(vec!["set1", "set2"], vec!["msg"]),
+            UnittestAssert::True => Arguments::new(vec!["expr"], vec!["msg"]),
+            UnittestAssert::Underscore => Arguments::new(vec!["expr"], vec!["msg"]),
         }
     }
 
@@ -226,14 +229,14 @@ impl UnittestAssert {
             return Err("Contains variable-length arguments. Cannot autofix.".to_string());
         }
 
-        let sig = self.signature();
+        let arguments = self.arguments();
         let mut arg_hashmap: FxHashMap<&str, &Expr> = FxHashMap::default();
-        for (arg, value) in sig.pos_args.iter().zip(args.iter()) {
+        for (arg, value) in arguments.positional.iter().zip(args.iter()) {
             arg_hashmap.insert(arg, value);
         }
         for kw in keywords {
             let arg = kw.node.arg.as_ref().unwrap();
-            if !sig.is_valid_arg((*arg).as_str()) {
+            if !arguments.is_valid_arg((*arg).as_str()) {
                 return Err(format!("Unexpected keyword argument `{arg}`"));
             }
             arg_hashmap.insert(kw.node.arg.as_ref().unwrap().as_str(), &kw.node.value);
@@ -242,9 +245,8 @@ impl UnittestAssert {
     }
 
     pub fn generate_assert(&self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt, String> {
-        use UnittestAssert::*;
         match self {
-            True | False => {
+            UnittestAssert::True | UnittestAssert::False => {
                 let args = self.arg_hashmap(args, keywords)?;
                 let expr = args.get("expr").ok_or("Missing argument `expr`")?;
                 let msg = args.get("msg").copied();
@@ -252,36 +254,43 @@ impl UnittestAssert {
                     Location::default(),
                     Location::default(),
                     ExprKind::Constant {
-                        value: Constant::Bool(matches!(self, True)),
+                        value: Constant::Bool(matches!(self, UnittestAssert::True)),
                         kind: None,
                     },
                 );
                 let expr = compare(expr, Cmpop::Is, &bool);
                 Ok(assert(&expr, msg))
             }
-            Equal | Equals | NotEqual | NotEquals | Greater | GreaterEqual | Less | LessEqual => {
+            UnittestAssert::Equal
+            | UnittestAssert::Equals
+            | UnittestAssert::NotEqual
+            | UnittestAssert::NotEquals
+            | UnittestAssert::Greater
+            | UnittestAssert::GreaterEqual
+            | UnittestAssert::Less
+            | UnittestAssert::LessEqual => {
                 let args = self.arg_hashmap(args, keywords)?;
                 let first = args.get("first").ok_or("Missing argument `first`")?;
                 let second = args.get("second").ok_or("Missing argument `second`")?;
                 let msg = args.get("msg").copied();
                 let cmpop = match self {
-                    Equal | Equals => Cmpop::Eq,
-                    NotEqual | NotEquals => Cmpop::NotEq,
-                    Greater => Cmpop::Gt,
-                    GreaterEqual => Cmpop::GtE,
-                    Less => Cmpop::Lt,
-                    LessEqual => Cmpop::LtE,
+                    UnittestAssert::Equal | UnittestAssert::Equals => Cmpop::Eq,
+                    UnittestAssert::NotEqual | UnittestAssert::NotEquals => Cmpop::NotEq,
+                    UnittestAssert::Greater => Cmpop::Gt,
+                    UnittestAssert::GreaterEqual => Cmpop::GtE,
+                    UnittestAssert::Less => Cmpop::Lt,
+                    UnittestAssert::LessEqual => Cmpop::LtE,
                     _ => unreachable!(),
                 };
                 let expr = compare(first, cmpop, second);
                 Ok(assert(&expr, msg))
             }
-            Is | IsNot => {
+            UnittestAssert::Is | UnittestAssert::IsNot => {
                 let args = self.arg_hashmap(args, keywords)?;
                 let expr1 = args.get("expr1").ok_or("Missing argument `expr1`")?;
                 let expr2 = args.get("expr2").ok_or("Missing argument `expr2`")?;
                 let msg = args.get("msg").copied();
-                let cmpop = if matches!(self, Is) {
+                let cmpop = if matches!(self, UnittestAssert::Is) {
                     Cmpop::Is
                 } else {
                     Cmpop::IsNot
@@ -289,14 +298,14 @@ impl UnittestAssert {
                 let expr = compare(expr1, cmpop, expr2);
                 Ok(assert(&expr, msg))
             }
-            In | NotIn => {
+            UnittestAssert::In | UnittestAssert::NotIn => {
                 let args = self.arg_hashmap(args, keywords)?;
                 let member = args.get("member").ok_or("Missing argument `member`")?;
                 let container = args
                     .get("container")
                     .ok_or("Missing argument `container`")?;
                 let msg = args.get("msg").copied();
-                let cmpop = if matches!(self, In) {
+                let cmpop = if matches!(self, UnittestAssert::In) {
                     Cmpop::In
                 } else {
                     Cmpop::NotIn
@@ -304,11 +313,11 @@ impl UnittestAssert {
                 let expr = compare(member, cmpop, container);
                 Ok(assert(&expr, msg))
             }
-            IsNone | IsNotNone => {
+            UnittestAssert::IsNone | UnittestAssert::IsNotNone => {
                 let args = self.arg_hashmap(args, keywords)?;
                 let expr = args.get("expr").ok_or("Missing argument `expr`")?;
                 let msg = args.get("msg").copied();
-                let cmpop = if matches!(self, IsNone) {
+                let cmpop = if matches!(self, UnittestAssert::IsNone) {
                     Cmpop::Is
                 } else {
                     Cmpop::IsNot
@@ -327,7 +336,7 @@ impl UnittestAssert {
                 );
                 Ok(assert(&expr, msg))
             }
-            IsInstance | NotIsInstance => {
+            UnittestAssert::IsInstance | UnittestAssert::NotIsInstance => {
                 let args = self.arg_hashmap(args, keywords)?;
                 let obj = args.get("obj").ok_or("Missing argument `obj`")?;
                 let cls = args.get("cls").ok_or("Missing argument `cls`")?;
@@ -348,7 +357,7 @@ impl UnittestAssert {
                         keywords: vec![],
                     },
                 );
-                if matches!(self, IsInstance) {
+                if matches!(self, UnittestAssert::IsInstance) {
                     Ok(assert(&isinstance, msg))
                 } else {
                     let expr = Expr::new(
@@ -362,7 +371,10 @@ impl UnittestAssert {
                     Ok(assert(&expr, msg))
                 }
             }
-            Regex | RegexpMatches | NotRegex | NotRegexpMatches => {
+            UnittestAssert::Regex
+            | UnittestAssert::RegexpMatches
+            | UnittestAssert::NotRegex
+            | UnittestAssert::NotRegexpMatches => {
                 let args = self.arg_hashmap(args, keywords)?;
                 let regex = args.get("regex").ok_or("Missing argument `regex`")?;
                 let text = args.get("text").ok_or("Missing argument `text`")?;
@@ -391,7 +403,7 @@ impl UnittestAssert {
                         keywords: vec![],
                     },
                 );
-                if matches!(self, Regex | RegexpMatches) {
+                if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
                     Ok(assert(&re_search, msg))
                 } else {
                     let expr = Expr::new(
