@@ -918,8 +918,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
-| PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
-| PT009 | UnittestAssertion | Use a regular `assert` instead of unittest-style `...` |  |
+| PT008 | PatchWithLambda | Use `return_value=` instead of patching with lambda |  |
+| PT009 | UnittestAssertion | Use a regular `assert` instead of unittest-style `...` | 🛠 |
 | PT010 | RaisesWithoutException | set the expected exception in `pytest.raises()` |  |
 | PT011 | RaisesTooBroad | `pytest.raises(...)` is too broad, set the `match` parameter or use a more specific exception |  |
 | PT012 | RaisesWithMultipleStatements | `pytest.raises()` block should contain a single simple statement |  |

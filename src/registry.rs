@@ -3790,6 +3790,7 @@ impl CheckKind {
             | CheckKind::TrueFalseComparison(..)
             | CheckKind::TypeOfPrimitive(..)
             | CheckKind::TypingTextStrAlias
+            | CheckKind::UnittestAssertion(..)
             | CheckKind::UnnecessaryBuiltinImport(..)
             | CheckKind::UnnecessaryCallAroundSorted(..)
             | CheckKind::UnnecessaryCollectionCall(..)
@@ -4032,6 +4033,9 @@ impl CheckKind {
             CheckKind::TypingTextStrAlias => Some("Replace with `str`".to_string()),
             CheckKind::UnnecessaryBuiltinImport(..) => {
                 Some("Remove unnecessary builtin import".to_string())
+            }
+            CheckKind::UnittestAssertion(assertion) => {
+                Some(format!("Replace `{assertion}(...)` with `assert ...`"))
             }
             CheckKind::UnnecessaryCallAroundSorted(func) => {
                 Some(format!("Remove unnecessary `{func}` call"))
