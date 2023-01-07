@@ -31,6 +31,6 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
                 type_.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }

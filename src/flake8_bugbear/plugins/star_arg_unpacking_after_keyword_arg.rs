@@ -20,7 +20,7 @@ pub fn star_arg_unpacking_after_keyword_arg(
         if arg.location <= keyword.location {
             continue;
         }
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::StarArgUnpackingAfterKeywordArg,
             Range::from_located(arg),
         ));

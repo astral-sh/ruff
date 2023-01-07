@@ -34,7 +34,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
                 stmt.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }
 
@@ -52,7 +52,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
                 stmt.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }
 
@@ -61,7 +61,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
     match &last_stmt.node {
         StmtKind::If { body, orelse, .. } => {
             if body.is_empty() || orelse.is_empty() {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::ImplicitReturn,
                     Range::from_located(last_stmt),
                 ));
@@ -111,7 +111,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
                     Location::new(last_stmt.end_location.unwrap().row() + 1, 0),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }
@@ -190,7 +190,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         }
 
         if !stack.refs.contains_key(id.as_str()) {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::UnnecessaryAssign,
                 Range::from_located(expr),
             ));
@@ -207,7 +207,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::UnnecessaryAssign,
             Range::from_located(expr),
         ));
@@ -222,7 +222,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
     for child in body {
         if matches!(child.node, StmtKind::Return { .. }) {
             if checker.settings.enabled.contains(&CheckCode::RET505) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::SuperfluousElseReturn(branch),
                     Range::from_located(stmt),
                 ));
@@ -231,7 +231,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         }
         if matches!(child.node, StmtKind::Break) {
             if checker.settings.enabled.contains(&CheckCode::RET508) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::SuperfluousElseBreak(branch),
                     Range::from_located(stmt),
                 ));
@@ -240,7 +240,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         }
         if matches!(child.node, StmtKind::Raise { .. }) {
             if checker.settings.enabled.contains(&CheckCode::RET506) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::SuperfluousElseRaise(branch),
                     Range::from_located(stmt),
                 ));
@@ -249,7 +249,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         }
         if matches!(child.node, StmtKind::Continue) {
             if checker.settings.enabled.contains(&CheckCode::RET507) {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::SuperfluousElseContinue(branch),
                     Range::from_located(stmt),
                 ));

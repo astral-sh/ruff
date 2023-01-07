@@ -168,7 +168,7 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
                     item.stmt.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }

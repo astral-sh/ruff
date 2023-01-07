@@ -16,7 +16,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                 } => {
                     if checker.settings.enabled.contains(&CheckCode::EM101) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
-                            checker.add_check(Check::new(
+                            checker.checks.push(Check::new(
                                 CheckKind::RawStringInException,
                                 Range::from_located(first),
                             ));
@@ -26,7 +26,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                 // Check for f-strings
                 ExprKind::JoinedStr { .. } => {
                     if checker.settings.enabled.contains(&CheckCode::EM102) {
-                        checker.add_check(Check::new(
+                        checker.checks.push(Check::new(
                             CheckKind::FStringInException,
                             Range::from_located(first),
                         ));
@@ -37,7 +37,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                     if checker.settings.enabled.contains(&CheckCode::EM103) {
                         if let ExprKind::Attribute { value, attr, .. } = &func.node {
                             if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
-                                checker.add_check(Check::new(
+                                checker.checks.push(Check::new(
                                     CheckKind::DotFormatInException,
                                     Range::from_located(first),
                                 ));

@@ -554,7 +554,7 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> boo
             Location::new(stmt.location.row(), 0),
         );
         let line = locator.slice_source_code_range(&range);
-        if line.trim().ends_with('\\') {
+        if line.trim_end().ends_with('\\') {
             return true;
         }
     }

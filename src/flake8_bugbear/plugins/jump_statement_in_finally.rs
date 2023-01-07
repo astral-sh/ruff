@@ -7,7 +7,7 @@ use crate::registry::{Check, CheckKind};
 fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::JumpStatementInFinally(match &stmt.node {
                     StmtKind::Break { .. } => "break".to_string(),
                     StmtKind::Continue { .. } => "continue".to_string(),

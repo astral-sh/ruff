@@ -15,5 +15,7 @@ pub fn no_eval(checker: &mut Checker, func: &Expr) {
     if !checker.is_builtin("eval") {
         return;
     }
-    checker.add_check(Check::new(CheckKind::NoEval, Range::from_located(func)));
+    checker
+        .checks
+        .push(Check::new(CheckKind::NoEval, Range::from_located(func)));
 }

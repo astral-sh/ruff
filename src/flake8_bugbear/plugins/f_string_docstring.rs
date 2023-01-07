@@ -15,7 +15,7 @@ pub fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     let ExprKind::JoinedStr { .. } = value.node else {
         return;
     };
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::FStringDocstring,
         helpers::identifier_range(stmt, checker.locator),
     ));

@@ -6,7 +6,7 @@ use crate::registry::{Check, CheckKind};
 
 pub fn useless_comparison(checker: &mut Checker, expr: &Expr) {
     if matches!(expr.node, ExprKind::Compare { .. }) {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::UselessComparison,
             Range::from_located(expr),
         ));

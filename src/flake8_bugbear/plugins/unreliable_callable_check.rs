@@ -25,7 +25,7 @@ pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr
     if s != "__call__" {
         return;
     }
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::UnreliableCallableCheck,
         Range::from_located(expr),
     ));

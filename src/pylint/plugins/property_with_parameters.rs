@@ -27,7 +27,7 @@ pub fn property_with_parameters(
             .count()
             > 1
     {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::PropertyWithParameters,
             Range::from_located(stmt),
         ));

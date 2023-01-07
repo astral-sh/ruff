@@ -59,7 +59,7 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.add_check(Check::new(
+    checker.checks.push(Check::new(
         CheckKind::NestedIfStatements,
         Range::from_located(stmt),
     ));
@@ -149,5 +149,5 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
             stmt.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }

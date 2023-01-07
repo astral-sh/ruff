@@ -52,5 +52,5 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }

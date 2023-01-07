@@ -165,7 +165,7 @@ fn handle_making_changes(
                 range.end_location,
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }
 

@@ -24,7 +24,7 @@ fn pytest_mark_parentheses(
     if checker.patch(check.kind.code()) {
         check.amend(fix);
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
 
 fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr) {
@@ -78,7 +78,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
             check.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }
 

@@ -130,7 +130,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }
@@ -197,7 +197,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                 expr.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.checks.push(check);
     }
 }
 
@@ -243,7 +243,7 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }
@@ -291,7 +291,7 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.add_check(check);
+                checker.checks.push(check);
             }
         }
     }
@@ -316,7 +316,7 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }
@@ -340,7 +340,7 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }

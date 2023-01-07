@@ -32,7 +32,7 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
     if is_pytest_raises(func, &checker.from_imports, &checker.import_aliases) {
         if checker.settings.enabled.contains(&CheckCode::PT010) {
             if args.is_empty() && keywords.is_empty() {
-                checker.add_check(Check::new(
+                checker.checks.push(Check::new(
                     CheckKind::RaisesWithoutException,
                     Range::from_located(func),
                 ));
@@ -90,7 +90,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
         }
 
         if is_too_complex {
-            checker.add_check(Check::new(
+            checker.checks.push(Check::new(
                 CheckKind::RaisesWithMultipleStatements,
                 Range::from_located(stmt),
             ));
@@ -117,7 +117,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
         .any(|(module, member)| match_call_path(&call_path, module, member, &checker.from_imports));
 
     if is_broad_exception {
-        checker.add_check(Check::new(
+        checker.checks.push(Check::new(
             CheckKind::RaisesTooBroad(call_path.join(".")),
             Range::from_located(exception),
         ));

@@ -68,7 +68,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.checks.push(check);
         }
     }
 }

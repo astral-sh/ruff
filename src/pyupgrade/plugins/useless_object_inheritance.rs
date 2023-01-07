@@ -26,5 +26,5 @@ pub fn useless_object_inheritance(
             check.amend(fix);
         }
     }
-    checker.add_check(check);
+    checker.checks.push(check);
 }
