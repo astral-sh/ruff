@@ -53,4 +53,14 @@ expression: checks
       row: 15
       column: 56
   parent: ~
+- kind:
+    ConvertNamedTupleFunctionalToClass: NT4
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 22
+    column: 1
+  fix: ~
+  parent: ~
 
