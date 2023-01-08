@@ -6,7 +6,7 @@ use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
 
@@ -41,10 +41,10 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::B014) {
+    if checker.settings.enabled.contains(&RuleCode::B014) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
-            let mut check = Check::new(
+            let mut check = Diagnostic::new(
                 violations::DuplicateHandlerException(
                     duplicates
                         .into_iter()
@@ -67,7 +67,7 @@ fn duplicate_handler_exceptions<'a>(
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.checks.push(check);
+            checker.diagnostics.push(check);
         }
     }
 
@@ -105,10 +105,10 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::B025) {
+    if checker.settings.enabled.contains(&RuleCode::B025) {
         for (name, exprs) in duplicates {
             for expr in exprs {
-                checker.checks.push(Check::new(
+                checker.diagnostics.push(Diagnostic::new(
                     violations::DuplicateTryBlockException(name.join(".")),
                     Range::from_located(expr),
                 ));

@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use ruff::registry::CheckCodePrefix;
+use ruff::registry::RuleCodePrefix;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
@@ -97,32 +97,32 @@ impl fmt::Debug for Plugin {
 }
 
 impl Plugin {
-    pub fn prefix(&self) -> CheckCodePrefix {
+    pub fn prefix(&self) -> RuleCodePrefix {
         match self {
-            Plugin::Flake8Annotations => CheckCodePrefix::ANN,
-            Plugin::Flake8Bandit => CheckCodePrefix::S,
+            Plugin::Flake8Annotations => RuleCodePrefix::ANN,
+            Plugin::Flake8Bandit => RuleCodePrefix::S,
             // TODO(charlie): Handle rename of `B` to `BLE`.
-            Plugin::Flake8BlindExcept => CheckCodePrefix::BLE,
-            Plugin::Flake8Bugbear => CheckCodePrefix::B,
-            Plugin::Flake8Builtins => CheckCodePrefix::A,
-            Plugin::Flake8Comprehensions => CheckCodePrefix::C4,
-            Plugin::Flake8Datetimez => CheckCodePrefix::DTZ,
-            Plugin::Flake8Debugger => CheckCodePrefix::T1,
-            Plugin::Flake8Docstrings => CheckCodePrefix::D,
+            Plugin::Flake8BlindExcept => RuleCodePrefix::BLE,
+            Plugin::Flake8Bugbear => RuleCodePrefix::B,
+            Plugin::Flake8Builtins => RuleCodePrefix::A,
+            Plugin::Flake8Comprehensions => RuleCodePrefix::C4,
+            Plugin::Flake8Datetimez => RuleCodePrefix::DTZ,
+            Plugin::Flake8Debugger => RuleCodePrefix::T1,
+            Plugin::Flake8Docstrings => RuleCodePrefix::D,
             // TODO(charlie): Handle rename of `E` to `ERA`.
-            Plugin::Flake8Eradicate => CheckCodePrefix::ERA,
-            Plugin::Flake8ErrMsg => CheckCodePrefix::EM,
-            Plugin::Flake8ImplicitStrConcat => CheckCodePrefix::ISC,
-            Plugin::Flake8Print => CheckCodePrefix::T2,
-            Plugin::Flake8PytestStyle => CheckCodePrefix::PT,
-            Plugin::Flake8Quotes => CheckCodePrefix::Q,
-            Plugin::Flake8Return => CheckCodePrefix::RET,
-            Plugin::Flake8Simplify => CheckCodePrefix::SIM,
-            Plugin::Flake8TidyImports => CheckCodePrefix::TID25,
-            Plugin::McCabe => CheckCodePrefix::C9,
-            Plugin::PandasVet => CheckCodePrefix::PD,
-            Plugin::PEP8Naming => CheckCodePrefix::N,
-            Plugin::Pyupgrade => CheckCodePrefix::UP,
+            Plugin::Flake8Eradicate => RuleCodePrefix::ERA,
+            Plugin::Flake8ErrMsg => RuleCodePrefix::EM,
+            Plugin::Flake8ImplicitStrConcat => RuleCodePrefix::ISC,
+            Plugin::Flake8Print => RuleCodePrefix::T2,
+            Plugin::Flake8PytestStyle => RuleCodePrefix::PT,
+            Plugin::Flake8Quotes => RuleCodePrefix::Q,
+            Plugin::Flake8Return => RuleCodePrefix::RET,
+            Plugin::Flake8Simplify => RuleCodePrefix::SIM,
+            Plugin::Flake8TidyImports => RuleCodePrefix::TID25,
+            Plugin::McCabe => RuleCodePrefix::C9,
+            Plugin::PandasVet => RuleCodePrefix::PD,
+            Plugin::PEP8Naming => RuleCodePrefix::N,
+            Plugin::Pyupgrade => RuleCodePrefix::UP,
         }
     }
 }
@@ -269,7 +269,7 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
 ///
 /// For example, if the user ignores `ANN101`, we should infer that
 /// `flake8-annotations` is active.
-pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin> {
+pub fn infer_plugins_from_codes(codes: &BTreeSet<RuleCodePrefix>) -> Vec<Plugin> {
     [
         Plugin::Flake8Annotations,
         Plugin::Flake8Bandit,
@@ -307,9 +307,10 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<CheckCodePrefix>) -> Vec<Plugin
     .collect()
 }
 
-/// Resolve the set of enabled `CheckCodePrefix` values for the given plugins.
-pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<CheckCodePrefix> {
-    let mut select = BTreeSet::from([CheckCodePrefix::F, CheckCodePrefix::E, CheckCodePrefix::W]);
+/// Resolve the set of enabled `RuleCodePrefix` values for the given
+/// plugins.
+pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleCodePrefix> {
+    let mut select = BTreeSet::from([RuleCodePrefix::F, RuleCodePrefix::E, RuleCodePrefix::W]);
     select.extend(plugins.iter().map(Plugin::prefix));
     select
 }

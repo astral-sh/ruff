@@ -1,10 +1,10 @@
 use rustpython_ast::{Located, StmtKind};
 
 use crate::ast::types::Range;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// S101
-pub fn assert_used(stmt: &Located<StmtKind>) -> Check {
-    Check::new(violations::AssertUsed, Range::from_located(stmt))
+pub fn assert_used(stmt: &Located<StmtKind>) -> Diagnostic {
+    Diagnostic::new(violations::AssertUsed, Range::from_located(stmt))
 }

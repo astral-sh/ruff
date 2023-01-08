@@ -20,7 +20,7 @@ impl Flags {
         if settings
             .enabled
             .iter()
-            .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports))
+            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports))
         {
             Flags::NOQA | Flags::ISORT
         } else {

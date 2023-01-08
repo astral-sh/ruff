@@ -5,7 +5,7 @@ use path_absolutize::path_dedot;
 use rustpython_parser::lexer::LexResult;
 
 use crate::linter::check_path;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::resolver::Relativity;
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
@@ -29,7 +29,7 @@ fn resolve(path: &Path) -> Result<Settings> {
 }
 
 /// Run Ruff over Python source code directly.
-pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
+pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnostic>> {
     // Load the relevant `Settings` for the given `Path`.
     let settings = resolve(path)?;
 
@@ -49,8 +49,8 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
 
-    // Generate checks.
-    let checks = check_path(
+    // Generate diagnostics.
+    let diagnostics = check_path(
         path,
         packages::detect_package_root(path),
         contents,
@@ -63,5 +63,5 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Check>> {
         flags::Noqa::Enabled,
     )?;
 
-    Ok(checks)
+    Ok(diagnostics)
 }

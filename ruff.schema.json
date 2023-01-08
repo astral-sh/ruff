@@ -63,7 +63,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/RuleCodePrefix"
       }
     },
     "extend-select": {
@@ -73,7 +73,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/RuleCodePrefix"
       }
     },
     "external": {
@@ -107,7 +107,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/RuleCodePrefix"
       }
     },
     "flake8-annotations": {
@@ -234,7 +234,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/RuleCodePrefix"
       }
     },
     "ignore-init-module-imports": {
@@ -295,7 +295,7 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "$ref": "#/definitions/CheckCodePrefix"
+          "$ref": "#/definitions/RuleCodePrefix"
         }
       }
     },
@@ -357,7 +357,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/RuleCodePrefix"
       }
     },
     "show-source": {
@@ -405,7 +405,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CheckCodePrefix"
+        "$ref": "#/definitions/RuleCodePrefix"
       }
     },
     "update-check": {
@@ -431,7 +431,537 @@
       },
       "additionalProperties": false
     },
-    "CheckCodePrefix": {
+    "Convention": {
+      "oneOf": [
+        {
+          "description": "Use Google-style docstrings.",
+          "type": "string",
+          "enum": [
+            "google"
+          ]
+        },
+        {
+          "description": "Use NumPy-style docstrings.",
+          "type": "string",
+          "enum": [
+            "numpy"
+          ]
+        },
+        {
+          "description": "Use PEP257-style docstrings.",
+          "type": "string",
+          "enum": [
+            "pep257"
+          ]
+        }
+      ]
+    },
+    "Flake8AnnotationsOptions": {
+      "type": "object",
+      "properties": {
+        "allow-star-arg-any": {
+          "description": "Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "mypy-init-return": {
+          "description": "Whether to allow the omission of a return type hint for `__init__` if at least one argument is annotated.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "suppress-dummy-args": {
+          "description": "Whether to suppress `ANN000`-level errors for arguments matching the \"dummy\" variable regex (like `_`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "suppress-none-returning": {
+          "description": "Whether to suppress `ANN200`-level errors for functions that meet either of the following criteria:\n\n- Contain no `return` statement. - Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8BanditOptions": {
+      "type": "object",
+      "properties": {
+        "hardcoded-tmp-directory": {
+          "description": "A list of directories to consider temporary.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "hardcoded-tmp-directory-extend": {
+          "description": "A list of directories to consider temporary, in addition to those specified by `hardcoded-tmp-directory`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8BugbearOptions": {
+      "type": "object",
+      "properties": {
+        "extend-immutable-calls": {
+          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., `no-mutable-default-argument` checks (`B006`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8ErrMsgOptions": {
+      "type": "object",
+      "properties": {
+        "max-string-length": {
+          "description": "Maximum string length for string literals in exception messages.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8ImportConventionsOptions": {
+      "type": "object",
+      "properties": {
+        "aliases": {
+          "description": "The conventional aliases for imports. These aliases can be extended by the `extend_aliases` option.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "extend-aliases": {
+          "description": "A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8PytestStyleOptions": {
+      "type": "object",
+      "properties": {
+        "fixture-parentheses": {
+          "description": "Boolean flag specifying whether `@pytest.fixture()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.fixture()` is valid and `@pytest.fixture` is an error. If set to `false`, `@pytest.fixture` is valid and `@pytest.fixture()` is an error.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "mark-parentheses": {
+          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is an error. If set to `false`, `@pytest.fixture` is valid and `@pytest.mark.foo()` is an error.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "parametrize-names-type": {
+          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported: * `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize('name1,name2', ...)` * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), ...)` * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ParametrizeNameType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parametrize-values-row-type": {
+          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported: * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])` * `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ParametrizeValuesRowType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parametrize-values-type": {
+          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported: * `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))` * `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ParametrizeValuesType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raises-extend-require-match-for": {
+          "description": "List of additional exception names that require a match= parameter in a `pytest.raises()` call. This extends the default list of exceptions that require a match= parameter. This option is useful if you want to extend the default list of exceptions that require a match= parameter without having to specify the entire list. Note that this option does not remove any exceptions from the default list.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "raises-require-match-for": {
+          "description": "List of exception names that require a match= parameter in a `pytest.raises()` call.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8QuotesOptions": {
+      "type": "object",
+      "properties": {
+        "avoid-escape": {
+          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "docstring-quotes": {
+          "description": "Quote style to prefer for docstrings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quote"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inline-quotes": {
+          "description": "Quote style to prefer for inline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quote"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "multiline-quotes": {
+          "description": "Quote style to prefer for multiline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quote"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8TidyImportsOptions": {
+      "type": "object",
+      "properties": {
+        "ban-relative-imports": {
+          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module or beyond (`\"parents\"`).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Strictness"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "banned-api": {
+          "description": "Specific modules or module members that may not be imported or accessed. Note that this check is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/BannedApi"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8UnusedArgumentsOptions": {
+      "type": "object",
+      "properties": {
+        "ignore-variadic-names": {
+          "description": "Whether to allow unused variadic arguments, like `*args` and `**kwargs`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "IsortOptions": {
+      "type": "object",
+      "properties": {
+        "combine-as-imports": {
+          "description": "Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports) option.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "extra-standard-library": {
+          "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "force-single-line": {
+          "description": "Forces all from imports to appear on their own line.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "force-wrap-aliases": {
+          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```py from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "known-first-party": {
+          "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "known-third-party": {
+          "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "order-by-type": {
+          "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "single-line-exclusions": {
+          "description": "One or more modules to exclude from the single line rule.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "split-on-trailing-comma": {
+          "description": "If a comma is placed after the last member in a multi-line import, then the imports will never be folded into one line.\n\nSee isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "McCabeOptions": {
+      "type": "object",
+      "properties": {
+        "max-complexity": {
+          "description": "The maximum McCabe complexity to allow before triggering `C901` errors.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ParametrizeNameType": {
+      "type": "string",
+      "enum": [
+        "csv",
+        "tuple",
+        "list"
+      ]
+    },
+    "ParametrizeValuesRowType": {
+      "type": "string",
+      "enum": [
+        "tuple",
+        "list"
+      ]
+    },
+    "ParametrizeValuesType": {
+      "type": "string",
+      "enum": [
+        "tuple",
+        "list"
+      ]
+    },
+    "Pep8NamingOptions": {
+      "type": "object",
+      "properties": {
+        "classmethod-decorators": {
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method. For example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignore-names": {
+          "description": "A list of names to ignore when considering `pep8-naming` violations.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "staticmethod-decorators": {
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method. For example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PyUpgradeOptions": {
+      "type": "object",
+      "properties": {
+        "keep-runtime-typing": {
+          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Pycodestyle": {
+      "type": "object",
+      "properties": {
+        "ignore-overlong-task-comments": {
+          "description": "Whether or not line-length checks (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Pydocstyle": {
+      "type": "object",
+      "properties": {
+        "convention": {
+          "description": "Whether to use Google-style or NumPy-style conventions or the PEP257 defaults when analyzing docstring sections.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Convention"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PythonVersion": {
+      "type": "string",
+      "enum": [
+        "py33",
+        "py34",
+        "py35",
+        "py36",
+        "py37",
+        "py38",
+        "py39",
+        "py310",
+        "py311"
+      ]
+    },
+    "Quote": {
+      "oneOf": [
+        {
+          "description": "Use single quotes (`'`).",
+          "type": "string",
+          "enum": [
+            "single"
+          ]
+        },
+        {
+          "description": "Use double quotes (`\"`).",
+          "type": "string",
+          "enum": [
+            "double"
+          ]
+        }
+      ]
+    },
+    "RuleCodePrefix": {
       "type": "string",
       "enum": [
         "A",
@@ -1059,536 +1589,6 @@
         "YTT301",
         "YTT302",
         "YTT303"
-      ]
-    },
-    "Convention": {
-      "oneOf": [
-        {
-          "description": "Use Google-style docstrings.",
-          "type": "string",
-          "enum": [
-            "google"
-          ]
-        },
-        {
-          "description": "Use NumPy-style docstrings.",
-          "type": "string",
-          "enum": [
-            "numpy"
-          ]
-        },
-        {
-          "description": "Use PEP257-style docstrings.",
-          "type": "string",
-          "enum": [
-            "pep257"
-          ]
-        }
-      ]
-    },
-    "Flake8AnnotationsOptions": {
-      "type": "object",
-      "properties": {
-        "allow-star-arg-any": {
-          "description": "Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "mypy-init-return": {
-          "description": "Whether to allow the omission of a return type hint for `__init__` if at least one argument is annotated.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "suppress-dummy-args": {
-          "description": "Whether to suppress `ANN000`-level errors for arguments matching the \"dummy\" variable regex (like `_`).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "suppress-none-returning": {
-          "description": "Whether to suppress `ANN200`-level errors for functions that meet either of the following criteria:\n\n- Contain no `return` statement. - Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "Flake8BanditOptions": {
-      "type": "object",
-      "properties": {
-        "hardcoded-tmp-directory": {
-          "description": "A list of directories to consider temporary.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "hardcoded-tmp-directory-extend": {
-          "description": "A list of directories to consider temporary, in addition to those specified by `hardcoded-tmp-directory`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "Flake8BugbearOptions": {
-      "type": "object",
-      "properties": {
-        "extend-immutable-calls": {
-          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., `no-mutable-default-argument` checks (`B006`).",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "Flake8ErrMsgOptions": {
-      "type": "object",
-      "properties": {
-        "max-string-length": {
-          "description": "Maximum string length for string literals in exception messages.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint",
-          "minimum": 0.0
-        }
-      },
-      "additionalProperties": false
-    },
-    "Flake8ImportConventionsOptions": {
-      "type": "object",
-      "properties": {
-        "aliases": {
-          "description": "The conventional aliases for imports. These aliases can be extended by the `extend_aliases` option.",
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "extend-aliases": {
-          "description": "A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.",
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "Flake8PytestStyleOptions": {
-      "type": "object",
-      "properties": {
-        "fixture-parentheses": {
-          "description": "Boolean flag specifying whether `@pytest.fixture()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.fixture()` is valid and `@pytest.fixture` is an error. If set to `false`, `@pytest.fixture` is valid and `@pytest.fixture()` is an error.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "mark-parentheses": {
-          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is an error. If set to `false`, `@pytest.fixture` is valid and `@pytest.mark.foo()` is an error.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "parametrize-names-type": {
-          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported: * `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize('name1,name2', ...)` * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), ...)` * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/ParametrizeNameType"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "parametrize-values-row-type": {
-          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported: * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])` * `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/ParametrizeValuesRowType"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "parametrize-values-type": {
-          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported: * `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))` * `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/ParametrizeValuesType"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "raises-extend-require-match-for": {
-          "description": "List of additional exception names that require a match= parameter in a `pytest.raises()` call. This extends the default list of exceptions that require a match= parameter. This option is useful if you want to extend the default list of exceptions that require a match= parameter without having to specify the entire list. Note that this option does not remove any exceptions from the default list.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "raises-require-match-for": {
-          "description": "List of exception names that require a match= parameter in a `pytest.raises()` call.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "Flake8QuotesOptions": {
-      "type": "object",
-      "properties": {
-        "avoid-escape": {
-          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "docstring-quotes": {
-          "description": "Quote style to prefer for docstrings (either \"single\" (`'`) or \"double\" (`\"`)).",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Quote"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "inline-quotes": {
-          "description": "Quote style to prefer for inline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Quote"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "multiline-quotes": {
-          "description": "Quote style to prefer for multiline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Quote"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "Flake8TidyImportsOptions": {
-      "type": "object",
-      "properties": {
-        "ban-relative-imports": {
-          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module or beyond (`\"parents\"`).",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Strictness"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "banned-api": {
-          "description": "Specific modules or module members that may not be imported or accessed. Note that this check is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": {
-            "$ref": "#/definitions/BannedApi"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "Flake8UnusedArgumentsOptions": {
-      "type": "object",
-      "properties": {
-        "ignore-variadic-names": {
-          "description": "Whether to allow unused variadic arguments, like `*args` and `**kwargs`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "IsortOptions": {
-      "type": "object",
-      "properties": {
-        "combine-as-imports": {
-          "description": "Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports) option.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "extra-standard-library": {
-          "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "force-single-line": {
-          "description": "Forces all from imports to appear on their own line.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "force-wrap-aliases": {
-          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```py from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "known-first-party": {
-          "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "known-third-party": {
-          "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "order-by-type": {
-          "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "single-line-exclusions": {
-          "description": "One or more modules to exclude from the single line rule.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "split-on-trailing-comma": {
-          "description": "If a comma is placed after the last member in a multi-line import, then the imports will never be folded into one line.\n\nSee isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "McCabeOptions": {
-      "type": "object",
-      "properties": {
-        "max-complexity": {
-          "description": "The maximum McCabe complexity to allow before triggering `C901` errors.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint",
-          "minimum": 0.0
-        }
-      },
-      "additionalProperties": false
-    },
-    "ParametrizeNameType": {
-      "type": "string",
-      "enum": [
-        "csv",
-        "tuple",
-        "list"
-      ]
-    },
-    "ParametrizeValuesRowType": {
-      "type": "string",
-      "enum": [
-        "tuple",
-        "list"
-      ]
-    },
-    "ParametrizeValuesType": {
-      "type": "string",
-      "enum": [
-        "tuple",
-        "list"
-      ]
-    },
-    "Pep8NamingOptions": {
-      "type": "object",
-      "properties": {
-        "classmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method. For example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "ignore-names": {
-          "description": "A list of names to ignore when considering `pep8-naming` violations.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "staticmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method. For example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "PyUpgradeOptions": {
-      "type": "object",
-      "properties": {
-        "keep-runtime-typing": {
-          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "Pycodestyle": {
-      "type": "object",
-      "properties": {
-        "ignore-overlong-task-comments": {
-          "description": "Whether or not line-length checks (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "Pydocstyle": {
-      "type": "object",
-      "properties": {
-        "convention": {
-          "description": "Whether to use Google-style or NumPy-style conventions or the PEP257 defaults when analyzing docstring sections.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Convention"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "PythonVersion": {
-      "type": "string",
-      "enum": [
-        "py33",
-        "py34",
-        "py35",
-        "py36",
-        "py37",
-        "py38",
-        "py39",
-        "py310",
-        "py311"
-      ]
-    },
-    "Quote": {
-      "oneOf": [
-        {
-          "description": "Use single quotes (`'`).",
-          "type": "string",
-          "enum": [
-            "single"
-          ]
-        },
-        {
-          "description": "Use double quotes (`\"`).",
-          "type": "string",
-          "enum": [
-            "double"
-          ]
-        }
       ]
     },
     "SerializationFormat": {

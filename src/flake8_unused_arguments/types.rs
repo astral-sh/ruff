@@ -1,4 +1,4 @@
-use crate::registry::{CheckCode, CheckKind};
+use crate::registry::{DiagnosticKind, RuleCode};
 use crate::violations;
 
 /// An AST node that can contain arguments.
@@ -11,7 +11,7 @@ pub enum Argumentable {
 }
 
 impl Argumentable {
-    pub fn check_for(&self, name: String) -> CheckKind {
+    pub fn check_for(&self, name: String) -> DiagnosticKind {
         match self {
             Argumentable::Function => violations::UnusedFunctionArgument(name).into(),
             Argumentable::Method => violations::UnusedMethodArgument(name).into(),
@@ -21,13 +21,13 @@ impl Argumentable {
         }
     }
 
-    pub fn check_code(&self) -> &CheckCode {
+    pub fn rule_code(&self) -> &RuleCode {
         match self {
-            Argumentable::Function => &CheckCode::ARG001,
-            Argumentable::Method => &CheckCode::ARG002,
-            Argumentable::ClassMethod => &CheckCode::ARG003,
-            Argumentable::StaticMethod => &CheckCode::ARG004,
-            Argumentable::Lambda => &CheckCode::ARG005,
+            Argumentable::Function => &RuleCode::ARG001,
+            Argumentable::Method => &RuleCode::ARG002,
+            Argumentable::ClassMethod => &RuleCode::ARG003,
+            Argumentable::StaticMethod => &RuleCode::ARG004,
+            Argumentable::Lambda => &RuleCode::ARG005,
         }
     }
 }

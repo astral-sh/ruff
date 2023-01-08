@@ -21,7 +21,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
-use crate::registry::{Check, CheckCode, LintSource};
+use crate::registry::{Diagnostic, LintSource, RuleCode};
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
@@ -49,7 +49,7 @@ impl AddAssign for Diagnostics {
     }
 }
 
-/// Generate a list of `Check` violations from the source code contents at the
+/// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_path(
@@ -63,36 +63,36 @@ pub(crate) fn check_path(
     settings: &Settings,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
-) -> Result<Vec<Check>> {
+) -> Result<Vec<Diagnostic>> {
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
-    // Aggregate all checks.
-    let mut checks: Vec<Check> = vec![];
+    // Aggregate all diagnostics.
+    let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    // Run the token-based checks.
+    // Run the token-based rules.
     if settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Tokens))
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Tokens))
     {
-        checks.extend(check_tokens(locator, &tokens, settings, autofix));
+        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
     }
 
-    // Run the AST-based checks.
+    // Run the AST-based rules.
     let use_ast = settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::AST));
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::AST));
     let use_imports = settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Imports));
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 if use_ast {
-                    checks.extend(check_ast(
+                    diagnostics.extend(check_ast(
                         &python_ast,
                         locator,
                         stylist,
@@ -104,7 +104,7 @@ pub(crate) fn check_path(
                     ));
                 }
                 if use_imports {
-                    checks.extend(check_imports(
+                    diagnostics.extend(check_imports(
                         &python_ast,
                         locator,
                         &directives.isort,
@@ -117,8 +117,8 @@ pub(crate) fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.enabled.contains(&CheckCode::E999) {
-                    checks.push(Check::new(
+                if settings.enabled.contains(&RuleCode::E999) {
+                    diagnostics.push(Diagnostic::new(
                         violations::SyntaxError(parse_error.error.to_string()),
                         Range::new(parse_error.location, parse_error.location),
                     ));
@@ -127,13 +127,13 @@ pub(crate) fn check_path(
         }
     }
 
-    // Run the lines-based checks.
+    // Run the lines-based rules.
     if settings
         .enabled
         .iter()
-        .any(|check_code| matches!(check_code.lint_source(), LintSource::Lines))
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
     {
-        checks.extend(check_lines(
+        diagnostics.extend(check_lines(
             contents,
             &directives.commented_lines,
             settings,
@@ -146,10 +146,10 @@ pub(crate) fn check_path(
         || settings
             .enabled
             .iter()
-            .any(|check_code| matches!(check_code.lint_source(), LintSource::NoQA))
+            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQA))
     {
         check_noqa(
-            &mut checks,
+            &mut diagnostics,
             contents,
             &directives.commented_lines,
             &directives.noqa_line_for,
@@ -159,17 +159,17 @@ pub(crate) fn check_path(
     }
 
     // Create path ignores.
-    if !checks.is_empty() && !settings.per_file_ignores.is_empty() {
+    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
         let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;
         if !ignores.is_empty() {
-            return Ok(checks
+            return Ok(diagnostics
                 .into_iter()
                 .filter(|check| !ignores.contains(&check.kind.code()))
                 .collect());
         }
     }
 
-    Ok(checks)
+    Ok(diagnostics)
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -259,8 +259,8 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
-    // Generate checks, ignoring any existing `noqa` directives.
-    let checks = check_path(
+    // Generate diagnostics, ignoring any existing `noqa` directives.
+    let diagnostics = check_path(
         path,
         None,
         &contents,
@@ -275,7 +275,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
 
     add_noqa(
         path,
-        &checks,
+        &diagnostics,
         &contents,
         &directives.noqa_line_for,
         &settings.external,
@@ -283,7 +283,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     )
 }
 
-/// Generate a list of `Check` violations from source code content derived from
+/// Generate `Diagnostic`s from source code content derived from
 /// stdin.
 pub fn lint_stdin(
     path: Option<&Path>,
@@ -339,7 +339,7 @@ pub fn lint_stdin(
     Ok(Diagnostics { messages, fixed })
 }
 
-/// Generate a list of `Check` violations (optionally including any autofix
+/// Generate `Diagnostic`s (optionally including any autofix
 /// patches) from source code content.
 fn lint_only(
     contents: &str,
@@ -361,8 +361,8 @@ fn lint_only(
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
-    // Generate checks.
-    let checks = check_path(
+    // Generate diagnostics.
+    let diagnostics = check_path(
         path,
         package,
         contents,
@@ -375,23 +375,23 @@ fn lint_only(
         flags::Noqa::Enabled,
     )?;
 
-    // Convert from checks to messages.
+    // Convert from diagnostics to messages.
     let path_lossy = path.to_string_lossy();
-    Ok(checks
+    Ok(diagnostics
         .into_iter()
-        .map(|check| {
+        .map(|diagnostic| {
             let source = if settings.show_source {
-                Some(Source::from_check(&check, &locator))
+                Some(Source::from_diagnostic(&diagnostic, &locator))
             } else {
                 None
             };
-            Message::from_check(check, path_lossy.to_string(), source)
+            Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
         })
         .collect())
 }
 
-/// Generate a list of `Check` violations from source code content, iteratively
-/// autofixing any violations until stable.
+/// Generate `Diagnostic`s from source code content, iteratively autofixing
+/// until stable.
 fn lint_fix(
     contents: &str,
     path: &Path,
@@ -421,8 +421,8 @@ fn lint_fix(
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
-        // Generate checks.
-        let checks = check_path(
+        // Generate diagnostics.
+        let diagnostics = check_path(
             path,
             package,
             &contents,
@@ -436,7 +436,7 @@ fn lint_fix(
         )?;
 
         // Apply autofix.
-        if let Some((fixed_contents, applied)) = fix_file(&checks, &locator) {
+        if let Some((fixed_contents, applied)) = fix_file(&diagnostics, &locator) {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 fixed += applied;
@@ -472,15 +472,15 @@ quoting the contents of `{}`, along with the `pyproject.toml` settings and execu
 
         // Convert to messages.
         let path_lossy = path.to_string_lossy();
-        let messages = checks
+        let messages = diagnostics
             .into_iter()
-            .map(|check| {
+            .map(|diagnostic| {
                 let source = if settings.show_source {
-                    Some(Source::from_check(&check, &locator))
+                    Some(Source::from_diagnostic(&diagnostic, &locator))
                 } else {
                     None
                 };
-                Message::from_check(check, path_lossy.to_string(), source)
+                Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
             })
             .collect();
         return Ok((contents, fixed, messages));
@@ -488,14 +488,14 @@ quoting the contents of `{}`, along with the `pyproject.toml` settings and execu
 }
 
 #[cfg(test)]
-pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
+pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = SourceCodeLocator::new(&contents);
     let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
-    let mut checks = check_path(
+    let mut diagnostics = check_path(
         path,
         None,
         &contents,
@@ -509,7 +509,10 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
     )?;
 
     // Detect autofixes that don't converge after multiple iterations.
-    if checks.iter().any(|check| check.fix.is_some()) {
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.fix.is_some())
+    {
         let max_iterations = 10;
 
         let mut contents = contents.clone();
@@ -521,7 +524,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
             let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
-            let checks = check_path(
+            let diagnostics = check_path(
                 path,
                 None,
                 &contents,
@@ -533,7 +536,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
                 flags::Autofix::Enabled,
                 flags::Noqa::Enabled,
             )?;
-            if let Some((fixed_contents, _)) = fix_file(&checks, &locator) {
+            if let Some((fixed_contents, _)) = fix_file(&diagnostics, &locator) {
                 if iterations < max_iterations {
                     iterations += 1;
                     contents = fixed_contents.to_string();
@@ -549,6 +552,6 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Check>> {
         }
     }
 
-    checks.sort_by_key(|check| check.location);
-    Ok(checks)
+    diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+    Ok(diagnostics)
 }

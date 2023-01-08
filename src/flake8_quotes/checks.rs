@@ -2,7 +2,7 @@ use rustpython_ast::Location;
 
 use crate::ast::types::Range;
 use crate::flake8_quotes::settings::{Quote, Settings};
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 
@@ -47,7 +47,7 @@ pub fn quotes(
     end: Location,
     is_docstring: bool,
     settings: &Settings,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let text = locator.slice_source_code_range(&Range::new(start, end));
 
     // Remove any prefixes (e.g., remove `u` from `u"foo"`).
@@ -72,7 +72,7 @@ pub fn quotes(
             return None;
         }
 
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::BadQuotesDocstring(settings.docstring_quotes.clone()),
             Range::new(start, end),
         ))
@@ -87,7 +87,7 @@ pub fn quotes(
             return None;
         }
 
-        Some(Check::new(
+        Some(Diagnostic::new(
             violations::BadQuotesMultilineString(settings.multiline_quotes.clone()),
             Range::new(start, end),
         ))
@@ -102,7 +102,7 @@ pub fn quotes(
             if string_contents.contains(good_single(&settings.inline_quotes))
                 && !string_contents.contains(bad_single(&settings.inline_quotes))
             {
-                return Some(Check::new(
+                return Some(Diagnostic::new(
                     violations::AvoidQuoteEscape,
                     Range::new(start, end),
                 ));
@@ -112,7 +112,7 @@ pub fn quotes(
 
         // If we're not using the preferred type, only allow use to avoid escapes.
         if !string_contents.contains(good_single(&settings.inline_quotes)) {
-            return Some(Check::new(
+            return Some(Diagnostic::new(
                 violations::BadQuotesInlineString(settings.inline_quotes.clone()),
                 Range::new(start, end),
             ));

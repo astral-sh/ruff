@@ -344,7 +344,7 @@ Options:
       --isolated
           Ignore all configuration files
       --select <SELECT>
-          Comma-separated list of error codes to enable (or ALL, to enable all checks)
+          Comma-separated list of rule codes to enable (or ALL, to enable all rules)
       --extend-select <EXTEND_SELECT>
           Like --select, but adds additional error codes on top of the selected ones
       --ignore <IGNORE>
@@ -1867,7 +1867,7 @@ by `ignore`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -1886,7 +1886,7 @@ by `select`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -1961,7 +1961,7 @@ A list of check code prefixes to consider autofix-able.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -2033,7 +2033,7 @@ specific prefixes.
 
 **Default value**: `[]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -2092,7 +2092,7 @@ when considering any matching files.
 
 **Default value**: `{}`
 
-**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
+**Type**: `HashMap<String, Vec<RuleCodePrefix>>`
 
 **Example usage**:
 
@@ -2156,7 +2156,7 @@ specific prefixes.
 
 **Default value**: `["E", "F"]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -2276,7 +2276,7 @@ A list of check code prefixes to consider un-autofix-able.
 
 **Default value**: `[]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 

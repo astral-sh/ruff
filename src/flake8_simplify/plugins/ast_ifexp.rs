@@ -4,7 +4,7 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// SIM210
@@ -28,7 +28,7 @@ pub fn explicit_true_false_in_ifexpr(
         return;
     }
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::IfExprWithTrueFalse(unparse_expr(test, checker.style)),
         Range::from_located(expr),
     );
@@ -49,7 +49,7 @@ pub fn explicit_true_false_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM211
@@ -73,7 +73,7 @@ pub fn explicit_false_true_in_ifexpr(
         return;
     }
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::IfExprWithFalseTrue(unparse_expr(test, checker.style)),
         Range::from_located(expr),
     );
@@ -90,7 +90,7 @@ pub fn explicit_false_true_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM212
@@ -119,7 +119,7 @@ pub fn twisted_arms_in_ifexpr(
         return;
     }
 
-    let mut check = Check::new(
+    let mut check = Diagnostic::new(
         violations::IfExprWithTwistedArms(
             unparse_expr(body, checker.style),
             unparse_expr(orelse, checker.style),
@@ -140,5 +140,5 @@ pub fn twisted_arms_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

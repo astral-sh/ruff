@@ -131,7 +131,7 @@ mod tests {
 
     use crate::flake8_quotes::settings::Quote;
     use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
-    use crate::registry::CheckCodePrefix;
+    use crate::registry::RuleCodePrefix;
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
@@ -354,7 +354,7 @@ select = ["E501"]
                     per_file_ignores: None,
                     required_version: None,
                     respect_gitignore: None,
-                    select: Some(vec![CheckCodePrefix::E501]),
+                    select: Some(vec![RuleCodePrefix::E501]),
                     show_source: None,
                     src: None,
                     target_version: None,
@@ -399,14 +399,14 @@ ignore = ["E501"]
                     extend: None,
                     extend_exclude: None,
                     extend_ignore: None,
-                    extend_select: Some(vec![CheckCodePrefix::RUF100]),
+                    extend_select: Some(vec![RuleCodePrefix::RUF100]),
                     external: None,
                     fix: None,
                     fix_only: None,
                     fixable: None,
                     force_exclude: None,
                     format: None,
-                    ignore: Some(vec![CheckCodePrefix::E501]),
+                    ignore: Some(vec![RuleCodePrefix::E501]),
                     ignore_init_module_imports: None,
                     line_length: None,
                     per_file_ignores: None,
@@ -510,7 +510,7 @@ other-attribute = 1
                 cache_dir: None,
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
-                    vec![CheckCodePrefix::F401]
+                    vec![RuleCodePrefix::F401]
                 )])),
                 dummy_variable_rgx: None,
                 respect_gitignore: None,
@@ -619,7 +619,7 @@ other-attribute = 1
     }
 
     #[test]
-    fn str_check_code_pair_strings() {
+    fn str_pattern_prefix_pair() {
         let result = PatternPrefixPair::from_str("foo:E501");
         assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("foo: E501");

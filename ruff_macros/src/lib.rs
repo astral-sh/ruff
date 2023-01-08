@@ -14,8 +14,8 @@
 
 use syn::{parse_macro_input, DeriveInput};
 
-mod check_code_prefix;
 mod config;
+mod rule_code_prefix;
 
 #[proc_macro_derive(ConfigurationOptions, attributes(option, doc, option_group))]
 pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -26,11 +26,11 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
         .into()
 }
 
-#[proc_macro_derive(CheckCodePrefix)]
-pub fn derive_check_code_prefix(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_derive(RuleCodePrefix)]
+pub fn derive_rule_code_prefix(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    check_code_prefix::derive_impl(input)
+    rule_code_prefix::derive_impl(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

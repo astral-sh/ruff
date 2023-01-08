@@ -6,7 +6,7 @@ use crate::ast::types::Range;
 use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
 /// PIE790
@@ -27,11 +27,11 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             }
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
-                let mut check = Check::new(
+                let mut check = Diagnostic::new(
                     violations::NoUnnecessaryPass,
                     Range::from_located(pass_stmt),
                 );
-                if checker.patch(&CheckCode::PIE790) {
+                if checker.patch(&RuleCode::PIE790) {
                     match delete_stmt(pass_stmt, None, &[], checker.locator) {
                         Ok(fix) => {
                             check.amend(fix);
@@ -41,7 +41,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                         }
                     }
                 }
-                checker.checks.push(check);
+                checker.diagnostics.push(check);
             }
         }
     }
@@ -78,14 +78,14 @@ pub fn dupe_class_field_definitions(checker: &mut Checker, bases: &[Expr], body:
         };
 
         if seen_targets.contains(target) {
-            let mut check = Check::new(
+            let mut check = Diagnostic::new(
                 violations::DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(&CheckCode::PIE794) {
+            if checker.patch(&RuleCode::PIE794) {
                 check.amend(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
             }
-            checker.checks.push(check);
+            checker.diagnostics.push(check);
         } else {
             seen_targets.insert(target);
         }
@@ -101,15 +101,15 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
                 let mut check =
-                    Check::new(violations::PreferListBuiltin, Range::from_located(expr));
-                if checker.patch(&CheckCode::PIE807) {
+                    Diagnostic::new(violations::PreferListBuiltin, Range::from_located(expr));
+                if checker.patch(&RuleCode::PIE807) {
                     check.amend(Fix::replacement(
                         "list".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.checks.push(check);
+                checker.diagnostics.push(check);
             }
         }
     }

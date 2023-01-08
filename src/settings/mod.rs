@@ -17,7 +17,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::cache::cache_dir;
-use crate::registry::{CheckCode, CheckCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::registry::{RuleCode, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
@@ -42,18 +42,18 @@ pub struct Settings {
     pub allowed_confusables: FxHashSet<char>,
     pub cache_dir: PathBuf,
     pub dummy_variable_rgx: Regex,
-    pub enabled: FxHashSet<CheckCode>,
+    pub enabled: FxHashSet<RuleCode>,
     pub exclude: GlobSet,
     pub extend_exclude: GlobSet,
     pub external: FxHashSet<String>,
     pub fix: bool,
     pub fix_only: bool,
-    pub fixable: FxHashSet<CheckCode>,
+    pub fixable: FxHashSet<RuleCode>,
     pub force_exclude: bool,
     pub format: SerializationFormat,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
-    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>,
+    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<RuleCode>)>,
     pub required_version: Option<Version>,
     pub respect_gitignore: bool,
     pub show_source: bool,
@@ -118,10 +118,10 @@ impl Settings {
                 .dummy_variable_rgx
                 .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
             enabled: validate_enabled(resolve_codes(
-                [CheckCodeSpec {
+                [RuleCodeSpec {
                     select: &config
                         .select
-                        .unwrap_or_else(|| vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+                        .unwrap_or_else(|| vec![RuleCodePrefix::E, RuleCodePrefix::F]),
                     ignore: &config.ignore.unwrap_or_default(),
                 }]
                 .into_iter()
@@ -130,7 +130,7 @@ impl Settings {
                         .extend_select
                         .iter()
                         .zip(config.extend_ignore.iter())
-                        .map(|(select, ignore)| CheckCodeSpec { select, ignore }),
+                        .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
                 )
                 .chain(
                     // If a docstring convention is specified, force-disable any incompatible error
@@ -140,7 +140,7 @@ impl Settings {
                         .as_ref()
                         .and_then(|pydocstyle| pydocstyle.convention)
                     {
-                        Left(iter::once(CheckCodeSpec {
+                        Left(iter::once(RuleCodeSpec {
                             select: &[],
                             ignore: convention.codes(),
                         }))
@@ -155,7 +155,7 @@ impl Settings {
             fix: config.fix.unwrap_or(false),
             fix_only: config.fix_only.unwrap_or(false),
             fixable: resolve_codes(
-                [CheckCodeSpec {
+                [RuleCodeSpec {
                     select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
                     ignore: &config.unfixable.unwrap_or_default(),
                 }]
@@ -213,18 +213,18 @@ impl Settings {
         })
     }
 
-    pub fn for_rule(check_code: CheckCode) -> Self {
+    pub fn for_rule(rule_code: RuleCode) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
             cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FxHashSet::from_iter([check_code.clone()]),
+            enabled: FxHashSet::from_iter([rule_code.clone()]),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
             fix: false,
             fix_only: false,
-            fixable: FxHashSet::from_iter([check_code]),
+            fixable: FxHashSet::from_iter([rule_code]),
             force_exclude: false,
             format: SerializationFormat::Text,
             ignore_init_module_imports: false,
@@ -255,18 +255,18 @@ impl Settings {
         }
     }
 
-    pub fn for_rules(check_codes: Vec<CheckCode>) -> Self {
+    pub fn for_rules(rule_codes: Vec<RuleCode>) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
             cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FxHashSet::from_iter(check_codes.clone()),
+            enabled: FxHashSet::from_iter(rule_codes.clone()),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
             fix: false,
             fix_only: false,
-            fixable: FxHashSet::from_iter(check_codes),
+            fixable: FxHashSet::from_iter(rule_codes),
             force_exclude: false,
             format: SerializationFormat::Text,
             ignore_init_module_imports: false,
@@ -369,7 +369,7 @@ pub fn resolve_globset(patterns: Vec<FilePattern>) -> Result<GlobSet> {
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
-) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<CheckCode>)>> {
+) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<RuleCode>)>> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {
@@ -386,15 +386,15 @@ pub fn resolve_per_file_ignores(
 }
 
 #[derive(Debug)]
-struct CheckCodeSpec<'a> {
-    select: &'a [CheckCodePrefix],
-    ignore: &'a [CheckCodePrefix],
+struct RuleCodeSpec<'a> {
+    select: &'a [RuleCodePrefix],
+    ignore: &'a [RuleCodePrefix],
 }
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// error codes.
-fn resolve_codes<'a>(specs: impl Iterator<Item = CheckCodeSpec<'a>>) -> FxHashSet<CheckCode> {
-    let mut codes: FxHashSet<CheckCode> = FxHashSet::default();
+fn resolve_codes<'a>(specs: impl Iterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<RuleCode> {
+    let mut codes: FxHashSet<RuleCode> = FxHashSet::default();
     for spec in specs {
         for specificity in [
             SuffixLength::None,
@@ -422,7 +422,7 @@ fn resolve_codes<'a>(specs: impl Iterator<Item = CheckCodeSpec<'a>>) -> FxHashSe
 }
 
 /// Warn if the set of enabled codes contains any incompatibilities.
-fn validate_enabled(enabled: FxHashSet<CheckCode>) -> FxHashSet<CheckCode> {
+fn validate_enabled(enabled: FxHashSet<RuleCode>) -> FxHashSet<RuleCode> {
     for (a, b, message) in INCOMPATIBLE_CODES {
         if enabled.contains(a) && enabled.contains(b) {
             one_time_warning!(
@@ -440,45 +440,45 @@ fn validate_enabled(enabled: FxHashSet<CheckCode>) -> FxHashSet<CheckCode> {
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::registry::{CheckCode, CheckCodePrefix};
-    use crate::settings::{resolve_codes, CheckCodeSpec};
+    use crate::registry::{RuleCode, RuleCodePrefix};
+    use crate::settings::{resolve_codes, RuleCodeSpec};
 
     #[test]
-    fn check_codes() {
+    fn rule_codes() {
         let actual = resolve_codes(
-            [CheckCodeSpec {
-                select: &[CheckCodePrefix::W],
+            [RuleCodeSpec {
+                select: &[RuleCodePrefix::W],
                 ignore: &[],
             }]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([CheckCode::W292, CheckCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
-            [CheckCodeSpec {
-                select: &[CheckCodePrefix::W6],
+            [RuleCodeSpec {
+                select: &[RuleCodePrefix::W6],
                 ignore: &[],
             }]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([CheckCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
-            [CheckCodeSpec {
-                select: &[CheckCodePrefix::W],
-                ignore: &[CheckCodePrefix::W292],
+            [RuleCodeSpec {
+                select: &[RuleCodePrefix::W],
+                ignore: &[RuleCodePrefix::W292],
             }]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([CheckCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
-            [CheckCodeSpec {
-                select: &[CheckCodePrefix::W605],
-                ignore: &[CheckCodePrefix::W605],
+            [RuleCodeSpec {
+                select: &[RuleCodePrefix::W605],
+                ignore: &[RuleCodePrefix::W605],
             }]
             .into_iter(),
         );
@@ -487,34 +487,34 @@ mod tests {
 
         let actual = resolve_codes(
             [
-                CheckCodeSpec {
-                    select: &[CheckCodePrefix::W],
-                    ignore: &[CheckCodePrefix::W292],
+                RuleCodeSpec {
+                    select: &[RuleCodePrefix::W],
+                    ignore: &[RuleCodePrefix::W292],
                 },
-                CheckCodeSpec {
-                    select: &[CheckCodePrefix::W292],
+                RuleCodeSpec {
+                    select: &[RuleCodePrefix::W292],
                     ignore: &[],
                 },
             ]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([CheckCode::W292, CheckCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
             [
-                CheckCodeSpec {
-                    select: &[CheckCodePrefix::W],
-                    ignore: &[CheckCodePrefix::W292],
+                RuleCodeSpec {
+                    select: &[RuleCodePrefix::W],
+                    ignore: &[RuleCodePrefix::W292],
                 },
-                CheckCodeSpec {
-                    select: &[CheckCodePrefix::W292],
-                    ignore: &[CheckCodePrefix::W],
+                RuleCodeSpec {
+                    select: &[RuleCodePrefix::W292],
+                    ignore: &[RuleCodePrefix::W],
                 },
             ]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([CheckCode::W292]);
+        let expected = FxHashSet::from_iter([RuleCode::W292]);
         assert_eq!(actual, expected);
     }
 }
