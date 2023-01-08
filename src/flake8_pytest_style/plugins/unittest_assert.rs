@@ -11,6 +11,8 @@ use crate::ast::helpers::{create_expr, create_stmt};
 pub enum UnittestAssert {
     AlmostEqual,
     AlmostEquals,
+    CountEqual,
+    DictContainsSubset,
     DictEqual,
     Equal,
     Equals,
@@ -23,11 +25,12 @@ pub enum UnittestAssert {
     IsNone,
     IsNot,
     IsNotNone,
-    ItemsEqual,
     Less,
     LessEqual,
     ListEqual,
+    Logs,
     MultiLineEqual,
+    NoLogs,
     NotAlmostEqual,
     NotAlmostEquals,
     NotEqual,
@@ -37,7 +40,7 @@ pub enum UnittestAssert {
     NotRegex,
     NotRegexpMatches,
     Raises,
-    RaisesMessage,
+    RaisesRegex,
     RaisesRegexp,
     Regex,
     RegexpMatches,
@@ -46,6 +49,8 @@ pub enum UnittestAssert {
     True,
     TupleEqual,
     Underscore,
+    Warns,
+    WarnsRegex,
 }
 
 impl std::fmt::Display for UnittestAssert {
