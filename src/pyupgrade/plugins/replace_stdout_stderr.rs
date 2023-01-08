@@ -75,8 +75,9 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
             return;
         }
 
-        let mut check = Diagnostic::new(violations::ReplaceStdoutStderr, Range::from_located(expr));
-        if checker.patch(check.kind.code()) {
+        let mut diagnostic =
+            Diagnostic::new(violations::ReplaceStdoutStderr, Range::from_located(expr));
+        if checker.patch(diagnostic.kind.code()) {
             let first = if stdout.location < stderr.location {
                 stdout
             } else {
@@ -104,12 +105,12 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
                 }
                 contents.push_str(middle.contents);
             }
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 contents,
                 first.location,
                 last.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

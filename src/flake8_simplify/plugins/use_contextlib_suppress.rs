@@ -30,11 +30,10 @@ pub fn use_contextlib_suppress(
             } else {
                 handler_names.join(", ")
             };
-            let check = Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::UseContextlibSuppress(exception),
                 Range::from_located(stmt),
-            );
-            checker.diagnostics.push(check);
+            ));
         }
     }
 }

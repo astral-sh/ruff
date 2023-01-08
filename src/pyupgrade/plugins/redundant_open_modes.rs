@@ -80,13 +80,13 @@ fn create_check(
     locator: &SourceCodeLocator,
     patch: bool,
 ) -> Diagnostic {
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::RedundantOpenModes(replacement_value.clone()),
         Range::from_located(expr),
     );
     if patch {
         if let Some(content) = replacement_value {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 content,
                 mode_param.location,
                 mode_param.end_location.unwrap(),
@@ -94,13 +94,13 @@ fn create_check(
         } else {
             match create_remove_param_fix(locator, expr, mode_param) {
                 Ok(fix) => {
-                    check.amend(fix);
+                    diagnostic.amend(fix);
                 }
                 Err(e) => error!("Failed to remove parameter: {e}"),
             }
         }
     }
-    check
+    diagnostic
 }
 
 fn create_remove_param_fix(

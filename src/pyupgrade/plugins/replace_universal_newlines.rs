@@ -24,14 +24,14 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
                 kwarg.location.column() + "universal_newlines".len(),
             ),
         );
-        let mut check = Diagnostic::new(violations::ReplaceUniversalNewlines, range);
-        if checker.patch(check.kind.code()) {
-            check.amend(Fix::replacement(
+        let mut diagnostic = Diagnostic::new(violations::ReplaceUniversalNewlines, range);
+        if checker.patch(diagnostic.kind.code()) {
+            diagnostic.amend(Fix::replacement(
                 "text".to_string(),
                 range.location,
                 range.end_location,
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

@@ -110,21 +110,21 @@ pub(crate) fn percent_format_extra_named_arguments(
         return;
     }
 
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::PercentFormatExtraNamedArguments(
             missing.iter().map(|&arg| arg.to_string()).collect(),
         ),
         location,
     );
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         match remove_unused_format_arguments_from_dict(&missing, right, checker.locator) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to remove unused format arguments: {e}"),
         }
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// F505
@@ -268,22 +268,22 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::StringDotFormatExtraNamedArguments(
             missing.iter().map(|&arg| arg.to_string()).collect(),
         ),
         location,
     );
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         match remove_unused_keyword_arguments_from_format_call(&missing, location, checker.locator)
         {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to remove unused keyword arguments: {e}"),
         }
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// F523

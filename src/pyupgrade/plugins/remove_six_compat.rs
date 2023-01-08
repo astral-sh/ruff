@@ -35,15 +35,16 @@ fn map_name(name: &str, expr: &Expr, patch: bool) -> Option<Diagnostic> {
         _ => None,
     };
     if let Some(replacement) = replacement {
-        let mut check = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
+        let mut diagnostic =
+            Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
         if patch {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 replacement.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        Some(check)
+        Some(diagnostic)
     } else {
         None
     }
@@ -58,7 +59,8 @@ fn replace_by_str_literal(
 ) -> Option<Diagnostic> {
     match &arg.node {
         ExprKind::Constant { .. } => {
-            let mut check = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
+            let mut diagnostic =
+                Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
             if patch {
                 let content = format!(
                     "{}{}",
@@ -68,13 +70,13 @@ fn replace_by_str_literal(
                         arg.end_location.unwrap(),
                     ))
                 );
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     content,
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             };
-            Some(check)
+            Some(diagnostic)
         }
         _ => None,
     }
@@ -132,17 +134,17 @@ fn replace_by_expr_kind(
     patch: bool,
     stylist: &SourceCodeStyleDetector,
 ) -> Diagnostic {
-    let mut check = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
         let mut generator: SourceCodeGenerator = stylist.into();
         generator.unparse_expr(&create_expr(node), 0);
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             generator.generate(),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    check
+    diagnostic
 }
 
 fn replace_by_stmt_kind(
@@ -151,17 +153,17 @@ fn replace_by_stmt_kind(
     patch: bool,
     stylist: &SourceCodeStyleDetector,
 ) -> Diagnostic {
-    let mut check = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
         let mut generator: SourceCodeGenerator = stylist.into();
         generator.unparse_stmt(&create_stmt(node));
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             generator.generate(),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    check
+    diagnostic
 }
 
 // => `raise exc from cause`
@@ -411,15 +413,17 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
 
 /// UP016
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
-    if let Some(check) = handle_next_on_six_dict(expr, checker.patch(&RuleCode::UP016), checker) {
-        checker.diagnostics.push(check);
+    if let Some(diagnostic) =
+        handle_next_on_six_dict(expr, checker.patch(&RuleCode::UP016), checker)
+    {
+        checker.diagnostics.push(diagnostic);
         return;
     }
 
     let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
     if is_module_member(&call_path, "six") {
         let patch = checker.patch(&RuleCode::UP016);
-        let check = match &expr.node {
+        let diagnostic = match &expr.node {
             ExprKind::Call {
                 func,
                 args,
@@ -437,8 +441,8 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
             ExprKind::Name { id, .. } => map_name(id.as_str(), expr, patch),
             _ => return,
         };
-        if let Some(check) = check {
-            checker.diagnostics.push(check);
+        if let Some(diagnostic) = diagnostic {
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

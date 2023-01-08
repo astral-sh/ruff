@@ -7,18 +7,19 @@ use crate::registry::Diagnostic;
 use crate::violations;
 
 fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
-    let mut check = Diagnostic::new(violations::RewriteCElementTree, Range::from_located(node));
-    if checker.patch(check.kind.code()) {
+    let mut diagnostic =
+        Diagnostic::new(violations::RewriteCElementTree, Range::from_located(node));
+    if checker.patch(diagnostic.kind.code()) {
         let contents = checker
             .locator
             .slice_source_code_range(&Range::from_located(node));
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             contents.replacen("cElementTree", "ElementTree", 1),
             node.location,
             node.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// UP023

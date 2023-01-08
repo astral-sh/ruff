@@ -12,19 +12,19 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut check) = checks::useless_object_inheritance(name, bases, checker.current_scope(), &checker.bindings) else {
+    let Some(mut diagnostic) = checks::useless_object_inheritance(name, bases, checker.current_scope(), &checker.bindings) else {
         return;
     };
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         if let Some(fix) = pyupgrade::fixes::remove_class_def_base(
             checker.locator,
             stmt.location,
-            check.location,
+            diagnostic.location,
             bases,
             keywords,
         ) {
-            check.amend(fix);
+            diagnostic.amend(fix);
         }
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

@@ -27,21 +27,21 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             }
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::NoUnnecessaryPass,
                     Range::from_located(pass_stmt),
                 );
                 if checker.patch(&RuleCode::PIE790) {
                     match delete_stmt(pass_stmt, None, &[], checker.locator) {
                         Ok(fix) => {
-                            check.amend(fix);
+                            diagnostic.amend(fix);
                         }
                         Err(e) => {
                             error!("Failed to delete `pass` statement: {}", e);
                         }
                     }
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -78,14 +78,14 @@ pub fn dupe_class_field_definitions(checker: &mut Checker, bases: &[Expr], body:
         };
 
         if seen_targets.contains(target) {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
             if checker.patch(&RuleCode::PIE794) {
-                check.amend(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
+                diagnostic.amend(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         } else {
             seen_targets.insert(target);
         }
@@ -100,16 +100,16 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     if args.args.is_empty() {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
-                let mut check =
+                let mut diagnostic =
                     Diagnostic::new(violations::PreferListBuiltin, Range::from_located(expr));
                 if checker.patch(&RuleCode::PIE807) {
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         "list".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }

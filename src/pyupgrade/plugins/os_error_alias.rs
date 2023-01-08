@@ -158,15 +158,16 @@ fn handle_making_changes(
             final_str.insert(0, '(');
             final_str.push(')');
         }
-        let mut check = Diagnostic::new(violations::OSErrorAlias(compose_call_path(target)), range);
-        if checker.patch(check.kind.code()) {
-            check.amend(Fix::replacement(
+        let mut diagnostic =
+            Diagnostic::new(violations::OSErrorAlias(compose_call_path(target)), range);
+        if checker.patch(diagnostic.kind.code()) {
+            diagnostic.amend(Fix::replacement(
                 final_str,
                 range.location,
                 range.end_location,
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 

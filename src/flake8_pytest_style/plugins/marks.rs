@@ -14,7 +14,7 @@ fn pytest_mark_parentheses(
     preferred: &str,
     actual: &str,
 ) {
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::IncorrectMarkParenthesesStyle(
             get_mark_name(decorator).to_string(),
             preferred.to_string(),
@@ -22,10 +22,10 @@ fn pytest_mark_parentheses(
         ),
         Range::from_located(decorator),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(fix);
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(fix);
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr) {
@@ -71,15 +71,15 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
     }
 
     if !has_parameters {
-        let mut check = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::UseFixturesWithoutParameters,
             Range::from_located(decorator),
         );
-        if checker.patch(check.kind.code()) {
+        if checker.patch(diagnostic.kind.code()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
-            check.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
+            diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 

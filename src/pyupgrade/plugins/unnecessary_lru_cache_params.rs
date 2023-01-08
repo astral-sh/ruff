@@ -6,7 +6,7 @@ use crate::pyupgrade::checks;
 
 /// UP011
 pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Expr]) {
-    let Some(mut check) = checks::unnecessary_lru_cache_params(
+    let Some(mut diagnostic) = checks::unnecessary_lru_cache_params(
         decorator_list,
         checker.settings.target_version,
         &checker.from_imports,
@@ -14,8 +14,8 @@ pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Exp
     ) else {
         return;
     };
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::deletion(check.location, check.end_location));
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::deletion(diagnostic.location, diagnostic.end_location));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

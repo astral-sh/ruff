@@ -176,17 +176,17 @@ static CODING_COMMENT_REGEX: Lazy<Regex> =
 pub fn unnecessary_coding_comment(lineno: usize, line: &str, autofix: bool) -> Option<Diagnostic> {
     // PEP3120 makes utf-8 the default encoding.
     if CODING_COMMENT_REGEX.is_match(line) {
-        let mut check = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::PEP3120UnnecessaryCodingComment,
             Range::new(Location::new(lineno + 1, 0), Location::new(lineno + 2, 0)),
         );
         if autofix {
-            check.amend(Fix::deletion(
+            diagnostic.amend(Fix::deletion(
                 Location::new(lineno + 1, 0),
                 Location::new(lineno + 2, 0),
             ));
         }
-        Some(check)
+        Some(diagnostic)
     } else {
         None
     }

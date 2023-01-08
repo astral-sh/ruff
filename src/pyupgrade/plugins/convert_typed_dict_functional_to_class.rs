@@ -200,14 +200,14 @@ pub fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::ConvertTypedDictFunctionalToClass(class_name.to_string()),
         Range::from_located(stmt),
     );
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         match match_properties_and_total(args, keywords) {
             Ok((body, total_keyword)) => {
-                check.amend(convert_to_class(
+                diagnostic.amend(convert_to_class(
                     stmt,
                     class_name,
                     body,
@@ -219,5 +219,5 @@ pub fn convert_typed_dict_functional_to_class(
             Err(err) => debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}"),
         };
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

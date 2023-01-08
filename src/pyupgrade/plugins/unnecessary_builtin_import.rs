@@ -68,7 +68,7 @@ pub fn unnecessary_builtin_import(
     if unused_imports.is_empty() {
         return;
     }
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryBuiltinImport(
             unused_imports
                 .iter()
@@ -79,7 +79,7 @@ pub fn unnecessary_builtin_import(
         Range::from_located(stmt),
     );
 
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
@@ -102,10 +102,10 @@ pub fn unnecessary_builtin_import(
                 if fix.content.is_empty() || fix.content == "pass" {
                     checker.deletions.insert(defined_by.clone());
                 }
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to remove builtin import: {e}"),
         }
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

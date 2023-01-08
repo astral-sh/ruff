@@ -166,18 +166,18 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             .take_while(|line| line.trim().is_empty())
             .count();
         if blank_lines_before != 0 {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::NoBlankLineBeforeFunction(blank_lines_before),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Delete the blank line before the docstring.
-                check.amend(Fix::deletion(
+                diagnostic.amend(Fix::deletion(
                     Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                     Location::new(docstring.expr.location.row(), 0),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 
@@ -207,13 +207,13 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
         }
 
         if blank_lines_after != 0 {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::NoBlankLineAfterFunction(blank_lines_after),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Delete the blank line after the docstring.
-                check.amend(Fix::deletion(
+                diagnostic.amend(Fix::deletion(
                     Location::new(docstring.expr.end_location.unwrap().row() + 1, 0),
                     Location::new(
                         docstring.expr.end_location.unwrap().row() + 1 + blank_lines_after,
@@ -221,7 +221,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
                     ),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -248,35 +248,35 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             .count();
         if checker.settings.enabled.contains(&RuleCode::D211) {
             if blank_lines_before != 0 {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::NoBlankLineBeforeClass(blank_lines_before),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Delete the blank line before the class.
-                    check.amend(Fix::deletion(
+                    diagnostic.amend(Fix::deletion(
                         Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                         Location::new(docstring.expr.location.row(), 0),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
         if checker.settings.enabled.contains(&RuleCode::D203) {
             if blank_lines_before != 1 {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::OneBlankLineBeforeClass(blank_lines_before),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Insert one blank line before the class.
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         "\n".to_string(),
                         Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                         Location::new(docstring.expr.location.row(), 0),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -301,13 +301,13 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             .take_while(|line| line.trim().is_empty())
             .count();
         if blank_lines_after != 1 {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::OneBlankLineAfterClass(blank_lines_after),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Insert a blank line before the class (replacing any existing lines).
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     "\n".to_string(),
                     Location::new(docstring.expr.end_location.unwrap().row() + 1, 0),
                     Location::new(
@@ -316,7 +316,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                     ),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -336,11 +336,11 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
         }
     }
     if lines_count > 1 && blanks_count != 1 {
-        let mut check = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::BlankLineAfterSummary(blanks_count),
             Range::from_located(docstring.expr),
         );
-        if checker.patch(check.kind.code()) {
+        if checker.patch(diagnostic.kind.code()) {
             if blanks_count > 1 {
                 // Find the "summary" line (defined as the first non-blank line).
                 let mut summary_line = 0;
@@ -353,7 +353,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
                 }
 
                 // Insert one blank line after the summary (replacing any existing lines).
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     "\n".to_string(),
                     Location::new(docstring.expr.location.row() + summary_line + 1, 0),
                     Location::new(
@@ -363,7 +363,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
                 ));
             }
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -405,21 +405,21 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             if (i == lines.len() - 1 || !is_blank)
                 && line_indent.len() < docstring.indentation.len()
             {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::NoUnderIndentation,
                     Range::new(
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, 0),
                     ),
                 );
-                if checker.patch(check.kind.code()) {
-                    check.amend(Fix::replacement(
+                if checker.patch(diagnostic.kind.code()) {
+                    diagnostic.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, line_indent.len()),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
 
@@ -455,21 +455,21 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 if line_indent.len() > docstring.indentation.len() {
                     // We report over-indentation on every line. This isn't great, but
                     // enables autofix.
-                    let mut check = Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         violations::NoOverIndentation,
                         Range::new(
                             Location::new(docstring.expr.location.row() + i, 0),
                             Location::new(docstring.expr.location.row() + i, 0),
                         ),
                     );
-                    if checker.patch(check.kind.code()) {
-                        check.amend(Fix::replacement(
+                    if checker.patch(diagnostic.kind.code()) {
+                        diagnostic.amend(Fix::replacement(
                             whitespace::clean(docstring.indentation),
                             Location::new(docstring.expr.location.row() + i, 0),
                             Location::new(docstring.expr.location.row() + i, line_indent.len()),
                         ));
                     }
-                    checker.diagnostics.push(check);
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }
@@ -479,21 +479,21 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             let i = lines.len() - 1;
             let line_indent = whitespace::leading_space(lines[i]);
             if line_indent.len() > docstring.indentation.len() {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::NoOverIndentation,
                     Range::new(
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, 0),
                     ),
                 );
-                if checker.patch(check.kind.code()) {
-                    check.amend(Fix::replacement(
+                if checker.patch(diagnostic.kind.code()) {
+                    diagnostic.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, line_indent.len()),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -512,14 +512,14 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
         if line_count > 1 {
             if let Some(last_line) = contents.lines().last().map(str::trim) {
                 if last_line != "\"\"\"" && last_line != "'''" {
-                    let mut check = Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         violations::NewLineAfterLastParagraph,
                         Range::from_located(docstring.expr),
                     );
-                    if checker.patch(check.kind.code()) {
+                    if checker.patch(diagnostic.kind.code()) {
                         // Insert a newline just before the end-quote(s).
                         let content = format!("\n{}", whitespace::clean(docstring.indentation));
-                        check.amend(Fix::insertion(
+                        diagnostic.amend(Fix::insertion(
                             content,
                             Location::new(
                                 docstring.expr.end_location.unwrap().row(),
@@ -527,7 +527,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                             ),
                         ));
                     }
-                    checker.diagnostics.push(check);
+                    checker.diagnostics.push(diagnostic);
                 }
             }
             return;
@@ -551,17 +551,17 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     if line == trimmed {
         return;
     }
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::NoSurroundingWhitespace,
         Range::from_located(docstring.expr),
     );
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         if let Some(pattern) = leading_quote(contents) {
             if let Some(quote) = pattern.chars().last() {
                 // If removing whitespace would lead to an invalid string of quote
                 // characters, avoid applying the fix.
                 if !trimmed.ends_with(quote) {
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         trimmed.to_string(),
                         Location::new(
                             docstring.expr.location.row(),
@@ -576,7 +576,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
             }
         }
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// D212, D213
@@ -696,7 +696,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
         let trimmed = line.trim_end();
 
         if !trimmed.ends_with('.') {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::EndsInPeriod,
                 Range::from_located(docstring.expr),
             );
@@ -718,10 +718,10 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
                         trimmed.chars().count(),
                     ))
                 } {
-                    check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
+                    diagnostic.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         };
     }
 }
@@ -843,7 +843,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
         let line = body.lines().nth(index).unwrap();
         let trimmed = line.trim_end();
         if !(trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?')) {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::EndsInPunctuation,
                 Range::from_located(docstring.expr),
             );
@@ -865,10 +865,10 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
                         trimmed.chars().count(),
                     ))
                 } {
-                    check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
+                    diagnostic.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         };
     }
 }
@@ -961,18 +961,18 @@ fn blanks_and_section_underline(
     // Nothing but blank lines after the section header.
     if blank_lines_after_header == context.following_lines.len() {
         if checker.settings.enabled.contains(&RuleCode::D407) {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
                     whitespace::clean(docstring.indentation),
                     "-".repeat(context.section_name.len())
                 );
-                check.amend(Fix::insertion(
+                diagnostic.amend(Fix::insertion(
                     content,
                     Location::new(
                         docstring.expr.location.row() + context.original_index + 1,
@@ -980,7 +980,7 @@ fn blanks_and_section_underline(
                     ),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
         if checker.settings.enabled.contains(&RuleCode::D414) {
             checker.diagnostics.push(Diagnostic::new(
@@ -999,13 +999,13 @@ fn blanks_and_section_underline(
     if dash_line_found {
         if blank_lines_after_header > 0 {
             if checker.settings.enabled.contains(&RuleCode::D408) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::SectionUnderlineAfterName(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Delete any blank lines between the header and the underline.
-                    check.amend(Fix::deletion(
+                    diagnostic.amend(Fix::deletion(
                         Location::new(
                             docstring.expr.location.row() + context.original_index + 1,
                             0,
@@ -1019,7 +1019,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
 
@@ -1031,20 +1031,20 @@ fn blanks_and_section_underline(
             != context.section_name.len()
         {
             if checker.settings.enabled.contains(&RuleCode::D409) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::SectionUnderlineMatchesSectionLength(
                         context.section_name.to_string(),
                     ),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Replace the existing underline with a line of the appropriate length.
                     let content = format!(
                         "{}{}\n",
                         whitespace::clean(docstring.indentation),
                         "-".repeat(context.section_name.len())
                     );
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         content,
                         Location::new(
                             docstring.expr.location.row()
@@ -1063,20 +1063,20 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 };
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
 
         if checker.settings.enabled.contains(&RuleCode::D215) {
             let leading_space = whitespace::leading_space(non_empty_line);
             if leading_space.len() > docstring.indentation.len() {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::SectionUnderlineNotOverIndented(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Replace the existing indentation with whitespace of the appropriate length.
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(
                             docstring.expr.location.row()
@@ -1094,7 +1094,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 };
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
 
@@ -1117,15 +1117,15 @@ fn blanks_and_section_underline(
                     }
                 } else {
                     if checker.settings.enabled.contains(&RuleCode::D412) {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::NoBlankLinesBetweenHeaderAndContent(
                                 context.section_name.to_string(),
                             ),
                             Range::from_located(docstring.expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             // Delete any blank lines between the header and content.
-                            check.amend(Fix::deletion(
+                            diagnostic.amend(Fix::deletion(
                                 Location::new(
                                     docstring.expr.location.row()
                                         + context.original_index
@@ -1143,7 +1143,7 @@ fn blanks_and_section_underline(
                                 ),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -1157,18 +1157,18 @@ fn blanks_and_section_underline(
         }
     } else {
         if checker.settings.enabled.contains(&RuleCode::D407) {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
                     whitespace::clean(docstring.indentation),
                     "-".repeat(context.section_name.len())
                 );
-                check.amend(Fix::insertion(
+                diagnostic.amend(Fix::insertion(
                     content,
                     Location::new(
                         docstring.expr.location.row() + context.original_index + 1,
@@ -1176,19 +1176,19 @@ fn blanks_and_section_underline(
                     ),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
         if blank_lines_after_header > 0 {
             if checker.settings.enabled.contains(&RuleCode::D412) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::NoBlankLinesBetweenHeaderAndContent(
                         context.section_name.to_string(),
                     ),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Delete any blank lines between the header and content.
-                    check.amend(Fix::deletion(
+                    diagnostic.amend(Fix::deletion(
                         Location::new(
                             docstring.expr.location.row() + context.original_index + 1,
                             0,
@@ -1202,7 +1202,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -1221,18 +1221,18 @@ fn common_section(
                 .section_names()
                 .contains(capitalized_section_name.as_str())
             {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::CapitalizeSectionName(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Replace the section title with the capitalized variant. This requires
                     // locating the start and end of the section name.
                     if let Some(index) = context.line.find(context.section_name) {
                         // Map from bytes to characters.
                         let section_name_start = &context.line[..index].chars().count();
                         let section_name_length = &context.section_name.chars().count();
-                        check.amend(Fix::replacement(
+                        diagnostic.amend(Fix::replacement(
                             capitalized_section_name,
                             Location::new(
                                 docstring.expr.location.row() + context.original_index,
@@ -1245,7 +1245,7 @@ fn common_section(
                         ));
                     }
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -1253,13 +1253,13 @@ fn common_section(
     if checker.settings.enabled.contains(&RuleCode::D214) {
         let leading_space = whitespace::leading_space(context.line);
         if leading_space.len() > docstring.indentation.len() {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::SectionNotOverIndented(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     whitespace::clean(docstring.indentation),
                     Location::new(docstring.expr.location.row() + context.original_index, 0),
                     Location::new(
@@ -1268,7 +1268,7 @@ fn common_section(
                     ),
                 ));
             };
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 
@@ -1279,13 +1279,13 @@ fn common_section(
     {
         if context.is_last_section {
             if checker.settings.enabled.contains(&RuleCode::D413) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::BlankLineAfterLastSection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Add a newline after the section.
-                    check.amend(Fix::insertion(
+                    diagnostic.amend(Fix::insertion(
                         "\n".to_string(),
                         Location::new(
                             docstring.expr.location.row()
@@ -1296,17 +1296,17 @@ fn common_section(
                         ),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         } else {
             if checker.settings.enabled.contains(&RuleCode::D410) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::BlankLineAfterSection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     // Add a newline after the section.
-                    check.amend(Fix::insertion(
+                    diagnostic.amend(Fix::insertion(
                         "\n".to_string(),
                         Location::new(
                             docstring.expr.location.row()
@@ -1317,25 +1317,25 @@ fn common_section(
                         ),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
 
     if checker.settings.enabled.contains(&RuleCode::D411) {
         if !context.previous_line.is_empty() {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::BlankLineBeforeSection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Add a blank line before the section.
-                check.amend(Fix::insertion(
+                diagnostic.amend(Fix::insertion(
                     "\n".to_string(),
                     Location::new(docstring.expr.location.row() + context.original_index, 0),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 
@@ -1513,11 +1513,11 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
             .strip_prefix(context.section_name)
             .unwrap();
         if !suffix.is_empty() {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::NewLineAfterSectionName(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Delete the suffix. This requires locating the end of the section name.
                 if let Some(index) = context.line.find(context.section_name) {
                     // Map from bytes to characters.
@@ -1525,7 +1525,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
                         .chars()
                         .count();
                     let suffix_length = suffix.chars().count();
-                    check.amend(Fix::deletion(
+                    diagnostic.amend(Fix::deletion(
                         Location::new(
                             docstring.expr.location.row() + context.original_index,
                             *suffix_start,
@@ -1537,7 +1537,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
                     ));
                 }
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 
@@ -1559,11 +1559,11 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
             .strip_prefix(context.section_name)
             .unwrap();
         if suffix != ":" {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::SectionNameEndsInColon(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 // Replace the suffix. This requires locating the end of the section name.
                 if let Some(index) = context.line.find(context.section_name) {
                     // Map from bytes to characters.
@@ -1571,7 +1571,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                         .chars()
                         .count();
                     let suffix_length = suffix.chars().count();
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         ":".to_string(),
                         Location::new(
                             docstring.expr.location.row() + context.original_index,
@@ -1584,7 +1584,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                     ));
                 }
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 

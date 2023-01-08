@@ -40,16 +40,16 @@ pub fn misplaced_comparison_constant(
         _ => unreachable!("Expected comparison operator"),
     };
     let suggestion = format!("{right} {reversed_op} {left}");
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::MisplacedComparisonConstant(suggestion.clone()),
         Range::from_located(expr),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             suggestion,
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

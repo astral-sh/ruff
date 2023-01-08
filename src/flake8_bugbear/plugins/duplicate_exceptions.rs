@@ -44,7 +44,7 @@ fn duplicate_handler_exceptions<'a>(
     if checker.settings.enabled.contains(&RuleCode::B014) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::DuplicateHandlerException(
                     duplicates
                         .into_iter()
@@ -54,20 +54,20 @@ fn duplicate_handler_exceptions<'a>(
                 ),
                 Range::from_located(expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 let mut generator: SourceCodeGenerator = checker.style.into();
                 if unique_elts.len() == 1 {
                     generator.unparse_expr(unique_elts[0], 0);
                 } else {
                     generator.unparse_expr(&type_pattern(unique_elts), 0);
                 }
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     generator.generate(),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 

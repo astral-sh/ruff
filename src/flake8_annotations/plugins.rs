@@ -326,19 +326,19 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         if !(checker.settings.flake8_annotations.mypy_init_return
                             && has_any_typed_arg)
                         {
-                            let mut check = Diagnostic::new(
+                            let mut diagnostic = Diagnostic::new(
                                 violations::MissingReturnTypeSpecialMethod(name.to_string()),
                                 helpers::identifier_range(stmt, checker.locator),
                             );
-                            if checker.patch(check.kind.code()) {
+                            if checker.patch(diagnostic.kind.code()) {
                                 match fixes::add_return_none_annotation(checker.locator, stmt) {
                                     Ok(fix) => {
-                                        check.amend(fix);
+                                        diagnostic.amend(fix);
                                     }
                                     Err(e) => error!("Failed to generate fix: {e}"),
                                 }
                             }
-                            checker.diagnostics.push(check);
+                            checker.diagnostics.push(diagnostic);
                         }
                     }
                 } else if visibility::is_magic(stmt) {

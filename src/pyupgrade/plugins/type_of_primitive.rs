@@ -9,18 +9,19 @@ use crate::violations;
 
 /// UP003
 pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let Some(mut check) = checks::type_of_primitive(func, args, Range::from_located(expr)) else {
+    let Some(mut diagnostic) = checks::type_of_primitive(func, args, Range::from_located(expr)) else {
         return;
     };
-    if checker.patch(check.kind.code()) {
-        if let DiagnosticKind::TypeOfPrimitive(violations::TypeOfPrimitive(primitive)) = &check.kind
+    if checker.patch(diagnostic.kind.code()) {
+        if let DiagnosticKind::TypeOfPrimitive(violations::TypeOfPrimitive(primitive)) =
+            &diagnostic.kind
         {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 primitive.builtin(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

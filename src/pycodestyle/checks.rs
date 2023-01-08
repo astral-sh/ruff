@@ -54,7 +54,7 @@ pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<D
 
 /// E721
 pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Diagnostic> {
-    let mut checks: Vec<Diagnostic> = vec![];
+    let mut diagnostics: Vec<Diagnostic> = vec![];
 
     for (op, right) in izip!(ops, comparators) {
         if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
@@ -75,7 +75,8 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                                         kind: None
                                     }
                             ) {
-                                checks.push(Diagnostic::new(violations::TypeComparison, location));
+                                diagnostics
+                                    .push(Diagnostic::new(violations::TypeComparison, location));
                             }
                         }
                     }
@@ -85,7 +86,7 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                 if let ExprKind::Name { id, .. } = &value.node {
                     // Ex) types.IntType
                     if id == "types" {
-                        checks.push(Diagnostic::new(violations::TypeComparison, location));
+                        diagnostics.push(Diagnostic::new(violations::TypeComparison, location));
                     }
                 }
             }
@@ -93,7 +94,7 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
         }
     }
 
-    checks
+    diagnostics
 }
 
 /// E722
@@ -171,14 +172,14 @@ pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Diagno
         if let Some(line) = contents.lines().last() {
             // Both locations are at the end of the file (and thus the same).
             let location = Location::new(contents.lines().count(), line.len());
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::NoNewLineAtEndOfFile,
                 Range::new(location, location),
             );
             if autofix {
-                check.amend(Fix::insertion("\n".to_string(), location));
+                diagnostic.amend(Fix::insertion("\n".to_string(), location));
             }
-            return Some(check);
+            return Some(diagnostic);
         }
     }
     None

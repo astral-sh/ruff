@@ -157,16 +157,16 @@ pub fn convert_named_tuple_functional_to_class(
     {
         return;
     };
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::ConvertNamedTupleFunctionalToClass(typename.to_string()),
         Range::from_located(stmt),
     );
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         match match_defaults(keywords)
             .and_then(|defaults| create_properties_from_args(args, defaults))
         {
             Ok(properties) => {
-                check.amend(convert_to_class(
+                diagnostic.amend(convert_to_class(
                     stmt,
                     typename,
                     properties,
@@ -177,5 +177,5 @@ pub fn convert_named_tuple_functional_to_class(
             Err(err) => debug!("Skipping ineligible `NamedTuple` \"{typename}\": {err}"),
         };
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

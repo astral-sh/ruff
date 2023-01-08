@@ -61,16 +61,16 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // (i.e., it's directly within an `StmtKind::Expr`).
     if let StmtKind::Expr { value: child } = &checker.current_stmt().node {
         if expr == child.as_ref() {
-            let mut check =
+            let mut diagnostic =
                 Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
-            if checker.patch(check.kind.code()) {
-                check.amend(Fix::replacement(
+            if checker.patch(diagnostic.kind.code()) {
+                diagnostic.amend(Fix::replacement(
                     assignment(obj, name, value, checker.style),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

@@ -172,16 +172,16 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     )
     .map_err(|e| e.to_string())?;
 
-    let messages: Vec<ExpandedMessage> = checks
+    let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
-        .map(|check| ExpandedMessage {
-            code: check.kind.code().clone(),
-            message: check.kind.body(),
-            location: check.location,
-            end_location: check.end_location,
-            fix: check.fix.map(|fix| ExpandedFix {
+        .map(|diagnostic| ExpandedMessage {
+            code: diagnostic.kind.code().clone(),
+            message: diagnostic.kind.body(),
+            location: diagnostic.location,
+            end_location: diagnostic.end_location,
+            fix: diagnostic.fix.map(|fix| ExpandedFix {
                 content: fix.content,
-                message: check.kind.commit(),
+                message: diagnostic.kind.commit(),
                 location: fix.location,
                 end_location: fix.end_location,
             }),

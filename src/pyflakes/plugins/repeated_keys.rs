@@ -40,7 +40,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                         if checker.settings.enabled.contains(&RuleCode::F601) {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
-                            let mut check = Diagnostic::new(
+                            let mut diagnostic = Diagnostic::new(
                                 violations::MultiValueRepeatedKeyLiteral(
                                     unparse_expr(&keys[i], checker.style),
                                     is_duplicate_value,
@@ -49,7 +49,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                             );
                             if is_duplicate_value {
                                 if checker.patch(&RuleCode::F601) {
-                                    check.amend(Fix::deletion(
+                                    diagnostic.amend(Fix::deletion(
                                         values[i - 1].end_location.unwrap(),
                                         values[i].end_location.unwrap(),
                                     ));
@@ -57,14 +57,14 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                             } else {
                                 seen_values.insert(comparable_value);
                             }
-                            checker.diagnostics.push(check);
+                            checker.diagnostics.push(diagnostic);
                         }
                     }
                     DictionaryKey::Variable(key) => {
                         if checker.settings.enabled.contains(&RuleCode::F602) {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
-                            let mut check = Diagnostic::new(
+                            let mut diagnostic = Diagnostic::new(
                                 violations::MultiValueRepeatedKeyVariable(
                                     key.to_string(),
                                     is_duplicate_value,
@@ -73,7 +73,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                             );
                             if is_duplicate_value {
                                 if checker.patch(&RuleCode::F602) {
-                                    check.amend(Fix::deletion(
+                                    diagnostic.amend(Fix::deletion(
                                         values[i - 1].end_location.unwrap(),
                                         values[i].end_location.unwrap(),
                                     ));
@@ -81,7 +81,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                             } else {
                                 seen_values.insert(comparable_value);
                             }
-                            checker.diagnostics.push(check);
+                            checker.diagnostics.push(diagnostic);
                         }
                     }
                 }

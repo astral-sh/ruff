@@ -60,19 +60,19 @@ fn delete_default_encode_arg_or_kwarg(
     patch: bool,
 ) -> Option<Diagnostic> {
     if let Some(arg) = args.get(0) {
-        let mut check =
+        let mut diagnostic =
             Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
-            check.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
+            diagnostic.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
         }
-        Some(check)
+        Some(diagnostic)
     } else if let Some(kwarg) = kwargs.get(0) {
-        let mut check =
+        let mut diagnostic =
             Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
-            check.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
+            diagnostic.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
-        Some(check)
+        Some(diagnostic)
     } else {
         None
     }
@@ -85,7 +85,8 @@ fn replace_with_bytes_literal(
     locator: &SourceCodeLocator,
     patch: bool,
 ) -> Diagnostic {
-    let mut check = Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
+    let mut diagnostic =
+        Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
         let content = locator.slice_source_code_range(&Range::new(
             constant.location,
@@ -95,13 +96,13 @@ fn replace_with_bytes_literal(
             "b{}",
             content.trim_start_matches('u').trim_start_matches('U')
         );
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             content,
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    check
+    diagnostic
 }
 
 /// UP012
@@ -133,13 +134,13 @@ pub fn unnecessary_encode_utf8(
                     ));
                 } else {
                     // "unicode text©".encode("utf-8")
-                    if let Some(check) = delete_default_encode_arg_or_kwarg(
+                    if let Some(diagnostic) = delete_default_encode_arg_or_kwarg(
                         expr,
                         args,
                         kwargs,
                         checker.patch(&RuleCode::UP012),
                     ) {
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -147,13 +148,13 @@ pub fn unnecessary_encode_utf8(
         // f"foo{bar}".encode(*args, **kwargs)
         ExprKind::JoinedStr { .. } => {
             if is_default_encode(args, kwargs) {
-                if let Some(check) = delete_default_encode_arg_or_kwarg(
+                if let Some(diagnostic) = delete_default_encode_arg_or_kwarg(
                     expr,
                     args,
                     kwargs,
                     checker.patch(&RuleCode::UP012),
                 ) {
-                    checker.diagnostics.push(check);
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }

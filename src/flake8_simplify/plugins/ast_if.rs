@@ -88,7 +88,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
     let condition = unparse_expr(test, checker.style);
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
@@ -96,13 +96,13 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         let return_stmt = create_stmt(StmtKind::Return {
             value: Some(test.clone()),
         });
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             unparse_stmt(&return_stmt, checker.style),
             stmt.location,
             stmt.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
@@ -178,16 +178,16 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let ternary = ternary(target_var, body_value, test, orelse_value);
     let content = unparse_stmt(&ternary, checker.style);
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UseTernaryOperator(content.clone()),
         Range::from_located(stmt),
     );
     if checker.patch(&RuleCode::SIM108) {
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             content,
             stmt.location,
             stmt.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

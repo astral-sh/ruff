@@ -79,14 +79,14 @@ fn pytest_fixture_parentheses(
     preferred: &str,
     actual: &str,
 ) {
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::IncorrectFixtureParenthesesStyle(preferred.to_string(), actual.to_string()),
         Range::from_located(decorator),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(fix);
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(fix);
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// PT001, PT002, PT003
@@ -176,12 +176,12 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
             if let StmtKind::Expr { value, .. } = &stmt.node {
                 if let ExprKind::Yield { .. } = value.node {
                     if visitor.yield_statements.len() == 1 {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::UselessYieldFixture(func_name.to_string()),
                             Range::from_located(stmt),
                         );
-                        if checker.patch(check.kind.code()) {
-                            check.amend(Fix::replacement(
+                        if checker.patch(diagnostic.kind.code()) {
+                            diagnostic.amend(Fix::replacement(
                                 "return".to_string(),
                                 stmt.location,
                                 Location::new(
@@ -190,7 +190,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                                 ),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }

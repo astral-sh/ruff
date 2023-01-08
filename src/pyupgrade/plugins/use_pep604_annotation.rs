@@ -64,20 +64,22 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
 
     let call_path = dealias_call_path(collect_call_paths(value), &checker.import_aliases);
     if checker.match_typing_call_path(&call_path, "Optional") {
-        let mut check = Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
-        if checker.patch(check.kind.code()) {
+        let mut diagnostic =
+            Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
+        if checker.patch(diagnostic.kind.code()) {
             let mut generator: SourceCodeGenerator = checker.style.into();
             generator.unparse_expr(&optional(slice), 0);
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 generator.generate(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     } else if checker.match_typing_call_path(&call_path, "Union") {
-        let mut check = Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
-        if checker.patch(check.kind.code()) {
+        let mut diagnostic =
+            Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
+        if checker.patch(diagnostic.kind.code()) {
             match &slice.node {
                 ExprKind::Slice { .. } => {
                     // Invalid type annotation.
@@ -85,7 +87,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 ExprKind::Tuple { elts, .. } => {
                     let mut generator: SourceCodeGenerator = checker.style.into();
                     generator.unparse_expr(&union(elts), 0);
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         generator.generate(),
                         expr.location,
                         expr.end_location.unwrap(),
@@ -95,7 +97,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     // Single argument.
                     let mut generator: SourceCodeGenerator = checker.style.into();
                     generator.unparse_expr(slice, 0);
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         generator.generate(),
                         expr.location,
                         expr.end_location.unwrap(),
@@ -103,6 +105,6 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 }
             }
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

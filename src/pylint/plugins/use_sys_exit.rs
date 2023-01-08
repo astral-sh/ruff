@@ -75,19 +75,19 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
         if !checker.is_builtin(name) {
             continue;
         }
-        let mut check = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::UseSysExit(name.to_string()),
             Range::from_located(func),
         );
-        if checker.patch(check.kind.code()) {
+        if checker.patch(diagnostic.kind.code()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     content,
                     func.location,
                     func.end_location.unwrap(),
                 ));
             }
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
