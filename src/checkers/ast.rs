@@ -330,7 +330,7 @@ where
             }
             StmtKind::Break => {
                 if self.settings.enabled.contains(&RuleCode::F701) {
-                    if let Some(check) = pyflakes::checks::break_outside_loop(
+                    if let Some(diagnostic) = pyflakes::checks::break_outside_loop(
                         stmt,
                         &mut self
                             .parents
@@ -339,13 +339,13 @@ where
                             .map(std::convert::Into::into)
                             .skip(1),
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
             }
             StmtKind::Continue => {
                 if self.settings.enabled.contains(&RuleCode::F702) {
-                    if let Some(check) = pyflakes::checks::continue_outside_loop(
+                    if let Some(diagnostic) = pyflakes::checks::continue_outside_loop(
                         stmt,
                         &mut self
                             .parents
@@ -354,7 +354,7 @@ where
                             .map(std::convert::Into::into)
                             .skip(1),
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -375,26 +375,28 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&RuleCode::E743) {
-                    if let Some(check) = pycodestyle::checks::ambiguous_function_name(name, || {
-                        helpers::identifier_range(stmt, self.locator)
-                    }) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        pycodestyle::checks::ambiguous_function_name(name, || {
+                            helpers::identifier_range(stmt, self.locator)
+                        })
+                    {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
                 if self.settings.enabled.contains(&RuleCode::N802) {
-                    if let Some(check) = pep8_naming::checks::invalid_function_name(
+                    if let Some(diagnostic) = pep8_naming::checks::invalid_function_name(
                         stmt,
                         name,
                         &self.settings.pep8_naming.ignore_names,
                         self.locator,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
                 if self.settings.enabled.contains(&RuleCode::N804) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         pep8_naming::checks::invalid_first_argument_name_for_class_method(
                             self.current_scope(),
                             name,
@@ -405,32 +407,34 @@ where
                             &self.settings.pep8_naming,
                         )
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
                 if self.settings.enabled.contains(&RuleCode::N805) {
-                    if let Some(check) = pep8_naming::checks::invalid_first_argument_name_for_method(
-                        self.current_scope(),
-                        name,
-                        decorator_list,
-                        args,
-                        &self.from_imports,
-                        &self.import_aliases,
-                        &self.settings.pep8_naming,
-                    ) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        pep8_naming::checks::invalid_first_argument_name_for_method(
+                            self.current_scope(),
+                            name,
+                            decorator_list,
+                            args,
+                            &self.from_imports,
+                            &self.import_aliases,
+                            &self.settings.pep8_naming,
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
                 if self.settings.enabled.contains(&RuleCode::N807) {
-                    if let Some(check) = pep8_naming::checks::dunder_function_name(
+                    if let Some(diagnostic) = pep8_naming::checks::dunder_function_name(
                         self.current_scope(),
                         stmt,
                         name,
                         self.locator,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
@@ -461,14 +465,14 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::C901) {
-                    if let Some(check) = mccabe::checks::function_is_too_complex(
+                    if let Some(diagnostic) = mccabe::checks::function_is_too_complex(
                         stmt,
                         name,
                         body,
                         self.settings.mccabe.max_complexity,
                         self.locator,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
@@ -595,29 +599,31 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::E742) {
-                    if let Some(check) = pycodestyle::checks::ambiguous_class_name(name, || {
-                        helpers::identifier_range(stmt, self.locator)
-                    }) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        pycodestyle::checks::ambiguous_class_name(name, || {
+                            helpers::identifier_range(stmt, self.locator)
+                        })
+                    {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
                 if self.settings.enabled.contains(&RuleCode::N801) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         pep8_naming::checks::invalid_class_name(stmt, name, self.locator)
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
                 if self.settings.enabled.contains(&RuleCode::N818) {
-                    if let Some(check) = pep8_naming::checks::error_suffix_on_exception_name(
+                    if let Some(diagnostic) = pep8_naming::checks::error_suffix_on_exception_name(
                         stmt,
                         bases,
                         name,
                         self.locator,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
@@ -740,21 +746,23 @@ where
 
                     // flake8-debugger
                     if self.settings.enabled.contains(&RuleCode::T100) {
-                        if let Some(check) =
+                        if let Some(diagnostic) =
                             flake8_debugger::checks::debugger_import(stmt, None, &alias.node.name)
                         {
-                            self.diagnostics.push(check);
+                            self.diagnostics.push(diagnostic);
                         }
                     }
 
                     // flake8_tidy_imports
                     if self.settings.enabled.contains(&RuleCode::TID251) {
-                        if let Some(check) = flake8_tidy_imports::checks::name_or_parent_is_banned(
-                            alias,
-                            &alias.node.name,
-                            &self.settings.flake8_tidy_imports.banned_api,
-                        ) {
-                            self.diagnostics.push(check);
+                        if let Some(diagnostic) =
+                            flake8_tidy_imports::checks::name_or_parent_is_banned(
+                                alias,
+                                &alias.node.name,
+                                &self.settings.flake8_tidy_imports.banned_api,
+                            )
+                        {
+                            self.diagnostics.push(diagnostic);
                         }
                     }
 
@@ -775,7 +783,7 @@ where
 
                         let name = alias.node.name.split('.').last().unwrap();
                         if self.settings.enabled.contains(&RuleCode::N811) {
-                            if let Some(check) =
+                            if let Some(diagnostic) =
                                 pep8_naming::checks::constant_imported_as_non_constant(
                                     stmt,
                                     name,
@@ -783,12 +791,12 @@ where
                                     self.locator,
                                 )
                             {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
                         if self.settings.enabled.contains(&RuleCode::N812) {
-                            if let Some(check) =
+                            if let Some(diagnostic) =
                                 pep8_naming::checks::lowercase_imported_as_non_lowercase(
                                     stmt,
                                     name,
@@ -796,12 +804,12 @@ where
                                     self.locator,
                                 )
                             {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
                         if self.settings.enabled.contains(&RuleCode::N813) {
-                            if let Some(check) =
+                            if let Some(diagnostic) =
                                 pep8_naming::checks::camelcase_imported_as_lowercase(
                                     stmt,
                                     name,
@@ -809,35 +817,39 @@ where
                                     self.locator,
                                 )
                             {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
                         if self.settings.enabled.contains(&RuleCode::N814) {
-                            if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
-                                stmt,
-                                name,
-                                asname,
-                                self.locator,
-                            ) {
-                                self.diagnostics.push(check);
+                            if let Some(diagnostic) =
+                                pep8_naming::checks::camelcase_imported_as_constant(
+                                    stmt,
+                                    name,
+                                    asname,
+                                    self.locator,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
                         if self.settings.enabled.contains(&RuleCode::N817) {
-                            if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
-                                stmt,
-                                name,
-                                asname,
-                                self.locator,
-                            ) {
-                                self.diagnostics.push(check);
+                            if let Some(diagnostic) =
+                                pep8_naming::checks::camelcase_imported_as_acronym(
+                                    stmt,
+                                    name,
+                                    asname,
+                                    self.locator,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
                             }
                         }
                     }
 
                     if self.settings.enabled.contains(&RuleCode::ICN001) {
-                        if let Some(check) =
+                        if let Some(diagnostic) =
                             flake8_import_conventions::checks::check_conventional_import(
                                 stmt,
                                 &alias.node.name,
@@ -845,17 +857,17 @@ where
                                 &self.settings.flake8_import_conventions.aliases,
                             )
                         {
-                            self.diagnostics.push(check);
+                            self.diagnostics.push(diagnostic);
                         }
                     }
 
                     if self.settings.enabled.contains(&RuleCode::PT013) {
-                        if let Some(check) = flake8_pytest_style::plugins::import(
+                        if let Some(diagnostic) = flake8_pytest_style::plugins::import(
                             stmt,
                             &alias.node.name,
                             alias.node.asname.as_deref(),
                         ) {
-                            self.diagnostics.push(check);
+                            self.diagnostics.push(diagnostic);
                         }
                     }
                 }
@@ -910,31 +922,33 @@ where
                 if self.settings.enabled.contains(&RuleCode::TID251) {
                     if let Some(module) = module {
                         for name in names {
-                            if let Some(check) = flake8_tidy_imports::checks::name_is_banned(
+                            if let Some(diagnostic) = flake8_tidy_imports::checks::name_is_banned(
                                 module,
                                 name,
                                 &self.settings.flake8_tidy_imports.banned_api,
                             ) {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
-                        if let Some(check) = flake8_tidy_imports::checks::name_or_parent_is_banned(
-                            stmt,
-                            module,
-                            &self.settings.flake8_tidy_imports.banned_api,
-                        ) {
-                            self.diagnostics.push(check);
+                        if let Some(diagnostic) =
+                            flake8_tidy_imports::checks::name_or_parent_is_banned(
+                                stmt,
+                                module,
+                                &self.settings.flake8_tidy_imports.banned_api,
+                            )
+                        {
+                            self.diagnostics.push(diagnostic);
                         }
                     }
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PT013) {
-                    if let Some(check) = flake8_pytest_style::plugins::import_from(
+                    if let Some(diagnostic) = flake8_pytest_style::plugins::import_from(
                         stmt,
                         module.as_deref(),
                         level.as_ref(),
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
@@ -1065,29 +1079,31 @@ where
                     }
 
                     if self.settings.enabled.contains(&RuleCode::TID252) {
-                        if let Some(check) = flake8_tidy_imports::checks::banned_relative_import(
-                            stmt,
-                            level.as_ref(),
-                            &self.settings.flake8_tidy_imports.ban_relative_imports,
-                        ) {
-                            self.diagnostics.push(check);
+                        if let Some(diagnostic) =
+                            flake8_tidy_imports::checks::banned_relative_import(
+                                stmt,
+                                level.as_ref(),
+                                &self.settings.flake8_tidy_imports.ban_relative_imports,
+                            )
+                        {
+                            self.diagnostics.push(diagnostic);
                         }
                     }
 
                     // flake8-debugger
                     if self.settings.enabled.contains(&RuleCode::T100) {
-                        if let Some(check) = flake8_debugger::checks::debugger_import(
+                        if let Some(diagnostic) = flake8_debugger::checks::debugger_import(
                             stmt,
                             module.as_deref(),
                             &alias.node.name,
                         ) {
-                            self.diagnostics.push(check);
+                            self.diagnostics.push(diagnostic);
                         }
                     }
 
                     if let Some(asname) = &alias.node.asname {
                         if self.settings.enabled.contains(&RuleCode::N811) {
-                            if let Some(check) =
+                            if let Some(diagnostic) =
                                 pep8_naming::checks::constant_imported_as_non_constant(
                                     stmt,
                                     &alias.node.name,
@@ -1095,12 +1111,12 @@ where
                                     self.locator,
                                 )
                             {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
                         if self.settings.enabled.contains(&RuleCode::N812) {
-                            if let Some(check) =
+                            if let Some(diagnostic) =
                                 pep8_naming::checks::lowercase_imported_as_non_lowercase(
                                     stmt,
                                     &alias.node.name,
@@ -1108,12 +1124,12 @@ where
                                     self.locator,
                                 )
                             {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
                         if self.settings.enabled.contains(&RuleCode::N813) {
-                            if let Some(check) =
+                            if let Some(diagnostic) =
                                 pep8_naming::checks::camelcase_imported_as_lowercase(
                                     stmt,
                                     &alias.node.name,
@@ -1121,29 +1137,33 @@ where
                                     self.locator,
                                 )
                             {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
                         if self.settings.enabled.contains(&RuleCode::N814) {
-                            if let Some(check) = pep8_naming::checks::camelcase_imported_as_constant(
-                                stmt,
-                                &alias.node.name,
-                                asname,
-                                self.locator,
-                            ) {
-                                self.diagnostics.push(check);
+                            if let Some(diagnostic) =
+                                pep8_naming::checks::camelcase_imported_as_constant(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                    self.locator,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
                         if self.settings.enabled.contains(&RuleCode::N817) {
-                            if let Some(check) = pep8_naming::checks::camelcase_imported_as_acronym(
-                                stmt,
-                                &alias.node.name,
-                                asname,
-                                self.locator,
-                            ) {
-                                self.diagnostics.push(check);
+                            if let Some(diagnostic) =
+                                pep8_naming::checks::camelcase_imported_as_acronym(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                    self.locator,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
@@ -1217,15 +1237,16 @@ where
                         .push(flake8_bandit::checks::assert_used(stmt));
                 }
                 if self.settings.enabled.contains(&RuleCode::PT015) {
-                    if let Some(check) = flake8_pytest_style::plugins::assert_falsy(stmt, test) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) = flake8_pytest_style::plugins::assert_falsy(stmt, test)
+                    {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::PT018) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_pytest_style::plugins::composite_condition(stmt, test)
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -1286,10 +1307,10 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&RuleCode::F707) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         pyflakes::checks::default_except_not_last(handlers, self.locator)
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::B014)
@@ -1331,10 +1352,10 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::S105) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_bandit::checks::assign_hardcoded_password_string(value, targets)
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
@@ -1356,8 +1377,8 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PD901) {
-                    if let Some(check) = pandas_vet::checks::assignment_to_df(targets) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) = pandas_vet::checks::assignment_to_df(targets) {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -1637,13 +1658,13 @@ where
                         self.settings.enabled.contains(&RuleCode::F621);
                     let check_two_starred_expressions =
                         self.settings.enabled.contains(&RuleCode::F622);
-                    if let Some(check) = pyflakes::checks::starred_expressions(
+                    if let Some(diagnostic) = pyflakes::checks::starred_expressions(
                         elts,
                         check_too_many_expressions,
                         check_two_starred_expressions,
                         Range::from_located(expr),
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -1675,11 +1696,11 @@ where
                     }
                     ExprContext::Store => {
                         if self.settings.enabled.contains(&RuleCode::E741) {
-                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                            if let Some(diagnostic) = pycodestyle::checks::ambiguous_variable_name(
                                 id,
                                 Range::from_located(expr),
                             ) {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
@@ -1921,41 +1942,41 @@ where
 
                 // flake8-bandit
                 if self.settings.enabled.contains(&RuleCode::S102) {
-                    if let Some(check) = flake8_bandit::checks::exec_used(expr, func) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) = flake8_bandit::checks::exec_used(expr, func) {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::S103) {
-                    if let Some(check) = flake8_bandit::checks::bad_file_permissions(
+                    if let Some(diagnostic) = flake8_bandit::checks::bad_file_permissions(
                         func,
                         args,
                         keywords,
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::S501) {
-                    if let Some(check) = flake8_bandit::checks::request_with_no_cert_validation(
+                    if let Some(diagnostic) = flake8_bandit::checks::request_with_no_cert_validation(
                         func,
                         args,
                         keywords,
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::S506) {
-                    if let Some(check) = flake8_bandit::checks::unsafe_yaml_load(
+                    if let Some(diagnostic) = flake8_bandit::checks::unsafe_yaml_load(
                         func,
                         args,
                         keywords,
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::S106) {
@@ -1963,70 +1984,76 @@ where
                         .extend(flake8_bandit::checks::hardcoded_password_func_arg(keywords));
                 }
                 if self.settings.enabled.contains(&RuleCode::S324) {
-                    if let Some(check) = flake8_bandit::checks::hashlib_insecure_hash_functions(
+                    if let Some(diagnostic) = flake8_bandit::checks::hashlib_insecure_hash_functions(
                         func,
                         args,
                         keywords,
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::S113) {
-                    if let Some(check) = flake8_bandit::checks::request_without_timeout(
+                    if let Some(diagnostic) = flake8_bandit::checks::request_without_timeout(
                         func,
                         args,
                         keywords,
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&RuleCode::C400) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_list(
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C400),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        flake8_comprehensions::checks::unnecessary_generator_list(
+                            expr,
+                            func,
+                            args,
+                            keywords,
+                            self.locator,
+                            self.patch(&RuleCode::C400),
+                            Range::from_located(expr),
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C401) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_set(
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C401),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        flake8_comprehensions::checks::unnecessary_generator_set(
+                            expr,
+                            func,
+                            args,
+                            keywords,
+                            self.locator,
+                            self.patch(&RuleCode::C401),
+                            Range::from_located(expr),
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C402) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_generator_dict(
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C402),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        flake8_comprehensions::checks::unnecessary_generator_dict(
+                            expr,
+                            func,
+                            args,
+                            keywords,
+                            self.locator,
+                            self.patch(&RuleCode::C402),
+                            Range::from_located(expr),
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C403) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_set(
                             expr,
                             func,
@@ -2037,11 +2064,11 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C404) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_comprehensions::checks::unnecessary_list_comprehension_dict(
                             expr,
                             func,
@@ -2052,11 +2079,11 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C405) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_set(
+                    if let Some(diagnostic) = flake8_comprehensions::checks::unnecessary_literal_set(
                         expr,
                         func,
                         args,
@@ -2065,37 +2092,41 @@ where
                         self.patch(&RuleCode::C405),
                         Range::from_located(expr),
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C406) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_literal_dict(
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C406),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        flake8_comprehensions::checks::unnecessary_literal_dict(
+                            expr,
+                            func,
+                            args,
+                            keywords,
+                            self.locator,
+                            self.patch(&RuleCode::C406),
+                            Range::from_located(expr),
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C408) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_collection_call(
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C408),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        flake8_comprehensions::checks::unnecessary_collection_call(
+                            expr,
+                            func,
+                            args,
+                            keywords,
+                            self.locator,
+                            self.patch(&RuleCode::C408),
+                            Range::from_located(expr),
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C409) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_comprehensions::checks::unnecessary_literal_within_tuple_call(
                             expr,
                             func,
@@ -2105,11 +2136,11 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C410) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_comprehensions::checks::unnecessary_literal_within_list_call(
                             expr,
                             func,
@@ -2119,11 +2150,11 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C411) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_list_call(
+                    if let Some(diagnostic) = flake8_comprehensions::checks::unnecessary_list_call(
                         expr,
                         func,
                         args,
@@ -2131,11 +2162,11 @@ where
                         self.patch(&RuleCode::C411),
                         Range::from_located(expr),
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C413) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_comprehensions::checks::unnecessary_call_around_sorted(
                             expr,
                             func,
@@ -2145,38 +2176,38 @@ where
                             Range::from_located(expr),
                         )
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C414) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_comprehensions::checks::unnecessary_double_cast_or_process(
                             func,
                             args,
                             Range::from_located(expr),
                         )
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C415) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_comprehensions::checks::unnecessary_subscript_reversal(
                             func,
                             args,
                             Range::from_located(expr),
                         )
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::C417) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_map(
+                    if let Some(diagnostic) = flake8_comprehensions::checks::unnecessary_map(
                         func,
                         args,
                         Range::from_located(expr),
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     };
                 }
 
@@ -2196,13 +2227,13 @@ where
 
                 // flake8-debugger
                 if self.settings.enabled.contains(&RuleCode::T100) {
-                    if let Some(check) = flake8_debugger::checks::debugger_call(
+                    if let Some(diagnostic) = flake8_debugger::checks::debugger_call(
                         expr,
                         func,
                         &self.from_imports,
                         &self.import_aliases,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
@@ -2260,8 +2291,8 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::PD015) {
-                    if let Some(check) = pandas_vet::checks::use_of_pd_merge(func) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) = pandas_vet::checks::use_of_pd_merge(func) {
+                        self.diagnostics.push(diagnostic);
                     };
                 }
 
@@ -2355,17 +2386,17 @@ where
 
                 // flake8-pytest-style
                 if self.settings.enabled.contains(&RuleCode::PT008) {
-                    if let Some(check) =
+                    if let Some(diagnostic) =
                         flake8_pytest_style::plugins::patch_with_lambda(func, args, keywords)
                     {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::PT009) {
-                    if let Some(check) = flake8_pytest_style::plugins::unittest_assertion(
+                    if let Some(diagnostic) = flake8_pytest_style::plugins::unittest_assertion(
                         self, expr, func, args, keywords,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
@@ -2530,8 +2561,8 @@ where
                 op: Operator::Add, ..
             } => {
                 if self.settings.enabled.contains(&RuleCode::ISC003) {
-                    if let Some(check) = flake8_implicit_str_concat::checks::explicit(expr) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) = flake8_implicit_str_concat::checks::explicit(expr) {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -2656,20 +2687,20 @@ where
                     ));
                 }
                 if self.settings.enabled.contains(&RuleCode::S104) {
-                    if let Some(check) = flake8_bandit::checks::hardcoded_bind_all_interfaces(
+                    if let Some(diagnostic) = flake8_bandit::checks::hardcoded_bind_all_interfaces(
                         value,
                         &Range::from_located(expr),
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::S108) {
-                    if let Some(check) = flake8_bandit::checks::hardcoded_tmp_directory(
+                    if let Some(diagnostic) = flake8_bandit::checks::hardcoded_tmp_directory(
                         expr,
                         value,
                         &self.settings.flake8_bandit.hardcoded_tmp_directory,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::UP025) {
@@ -2734,15 +2765,17 @@ where
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&RuleCode::C416) {
-                    if let Some(check) = flake8_comprehensions::checks::unnecessary_comprehension(
-                        expr,
-                        elt,
-                        generators,
-                        self.locator,
-                        self.patch(&RuleCode::C416),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(check);
+                    if let Some(diagnostic) =
+                        flake8_comprehensions::checks::unnecessary_comprehension(
+                            expr,
+                            elt,
+                            generators,
+                            self.locator,
+                            self.patch(&RuleCode::C416),
+                            Range::from_located(expr),
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::B023) {
@@ -3015,13 +3048,13 @@ where
                 type_, name, body, ..
             } => {
                 if self.settings.enabled.contains(&RuleCode::E722) {
-                    if let Some(check) = pycodestyle::checks::do_not_use_bare_except(
+                    if let Some(diagnostic) = pycodestyle::checks::do_not_use_bare_except(
                         type_.as_deref(),
                         body,
                         excepthandler,
                         self.locator,
                     ) {
-                        self.diagnostics.push(check);
+                        self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::B904) {
@@ -3038,12 +3071,12 @@ where
                 match name {
                     Some(name) => {
                         if self.settings.enabled.contains(&RuleCode::E741) {
-                            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+                            if let Some(diagnostic) = pycodestyle::checks::ambiguous_variable_name(
                                 name,
                                 helpers::excepthandler_name_range(excepthandler, self.locator)
                                     .expect("Failed to find `name` range"),
                             ) {
-                                self.diagnostics.push(check);
+                                self.diagnostics.push(diagnostic);
                             }
                         }
 
@@ -3109,7 +3142,7 @@ where
                                             }
                                         }
                                     }
-                                    self.diagnostics.push(check);
+                                    self.diagnostics.push(diagnostic);
                                 }
                             }
                         }
@@ -3199,17 +3232,18 @@ where
         );
 
         if self.settings.enabled.contains(&RuleCode::E741) {
-            if let Some(check) = pycodestyle::checks::ambiguous_variable_name(
+            if let Some(diagnostic) = pycodestyle::checks::ambiguous_variable_name(
                 &arg.node.arg,
                 Range::from_located(arg),
             ) {
-                self.diagnostics.push(check);
+                self.diagnostics.push(diagnostic);
             }
         }
 
         if self.settings.enabled.contains(&RuleCode::N803) {
-            if let Some(check) = pep8_naming::checks::invalid_argument_name(&arg.node.arg, arg) {
-                self.diagnostics.push(check);
+            if let Some(diagnostic) = pep8_naming::checks::invalid_argument_name(&arg.node.arg, arg)
+            {
+                self.diagnostics.push(diagnostic);
             }
         }
 
@@ -3571,8 +3605,9 @@ impl<'a> xxxxxxxx<'a> {
                 .iter()
                 .map(|index| &self.scopes[*index])
                 .collect();
-            if let Some(check) = pyflakes::checks::undefined_local(id, &scopes, &self.bindings) {
-                self.diagnostics.push(check);
+            if let Some(diagnostic) = pyflakes::checks::undefined_local(id, &scopes, &self.bindings)
+            {
+                self.diagnostics.push(diagnostic);
             }
         }
 
@@ -4337,22 +4372,22 @@ impl<'a> xxxxxxxx<'a> {
     fn check_builtin_shadowing<T>(&mut self, name: &str, located: &Located<T>, is_attribute: bool) {
         if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class(_)) {
             if self.settings.enabled.contains(&RuleCode::A003) {
-                if let Some(check) = flake8_builtins::checks::builtin_shadowing(
+                if let Some(diagnostic) = flake8_builtins::checks::builtin_shadowing(
                     name,
                     located,
                     flake8_builtins::types::ShadowingType::Attribute,
                 ) {
-                    self.diagnostics.push(check);
+                    self.diagnostics.push(diagnostic);
                 }
             }
         } else {
             if self.settings.enabled.contains(&RuleCode::A001) {
-                if let Some(check) = flake8_builtins::checks::builtin_shadowing(
+                if let Some(diagnostic) = flake8_builtins::checks::builtin_shadowing(
                     name,
                     located,
                     flake8_builtins::types::ShadowingType::Variable,
                 ) {
-                    self.diagnostics.push(check);
+                    self.diagnostics.push(diagnostic);
                 }
             }
         }
@@ -4360,12 +4395,12 @@ impl<'a> xxxxxxxx<'a> {
 
     fn check_builtin_arg_shadowing(&mut self, name: &str, arg: &Arg) {
         if self.settings.enabled.contains(&RuleCode::A002) {
-            if let Some(check) = flake8_builtins::checks::builtin_shadowing(
+            if let Some(diagnostic) = flake8_builtins::checks::builtin_shadowing(
                 name,
                 arg,
                 flake8_builtins::types::ShadowingType::Argument,
             ) {
-                self.diagnostics.push(check);
+                self.diagnostics.push(diagnostic);
             }
         }
     }

@@ -57,13 +57,13 @@ pub fn main(cli: &Cli) -> Result<()> {
 
         for rule_code in RuleCode::iter() {
             if rule_code.category() == check_category {
-                let check_kind = rule_code.kind();
-                let fix_token = if check_kind.fixable() { "🛠" } else { "" };
+                let kind = rule_code.kind();
+                let fix_token = if kind.fixable() { "🛠" } else { "" };
                 table_out.push_str(&format!(
                     "| {} | {} | {} | {} |",
-                    check_kind.code().as_ref(),
-                    check_kind.as_ref(),
-                    check_kind.summary().replace('|', r"\|"),
+                    kind.code().as_ref(),
+                    kind.as_ref(),
+                    kind.summary().replace('|', r"\|"),
                     fix_token
                 ));
                 table_out.push('\n');

@@ -59,8 +59,8 @@ pub struct Cli {
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config")]
     pub isolated: bool,
-    /// Comma-separated list of error codes to enable (or ALL, to enable all
-    /// checks).
+    /// Comma-separated list of rule codes to enable (or ALL, to enable all
+    /// rules).
     #[arg(long, value_delimiter = ',')]
     pub select: Option<Vec<RuleCodePrefix>>,
     /// Like --select, but adds additional error codes on top of the selected

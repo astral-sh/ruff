@@ -67,19 +67,19 @@ pub(crate) fn check_path(
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
-    // Aggregate all checks.
-    let mut checks: Vec<Diagnostic> = vec![];
+    // Aggregate all diagnostics.
+    let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    // Run the token-based checks.
+    // Run the token-based rules.
     if settings
         .enabled
         .iter()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Tokens))
     {
-        checks.extend(check_tokens(locator, &tokens, settings, autofix));
+        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
     }
 
-    // Run the AST-based checks.
+    // Run the AST-based rules.
     let use_ast = settings
         .enabled
         .iter()
@@ -92,7 +92,7 @@ pub(crate) fn check_path(
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 if use_ast {
-                    checks.extend(check_ast(
+                    diagnostics.extend(check_ast(
                         &python_ast,
                         locator,
                         stylist,
@@ -104,7 +104,7 @@ pub(crate) fn check_path(
                     ));
                 }
                 if use_imports {
-                    checks.extend(check_imports(
+                    diagnostics.extend(check_imports(
                         &python_ast,
                         locator,
                         &directives.isort,
@@ -118,7 +118,7 @@ pub(crate) fn check_path(
             }
             Err(parse_error) => {
                 if settings.enabled.contains(&RuleCode::E999) {
-                    checks.push(Diagnostic::new(
+                    diagnostics.push(Diagnostic::new(
                         violations::SyntaxError(parse_error.error.to_string()),
                         Range::new(parse_error.location, parse_error.location),
                     ));
@@ -127,13 +127,13 @@ pub(crate) fn check_path(
         }
     }
 
-    // Run the lines-based checks.
+    // Run the lines-based rules.
     if settings
         .enabled
         .iter()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
     {
-        checks.extend(check_lines(
+        diagnostics.extend(check_lines(
             contents,
             &directives.commented_lines,
             settings,
@@ -149,7 +149,7 @@ pub(crate) fn check_path(
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQA))
     {
         check_noqa(
-            &mut checks,
+            &mut diagnostics,
             contents,
             &directives.commented_lines,
             &directives.noqa_line_for,
@@ -159,17 +159,17 @@ pub(crate) fn check_path(
     }
 
     // Create path ignores.
-    if !checks.is_empty() && !settings.per_file_ignores.is_empty() {
+    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
         let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;
         if !ignores.is_empty() {
-            return Ok(checks
+            return Ok(diagnostics
                 .into_iter()
                 .filter(|check| !ignores.contains(&check.kind.code()))
                 .collect());
         }
     }
 
-    Ok(checks)
+    Ok(diagnostics)
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -379,13 +379,13 @@ fn lint_only(
     let path_lossy = path.to_string_lossy();
     Ok(diagnostics
         .into_iter()
-        .map(|check| {
+        .map(|diagnostic| {
             let source = if settings.show_source {
-                Some(Source::from_diagnostic(&check, &locator))
+                Some(Source::from_diagnostic(&diagnostic, &locator))
             } else {
                 None
             };
-            Message::from_diagnostic(check, path_lossy.to_string(), source)
+            Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
         })
         .collect())
 }
@@ -509,7 +509,10 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     )?;
 
     // Detect autofixes that don't converge after multiple iterations.
-    if diagnostics.iter().any(|check| check.fix.is_some()) {
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.fix.is_some())
+    {
         let max_iterations = 10;
 
         let mut contents = contents.clone();

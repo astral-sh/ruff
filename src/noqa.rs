@@ -81,19 +81,20 @@ pub fn includes(needle: &RuleCode, haystack: &[&str]) -> bool {
 
 pub fn add_noqa(
     path: &Path,
-    checks: &[Diagnostic],
+    diagnostics: &[Diagnostic],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
     external: &FxHashSet<String>,
     line_ending: &LineEnding,
 ) -> Result<usize> {
-    let (count, output) = add_noqa_inner(checks, contents, noqa_line_for, external, line_ending);
+    let (count, output) =
+        add_noqa_inner(diagnostics, contents, noqa_line_for, external, line_ending);
     fs::write(path, output)?;
     Ok(count)
 }
 
 fn add_noqa_inner(
-    checks: &[Diagnostic],
+    diagnostics: &[Diagnostic],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
     external: &FxHashSet<String>,
@@ -107,13 +108,13 @@ fn add_noqa_inner(
         }
 
         let mut codes: FxHashSet<&RuleCode> = FxHashSet::default();
-        for check in checks {
+        for diagnostic in diagnostics {
             // TODO(charlie): Consider respecting parent `noqa` directives. For now, we'll
-            // add a `noqa` for every check, on its own line. This could lead to
+            // add a `noqa` for every diagnostic, on its own line. This could lead to
             // duplication, whereby some parent `noqa` directives become
             // redundant.
-            if check.location.row() == lineno + 1 {
-                codes.insert(check.kind.code());
+            if diagnostic.location.row() == lineno + 1 {
+                codes.insert(diagnostic.kind.code());
             }
         }
 

@@ -76,7 +76,7 @@ macro_rules! define_rule_mapping {
                 }
             }
 
-            /// Whether the check kind is (potentially) fixable.
+            /// Whether the diagnostic is (potentially) fixable.
             pub fn fixable(&self) -> bool {
                 match self {
                     $(
