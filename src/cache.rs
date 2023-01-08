@@ -1,6 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
-use std::fs::{create_dir_all, File, Metadata};
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -8,16 +7,15 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use filetime::FileTime;
 use log::error;
-use once_cell::sync::Lazy;
 use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 
 use crate::message::Message;
 use crate::settings::{flags, Settings};
 
+pub const CACHE_DIR_NAME: &str = ".ruff_cache";
+
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
-static CACHE_DIR: Lazy<Option<String>> = Lazy::new(|| std::env::var("RUFF_CACHE_DIR").ok());
-pub const DEFAULT_CACHE_DIR_NAME: &str = ".ruff_cache";
 
 #[derive(Serialize, Deserialize)]
 struct CacheMetadata {
@@ -39,9 +37,7 @@ struct CheckResult {
 /// Return the cache directory for a given project root. Defers to the
 /// `RUFF_CACHE_DIR` environment variable, if set.
 pub fn cache_dir(project_root: &Path) -> PathBuf {
-    CACHE_DIR
-        .as_ref()
-        .map_or_else(|| project_root.join(DEFAULT_CACHE_DIR_NAME), PathBuf::from)
+    project_root.join(CACHE_DIR_NAME)
 }
 
 fn content_dir() -> &'static Path {
@@ -60,7 +56,7 @@ fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: flags::Autof
 /// Initialize the cache at the specified `Path`.
 pub fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
-    create_dir_all(path.join(content_dir()))?;
+    fs::create_dir_all(path.join(content_dir()))?;
 
     // Add the CACHEDIR.TAG.
     if !cachedir::is_tagged(path)? {
@@ -70,7 +66,7 @@ pub fn init(path: &Path) -> Result<()> {
     // Add the .gitignore.
     let gitignore_path = path.join(".gitignore");
     if !gitignore_path.exists() {
-        let mut file = File::create(gitignore_path)?;
+        let mut file = fs::File::create(gitignore_path)?;
         file.write_all(b"*")?;
     }
 
@@ -91,7 +87,7 @@ fn read_sync(cache_dir: &Path, key: u64) -> Result<Vec<u8>, std::io::Error> {
 /// Get a value from the cache.
 pub fn get<P: AsRef<Path>>(
     path: P,
-    metadata: &Metadata,
+    metadata: &fs::Metadata,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Vec<Message>> {
@@ -115,7 +111,7 @@ pub fn get<P: AsRef<Path>>(
 /// Set a value in the cache.
 pub fn set<P: AsRef<Path>>(
     path: P,
-    metadata: &Metadata,
+    metadata: &fs::Metadata,
     settings: &Settings,
     autofix: flags::Autofix,
     messages: &[Message],

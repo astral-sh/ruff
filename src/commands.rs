@@ -16,7 +16,7 @@ use serde::Serialize;
 use walkdir::WalkDir;
 
 use crate::autofix::fixer;
-use crate::cache::DEFAULT_CACHE_DIR_NAME;
+use crate::cache::CACHE_DIR_NAME;
 use crate::cli::Overrides;
 use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, lint_path, lint_stdin, Diagnostics};
@@ -340,10 +340,10 @@ pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
 pub fn clean(level: &LogLevel) -> Result<()> {
     for entry in WalkDir::new(&*path_dedot::CWD)
         .into_iter()
-        .filter_map(std::result::Result::ok)
+        .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_dir())
     {
-        let cache = entry.path().join(DEFAULT_CACHE_DIR_NAME);
+        let cache = entry.path().join(CACHE_DIR_NAME);
         if cache.is_dir() {
             if level >= &LogLevel::Default {
                 eprintln!("Removing cache at: {}", fs::relativize_path(&cache).bold());
