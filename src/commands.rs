@@ -298,7 +298,7 @@ pub fn show_files(
 #[derive(Serialize)]
 struct Explanation<'a> {
     code: &'a str,
-    category: &'a str,
+    origin: &'a str,
     summary: &'a str,
 }
 
@@ -309,7 +309,7 @@ pub fn explain(code: &RuleCode, format: &SerializationFormat) -> Result<()> {
             println!(
                 "{} ({}): {}",
                 code.as_ref(),
-                code.category().title(),
+                code.origin().title(),
                 code.kind().summary()
             );
         }
@@ -318,7 +318,7 @@ pub fn explain(code: &RuleCode, format: &SerializationFormat) -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
                     code: code.as_ref(),
-                    category: code.category().title(),
+                    origin: code.origin().title(),
                     summary: &code.kind().summary(),
                 })?
             );
