@@ -187,17 +187,17 @@ impl UnittestAssert {
             UnittestAssert::DictContainsSubset => {
                 Arguments::new(vec!["subset", "dictionary"], vec!["msg"])
             }
-            UnittestAssert::DictEqual => Arguments::new(vec!["d1", "d2"], vec!["msg"]),
+            UnittestAssert::DictEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::Equal => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::Equals => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::False => Arguments::new(vec!["expr"], vec!["msg"]),
             UnittestAssert::Greater => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::GreaterEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::In => Arguments::new(vec!["member", "container"], vec!["msg"]),
-            UnittestAssert::Is => Arguments::new(vec!["expr1", "expr2"], vec!["msg"]),
+            UnittestAssert::Is => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::IsInstance => Arguments::new(vec!["obj", "cls"], vec!["msg"]),
             UnittestAssert::IsNone => Arguments::new(vec!["expr"], vec!["msg"]),
-            UnittestAssert::IsNot => Arguments::new(vec!["expr1", "expr2"], vec!["msg"]),
+            UnittestAssert::IsNot => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::IsNotNone => Arguments::new(vec!["expr"], vec!["msg"]),
             UnittestAssert::Less => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::LessEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
