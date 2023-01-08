@@ -8,9 +8,14 @@ use rustpython_ast::{
 
 use crate::ast::helpers::{create_expr, create_stmt};
 
+/// An enum to represent the different types of assertions present in the
+/// `unittest` module. Note: any variants that can't be replaced with plain
+/// `assert` statements are commented out.
 pub enum UnittestAssert {
     AlmostEqual,
     AlmostEquals,
+    CountEqual,
+    DictContainsSubset,
     DictEqual,
     Equal,
     Equals,
@@ -23,11 +28,12 @@ pub enum UnittestAssert {
     IsNone,
     IsNot,
     IsNotNone,
-    ItemsEqual,
     Less,
     LessEqual,
     ListEqual,
+    // Logs,
     MultiLineEqual,
+    // NoLogs,
     NotAlmostEqual,
     NotAlmostEquals,
     NotEqual,
@@ -36,9 +42,9 @@ pub enum UnittestAssert {
     NotIsInstance,
     NotRegex,
     NotRegexpMatches,
-    Raises,
-    RaisesMessage,
-    RaisesRegexp,
+    // Raises,
+    // RaisesRegex,
+    // RaisesRegexp,
     Regex,
     RegexpMatches,
     SequenceEqual,
@@ -46,6 +52,8 @@ pub enum UnittestAssert {
     True,
     TupleEqual,
     Underscore,
+    // Warns,
+    // WarnsRegex,
 }
 
 impl std::fmt::Display for UnittestAssert {
@@ -53,7 +61,9 @@ impl std::fmt::Display for UnittestAssert {
         match self {
             UnittestAssert::AlmostEqual => write!(f, "assertAlmostEqual"),
             UnittestAssert::AlmostEquals => write!(f, "assertAlmostEquals"),
+            UnittestAssert::CountEqual => write!(f, "assertCountEqual"),
             UnittestAssert::DictEqual => write!(f, "assertDictEqual"),
+            UnittestAssert::DictContainsSubset => write!(f, "assertDictContainsSubset"),
             UnittestAssert::Equal => write!(f, "assertEqual"),
             UnittestAssert::Equals => write!(f, "assertEquals"),
             UnittestAssert::False => write!(f, "assertFalse"),
@@ -65,7 +75,6 @@ impl std::fmt::Display for UnittestAssert {
             UnittestAssert::IsNone => write!(f, "assertIsNone"),
             UnittestAssert::IsNot => write!(f, "assertIsNot"),
             UnittestAssert::IsNotNone => write!(f, "assertIsNotNone"),
-            UnittestAssert::ItemsEqual => write!(f, "assertItemsEqual"),
             UnittestAssert::Less => write!(f, "assertLess"),
             UnittestAssert::LessEqual => write!(f, "assertLessEqual"),
             UnittestAssert::ListEqual => write!(f, "assertListEqual"),
@@ -78,9 +87,6 @@ impl std::fmt::Display for UnittestAssert {
             UnittestAssert::NotIsInstance => write!(f, "assertNotIsInstance"),
             UnittestAssert::NotRegex => write!(f, "assertNotRegex"),
             UnittestAssert::NotRegexpMatches => write!(f, "assertNotRegexpMatches"),
-            UnittestAssert::Raises => write!(f, "assertRaises"),
-            UnittestAssert::RaisesMessage => write!(f, "assertRaisesMessage"),
-            UnittestAssert::RaisesRegexp => write!(f, "assertRaisesRegexp"),
             UnittestAssert::Regex => write!(f, "assertRegex"),
             UnittestAssert::RegexpMatches => write!(f, "assertRegexpMatches"),
             UnittestAssert::SequenceEqual => write!(f, "assertSequenceEqual"),
@@ -99,6 +105,8 @@ impl TryFrom<&str> for UnittestAssert {
         match value {
             "assertAlmostEqual" => Ok(UnittestAssert::AlmostEqual),
             "assertAlmostEquals" => Ok(UnittestAssert::AlmostEquals),
+            "assertCountEqual" => Ok(UnittestAssert::CountEqual),
+            "assertDictContainsSubset" => Ok(UnittestAssert::DictContainsSubset),
             "assertDictEqual" => Ok(UnittestAssert::DictEqual),
             "assertEqual" => Ok(UnittestAssert::Equal),
             "assertEquals" => Ok(UnittestAssert::Equals),
@@ -111,7 +119,6 @@ impl TryFrom<&str> for UnittestAssert {
             "assertIsNone" => Ok(UnittestAssert::IsNone),
             "assertIsNot" => Ok(UnittestAssert::IsNot),
             "assertIsNotNone" => Ok(UnittestAssert::IsNotNone),
-            "assertItemsEqual" => Ok(UnittestAssert::ItemsEqual),
             "assertLess" => Ok(UnittestAssert::Less),
             "assertLessEqual" => Ok(UnittestAssert::LessEqual),
             "assertListEqual" => Ok(UnittestAssert::ListEqual),
@@ -124,9 +131,6 @@ impl TryFrom<&str> for UnittestAssert {
             "assertNotIsInstance" => Ok(UnittestAssert::NotIsInstance),
             "assertNotRegex" => Ok(UnittestAssert::NotRegex),
             "assertNotRegexpMatches" => Ok(UnittestAssert::NotRegexpMatches),
-            "assertRaises" => Ok(UnittestAssert::Raises),
-            "assertRaisesMessage" => Ok(UnittestAssert::RaisesMessage),
-            "assertRaisesRegexp" => Ok(UnittestAssert::RaisesRegexp),
             "assertRegex" => Ok(UnittestAssert::Regex),
             "assertRegexpMatches" => Ok(UnittestAssert::RegexpMatches),
             "assertSequenceEqual" => Ok(UnittestAssert::SequenceEqual),
@@ -181,19 +185,22 @@ impl UnittestAssert {
             UnittestAssert::AlmostEquals => {
                 Arguments::new(vec!["first", "second"], vec!["places", "msg", "delta"])
             }
-            UnittestAssert::DictEqual => Arguments::new(vec!["d1", "d2"], vec!["msg"]),
+            UnittestAssert::CountEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::DictContainsSubset => {
+                Arguments::new(vec!["subset", "dictionary"], vec!["msg"])
+            }
+            UnittestAssert::DictEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::Equal => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::Equals => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::False => Arguments::new(vec!["expr"], vec!["msg"]),
             UnittestAssert::Greater => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::GreaterEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::In => Arguments::new(vec!["member", "container"], vec!["msg"]),
-            UnittestAssert::Is => Arguments::new(vec!["expr1", "expr2"], vec!["msg"]),
+            UnittestAssert::Is => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::IsInstance => Arguments::new(vec!["obj", "cls"], vec!["msg"]),
             UnittestAssert::IsNone => Arguments::new(vec!["expr"], vec!["msg"]),
-            UnittestAssert::IsNot => Arguments::new(vec!["expr1", "expr2"], vec!["msg"]),
+            UnittestAssert::IsNot => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::IsNotNone => Arguments::new(vec!["expr"], vec!["msg"]),
-            UnittestAssert::ItemsEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::Less => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::LessEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::ListEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
@@ -206,12 +213,11 @@ impl UnittestAssert {
             UnittestAssert::NotIsInstance => Arguments::new(vec!["obj", "cls"], vec!["msg"]),
             UnittestAssert::NotRegex => Arguments::new(vec!["text", "regex"], vec!["msg"]),
             UnittestAssert::NotRegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
-            UnittestAssert::Raises => Arguments::new(vec!["exception"], vec!["msg"]),
-            UnittestAssert::RaisesMessage => Arguments::new(vec!["exception", "msg"], vec!["msg"]),
-            UnittestAssert::RaisesRegexp => Arguments::new(vec!["exception", "regex"], vec!["msg"]),
             UnittestAssert::Regex => Arguments::new(vec!["text", "regex"], vec!["msg"]),
             UnittestAssert::RegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
-            UnittestAssert::SequenceEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::SequenceEqual => {
+                Arguments::new(vec!["first", "second"], vec!["msg", "seq_type"])
+            }
             UnittestAssert::SetEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::True => Arguments::new(vec!["expr"], vec!["msg"]),
             UnittestAssert::TupleEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
@@ -273,7 +279,9 @@ impl UnittestAssert {
             | UnittestAssert::Greater
             | UnittestAssert::GreaterEqual
             | UnittestAssert::Less
-            | UnittestAssert::LessEqual => {
+            | UnittestAssert::LessEqual
+            | UnittestAssert::Is
+            | UnittestAssert::IsNot => {
                 let first = args
                     .get("first")
                     .ok_or_else(|| anyhow!("Missing argument `first`"))?;
@@ -288,25 +296,11 @@ impl UnittestAssert {
                     UnittestAssert::GreaterEqual => Cmpop::GtE,
                     UnittestAssert::Less => Cmpop::Lt,
                     UnittestAssert::LessEqual => Cmpop::LtE,
+                    UnittestAssert::Is => Cmpop::Is,
+                    UnittestAssert::IsNot => Cmpop::IsNot,
                     _ => unreachable!(),
                 };
                 let expr = compare(first, cmpop, second);
-                Ok(assert(&expr, msg))
-            }
-            UnittestAssert::Is | UnittestAssert::IsNot => {
-                let expr1 = args
-                    .get("expr1")
-                    .ok_or_else(|| anyhow!("Missing argument `expr1`"))?;
-                let expr2 = args
-                    .get("expr2")
-                    .ok_or_else(|| anyhow!("Missing argument `expr2`"))?;
-                let msg = args.get("msg").copied();
-                let cmpop = if matches!(self, UnittestAssert::Is) {
-                    Cmpop::Is
-                } else {
-                    Cmpop::IsNot
-                };
-                let expr = compare(expr1, cmpop, expr2);
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::In | UnittestAssert::NotIn => {
@@ -375,12 +369,12 @@ impl UnittestAssert {
             | UnittestAssert::RegexpMatches
             | UnittestAssert::NotRegex
             | UnittestAssert::NotRegexpMatches => {
-                let regex = args
-                    .get("regex")
-                    .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let text = args
                     .get("text")
                     .ok_or_else(|| anyhow!("Missing argument `text`"))?;
+                let regex = args
+                    .get("regex")
+                    .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
                 let re_search = create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Attribute {
