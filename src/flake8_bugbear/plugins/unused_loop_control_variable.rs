@@ -62,18 +62,18 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
             continue;
         }
 
-        let mut check = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::UnusedLoopControlVariable(name.to_string()),
             Range::from_located(expr),
         );
-        if checker.patch(check.kind.code()) {
+        if checker.patch(diagnostic.kind.code()) {
             // Prefix the variable name with an underscore.
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 format!("_{name}"),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

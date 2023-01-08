@@ -11,9 +11,10 @@ use crate::violations;
 pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
     let dealiased_call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
     if dealiased_call_path == ["datetime", "timezone", "utc"] {
-        let mut check = Diagnostic::new(violations::DatetimeTimezoneUTC, Range::from_located(expr));
+        let mut diagnostic =
+            Diagnostic::new(violations::DatetimeTimezoneUTC, Range::from_located(expr));
         if checker.patch(&RuleCode::UP017) {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 compose_call_path(expr)
                     .unwrap()
                     .replace("timezone.utc", "UTC"),
@@ -21,6 +22,6 @@ pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
                 expr.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

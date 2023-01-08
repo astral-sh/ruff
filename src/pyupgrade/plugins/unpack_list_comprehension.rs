@@ -75,7 +75,7 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
                 return;
             }
 
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::RewriteListComprehension,
                 Range::from_located(value),
             );
@@ -88,13 +88,13 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
                 content.push('(');
                 content.push_str(&existing[1..existing.len() - 1]);
                 content.push(')');
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     content,
                     value.location,
                     value.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

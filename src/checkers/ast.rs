@@ -4073,16 +4073,16 @@ impl<'a> Checker<'a> {
                     let defined_in = self.child_to_parent.get(defined_by);
                     let child: &Stmt = defined_by.into();
 
-                    let check_lineno = binding.range.location.row();
+                    let diagnostic_lineno = binding.range.location.row();
                     let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
-                        && child.location.row() != check_lineno
+                        && child.location.row() != diagnostic_lineno
                     {
                         Some(child.location.row())
                     } else {
                         None
                     };
 
-                    if self.is_ignored(&RuleCode::F401, check_lineno)
+                    if self.is_ignored(&RuleCode::F401, diagnostic_lineno)
                         || parent_lineno.map_or(false, |parent_lineno| {
                             self.is_ignored(&RuleCode::F401, parent_lineno)
                         })

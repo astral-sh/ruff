@@ -59,16 +59,16 @@ pub fn unnecessary_generator_list(
 ) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("list", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut check = Diagnostic::new(violations::UnnecessaryGeneratorList, location);
+        let mut diagnostic = Diagnostic::new(violations::UnnecessaryGeneratorList, location);
         if fix {
             match fixes::fix_unnecessary_generator_list(locator, expr) {
                 Ok(fix) => {
-                    check.amend(fix);
+                    diagnostic.amend(fix);
                 }
                 Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
-        return Some(check);
+        return Some(diagnostic);
     }
     None
 }
@@ -85,16 +85,16 @@ pub fn unnecessary_generator_set(
 ) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut check = Diagnostic::new(violations::UnnecessaryGeneratorSet, location);
+        let mut diagnostic = Diagnostic::new(violations::UnnecessaryGeneratorSet, location);
         if fix {
             match fixes::fix_unnecessary_generator_set(locator, expr) {
                 Ok(fix) => {
-                    check.amend(fix);
+                    diagnostic.amend(fix);
                 }
                 Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
-        return Some(check);
+        return Some(diagnostic);
     }
     None
 }
@@ -113,16 +113,17 @@ pub fn unnecessary_generator_dict(
     if let ExprKind::GeneratorExp { elt, .. } = argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                let mut check = Diagnostic::new(violations::UnnecessaryGeneratorDict, location);
+                let mut diagnostic =
+                    Diagnostic::new(violations::UnnecessaryGeneratorDict, location);
                 if fix {
                     match fixes::fix_unnecessary_generator_dict(locator, expr) {
                         Ok(fix) => {
-                            check.amend(fix);
+                            diagnostic.amend(fix);
                         }
                         Err(e) => error!("Failed to generate fix: {e}"),
                     }
                 }
-                return Some(check);
+                return Some(diagnostic);
             }
             _ => {}
         }
@@ -142,16 +143,16 @@ pub fn unnecessary_list_comprehension_set(
 ) -> Option<Diagnostic> {
     let argument = exactly_one_argument_with_matching_function("set", func, args, keywords)?;
     if let ExprKind::ListComp { .. } = &argument {
-        let mut check = Diagnostic::new(violations::UnnecessaryListComprehensionSet, location);
+        let mut diagnostic = Diagnostic::new(violations::UnnecessaryListComprehensionSet, location);
         if fix {
             match fixes::fix_unnecessary_list_comprehension_set(locator, expr) {
                 Ok(fix) => {
-                    check.amend(fix);
+                    diagnostic.amend(fix);
                 }
                 Err(e) => error!("Failed to generate fix: {e}"),
             }
         }
-        return Some(check);
+        return Some(diagnostic);
     }
     None
 }
@@ -176,16 +177,16 @@ pub fn unnecessary_list_comprehension_dict(
     if elts.len() != 2 {
         return None;
     }
-    let mut check = Diagnostic::new(violations::UnnecessaryListComprehensionDict, location);
+    let mut diagnostic = Diagnostic::new(violations::UnnecessaryListComprehensionDict, location);
     if fix {
         match fixes::fix_unnecessary_list_comprehension_dict(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C405 (`set([1, 2])`)
@@ -204,19 +205,19 @@ pub fn unnecessary_literal_set(
         ExprKind::Tuple { .. } => "tuple",
         _ => return None,
     };
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryLiteralSet(kind.to_string()),
         location,
     );
     if fix {
         match fixes::fix_unnecessary_literal_set(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C406 (`dict([(1, 2)])`)
@@ -242,19 +243,19 @@ pub fn unnecessary_literal_dict(
     {
         return None;
     }
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryLiteralDict(kind.to_string()),
         location,
     );
     if fix {
         match fixes::fix_unnecessary_literal_dict(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C408
@@ -280,19 +281,19 @@ pub fn unnecessary_collection_call(
         }
         _ => return None,
     };
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryCollectionCall(id.to_string()),
         location,
     );
     if fix {
         match fixes::fix_unnecessary_collection_call(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C409
@@ -310,19 +311,19 @@ pub fn unnecessary_literal_within_tuple_call(
         ExprKind::List { .. } => "list",
         _ => return None,
     };
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
         location,
     );
     if fix {
         match fixes::fix_unnecessary_literal_within_tuple_call(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C410
@@ -340,19 +341,19 @@ pub fn unnecessary_literal_within_list_call(
         ExprKind::List { .. } => "list",
         _ => return None,
     };
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
         location,
     );
     if fix {
         match fixes::fix_unnecessary_literal_within_list_call(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C411
@@ -368,16 +369,16 @@ pub fn unnecessary_list_call(
     if !matches!(argument, ExprKind::ListComp { .. }) {
         return None;
     }
-    let mut check = Diagnostic::new(violations::UnnecessaryListCall, location);
+    let mut diagnostic = Diagnostic::new(violations::UnnecessaryListCall, location);
     if fix {
         match fixes::fix_unnecessary_list_call(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C413
@@ -400,19 +401,19 @@ pub fn unnecessary_call_around_sorted(
         return None;
     }
 
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryCallAroundSorted(outer.to_string()),
         location,
     );
     if fix {
         match fixes::fix_unnecessary_call_around_sorted(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C414
@@ -525,19 +526,19 @@ pub fn unnecessary_comprehension(
         ExprKind::SetComp { .. } => "set",
         _ => return None,
     };
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryComprehension(expr_kind.to_string()),
         location,
     );
     if fix {
         match fixes::fix_unnecessary_comprehension(locator, expr) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to generate fix: {e}"),
         }
     }
-    Some(check)
+    Some(diagnostic)
 }
 
 /// C417

@@ -164,7 +164,7 @@ pub(crate) fn check_path(
         if !ignores.is_empty() {
             return Ok(diagnostics
                 .into_iter()
-                .filter(|check| !ignores.contains(&check.kind.code()))
+                .filter(|diagnostic| !ignores.contains(&diagnostic.kind.code()))
                 .collect());
         }
     }

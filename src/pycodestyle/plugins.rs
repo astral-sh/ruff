@@ -47,7 +47,7 @@ pub fn literal_comparisons(
     // then replace the entire expression at the end with one "real" fix, to
     // avoid conflicts.
     let mut bad_ops: FxHashMap<usize, Cmpop> = FxHashMap::default();
-    let mut checks: Vec<Diagnostic> = vec![];
+    let mut diagnostics: Vec<Diagnostic> = vec![];
 
     let op = ops.first().unwrap();
 
@@ -64,24 +64,24 @@ pub fn literal_comparisons(
         )
     {
         if matches!(op, Cmpop::Eq) {
-            let check = Diagnostic::new(
+            let diagnostic = Diagnostic::new(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
-            if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
+            if checker.patch(diagnostic.kind.code()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::Is);
             }
-            checks.push(check);
+            diagnostics.push(diagnostic);
         }
         if matches!(op, Cmpop::NotEq) {
-            let check = Diagnostic::new(
+            let diagnostic = Diagnostic::new(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
-            if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
+            if checker.patch(diagnostic.kind.code()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::IsNot);
             }
-            checks.push(check);
+            diagnostics.push(diagnostic);
         }
     }
 
@@ -92,24 +92,28 @@ pub fn literal_comparisons(
         } = comparator.node
         {
             if matches!(op, Cmpop::Eq) {
-                let check = Diagnostic::new(
+                let diagnostic = Diagnostic::new(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
-                if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
+                if checker.patch(diagnostic.kind.code())
+                    && !helpers::is_constant_non_singleton(next)
+                {
                     bad_ops.insert(0, Cmpop::Is);
                 }
-                checks.push(check);
+                diagnostics.push(diagnostic);
             }
             if matches!(op, Cmpop::NotEq) {
-                let check = Diagnostic::new(
+                let diagnostic = Diagnostic::new(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
-                if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
+                if checker.patch(diagnostic.kind.code())
+                    && !helpers::is_constant_non_singleton(next)
+                {
                     bad_ops.insert(0, Cmpop::IsNot);
                 }
-                checks.push(check);
+                diagnostics.push(diagnostic);
             }
         }
     }
@@ -126,28 +130,28 @@ pub fn literal_comparisons(
             )
         {
             if matches!(op, Cmpop::Eq) {
-                let check = Diagnostic::new(
+                let diagnostic = Diagnostic::new(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
-                if checker.patch(check.kind.code())
+                if checker.patch(diagnostic.kind.code())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
                     bad_ops.insert(idx, Cmpop::Is);
                 }
-                checks.push(check);
+                diagnostics.push(diagnostic);
             }
             if matches!(op, Cmpop::NotEq) {
-                let check = Diagnostic::new(
+                let diagnostic = Diagnostic::new(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
-                if checker.patch(check.kind.code())
+                if checker.patch(diagnostic.kind.code())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
                     bad_ops.insert(idx, Cmpop::IsNot);
                 }
-                checks.push(check);
+                diagnostics.push(diagnostic);
             }
         }
 
@@ -158,28 +162,28 @@ pub fn literal_comparisons(
             } = next.node
             {
                 if matches!(op, Cmpop::Eq) {
-                    let check = Diagnostic::new(
+                    let diagnostic = Diagnostic::new(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch(check.kind.code())
+                    if checker.patch(diagnostic.kind.code())
                         && !helpers::is_constant_non_singleton(comparator)
                     {
                         bad_ops.insert(idx, Cmpop::Is);
                     }
-                    checks.push(check);
+                    diagnostics.push(diagnostic);
                 }
                 if matches!(op, Cmpop::NotEq) {
-                    let check = Diagnostic::new(
+                    let diagnostic = Diagnostic::new(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch(check.kind.code())
+                    if checker.patch(diagnostic.kind.code())
                         && !helpers::is_constant_non_singleton(comparator)
                     {
                         bad_ops.insert(idx, Cmpop::IsNot);
                     }
-                    checks.push(check);
+                    diagnostics.push(diagnostic);
                 }
             }
         }
@@ -198,8 +202,8 @@ pub fn literal_comparisons(
             .cloned()
             .collect::<Vec<_>>();
         let content = compare(left, &ops, comparators, checker.style);
-        for check in &mut checks {
-            check.amend(Fix::replacement(
+        for diagnostic in &mut diagnostics {
+            diagnostic.amend(Fix::replacement(
                 content.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
@@ -207,7 +211,7 @@ pub fn literal_comparisons(
         }
     }
 
-    checker.diagnostics.extend(checks);
+    checker.diagnostics.extend(diagnostics);
 }
 
 /// E713, E714
@@ -232,34 +236,34 @@ pub fn not_tests(
                 match op {
                     Cmpop::In => {
                         if check_not_in {
-                            let mut check = Diagnostic::new(
+                            let mut diagnostic = Diagnostic::new(
                                 violations::NotInTest,
                                 Range::from_located(operand),
                             );
-                            if checker.patch(check.kind.code()) && should_fix {
-                                check.amend(Fix::replacement(
+                            if checker.patch(diagnostic.kind.code()) && should_fix {
+                                diagnostic.amend(Fix::replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.style),
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
                             }
-                            checker.diagnostics.push(check);
+                            checker.diagnostics.push(diagnostic);
                         }
                     }
                     Cmpop::Is => {
                         if check_not_is {
-                            let mut check = Diagnostic::new(
+                            let mut diagnostic = Diagnostic::new(
                                 violations::NotIsTest,
                                 Range::from_located(operand),
                             );
-                            if checker.patch(check.kind.code()) && should_fix {
-                                check.amend(Fix::replacement(
+                            if checker.patch(diagnostic.kind.code()) && should_fix {
+                                diagnostic.amend(Fix::replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.style),
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
                             }
-                            checker.diagnostics.push(check);
+                            checker.diagnostics.push(diagnostic);
                         }
                     }
                     _ => {}
@@ -303,11 +307,11 @@ fn function(
 pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
     if let ExprKind::Name { id, .. } = &target.node {
         if let ExprKind::Lambda { args, body } = &value.node {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::DoNotAssignLambda(id.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)
                 {
@@ -326,14 +330,14 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                             indented.push_str(line);
                         }
                     }
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         indented,
                         stmt.location,
                         stmt.end_location.unwrap(),
                     ));
                 }
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

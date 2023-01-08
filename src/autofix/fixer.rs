@@ -30,15 +30,15 @@ impl From<bool> for Mode {
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub fn fix_file<'a>(
-    checks: &'a [Diagnostic],
+    diagnostics: &'a [Diagnostic],
     locator: &'a SourceCodeLocator<'a>,
 ) -> Option<(Cow<'a, str>, usize)> {
-    if checks.iter().all(|check| check.fix.is_none()) {
+    if diagnostics.iter().all(|check| check.fix.is_none()) {
         return None;
     }
 
     Some(apply_fixes(
-        checks.iter().filter_map(|check| check.fix.as_ref()),
+        diagnostics.iter().filter_map(|check| check.fix.as_ref()),
         locator,
     ))
 }

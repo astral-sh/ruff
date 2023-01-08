@@ -34,18 +34,18 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
         .locator
         .slice_source_code_range(&Range::from_located(value));
 
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::KeyInDict(left_content.to_string(), value_content.to_string()),
         range,
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             value_content.to_string(),
             right.location,
             right.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM118 in a for loop

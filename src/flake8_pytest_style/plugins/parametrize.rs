@@ -80,11 +80,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
@@ -101,20 +101,20 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 1,
                             );
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 generator.generate(),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
@@ -131,13 +131,13 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 0,
                             );
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 generator.generate(),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::CSV => {}
                 }
@@ -152,11 +152,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
                     types::ParametrizeNameType::List => {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
@@ -165,29 +165,29 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 0,
                             );
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 generator.generate(),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::CSV => {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                check.amend(Fix::replacement(
+                                diagnostic.amend(Fix::replacement(
                                     content,
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
                             }
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             };
@@ -201,11 +201,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::List => {}
                     types::ParametrizeNameType::Tuple => {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
@@ -214,29 +214,29 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 1, // so tuple is generated with parentheses
                             );
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 generator.generate(),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::CSV => {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                check.amend(Fix::replacement(
+                                diagnostic.amend(Fix::replacement(
                                     content,
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
                             }
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             };
@@ -278,21 +278,21 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
 }
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::ParametrizeNamesWrongType(types::ParametrizeNameType::CSV),
         Range::from_located(expr),
     );
 
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             generator.generate(),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 fn handle_value_rows(

@@ -8,7 +8,7 @@ use crate::registry::Diagnostic;
 use crate::violations;
 
 struct RaiseVisitor {
-    checks: Vec<Diagnostic>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a> Visitor<'a> for RaiseVisitor {
@@ -20,7 +20,7 @@ impl<'a> Visitor<'a> for RaiseVisitor {
             } => match &exc.node {
                 ExprKind::Name { id, .. } if is_lower(id) => {}
                 _ => {
-                    self.checks.push(Diagnostic::new(
+                    self.diagnostics.push(Diagnostic::new(
                         violations::RaiseWithoutFromInsideExcept,
                         Range::from_located(stmt),
                     ));
@@ -46,9 +46,11 @@ impl<'a> Visitor<'a> for RaiseVisitor {
 }
 
 pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
-    let mut visitor = RaiseVisitor { checks: vec![] };
+    let mut visitor = RaiseVisitor {
+        diagnostics: vec![],
+    };
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
-    checker.diagnostics.extend(visitor.checks);
+    checker.diagnostics.extend(visitor.diagnostics);
 }

@@ -16,14 +16,15 @@ pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
         &checker.from_imports,
         &checker.import_aliases,
     ) {
-        let mut check = Diagnostic::new(violations::TypingTextStrAlias, Range::from_located(expr));
-        if checker.patch(check.kind.code()) {
-            check.amend(Fix::replacement(
+        let mut diagnostic =
+            Diagnostic::new(violations::TypingTextStrAlias, Range::from_located(expr));
+        if checker.patch(diagnostic.kind.code()) {
+            diagnostic.amend(Fix::replacement(
                 "str".to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

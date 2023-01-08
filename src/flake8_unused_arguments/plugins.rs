@@ -21,7 +21,7 @@ fn function(
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
-    let mut checks: Vec<Diagnostic> = vec![];
+    let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args
         .posonlyargs
         .iter()
@@ -46,14 +46,14 @@ fn function(
                 && matches!(binding.kind, BindingKind::Argument)
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
-                checks.push(Diagnostic::new(
+                diagnostics.push(Diagnostic::new(
                     argumentable.check_for(arg.node.arg.to_string()),
                     binding.range,
                 ));
             }
         }
     }
-    checks
+    diagnostics
 }
 
 /// Check a method for unused arguments.
@@ -65,7 +65,7 @@ fn method(
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
-    let mut checks: Vec<Diagnostic> = vec![];
+    let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args
         .posonlyargs
         .iter()
@@ -91,14 +91,14 @@ fn method(
                 && matches!(binding.kind, BindingKind::Argument)
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
-                checks.push(Diagnostic::new(
+                diagnostics.push(Diagnostic::new(
                     argumentable.check_for(arg.node.arg.to_string()),
                     binding.range,
                 ));
             }
         }
     }
-    checks
+    diagnostics
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005

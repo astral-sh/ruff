@@ -62,7 +62,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     // Generate a `Diagnostic` for each duplicate.
     for (arg_name, indices) in duplicates {
         if indices.len() > 1 {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::DuplicateIsinstanceCall(arg_name.to_string()),
                 Range::from_located(expr),
             );
@@ -125,13 +125,13 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     unparse_expr(&bool_op, checker.style),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -171,7 +171,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             .iter()
             .map(|value| unparse_expr(value, checker.style))
             .collect();
-        let mut check = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::CompareWithTuple(
                 value.to_string(),
                 str_values,
@@ -192,13 +192,13 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                     ctx: ExprContext::Load,
                 })],
             });
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 unparse_expr(&in_expr, checker.style),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -233,18 +233,18 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::AAndNotA(id.to_string()),
                     Range::from_located(expr),
                 );
                 if checker.patch(&RuleCode::SIM220) {
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         "False".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -281,18 +281,18 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::AOrNotA(id.to_string()),
                     Range::from_located(expr),
                 );
                 if checker.patch(&RuleCode::SIM220) {
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         "True".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -309,15 +309,15 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut check = Diagnostic::new(violations::OrTrue, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(violations::OrTrue, Range::from_located(value));
             if checker.patch(&RuleCode::SIM223) {
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     "True".to_string(),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -333,15 +333,15 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut check = Diagnostic::new(violations::AndFalse, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(violations::AndFalse, Range::from_located(value));
             if checker.patch(&RuleCode::SIM223) {
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     "False".to_string(),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

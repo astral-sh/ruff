@@ -14,7 +14,7 @@ use crate::violations::UnusedCodes;
 use crate::{noqa, violations};
 
 pub fn check_noqa(
-    checks: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<Diagnostic>,
     contents: &str,
     commented_lines: &[usize],
     noqa_line_for: &IntMap<usize, usize>,
@@ -30,7 +30,7 @@ pub fn check_noqa(
     for lineno in commented_lines {
         // If we hit an exemption for the entire file, bail.
         if is_file_exempt(lines[lineno - 1]) {
-            checks.drain(..);
+            diagnostics.drain(..);
             return;
         }
 
@@ -41,14 +41,14 @@ pub fn check_noqa(
         }
     }
 
-    // Remove any ignored checks.
-    for (index, check) in checks.iter().enumerate() {
-        if matches!(check.kind, DiagnosticKind::BlanketNOQA(..)) {
+    // Remove any ignored diagnostics.
+    for (index, diagnostic) in diagnostics.iter().enumerate() {
+        if matches!(diagnostic.kind, DiagnosticKind::BlanketNOQA(..)) {
             continue;
         }
 
         // Is the check ignored by a `noqa` directive on the parent line?
-        if let Some(parent_lineno) = check.parent.map(|location| location.row()) {
+        if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
             let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
             if commented_lines.contains(noqa_lineno) {
                 let noqa = noqa_directives.entry(noqa_lineno - 1).or_insert_with(|| {
@@ -56,13 +56,13 @@ pub fn check_noqa(
                 });
                 match noqa {
                     (Directive::All(..), matches) => {
-                        matches.push(check.kind.code().as_ref());
+                        matches.push(diagnostic.kind.code().as_ref());
                         ignored.push(index);
                         continue;
                     }
                     (Directive::Codes(.., codes), matches) => {
-                        if noqa::includes(check.kind.code(), codes) {
-                            matches.push(check.kind.code().as_ref());
+                        if noqa::includes(diagnostic.kind.code(), codes) {
+                            matches.push(diagnostic.kind.code().as_ref());
                             ignored.push(index);
                             continue;
                         }
@@ -72,21 +72,23 @@ pub fn check_noqa(
             }
         }
 
-        // Is the check ignored by a `noqa` directive on the same line?
-        let check_lineno = check.location.row();
-        let noqa_lineno = noqa_line_for.get(&check_lineno).unwrap_or(&check_lineno);
+        // Is the diagnostic ignored by a `noqa` directive on the same line?
+        let diagnostic_lineno = diagnostic.location.row();
+        let noqa_lineno = noqa_line_for
+            .get(&diagnostic_lineno)
+            .unwrap_or(&diagnostic_lineno);
         if commented_lines.contains(noqa_lineno) {
             let noqa = noqa_directives
                 .entry(noqa_lineno - 1)
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![]));
             match noqa {
                 (Directive::All(..), matches) => {
-                    matches.push(check.kind.code().as_ref());
+                    matches.push(diagnostic.kind.code().as_ref());
                     ignored.push(index);
                 }
                 (Directive::Codes(.., codes), matches) => {
-                    if noqa::includes(check.kind.code(), codes) {
-                        matches.push(check.kind.code().as_ref());
+                    if noqa::includes(diagnostic.kind.code(), codes) {
+                        matches.push(diagnostic.kind.code().as_ref());
                         ignored.push(index);
                     }
                 }
@@ -101,19 +103,19 @@ pub fn check_noqa(
             match directive {
                 Directive::All(spaces, start, end) => {
                     if matches.is_empty() {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::UnusedNOQA(None),
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(check.kind.code())
+                            && settings.fixable.contains(diagnostic.kind.code())
                         {
-                            check.amend(Fix::deletion(
+                            diagnostic.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
                                 Location::new(row + 1, lines[row].chars().count()),
                             ));
                         }
-                        checks.push(check);
+                        diagnostics.push(diagnostic);
                     }
                 }
                 Directive::Codes(spaces, start, end, codes) => {
@@ -152,7 +154,7 @@ pub fn check_noqa(
                         && unknown_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::UnusedNOQA(Some(UnusedCodes {
                                 disabled: disabled_codes
                                     .iter()
@@ -170,22 +172,22 @@ pub fn check_noqa(
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(check.kind.code())
+                            && settings.fixable.contains(diagnostic.kind.code())
                         {
                             if valid_codes.is_empty() {
-                                check.amend(Fix::deletion(
+                                diagnostic.amend(Fix::deletion(
                                     Location::new(row + 1, start - spaces),
                                     Location::new(row + 1, lines[row].chars().count()),
                                 ));
                             } else {
-                                check.amend(Fix::replacement(
+                                diagnostic.amend(Fix::replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     Location::new(row + 1, start),
                                     Location::new(row + 1, lines[row].chars().count()),
                                 ));
                             }
                         }
-                        checks.push(check);
+                        diagnostics.push(diagnostic);
                     }
                 }
                 Directive::None => {}
@@ -195,6 +197,6 @@ pub fn check_noqa(
 
     ignored.sort_unstable();
     for index in ignored.iter().rev() {
-        checks.swap_remove(*index);
+        diagnostics.swap_remove(*index);
     }
 }

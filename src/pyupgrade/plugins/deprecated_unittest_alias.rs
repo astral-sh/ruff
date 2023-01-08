@@ -42,16 +42,16 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
     if id != "self" {
         return;
     }
-    let mut check = Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         violations::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             format!("self.{target}"),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

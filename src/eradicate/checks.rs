@@ -32,13 +32,13 @@ pub fn commented_out_code(
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(&line) && comment_contains_code(&line, &settings.task_tags[..]) {
-        let mut check = Diagnostic::new(violations::CommentedOutCode, Range::new(start, end));
+        let mut diagnostic = Diagnostic::new(violations::CommentedOutCode, Range::new(start, end));
         if matches!(autofix, flags::Autofix::Enabled)
             && settings.fixable.contains(&RuleCode::ERA001)
         {
-            check.amend(Fix::deletion(location, end_location));
+            diagnostic.amend(Fix::deletion(location, end_location));
         }
-        Some(check)
+        Some(diagnostic)
     } else {
         None
     }

@@ -157,20 +157,20 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
                 continue;
             }
 
-            let mut check =
+            let mut diagnostic =
                 Diagnostic::new(violations::RewriteYieldFrom, Range::from_located(item.stmt));
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 let contents = checker
                     .locator
                     .slice_source_code_range(&Range::from_located(item.iter));
                 let contents = format!("yield from {contents}");
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     contents,
                     item.stmt.location,
                     item.stmt.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

@@ -205,18 +205,18 @@ fn format_import_from(
 pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
         if collect_call_paths(value) == ["mock", "mock"] {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::RewriteMockImport(MockReference::Attribute),
                 Range::from_located(value),
             );
             if checker.patch(&RuleCode::UP026) {
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     "mock".to_string(),
                     value.location,
                     value.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -247,18 +247,18 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 // Add a `Diagnostic` for each `mock` import.
                 for name in names {
                     if name.node.name == "mock" || name.node.name == "mock.mock" {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::RewriteMockImport(MockReference::Import),
                             Range::from_located(name),
                         );
                         if let Some(content) = content.as_ref() {
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 content.clone(),
                                 stmt.location,
                                 stmt.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -273,7 +273,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
             }
 
             if module == "mock" {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::RewriteMockImport(MockReference::Import),
                     Range::from_located(stmt),
                 );
@@ -281,7 +281,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     let indent = indentation(checker, stmt);
                     match format_import_from(stmt, &indent, checker.locator, checker.style) {
                         Ok(content) => {
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 content,
                                 stmt.location,
                                 stmt.end_location.unwrap(),
@@ -290,7 +290,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                         Err(e) => error!("Failed to rewrite `mock` import: {e}"),
                     }
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
         _ => (),

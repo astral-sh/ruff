@@ -19,19 +19,19 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
         let [elt] = &elts[..] else {
             continue;
         };
-        let mut check = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::RedundantTupleInExceptionHandler(elt.to_string()),
             Range::from_located(type_),
         );
-        if checker.patch(check.kind.code()) {
+        if checker.patch(diagnostic.kind.code()) {
             let mut generator: SourceCodeGenerator = checker.style.into();
             generator.unparse_expr(elt, 0);
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 generator.generate(),
                 type_.location,
                 type_.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

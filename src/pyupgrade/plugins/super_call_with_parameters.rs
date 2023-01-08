@@ -18,13 +18,13 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
         .iter()
         .map(std::convert::Into::into)
         .collect();
-    let Some(mut check) = checks::super_args(scope, &parents, expr, func, args) else {
+    let Some(mut diagnostic) = checks::super_args(scope, &parents, expr, func, args) else {
         return;
     };
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         if let Some(fix) = pyupgrade::fixes::remove_super_arguments(checker.locator, expr) {
-            check.amend(fix);
+            diagnostic.amend(fix);
         }
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

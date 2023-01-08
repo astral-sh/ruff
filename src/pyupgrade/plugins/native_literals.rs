@@ -25,13 +25,13 @@ pub fn native_literals(
 
     if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let mut check = Diagnostic::new(violations::NativeLiterals(if id == "str" {
+            let mut diagnostic = Diagnostic::new(violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
             }), Range::from_located(expr));
             if checker.patch(&RuleCode::UP018) {
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
                         content.push('b');
@@ -48,7 +48,7 @@ pub fn native_literals(
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
             return;
         };
 
@@ -93,7 +93,7 @@ pub fn native_literals(
             return;
         }
 
-        let mut check = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
@@ -102,12 +102,12 @@ pub fn native_literals(
             Range::from_located(expr),
         );
         if checker.patch(&RuleCode::UP018) {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 arg_code.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

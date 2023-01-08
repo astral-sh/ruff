@@ -92,16 +92,16 @@ pub fn check_imports(
     if actual == dedent(&expected) {
         None
     } else {
-        let mut check = Diagnostic::new(violations::UnsortedImports, range);
+        let mut diagnostic = Diagnostic::new(violations::UnsortedImports, range);
         if matches!(autofix, flags::Autofix::Enabled)
-            && settings.fixable.contains(check.kind.code())
+            && settings.fixable.contains(diagnostic.kind.code())
         {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 indent(&expected, indentation),
                 range.location,
                 range.end_location,
             ));
         }
-        Some(check)
+        Some(diagnostic)
     }
 }

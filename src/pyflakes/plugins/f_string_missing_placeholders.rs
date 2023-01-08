@@ -13,14 +13,14 @@ pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut
         .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
     {
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
-            let mut check = Diagnostic::new(violations::FStringMissingPlaceholders, tok_range);
+            let mut diagnostic = Diagnostic::new(violations::FStringMissingPlaceholders, tok_range);
             if checker.patch(&RuleCode::F541) {
-                check.amend(Fix::deletion(
+                diagnostic.amend(Fix::deletion(
                     prefix_range.location,
                     prefix_range.end_location,
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

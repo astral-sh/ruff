@@ -30,13 +30,14 @@ pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
-    let mut check = Diagnostic::new(violations::RaiseNotImplemented, Range::from_located(expr));
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    let mut diagnostic =
+        Diagnostic::new(violations::RaiseNotImplemented, Range::from_located(expr));
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             "NotImplementedError".to_string(),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

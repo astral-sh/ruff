@@ -27,16 +27,16 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         ) {
             continue;
         }
-        let mut check =
+        let mut diagnostic =
             Diagnostic::new(violations::UnnecessaryReturnNone, Range::from_located(stmt));
         if checker.patch(&RuleCode::RET501) {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 "return".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -46,15 +46,16 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if expr.is_some() {
             continue;
         }
-        let mut check = Diagnostic::new(violations::ImplicitReturnValue, Range::from_located(stmt));
+        let mut diagnostic =
+            Diagnostic::new(violations::ImplicitReturnValue, Range::from_located(stmt));
         if checker.patch(&RuleCode::RET502) {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 "return None".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -102,19 +103,19 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         | StmtKind::Raise { .. }
         | StmtKind::Try { .. } => {}
         _ => {
-            let mut check =
+            let mut diagnostic =
                 Diagnostic::new(violations::ImplicitReturn, Range::from_located(last_stmt));
             if checker.patch(&RuleCode::RET503) {
                 let mut content = String::new();
                 content.push_str(&indentation(checker, last_stmt));
                 content.push_str("return None");
                 content.push('\n');
-                check.amend(Fix::insertion(
+                diagnostic.amend(Fix::insertion(
                     content,
                     Location::new(last_stmt.end_location.unwrap().row() + 1, 0),
                 ));
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

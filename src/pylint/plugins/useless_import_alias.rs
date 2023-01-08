@@ -17,13 +17,14 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
         return;
     }
 
-    let mut check = Diagnostic::new(violations::UselessImportAlias, Range::from_located(alias));
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    let mut diagnostic =
+        Diagnostic::new(violations::UselessImportAlias, Range::from_located(alias));
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             asname.to_string(),
             alias.location,
             alias.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    checker.diagnostics.push(diagnostic);
 }

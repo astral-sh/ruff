@@ -12,14 +12,14 @@ pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
     let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
 
     if match_call_path(&call_path, "io", "open", &checker.from_imports) {
-        let mut check = Diagnostic::new(violations::OpenAlias, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(violations::OpenAlias, Range::from_located(expr));
         if checker.patch(&RuleCode::UP020) {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 "open".to_string(),
                 func.location,
                 func.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

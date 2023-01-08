@@ -169,7 +169,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
             && name != &"__traceback_info__"
             && name != &"__traceback_supplement__"
         {
-            let mut check = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::UnusedVariable((*name).to_string()),
                 binding.range,
             );
@@ -180,11 +180,11 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
                         if matches!(kind, DeletionKind::Whole) {
                             checker.deletions.insert(RefEquality(stmt));
                         }
-                        check.amend(fix);
+                        diagnostic.amend(fix);
                     }
                 }
             }
-            checker.diagnostics.push(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

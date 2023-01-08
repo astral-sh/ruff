@@ -118,18 +118,18 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     loop_info.iter,
                     checker.style,
                 );
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::ConvertLoopToAny(content.clone()),
                     Range::from_located(stmt),
                 );
                 if checker.patch(&RuleCode::SIM110) {
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         content,
                         stmt.location,
                         sibling.end_location.unwrap(),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
 
@@ -157,18 +157,18 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     loop_info.iter,
                     checker.style,
                 );
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::ConvertLoopToAll(content.clone()),
                     Range::from_located(stmt),
                 );
                 if checker.patch(&RuleCode::SIM111) {
-                    check.amend(Fix::replacement(
+                    diagnostic.amend(Fix::replacement(
                         content,
                         stmt.location,
                         sibling.end_location.unwrap(),
                     ));
                 }
-                checker.diagnostics.push(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }

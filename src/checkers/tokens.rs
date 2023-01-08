@@ -15,7 +15,7 @@ pub fn check_tokens(
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
-    let mut checks: Vec<Diagnostic> = vec![];
+    let mut diagnostics: Vec<Diagnostic> = vec![];
 
     let enforce_ambiguous_unicode_character = settings.enabled.contains(&RuleCode::RUF001)
         || settings.enabled.contains(&RuleCode::RUF002)
@@ -40,7 +40,7 @@ pub fn check_tokens(
         // RUF001, RUF002, RUF003
         if enforce_ambiguous_unicode_character {
             if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
-                checks.extend(ruff::checks::ambiguous_unicode_character(
+                diagnostics.extend(ruff::checks::ambiguous_unicode_character(
                     locator,
                     start,
                     end,
@@ -62,15 +62,15 @@ pub fn check_tokens(
         // flake8-quotes
         if enforce_quotes {
             if matches!(tok, Tok::String { .. }) {
-                if let Some(check) = flake8_quotes::checks::quotes(
+                if let Some(diagnostic) = flake8_quotes::checks::quotes(
                     locator,
                     start,
                     end,
                     is_docstring,
                     &settings.flake8_quotes,
                 ) {
-                    if settings.enabled.contains(check.kind.code()) {
-                        checks.push(check);
+                    if settings.enabled.contains(diagnostic.kind.code()) {
+                        diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -79,10 +79,10 @@ pub fn check_tokens(
         // eradicate
         if enforce_commented_out_code {
             if matches!(tok, Tok::Comment(_)) {
-                if let Some(check) =
+                if let Some(diagnostic) =
                     eradicate::checks::commented_out_code(locator, start, end, settings, autofix)
                 {
-                    checks.push(check);
+                    diagnostics.push(diagnostic);
                 }
             }
         }
@@ -90,7 +90,7 @@ pub fn check_tokens(
         // W605
         if enforce_invalid_escape_sequence {
             if matches!(tok, Tok::String { .. }) {
-                checks.extend(pycodestyle::checks::invalid_escape_sequence(
+                diagnostics.extend(pycodestyle::checks::invalid_escape_sequence(
                     locator,
                     start,
                     end,
@@ -103,12 +103,12 @@ pub fn check_tokens(
 
     // ISC001, ISC002
     if enforce_implicit_string_concatenation {
-        checks.extend(
+        diagnostics.extend(
             flake8_implicit_str_concat::checks::implicit(tokens, locator)
                 .into_iter()
-                .filter(|check| settings.enabled.contains(check.kind.code())),
+                .filter(|diagnostic| settings.enabled.contains(diagnostic.kind.code())),
         );
     }
 
-    checks
+    diagnostics
 }

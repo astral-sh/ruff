@@ -99,20 +99,20 @@ pub fn unittest_assertion(
     match &func.node {
         ExprKind::Attribute { attr, .. } => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::UnittestAssertion(unittest_assert.to_string()),
                     Range::from_located(func),
                 );
-                if checker.patch(check.kind.code()) {
+                if checker.patch(diagnostic.kind.code()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        check.amend(Fix::replacement(
+                        diagnostic.amend(Fix::replacement(
                             unparse_stmt(&stmt, checker.style),
                             call.location,
                             call.end_location.unwrap(),
                         ));
                     }
                 }
-                Some(check)
+                Some(diagnostic)
             } else {
                 None
             }

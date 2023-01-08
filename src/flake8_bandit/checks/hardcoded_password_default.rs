@@ -19,7 +19,7 @@ fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Diagno
 
 /// S107
 pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
-    let mut checks: Vec<Diagnostic> = Vec::new();
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     let defaults_start =
         arguments.posonlyargs.len() + arguments.args.len() - arguments.defaults.len();
@@ -31,8 +31,8 @@ pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
     {
         if let Some(i) = i.checked_sub(defaults_start) {
             let default = &arguments.defaults[i];
-            if let Some(check) = check_password_kwarg(arg, default) {
-                checks.push(check);
+            if let Some(diagnostic) = check_password_kwarg(arg, default) {
+                diagnostics.push(diagnostic);
             }
         }
     }
@@ -41,11 +41,11 @@ pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
     for (i, kwarg) in arguments.kwonlyargs.iter().enumerate() {
         if let Some(i) = i.checked_sub(defaults_start) {
             let default = &arguments.kw_defaults[i];
-            if let Some(check) = check_password_kwarg(kwarg, default) {
-                checks.push(check);
+            if let Some(diagnostic) = check_password_kwarg(kwarg, default) {
+                diagnostics.push(diagnostic);
             }
         }
     }
 
-    checks
+    diagnostics
 }
