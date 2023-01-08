@@ -26,6 +26,7 @@ pub enum UnittestAssert {
     ItemsEqual,
     Less,
     LessEqual,
+    ListEqual,
     MultiLineEqual,
     NotAlmostEqual,
     NotAlmostEquals,
@@ -41,8 +42,10 @@ pub enum UnittestAssert {
     RaisesRegexp,
     Regex,
     RegexpMatches,
+    SequenceEqual,
     SetEqual,
     True,
+    TupleEqual,
     Underscore,
 }
 
@@ -66,6 +69,7 @@ impl std::fmt::Display for UnittestAssert {
             UnittestAssert::ItemsEqual => write!(f, "assertItemsEqual"),
             UnittestAssert::Less => write!(f, "assertLess"),
             UnittestAssert::LessEqual => write!(f, "assertLessEqual"),
+            UnittestAssert::ListEqual => write!(f, "assertListEqual"),
             UnittestAssert::MultiLineEqual => write!(f, "assertMultiLineEqual"),
             UnittestAssert::NotAlmostEqual => write!(f, "assertNotAlmostEqual"),
             UnittestAssert::NotAlmostEquals => write!(f, "assertNotAlmostEquals"),
@@ -81,8 +85,10 @@ impl std::fmt::Display for UnittestAssert {
             UnittestAssert::RaisesRegexp => write!(f, "assertRaisesRegexp"),
             UnittestAssert::Regex => write!(f, "assertRegex"),
             UnittestAssert::RegexpMatches => write!(f, "assertRegexpMatches"),
+            UnittestAssert::SequenceEqual => write!(f, "assertSequenceEqual"),
             UnittestAssert::SetEqual => write!(f, "assertSetEqual"),
             UnittestAssert::True => write!(f, "assertTrue"),
+            UnittestAssert::TupleEqual => write!(f, "assertTupleEqual"),
             UnittestAssert::Underscore => write!(f, "assert_"),
         }
     }
@@ -110,6 +116,7 @@ impl TryFrom<&str> for UnittestAssert {
             "assertItemsEqual" => Ok(UnittestAssert::ItemsEqual),
             "assertLess" => Ok(UnittestAssert::Less),
             "assertLessEqual" => Ok(UnittestAssert::LessEqual),
+            "assertListEqual" => Ok(UnittestAssert::ListEqual),
             "assertMultiLineEqual" => Ok(UnittestAssert::MultiLineEqual),
             "assertNotAlmostEqual" => Ok(UnittestAssert::NotAlmostEqual),
             "assertNotAlmostEquals" => Ok(UnittestAssert::NotAlmostEquals),
@@ -125,8 +132,10 @@ impl TryFrom<&str> for UnittestAssert {
             "assertRaisesRegexp" => Ok(UnittestAssert::RaisesRegexp),
             "assertRegex" => Ok(UnittestAssert::Regex),
             "assertRegexpMatches" => Ok(UnittestAssert::RegexpMatches),
+            "assertSequenceEqual" => Ok(UnittestAssert::SequenceEqual),
             "assertSetEqual" => Ok(UnittestAssert::SetEqual),
             "assertTrue" => Ok(UnittestAssert::True),
+            "assertTupleEqual" => Ok(UnittestAssert::TupleEqual),
             "assert_" => Ok(UnittestAssert::Underscore),
             _ => Err(format!("Unknown unittest assert method: {value}")),
         }
@@ -190,6 +199,7 @@ impl UnittestAssert {
             UnittestAssert::ItemsEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::Less => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::LessEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::ListEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::MultiLineEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::NotAlmostEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::NotAlmostEquals => Arguments::new(vec!["first", "second"], vec!["msg"]),
@@ -205,8 +215,10 @@ impl UnittestAssert {
             UnittestAssert::RaisesRegexp => Arguments::new(vec!["exception", "regex"], vec!["msg"]),
             UnittestAssert::Regex => Arguments::new(vec!["text", "regex"], vec!["msg"]),
             UnittestAssert::RegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
-            UnittestAssert::SetEqual => Arguments::new(vec!["set1", "set2"], vec!["msg"]),
+            UnittestAssert::SequenceEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::SetEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::True => Arguments::new(vec!["expr"], vec!["msg"]),
+            UnittestAssert::TupleEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::Underscore => Arguments::new(vec!["expr"], vec!["msg"]),
         }
     }
