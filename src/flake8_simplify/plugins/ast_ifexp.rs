@@ -120,7 +120,7 @@ pub fn twisted_arms_in_ifexpr(
     }
 
     let mut check = Check::new(
-        violations::NegateEqualOp(
+        violations::IfExprWithTwistedArms(
             unparse_expr(body, checker.style),
             unparse_expr(orelse, checker.style),
         ),
