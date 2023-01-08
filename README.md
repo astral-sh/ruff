@@ -362,7 +362,7 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [possible values: text, json, junit, grouped, github, gitlab]
+          Output serialization format for error messages [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
       --cache-dir <CACHE_DIR>

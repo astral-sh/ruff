@@ -93,7 +93,7 @@ pub struct Cli {
     #[arg(long, value_delimiter = ',')]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// Output serialization format for error messages.
-    #[arg(long, value_enum)]
+    #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
     /// The name of the file when passing it through stdin.
     #[arg(long)]
