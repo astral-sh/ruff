@@ -25,5 +25,5 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
             alias.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

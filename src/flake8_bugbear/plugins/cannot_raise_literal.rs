@@ -10,7 +10,7 @@ pub fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Constant { .. } = &expr.node else {
         return;
     };
-    checker.checks.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::CannotRaiseLiteral,
         Range::from_located(expr),
     ));

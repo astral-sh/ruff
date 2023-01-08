@@ -23,7 +23,7 @@ pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
     if id != "os" {
         return;
     }
-    checker.checks.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::AssignmentToOsEnviron,
         Range::from_located(target),
     ));

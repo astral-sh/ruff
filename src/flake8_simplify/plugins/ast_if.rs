@@ -4,7 +4,7 @@ use crate::ast::helpers::{create_expr, create_stmt, unparse_expr, unparse_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
 fn is_main_check(expr: &Expr) -> bool {
@@ -60,7 +60,7 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.checks.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::NestedIfStatements,
         Range::from_located(stmt),
     ));
@@ -92,7 +92,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
-    if checker.patch(&DiagnosticCode::SIM103) {
+    if checker.patch(&RuleCode::SIM103) {
         let return_stmt = create_stmt(StmtKind::Return {
             value: Some(test.clone()),
         });
@@ -102,7 +102,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
             stmt.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }
 
 fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
@@ -182,12 +182,12 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         violations::UseTernaryOperator(content.clone()),
         Range::from_located(stmt),
     );
-    if checker.patch(&DiagnosticCode::SIM108) {
+    if checker.patch(&RuleCode::SIM108) {
         check.amend(Fix::replacement(
             content,
             stmt.location,
             stmt.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

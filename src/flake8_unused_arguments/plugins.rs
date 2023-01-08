@@ -129,7 +129,7 @@ pub fn unused_arguments(
                     if checker
                         .settings
                         .enabled
-                        .contains(Argumentable::Function.check_code())
+                        .contains(Argumentable::Function.rule_code())
                         && !visibility::is_overload(checker, decorator_list)
                     {
                         function(
@@ -151,7 +151,7 @@ pub fn unused_arguments(
                     if checker
                         .settings
                         .enabled
-                        .contains(Argumentable::Method.check_code())
+                        .contains(Argumentable::Method.rule_code())
                         && !helpers::is_empty(body)
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
@@ -176,7 +176,7 @@ pub fn unused_arguments(
                     if checker
                         .settings
                         .enabled
-                        .contains(Argumentable::ClassMethod.check_code())
+                        .contains(Argumentable::ClassMethod.rule_code())
                         && !helpers::is_empty(body)
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
@@ -201,7 +201,7 @@ pub fn unused_arguments(
                     if checker
                         .settings
                         .enabled
-                        .contains(Argumentable::StaticMethod.check_code())
+                        .contains(Argumentable::StaticMethod.rule_code())
                         && !helpers::is_empty(body)
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
@@ -228,7 +228,7 @@ pub fn unused_arguments(
             if checker
                 .settings
                 .enabled
-                .contains(Argumentable::Lambda.check_code())
+                .contains(Argumentable::Lambda.rule_code())
             {
                 function(
                     &Argumentable::Lambda,

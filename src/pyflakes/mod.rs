@@ -16,162 +16,162 @@ mod tests {
     use textwrap::dedent;
 
     use crate::linter::{check_path, test_path};
-    use crate::registry::{DiagnosticCode, DiagnosticCodePrefix};
+    use crate::registry::{RuleCode, RuleCodePrefix};
     use crate::settings::flags;
     use crate::source_code_locator::SourceCodeLocator;
     use crate::source_code_style::SourceCodeStyleDetector;
     use crate::{directives, rustpython_helpers, settings};
 
-    #[test_case(DiagnosticCode::F401, Path::new("F401_0.py"); "F401_0")]
-    #[test_case(DiagnosticCode::F401, Path::new("F401_1.py"); "F401_1")]
-    #[test_case(DiagnosticCode::F401, Path::new("F401_2.py"); "F401_2")]
-    #[test_case(DiagnosticCode::F401, Path::new("F401_3.py"); "F401_3")]
-    #[test_case(DiagnosticCode::F401, Path::new("F401_4.py"); "F401_4")]
-    #[test_case(DiagnosticCode::F401, Path::new("F401_5.py"); "F401_5")]
-    #[test_case(DiagnosticCode::F401, Path::new("F401_6.py"); "F401_6")]
-    #[test_case(DiagnosticCode::F401, Path::new("F401_7.py"); "F401_7")]
-    #[test_case(DiagnosticCode::F402, Path::new("F402.py"); "F402")]
-    #[test_case(DiagnosticCode::F403, Path::new("F403.py"); "F403")]
-    #[test_case(DiagnosticCode::F404, Path::new("F404.py"); "F404")]
-    #[test_case(DiagnosticCode::F405, Path::new("F405.py"); "F405")]
-    #[test_case(DiagnosticCode::F406, Path::new("F406.py"); "F406")]
-    #[test_case(DiagnosticCode::F407, Path::new("F407.py"); "F407")]
-    #[test_case(DiagnosticCode::F501, Path::new("F50x.py"); "F501")]
-    #[test_case(DiagnosticCode::F502, Path::new("F502.py"); "F502_1")]
-    #[test_case(DiagnosticCode::F502, Path::new("F50x.py"); "F502_0")]
-    #[test_case(DiagnosticCode::F503, Path::new("F503.py"); "F503_1")]
-    #[test_case(DiagnosticCode::F503, Path::new("F50x.py"); "F503_0")]
-    #[test_case(DiagnosticCode::F504, Path::new("F504.py"); "F504_1")]
-    #[test_case(DiagnosticCode::F504, Path::new("F50x.py"); "F504_0")]
-    #[test_case(DiagnosticCode::F505, Path::new("F504.py"); "F505_1")]
-    #[test_case(DiagnosticCode::F505, Path::new("F50x.py"); "F505_0")]
-    #[test_case(DiagnosticCode::F506, Path::new("F50x.py"); "F506")]
-    #[test_case(DiagnosticCode::F507, Path::new("F50x.py"); "F507")]
-    #[test_case(DiagnosticCode::F508, Path::new("F50x.py"); "F508")]
-    #[test_case(DiagnosticCode::F509, Path::new("F50x.py"); "F509")]
-    #[test_case(DiagnosticCode::F521, Path::new("F521.py"); "F521")]
-    #[test_case(DiagnosticCode::F522, Path::new("F522.py"); "F522")]
-    #[test_case(DiagnosticCode::F523, Path::new("F523.py"); "F523")]
-    #[test_case(DiagnosticCode::F524, Path::new("F524.py"); "F524")]
-    #[test_case(DiagnosticCode::F525, Path::new("F525.py"); "F525")]
-    #[test_case(DiagnosticCode::F541, Path::new("F541.py"); "F541")]
-    #[test_case(DiagnosticCode::F601, Path::new("F601.py"); "F601")]
-    #[test_case(DiagnosticCode::F602, Path::new("F602.py"); "F602")]
-    #[test_case(DiagnosticCode::F622, Path::new("F622.py"); "F622")]
-    #[test_case(DiagnosticCode::F631, Path::new("F631.py"); "F631")]
-    #[test_case(DiagnosticCode::F632, Path::new("F632.py"); "F632")]
-    #[test_case(DiagnosticCode::F633, Path::new("F633.py"); "F633")]
-    #[test_case(DiagnosticCode::F634, Path::new("F634.py"); "F634")]
-    #[test_case(DiagnosticCode::F701, Path::new("F701.py"); "F701")]
-    #[test_case(DiagnosticCode::F702, Path::new("F702.py"); "F702")]
-    #[test_case(DiagnosticCode::F704, Path::new("F704.py"); "F704")]
-    #[test_case(DiagnosticCode::F706, Path::new("F706.py"); "F706")]
-    #[test_case(DiagnosticCode::F707, Path::new("F707.py"); "F707")]
-    #[test_case(DiagnosticCode::F722, Path::new("F722.py"); "F722")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_0.py"); "F811_0")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_1.py"); "F811_1")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_2.py"); "F811_2")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_3.py"); "F811_3")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_4.py"); "F811_4")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_5.py"); "F811_5")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_6.py"); "F811_6")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_7.py"); "F811_7")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_8.py"); "F811_8")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_9.py"); "F811_9")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_10.py"); "F811_10")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_11.py"); "F811_11")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_12.py"); "F811_12")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_13.py"); "F811_13")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_14.py"); "F811_14")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_15.py"); "F811_15")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_16.py"); "F811_16")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_17.py"); "F811_17")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_18.py"); "F811_18")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_19.py"); "F811_19")]
-    #[test_case(DiagnosticCode::F811, Path::new("F811_20.py"); "F811_20")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_0.py"); "F821_0")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_1.py"); "F821_1")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_2.py"); "F821_2")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_3.py"); "F821_3")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_4.py"); "F821_4")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_5.py"); "F821_5")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_6.py"); "F821_6")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_7.py"); "F821_7")]
-    #[test_case(DiagnosticCode::F821, Path::new("F821_8.pyi"); "F821_8")]
-    #[test_case(DiagnosticCode::F822, Path::new("F822.py"); "F822")]
-    #[test_case(DiagnosticCode::F823, Path::new("F823.py"); "F823")]
-    #[test_case(DiagnosticCode::F841, Path::new("F841_0.py"); "F841_0")]
-    #[test_case(DiagnosticCode::F841, Path::new("F841_1.py"); "F841_1")]
-    #[test_case(DiagnosticCode::F841, Path::new("F841_2.py"); "F841_2")]
-    #[test_case(DiagnosticCode::F841, Path::new("F841_3.py"); "F841_3")]
-    #[test_case(DiagnosticCode::F842, Path::new("F842.py"); "F842")]
-    #[test_case(DiagnosticCode::F901, Path::new("F901.py"); "F901")]
-    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let checks = test_path(
+    #[test_case(RuleCode::F401, Path::new("F401_0.py"); "F401_0")]
+    #[test_case(RuleCode::F401, Path::new("F401_1.py"); "F401_1")]
+    #[test_case(RuleCode::F401, Path::new("F401_2.py"); "F401_2")]
+    #[test_case(RuleCode::F401, Path::new("F401_3.py"); "F401_3")]
+    #[test_case(RuleCode::F401, Path::new("F401_4.py"); "F401_4")]
+    #[test_case(RuleCode::F401, Path::new("F401_5.py"); "F401_5")]
+    #[test_case(RuleCode::F401, Path::new("F401_6.py"); "F401_6")]
+    #[test_case(RuleCode::F401, Path::new("F401_7.py"); "F401_7")]
+    #[test_case(RuleCode::F402, Path::new("F402.py"); "F402")]
+    #[test_case(RuleCode::F403, Path::new("F403.py"); "F403")]
+    #[test_case(RuleCode::F404, Path::new("F404.py"); "F404")]
+    #[test_case(RuleCode::F405, Path::new("F405.py"); "F405")]
+    #[test_case(RuleCode::F406, Path::new("F406.py"); "F406")]
+    #[test_case(RuleCode::F407, Path::new("F407.py"); "F407")]
+    #[test_case(RuleCode::F501, Path::new("F50x.py"); "F501")]
+    #[test_case(RuleCode::F502, Path::new("F502.py"); "F502_1")]
+    #[test_case(RuleCode::F502, Path::new("F50x.py"); "F502_0")]
+    #[test_case(RuleCode::F503, Path::new("F503.py"); "F503_1")]
+    #[test_case(RuleCode::F503, Path::new("F50x.py"); "F503_0")]
+    #[test_case(RuleCode::F504, Path::new("F504.py"); "F504_1")]
+    #[test_case(RuleCode::F504, Path::new("F50x.py"); "F504_0")]
+    #[test_case(RuleCode::F505, Path::new("F504.py"); "F505_1")]
+    #[test_case(RuleCode::F505, Path::new("F50x.py"); "F505_0")]
+    #[test_case(RuleCode::F506, Path::new("F50x.py"); "F506")]
+    #[test_case(RuleCode::F507, Path::new("F50x.py"); "F507")]
+    #[test_case(RuleCode::F508, Path::new("F50x.py"); "F508")]
+    #[test_case(RuleCode::F509, Path::new("F50x.py"); "F509")]
+    #[test_case(RuleCode::F521, Path::new("F521.py"); "F521")]
+    #[test_case(RuleCode::F522, Path::new("F522.py"); "F522")]
+    #[test_case(RuleCode::F523, Path::new("F523.py"); "F523")]
+    #[test_case(RuleCode::F524, Path::new("F524.py"); "F524")]
+    #[test_case(RuleCode::F525, Path::new("F525.py"); "F525")]
+    #[test_case(RuleCode::F541, Path::new("F541.py"); "F541")]
+    #[test_case(RuleCode::F601, Path::new("F601.py"); "F601")]
+    #[test_case(RuleCode::F602, Path::new("F602.py"); "F602")]
+    #[test_case(RuleCode::F622, Path::new("F622.py"); "F622")]
+    #[test_case(RuleCode::F631, Path::new("F631.py"); "F631")]
+    #[test_case(RuleCode::F632, Path::new("F632.py"); "F632")]
+    #[test_case(RuleCode::F633, Path::new("F633.py"); "F633")]
+    #[test_case(RuleCode::F634, Path::new("F634.py"); "F634")]
+    #[test_case(RuleCode::F701, Path::new("F701.py"); "F701")]
+    #[test_case(RuleCode::F702, Path::new("F702.py"); "F702")]
+    #[test_case(RuleCode::F704, Path::new("F704.py"); "F704")]
+    #[test_case(RuleCode::F706, Path::new("F706.py"); "F706")]
+    #[test_case(RuleCode::F707, Path::new("F707.py"); "F707")]
+    #[test_case(RuleCode::F722, Path::new("F722.py"); "F722")]
+    #[test_case(RuleCode::F811, Path::new("F811_0.py"); "F811_0")]
+    #[test_case(RuleCode::F811, Path::new("F811_1.py"); "F811_1")]
+    #[test_case(RuleCode::F811, Path::new("F811_2.py"); "F811_2")]
+    #[test_case(RuleCode::F811, Path::new("F811_3.py"); "F811_3")]
+    #[test_case(RuleCode::F811, Path::new("F811_4.py"); "F811_4")]
+    #[test_case(RuleCode::F811, Path::new("F811_5.py"); "F811_5")]
+    #[test_case(RuleCode::F811, Path::new("F811_6.py"); "F811_6")]
+    #[test_case(RuleCode::F811, Path::new("F811_7.py"); "F811_7")]
+    #[test_case(RuleCode::F811, Path::new("F811_8.py"); "F811_8")]
+    #[test_case(RuleCode::F811, Path::new("F811_9.py"); "F811_9")]
+    #[test_case(RuleCode::F811, Path::new("F811_10.py"); "F811_10")]
+    #[test_case(RuleCode::F811, Path::new("F811_11.py"); "F811_11")]
+    #[test_case(RuleCode::F811, Path::new("F811_12.py"); "F811_12")]
+    #[test_case(RuleCode::F811, Path::new("F811_13.py"); "F811_13")]
+    #[test_case(RuleCode::F811, Path::new("F811_14.py"); "F811_14")]
+    #[test_case(RuleCode::F811, Path::new("F811_15.py"); "F811_15")]
+    #[test_case(RuleCode::F811, Path::new("F811_16.py"); "F811_16")]
+    #[test_case(RuleCode::F811, Path::new("F811_17.py"); "F811_17")]
+    #[test_case(RuleCode::F811, Path::new("F811_18.py"); "F811_18")]
+    #[test_case(RuleCode::F811, Path::new("F811_19.py"); "F811_19")]
+    #[test_case(RuleCode::F811, Path::new("F811_20.py"); "F811_20")]
+    #[test_case(RuleCode::F821, Path::new("F821_0.py"); "F821_0")]
+    #[test_case(RuleCode::F821, Path::new("F821_1.py"); "F821_1")]
+    #[test_case(RuleCode::F821, Path::new("F821_2.py"); "F821_2")]
+    #[test_case(RuleCode::F821, Path::new("F821_3.py"); "F821_3")]
+    #[test_case(RuleCode::F821, Path::new("F821_4.py"); "F821_4")]
+    #[test_case(RuleCode::F821, Path::new("F821_5.py"); "F821_5")]
+    #[test_case(RuleCode::F821, Path::new("F821_6.py"); "F821_6")]
+    #[test_case(RuleCode::F821, Path::new("F821_7.py"); "F821_7")]
+    #[test_case(RuleCode::F821, Path::new("F821_8.pyi"); "F821_8")]
+    #[test_case(RuleCode::F822, Path::new("F822.py"); "F822")]
+    #[test_case(RuleCode::F823, Path::new("F823.py"); "F823")]
+    #[test_case(RuleCode::F841, Path::new("F841_0.py"); "F841_0")]
+    #[test_case(RuleCode::F841, Path::new("F841_1.py"); "F841_1")]
+    #[test_case(RuleCode::F841, Path::new("F841_2.py"); "F841_2")]
+    #[test_case(RuleCode::F841, Path::new("F841_3.py"); "F841_3")]
+    #[test_case(RuleCode::F842, Path::new("F842.py"); "F842")]
+    #[test_case(RuleCode::F901, Path::new("F901.py"); "F901")]
+    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyflakes")
                 .join(path)
                 .as_path(),
-            &settings::Settings::for_rule(check_code),
+            &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyflakes/F841_0.py"),
             &settings::Settings {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
-                ..settings::Settings::for_rule(DiagnosticCode::F841)
+                ..settings::Settings::for_rule(RuleCode::F841)
             },
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn init() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyflakes/__init__.py"),
-            &settings::Settings::for_rules(vec![DiagnosticCode::F821, DiagnosticCode::F822]),
+            &settings::Settings::for_rules(vec![RuleCode::F821, RuleCode::F822]),
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn future_annotations() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyflakes/future_annotations.py"),
-            &settings::Settings::for_rules(vec![DiagnosticCode::F401, DiagnosticCode::F821]),
+            &settings::Settings::for_rules(vec![RuleCode::F401, RuleCode::F821]),
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn multi_statement_lines() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyflakes/multi_statement_lines.py"),
-            &settings::Settings::for_rule(DiagnosticCode::F401),
+            &settings::Settings::for_rule(RuleCode::F401),
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     /// A re-implementation of the Pyflakes test runner.
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
-    fn flakes(contents: &str, expected: &[DiagnosticCode]) -> Result<()> {
+    fn flakes(contents: &str, expected: &[RuleCode]) -> Result<()> {
         let contents = dedent(contents);
-        let settings = settings::Settings::for_rules(DiagnosticCodePrefix::F.codes());
+        let settings = settings::Settings::for_rules(RuleCodePrefix::F.codes());
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = SourceCodeLocator::new(&contents);
         let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
-        let mut checks = check_path(
+        let mut diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &contents,
@@ -183,10 +183,10 @@ mod tests {
             flags::Autofix::Enabled,
             flags::Noqa::Enabled,
         )?;
-        checks.sort_by_key(|check| check.location);
-        let actual = checks
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        let actual = diagnostics
             .iter()
-            .map(|check| check.kind.code().clone())
+            .map(|diagnostic| diagnostic.kind.code().clone())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
         Ok(())
@@ -195,7 +195,7 @@ mod tests {
     /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_undefined_names.py>
     #[test]
     fn undefined() -> Result<()> {
-        flakes("bar", &[DiagnosticCode::F821])?;
+        flakes("bar", &[RuleCode::F821])?;
         Ok(())
     }
 
@@ -212,7 +212,7 @@ mod tests {
         [a for a in range(10)]
         a
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )
     }
 
@@ -229,7 +229,7 @@ mod tests {
             pass
         exc
         "#,
-            &[DiagnosticCode::F841, DiagnosticCode::F821],
+            &[RuleCode::F841, RuleCode::F821],
         )?;
         Ok(())
     }
@@ -268,7 +268,7 @@ mod tests {
         print(exc)
         exc = 'Original value'
         "#,
-            &[DiagnosticCode::F841, DiagnosticCode::F821],
+            &[RuleCode::F841, RuleCode::F821],
         )?;
         Ok(())
     }
@@ -352,7 +352,7 @@ mod tests {
     fn magic_module_in_class_scope() -> Result<()> {
         // Use of the C{__module__} magic builtin should not emit an undefined
         // name warning if used in class scope.
-        flakes("__module__", &[DiagnosticCode::F821])?;
+        flakes("__module__", &[RuleCode::F821])?;
         flakes(
             r#"
         class Foo:
@@ -366,7 +366,7 @@ mod tests {
             def bar(self):
                 __module__
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -375,7 +375,7 @@ mod tests {
     fn magic_qualname_in_class_scope() -> Result<()> {
         // Use of the C{__qualname__} magic builtin should not emit an undefined
         // name warning if used in class scope.
-        flakes("__qualname__", &[DiagnosticCode::F821])?;
+        flakes("__qualname__", &[RuleCode::F821])?;
         flakes(
             r#"
         class Foo:
@@ -389,7 +389,7 @@ mod tests {
             def bar(self):
                 __qualname__
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -397,10 +397,7 @@ mod tests {
     #[test]
     fn global_import_star() -> Result<()> {
         // Can't find undefined names with import *.
-        flakes(
-            "from fu import *; bar",
-            &[DiagnosticCode::F403, DiagnosticCode::F405],
-        )?;
+        flakes("from fu import *; bar", &[RuleCode::F403, RuleCode::F405])?;
         Ok(())
     }
 
@@ -430,7 +427,7 @@ mod tests {
             def b():
                 global bar; bar = 1
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -457,7 +454,7 @@ mod tests {
         def foo():
             print(x)
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -473,7 +470,7 @@ mod tests {
         def f2():
             global m
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -481,7 +478,7 @@ mod tests {
     #[test]
     fn del() -> Result<()> {
         // Del deletes bindings.
-        flakes("a = 1; del a; a", &[DiagnosticCode::F821])?;
+        flakes("a = 1; del a; a", &[RuleCode::F821])?;
         Ok(())
     }
 
@@ -504,7 +501,7 @@ mod tests {
     #[test]
     fn del_undefined() -> Result<()> {
         // Del an undefined name.
-        flakes("del a", &[DiagnosticCode::F821])?;
+        flakes("del a", &[RuleCode::F821])?;
         Ok(())
     }
 
@@ -623,7 +620,7 @@ mod tests {
             a = 2
             return a
         "#,
-            &[DiagnosticCode::F823],
+            &[RuleCode::F823],
         )?;
         Ok(())
     }
@@ -643,7 +640,7 @@ mod tests {
                     a = 2
                     return a
         "#,
-            &[DiagnosticCode::F823],
+            &[RuleCode::F823],
         )?;
         Ok(())
     }
@@ -665,7 +662,7 @@ mod tests {
                     print(x, a)
             print(x)
         "#,
-            &[DiagnosticCode::F823],
+            &[RuleCode::F823],
         )?;
         Ok(())
     }
@@ -684,7 +681,7 @@ mod tests {
                     return a
                 return a
         "#,
-            &[DiagnosticCode::F823],
+            &[RuleCode::F823],
         )?;
         Ok(())
     }
@@ -703,11 +700,11 @@ mod tests {
                 e[any] = 5
             "#,
             &[
-                DiagnosticCode::F821,
-                DiagnosticCode::F821,
-                DiagnosticCode::F821,
-                DiagnosticCode::F841,
-                DiagnosticCode::F821,
+                RuleCode::F821,
+                RuleCode::F821,
+                RuleCode::F821,
+                RuleCode::F841,
+                RuleCode::F821,
             ],
         )?;
         Ok(())
@@ -744,7 +741,7 @@ mod tests {
             return foo
         f()
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -845,7 +842,7 @@ mod tests {
         def f(*, a, b=default_c):
             print(a, b)
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -904,12 +901,12 @@ mod tests {
         // not defined in the other generator.
         flakes(
             "(b for b in (a for a in [1, 2, 3] if b) if b)",
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
 
         flakes(
             "(b for b in (a for a in [1, 2, 3] if a) if a)",
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -944,7 +941,7 @@ mod tests {
         except:
             socket_map = {}
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
@@ -953,7 +950,7 @@ mod tests {
         except Exception:
             socket_map = {}
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -1009,19 +1006,19 @@ mod tests {
         for i in range(i):
             print(i)
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
         [42 for i in range(i)]
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
         (42 for i in range(i))
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -1060,7 +1057,7 @@ mod tests {
             r#"
         {lambda: id(y) for x in range(10)}
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -1073,7 +1070,7 @@ mod tests {
             r#"
         any(lambda: id(y) for x in range(10))
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -1097,28 +1094,22 @@ mod tests {
     /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_imports.py>
     #[test]
     fn unused_import() -> Result<()> {
-        flakes(
-            "import fu, bar",
-            &[DiagnosticCode::F401, DiagnosticCode::F401],
-        )?;
-        flakes(
-            "from baz import fu, bar",
-            &[DiagnosticCode::F401, DiagnosticCode::F401],
-        )?;
+        flakes("import fu, bar", &[RuleCode::F401, RuleCode::F401])?;
+        flakes("from baz import fu, bar", &[RuleCode::F401, RuleCode::F401])?;
         Ok(())
     }
 
     #[test]
     fn unused_import_relative() -> Result<()> {
-        flakes("from . import fu", &[DiagnosticCode::F401])?;
-        flakes("from . import fu as baz", &[DiagnosticCode::F401])?;
-        flakes("from .. import fu", &[DiagnosticCode::F401])?;
-        flakes("from ... import fu", &[DiagnosticCode::F401])?;
-        flakes("from .. import fu as baz", &[DiagnosticCode::F401])?;
-        flakes("from .bar import fu", &[DiagnosticCode::F401])?;
-        flakes("from ..bar import fu", &[DiagnosticCode::F401])?;
-        flakes("from ...bar import fu", &[DiagnosticCode::F401])?;
-        flakes("from ...bar import fu as baz", &[DiagnosticCode::F401])?;
+        flakes("from . import fu", &[RuleCode::F401])?;
+        flakes("from . import fu as baz", &[RuleCode::F401])?;
+        flakes("from .. import fu", &[RuleCode::F401])?;
+        flakes("from ... import fu", &[RuleCode::F401])?;
+        flakes("from .. import fu as baz", &[RuleCode::F401])?;
+        flakes("from .bar import fu", &[RuleCode::F401])?;
+        flakes("from ..bar import fu", &[RuleCode::F401])?;
+        flakes("from ...bar import fu", &[RuleCode::F401])?;
+        flakes("from ...bar import fu as baz", &[RuleCode::F401])?;
 
         Ok(())
     }
@@ -1127,19 +1118,11 @@ mod tests {
     fn aliased_import() -> Result<()> {
         flakes(
             "import fu as FU, bar as FU",
-            &[
-                DiagnosticCode::F401,
-                DiagnosticCode::F811,
-                DiagnosticCode::F401,
-            ],
+            &[RuleCode::F401, RuleCode::F811, RuleCode::F401],
         )?;
         flakes(
             "from moo import fu as FU, bar as FU",
-            &[
-                DiagnosticCode::F401,
-                DiagnosticCode::F811,
-                DiagnosticCode::F401,
-            ],
+            &[RuleCode::F401, RuleCode::F811, RuleCode::F401],
         )?;
 
         Ok(())
@@ -1176,17 +1159,11 @@ mod tests {
 
     #[test]
     fn redefined_while_unused() -> Result<()> {
-        flakes(
-            "import fu; fu = 3",
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
-        )?;
-        flakes(
-            "import fu; fu, bar = 3",
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
-        )?;
+        flakes("import fu; fu = 3", &[RuleCode::F401, RuleCode::F811])?;
+        flakes("import fu; fu, bar = 3", &[RuleCode::F401, RuleCode::F811])?;
         flakes(
             "import fu; [fu, bar] = 3",
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -1204,7 +1181,7 @@ mod tests {
             import os
         os.path
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -1242,7 +1219,7 @@ mod tests {
             pass
         os.path
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -1318,7 +1295,7 @@ mod tests {
             from bb import mixer
         mixer(123)
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -1390,7 +1367,7 @@ mod tests {
         def fu():
             pass
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -1408,7 +1385,7 @@ mod tests {
                 def fu():
                     pass
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -1428,10 +1405,10 @@ mod tests {
                     pass
         "#,
             &[
-                DiagnosticCode::F401,
-                DiagnosticCode::F811,
-                DiagnosticCode::F401,
-                DiagnosticCode::F811,
+                RuleCode::F401,
+                RuleCode::F811,
+                RuleCode::F401,
+                RuleCode::F811,
             ],
         )?;
 
@@ -1468,7 +1445,7 @@ mod tests {
         class fu:
             pass
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -1525,7 +1502,7 @@ mod tests {
 
         fu
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
 
         Ok(())
@@ -1553,7 +1530,7 @@ mod tests {
         def fun(fu):
             print(fu)
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         flakes(
@@ -1579,7 +1556,7 @@ mod tests {
     #[test]
     fn used_in_getattr() -> Result<()> {
         flakes("import fu; fu.bar.baz", &[])?;
-        flakes("import fu; \"bar\".fu.baz", &[DiagnosticCode::F401])?;
+        flakes("import fu; \"bar\".fu.baz", &[RuleCode::F401])?;
 
         Ok(())
     }
@@ -1732,7 +1709,7 @@ mod tests {
         for fu in range(2):
             pass
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F402],
+            &[RuleCode::F401, RuleCode::F402],
         )?;
 
         Ok(())
@@ -1749,7 +1726,7 @@ mod tests {
         for fu in ():
             pass
         "#,
-            &[DiagnosticCode::F402],
+            &[RuleCode::F402],
         )?;
 
         Ok(())
@@ -1766,7 +1743,7 @@ mod tests {
         for (x, y, z, (a, b, c, (fu,))) in ():
             pass
         "#,
-            &[DiagnosticCode::F402],
+            &[RuleCode::F402],
         )?;
         flakes(
             r#"
@@ -1775,7 +1752,7 @@ mod tests {
         for [x, y, z, (a, b, c, (fu,))] in ():
             pass
         "#,
-            &[DiagnosticCode::F402],
+            &[RuleCode::F402],
         )?;
 
         Ok(())
@@ -1889,11 +1866,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[
-                DiagnosticCode::F401,
-                DiagnosticCode::F811,
-                DiagnosticCode::F841,
-            ],
+            &[RuleCode::F401, RuleCode::F811, RuleCode::F841],
         )?;
 
         Ok(())
@@ -2032,7 +2005,7 @@ mod tests {
         import fu
         def f(): global fu
         "#,
-            &[DiagnosticCode::F401],
+            &[RuleCode::F401],
         )?;
 
         Ok(())
@@ -2092,7 +2065,7 @@ mod tests {
     fn shadowed_by_lambda() -> Result<()> {
         flakes(
             "import fu; lambda fu: fu",
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
         flakes("import fu; lambda fu: fu\nfu()", &[])?;
 
@@ -2119,7 +2092,7 @@ mod tests {
             import fu
         fu
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F821],
+            &[RuleCode::F401, RuleCode::F821],
         )?;
 
         Ok(())
@@ -2134,7 +2107,7 @@ mod tests {
             def fun(self):
                 fu
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
 
         Ok(())
@@ -2189,7 +2162,7 @@ mod tests {
     fn unused_package_import() -> Result<()> {
         // If a dotted name is imported and not used, an unused import warning is
         // reported.
-        flakes("import fu.bar", &[DiagnosticCode::F401])?;
+        flakes("import fu.bar", &[RuleCode::F401])?;
 
         Ok(())
     }
@@ -2203,7 +2176,7 @@ mod tests {
         import fu.bar, fu.bar
         fu.bar
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
         flakes(
             r#"
@@ -2211,7 +2184,7 @@ mod tests {
         import fu.bar
         fu.bar
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -2296,7 +2269,7 @@ mod tests {
         import fu
         import fu.bar
         "#,
-            &[DiagnosticCode::F401],
+            &[RuleCode::F401],
         )?;
 
         Ok(())
@@ -2367,7 +2340,7 @@ mod tests {
             fu
         fu
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -2436,7 +2409,7 @@ mod tests {
         x = 5
         from __future__ import division
         "#,
-            &[DiagnosticCode::F404],
+            &[RuleCode::F404],
         )?;
         flakes(
             r#"
@@ -2444,7 +2417,7 @@ mod tests {
         from __future__ import division
         bar
         "#,
-            &[DiagnosticCode::F404],
+            &[RuleCode::F404],
         )?;
 
         Ok(())
@@ -2473,7 +2446,7 @@ mod tests {
             r#"
         from __future__ import print_statement
         "#,
-            &[DiagnosticCode::F407],
+            &[RuleCode::F407],
         )?;
 
         Ok(())
@@ -2486,7 +2459,7 @@ mod tests {
             r#"
         from __future__ import *
         "#,
-            &[DiagnosticCode::F407],
+            &[RuleCode::F407],
         )?;
 
         Ok(())
@@ -2502,7 +2475,7 @@ mod tests {
             import bar
             __all__ = ["bar"]
         "#,
-            &[DiagnosticCode::F401, DiagnosticCode::F841],
+            &[RuleCode::F401, RuleCode::F841],
         )?;
 
         Ok(())
@@ -2517,7 +2490,7 @@ mod tests {
         class foo:
             __all__ = ["bar"]
         "#,
-            &[DiagnosticCode::F401],
+            &[RuleCode::F401],
         )?;
 
         Ok(())
@@ -2530,7 +2503,7 @@ mod tests {
         import bar
         (__all__,) = ("foo",)
         "#,
-            &[DiagnosticCode::F401],
+            &[RuleCode::F401],
         )?;
 
         Ok(())
@@ -2570,7 +2543,7 @@ mod tests {
         if 1 < 3:
             __all__ += ['c', 'd']
         "#,
-            &[DiagnosticCode::F822, DiagnosticCode::F822],
+            &[RuleCode::F822, RuleCode::F822],
         )?;
 
         Ok(())
@@ -2585,10 +2558,10 @@ mod tests {
         __all__ = ['a'] + ['b'] + ['c']
         "#,
             &[
-                DiagnosticCode::F401,
-                DiagnosticCode::F822,
-                DiagnosticCode::F822,
-                DiagnosticCode::F822,
+                RuleCode::F401,
+                RuleCode::F822,
+                RuleCode::F822,
+                RuleCode::F822,
             ],
         )?;
 
@@ -2604,10 +2577,10 @@ mod tests {
         __all__ = ('a',) + ('b',) + ('c',)
         "#,
             &[
-                DiagnosticCode::F401,
-                DiagnosticCode::F822,
-                DiagnosticCode::F822,
-                DiagnosticCode::F822,
+                RuleCode::F401,
+                RuleCode::F822,
+                RuleCode::F822,
+                RuleCode::F822,
             ],
         )?;
 
@@ -2675,7 +2648,7 @@ mod tests {
             r#"
         __all__ = ["foo"]
         "#,
-            &[DiagnosticCode::F822],
+            &[RuleCode::F822],
         )?;
 
         Ok(())
@@ -2691,10 +2664,10 @@ mod tests {
         csc(1)
         "#,
             &[
-                DiagnosticCode::F403,
-                DiagnosticCode::F405,
-                DiagnosticCode::F405,
-                DiagnosticCode::F405,
+                RuleCode::F403,
+                RuleCode::F405,
+                RuleCode::F405,
+                RuleCode::F405,
             ],
         )?;
 
@@ -2711,7 +2684,7 @@ mod tests {
         a = 1
         __all__ = ['a']
         "#,
-            &[DiagnosticCode::F403, DiagnosticCode::F401],
+            &[RuleCode::F403, RuleCode::F401],
         )?;
 
         Ok(())
@@ -2732,7 +2705,7 @@ mod tests {
         // expression results in a redefinition warning.
         flakes(
             "import fu; (1 for fu in range(1))",
-            &[DiagnosticCode::F401, DiagnosticCode::F811],
+            &[RuleCode::F401, RuleCode::F811],
         )?;
 
         Ok(())
@@ -2769,7 +2742,7 @@ mod tests {
         def f():
             return "hello"
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
 
         Ok(())
@@ -2806,7 +2779,7 @@ mod tests {
         class foo:
             pass
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
 
         Ok(())
@@ -2991,7 +2964,7 @@ mod tests {
             def bar():
                 pass
         "#,
-            &[DiagnosticCode::F811],
+            &[RuleCode::F811],
         )?;
         Ok(())
     }
@@ -3034,7 +3007,7 @@ mod tests {
             name: str
             age: int
         "#,
-            &[DiagnosticCode::F842, DiagnosticCode::F842],
+            &[RuleCode::F842, RuleCode::F842],
         )?;
         flakes(
             r#"
@@ -3044,10 +3017,10 @@ mod tests {
             foo: not_a_real_type = None
         "#,
             &[
-                DiagnosticCode::F841,
-                DiagnosticCode::F841,
-                DiagnosticCode::F841,
-                DiagnosticCode::F821,
+                RuleCode::F841,
+                RuleCode::F841,
+                RuleCode::F841,
+                RuleCode::F821,
             ],
         )?;
         flakes(
@@ -3056,7 +3029,7 @@ mod tests {
             name: str
             print(name)
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
@@ -3064,33 +3037,33 @@ mod tests {
         def f():
             a: Any
         "#,
-            &[DiagnosticCode::F842],
+            &[RuleCode::F842],
         )?;
         flakes(
             r#"
         foo: not_a_real_type
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
         foo: not_a_real_type = None
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
         class C:
             foo: not_a_real_type
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
         class C:
             foo: not_a_real_type = None
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
@@ -3098,7 +3071,7 @@ mod tests {
             class C:
                 foo: not_a_real_type
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
@@ -3106,7 +3079,7 @@ mod tests {
             class C:
                 foo: not_a_real_type = None
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
@@ -3168,34 +3141,34 @@ mod tests {
             r#"
         bar: 'Bar'
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
         bar: 'foo.Bar'
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
         from foo import Bar
         bar: str
         "#,
-            &[DiagnosticCode::F401],
+            &[RuleCode::F401],
         )?;
         flakes(
             r#"
         from foo import Bar
         def f(bar: str): pass
         "#,
-            &[DiagnosticCode::F401],
+            &[RuleCode::F401],
         )?;
         flakes(
             r#"
         def f(a: A) -> A: pass
         class A: pass
         "#,
-            &[DiagnosticCode::F821, DiagnosticCode::F821],
+            &[RuleCode::F821, RuleCode::F821],
         )?;
         flakes(
             r#"
@@ -3209,7 +3182,7 @@ mod tests {
         a: A
         class A: pass
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
@@ -3223,7 +3196,7 @@ mod tests {
         T: object
         def f(t: T): pass
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         flakes(
             r#"
@@ -3236,13 +3209,13 @@ mod tests {
             r#"
         a: 'A B'
         "#,
-            &[DiagnosticCode::F722],
+            &[RuleCode::F722],
         )?;
         flakes(
             r#"
         a: 'A; B'
         "#,
-            &[DiagnosticCode::F722],
+            &[RuleCode::F722],
         )?;
         flakes(
             r#"
@@ -3254,7 +3227,7 @@ mod tests {
             r#"
         a: 'a: "A"'
         "#,
-            &[DiagnosticCode::F722],
+            &[RuleCode::F722],
         )?;
         Ok(())
     }
@@ -3265,7 +3238,7 @@ mod tests {
             r#"
         x: int = x
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -3325,7 +3298,7 @@ mod tests {
 
         bar: TypeAlias
         "#,
-            &[DiagnosticCode::F401],
+            &[RuleCode::F401],
         )?;
         Ok(())
     }
@@ -3359,7 +3332,7 @@ mod tests {
         def f():
             x: int
         "#,
-            &[DiagnosticCode::F842],
+            &[RuleCode::F842],
         )?;
         // This should only print one UnusedVariable message.
         flakes(
@@ -3368,7 +3341,7 @@ mod tests {
             x: int
             x = 3
         "#,
-            &[DiagnosticCode::F841],
+            &[RuleCode::F841],
         )?;
         Ok(())
     }
@@ -3380,7 +3353,7 @@ mod tests {
         name: str
         print(name)
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -3418,7 +3391,7 @@ mod tests {
             b: Undefined
         class B: pass
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
 
         flakes(
@@ -3476,7 +3449,7 @@ mod tests {
                 Y = 2
                 return Y
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -3643,7 +3616,7 @@ mod tests {
         def f(x: Annotated['integer', 1]) -> None:
             return None
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -3671,7 +3644,7 @@ mod tests {
         def f(x: Union[Annotated['int', '>0'], 'integer']) -> None:
             return None
         "#,
-            &[DiagnosticCode::F821],
+            &[RuleCode::F821],
         )?;
         Ok(())
     }
@@ -3851,13 +3824,13 @@ mod tests {
             List[TypeVar("A", List["C"])]
         "#,
             &[
-                DiagnosticCode::F821,
-                DiagnosticCode::F821,
-                DiagnosticCode::F821,
-                DiagnosticCode::F821,
-                DiagnosticCode::F821,
-                DiagnosticCode::F821,
-                DiagnosticCode::F821,
+                RuleCode::F821,
+                RuleCode::F821,
+                RuleCode::F821,
+                RuleCode::F821,
+                RuleCode::F821,
+                RuleCode::F821,
+                RuleCode::F821,
             ],
         )?;
         flakes(

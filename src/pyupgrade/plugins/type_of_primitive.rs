@@ -22,5 +22,5 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
             ));
         }
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

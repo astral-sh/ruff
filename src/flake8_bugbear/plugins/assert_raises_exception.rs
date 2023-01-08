@@ -34,7 +34,7 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
         return;
     }
 
-    checker.checks.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::NoAssertRaisesException,
         Range::from_located(stmt),
     ));

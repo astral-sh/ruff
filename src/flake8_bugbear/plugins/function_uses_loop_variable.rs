@@ -212,7 +212,7 @@ where
             if reassigned_in_loop.contains(name) {
                 if !checker.flake8_bugbear_seen.contains(&expr) {
                     checker.flake8_bugbear_seen.push(expr);
-                    checker.checks.push(Diagnostic::new(
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::FunctionUsesLoopVariable(name.to_string()),
                         range,
                     ));

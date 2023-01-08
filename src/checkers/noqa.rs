@@ -8,7 +8,7 @@ use rustpython_parser::ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::registry::{Diagnostic, DiagnosticCode, DiagnosticKind, UnusedCodes, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, DiagnosticKind, RuleCode, UnusedCodes, CODE_REDIRECTS};
 use crate::settings::{flags, Settings};
 use crate::{noqa, violations};
 
@@ -23,7 +23,7 @@ pub fn check_noqa(
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut ignored = vec![];
 
-    let enforce_noqa = settings.enabled.contains(&DiagnosticCode::RUF100);
+    let enforce_noqa = settings.enabled.contains(&RuleCode::RUF100);
 
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {
@@ -123,7 +123,7 @@ pub fn check_noqa(
                     let mut self_ignore = false;
                     for code in codes {
                         let code = CODE_REDIRECTS.get(code).map_or(code, AsRef::as_ref);
-                        if code == DiagnosticCode::RUF100.as_ref() {
+                        if code == RuleCode::RUF100.as_ref() {
                             self_ignore = true;
                             break;
                         }
@@ -131,8 +131,8 @@ pub fn check_noqa(
                         if matches.contains(&code) || settings.external.contains(code) {
                             valid_codes.push(code);
                         } else {
-                            if let Ok(check_code) = DiagnosticCode::from_str(code) {
-                                if settings.enabled.contains(&check_code) {
+                            if let Ok(rule_code) = RuleCode::from_str(code) {
+                                if settings.enabled.contains(&rule_code) {
                                     unmatched_codes.push(code);
                                 } else {
                                     disabled_codes.push(code);

@@ -10,7 +10,7 @@ mod tests {
 
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::test_path;
-    use crate::registry::DiagnosticCode;
+    use crate::registry::RuleCode;
     use crate::{flake8_quotes, Settings};
 
     #[test_case(Path::new("doubles.py"))]
@@ -20,7 +20,7 @@ mod tests {
     #[test_case(Path::new("doubles_wrapped.py"))]
     fn doubles(path: &Path) -> Result<()> {
         let snapshot = format!("doubles_{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -32,14 +32,14 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    DiagnosticCode::Q000,
-                    DiagnosticCode::Q001,
-                    DiagnosticCode::Q002,
-                    DiagnosticCode::Q003,
+                    RuleCode::Q000,
+                    RuleCode::Q001,
+                    RuleCode::Q002,
+                    RuleCode::Q003,
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -50,7 +50,7 @@ mod tests {
     #[test_case(Path::new("singles_wrapped.py"))]
     fn singles(path: &Path) -> Result<()> {
         let snapshot = format!("singles_{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -62,14 +62,14 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    DiagnosticCode::Q000,
-                    DiagnosticCode::Q001,
-                    DiagnosticCode::Q002,
-                    DiagnosticCode::Q003,
+                    RuleCode::Q000,
+                    RuleCode::Q001,
+                    RuleCode::Q002,
+                    RuleCode::Q003,
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -85,7 +85,7 @@ mod tests {
     #[test_case(Path::new("docstring_singles_function.py"))]
     fn double_docstring(path: &Path) -> Result<()> {
         let snapshot = format!("double_docstring_{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -97,14 +97,14 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    DiagnosticCode::Q000,
-                    DiagnosticCode::Q001,
-                    DiagnosticCode::Q002,
-                    DiagnosticCode::Q003,
+                    RuleCode::Q000,
+                    RuleCode::Q001,
+                    RuleCode::Q002,
+                    RuleCode::Q003,
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -120,7 +120,7 @@ mod tests {
     #[test_case(Path::new("docstring_singles_function.py"))]
     fn single_docstring(path: &Path) -> Result<()> {
         let snapshot = format!("single_docstring_{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_quotes")
                 .join(path)
                 .as_path(),
@@ -132,14 +132,14 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    DiagnosticCode::Q000,
-                    DiagnosticCode::Q001,
-                    DiagnosticCode::Q002,
-                    DiagnosticCode::Q003,
+                    RuleCode::Q000,
+                    RuleCode::Q001,
+                    RuleCode::Q002,
+                    RuleCode::Q003,
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

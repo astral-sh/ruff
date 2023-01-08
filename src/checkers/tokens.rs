@@ -3,7 +3,7 @@
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::{Diagnostic, DiagnosticCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::ruff::checks::Context;
 use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
@@ -17,17 +17,17 @@ pub fn check_tokens(
 ) -> Vec<Diagnostic> {
     let mut checks: Vec<Diagnostic> = vec![];
 
-    let enforce_ambiguous_unicode_character = settings.enabled.contains(&DiagnosticCode::RUF001)
-        || settings.enabled.contains(&DiagnosticCode::RUF002)
-        || settings.enabled.contains(&DiagnosticCode::RUF003);
-    let enforce_quotes = settings.enabled.contains(&DiagnosticCode::Q000)
-        || settings.enabled.contains(&DiagnosticCode::Q001)
-        || settings.enabled.contains(&DiagnosticCode::Q002)
-        || settings.enabled.contains(&DiagnosticCode::Q003);
-    let enforce_commented_out_code = settings.enabled.contains(&DiagnosticCode::ERA001);
-    let enforce_invalid_escape_sequence = settings.enabled.contains(&DiagnosticCode::W605);
-    let enforce_implicit_string_concatenation = settings.enabled.contains(&DiagnosticCode::ISC001)
-        || settings.enabled.contains(&DiagnosticCode::ISC002);
+    let enforce_ambiguous_unicode_character = settings.enabled.contains(&RuleCode::RUF001)
+        || settings.enabled.contains(&RuleCode::RUF002)
+        || settings.enabled.contains(&RuleCode::RUF003);
+    let enforce_quotes = settings.enabled.contains(&RuleCode::Q000)
+        || settings.enabled.contains(&RuleCode::Q001)
+        || settings.enabled.contains(&RuleCode::Q002)
+        || settings.enabled.contains(&RuleCode::Q003);
+    let enforce_commented_out_code = settings.enabled.contains(&RuleCode::ERA001);
+    let enforce_invalid_escape_sequence = settings.enabled.contains(&RuleCode::W605);
+    let enforce_implicit_string_concatenation = settings.enabled.contains(&RuleCode::ISC001)
+        || settings.enabled.contains(&RuleCode::ISC002);
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {
@@ -95,7 +95,7 @@ pub fn check_tokens(
                     start,
                     end,
                     matches!(autofix, flags::Autofix::Enabled)
-                        && settings.fixable.contains(&DiagnosticCode::W605),
+                        && settings.fixable.contains(&RuleCode::W605),
                 ));
             }
         }

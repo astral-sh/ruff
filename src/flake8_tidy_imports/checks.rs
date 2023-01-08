@@ -84,7 +84,7 @@ pub fn banned_attribute_access(
     for (banned_path, ban) in banned_apis {
         if let Some((module, member)) = banned_path.rsplit_once('.') {
             if match_call_path(call_path, module, member, &checker.from_imports) {
-                checker.checks.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     violations::BannedApi {
                         name: banned_path.to_string(),
                         message: ban.msg.to_string(),

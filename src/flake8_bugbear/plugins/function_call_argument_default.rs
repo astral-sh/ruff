@@ -118,6 +118,6 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         visitor.visit_expr(expr);
     }
     for (check, range) in visitor.checks {
-        checker.checks.push(Diagnostic::new(check, range));
+        checker.diagnostics.push(Diagnostic::new(check, range));
     }
 }

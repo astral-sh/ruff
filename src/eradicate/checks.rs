@@ -3,7 +3,7 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::eradicate::detection::comment_contains_code;
-use crate::registry::DiagnosticCode;
+use crate::registry::RuleCode;
 use crate::settings::flags;
 use crate::{violations, Diagnostic, Settings, SourceCodeLocator};
 
@@ -34,7 +34,7 @@ pub fn commented_out_code(
     if is_standalone_comment(&line) && comment_contains_code(&line, &settings.task_tags[..]) {
         let mut check = Diagnostic::new(violations::CommentedOutCode, Range::new(start, end));
         if matches!(autofix, flags::Autofix::Enabled)
-            && settings.fixable.contains(&DiagnosticCode::ERA001)
+            && settings.fixable.contains(&RuleCode::ERA001)
         {
             check.amend(Fix::deletion(location, end_location));
         }

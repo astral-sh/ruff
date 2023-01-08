@@ -56,7 +56,7 @@ pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, it
 
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
-            checker.checks.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::LoopVariableOverridesIterator(name.to_string()),
                 Range::from_located(expr),
             ));

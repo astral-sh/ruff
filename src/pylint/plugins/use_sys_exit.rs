@@ -88,6 +88,6 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
                 ));
             }
         }
-        checker.checks.push(check);
+        checker.diagnostics.push(check);
     }
 }

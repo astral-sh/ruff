@@ -10,7 +10,7 @@ use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 
@@ -163,12 +163,12 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
             } = &keyword.node.value.node
             {
                 if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                    checker.checks.push(create_check(
+                    checker.diagnostics.push(create_check(
                         expr,
                         &keyword.node.value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&DiagnosticCode::UP015),
+                        checker.patch(&RuleCode::UP015),
                     ));
                 }
             }
@@ -180,12 +180,12 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
         } = &mode_param.node
         {
             if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                checker.checks.push(create_check(
+                checker.diagnostics.push(create_check(
                     expr,
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&DiagnosticCode::UP015),
+                    checker.patch(&RuleCode::UP015),
                 ));
             }
         }

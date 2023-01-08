@@ -51,5 +51,5 @@ pub fn misplaced_comparison_constant(
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

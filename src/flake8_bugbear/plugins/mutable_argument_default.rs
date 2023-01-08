@@ -165,7 +165,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
                 !is_immutable_annotation(expr, &checker.from_imports, &checker.import_aliases)
             })
         {
-            checker.checks.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::MutableArgumentDefault,
                 Range::from_located(default),
             ));

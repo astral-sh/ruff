@@ -56,7 +56,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM202
@@ -100,7 +100,7 @@ pub fn negation_with_not_equal_op(
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM208
@@ -126,5 +126,5 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

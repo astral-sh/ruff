@@ -15,7 +15,7 @@ pub fn useless_contextlib_suppress(checker: &mut Checker, expr: &Expr, args: &[E
         &checker.from_imports,
     ) && args.is_empty()
     {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::UselessContextlibSuppress,
             Range::from_located(expr),
         ));

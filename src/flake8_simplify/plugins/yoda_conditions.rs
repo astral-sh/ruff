@@ -54,5 +54,5 @@ pub fn yoda_conditions(
         ));
     }
 
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

@@ -8,7 +8,7 @@ use crate::violations;
 fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
-            checker.checks.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::JumpStatementInFinally(match &stmt.node {
                     StmtKind::Break { .. } => "break".to_string(),
                     StmtKind::Continue { .. } => "continue".to_string(),

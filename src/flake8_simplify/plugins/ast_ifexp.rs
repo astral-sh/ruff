@@ -49,7 +49,7 @@ pub fn explicit_true_false_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM211
@@ -90,7 +90,7 @@ pub fn explicit_false_true_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM212
@@ -140,5 +140,5 @@ pub fn twisted_arms_in_ifexpr(
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

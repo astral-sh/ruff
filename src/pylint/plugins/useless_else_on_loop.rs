@@ -32,7 +32,7 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
 /// PLW0120
 pub fn useless_else_on_loop(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
     if !orelse.is_empty() && !loop_exits_early(body) {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::UselessElseOnLoop,
             helpers::else_range(stmt, checker.locator).unwrap(),
         ));

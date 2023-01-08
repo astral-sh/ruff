@@ -8,7 +8,7 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::flake8_return::helpers::result_exists;
 use crate::flake8_return::visitor::{ReturnVisitor, Stack};
-use crate::registry::{Branch, DiagnosticCode};
+use crate::registry::{Branch, RuleCode};
 use crate::{violations, Diagnostic};
 
 /// RET501
@@ -28,14 +28,14 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut check =
             Diagnostic::new(violations::UnnecessaryReturnNone, Range::from_located(stmt));
-        if checker.patch(&DiagnosticCode::RET501) {
+        if checker.patch(&RuleCode::RET501) {
             check.amend(Fix::replacement(
                 "return".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
         }
-        checker.checks.push(check);
+        checker.diagnostics.push(check);
     }
 }
 
@@ -46,14 +46,14 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
             continue;
         }
         let mut check = Diagnostic::new(violations::ImplicitReturnValue, Range::from_located(stmt));
-        if checker.patch(&DiagnosticCode::RET502) {
+        if checker.patch(&RuleCode::RET502) {
             check.amend(Fix::replacement(
                 "return None".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
         }
-        checker.checks.push(check);
+        checker.diagnostics.push(check);
     }
 }
 
@@ -62,7 +62,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
     match &last_stmt.node {
         StmtKind::If { body, orelse, .. } => {
             if body.is_empty() || orelse.is_empty() {
-                checker.checks.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     violations::ImplicitReturn,
                     Range::from_located(last_stmt),
                 ));
@@ -103,7 +103,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         _ => {
             let mut check =
                 Diagnostic::new(violations::ImplicitReturn, Range::from_located(last_stmt));
-            if checker.patch(&DiagnosticCode::RET503) {
+            if checker.patch(&RuleCode::RET503) {
                 let mut content = String::new();
                 content.push_str(&indentation(checker, last_stmt));
                 content.push_str("return None");
@@ -113,7 +113,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
                     Location::new(last_stmt.end_location.unwrap().row() + 1, 0),
                 ));
             }
-            checker.checks.push(check);
+            checker.diagnostics.push(check);
         }
     }
 }
@@ -192,7 +192,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         }
 
         if !stack.refs.contains_key(id.as_str()) {
-            checker.checks.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::UnnecessaryAssign,
                 Range::from_located(expr),
             ));
@@ -209,7 +209,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::UnnecessaryAssign,
             Range::from_located(expr),
         ));
@@ -223,8 +223,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
     };
     for child in body {
         if matches!(child.node, StmtKind::Return { .. }) {
-            if checker.settings.enabled.contains(&DiagnosticCode::RET505) {
-                checker.checks.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::RET505) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseReturn(branch),
                     Range::from_located(stmt),
                 ));
@@ -232,8 +232,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Break) {
-            if checker.settings.enabled.contains(&DiagnosticCode::RET508) {
-                checker.checks.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::RET508) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseBreak(branch),
                     Range::from_located(stmt),
                 ));
@@ -241,8 +241,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Raise { .. }) {
-            if checker.settings.enabled.contains(&DiagnosticCode::RET506) {
-                checker.checks.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::RET506) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseRaise(branch),
                     Range::from_located(stmt),
                 ));
@@ -250,8 +250,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Continue) {
-            if checker.settings.enabled.contains(&DiagnosticCode::RET507) {
-                checker.checks.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::RET507) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseContinue(branch),
                     Range::from_located(stmt),
                 ));
@@ -312,10 +312,10 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
         visitor.stack
     };
 
-    if checker.settings.enabled.contains(&DiagnosticCode::RET505)
-        || checker.settings.enabled.contains(&DiagnosticCode::RET506)
-        || checker.settings.enabled.contains(&DiagnosticCode::RET507)
-        || checker.settings.enabled.contains(&DiagnosticCode::RET508)
+    if checker.settings.enabled.contains(&RuleCode::RET505)
+        || checker.settings.enabled.contains(&RuleCode::RET506)
+        || checker.settings.enabled.contains(&RuleCode::RET507)
+        || checker.settings.enabled.contains(&RuleCode::RET508)
     {
         if superfluous_elif(checker, &stack) {
             return;
@@ -331,20 +331,20 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
     }
 
     if !result_exists(&stack.returns) {
-        if checker.settings.enabled.contains(&DiagnosticCode::RET501) {
+        if checker.settings.enabled.contains(&RuleCode::RET501) {
             unnecessary_return_none(checker, &stack);
         }
         return;
     }
 
-    if checker.settings.enabled.contains(&DiagnosticCode::RET502) {
+    if checker.settings.enabled.contains(&RuleCode::RET502) {
         implicit_return_value(checker, &stack);
     }
-    if checker.settings.enabled.contains(&DiagnosticCode::RET503) {
+    if checker.settings.enabled.contains(&RuleCode::RET503) {
         implicit_return(checker, last_stmt);
     }
 
-    if checker.settings.enabled.contains(&DiagnosticCode::RET504) {
+    if checker.settings.enabled.contains(&RuleCode::RET504) {
         for (_, expr) in &stack.returns {
             if let Some(expr) = expr {
                 unnecessary_assign(checker, &stack, expr);

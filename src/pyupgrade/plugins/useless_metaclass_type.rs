@@ -35,5 +35,5 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
             Err(e) => error!("Failed to fix remove metaclass type: {e}"),
         }
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

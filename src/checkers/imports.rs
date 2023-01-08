@@ -21,17 +21,17 @@ fn check_import_blocks(
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Vec<Diagnostic> {
-    let mut checks = vec![];
+    let mut diagnostics = vec![];
     for block in tracker.into_iter() {
         if !block.imports.is_empty() {
-            if let Some(check) =
+            if let Some(diagnostic) =
                 isort::plugins::check_imports(&block, locator, settings, stylist, autofix, package)
             {
-                checks.push(check);
+                diagnostics.push(diagnostic);
             }
         }
     }
-    checks
+    diagnostics
 }
 
 #[allow(clippy::too_many_arguments)]

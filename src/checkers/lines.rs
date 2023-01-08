@@ -3,7 +3,7 @@
 use crate::pycodestyle::checks::{line_too_long, no_newline_at_end_of_file};
 use crate::pygrep_hooks::plugins::{blanket_noqa, blanket_type_ignore};
 use crate::pyupgrade::checks::unnecessary_coding_comment;
-use crate::registry::{Diagnostic, DiagnosticCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::{flags, Settings};
 
 pub fn check_lines(
@@ -14,11 +14,11 @@ pub fn check_lines(
 ) -> Vec<Diagnostic> {
     let mut checks: Vec<Diagnostic> = vec![];
 
-    let enforce_unnecessary_coding_comment = settings.enabled.contains(&DiagnosticCode::UP009);
-    let enforce_line_too_long = settings.enabled.contains(&DiagnosticCode::E501);
-    let enforce_no_newline_at_end_of_file = settings.enabled.contains(&DiagnosticCode::W292);
-    let enforce_blanket_type_ignore = settings.enabled.contains(&DiagnosticCode::PGH003);
-    let enforce_blanket_noqa = settings.enabled.contains(&DiagnosticCode::PGH004);
+    let enforce_unnecessary_coding_comment = settings.enabled.contains(&RuleCode::UP009);
+    let enforce_line_too_long = settings.enabled.contains(&RuleCode::E501);
+    let enforce_no_newline_at_end_of_file = settings.enabled.contains(&RuleCode::W292);
+    let enforce_blanket_type_ignore = settings.enabled.contains(&RuleCode::PGH003);
+    let enforce_blanket_noqa = settings.enabled.contains(&RuleCode::PGH004);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     for (index, line) in contents.lines().enumerate() {
@@ -32,7 +32,7 @@ pub fn check_lines(
                         index,
                         line,
                         matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(&DiagnosticCode::UP009),
+                            && settings.fixable.contains(&RuleCode::UP009),
                     ) {
                         checks.push(check);
                     }
@@ -67,7 +67,7 @@ pub fn check_lines(
         if let Some(check) = no_newline_at_end_of_file(
             contents,
             matches!(autofix, flags::Autofix::Enabled)
-                && settings.fixable.contains(&DiagnosticCode::W292),
+                && settings.fixable.contains(&RuleCode::W292),
         ) {
             checks.push(check);
         }
@@ -80,7 +80,7 @@ pub fn check_lines(
 mod tests {
 
     use super::check_lines;
-    use crate::registry::DiagnosticCode;
+    use crate::registry::RuleCode;
     use crate::settings::{flags, Settings};
 
     #[test]
@@ -92,7 +92,7 @@ mod tests {
                 &[],
                 &Settings {
                     line_length,
-                    ..Settings::for_rule(DiagnosticCode::E501)
+                    ..Settings::for_rule(RuleCode::E501)
                 },
                 flags::Autofix::Enabled,
             )

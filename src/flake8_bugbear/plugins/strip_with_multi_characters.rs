@@ -26,7 +26,7 @@ pub fn strip_with_multi_characters(checker: &mut Checker, expr: &Expr, func: &Ex
     };
 
     if value.len() > 1 && value.chars().unique().count() != value.len() {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::StripWithMultiCharacters,
             Range::from_located(expr),
         ));

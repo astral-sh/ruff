@@ -10,44 +10,44 @@ mod tests {
 
     use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
     use crate::linter::test_path;
-    use crate::registry::DiagnosticCode;
+    use crate::registry::RuleCode;
     use crate::{flake8_tidy_imports, Settings};
 
     #[test]
     fn ban_parent_imports() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_tidy_imports/TID252.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::Parents,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![DiagnosticCode::TID252])
+                ..Settings::for_rules(vec![RuleCode::TID252])
             },
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn ban_all_imports() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_tidy_imports/TID252.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
                     ban_relative_imports: Strictness::All,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![DiagnosticCode::TID252])
+                ..Settings::for_rules(vec![RuleCode::TID252])
             },
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn banned_api_true_positives() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_tidy_imports/TID251.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
@@ -67,16 +67,16 @@ mod tests {
                     ]),
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![DiagnosticCode::TID251])
+                ..Settings::for_rules(vec![RuleCode::TID251])
             },
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn banned_api_false_positives() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_tidy_imports/TID251_false_positives.py"),
             &Settings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
@@ -88,10 +88,10 @@ mod tests {
                     )]),
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![DiagnosticCode::TID251])
+                ..Settings::for_rules(vec![RuleCode::TID251])
             },
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

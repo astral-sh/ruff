@@ -11,90 +11,90 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::DiagnosticCode;
+    use crate::registry::RuleCode;
     use crate::settings;
-    #[test_case(DiagnosticCode::RUF004, Path::new("RUF004.py"); "RUF004")]
-    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let checks = test_path(
+    #[test_case(RuleCode::RUF004, Path::new("RUF004.py"); "RUF004")]
+    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff")
                 .join(path)
                 .as_path(),
-            &settings::Settings::for_rule(check_code),
+            &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test]
     fn confusables() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff/confusables.py"),
             &settings::Settings {
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::Settings::for_rules(vec![
-                    DiagnosticCode::RUF001,
-                    DiagnosticCode::RUF002,
-                    DiagnosticCode::RUF003,
+                    RuleCode::RUF001,
+                    RuleCode::RUF002,
+                    RuleCode::RUF003,
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn ruf100_0() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff/RUF100_0.py"),
             &settings::Settings::for_rules(vec![
-                DiagnosticCode::RUF100,
-                DiagnosticCode::E501,
-                DiagnosticCode::F401,
-                DiagnosticCode::F841,
+                RuleCode::RUF100,
+                RuleCode::E501,
+                RuleCode::F401,
+                RuleCode::F841,
             ]),
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn ruf100_1() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff/RUF100_1.py"),
-            &settings::Settings::for_rules(vec![DiagnosticCode::RUF100, DiagnosticCode::F401]),
+            &settings::Settings::for_rules(vec![RuleCode::RUF100, RuleCode::F401]),
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn flake8_noqa() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff/flake8_noqa.py"),
-            &settings::Settings::for_rules(vec![DiagnosticCode::F401, DiagnosticCode::F841]),
+            &settings::Settings::for_rules(vec![RuleCode::F401, RuleCode::F841]),
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn ruff_noqa() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff/ruff_noqa.py"),
-            &settings::Settings::for_rules(vec![DiagnosticCode::F401, DiagnosticCode::F841]),
+            &settings::Settings::for_rules(vec![RuleCode::F401, RuleCode::F841]),
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn redirects() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff/redirects.py"),
-            &settings::Settings::for_rules(vec![DiagnosticCode::UP007]),
+            &settings::Settings::for_rules(vec![RuleCode::UP007]),
         )?;
-        insta::assert_yaml_snapshot!(checks);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

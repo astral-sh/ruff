@@ -16,7 +16,7 @@ pub fn no_eval(checker: &mut Checker, func: &Expr) {
     if !checker.is_builtin("eval") {
         return;
     }
-    checker.checks.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::NoEval,
         Range::from_located(func),
     ));

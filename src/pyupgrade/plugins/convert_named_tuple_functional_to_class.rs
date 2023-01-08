@@ -177,5 +177,5 @@ pub fn convert_named_tuple_functional_to_class(
             Err(err) => debug!("Skipping ineligible `NamedTuple` \"{typename}\": {err}"),
         };
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

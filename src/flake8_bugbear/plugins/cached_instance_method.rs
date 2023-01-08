@@ -34,7 +34,7 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
                 _ => decorator,
             },
         ) {
-            checker.checks.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::CachedInstanceMethod,
                 Range::from_located(decorator),
             ));

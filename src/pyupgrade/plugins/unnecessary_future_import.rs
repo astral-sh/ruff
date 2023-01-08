@@ -92,5 +92,5 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             Err(e) => error!("Failed to remove `__future__` import: {e}"),
         }
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

@@ -50,7 +50,7 @@ fn is_boolean_arg(arg: &Expr) -> bool {
 fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     if is_boolean_arg(arg) {
         checker
-            .checks
+            .diagnostics
             .push(Diagnostic::new(kind, Range::from_located(arg)));
     }
 }
@@ -76,7 +76,7 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Argume
         if !hint {
             continue;
         }
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::BooleanPositionalArgInFunctionDefinition,
             Range::from_located(arg),
         ));

@@ -14,13 +14,13 @@ pub fn fail_call(checker: &mut Checker, call: &Expr, args: &[Expr], keywords: &[
 
         if let Some(msg) = msg {
             if is_empty_or_null_string(msg) {
-                checker.checks.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     violations::FailWithoutMessage,
                     Range::from_located(call),
                 ));
             }
         } else {
-            checker.checks.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::FailWithoutMessage,
                 Range::from_located(call),
             ));

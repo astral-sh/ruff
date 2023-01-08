@@ -6,7 +6,7 @@ use crate::ast::helpers::{create_expr, create_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
@@ -110,7 +110,7 @@ fn return_stmt(
 pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stmt) {
     if let Some(loop_info) = return_values(stmt, sibling) {
         if loop_info.return_value && !loop_info.next_return_value {
-            if checker.settings.enabled.contains(&DiagnosticCode::SIM110) {
+            if checker.settings.enabled.contains(&RuleCode::SIM110) {
                 let content = return_stmt(
                     "any",
                     loop_info.test,
@@ -122,19 +122,19 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     violations::ConvertLoopToAny(content.clone()),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&DiagnosticCode::SIM110) {
+                if checker.patch(&RuleCode::SIM110) {
                     check.amend(Fix::replacement(
                         content,
                         stmt.location,
                         sibling.end_location.unwrap(),
                     ));
                 }
-                checker.checks.push(check);
+                checker.diagnostics.push(check);
             }
         }
 
         if !loop_info.return_value && loop_info.next_return_value {
-            if checker.settings.enabled.contains(&DiagnosticCode::SIM111) {
+            if checker.settings.enabled.contains(&RuleCode::SIM111) {
                 // Invert the condition.
                 let test = {
                     if let ExprKind::UnaryOp {
@@ -161,14 +161,14 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     violations::ConvertLoopToAll(content.clone()),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&DiagnosticCode::SIM111) {
+                if checker.patch(&RuleCode::SIM111) {
                     check.amend(Fix::replacement(
                         content,
                         stmt.location,
                         sibling.end_location.unwrap(),
                     ));
                 }
-                checker.checks.push(check);
+                checker.diagnostics.push(check);
             }
         }
     }

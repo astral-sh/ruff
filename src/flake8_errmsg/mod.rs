@@ -8,39 +8,35 @@ mod tests {
     use anyhow::Result;
 
     use crate::linter::test_path;
-    use crate::registry::DiagnosticCode;
+    use crate::registry::RuleCode;
     use crate::{flake8_errmsg, settings};
 
     #[test]
     fn defaults() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_errmsg/EM.py"),
-            &settings::Settings::for_rules(vec![
-                DiagnosticCode::EM101,
-                DiagnosticCode::EM102,
-                DiagnosticCode::EM103,
-            ]),
+            &settings::Settings::for_rules(vec![RuleCode::EM101, RuleCode::EM102, RuleCode::EM103]),
         )?;
-        insta::assert_yaml_snapshot!("defaults", checks);
+        insta::assert_yaml_snapshot!("defaults", diagnostics);
         Ok(())
     }
 
     #[test]
     fn custom() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_errmsg/EM.py"),
             &settings::Settings {
                 flake8_errmsg: flake8_errmsg::settings::Settings {
                     max_string_length: 20,
                 },
                 ..settings::Settings::for_rules(vec![
-                    DiagnosticCode::EM101,
-                    DiagnosticCode::EM102,
-                    DiagnosticCode::EM103,
+                    RuleCode::EM101,
+                    RuleCode::EM102,
+                    RuleCode::EM103,
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!("custom", checks);
+        insta::assert_yaml_snapshot!("custom", diagnostics);
         Ok(())
     }
 }

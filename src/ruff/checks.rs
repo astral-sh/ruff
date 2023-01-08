@@ -1612,7 +1612,7 @@ pub fn ambiguous_unicode_character(
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
-    let mut checks = vec![];
+    let mut diagnostics = vec![];
 
     let text = locator.slice_source_code_range(&Range::new(start, end));
 
@@ -1630,7 +1630,7 @@ pub fn ambiguous_unicode_character(
                     };
                     let location = Location::new(start.row() + row_offset, col);
                     let end_location = Location::new(location.row(), location.column() + 1);
-                    let mut check = Diagnostic::new::<DiagnosticKind>(
+                    let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
                         match context {
                             Context::String => violations::AmbiguousUnicodeCharacterString(
                                 current_char,
@@ -1650,17 +1650,17 @@ pub fn ambiguous_unicode_character(
                         },
                         Range::new(location, end_location),
                     );
-                    if settings.enabled.contains(check.kind.code()) {
+                    if settings.enabled.contains(diagnostic.kind.code()) {
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(check.kind.code())
+                            && settings.fixable.contains(diagnostic.kind.code())
                         {
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 representant.to_string(),
                                 location,
                                 end_location,
                             ));
                         }
-                        checks.push(check);
+                        diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -1675,7 +1675,7 @@ pub fn ambiguous_unicode_character(
         }
     }
 
-    checks
+    diagnostics
 }
 
 /// RUF004
@@ -1683,7 +1683,7 @@ pub fn keyword_argument_before_star_argument(
     args: &[Expr],
     keywords: &[Keyword],
 ) -> Vec<Diagnostic> {
-    let mut checks = vec![];
+    let mut diagnostics = vec![];
     if let Some(arg) = args
         .iter()
         .rfind(|arg| matches!(arg.node, ExprKind::Starred { .. }))
@@ -1692,7 +1692,7 @@ pub fn keyword_argument_before_star_argument(
             if keyword.location < arg.location {
                 let KeywordData { arg, .. } = &keyword.node;
                 if let Some(arg) = arg {
-                    checks.push(Diagnostic::new(
+                    diagnostics.push(Diagnostic::new(
                         violations::KeywordArgumentBeforeStarArgument(arg.to_string()),
                         Range::from_located(keyword),
                     ));
@@ -1700,5 +1700,5 @@ pub fn keyword_argument_before_star_argument(
             }
         }
     }
-    checks
+    diagnostics
 }

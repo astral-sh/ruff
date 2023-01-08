@@ -22,7 +22,7 @@ pub fn call_datetime_without_tzinfo(
 
     // No positional arg: keyword is missing or constant None.
     if args.len() < 8 && !has_non_none_keyword(keywords, "tzinfo") {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeWithoutTzinfo,
             location,
         ));
@@ -31,7 +31,7 @@ pub fn call_datetime_without_tzinfo(
 
     // Positional arg: is constant None.
     if args.len() >= 8 && is_const_none(&args[7]) {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeWithoutTzinfo,
             location,
         ));
@@ -48,7 +48,7 @@ pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) 
         &checker.from_imports,
     ) {
         checker
-            .checks
+            .diagnostics
             .push(Diagnostic::new(violations::CallDatetimeToday, location));
     }
 }
@@ -63,7 +63,7 @@ pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range)
         &checker.from_imports,
     ) {
         checker
-            .checks
+            .diagnostics
             .push(Diagnostic::new(violations::CallDatetimeUtcnow, location));
     }
 }
@@ -77,7 +77,7 @@ pub fn call_datetime_utcfromtimestamp(checker: &mut Checker, func: &Expr, locati
         "utcfromtimestamp",
         &checker.from_imports,
     ) {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeUtcfromtimestamp,
             location,
         ));
@@ -104,7 +104,7 @@ pub fn call_datetime_now_without_tzinfo(
 
     // no args / no args unqualified
     if args.is_empty() && keywords.is_empty() {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
@@ -113,7 +113,7 @@ pub fn call_datetime_now_without_tzinfo(
 
     // none args
     if !args.is_empty() && is_const_none(&args[0]) {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
@@ -122,7 +122,7 @@ pub fn call_datetime_now_without_tzinfo(
 
     // wrong keywords / none keyword
     if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
@@ -149,7 +149,7 @@ pub fn call_datetime_fromtimestamp(
 
     // no args / no args unqualified
     if args.len() < 2 && keywords.is_empty() {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeFromtimestamp,
             location,
         ));
@@ -158,7 +158,7 @@ pub fn call_datetime_fromtimestamp(
 
     // none args
     if args.len() > 1 && is_const_none(&args[1]) {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeFromtimestamp,
             location,
         ));
@@ -167,7 +167,7 @@ pub fn call_datetime_fromtimestamp(
 
     // wrong keywords / none keyword
     if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeFromtimestamp,
             location,
         ));
@@ -203,7 +203,7 @@ pub fn call_datetime_strptime_without_zone(
     };
 
     let (Some(grandparent), Some(parent)) = (checker.current_expr_grandparent(), checker.current_expr_parent()) else {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeStrptimeWithoutZone,
             location,
         ));
@@ -226,7 +226,7 @@ pub fn call_datetime_strptime_without_zone(
         }
     }
 
-    checker.checks.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::CallDatetimeStrptimeWithoutZone,
         location,
     ));
@@ -237,7 +237,7 @@ pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
     let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
     if match_call_path(&call_path, "datetime.date", "today", &checker.from_imports) {
         checker
-            .checks
+            .diagnostics
             .push(Diagnostic::new(violations::CallDateToday, location));
     }
 }
@@ -252,7 +252,7 @@ pub fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: Ran
         &checker.from_imports,
     ) {
         checker
-            .checks
+            .diagnostics
             .push(Diagnostic::new(violations::CallDateFromtimestamp, location));
     }
 }

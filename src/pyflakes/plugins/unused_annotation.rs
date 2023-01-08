@@ -15,7 +15,7 @@ pub fn unused_annotation(checker: &mut Checker, scope: usize) {
             && matches!(binding.kind, BindingKind::Annotation)
             && !checker.settings.dummy_variable_rgx.is_match(name)
         {
-            checker.checks.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::UnusedAnnotation((*name).to_string()),
                 binding.range,
             ));

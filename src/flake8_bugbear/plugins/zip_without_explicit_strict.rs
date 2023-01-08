@@ -23,7 +23,7 @@ pub fn zip_without_explicit_strict(
                     .map_or(false, |name| name == "strict")
             })
         {
-            checker.checks.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::ZipWithoutExplicitStrict,
                 Range::from_located(expr),
             ));

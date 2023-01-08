@@ -219,5 +219,5 @@ pub fn convert_typed_dict_functional_to_class(
             Err(err) => debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}"),
         };
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

@@ -209,7 +209,7 @@ pub fn invalid_escape_sequence(
     end: Location,
     autofix: bool,
 ) -> Vec<Diagnostic> {
-    let mut checks = vec![];
+    let mut diagnostics = vec![];
 
     let text = locator.slice_source_code_range(&Range::new(start, end));
 
@@ -252,17 +252,17 @@ pub fn invalid_escape_sequence(
                 };
                 let location = Location::new(start.row() + row_offset, col);
                 let end_location = Location::new(location.row(), location.column() + 2);
-                let mut check = Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::InvalidEscapeSequence(next_char),
                     Range::new(location, end_location),
                 );
                 if autofix {
-                    check.amend(Fix::insertion(r"\".to_string(), location));
+                    diagnostic.amend(Fix::insertion(r"\".to_string(), location));
                 }
-                checks.push(check);
+                diagnostics.push(diagnostic);
             }
         }
     }
 
-    checks
+    diagnostics
 }

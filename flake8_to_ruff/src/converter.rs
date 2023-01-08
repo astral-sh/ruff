@@ -7,7 +7,7 @@ use ruff::flake8_pytest_style::types::{
 use ruff::flake8_quotes::settings::Quote;
 use ruff::flake8_tidy_imports::settings::Strictness;
 use ruff::pydocstyle::settings::Convention;
-use ruff::registry::DiagnosticCodePrefix;
+use ruff::registry::RuleCodePrefix;
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{
@@ -30,7 +30,7 @@ pub fn convert(
         .expect("Unable to find flake8 section in INI file");
 
     // Extract all referenced check code prefixes, to power plugin inference.
-    let mut referenced_codes: BTreeSet<DiagnosticCodePrefix> = BTreeSet::default();
+    let mut referenced_codes: BTreeSet<RuleCodePrefix> = BTreeSet::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
             match key.as_str() {
@@ -345,7 +345,7 @@ mod tests {
 
     use anyhow::Result;
     use ruff::pydocstyle::settings::Convention;
-    use ruff::registry::DiagnosticCodePrefix;
+    use ruff::registry::RuleCodePrefix;
     use ruff::settings::options::Options;
     use ruff::settings::pyproject::Pyproject;
     use ruff::{flake8_quotes, pydocstyle};
@@ -382,9 +382,9 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                DiagnosticCodePrefix::E,
-                DiagnosticCodePrefix::F,
-                DiagnosticCodePrefix::W,
+                RuleCodePrefix::E,
+                RuleCodePrefix::F,
+                RuleCodePrefix::W,
             ]),
             show_source: None,
             src: None,
@@ -445,9 +445,9 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                DiagnosticCodePrefix::E,
-                DiagnosticCodePrefix::F,
-                DiagnosticCodePrefix::W,
+                RuleCodePrefix::E,
+                RuleCodePrefix::F,
+                RuleCodePrefix::W,
             ]),
             show_source: None,
             src: None,
@@ -508,9 +508,9 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                DiagnosticCodePrefix::E,
-                DiagnosticCodePrefix::F,
-                DiagnosticCodePrefix::W,
+                RuleCodePrefix::E,
+                RuleCodePrefix::F,
+                RuleCodePrefix::W,
             ]),
             show_source: None,
             src: None,
@@ -571,9 +571,9 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                DiagnosticCodePrefix::E,
-                DiagnosticCodePrefix::F,
-                DiagnosticCodePrefix::W,
+                RuleCodePrefix::E,
+                RuleCodePrefix::F,
+                RuleCodePrefix::W,
             ]),
             show_source: None,
             src: None,
@@ -634,9 +634,9 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                DiagnosticCodePrefix::E,
-                DiagnosticCodePrefix::F,
-                DiagnosticCodePrefix::W,
+                RuleCodePrefix::E,
+                RuleCodePrefix::F,
+                RuleCodePrefix::W,
             ]),
             show_source: None,
             src: None,
@@ -705,10 +705,10 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                DiagnosticCodePrefix::D,
-                DiagnosticCodePrefix::E,
-                DiagnosticCodePrefix::F,
-                DiagnosticCodePrefix::W,
+                RuleCodePrefix::D,
+                RuleCodePrefix::E,
+                RuleCodePrefix::F,
+                RuleCodePrefix::W,
             ]),
             show_source: None,
             src: None,
@@ -771,10 +771,10 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                DiagnosticCodePrefix::E,
-                DiagnosticCodePrefix::F,
-                DiagnosticCodePrefix::Q,
-                DiagnosticCodePrefix::W,
+                RuleCodePrefix::E,
+                RuleCodePrefix::F,
+                RuleCodePrefix::Q,
+                RuleCodePrefix::W,
             ]),
             show_source: None,
             src: None,

@@ -4,7 +4,7 @@ use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::registry::DiagnosticCodePrefix;
+use crate::registry::RuleCodePrefix;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -18,55 +18,55 @@ pub enum Convention {
 }
 
 impl Convention {
-    pub fn codes(&self) -> &'static [DiagnosticCodePrefix] {
+    pub fn codes(&self) -> &'static [RuleCodePrefix] {
         match self {
             Convention::Google => &[
                 // All errors except D203, D204, D213, D215, D400, D401, D404, D406, D407, D408,
                 // D409 and D413.
-                DiagnosticCodePrefix::D203,
-                DiagnosticCodePrefix::D204,
-                DiagnosticCodePrefix::D213,
-                DiagnosticCodePrefix::D215,
-                DiagnosticCodePrefix::D400,
-                DiagnosticCodePrefix::D404,
-                DiagnosticCodePrefix::D406,
-                DiagnosticCodePrefix::D407,
-                DiagnosticCodePrefix::D408,
-                DiagnosticCodePrefix::D409,
-                DiagnosticCodePrefix::D413,
+                RuleCodePrefix::D203,
+                RuleCodePrefix::D204,
+                RuleCodePrefix::D213,
+                RuleCodePrefix::D215,
+                RuleCodePrefix::D400,
+                RuleCodePrefix::D404,
+                RuleCodePrefix::D406,
+                RuleCodePrefix::D407,
+                RuleCodePrefix::D408,
+                RuleCodePrefix::D409,
+                RuleCodePrefix::D413,
             ],
             Convention::Numpy => &[
                 // All errors except D107, D203, D212, D213, D402, D413, D415, D416, and D417.
-                DiagnosticCodePrefix::D107,
-                DiagnosticCodePrefix::D203,
-                DiagnosticCodePrefix::D212,
-                DiagnosticCodePrefix::D213,
-                DiagnosticCodePrefix::D402,
-                DiagnosticCodePrefix::D413,
-                DiagnosticCodePrefix::D415,
-                DiagnosticCodePrefix::D416,
-                DiagnosticCodePrefix::D417,
+                RuleCodePrefix::D107,
+                RuleCodePrefix::D203,
+                RuleCodePrefix::D212,
+                RuleCodePrefix::D213,
+                RuleCodePrefix::D402,
+                RuleCodePrefix::D413,
+                RuleCodePrefix::D415,
+                RuleCodePrefix::D416,
+                RuleCodePrefix::D417,
             ],
             Convention::Pep257 => &[
                 // All errors except D203, D212, D213, D214, D215, D404, D405, D406, D407, D408,
                 // D409, D410, D411, D413, D415, D416 and D417.
-                DiagnosticCodePrefix::D203,
-                DiagnosticCodePrefix::D212,
-                DiagnosticCodePrefix::D213,
-                DiagnosticCodePrefix::D214,
-                DiagnosticCodePrefix::D215,
-                DiagnosticCodePrefix::D404,
-                DiagnosticCodePrefix::D405,
-                DiagnosticCodePrefix::D406,
-                DiagnosticCodePrefix::D407,
-                DiagnosticCodePrefix::D408,
-                DiagnosticCodePrefix::D409,
-                DiagnosticCodePrefix::D410,
-                DiagnosticCodePrefix::D411,
-                DiagnosticCodePrefix::D413,
-                DiagnosticCodePrefix::D415,
-                DiagnosticCodePrefix::D416,
-                DiagnosticCodePrefix::D417,
+                RuleCodePrefix::D203,
+                RuleCodePrefix::D212,
+                RuleCodePrefix::D213,
+                RuleCodePrefix::D214,
+                RuleCodePrefix::D215,
+                RuleCodePrefix::D404,
+                RuleCodePrefix::D405,
+                RuleCodePrefix::D406,
+                RuleCodePrefix::D407,
+                RuleCodePrefix::D408,
+                RuleCodePrefix::D409,
+                RuleCodePrefix::D410,
+                RuleCodePrefix::D411,
+                RuleCodePrefix::D413,
+                RuleCodePrefix::D415,
+                RuleCodePrefix::D416,
+                RuleCodePrefix::D417,
             ],
         }
     }

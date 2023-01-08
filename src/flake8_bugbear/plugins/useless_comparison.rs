@@ -7,7 +7,7 @@ use crate::violations;
 
 pub fn useless_comparison(checker: &mut Checker, expr: &Expr) {
     if matches!(expr.node, ExprKind::Compare { .. }) {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::UselessComparison,
             Range::from_located(expr),
         ));

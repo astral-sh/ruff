@@ -14,7 +14,7 @@ pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
     if matches!(body[0].node, StmtKind::With { .. }) {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::MultipleWithStatements,
             Range::from_located(stmt),
         ));

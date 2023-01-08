@@ -26,7 +26,7 @@ pub fn property_with_parameters(
             .count()
             > 1
     {
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::PropertyWithParameters,
             Range::from_located(stmt),
         ));

@@ -38,5 +38,5 @@ pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
             expr.end_location.unwrap(),
         ));
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

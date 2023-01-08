@@ -107,5 +107,5 @@ pub fn unnecessary_builtin_import(
             Err(e) => error!("Failed to remove builtin import: {e}"),
         }
     }
-    checker.checks.push(check);
+    checker.diagnostics.push(check);
 }

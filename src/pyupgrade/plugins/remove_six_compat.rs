@@ -4,7 +4,7 @@ use crate::ast::helpers::{collect_call_paths, create_expr, create_stmt, dealias_
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::{violations, SourceCodeLocator};
@@ -201,7 +201,7 @@ fn handle_reraise(
     stylist: &SourceCodeStyleDetector,
 ) -> Option<Diagnostic> {
     if let [_, exc, tb] = args {
-        let check = replace_by_raise_from(
+        Some(replace_by_raise_from(
             Some(ExprKind::Call {
                 func: Box::new(create_expr(ExprKind::Attribute {
                     value: Box::new(create_expr(exc.node.clone())),
@@ -215,16 +215,14 @@ fn handle_reraise(
             expr,
             patch,
             stylist,
-        );
-        Some(check)
+        ))
     } else if let [arg] = args {
         if let ExprKind::Starred { value, .. } = &arg.node {
             if let ExprKind::Call { func, .. } = &value.node {
                 if let ExprKind::Attribute { value, attr, .. } = &func.node {
                     if let ExprKind::Name { id, .. } = &value.node {
                         if id == "sys" && attr == "exc_info" {
-                            let check = replace_by_raise_from(None, None, expr, patch, stylist);
-                            return Some(check);
+                            return Some(replace_by_raise_from(None, None, expr, patch, stylist));
                         };
                     };
                 };
@@ -250,7 +248,7 @@ fn handle_func(
         ExprKind::Name { id, .. } => id,
         _ => return None,
     };
-    let check = match (func_name.as_str(), args, keywords) {
+    match (func_name.as_str(), args, keywords) {
         ("b", [arg], []) => replace_by_str_literal(arg, true, expr, patch, locator),
         ("ensure_binary", [arg], []) => replace_by_str_literal(arg, true, expr, patch, locator),
         ("u", [arg], []) => replace_by_str_literal(arg, false, expr, patch, locator),
@@ -361,8 +359,7 @@ fn handle_func(
             stylist,
         )),
         _ => None,
-    };
-    check
+    }
 }
 
 fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Option<Diagnostic> {
@@ -414,16 +411,14 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
 
 /// UP016
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
-    if let Some(check) =
-        handle_next_on_six_dict(expr, checker.patch(&DiagnosticCode::UP016), checker)
-    {
-        checker.checks.push(check);
+    if let Some(check) = handle_next_on_six_dict(expr, checker.patch(&RuleCode::UP016), checker) {
+        checker.diagnostics.push(check);
         return;
     }
 
     let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
     if is_module_member(&call_path, "six") {
-        let patch = checker.patch(&DiagnosticCode::UP016);
+        let patch = checker.patch(&RuleCode::UP016);
         let check = match &expr.node {
             ExprKind::Call {
                 func,
@@ -443,7 +438,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
             _ => return,
         };
         if let Some(check) = check {
-            checker.checks.push(check);
+            checker.diagnostics.push(check);
         }
     }
 }

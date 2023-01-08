@@ -5,7 +5,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticCode, LiteralType};
+use crate::registry::{Diagnostic, LiteralType, RuleCode};
 use crate::violations;
 
 /// UP018
@@ -29,7 +29,7 @@ pub fn native_literals(
             } else {
                 LiteralType::Bytes
             }), Range::from_located(expr));
-            if checker.patch(&DiagnosticCode::UP018) {
+            if checker.patch(&RuleCode::UP018) {
                 check.amend(Fix::replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
@@ -47,7 +47,7 @@ pub fn native_literals(
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.checks.push(check);
+            checker.diagnostics.push(check);
             return;
         };
 
@@ -100,13 +100,13 @@ pub fn native_literals(
             }),
             Range::from_located(expr),
         );
-        if checker.patch(&DiagnosticCode::UP018) {
+        if checker.patch(&RuleCode::UP018) {
             check.amend(Fix::replacement(
                 arg_code.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.checks.push(check);
+        checker.diagnostics.push(check);
     }
 }

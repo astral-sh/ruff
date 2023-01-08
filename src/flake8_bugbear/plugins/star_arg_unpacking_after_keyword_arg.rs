@@ -21,7 +21,7 @@ pub fn star_arg_unpacking_after_keyword_arg(
         if arg.location <= keyword.location {
             continue;
         }
-        checker.checks.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::StarArgUnpackingAfterKeywordArg,
             Range::from_located(arg),
         ));

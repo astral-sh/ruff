@@ -34,7 +34,7 @@ pub fn use_contextlib_suppress(
                 violations::UseContextlibSuppress(exception),
                 Range::from_located(stmt),
             );
-            checker.checks.push(check);
+            checker.diagnostics.push(check);
         }
     }
 }

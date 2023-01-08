@@ -49,8 +49,8 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
 
-    // Generate checks.
-    let checks = check_path(
+    // Generate diagnostics.
+    let diagnostics = check_path(
         path,
         packages::detect_package_root(path),
         contents,
@@ -63,5 +63,5 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
         flags::Noqa::Enabled,
     )?;
 
-    Ok(checks)
+    Ok(diagnostics)
 }

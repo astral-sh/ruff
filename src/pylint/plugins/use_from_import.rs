@@ -15,7 +15,7 @@ pub fn use_from_import(checker: &mut Checker, alias: &Alias) {
     if name != asname {
         return;
     }
-    checker.checks.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::ConsiderUsingFromImport(module.to_string(), name.to_string()),
         Range::from_located(alias),
     ));

@@ -10,21 +10,21 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::DiagnosticCode;
+    use crate::registry::RuleCode;
     use crate::settings;
 
-    #[test_case(DiagnosticCode::A001, Path::new("A001.py"); "A001")]
-    #[test_case(DiagnosticCode::A002, Path::new("A002.py"); "A002")]
-    #[test_case(DiagnosticCode::A003, Path::new("A003.py"); "A003")]
-    fn checks(check_code: DiagnosticCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let checks = test_path(
+    #[test_case(RuleCode::A001, Path::new("A001.py"); "A001")]
+    #[test_case(RuleCode::A002, Path::new("A002.py"); "A002")]
+    #[test_case(RuleCode::A003, Path::new("A003.py"); "A003")]
+    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_builtins")
                 .join(path)
                 .as_path(),
-            &settings::Settings::for_rule(check_code),
+            &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

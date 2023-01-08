@@ -166,7 +166,7 @@ fn handle_making_changes(
                 range.end_location,
             ));
         }
-        checker.checks.push(check);
+        checker.diagnostics.push(check);
     }
 }
 

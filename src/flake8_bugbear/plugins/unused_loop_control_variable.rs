@@ -74,6 +74,6 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
                 expr.end_location.unwrap(),
             ));
         }
-        checker.checks.push(check);
+        checker.diagnostics.push(check);
     }
 }
