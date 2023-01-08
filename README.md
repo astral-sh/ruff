@@ -366,7 +366,7 @@ Options:
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
       --cache-dir <CACHE_DIR>
-          Path to the cache directory
+          Path to the cache directory [env: RUFF_CACHE_DIR=]
       --show-source
           Show violations with source code
       --respect-gitignore

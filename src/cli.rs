@@ -99,7 +99,7 @@ pub struct Cli {
     #[arg(long)]
     pub stdin_filename: Option<PathBuf>,
     /// Path to the cache directory.
-    #[arg(long)]
+    #[arg(long, env = "RUFF_CACHE_DIR")]
     pub cache_dir: Option<PathBuf>,
     /// Show violations with source code.
     #[arg(long, overrides_with("no_show_source"))]
