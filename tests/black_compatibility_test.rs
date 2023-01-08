@@ -13,7 +13,7 @@ use assert_cmd::{crate_name, Command};
 use itertools::Itertools;
 use log::info;
 use ruff::logging::{set_up_logging, LogLevel};
-use ruff::registry::CheckCategory;
+use ruff::registry::RuleOrigin;
 use strum::IntoEnumIterator;
 use walkdir::WalkDir;
 
@@ -173,12 +173,12 @@ fn test_ruff_black_compatibility() -> Result<()> {
         .filter_map(Result::ok)
         .collect();
 
-    let codes = CheckCategory::iter()
+    let codes = RuleOrigin::iter()
         // Exclude ruff codes, specifically RUF100, because it causes differences that are not a
         // problem. Ruff would add a `# noqa: W292`  after the first run, black introduces a
         // newline, and ruff removes the `# noqa: W292` again.
-        .filter(|category| *category != CheckCategory::Ruff)
-        .map(|category| category.codes().iter().map(AsRef::as_ref).join(","))
+        .filter(|origin| *origin != RuleOrigin::Ruff)
+        .map(|origin| origin.codes().iter().map(AsRef::as_ref).join(","))
         .join(",");
     let ruff_args = [
         "-",
