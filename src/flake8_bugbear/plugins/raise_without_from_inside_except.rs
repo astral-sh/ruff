@@ -2,10 +2,10 @@ use rustpython_ast::{ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
-use crate::checkers::ast::Checker;
 use crate::python::string::is_lower;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 struct RaiseVisitor {
     checks: Vec<Diagnostic>,
@@ -45,10 +45,10 @@ impl<'a> Visitor<'a> for RaiseVisitor {
     }
 }
 
-pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
+pub fn raise_without_from_inside_except(xxxxxxxx: &mut xxxxxxxx, body: &[Stmt]) {
     let mut visitor = RaiseVisitor { checks: vec![] };
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
-    checker.diagnostics.extend(visitor.checks);
+    xxxxxxxx.diagnostics.extend(visitor.checks);
 }

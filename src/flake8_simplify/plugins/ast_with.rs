@@ -1,12 +1,12 @@
 use rustpython_ast::{Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// SIM117
-pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt) {
+pub fn multiple_with_statements(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt) {
     let StmtKind::With { body, .. } = &stmt.node else {
         return;
     };
@@ -14,7 +14,7 @@ pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
     if matches!(body[0].node, StmtKind::With { .. }) {
-        checker.diagnostics.push(Diagnostic::new(
+        xxxxxxxx.diagnostics.push(Diagnostic::new(
             violations::MultipleWithStatements,
             Range::from_located(stmt),
         ));

@@ -8,9 +8,9 @@ use rustpython_ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unary
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// Return `true` if two `Expr` instances are equivalent names.
 fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
@@ -23,7 +23,7 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 }
 
 /// SIM101
-pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
+pub fn duplicate_isinstance_call(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
         return;
     };
@@ -66,7 +66,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 violations::DuplicateIsinstanceCall(arg_name.to_string()),
                 Range::from_located(expr),
             );
-            if checker.patch(&RuleCode::SIM101) {
+            if xxxxxxxx.patch(&RuleCode::SIM101) {
                 // Grab the types used in each duplicate `isinstance` call.
                 let types: Vec<&Expr> = indices
                     .iter()
@@ -126,18 +126,18 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
                 check.amend(Fix::replacement(
-                    unparse_expr(&bool_op, checker.style),
+                    unparse_expr(&bool_op, xxxxxxxx.style),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            xxxxxxxx.diagnostics.push(check);
         }
     }
 }
 
 /// SIM109
-pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
+pub fn compare_with_tuple(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
         return;
     };
@@ -169,17 +169,17 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
         let str_values = values
             .iter()
-            .map(|value| unparse_expr(value, checker.style))
+            .map(|value| unparse_expr(value, xxxxxxxx.style))
             .collect();
         let mut check = Diagnostic::new(
             violations::CompareWithTuple(
                 value.to_string(),
                 str_values,
-                unparse_expr(expr, checker.style),
+                unparse_expr(expr, xxxxxxxx.style),
             ),
             Range::from_located(expr),
         );
-        if checker.patch(&RuleCode::SIM109) {
+        if xxxxxxxx.patch(&RuleCode::SIM109) {
             // Create a `x in (a, b)` compare expr.
             let in_expr = create_expr(ExprKind::Compare {
                 left: Box::new(create_expr(ExprKind::Name {
@@ -193,17 +193,17 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                 })],
             });
             check.amend(Fix::replacement(
-                unparse_expr(&in_expr, checker.style),
+                unparse_expr(&in_expr, xxxxxxxx.style),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
+        xxxxxxxx.diagnostics.push(check);
     }
 }
 
 /// SIM220
-pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
+pub fn a_and_not_a(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
@@ -237,21 +237,21 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
                     violations::AAndNotA(id.to_string()),
                     Range::from_located(expr),
                 );
-                if checker.patch(&RuleCode::SIM220) {
+                if xxxxxxxx.patch(&RuleCode::SIM220) {
                     check.amend(Fix::replacement(
                         "False".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.diagnostics.push(check);
+                xxxxxxxx.diagnostics.push(check);
             }
         }
     }
 }
 
 /// SIM221
-pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
+pub fn a_or_not_a(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
@@ -285,21 +285,21 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
                     violations::AOrNotA(id.to_string()),
                     Range::from_located(expr),
                 );
-                if checker.patch(&RuleCode::SIM220) {
+                if xxxxxxxx.patch(&RuleCode::SIM220) {
                     check.amend(Fix::replacement(
                         "True".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.diagnostics.push(check);
+                xxxxxxxx.diagnostics.push(check);
             }
         }
     }
 }
 
 /// SIM222
-pub fn or_true(checker: &mut Checker, expr: &Expr) {
+pub fn or_true(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
@@ -310,20 +310,20 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
         } = &value.node
         {
             let mut check = Diagnostic::new(violations::OrTrue, Range::from_located(value));
-            if checker.patch(&RuleCode::SIM223) {
+            if xxxxxxxx.patch(&RuleCode::SIM223) {
                 check.amend(Fix::replacement(
                     "True".to_string(),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            xxxxxxxx.diagnostics.push(check);
         }
     }
 }
 
 /// SIM223
-pub fn and_false(checker: &mut Checker, expr: &Expr) {
+pub fn and_false(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
@@ -334,14 +334,14 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
         } = &value.node
         {
             let mut check = Diagnostic::new(violations::AndFalse, Range::from_located(value));
-            if checker.patch(&RuleCode::SIM223) {
+            if xxxxxxxx.patch(&RuleCode::SIM223) {
                 check.amend(Fix::replacement(
                     "False".to_string(),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            xxxxxxxx.diagnostics.push(check);
         }
     }
 }

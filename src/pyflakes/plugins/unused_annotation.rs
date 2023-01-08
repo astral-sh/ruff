@@ -1,21 +1,21 @@
 use crate::ast::types::BindingKind;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// F842
-pub fn unused_annotation(checker: &mut Checker, scope: usize) {
-    let scope = &checker.scopes[scope];
+pub fn unused_annotation(xxxxxxxx: &mut xxxxxxxx, scope: usize) {
+    let scope = &xxxxxxxx.scopes[scope];
     for (name, binding) in scope
         .values
         .iter()
-        .map(|(name, index)| (name, &checker.bindings[*index]))
+        .map(|(name, index)| (name, &xxxxxxxx.bindings[*index]))
     {
         if binding.used.is_none()
             && matches!(binding.kind, BindingKind::Annotation)
-            && !checker.settings.dummy_variable_rgx.is_match(name)
+            && !xxxxxxxx.settings.dummy_variable_rgx.is_match(name)
         {
-            checker.diagnostics.push(Diagnostic::new(
+            xxxxxxxx.diagnostics.push(Diagnostic::new(
                 violations::UnusedAnnotation((*name).to_string()),
                 binding.range,
             ));

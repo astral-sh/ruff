@@ -1,23 +1,23 @@
 use rustpython_ast::{Expr, Keyword, Stmt};
 
-use crate::checkers::ast::Checker;
 use crate::pyupgrade;
 use crate::pyupgrade::checks;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// UP004
 pub fn useless_object_inheritance(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     stmt: &Stmt,
     name: &str,
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut check) = checks::useless_object_inheritance(name, bases, checker.current_scope(), &checker.bindings) else {
+    let Some(mut check) = checks::useless_object_inheritance(name, bases, xxxxxxxx.current_scope(), &xxxxxxxx.bindings) else {
         return;
     };
-    if checker.patch(check.kind.code()) {
+    if xxxxxxxx.patch(check.kind.code()) {
         if let Some(fix) = pyupgrade::fixes::remove_class_def_base(
-            checker.locator,
+            xxxxxxxx.locator,
             stmt.location,
             check.location,
             bases,
@@ -26,5 +26,5 @@ pub fn useless_object_inheritance(
             check.amend(fix);
         }
     }
-    checker.diagnostics.push(check);
+    xxxxxxxx.diagnostics.push(check);
 }

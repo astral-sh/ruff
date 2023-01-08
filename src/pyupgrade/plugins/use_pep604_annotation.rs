@@ -3,10 +3,10 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 use crate::ast::helpers::{collect_call_paths, dealias_call_path};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn optional(expr: &Expr) -> Expr {
     Expr::new(
@@ -56,17 +56,17 @@ fn any_arg_is_str(slice: &Expr) -> bool {
 }
 
 /// UP007
-pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
+pub fn use_pep604_annotation(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, value: &Expr, slice: &Expr) {
     // Avoid rewriting forward annotations.
     if any_arg_is_str(slice) {
         return;
     }
 
-    let call_path = dealias_call_path(collect_call_paths(value), &checker.import_aliases);
-    if checker.match_typing_call_path(&call_path, "Optional") {
+    let call_path = dealias_call_path(collect_call_paths(value), &xxxxxxxx.import_aliases);
+    if xxxxxxxx.match_typing_call_path(&call_path, "Optional") {
         let mut check = Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
-        if checker.patch(check.kind.code()) {
-            let mut generator: SourceCodeGenerator = checker.style.into();
+        if xxxxxxxx.patch(check.kind.code()) {
+            let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
             generator.unparse_expr(&optional(slice), 0);
             check.amend(Fix::replacement(
                 generator.generate(),
@@ -74,16 +74,16 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 expr.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(check);
-    } else if checker.match_typing_call_path(&call_path, "Union") {
+        xxxxxxxx.diagnostics.push(check);
+    } else if xxxxxxxx.match_typing_call_path(&call_path, "Union") {
         let mut check = Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
-        if checker.patch(check.kind.code()) {
+        if xxxxxxxx.patch(check.kind.code()) {
             match &slice.node {
                 ExprKind::Slice { .. } => {
                     // Invalid type annotation.
                 }
                 ExprKind::Tuple { elts, .. } => {
-                    let mut generator: SourceCodeGenerator = checker.style.into();
+                    let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
                     generator.unparse_expr(&union(elts), 0);
                     check.amend(Fix::replacement(
                         generator.generate(),
@@ -93,7 +93,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 }
                 _ => {
                     // Single argument.
-                    let mut generator: SourceCodeGenerator = checker.style.into();
+                    let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
                     generator.unparse_expr(slice, 0);
                     check.amend(Fix::replacement(
                         generator.generate(),
@@ -103,6 +103,6 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                 }
             }
         }
-        checker.diagnostics.push(check);
+        xxxxxxxx.diagnostics.push(check);
     }
 }

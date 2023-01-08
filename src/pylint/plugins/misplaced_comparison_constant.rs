@@ -2,12 +2,12 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 use crate::{violations, Diagnostic};
 
 /// PLC2201
 pub fn misplaced_comparison_constant(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     expr: &Expr,
     left: &Expr,
     ops: &[Cmpop],
@@ -44,12 +44,12 @@ pub fn misplaced_comparison_constant(
         violations::MisplacedComparisonConstant(suggestion.clone()),
         Range::from_located(expr),
     );
-    if checker.patch(check.kind.code()) {
+    if xxxxxxxx.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             suggestion,
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    xxxxxxxx.diagnostics.push(check);
 }

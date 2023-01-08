@@ -2,13 +2,13 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// SIM105
 pub fn use_contextlib_suppress(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     stmt: &Stmt,
     handlers: &[Excepthandler],
     orelse: &[Stmt],
@@ -34,7 +34,7 @@ pub fn use_contextlib_suppress(
                 violations::UseContextlibSuppress(exception),
                 Range::from_located(stmt),
             );
-            checker.diagnostics.push(check);
+            xxxxxxxx.diagnostics.push(check);
         }
     }
 }

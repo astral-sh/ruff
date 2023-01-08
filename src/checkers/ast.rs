@@ -51,7 +51,7 @@ const GLOBAL_SCOPE_INDEX: usize = 0;
 type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 
 #[allow(clippy::struct_excessive_bools)]
-pub struct Checker<'a> {
+pub struct xxxxxxxx<'a> {
     // Input data.
     path: &'a Path,
     autofix: flags::Autofix,
@@ -102,7 +102,7 @@ pub struct Checker<'a> {
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
 }
 
-impl<'a> Checker<'a> {
+impl<'a> xxxxxxxx<'a> {
     pub fn new(
         settings: &'a Settings,
         noqa_line_for: &'a IntMap<usize, usize>,
@@ -111,8 +111,8 @@ impl<'a> Checker<'a> {
         path: &'a Path,
         locator: &'a SourceCodeLocator,
         style: &'a SourceCodeStyleDetector,
-    ) -> Checker<'a> {
-        Checker {
+    ) -> xxxxxxxx<'a> {
+        xxxxxxxx {
             settings,
             noqa_line_for,
             autofix,
@@ -217,7 +217,7 @@ impl<'a> Checker<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for Checker<'a>
+impl<'a, 'b> Visitor<'b> for xxxxxxxx<'a>
 where
     'b: 'a,
 {
@@ -3237,7 +3237,7 @@ where
     }
 }
 
-impl<'a> Checker<'a> {
+impl<'a> xxxxxxxx<'a> {
     fn push_parent(&mut self, parent: &'a Stmt) {
         let num_existing = self.parents.len();
         self.parents.push(RefEquality(parent));
@@ -4382,7 +4382,7 @@ pub fn check_ast(
     noqa: flags::Noqa,
     path: &Path,
 ) -> Vec<Diagnostic> {
-    let mut checker = Checker::new(
+    let mut xxxxxxxx = xxxxxxxx::new(
         settings,
         noqa_line_for,
         autofix,
@@ -4391,11 +4391,11 @@ pub fn check_ast(
         locator,
         stylist,
     );
-    checker.push_scope(Scope::new(ScopeKind::Module));
-    checker.bind_builtins();
+    xxxxxxxx.push_scope(Scope::new(ScopeKind::Module));
+    xxxxxxxx.bind_builtins();
 
     // Check for module docstring.
-    let python_ast = if checker.visit_docstring(python_ast) {
+    let python_ast = if xxxxxxxx.visit_docstring(python_ast) {
         &python_ast[1..]
     } else {
         python_ast
@@ -4403,24 +4403,24 @@ pub fn check_ast(
 
     // Iterate over the AST.
     for stmt in python_ast {
-        checker.visit_stmt(stmt);
+        xxxxxxxx.visit_stmt(stmt);
     }
 
     // Check any deferred statements.
-    checker.check_deferred_functions();
-    checker.check_deferred_lambdas();
-    checker.check_deferred_assignments();
-    checker.check_deferred_type_definitions();
+    xxxxxxxx.check_deferred_functions();
+    xxxxxxxx.check_deferred_lambdas();
+    xxxxxxxx.check_deferred_assignments();
+    xxxxxxxx.check_deferred_type_definitions();
     let mut allocator = vec![];
-    checker.check_deferred_string_type_definitions(&mut allocator);
+    xxxxxxxx.check_deferred_string_type_definitions(&mut allocator);
 
     // Reset the scope to module-level, and check all consumed scopes.
-    checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];
-    checker.pop_scope();
-    checker.check_dead_scopes();
+    xxxxxxxx.scope_stack = vec![GLOBAL_SCOPE_INDEX];
+    xxxxxxxx.pop_scope();
+    xxxxxxxx.check_dead_scopes();
 
     // Check docstrings.
-    checker.check_definitions();
+    xxxxxxxx.check_definitions();
 
-    checker.diagnostics
+    xxxxxxxx.diagnostics
 }

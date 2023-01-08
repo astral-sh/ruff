@@ -6,8 +6,8 @@ use std::path::Path;
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::helpers::match_module_member;
-use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Documentable;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 #[derive(Debug, Clone)]
 pub enum Modifier {
@@ -29,54 +29,54 @@ pub struct VisibleScope {
 }
 
 /// Returns `true` if a function is a "static method".
-pub fn is_staticmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub fn is_staticmethod(xxxxxxxx: &xxxxxxxx, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
         match_module_member(
             expr,
             "",
             "staticmethod",
-            &checker.from_imports,
-            &checker.import_aliases,
+            &xxxxxxxx.from_imports,
+            &xxxxxxxx.import_aliases,
         )
     })
 }
 
 /// Returns `true` if a function is a "class method".
-pub fn is_classmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub fn is_classmethod(xxxxxxxx: &xxxxxxxx, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
         match_module_member(
             expr,
             "",
             "classmethod",
-            &checker.from_imports,
-            &checker.import_aliases,
+            &xxxxxxxx.from_imports,
+            &xxxxxxxx.import_aliases,
         )
     })
 }
 
 /// Returns `true` if a function definition is an `@overload`.
-pub fn is_overload(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub fn is_overload(xxxxxxxx: &xxxxxxxx, decorator_list: &[Expr]) -> bool {
     decorator_list
         .iter()
-        .any(|expr| checker.match_typing_expr(expr, "overload"))
+        .any(|expr| xxxxxxxx.match_typing_expr(expr, "overload"))
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
-pub fn is_override(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub fn is_override(xxxxxxxx: &xxxxxxxx, decorator_list: &[Expr]) -> bool {
     decorator_list
         .iter()
-        .any(|expr| checker.match_typing_expr(expr, "override"))
+        .any(|expr| xxxxxxxx.match_typing_expr(expr, "override"))
 }
 
 /// Returns `true` if a function definition is an `@abstractmethod`.
-pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub fn is_abstract(xxxxxxxx: &xxxxxxxx, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
         match_module_member(
             expr,
             "abc",
             "abstractmethod",
-            &checker.from_imports,
-            &checker.import_aliases,
+            &xxxxxxxx.from_imports,
+            &xxxxxxxx.import_aliases,
         )
     })
 }

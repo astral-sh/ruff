@@ -6,19 +6,19 @@ use crate::ast::helpers;
 use crate::ast::operations::locate_cmpops;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// F632
 pub fn invalid_literal_comparison(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     left: &Expr,
     ops: &[Cmpop],
     comparators: &[Expr],
     location: Range,
 ) {
-    let located = Lazy::new(|| locate_cmpops(&checker.locator.slice_source_code_range(&location)));
+    let located = Lazy::new(|| locate_cmpops(&xxxxxxxx.locator.slice_source_code_range(&location)));
     let mut left = left;
     for (index, (op, right)) in izip!(ops, comparators).enumerate() {
         if matches!(op, Cmpop::Is | Cmpop::IsNot)
@@ -26,7 +26,7 @@ pub fn invalid_literal_comparison(
                 || helpers::is_constant_non_singleton(right))
         {
             let mut check = Diagnostic::new(violations::IsLiteral(op.into()), location);
-            if checker.patch(check.kind.code()) {
+            if xxxxxxxx.patch(check.kind.code()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(&located_op.node, op);
                     if let Some(content) = match &located_op.node {
@@ -50,7 +50,7 @@ pub fn invalid_literal_comparison(
                     eprintln!("Failed to fix invalid comparison due to missing op");
                 }
             }
-            checker.diagnostics.push(check);
+            xxxxxxxx.diagnostics.push(check);
         }
         left = right;
     }

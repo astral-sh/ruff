@@ -1,16 +1,16 @@
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// B016
-pub fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
+pub fn cannot_raise_literal(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     let ExprKind::Constant { .. } = &expr.node else {
         return;
     };
-    checker.diagnostics.push(Diagnostic::new(
+    xxxxxxxx.diagnostics.push(Diagnostic::new(
         violations::CannotRaiseLiteral,
         Range::from_located(expr),
     ));

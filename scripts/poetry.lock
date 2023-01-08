@@ -62,7 +62,7 @@ graph = ["objgraph (>=1.7.2)"]
 [[package]]
 name = "flake8"
 version = "5.0.4"
-description = "the modular source code checker: pep8 pyflakes and co"
+description = "the modular source code xxxxxxxx: pep8 pyflakes and co"
 category = "main"
 optional = false
 python-versions = ">=3.6.1"
@@ -126,7 +126,7 @@ files = [
 [[package]]
 name = "mccabe"
 version = "0.7.0"
-description = "McCabe checker, plugin for flake8"
+description = "McCabe xxxxxxxx, plugin for flake8"
 category = "main"
 optional = false
 python-versions = ">=3.6"
@@ -154,7 +154,7 @@ test = ["appdirs (==1.4.4)", "covdefaults (>=2.2.2)", "pytest (>=7.2)", "pytest-
 [[package]]
 name = "pycodestyle"
 version = "2.9.1"
-description = "Python style guide checker"
+description = "Python style guide xxxxxxxx"
 category = "main"
 optional = false
 python-versions = ">=3.6"
@@ -166,7 +166,7 @@ files = [
 [[package]]
 name = "pyflakes"
 version = "2.5.0"
-description = "passive checker of Python programs"
+description = "passive xxxxxxxx of Python programs"
 category = "main"
 optional = false
 python-versions = ">=3.6"
@@ -178,7 +178,7 @@ files = [
 [[package]]
 name = "pylint"
 version = "2.15.9"
-description = "python code static checker"
+description = "python code static xxxxxxxx"
 category = "main"
 optional = false
 python-versions = ">=3.7.2"

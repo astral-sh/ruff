@@ -6,9 +6,9 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 use crate::ast::helpers::{compose_call_path, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 const ERROR_NAMES: &[&str] = &["EnvironmentError", "IOError", "WindowsError"];
 const ERROR_MODULES: &[&str] = &["mmap", "select", "socket"];
@@ -33,7 +33,7 @@ fn get_before_replace(elts: &[Expr]) -> Vec<String> {
         .collect()
 }
 
-fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
+fn check_module(xxxxxxxx: &xxxxxxxx, expr: &Expr) -> (Vec<String>, Vec<String>) {
     let mut replacements: Vec<String> = vec![];
     let mut before_replace: Vec<String> = vec![];
     for module in ERROR_MODULES.iter() {
@@ -41,8 +41,8 @@ fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
             expr,
             module,
             "error",
-            &checker.from_imports,
-            &checker.import_aliases,
+            &xxxxxxxx.from_imports,
+            &xxxxxxxx.import_aliases,
         ) {
             replacements.push("OSError".to_string());
             before_replace.push(format!("{module}.error"));
@@ -53,14 +53,14 @@ fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
 }
 
 fn handle_name_or_attribute(
-    checker: &Checker,
+    xxxxxxxx: &xxxxxxxx,
     item: &Expr,
     replacements: &mut Vec<String>,
     before_replace: &mut Vec<String>,
 ) {
     match &item.node {
         ExprKind::Name { id, .. } => {
-            let (temp_replacements, temp_before_replace) = check_module(checker, item);
+            let (temp_replacements, temp_before_replace) = check_module(xxxxxxxx, item);
             replacements.extend(temp_replacements);
             before_replace.extend(temp_before_replace);
             if replacements.is_empty() {
@@ -70,7 +70,7 @@ fn handle_name_or_attribute(
             }
         }
         ExprKind::Attribute { .. } => {
-            let (temp_replacements, temp_before_replace) = check_module(checker, item);
+            let (temp_replacements, temp_before_replace) = check_module(xxxxxxxx, item);
             replacements.extend(temp_replacements);
             before_replace.extend(temp_before_replace);
         }
@@ -79,7 +79,7 @@ fn handle_name_or_attribute(
 }
 
 /// Handles one block of an except (use a loop if there are multiple blocks)
-fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKind>) {
+fn handle_except_block(xxxxxxxx: &mut xxxxxxxx, handler: &Located<ExcepthandlerKind>) {
     let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
     let Some(error_handlers) = type_.as_ref() else {
         return;
@@ -91,7 +91,7 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
     match &error_handlers.node {
         ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
             handle_name_or_attribute(
-                checker,
+                xxxxxxxx,
                 error_handlers,
                 &mut replacements,
                 &mut before_replace,
@@ -106,7 +106,7 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
                         replacements.push(new_name);
                     }
                     ExprKind::Attribute { .. } => {
-                        let (new_replacements, new_before_replace) = check_module(checker, elt);
+                        let (new_replacements, new_before_replace) = check_module(xxxxxxxx, elt);
                         replacements.extend(new_replacements);
                         before_replace.extend(new_before_replace);
                     }
@@ -129,18 +129,18 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
 
     // This part checks if there are differences between what there is and
     // what there should be. Where differences, the changes are applied
-    handle_making_changes(checker, error_handlers, &before_replace, &replacements);
+    handle_making_changes(xxxxxxxx, error_handlers, &before_replace, &replacements);
 }
 
 fn handle_making_changes(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     target: &Expr,
     before_replace: &[String],
     replacements: &[String],
 ) {
     if before_replace != replacements && replacements.len() > 0 {
         let range = Range::new(target.location, target.end_location.unwrap());
-        let contents = checker.locator.slice_source_code_range(&range);
+        let contents = xxxxxxxx.locator.slice_source_code_range(&range);
         // Pyyupgrade does not want imports changed if a module only is
         // surrounded by parentheses. For example: `except mmap.error:`
         // would be changed, but: `(mmap).error:` would not. One issue with
@@ -159,64 +159,64 @@ fn handle_making_changes(
             final_str.push(')');
         }
         let mut check = Diagnostic::new(violations::OSErrorAlias(compose_call_path(target)), range);
-        if checker.patch(check.kind.code()) {
+        if xxxxxxxx.patch(check.kind.code()) {
             check.amend(Fix::replacement(
                 final_str,
                 range.location,
                 range.end_location,
             ));
         }
-        checker.diagnostics.push(check);
+        xxxxxxxx.diagnostics.push(check);
     }
 }
 
 // This is a hacky way to handle the different variable types we get since
 // raise and try are very different. Would love input on a cleaner way
-pub trait OSErrorAliasChecker {
-    fn check_error(&self, checker: &mut Checker)
+pub trait OSErrorAliasxxxxxxxx {
+    fn check_error(&self, xxxxxxxx: &mut xxxxxxxx)
     where
         Self: Sized;
 }
 
-impl OSErrorAliasChecker for &Vec<Excepthandler> {
-    fn check_error(&self, checker: &mut Checker) {
+impl OSErrorAliasxxxxxxxx for &Vec<Excepthandler> {
+    fn check_error(&self, xxxxxxxx: &mut xxxxxxxx) {
         // Each separate except block is a separate error and fix
         for handler in self.iter() {
-            handle_except_block(checker, handler);
+            handle_except_block(xxxxxxxx, handler);
         }
     }
 }
 
-impl OSErrorAliasChecker for &Box<Expr> {
-    fn check_error(&self, checker: &mut Checker) {
+impl OSErrorAliasxxxxxxxx for &Box<Expr> {
+    fn check_error(&self, xxxxxxxx: &mut xxxxxxxx) {
         let mut replacements: Vec<String> = vec![];
         let mut before_replace: Vec<String> = vec![];
         match &self.node {
             ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
-                handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
+                handle_name_or_attribute(xxxxxxxx, self, &mut replacements, &mut before_replace);
             }
             _ => return,
         }
-        handle_making_changes(checker, self, &before_replace, &replacements);
+        handle_making_changes(xxxxxxxx, self, &before_replace, &replacements);
     }
 }
 
-impl OSErrorAliasChecker for &Expr {
-    fn check_error(&self, checker: &mut Checker) {
+impl OSErrorAliasxxxxxxxx for &Expr {
+    fn check_error(&self, xxxxxxxx: &mut xxxxxxxx) {
         let mut replacements: Vec<String> = vec![];
         let mut before_replace: Vec<String> = vec![];
         let change_target: &Expr;
         match &self.node {
             ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
                 change_target = self;
-                handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
+                handle_name_or_attribute(xxxxxxxx, self, &mut replacements, &mut before_replace);
             }
             ExprKind::Call { func, .. } => {
                 change_target = func;
                 match &func.node {
                     ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
                         handle_name_or_attribute(
-                            checker,
+                            xxxxxxxx,
                             func,
                             &mut replacements,
                             &mut before_replace,
@@ -227,11 +227,11 @@ impl OSErrorAliasChecker for &Expr {
             }
             _ => return,
         }
-        handle_making_changes(checker, change_target, &before_replace, &replacements);
+        handle_making_changes(xxxxxxxx, change_target, &before_replace, &replacements);
     }
 }
 
 /// UP024
-pub fn os_error_alias<U: OSErrorAliasChecker>(checker: &mut Checker, handlers: U) {
-    handlers.check_error(checker);
+pub fn os_error_alias<U: OSErrorAliasxxxxxxxx>(xxxxxxxx: &mut xxxxxxxx, handlers: U) {
+    handlers.check_error(xxxxxxxx);
 }

@@ -4,12 +4,12 @@ use std::str::Lines;
 use rustpython_ast::{Located, Location};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// Extract the leading indentation from a line.
-pub fn indentation<'a, T>(checker: &'a Checker, located: &'a Located<T>) -> Cow<'a, str> {
+pub fn indentation<'a, T>(xxxxxxxx: &'a xxxxxxxx, located: &'a Located<T>) -> Cow<'a, str> {
     let range = Range::from_located(located);
-    checker.locator.slice_source_code_range(&Range::new(
+    xxxxxxxx.locator.slice_source_code_range(&Range::new(
         Location::new(range.location.row(), 0),
         Location::new(range.location.row(), range.location.column()),
     ))

@@ -3,10 +3,10 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, StmtKind};
 use crate::ast::helpers::{collect_call_paths, create_expr, create_stmt, dealias_call_path};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 use crate::{violations, SourceCodeLocator};
 
 /// Return `true` if the `Expr` is a reference to `${module}.${any}`.
@@ -362,7 +362,7 @@ fn handle_func(
     }
 }
 
-fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Option<Diagnostic> {
+fn handle_next_on_six_dict(expr: &Expr, patch: bool, xxxxxxxx: &xxxxxxxx) -> Option<Diagnostic> {
     let ExprKind::Call { func, args, .. } = &expr.node else {
         return None;
     };
@@ -373,7 +373,7 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
         return None;
     }
     let [arg] = &args[..] else { return None; };
-    let call_path = dealias_call_path(collect_call_paths(arg), &checker.import_aliases);
+    let call_path = dealias_call_path(collect_call_paths(arg), &xxxxxxxx.import_aliases);
     if !is_module_member(&call_path, "six") {
         return None;
     }
@@ -405,20 +405,20 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
         },
         arg,
         patch,
-        checker.style,
+        xxxxxxxx.style,
     ))
 }
 
 /// UP016
-pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
-    if let Some(check) = handle_next_on_six_dict(expr, checker.patch(&RuleCode::UP016), checker) {
-        checker.diagnostics.push(check);
+pub fn remove_six_compat(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
+    if let Some(check) = handle_next_on_six_dict(expr, xxxxxxxx.patch(&RuleCode::UP016), xxxxxxxx) {
+        xxxxxxxx.diagnostics.push(check);
         return;
     }
 
-    let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
+    let call_path = dealias_call_path(collect_call_paths(expr), &xxxxxxxx.import_aliases);
     if is_module_member(&call_path, "six") {
-        let patch = checker.patch(&RuleCode::UP016);
+        let patch = xxxxxxxx.patch(&RuleCode::UP016);
         let check = match &expr.node {
             ExprKind::Call {
                 func,
@@ -430,15 +430,15 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
                 keywords,
                 expr,
                 patch,
-                checker.style,
-                checker.locator,
+                xxxxxxxx.style,
+                xxxxxxxx.locator,
             ),
             ExprKind::Attribute { attr, .. } => map_name(attr.as_str(), expr, patch),
             ExprKind::Name { id, .. } => map_name(id.as_str(), expr, patch),
             _ => return,
         };
         if let Some(check) = check {
-            checker.diagnostics.push(check);
+            xxxxxxxx.diagnostics.push(check);
         }
     }
 }

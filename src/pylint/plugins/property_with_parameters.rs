@@ -1,12 +1,12 @@
 use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 use crate::{violations, Diagnostic};
 
 /// PLR0206
 pub fn property_with_parameters(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     stmt: &Stmt,
     decorator_list: &[Expr],
     args: &Arguments,
@@ -17,7 +17,7 @@ pub fn property_with_parameters(
     {
         return;
     }
-    if checker.is_builtin("property")
+    if xxxxxxxx.is_builtin("property")
         && args
             .args
             .iter()
@@ -26,7 +26,7 @@ pub fn property_with_parameters(
             .count()
             > 1
     {
-        checker.diagnostics.push(Diagnostic::new(
+        xxxxxxxx.diagnostics.push(Diagnostic::new(
             violations::PropertyWithParameters,
             Range::from_located(stmt),
         ));

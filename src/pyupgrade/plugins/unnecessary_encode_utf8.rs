@@ -2,10 +2,10 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
@@ -106,7 +106,7 @@ fn replace_with_bytes_literal(
 
 /// UP012
 pub fn unnecessary_encode_utf8(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -125,11 +125,11 @@ pub fn unnecessary_encode_utf8(
             if is_default_encode(args, kwargs) {
                 if literal.is_ascii() {
                     // "foo".encode()
-                    checker.diagnostics.push(replace_with_bytes_literal(
+                    xxxxxxxx.diagnostics.push(replace_with_bytes_literal(
                         expr,
                         variable,
-                        checker.locator,
-                        checker.patch(&RuleCode::UP012),
+                        xxxxxxxx.locator,
+                        xxxxxxxx.patch(&RuleCode::UP012),
                     ));
                 } else {
                     // "unicode text©".encode("utf-8")
@@ -137,9 +137,9 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         args,
                         kwargs,
-                        checker.patch(&RuleCode::UP012),
+                        xxxxxxxx.patch(&RuleCode::UP012),
                     ) {
-                        checker.diagnostics.push(check);
+                        xxxxxxxx.diagnostics.push(check);
                     }
                 }
             }
@@ -151,9 +151,9 @@ pub fn unnecessary_encode_utf8(
                     expr,
                     args,
                     kwargs,
-                    checker.patch(&RuleCode::UP012),
+                    xxxxxxxx.patch(&RuleCode::UP012),
                 ) {
-                    checker.diagnostics.push(check);
+                    xxxxxxxx.diagnostics.push(check);
                 }
             }
         }

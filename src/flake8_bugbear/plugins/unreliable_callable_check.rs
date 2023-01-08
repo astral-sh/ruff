@@ -1,12 +1,12 @@
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// B004
-pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub fn unreliable_callable_check(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, func: &Expr, args: &[Expr]) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
     };
@@ -26,7 +26,7 @@ pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr
     if s != "__call__" {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
+    xxxxxxxx.diagnostics.push(Diagnostic::new(
         violations::UnreliableCallableCheck,
         Range::from_located(expr),
     ));

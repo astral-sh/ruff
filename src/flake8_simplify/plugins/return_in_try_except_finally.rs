@@ -1,9 +1,9 @@
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
     stmts
@@ -13,7 +13,7 @@ fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
 
 /// SIM107
 pub fn return_in_try_except_finally(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     body: &[Stmt],
     handlers: &[Excepthandler],
     finalbody: &[Stmt],
@@ -26,7 +26,7 @@ pub fn return_in_try_except_finally(
 
     if let Some(finally_return) = find_return(finalbody) {
         if try_has_return || except_has_return {
-            checker.diagnostics.push(Diagnostic::new(
+            xxxxxxxx.diagnostics.push(Diagnostic::new(
                 violations::ReturnInTryExceptFinally,
                 Range::from_located(finally_return),
             ));

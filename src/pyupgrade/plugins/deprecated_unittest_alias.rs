@@ -4,9 +4,9 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
     FxHashMap::from_iter([
@@ -29,7 +29,7 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
 });
 
 /// UP005
-pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
+pub fn deprecated_unittest_alias(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     let ExprKind::Attribute { value, attr, .. } = &expr.node else {
         return;
     };
@@ -46,12 +46,12 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         violations::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(check.kind.code()) {
+    if xxxxxxxx.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             format!("self.{target}"),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    xxxxxxxx.diagnostics.push(check);
 }

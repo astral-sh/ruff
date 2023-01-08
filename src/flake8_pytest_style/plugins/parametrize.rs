@@ -4,19 +4,19 @@ use super::helpers::is_pytest_parametrize;
 use crate::ast::helpers::create_expr;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::flake8_pytest_style::types;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
-fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
+fn get_parametrize_decorator<'a>(xxxxxxxx: &xxxxxxxx, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators
         .iter()
-        .find(|decorator| is_pytest_parametrize(decorator, checker))
+        .find(|decorator| is_pytest_parametrize(decorator, xxxxxxxx))
 }
 
-fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
+fn elts_to_csv(elts: &[Expr], xxxxxxxx: &xxxxxxxx) -> Option<String> {
     let all_literals = elts.iter().all(|e| {
         matches!(
             e.node,
@@ -31,7 +31,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         return None;
     }
 
-    let mut generator: SourceCodeGenerator = checker.style.into();
+    let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
     generator.unparse_expr(
         &create_expr(ExprKind::Constant {
             value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
@@ -55,8 +55,8 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
 }
 
 /// PT006
-fn check_names(checker: &mut Checker, expr: &Expr) {
-    let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
+fn check_names(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
+    let names_type = xxxxxxxx.settings.flake8_pytest_style.parametrize_names_type;
 
     match &expr.node {
         ExprKind::Constant {
@@ -84,8 +84,8 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
-                            let mut generator: SourceCodeGenerator = checker.style.into();
+                        if xxxxxxxx.patch(check.kind.code()) {
+                            let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: names
@@ -107,15 +107,15 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        xxxxxxxx.diagnostics.push(check);
                     }
                     types::ParametrizeNameType::List => {
                         let mut check = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
-                            let mut generator: SourceCodeGenerator = checker.style.into();
+                        if xxxxxxxx.patch(check.kind.code()) {
+                            let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: names
@@ -137,7 +137,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        xxxxxxxx.diagnostics.push(check);
                     }
                     types::ParametrizeNameType::CSV => {}
                 }
@@ -146,7 +146,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
         ExprKind::Tuple { elts, .. } => {
             if elts.len() == 1 {
                 if let Some(first) = elts.first() {
-                    handle_single_name(checker, expr, first);
+                    handle_single_name(xxxxxxxx, expr, first);
                 }
             } else {
                 match names_type {
@@ -156,8 +156,8 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
-                            let mut generator: SourceCodeGenerator = checker.style.into();
+                        if xxxxxxxx.patch(check.kind.code()) {
+                            let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: elts.clone(),
@@ -171,15 +171,15 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        xxxxxxxx.diagnostics.push(check);
                     }
                     types::ParametrizeNameType::CSV => {
                         let mut check = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
-                            if let Some(content) = elts_to_csv(elts, checker) {
+                        if xxxxxxxx.patch(check.kind.code()) {
+                            if let Some(content) = elts_to_csv(elts, xxxxxxxx) {
                                 check.amend(Fix::replacement(
                                     content,
                                     expr.location,
@@ -187,7 +187,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 ));
                             }
                         }
-                        checker.diagnostics.push(check);
+                        xxxxxxxx.diagnostics.push(check);
                     }
                 }
             };
@@ -195,7 +195,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
         ExprKind::List { elts, .. } => {
             if elts.len() == 1 {
                 if let Some(first) = elts.first() {
-                    handle_single_name(checker, expr, first);
+                    handle_single_name(xxxxxxxx, expr, first);
                 }
             } else {
                 match names_type {
@@ -205,8 +205,8 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
-                            let mut generator: SourceCodeGenerator = checker.style.into();
+                        if xxxxxxxx.patch(check.kind.code()) {
+                            let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: elts.clone(),
@@ -220,15 +220,15 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        xxxxxxxx.diagnostics.push(check);
                     }
                     types::ParametrizeNameType::CSV => {
                         let mut check = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
-                            if let Some(content) = elts_to_csv(elts, checker) {
+                        if xxxxxxxx.patch(check.kind.code()) {
+                            if let Some(content) = elts_to_csv(elts, xxxxxxxx) {
                                 check.amend(Fix::replacement(
                                     content,
                                     expr.location,
@@ -236,7 +236,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 ));
                             }
                         }
-                        checker.diagnostics.push(check);
+                        xxxxxxxx.diagnostics.push(check);
                     }
                 }
             };
@@ -246,10 +246,13 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
 }
 
 /// PT007
-fn check_values(checker: &mut Checker, expr: &Expr) {
-    let values_type = checker.settings.flake8_pytest_style.parametrize_values_type;
+fn check_values(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
+    let values_type = xxxxxxxx
+        .settings
+        .flake8_pytest_style
+        .parametrize_values_type;
 
-    let values_row_type = checker
+    let values_row_type = xxxxxxxx
         .settings
         .flake8_pytest_style
         .parametrize_values_row_type;
@@ -257,34 +260,34 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
     match &expr.node {
         ExprKind::List { elts, .. } => {
             if values_type != types::ParametrizeValuesType::List {
-                checker.diagnostics.push(Diagnostic::new(
+                xxxxxxxx.diagnostics.push(Diagnostic::new(
                     violations::ParametrizeValuesWrongType(values_type, values_row_type),
                     Range::from_located(expr),
                 ));
             }
-            handle_value_rows(checker, elts, values_type, values_row_type);
+            handle_value_rows(xxxxxxxx, elts, values_type, values_row_type);
         }
         ExprKind::Tuple { elts, .. } => {
             if values_type != types::ParametrizeValuesType::Tuple {
-                checker.diagnostics.push(Diagnostic::new(
+                xxxxxxxx.diagnostics.push(Diagnostic::new(
                     violations::ParametrizeValuesWrongType(values_type, values_row_type),
                     Range::from_located(expr),
                 ));
             }
-            handle_value_rows(checker, elts, values_type, values_row_type);
+            handle_value_rows(xxxxxxxx, elts, values_type, values_row_type);
         }
         _ => {}
     }
 }
 
-fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
+fn handle_single_name(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, value: &Expr) {
     let mut check = Diagnostic::new(
         violations::ParametrizeNamesWrongType(types::ParametrizeNameType::CSV),
         Range::from_located(expr),
     );
 
-    if checker.patch(check.kind.code()) {
-        let mut generator: SourceCodeGenerator = checker.style.into();
+    if xxxxxxxx.patch(check.kind.code()) {
+        let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
         check.amend(Fix::replacement(
             generator.generate(),
@@ -292,11 +295,11 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
             expr.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    xxxxxxxx.diagnostics.push(check);
 }
 
 fn handle_value_rows(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     elts: &[Expr],
     values_type: types::ParametrizeValuesType,
     values_row_type: types::ParametrizeValuesRowType,
@@ -305,7 +308,7 @@ fn handle_value_rows(
         match &elt.node {
             ExprKind::Tuple { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
-                    checker.diagnostics.push(Diagnostic::new(
+                    xxxxxxxx.diagnostics.push(Diagnostic::new(
                         violations::ParametrizeValuesWrongType(values_type, values_row_type),
                         Range::from_located(elt),
                     ));
@@ -313,7 +316,7 @@ fn handle_value_rows(
             }
             ExprKind::List { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
-                    checker.diagnostics.push(Diagnostic::new(
+                    xxxxxxxx.diagnostics.push(Diagnostic::new(
                         violations::ParametrizeValuesWrongType(values_type, values_row_type),
                         Range::from_located(elt),
                     ));
@@ -324,18 +327,18 @@ fn handle_value_rows(
     }
 }
 
-pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
-    let decorator = get_parametrize_decorator(checker, decorators);
+pub fn parametrize(xxxxxxxx: &mut xxxxxxxx, decorators: &[Expr]) {
+    let decorator = get_parametrize_decorator(xxxxxxxx, decorators);
     if let Some(decorator) = decorator {
         if let ExprKind::Call { args, .. } = &decorator.node {
-            if checker.settings.enabled.contains(&RuleCode::PT006) {
+            if xxxxxxxx.settings.enabled.contains(&RuleCode::PT006) {
                 if let Some(arg) = args.get(0) {
-                    check_names(checker, arg);
+                    check_names(xxxxxxxx, arg);
                 }
             }
-            if checker.settings.enabled.contains(&RuleCode::PT007) {
+            if xxxxxxxx.settings.enabled.contains(&RuleCode::PT007) {
                 if let Some(arg) = args.get(1) {
-                    check_values(checker, arg);
+                    check_values(xxxxxxxx, arg);
                 }
             }
         }

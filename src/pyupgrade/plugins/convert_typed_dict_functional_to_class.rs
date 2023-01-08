@@ -5,17 +5,17 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtK
 use crate::ast::helpers::{create_expr, create_stmt, match_module_member, unparse_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
 fn match_typed_dict_assign<'a>(
-    checker: &Checker,
+    xxxxxxxx: &xxxxxxxx,
     targets: &'a [Expr],
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
@@ -34,8 +34,8 @@ fn match_typed_dict_assign<'a>(
         func,
         "typing",
         "TypedDict",
-        &checker.from_imports,
-        &checker.import_aliases,
+        &xxxxxxxx.from_imports,
+        &xxxxxxxx.import_aliases,
     ) {
         return None;
     }
@@ -189,13 +189,13 @@ fn convert_to_class(
 
 /// UP013
 pub fn convert_typed_dict_functional_to_class(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     stmt: &Stmt,
     targets: &[Expr],
     value: &Expr,
 ) {
     let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(checker, targets, value) else
+        match_typed_dict_assign(xxxxxxxx, targets, value) else
     {
         return;
     };
@@ -204,7 +204,7 @@ pub fn convert_typed_dict_functional_to_class(
         violations::ConvertTypedDictFunctionalToClass(class_name.to_string()),
         Range::from_located(stmt),
     );
-    if checker.patch(check.kind.code()) {
+    if xxxxxxxx.patch(check.kind.code()) {
         match match_properties_and_total(args, keywords) {
             Ok((body, total_keyword)) => {
                 check.amend(convert_to_class(
@@ -213,11 +213,11 @@ pub fn convert_typed_dict_functional_to_class(
                     body,
                     total_keyword,
                     base_class,
-                    checker.style,
+                    xxxxxxxx.style,
                 ));
             }
             Err(err) => debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}"),
         };
     }
-    checker.diagnostics.push(check);
+    xxxxxxxx.diagnostics.push(check);
 }

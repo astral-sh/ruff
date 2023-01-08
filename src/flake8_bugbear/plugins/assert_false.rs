@@ -2,10 +2,10 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, Stmt
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::new(
@@ -38,7 +38,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
 }
 
 /// B011
-pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+pub fn assert_false(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let ExprKind::Constant {
         value: Constant::Bool(false),
         ..
@@ -47,8 +47,8 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
     };
 
     let mut check = Diagnostic::new(violations::DoNotAssertFalse, Range::from_located(test));
-    if checker.patch(check.kind.code()) {
-        let mut generator: SourceCodeGenerator = checker.style.into();
+    if xxxxxxxx.patch(check.kind.code()) {
+        let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
         generator.unparse_stmt(&assertion_error(msg));
         check.amend(Fix::replacement(
             generator.generate(),
@@ -56,5 +56,5 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
             stmt.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    xxxxxxxx.diagnostics.push(check);
 }

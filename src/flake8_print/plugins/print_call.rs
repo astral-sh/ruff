@@ -4,15 +4,15 @@ use rustpython_ast::{Expr, Keyword, Stmt, StmtKind};
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, is_const_none, match_call_path};
 use crate::ast::types::Range;
 use crate::autofix::helpers;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// T201, T203
-pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
+pub fn print_call(xxxxxxxx: &mut xxxxxxxx, func: &Expr, keywords: &[Keyword]) {
     let mut check = {
-        let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-        if match_call_path(&call_path, "", "print", &checker.from_imports) {
+        let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
+        if match_call_path(&call_path, "", "print", &xxxxxxxx.from_imports) {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = keywords
@@ -21,30 +21,30 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
             {
                 if !is_const_none(&keyword.node.value) {
                     let call_path = collect_call_paths(&keyword.node.value);
-                    if !(match_call_path(&call_path, "sys", "stdout", &checker.from_imports)
-                        || match_call_path(&call_path, "sys", "stderr", &checker.from_imports))
+                    if !(match_call_path(&call_path, "sys", "stdout", &xxxxxxxx.from_imports)
+                        || match_call_path(&call_path, "sys", "stderr", &xxxxxxxx.from_imports))
                     {
                         return;
                     }
                 }
             }
             Diagnostic::new(violations::PrintFound, Range::from_located(func))
-        } else if match_call_path(&call_path, "pprint", "pprint", &checker.from_imports) {
+        } else if match_call_path(&call_path, "pprint", "pprint", &xxxxxxxx.from_imports) {
             Diagnostic::new(violations::PPrintFound, Range::from_located(func))
         } else {
             return;
         }
     };
 
-    if !checker.settings.enabled.contains(check.kind.code()) {
+    if !xxxxxxxx.settings.enabled.contains(check.kind.code()) {
         return;
     }
 
-    if checker.patch(check.kind.code()) {
-        let defined_by = checker.current_stmt();
-        let defined_in = checker.current_stmt_parent();
+    if xxxxxxxx.patch(check.kind.code()) {
+        let defined_by = xxxxxxxx.current_stmt();
+        let defined_in = xxxxxxxx.current_stmt_parent();
         if matches!(defined_by.node, StmtKind::Expr { .. }) {
-            let deleted: Vec<&Stmt> = checker
+            let deleted: Vec<&Stmt> = xxxxxxxx
                 .deletions
                 .iter()
                 .map(std::convert::Into::into)
@@ -53,11 +53,11 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                 defined_by.into(),
                 defined_in.map(std::convert::Into::into),
                 &deleted,
-                checker.locator,
+                xxxxxxxx.locator,
             ) {
                 Ok(fix) => {
                     if fix.content.is_empty() || fix.content == "pass" {
-                        checker.deletions.insert(defined_by.clone());
+                        xxxxxxxx.deletions.insert(defined_by.clone());
                     }
                     check.amend(fix);
                 }
@@ -66,5 +66,5 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
         }
     }
 
-    checker.diagnostics.push(check);
+    xxxxxxxx.diagnostics.push(check);
 }

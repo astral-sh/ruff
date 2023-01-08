@@ -10,12 +10,12 @@ use crate::ast::helpers::collect_call_paths;
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::registry::{Diagnostic, MockReference, RuleCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// Return a vector of all non-`mock` imports.
 fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Option<AsName>>) {
@@ -201,27 +201,27 @@ fn format_import_from(
 }
 
 /// UP026
-pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
+pub fn rewrite_mock_attribute(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
         if collect_call_paths(value) == ["mock", "mock"] {
             let mut check = Diagnostic::new(
                 violations::RewriteMockImport(MockReference::Attribute),
                 Range::from_located(value),
             );
-            if checker.patch(&RuleCode::UP026) {
+            if xxxxxxxx.patch(&RuleCode::UP026) {
                 check.amend(Fix::replacement(
                     "mock".to_string(),
                     value.location,
                     value.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            xxxxxxxx.diagnostics.push(check);
         }
     }
 }
 
 /// UP026
-pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
+pub fn rewrite_mock_import(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::Import { names } => {
             // Find all `mock` imports.
@@ -230,9 +230,9 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| name.node.name == "mock" || name.node.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(&RuleCode::UP026) {
-                    let indent = indentation(checker, stmt);
-                    match format_import(stmt, &indent, checker.locator, checker.style) {
+                let content = if xxxxxxxx.patch(&RuleCode::UP026) {
+                    let indent = indentation(xxxxxxxx, stmt);
+                    match format_import(stmt, &indent, xxxxxxxx.locator, xxxxxxxx.style) {
                         Ok(content) => Some(content),
                         Err(e) => {
                             error!("Failed to rewrite `mock` import: {e}");
@@ -257,7 +257,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                                 stmt.end_location.unwrap(),
                             ));
                         }
-                        checker.diagnostics.push(check);
+                        xxxxxxxx.diagnostics.push(check);
                     }
                 }
             }
@@ -276,9 +276,9 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     violations::RewriteMockImport(MockReference::Import),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&RuleCode::UP026) {
-                    let indent = indentation(checker, stmt);
-                    match format_import_from(stmt, &indent, checker.locator, checker.style) {
+                if xxxxxxxx.patch(&RuleCode::UP026) {
+                    let indent = indentation(xxxxxxxx, stmt);
+                    match format_import_from(stmt, &indent, xxxxxxxx.locator, xxxxxxxx.style) {
                         Ok(content) => {
                             check.amend(Fix::replacement(
                                 content,
@@ -289,7 +289,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                         Err(e) => error!("Failed to rewrite `mock` import: {e}"),
                     }
                 }
-                checker.diagnostics.push(check);
+                xxxxxxxx.diagnostics.push(check);
             }
         }
         _ => (),

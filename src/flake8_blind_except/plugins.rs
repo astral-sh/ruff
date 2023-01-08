@@ -1,13 +1,13 @@
 use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// BLE001
 pub fn blind_except(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     type_: Option<&Expr>,
     name: Option<&str>,
     body: &[Stmt],
@@ -19,7 +19,7 @@ pub fn blind_except(
         return;
     };
     for exception in ["BaseException", "Exception"] {
-        if id == exception && checker.is_builtin(exception) {
+        if id == exception && xxxxxxxx.is_builtin(exception) {
             // If the exception is re-raised, don't flag an error.
             if !body.iter().any(|stmt| {
                 if let StmtKind::Raise { exc, .. } = &stmt.node {
@@ -36,7 +36,7 @@ pub fn blind_except(
                     false
                 }
             }) {
-                checker.diagnostics.push(Diagnostic::new(
+                xxxxxxxx.diagnostics.push(Diagnostic::new(
                     violations::BlindExcept(id.to_string()),
                     Range::from_located(type_),
                 ));

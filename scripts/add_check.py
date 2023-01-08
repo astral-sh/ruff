@@ -56,7 +56,7 @@ def main(*, name: str, code: str, plugin: str) -> None:
         fp.write(
             f"""
 /// {code}
-pub fn {snake_case(name)}(checker: &mut Checker) {{}}
+pub fn {snake_case(name)}(xxxxxxxx: &mut xxxxxxxx) {{}}
 """
         )
         fp.write("\n")

@@ -2,12 +2,17 @@ use itertools::Itertools;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// B005
-pub fn strip_with_multi_characters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub fn strip_with_multi_characters(
+    xxxxxxxx: &mut xxxxxxxx,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     let ExprKind::Attribute { attr, .. } = &func.node else {
         return;
     };
@@ -26,7 +31,7 @@ pub fn strip_with_multi_characters(checker: &mut Checker, expr: &Expr, func: &Ex
     };
 
     if value.len() > 1 && value.chars().unique().count() != value.len() {
-        checker.diagnostics.push(Diagnostic::new(
+        xxxxxxxx.diagnostics.push(Diagnostic::new(
             violations::StripWithMultiCharacters,
             Range::from_located(expr),
         ));

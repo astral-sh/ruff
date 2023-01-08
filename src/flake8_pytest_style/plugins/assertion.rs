@@ -9,9 +9,9 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
@@ -90,7 +90,7 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
 
 /// PT009
 pub fn unittest_assertion(
-    checker: &Checker,
+    xxxxxxxx: &xxxxxxxx,
     call: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -103,10 +103,10 @@ pub fn unittest_assertion(
                     violations::UnittestAssertion(unittest_assert.to_string()),
                     Range::from_located(func),
                 );
-                if checker.patch(check.kind.code()) {
+                if xxxxxxxx.patch(check.kind.code()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         check.amend(Fix::replacement(
-                            unparse_stmt(&stmt, checker.style),
+                            unparse_stmt(&stmt, xxxxxxxx.style),
                             call.location,
                             call.end_location.unwrap(),
                         ));

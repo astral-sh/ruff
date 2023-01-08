@@ -2,11 +2,11 @@ use rustpython_ast::Alias;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 use crate::{violations, Diagnostic};
 
 /// PLC0414
-pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
+pub fn useless_import_alias(xxxxxxxx: &mut xxxxxxxx, alias: &Alias) {
     let Some(asname) = &alias.node.asname else {
         return;
     };
@@ -18,12 +18,12 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     }
 
     let mut check = Diagnostic::new(violations::UselessImportAlias, Range::from_located(alias));
-    if checker.patch(check.kind.code()) {
+    if xxxxxxxx.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             asname.to_string(),
             alias.location,
             alias.end_location.unwrap(),
         ));
     }
-    checker.diagnostics.push(check);
+    xxxxxxxx.diagnostics.push(check);
 }

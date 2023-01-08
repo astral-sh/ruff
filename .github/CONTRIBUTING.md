@@ -58,8 +58,8 @@ There are four phases to adding a new lint rule:
 
 1. Define the violation in `src/violations.rs` (e.g., `ModuleImportNotAtTopOfFile`).
 2. Map the violation to a code in `src/registry.rs` (e.g., `E402`).
-3. Define the _logic_ for triggering the violation in `src/checkers/ast.rs` (for AST-based checks),
-   `src/checkers/tokens.rs` (for token-based checks), or `src/checkers/lines.rs` (for text-based checks).
+3. Define the _logic_ for triggering the violation in `src/xxxxxxxxs/ast.rs` (for AST-based checks),
+   `src/xxxxxxxxs/tokens.rs` (for token-based checks), or `src/xxxxxxxxs/lines.rs` (for text-based checks).
 4. Add a test fixture.
 5. Update the generated files (documentation and generated code).
 
@@ -67,7 +67,7 @@ To define the violation, open up `src/violations.rs`, and define a new struct us
 `define_violation!` macro. There are plenty of examples in that file, so feel free to pattern-match
 against the existing structs.
 
-To trigger the violation, you'll likely want to augment the logic in `src/checkers/ast.rs`, which
+To trigger the violation, you'll likely want to augment the logic in `src/xxxxxxxxs/ast.rs`, which
 defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
 collecting diagnostics as it goes.
 

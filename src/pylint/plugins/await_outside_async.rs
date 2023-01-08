@@ -1,12 +1,12 @@
 use rustpython_ast::Expr;
 
 use crate::ast::types::{FunctionDef, Range, ScopeKind};
-use crate::checkers::ast::Checker;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 use crate::{violations, Diagnostic};
 
 /// PLE1142
-pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
-    if !checker
+pub fn await_outside_async(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
+    if !xxxxxxxx
         .current_scopes()
         .find_map(|scope| {
             if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
@@ -17,7 +17,7 @@ pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
         })
         .unwrap_or(true)
     {
-        checker.diagnostics.push(Diagnostic::new(
+        xxxxxxxx.diagnostics.push(Diagnostic::new(
             violations::AwaitOutsideAsync,
             Range::from_located(expr),
         ));

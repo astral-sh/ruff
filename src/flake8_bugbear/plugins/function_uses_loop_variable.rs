@@ -5,9 +5,9 @@ use crate::ast::helpers::collect_arg_names;
 use crate::ast::types::{Node, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
@@ -180,7 +180,7 @@ where
 }
 
 /// B023
-pub fn function_uses_loop_variable<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>)
+pub fn function_uses_loop_variable<'a, 'b>(xxxxxxxx: &'a mut xxxxxxxx<'b>, node: &Node<'b>)
 where
     'b: 'a,
 {
@@ -210,9 +210,9 @@ where
         // loop, flag it.
         for (name, expr, range) in suspicious_variables {
             if reassigned_in_loop.contains(name) {
-                if !checker.flake8_bugbear_seen.contains(&expr) {
-                    checker.flake8_bugbear_seen.push(expr);
-                    checker.diagnostics.push(Diagnostic::new(
+                if !xxxxxxxx.flake8_bugbear_seen.contains(&expr) {
+                    xxxxxxxx.flake8_bugbear_seen.push(expr);
+                    xxxxxxxx.diagnostics.push(Diagnostic::new(
                         violations::FunctionUsesLoopVariable(name.to_string()),
                         range,
                     ));

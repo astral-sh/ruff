@@ -2,13 +2,13 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, Stmt
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &SourceCodeStyleDetector) -> String {
     let stmt = Stmt::new(
@@ -34,7 +34,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &SourceCodeStyleDet
 }
 
 /// B010
-pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub fn setattr_with_constant(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, func: &Expr, args: &[Expr]) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
     };
@@ -59,18 +59,18 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `StmtKind::Expr`).
-    if let StmtKind::Expr { value: child } = &checker.current_stmt().node {
+    if let StmtKind::Expr { value: child } = &xxxxxxxx.current_stmt().node {
         if expr == child.as_ref() {
             let mut check =
                 Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
-            if checker.patch(check.kind.code()) {
+            if xxxxxxxx.patch(check.kind.code()) {
                 check.amend(Fix::replacement(
-                    assignment(obj, name, value, checker.style),
+                    assignment(obj, name, value, xxxxxxxx.style),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.diagnostics.push(check);
+            xxxxxxxx.diagnostics.push(check);
         }
     }
 }

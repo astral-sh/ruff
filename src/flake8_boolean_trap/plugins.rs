@@ -2,9 +2,9 @@ use rustpython_ast::{Arguments, ExprKind};
 use rustpython_parser::ast::{Constant, Expr};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 const FUNC_NAME_ALLOWLIST: &[&str] = &[
     "assertEqual",
@@ -47,15 +47,15 @@ fn is_boolean_arg(arg: &Expr) -> bool {
     )
 }
 
-fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
+fn add_if_boolean(xxxxxxxx: &mut xxxxxxxx, arg: &Expr, kind: DiagnosticKind) {
     if is_boolean_arg(arg) {
-        checker
+        xxxxxxxx
             .diagnostics
             .push(Diagnostic::new(kind, Range::from_located(arg)));
     }
 }
 
-pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Arguments) {
+pub fn check_positional_boolean_in_def(xxxxxxxx: &mut xxxxxxxx, arguments: &Arguments) {
     for arg in arguments.posonlyargs.iter().chain(arguments.args.iter()) {
         if arg.node.annotation.is_none() {
             continue;
@@ -76,7 +76,7 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Argume
         if !hint {
             continue;
         }
-        checker.diagnostics.push(Diagnostic::new(
+        xxxxxxxx.diagnostics.push(Diagnostic::new(
             violations::BooleanPositionalArgInFunctionDefinition,
             Range::from_located(arg),
         ));
@@ -84,12 +84,12 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Argume
 }
 
 pub fn check_boolean_default_value_in_function_definition(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     arguments: &Arguments,
 ) {
     for arg in &arguments.defaults {
         add_if_boolean(
-            checker,
+            xxxxxxxx,
             arg,
             violations::BooleanDefaultValueInFunctionDefinition.into(),
         );
@@ -97,7 +97,7 @@ pub fn check_boolean_default_value_in_function_definition(
 }
 
 pub fn check_boolean_positional_value_in_function_call(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     args: &[Expr],
     func: &Expr,
 ) {
@@ -106,7 +106,7 @@ pub fn check_boolean_positional_value_in_function_call(
             continue;
         }
         add_if_boolean(
-            checker,
+            xxxxxxxx,
             arg,
             violations::BooleanPositionalValueInFunctionCall.into(),
         );

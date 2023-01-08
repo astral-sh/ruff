@@ -7,10 +7,10 @@ use crate::ast::helpers::{
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::checkers::ast::Checker;
 use crate::flake8_bugbear::plugins::mutable_argument_default::is_mutable_func;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 const IMMUTABLE_FUNCS: [(&str, &str); 7] = [
     ("", "tuple"),
@@ -95,9 +95,9 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
 }
 
 /// B008
-pub fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub fn function_call_argument_default(xxxxxxxx: &mut xxxxxxxx, arguments: &Arguments) {
     // Map immutable calls to (module, member) format.
-    let extend_immutable_cells: Vec<(&str, &str)> = checker
+    let extend_immutable_cells: Vec<(&str, &str)> = xxxxxxxx
         .settings
         .flake8_bugbear
         .extend_immutable_calls
@@ -107,8 +107,8 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
     let mut visitor = ArgumentDefaultVisitor {
         checks: vec![],
         extend_immutable_calls: &extend_immutable_cells,
-        from_imports: &checker.from_imports,
-        import_aliases: &checker.import_aliases,
+        from_imports: &xxxxxxxx.from_imports,
+        import_aliases: &xxxxxxxx.import_aliases,
     };
     for expr in arguments
         .defaults
@@ -118,6 +118,6 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         visitor.visit_expr(expr);
     }
     for (check, range) in visitor.checks {
-        checker.diagnostics.push(Diagnostic::new(check, range));
+        xxxxxxxx.diagnostics.push(Diagnostic::new(check, range));
     }
 }

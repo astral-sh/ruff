@@ -1,20 +1,20 @@
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
+use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// B905
 pub fn zip_without_explicit_strict(
-    checker: &mut Checker,
+    xxxxxxxx: &mut xxxxxxxx,
     expr: &Expr,
     func: &Expr,
     kwargs: &[Keyword],
 ) {
     if let ExprKind::Name { id, .. } = &func.node {
         if id == "zip"
-            && checker.is_builtin("zip")
+            && xxxxxxxx.is_builtin("zip")
             && !kwargs.iter().any(|keyword| {
                 keyword
                     .node
@@ -23,7 +23,7 @@ pub fn zip_without_explicit_strict(
                     .map_or(false, |name| name == "strict")
             })
         {
-            checker.diagnostics.push(Diagnostic::new(
+            xxxxxxxx.diagnostics.push(Diagnostic::new(
                 violations::ZipWithoutExplicitStrict,
                 Range::from_located(expr),
             ));
