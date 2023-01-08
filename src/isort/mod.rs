@@ -25,7 +25,7 @@ mod categorize;
 mod comments;
 pub mod format;
 pub mod helpers;
-pub mod plugins;
+pub mod rules;
 pub mod settings;
 mod sorting;
 pub mod track;

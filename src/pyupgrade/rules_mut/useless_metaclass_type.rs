@@ -4,12 +4,12 @@ use rustpython_ast::{Expr, Stmt};
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::pyupgrade::checks;
+use crate::pyupgrade::rules;
 
 /// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
     let Some(mut diagnostic) =
-        checks::useless_metaclass_type(targets, value, Range::from_located(stmt)) else {
+        rules::useless_metaclass_type(targets, value, Range::from_located(stmt)) else {
             return;
         };
     if checker.patch(diagnostic.kind.code()) {

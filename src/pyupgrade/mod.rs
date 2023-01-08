@@ -1,6 +1,6 @@
-pub mod checks;
 pub mod fixes;
-pub mod plugins;
+pub mod rules;
+pub mod rules_mut;
 pub mod settings;
 pub mod types;
 

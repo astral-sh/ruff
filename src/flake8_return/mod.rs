@@ -1,5 +1,5 @@
 mod helpers;
-pub mod plugins;
+pub mod rules_mut;
 mod visitor;
 
 #[cfg(test)]

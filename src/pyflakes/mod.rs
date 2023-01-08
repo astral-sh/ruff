@@ -1,8 +1,8 @@
 pub mod cformat;
-pub mod checks;
 pub mod fixes;
 pub mod format;
-pub mod plugins;
+pub mod rules;
+pub mod rules_mut;
 
 #[cfg(test)]
 mod tests {

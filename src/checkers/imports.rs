@@ -25,7 +25,7 @@ fn check_import_blocks(
     for block in tracker.into_iter() {
         if !block.imports.is_empty() {
             if let Some(diagnostic) =
-                isort::plugins::check_imports(&block, locator, settings, stylist, autofix, package)
+                isort::rules::check_imports(&block, locator, settings, stylist, autofix, package)
             {
                 diagnostics.push(diagnostic);
             }

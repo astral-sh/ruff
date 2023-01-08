@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, Keyword, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::pyupgrade;
-use crate::pyupgrade::checks;
+use crate::pyupgrade::rules;
 
 /// UP004
 pub fn useless_object_inheritance(
@@ -12,7 +12,7 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut diagnostic) = checks::useless_object_inheritance(name, bases, checker.current_scope(), &checker.bindings) else {
+    let Some(mut diagnostic) = rules::useless_object_inheritance(name, bases, checker.current_scope(), &checker.bindings) else {
         return;
     };
     if checker.patch(diagnostic.kind.code()) {

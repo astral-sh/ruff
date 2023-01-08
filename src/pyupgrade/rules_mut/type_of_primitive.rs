@@ -3,13 +3,13 @@ use rustpython_ast::Expr;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::pyupgrade::checks;
+use crate::pyupgrade::rules;
 use crate::registry::DiagnosticKind;
 use crate::violations;
 
 /// UP003
 pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let Some(mut diagnostic) = checks::type_of_primitive(func, args, Range::from_located(expr)) else {
+    let Some(mut diagnostic) = rules::type_of_primitive(func, args, Range::from_located(expr)) else {
         return;
     };
     if checker.patch(diagnostic.kind.code()) {

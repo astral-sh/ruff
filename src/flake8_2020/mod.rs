@@ -1,4 +1,4 @@
-pub mod plugins;
+pub mod rules_mut;
 
 #[cfg(test)]
 mod tests {

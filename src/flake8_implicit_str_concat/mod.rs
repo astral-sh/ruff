@@ -1,4 +1,4 @@
-pub mod checks;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {

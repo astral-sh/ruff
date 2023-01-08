@@ -143,7 +143,7 @@ pub struct Options {
     /// A list of check codes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
     /// retaining `# noqa` directives that cover plugins not yet implemented
-    /// in Ruff.
+    /// by Ruff.
     pub external: Option<Vec<String>>,
     #[option(default = "false", value_type = "bool", example = "fix = true")]
     /// Enable autofix behavior by-default when running `ruff` (overridden

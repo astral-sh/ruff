@@ -79,7 +79,7 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser::parser;
 
-    use crate::mccabe::checks::get_complexity_number;
+    use crate::mccabe::rules::get_complexity_number;
 
     #[test]
     fn trivial() -> Result<()> {
