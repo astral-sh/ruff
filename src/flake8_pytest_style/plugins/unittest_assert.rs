@@ -277,7 +277,9 @@ impl UnittestAssert {
             | UnittestAssert::Greater
             | UnittestAssert::GreaterEqual
             | UnittestAssert::Less
-            | UnittestAssert::LessEqual => {
+            | UnittestAssert::LessEqual
+            | UnittestAssert::Is
+            | UnittestAssert::IsNot => {
                 let first = args
                     .get("first")
                     .ok_or_else(|| anyhow!("Missing argument `first`"))?;
@@ -292,25 +294,11 @@ impl UnittestAssert {
                     UnittestAssert::GreaterEqual => Cmpop::GtE,
                     UnittestAssert::Less => Cmpop::Lt,
                     UnittestAssert::LessEqual => Cmpop::LtE,
+                    UnittestAssert::Is => Cmpop::Is,
+                    UnittestAssert::IsNot => Cmpop::IsNot,
                     _ => unreachable!(),
                 };
                 let expr = compare(first, cmpop, second);
-                Ok(assert(&expr, msg))
-            }
-            UnittestAssert::Is | UnittestAssert::IsNot => {
-                let expr1 = args
-                    .get("first")
-                    .ok_or_else(|| anyhow!("Missing argument `expr1`"))?;
-                let expr2 = args
-                    .get("second")
-                    .ok_or_else(|| anyhow!("Missing argument `expr2`"))?;
-                let msg = args.get("msg").copied();
-                let cmpop = if matches!(self, UnittestAssert::Is) {
-                    Cmpop::Is
-                } else {
-                    Cmpop::IsNot
-                };
-                let expr = compare(expr1, cmpop, expr2);
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::In | UnittestAssert::NotIn => {
@@ -379,12 +367,12 @@ impl UnittestAssert {
             | UnittestAssert::RegexpMatches
             | UnittestAssert::NotRegex
             | UnittestAssert::NotRegexpMatches => {
-                let regex = args
-                    .get("regex")
-                    .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let text = args
                     .get("text")
                     .ok_or_else(|| anyhow!("Missing argument `text`"))?;
+                let regex = args
+                    .get("regex")
+                    .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
                 let re_search = create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Attribute {
