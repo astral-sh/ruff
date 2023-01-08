@@ -1,4 +1,8 @@
+use std::fmt;
+
 use itertools::Itertools;
+use rustpython_ast::Cmpop;
+use serde::{Deserialize, Serialize};
 
 use crate::define_violation;
 use crate::flake8_debugger::types::DebuggerUsingType;
@@ -8,9 +12,6 @@ use crate::flake8_pytest_style::types::{
 use crate::flake8_quotes::settings::Quote;
 use crate::flake8_tidy_imports::settings::Strictness;
 use crate::pyupgrade::types::Primitive;
-use crate::registry::{
-    Branch, DeferralKeyword, EqCmpop, IsCmpop, LiteralType, MockReference, UnusedCodes,
-};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 // pycodestyle errors
@@ -52,6 +53,22 @@ impl Violation for LineTooLong {
 
     fn placeholder() -> Self {
         LineTooLong(89, 88)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EqCmpop {
+    Eq,
+    NotEq,
+}
+
+impl From<&Cmpop> for EqCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Eq => EqCmpop::Eq,
+            Cmpop::NotEq => EqCmpop::NotEq,
+            _ => unreachable!("Expected Cmpop::Eq | Cmpop::NotEq"),
+        }
     }
 }
 
@@ -737,6 +754,22 @@ impl Violation for AssertTuple {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IsCmpop {
+    Is,
+    IsNot,
+}
+
+impl From<&Cmpop> for IsCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Is => IsCmpop::Is,
+            Cmpop::IsNot => IsCmpop::IsNot,
+            _ => unreachable!("Expected Cmpop::Is | Cmpop::IsNot"),
+        }
+    }
+}
+
 define_violation!(
     pub struct IsLiteral(pub IsCmpop);
 );
@@ -811,6 +844,23 @@ impl Violation for ContinueOutsideLoop {
 
     fn placeholder() -> Self {
         ContinueOutsideLoop
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeferralKeyword {
+    Yield,
+    YieldFrom,
+    Await,
+}
+
+impl fmt::Display for DeferralKeyword {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeferralKeyword::Yield => fmt.write_str("yield"),
+            DeferralKeyword::YieldFrom => fmt.write_str("yield from"),
+            DeferralKeyword::Await => fmt.write_str("await"),
+        }
     }
 }
 
@@ -2117,6 +2167,21 @@ impl Violation for UnnecessaryAssign {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Branch {
+    Elif,
+    Else,
+}
+
+impl fmt::Display for Branch {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Branch::Elif => fmt.write_str("elif"),
+            Branch::Else => fmt.write_str("else"),
+        }
+    }
+}
+
 define_violation!(
     pub struct SuperfluousElseReturn(pub Branch);
 );
@@ -3318,6 +3383,21 @@ impl AlwaysAutofixableViolation for DatetimeTimezoneUTC {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LiteralType {
+    Str,
+    Bytes,
+}
+
+impl fmt::Display for LiteralType {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LiteralType::Str => fmt.write_str("str"),
+            LiteralType::Bytes => fmt.write_str("bytes"),
+        }
+    }
+}
+
 define_violation!(
     pub struct NativeLiterals(pub LiteralType);
 );
@@ -3458,6 +3538,12 @@ impl AlwaysAutofixableViolation for RewriteUnicodeLiteral {
     fn placeholder() -> Self {
         RewriteUnicodeLiteral
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MockReference {
+    Import,
+    Attribute,
 }
 
 define_violation!(
@@ -5733,6 +5819,13 @@ impl Violation for KeywordArgumentBeforeStarArgument {
     fn placeholder() -> Self {
         KeywordArgumentBeforeStarArgument("...".to_string())
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnusedCodes {
+    pub unknown: Vec<String>,
+    pub disabled: Vec<String>,
+    pub unmatched: Vec<String>,
 }
 
 define_violation!(

@@ -12,10 +12,11 @@ use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
-use crate::registry::{Diagnostic, MockReference, RuleCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
+use crate::violations::MockReference;
 
 /// Return a vector of all non-`mock` imports.
 fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Option<AsName>>) {

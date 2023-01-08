@@ -8,8 +8,9 @@ use rustpython_parser::ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::registry::{Diagnostic, DiagnosticKind, RuleCode, UnusedCodes, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, DiagnosticKind, RuleCode, CODE_REDIRECTS};
 use crate::settings::{flags, Settings};
+use crate::violations::UnusedCodes;
 use crate::{noqa, violations};
 
 pub fn check_noqa(

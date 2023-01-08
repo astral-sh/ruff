@@ -5,8 +5,9 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, LiteralType, RuleCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
+use crate::violations::LiteralType;
 
 /// UP018
 pub fn native_literals(
