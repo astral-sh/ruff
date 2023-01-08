@@ -213,7 +213,9 @@ impl UnittestAssert {
             UnittestAssert::NotRegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
             UnittestAssert::Regex => Arguments::new(vec!["text", "regex"], vec!["msg"]),
             UnittestAssert::RegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
-            UnittestAssert::SequenceEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
+            UnittestAssert::SequenceEqual => {
+                Arguments::new(vec!["first", "second"], vec!["msg", "seq_type"])
+            }
             UnittestAssert::SetEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
             UnittestAssert::True => Arguments::new(vec!["expr"], vec!["msg"]),
             UnittestAssert::TupleEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
@@ -297,10 +299,10 @@ impl UnittestAssert {
             }
             UnittestAssert::Is | UnittestAssert::IsNot => {
                 let expr1 = args
-                    .get("expr1")
+                    .get("first")
                     .ok_or_else(|| anyhow!("Missing argument `expr1`"))?;
                 let expr2 = args
-                    .get("expr2")
+                    .get("second")
                     .ok_or_else(|| anyhow!("Missing argument `expr2`"))?;
                 let msg = args.get("msg").copied();
                 let cmpop = if matches!(self, UnittestAssert::Is) {
