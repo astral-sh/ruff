@@ -30,11 +30,12 @@ use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::python::typing::SubscriptKind;
-use crate::registry::{DeferralKeyword, Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::violations::DeferralKeyword;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
     autofix, docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,

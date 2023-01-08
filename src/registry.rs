@@ -5,7 +5,6 @@ use std::fmt;
 use once_cell::sync::Lazy;
 use ruff_macros::RuleCodePrefix;
 use rustc_hash::FxHashMap;
-use rustpython_ast::Cmpop;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
@@ -762,98 +761,6 @@ pub enum LintSource {
     Tokens,
     Imports,
     NoQA,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EqCmpop {
-    Eq,
-    NotEq,
-}
-
-impl From<&Cmpop> for EqCmpop {
-    fn from(cmpop: &Cmpop) -> Self {
-        match cmpop {
-            Cmpop::Eq => EqCmpop::Eq,
-            Cmpop::NotEq => EqCmpop::NotEq,
-            _ => unreachable!("Expected Cmpop::Eq | Cmpop::NotEq"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum IsCmpop {
-    Is,
-    IsNot,
-}
-
-impl From<&Cmpop> for IsCmpop {
-    fn from(cmpop: &Cmpop) -> Self {
-        match cmpop {
-            Cmpop::Is => IsCmpop::Is,
-            Cmpop::IsNot => IsCmpop::IsNot,
-            _ => unreachable!("Expected Cmpop::Is | Cmpop::IsNot"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DeferralKeyword {
-    Yield,
-    YieldFrom,
-    Await,
-}
-
-impl fmt::Display for DeferralKeyword {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DeferralKeyword::Yield => fmt.write_str("yield"),
-            DeferralKeyword::YieldFrom => fmt.write_str("yield from"),
-            DeferralKeyword::Await => fmt.write_str("await"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Branch {
-    Elif,
-    Else,
-}
-
-impl fmt::Display for Branch {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Branch::Elif => fmt.write_str("elif"),
-            Branch::Else => fmt.write_str("else"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LiteralType {
-    Str,
-    Bytes,
-}
-
-impl fmt::Display for LiteralType {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            LiteralType::Str => fmt.write_str("str"),
-            LiteralType::Bytes => fmt.write_str("bytes"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UnusedCodes {
-    pub unknown: Vec<String>,
-    pub disabled: Vec<String>,
-    pub unmatched: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MockReference {
-    Import,
-    Attribute,
 }
 
 impl RuleCode {
