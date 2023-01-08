@@ -8,6 +8,9 @@ use rustpython_ast::{
 
 use crate::ast::helpers::{create_expr, create_stmt};
 
+/// An enum to represent the different types of assertions present in the
+/// `unittest` module. Note: any variants that can't be replaced with plain
+/// `assert` statements are commented out.
 pub enum UnittestAssert {
     AlmostEqual,
     AlmostEquals,
@@ -51,7 +54,6 @@ pub enum UnittestAssert {
     Underscore,
     // Warns,
     // WarnsRegex,
-    // Commented out methods can't be simply replaced with `assert ...`.
 }
 
 impl std::fmt::Display for UnittestAssert {
