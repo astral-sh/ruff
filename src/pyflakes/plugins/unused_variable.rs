@@ -4,11 +4,11 @@ use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
-fn is_literal_or_name(expr: &Expr, xxxxxxxx: &xxxxxxxx) -> bool {
+fn is_literal_or_name(expr: &Expr, checker: &Checker) -> bool {
     // Accept any obvious literals or names.
     if matches!(
         expr.node,
@@ -35,7 +35,7 @@ fn is_literal_or_name(expr: &Expr, xxxxxxxx: &xxxxxxxx) -> bool {
                     || id == "tuple"
                     || id == "dict"
                     || id == "frozenset")
-                    && xxxxxxxx.is_builtin(id);
+                    && checker.is_builtin(id);
             }
         }
     }
@@ -53,23 +53,23 @@ enum DeletionKind {
 fn remove_unused_variable(
     stmt: &Stmt,
     range: &Range,
-    xxxxxxxx: &xxxxxxxx,
+    checker: &Checker,
 ) -> Option<(DeletionKind, Fix)> {
     // First case: simple assignment (`x = 1`)
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
         if targets.len() == 1 && matches!(targets[0].node, ExprKind::Name { .. }) {
-            return if is_literal_or_name(value, xxxxxxxx) {
+            return if is_literal_or_name(value, checker) {
                 // If assigning to a constant (`x = 1`), delete the entire statement.
-                let parent = xxxxxxxx
+                let parent = checker
                     .child_to_parent
                     .get(&RefEquality(stmt))
                     .map(std::convert::Into::into);
-                let deleted: Vec<&Stmt> = xxxxxxxx
+                let deleted: Vec<&Stmt> = checker
                     .deletions
                     .iter()
                     .map(std::convert::Into::into)
                     .collect();
-                let locator = xxxxxxxx.locator;
+                let locator = checker.locator;
                 match delete_stmt(stmt, parent, &deleted, locator) {
                     Ok(fix) => Some((DeletionKind::Whole, fix)),
                     Err(err) => {
@@ -96,18 +96,18 @@ fn remove_unused_variable(
     } = &stmt.node
     {
         if matches!(target.node, ExprKind::Name { .. }) {
-            return if is_literal_or_name(value, xxxxxxxx) {
+            return if is_literal_or_name(value, checker) {
                 // If assigning to a constant (`x = 1`), delete the entire statement.
-                let parent = xxxxxxxx
+                let parent = checker
                     .child_to_parent
                     .get(&RefEquality(stmt))
                     .map(std::convert::Into::into);
-                let deleted: Vec<&Stmt> = xxxxxxxx
+                let deleted: Vec<&Stmt> = checker
                     .deletions
                     .iter()
                     .map(std::convert::Into::into)
                     .collect();
-                let locator = xxxxxxxx.locator;
+                let locator = checker.locator;
                 match delete_stmt(stmt, parent, &deleted, locator) {
                     Ok(fix) => Some((DeletionKind::Whole, fix)),
                     Err(err) => {
@@ -151,8 +151,8 @@ fn remove_unused_variable(
 }
 
 /// F841
-pub fn unused_variable(xxxxxxxx: &mut xxxxxxxx, scope: usize) {
-    let scope = &xxxxxxxx.scopes[scope];
+pub fn unused_variable(checker: &mut Checker, scope: usize) {
+    let scope = &checker.scopes[scope];
     if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
         return;
     }
@@ -160,11 +160,11 @@ pub fn unused_variable(xxxxxxxx: &mut xxxxxxxx, scope: usize) {
     for (name, binding) in scope
         .values
         .iter()
-        .map(|(name, index)| (name, &xxxxxxxx.bindings[*index]))
+        .map(|(name, index)| (name, &checker.bindings[*index]))
     {
         if binding.used.is_none()
             && matches!(binding.kind, BindingKind::Assignment)
-            && !xxxxxxxx.settings.dummy_variable_rgx.is_match(name)
+            && !checker.settings.dummy_variable_rgx.is_match(name)
             && name != &"__tracebackhide__"
             && name != &"__traceback_info__"
             && name != &"__traceback_supplement__"
@@ -173,19 +173,18 @@ pub fn unused_variable(xxxxxxxx: &mut xxxxxxxx, scope: usize) {
                 violations::UnusedVariable((*name).to_string()),
                 binding.range,
             );
-            if xxxxxxxx.patch(&RuleCode::F841) {
+            if checker.patch(&RuleCode::F841) {
                 if let Some(stmt) = binding.source.as_ref().map(std::convert::Into::into) {
-                    if let Some((kind, fix)) =
-                        remove_unused_variable(stmt, &binding.range, xxxxxxxx)
+                    if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
                     {
                         if matches!(kind, DeletionKind::Whole) {
-                            xxxxxxxx.deletions.insert(RefEquality(stmt));
+                            checker.deletions.insert(RefEquality(stmt));
                         }
                         check.amend(fix);
                     }
                 }
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 }

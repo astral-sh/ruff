@@ -1,7 +1,7 @@
 use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
+use crate::checkers::ast::Checker;
 use crate::{violations, Diagnostic};
 
 fn loop_exits_early(body: &[Stmt]) -> bool {
@@ -30,11 +30,11 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
 }
 
 /// PLW0120
-pub fn useless_else_on_loop(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
+pub fn useless_else_on_loop(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
     if !orelse.is_empty() && !loop_exits_early(body) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::UselessElseOnLoop,
-            helpers::else_range(stmt, xxxxxxxx.locator).unwrap(),
+            helpers::else_range(stmt, checker.locator).unwrap(),
         ));
     }
 }

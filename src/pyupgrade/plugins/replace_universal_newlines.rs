@@ -3,18 +3,18 @@ use rustpython_ast::{Expr, Keyword, Location};
 use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// UP021
-pub fn replace_universal_newlines(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, kwargs: &[Keyword]) {
+pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     if match_module_member(
         expr,
         "subprocess",
         "run",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     ) {
         let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
         let range = Range::new(
@@ -25,13 +25,13 @@ pub fn replace_universal_newlines(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, kwargs: 
             ),
         );
         let mut check = Diagnostic::new(violations::ReplaceUniversalNewlines, range);
-        if xxxxxxxx.patch(check.kind.code()) {
+        if checker.patch(check.kind.code()) {
             check.amend(Fix::replacement(
                 "text".to_string(),
                 range.location,
                 range.end_location,
             ));
         }
-        xxxxxxxx.diagnostics.push(check);
+        checker.diagnostics.push(check);
     }
 }

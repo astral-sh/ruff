@@ -3,9 +3,9 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn is_abc_class(
     bases: &[Expr],
@@ -61,7 +61,7 @@ fn is_overload(
 }
 
 pub fn abstract_base_class(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
     bases: &[Expr],
@@ -74,8 +74,8 @@ pub fn abstract_base_class(
     if !is_abc_class(
         bases,
         keywords,
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     ) {
         return;
     }
@@ -104,11 +104,11 @@ pub fn abstract_base_class(
 
         let has_abstract_decorator = decorator_list
             .iter()
-            .any(|d| is_abstractmethod(d, &xxxxxxxx.from_imports, &xxxxxxxx.import_aliases));
+            .any(|d| is_abstractmethod(d, &checker.from_imports, &checker.import_aliases));
 
         has_abstract_method |= has_abstract_decorator;
 
-        if !xxxxxxxx.settings.enabled.contains(&RuleCode::B027) {
+        if !checker.settings.enabled.contains(&RuleCode::B027) {
             continue;
         }
 
@@ -116,17 +116,17 @@ pub fn abstract_base_class(
             && is_empty_body(body)
             && !decorator_list
                 .iter()
-                .any(|d| is_overload(d, &xxxxxxxx.from_imports, &xxxxxxxx.import_aliases))
+                .any(|d| is_overload(d, &checker.from_imports, &checker.import_aliases))
         {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::EmptyMethodWithoutAbstractDecorator(name.to_string()),
                 Range::from_located(stmt),
             ));
         }
     }
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::B024) {
+    if checker.settings.enabled.contains(&RuleCode::B024) {
         if !has_abstract_method {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::AbstractBaseClassWithoutAbstractMethod(name.to_string()),
                 Range::from_located(stmt),
             ));

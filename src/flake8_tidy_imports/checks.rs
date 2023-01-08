@@ -4,10 +4,10 @@ use rustpython_ast::{Alias, Expr, Located, Stmt};
 use super::settings::BannedApi;
 use crate::ast::helpers::match_call_path;
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::flake8_tidy_imports::settings::Strictness;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// TID252
 pub fn banned_relative_import(
@@ -76,15 +76,15 @@ pub fn name_or_parent_is_banned<T>(
 
 /// TID251
 pub fn banned_attribute_access(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     call_path: &[&str],
     expr: &Expr,
     banned_apis: &FxHashMap<String, BannedApi>,
 ) {
     for (banned_path, ban) in banned_apis {
         if let Some((module, member)) = banned_path.rsplit_once('.') {
-            if match_call_path(call_path, module, member, &xxxxxxxx.from_imports) {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+            if match_call_path(call_path, module, member, &checker.from_imports) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::BannedApi {
                         name: banned_path.to_string(),
                         message: ban.msg.to_string(),

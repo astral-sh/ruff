@@ -7,9 +7,9 @@ use crate::ast::helpers::{
     to_module_and_member,
 };
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn is_pytest_raises(
     func: &Expr,
@@ -29,18 +29,18 @@ fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
-pub fn raises_call(xxxxxxxx: &mut xxxxxxxx, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_raises(func, &xxxxxxxx.from_imports, &xxxxxxxx.import_aliases) {
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::PT010) {
+pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+    if is_pytest_raises(func, &checker.from_imports, &checker.import_aliases) {
+        if checker.settings.enabled.contains(&RuleCode::PT010) {
             if args.is_empty() && keywords.is_empty() {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     violations::RaisesWithoutException,
                     Range::from_located(func),
                 ));
             }
         }
 
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::PT011) {
+        if checker.settings.enabled.contains(&RuleCode::PT011) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.node.arg == Some("match".to_string()));
@@ -48,22 +48,22 @@ pub fn raises_call(xxxxxxxx: &mut xxxxxxxx, func: &Expr, args: &[Expr], keywords
             if let Some(exception) = args.first() {
                 if let Some(match_keyword) = match_keyword {
                     if is_empty_or_null_string(&match_keyword.node.value) {
-                        exception_needs_match(xxxxxxxx, exception);
+                        exception_needs_match(checker, exception);
                     }
                 } else {
-                    exception_needs_match(xxxxxxxx, exception);
+                    exception_needs_match(checker, exception);
                 }
             }
         }
     }
 }
 
-pub fn complex_raises(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt, items: &[Withitem], body: &[Stmt]) {
+pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], body: &[Stmt]) {
     let mut is_too_complex = false;
 
     let raises_called = items.iter().any(|item| match &item.context_expr.node {
         ExprKind::Call { func, .. } => {
-            is_pytest_raises(func, &xxxxxxxx.from_imports, &xxxxxxxx.import_aliases)
+            is_pytest_raises(func, &checker.from_imports, &checker.import_aliases)
         }
         _ => false,
     });
@@ -91,7 +91,7 @@ pub fn complex_raises(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt, items: &[Withitem], 
         }
 
         if is_too_complex {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::RaisesWithMultipleStatements,
                 Range::from_located(stmt),
             ));
@@ -100,27 +100,25 @@ pub fn complex_raises(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt, items: &[Withitem], 
 }
 
 /// PT011
-fn exception_needs_match(xxxxxxxx: &mut xxxxxxxx, exception: &Expr) {
-    let call_path = dealias_call_path(collect_call_paths(exception), &xxxxxxxx.import_aliases);
+fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
+    let call_path = dealias_call_path(collect_call_paths(exception), &checker.import_aliases);
 
-    let is_broad_exception = xxxxxxxx
+    let is_broad_exception = checker
         .settings
         .flake8_pytest_style
         .raises_require_match_for
         .iter()
         .chain(
-            &xxxxxxxx
+            &checker
                 .settings
                 .flake8_pytest_style
                 .raises_extend_require_match_for,
         )
         .map(|target| to_module_and_member(target))
-        .any(|(module, member)| {
-            match_call_path(&call_path, module, member, &xxxxxxxx.from_imports)
-        });
+        .any(|(module, member)| match_call_path(&call_path, module, member, &checker.from_imports));
 
     if is_broad_exception {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::RaisesTooBroad(call_path.join(".")),
             Range::from_located(exception),
         ));

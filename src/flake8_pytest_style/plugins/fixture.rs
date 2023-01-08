@@ -9,9 +9,9 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 #[derive(Default)]
 /// Visitor that skips functions
@@ -60,20 +60,20 @@ where
     }
 }
 
-fn get_fixture_decorator<'a>(xxxxxxxx: &xxxxxxxx, decorators: &'a [Expr]) -> Option<&'a Expr> {
+fn get_fixture_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(decorator, xxxxxxxx) || is_pytest_yield_fixture(decorator, xxxxxxxx)
+        is_pytest_fixture(decorator, checker) || is_pytest_yield_fixture(decorator, checker)
     })
 }
 
-fn has_abstractmethod_decorator(decorators: &[Expr], xxxxxxxx: &xxxxxxxx) -> bool {
+fn has_abstractmethod_decorator(decorators: &[Expr], checker: &Checker) -> bool {
     decorators
         .iter()
-        .any(|decorator| is_abstractmethod_decorator(decorator, xxxxxxxx))
+        .any(|decorator| is_abstractmethod_decorator(decorator, checker))
 }
 
 fn pytest_fixture_parentheses(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     decorator: &Expr,
     fix: Fix,
     preferred: &str,
@@ -83,14 +83,14 @@ fn pytest_fixture_parentheses(
         violations::IncorrectFixtureParenthesesStyle(preferred.to_string(), actual.to_string()),
         Range::from_located(decorator),
     );
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         check.amend(fix);
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// PT001, PT002, PT003
-fn check_fixture_decorator(xxxxxxxx: &mut xxxxxxxx, func_name: &str, decorator: &Expr) {
+fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Expr) {
     match &decorator.node {
         ExprKind::Call {
             func,
@@ -98,8 +98,8 @@ fn check_fixture_decorator(xxxxxxxx: &mut xxxxxxxx, func_name: &str, decorator: 
             keywords,
             ..
         } => {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::PT001)
-                && !xxxxxxxx.settings.flake8_pytest_style.fixture_parentheses
+            if checker.settings.enabled.contains(&RuleCode::PT001)
+                && !checker.settings.flake8_pytest_style.fixture_parentheses
                 && args.is_empty()
                 && keywords.is_empty()
             {
@@ -108,24 +108,24 @@ fn check_fixture_decorator(xxxxxxxx: &mut xxxxxxxx, func_name: &str, decorator: 
                     func.end_location.unwrap(),
                     decorator.end_location.unwrap(),
                 );
-                pytest_fixture_parentheses(xxxxxxxx, decorator, fix, "", "()");
+                pytest_fixture_parentheses(checker, decorator, fix, "", "()");
             }
 
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::PT002) && !args.is_empty() {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::PT002) && !args.is_empty() {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::FixturePositionalArgs(func_name.to_string()),
                     Range::from_located(decorator),
                 ));
             }
 
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::PT003) {
+            if checker.settings.enabled.contains(&RuleCode::PT003) {
                 let scope_keyword = keywords
                     .iter()
                     .find(|kw| kw.node.arg == Some("scope".to_string()));
 
                 if let Some(scope_keyword) = scope_keyword {
                     if keyword_is_literal(scope_keyword, "function") {
-                        xxxxxxxx.diagnostics.push(Diagnostic::new(
+                        checker.diagnostics.push(Diagnostic::new(
                             violations::ExtraneousScopeFunction,
                             Range::from_located(scope_keyword),
                         ));
@@ -134,44 +134,44 @@ fn check_fixture_decorator(xxxxxxxx: &mut xxxxxxxx, func_name: &str, decorator: 
             }
         }
         _ => {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::PT001)
-                && xxxxxxxx.settings.flake8_pytest_style.fixture_parentheses
+            if checker.settings.enabled.contains(&RuleCode::PT001)
+                && checker.settings.flake8_pytest_style.fixture_parentheses
             {
                 let fix = Fix::insertion("()".to_string(), decorator.end_location.unwrap());
-                pytest_fixture_parentheses(xxxxxxxx, decorator, fix, "()", "");
+                pytest_fixture_parentheses(checker, decorator, fix, "()", "");
             }
         }
     }
 }
 
 /// PT004, PT005, PT022
-fn check_fixture_returns(xxxxxxxx: &mut xxxxxxxx, func: &Stmt, func_name: &str, body: &[Stmt]) {
+fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, body: &[Stmt]) {
     let mut visitor = SkipFunctionsVisitor::default();
 
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::PT005)
+    if checker.settings.enabled.contains(&RuleCode::PT005)
         && visitor.has_return_with_value
         && func_name.starts_with('_')
     {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::IncorrectFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
         ));
-    } else if xxxxxxxx.settings.enabled.contains(&RuleCode::PT004)
+    } else if checker.settings.enabled.contains(&RuleCode::PT004)
         && !visitor.has_return_with_value
         && !visitor.has_yield_from
         && !func_name.starts_with('_')
     {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::MissingFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
         ));
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::PT022) {
+    if checker.settings.enabled.contains(&RuleCode::PT022) {
         if let Some(stmt) = body.last() {
             if let StmtKind::Expr { value, .. } = &stmt.node {
                 if let ExprKind::Yield { .. } = value.node {
@@ -180,7 +180,7 @@ fn check_fixture_returns(xxxxxxxx: &mut xxxxxxxx, func: &Stmt, func_name: &str, 
                             violations::UselessYieldFixture(func_name.to_string()),
                             Range::from_located(stmt),
                         );
-                        if xxxxxxxx.patch(check.kind.code()) {
+                        if checker.patch(check.kind.code()) {
                             check.amend(Fix::replacement(
                                 "return".to_string(),
                                 stmt.location,
@@ -190,7 +190,7 @@ fn check_fixture_returns(xxxxxxxx: &mut xxxxxxxx, func: &Stmt, func_name: &str, 
                                 ),
                             ));
                         }
-                        xxxxxxxx.diagnostics.push(check);
+                        checker.diagnostics.push(check);
                     }
                 }
             }
@@ -199,11 +199,11 @@ fn check_fixture_returns(xxxxxxxx: &mut xxxxxxxx, func: &Stmt, func_name: &str, 
 }
 
 /// PT019
-fn check_test_function_args(xxxxxxxx: &mut xxxxxxxx, args: &Arguments) {
+fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
     args.args.iter().chain(&args.kwonlyargs).for_each(|arg| {
         let name = arg.node.arg.to_string();
         if name.starts_with('_') {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::FixtureParamWithoutValue(name),
                 Range::from_located(arg),
             ));
@@ -212,9 +212,9 @@ fn check_test_function_args(xxxxxxxx: &mut xxxxxxxx, args: &Arguments) {
 }
 
 /// PT020
-fn check_fixture_decorator_name(xxxxxxxx: &mut xxxxxxxx, decorator: &Expr) {
-    if is_pytest_yield_fixture(decorator, xxxxxxxx) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
+    if is_pytest_yield_fixture(decorator, checker) {
+        checker.diagnostics.push(Diagnostic::new(
             violations::DeprecatedYieldFixture,
             Range::from_located(decorator),
         ));
@@ -222,7 +222,7 @@ fn check_fixture_decorator_name(xxxxxxxx: &mut xxxxxxxx, decorator: &Expr) {
 }
 
 /// PT021
-fn check_fixture_addfinalizer(xxxxxxxx: &mut xxxxxxxx, args: &Arguments, body: &[Stmt]) {
+fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[Stmt]) {
     if !collect_arg_names(args).contains(&"request") {
         return;
     }
@@ -234,7 +234,7 @@ fn check_fixture_addfinalizer(xxxxxxxx: &mut xxxxxxxx, args: &Arguments, body: &
     }
 
     if let Some(addfinalizer) = visitor.addfinalizer_call {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::FixtureFinalizerCallback,
             Range::from_located(addfinalizer),
         ));
@@ -242,22 +242,22 @@ fn check_fixture_addfinalizer(xxxxxxxx: &mut xxxxxxxx, args: &Arguments, body: &
 }
 
 /// PT024, PT025
-fn check_fixture_marks(xxxxxxxx: &mut xxxxxxxx, decorators: &[Expr]) {
+fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
     for mark in get_mark_decorators(decorators) {
         let name = get_mark_name(mark);
 
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::PT024) {
+        if checker.settings.enabled.contains(&RuleCode::PT024) {
             if name == "asyncio" {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     violations::UnnecessaryAsyncioMarkOnFixture,
                     Range::from_located(mark),
                 ));
             }
         }
 
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::PT025) {
+        if checker.settings.enabled.contains(&RuleCode::PT025) {
             if name == "usefixtures" {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     violations::ErroneousUseFixturesOnFixture,
                     Range::from_located(mark),
                 ));
@@ -267,48 +267,48 @@ fn check_fixture_marks(xxxxxxxx: &mut xxxxxxxx, decorators: &[Expr]) {
 }
 
 pub fn fixture(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     func: &Stmt,
     func_name: &str,
     args: &Arguments,
     decorators: &[Expr],
     body: &[Stmt],
 ) {
-    let decorator = get_fixture_decorator(xxxxxxxx, decorators);
+    let decorator = get_fixture_decorator(checker, decorators);
     if let Some(decorator) = decorator {
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::PT001)
-            || xxxxxxxx.settings.enabled.contains(&RuleCode::PT002)
-            || xxxxxxxx.settings.enabled.contains(&RuleCode::PT003)
+        if checker.settings.enabled.contains(&RuleCode::PT001)
+            || checker.settings.enabled.contains(&RuleCode::PT002)
+            || checker.settings.enabled.contains(&RuleCode::PT003)
         {
-            check_fixture_decorator(xxxxxxxx, func_name, decorator);
+            check_fixture_decorator(checker, func_name, decorator);
         }
 
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::PT020)
-            && xxxxxxxx.settings.flake8_pytest_style.fixture_parentheses
+        if checker.settings.enabled.contains(&RuleCode::PT020)
+            && checker.settings.flake8_pytest_style.fixture_parentheses
         {
-            check_fixture_decorator_name(xxxxxxxx, decorator);
+            check_fixture_decorator_name(checker, decorator);
         }
 
-        if (xxxxxxxx.settings.enabled.contains(&RuleCode::PT004)
-            || xxxxxxxx.settings.enabled.contains(&RuleCode::PT005)
-            || xxxxxxxx.settings.enabled.contains(&RuleCode::PT022))
-            && !has_abstractmethod_decorator(decorators, xxxxxxxx)
+        if (checker.settings.enabled.contains(&RuleCode::PT004)
+            || checker.settings.enabled.contains(&RuleCode::PT005)
+            || checker.settings.enabled.contains(&RuleCode::PT022))
+            && !has_abstractmethod_decorator(decorators, checker)
         {
-            check_fixture_returns(xxxxxxxx, func, func_name, body);
+            check_fixture_returns(checker, func, func_name, body);
         }
 
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::PT021) {
-            check_fixture_addfinalizer(xxxxxxxx, args, body);
+        if checker.settings.enabled.contains(&RuleCode::PT021) {
+            check_fixture_addfinalizer(checker, args, body);
         }
 
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::PT024)
-            || xxxxxxxx.settings.enabled.contains(&RuleCode::PT025)
+        if checker.settings.enabled.contains(&RuleCode::PT024)
+            || checker.settings.enabled.contains(&RuleCode::PT025)
         {
-            check_fixture_marks(xxxxxxxx, decorators);
+            check_fixture_marks(checker, decorators);
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::PT019) && func_name.starts_with("test_") {
-        check_test_function_args(xxxxxxxx, args);
+    if checker.settings.enabled.contains(&RuleCode::PT019) && func_name.starts_with("test_") {
+        check_test_function_args(checker, args);
     }
 }

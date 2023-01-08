@@ -2,12 +2,12 @@ use rustpython_ast::{ExprKind, Stmt, Withitem};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// B017
-pub fn assert_raises_exception(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt, items: &[Withitem]) {
+pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[Withitem]) {
     let Some(item) = items.first() else {
         return;
     };
@@ -28,13 +28,13 @@ pub fn assert_raises_exception(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt, items: &[Wi
         args.first().unwrap(),
         "",
         "Exception",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     ) {
         return;
     }
 
-    xxxxxxxx.diagnostics.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::NoAssertRaisesException,
         Range::from_located(stmt),
     ));

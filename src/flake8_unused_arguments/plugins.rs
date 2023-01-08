@@ -7,9 +7,9 @@ use rustpython_ast::{Arg, Arguments};
 use crate::ast::function_type;
 use crate::ast::function_type::FunctionType;
 use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeKind};
+use crate::checkers::ast::Checker;
 use crate::flake8_unused_arguments::helpers;
 use crate::flake8_unused_arguments::types::Argumentable;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 use crate::{visibility, Diagnostic};
 
 /// Check a plain function for unused arguments.
@@ -103,7 +103,7 @@ fn method(
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
 pub fn unused_arguments(
-    xxxxxxxx: &xxxxxxxx,
+    checker: &Checker,
     parent: &Scope,
     scope: &Scope,
     bindings: &[Binding],
@@ -120,25 +120,25 @@ pub fn unused_arguments(
                 parent,
                 name,
                 decorator_list,
-                &xxxxxxxx.from_imports,
-                &xxxxxxxx.import_aliases,
-                &xxxxxxxx.settings.pep8_naming.classmethod_decorators,
-                &xxxxxxxx.settings.pep8_naming.staticmethod_decorators,
+                &checker.from_imports,
+                &checker.import_aliases,
+                &checker.settings.pep8_naming.classmethod_decorators,
+                &checker.settings.pep8_naming.staticmethod_decorators,
             ) {
                 FunctionType::Function => {
-                    if xxxxxxxx
+                    if checker
                         .settings
                         .enabled
                         .contains(Argumentable::Function.rule_code())
-                        && !visibility::is_overload(xxxxxxxx, decorator_list)
+                        && !visibility::is_overload(checker, decorator_list)
                     {
                         function(
                             &Argumentable::Function,
                             args,
                             &scope.values,
                             bindings,
-                            &xxxxxxxx.settings.dummy_variable_rgx,
-                            xxxxxxxx
+                            &checker.settings.dummy_variable_rgx,
+                            checker
                                 .settings
                                 .flake8_unused_arguments
                                 .ignore_variadic_names,
@@ -148,22 +148,22 @@ pub fn unused_arguments(
                     }
                 }
                 FunctionType::Method => {
-                    if xxxxxxxx
+                    if checker
                         .settings
                         .enabled
                         .contains(Argumentable::Method.rule_code())
                         && !helpers::is_empty(body)
-                        && !visibility::is_abstract(xxxxxxxx, decorator_list)
-                        && !visibility::is_override(xxxxxxxx, decorator_list)
-                        && !visibility::is_overload(xxxxxxxx, decorator_list)
+                        && !visibility::is_abstract(checker, decorator_list)
+                        && !visibility::is_override(checker, decorator_list)
+                        && !visibility::is_overload(checker, decorator_list)
                     {
                         method(
                             &Argumentable::Method,
                             args,
                             &scope.values,
                             bindings,
-                            &xxxxxxxx.settings.dummy_variable_rgx,
-                            xxxxxxxx
+                            &checker.settings.dummy_variable_rgx,
+                            checker
                                 .settings
                                 .flake8_unused_arguments
                                 .ignore_variadic_names,
@@ -173,22 +173,22 @@ pub fn unused_arguments(
                     }
                 }
                 FunctionType::ClassMethod => {
-                    if xxxxxxxx
+                    if checker
                         .settings
                         .enabled
                         .contains(Argumentable::ClassMethod.rule_code())
                         && !helpers::is_empty(body)
-                        && !visibility::is_abstract(xxxxxxxx, decorator_list)
-                        && !visibility::is_override(xxxxxxxx, decorator_list)
-                        && !visibility::is_overload(xxxxxxxx, decorator_list)
+                        && !visibility::is_abstract(checker, decorator_list)
+                        && !visibility::is_override(checker, decorator_list)
+                        && !visibility::is_overload(checker, decorator_list)
                     {
                         method(
                             &Argumentable::ClassMethod,
                             args,
                             &scope.values,
                             bindings,
-                            &xxxxxxxx.settings.dummy_variable_rgx,
-                            xxxxxxxx
+                            &checker.settings.dummy_variable_rgx,
+                            checker
                                 .settings
                                 .flake8_unused_arguments
                                 .ignore_variadic_names,
@@ -198,22 +198,22 @@ pub fn unused_arguments(
                     }
                 }
                 FunctionType::StaticMethod => {
-                    if xxxxxxxx
+                    if checker
                         .settings
                         .enabled
                         .contains(Argumentable::StaticMethod.rule_code())
                         && !helpers::is_empty(body)
-                        && !visibility::is_abstract(xxxxxxxx, decorator_list)
-                        && !visibility::is_override(xxxxxxxx, decorator_list)
-                        && !visibility::is_overload(xxxxxxxx, decorator_list)
+                        && !visibility::is_abstract(checker, decorator_list)
+                        && !visibility::is_override(checker, decorator_list)
+                        && !visibility::is_overload(checker, decorator_list)
                     {
                         function(
                             &Argumentable::StaticMethod,
                             args,
                             &scope.values,
                             bindings,
-                            &xxxxxxxx.settings.dummy_variable_rgx,
-                            xxxxxxxx
+                            &checker.settings.dummy_variable_rgx,
+                            checker
                                 .settings
                                 .flake8_unused_arguments
                                 .ignore_variadic_names,
@@ -225,7 +225,7 @@ pub fn unused_arguments(
             }
         }
         ScopeKind::Lambda(Lambda { args, .. }) => {
-            if xxxxxxxx
+            if checker
                 .settings
                 .enabled
                 .contains(Argumentable::Lambda.rule_code())
@@ -235,8 +235,8 @@ pub fn unused_arguments(
                     args,
                     &scope.values,
                     bindings,
-                    &xxxxxxxx.settings.dummy_variable_rgx,
-                    xxxxxxxx
+                    &checker.settings.dummy_variable_rgx,
+                    checker
                         .settings
                         .flake8_unused_arguments
                         .ignore_variadic_names,

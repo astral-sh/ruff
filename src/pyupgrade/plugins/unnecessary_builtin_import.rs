@@ -4,8 +4,8 @@ use rustpython_ast::{Alias, AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 use crate::{autofix, violations};
 
 const BUILTINS: &[&str] = &[
@@ -41,7 +41,7 @@ const SIX_MOVES: &[&str] = &["filter", "input", "map", "range", "zip"];
 
 /// UP029
 pub fn unnecessary_builtin_import(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     stmt: &Stmt,
     module: &str,
     names: &[Located<AliasData>],
@@ -79,14 +79,14 @@ pub fn unnecessary_builtin_import(
         Range::from_located(stmt),
     );
 
-    if xxxxxxxx.patch(check.kind.code()) {
-        let deleted: Vec<&Stmt> = xxxxxxxx
+    if checker.patch(check.kind.code()) {
+        let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
             .map(std::convert::Into::into)
             .collect();
-        let defined_by = xxxxxxxx.current_stmt();
-        let defined_in = xxxxxxxx.current_stmt_parent();
+        let defined_by = checker.current_stmt();
+        let defined_in = checker.current_stmt_parent();
         let unused_imports: Vec<String> = unused_imports
             .iter()
             .map(|alias| format!("{module}.{}", alias.node.name))
@@ -96,16 +96,16 @@ pub fn unnecessary_builtin_import(
             defined_by.into(),
             defined_in.map(std::convert::Into::into),
             &deleted,
-            xxxxxxxx.locator,
+            checker.locator,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {
-                    xxxxxxxx.deletions.insert(defined_by.clone());
+                    checker.deletions.insert(defined_by.clone());
                 }
                 check.amend(fix);
             }
             Err(e) => error!("Failed to remove builtin import: {e}"),
         }
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }

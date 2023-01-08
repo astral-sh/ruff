@@ -4,9 +4,9 @@ use rustpython_ast::{Alias, AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 use crate::{autofix, violations};
 
 const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
@@ -33,12 +33,8 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
 ];
 
 /// UP010
-pub fn unnecessary_future_import(
-    xxxxxxxx: &mut xxxxxxxx,
-    stmt: &Stmt,
-    names: &[Located<AliasData>],
-) {
-    let target_version = xxxxxxxx.settings.target_version;
+pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Located<AliasData>]) {
+    let target_version = checker.settings.target_version;
 
     let mut unused_imports: Vec<&Alias> = vec![];
     for alias in names {
@@ -68,14 +64,14 @@ pub fn unnecessary_future_import(
         Range::from_located(stmt),
     );
 
-    if xxxxxxxx.patch(check.kind.code()) {
-        let deleted: Vec<&Stmt> = xxxxxxxx
+    if checker.patch(check.kind.code()) {
+        let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
             .map(std::convert::Into::into)
             .collect();
-        let defined_by = xxxxxxxx.current_stmt();
-        let defined_in = xxxxxxxx.current_stmt_parent();
+        let defined_by = checker.current_stmt();
+        let defined_in = checker.current_stmt_parent();
         let unused_imports: Vec<String> = unused_imports
             .iter()
             .map(|alias| format!("__future__.{}", alias.node.name))
@@ -85,16 +81,16 @@ pub fn unnecessary_future_import(
             defined_by.into(),
             defined_in.map(std::convert::Into::into),
             &deleted,
-            xxxxxxxx.locator,
+            checker.locator,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {
-                    xxxxxxxx.deletions.insert(defined_by.clone());
+                    checker.deletions.insert(defined_by.clone());
                 }
                 check.amend(fix);
             }
             Err(e) => error!("Failed to remove `__future__` import: {e}"),
         }
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }

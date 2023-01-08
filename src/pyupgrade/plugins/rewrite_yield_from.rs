@@ -5,9 +5,9 @@ use crate::ast::types::{Range, RefEquality};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// Return `true` if the two expressions are equivalent, and consistent solely
 /// of tuples and names.
@@ -132,7 +132,7 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
 }
 
 /// UP028
-pub fn rewrite_yield_from(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt) {
+pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
     // Intentionally omit async functions.
     if let StmtKind::FunctionDef { body, .. } = &stmt.node {
         let yields = {
@@ -159,8 +159,8 @@ pub fn rewrite_yield_from(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt) {
 
             let mut check =
                 Diagnostic::new(violations::RewriteYieldFrom, Range::from_located(item.stmt));
-            if xxxxxxxx.patch(check.kind.code()) {
-                let contents = xxxxxxxx
+            if checker.patch(check.kind.code()) {
+                let contents = checker
                     .locator
                     .slice_source_code_range(&Range::from_located(item.iter));
                 let contents = format!("yield from {contents}");
@@ -170,7 +170,7 @@ pub fn rewrite_yield_from(xxxxxxxx: &mut xxxxxxxx, stmt: &Stmt) {
                     item.stmt.end_location.unwrap(),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 }

@@ -4,25 +4,25 @@ use crate::ast::helpers::{
     collect_call_paths, dealias_call_path, has_non_none_keyword, is_const_none, match_call_path,
 };
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 pub fn call_datetime_without_tzinfo(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
     location: Range,
 ) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
-    if !match_call_path(&call_path, "datetime", "datetime", &xxxxxxxx.from_imports) {
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
+    if !match_call_path(&call_path, "datetime", "datetime", &checker.from_imports) {
         return;
     }
 
     // No positional arg: keyword is missing or constant None.
     if args.len() < 8 && !has_non_none_keyword(keywords, "tzinfo") {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeWithoutTzinfo,
             location,
         ));
@@ -31,7 +31,7 @@ pub fn call_datetime_without_tzinfo(
 
     // Positional arg: is constant None.
     if args.len() >= 8 && is_const_none(&args[7]) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeWithoutTzinfo,
             location,
         ));
@@ -39,45 +39,45 @@ pub fn call_datetime_without_tzinfo(
 }
 
 /// DTZ002
-pub fn call_datetime_today(xxxxxxxx: &mut xxxxxxxx, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
+pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) {
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
     if match_call_path(
         &call_path,
         "datetime.datetime",
         "today",
-        &xxxxxxxx.from_imports,
+        &checker.from_imports,
     ) {
-        xxxxxxxx
+        checker
             .diagnostics
             .push(Diagnostic::new(violations::CallDatetimeToday, location));
     }
 }
 
 /// DTZ003
-pub fn call_datetime_utcnow(xxxxxxxx: &mut xxxxxxxx, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
+pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range) {
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
     if match_call_path(
         &call_path,
         "datetime.datetime",
         "utcnow",
-        &xxxxxxxx.from_imports,
+        &checker.from_imports,
     ) {
-        xxxxxxxx
+        checker
             .diagnostics
             .push(Diagnostic::new(violations::CallDatetimeUtcnow, location));
     }
 }
 
 /// DTZ004
-pub fn call_datetime_utcfromtimestamp(xxxxxxxx: &mut xxxxxxxx, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
+pub fn call_datetime_utcfromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
     if match_call_path(
         &call_path,
         "datetime.datetime",
         "utcfromtimestamp",
-        &xxxxxxxx.from_imports,
+        &checker.from_imports,
     ) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeUtcfromtimestamp,
             location,
         ));
@@ -86,25 +86,25 @@ pub fn call_datetime_utcfromtimestamp(xxxxxxxx: &mut xxxxxxxx, func: &Expr, loca
 
 /// DTZ005
 pub fn call_datetime_now_without_tzinfo(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
     location: Range,
 ) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
     if !match_call_path(
         &call_path,
         "datetime.datetime",
         "now",
-        &xxxxxxxx.from_imports,
+        &checker.from_imports,
     ) {
         return;
     }
 
     // no args / no args unqualified
     if args.is_empty() && keywords.is_empty() {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
@@ -113,7 +113,7 @@ pub fn call_datetime_now_without_tzinfo(
 
     // none args
     if !args.is_empty() && is_const_none(&args[0]) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
@@ -122,7 +122,7 @@ pub fn call_datetime_now_without_tzinfo(
 
     // wrong keywords / none keyword
     if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeNowWithoutTzinfo,
             location,
         ));
@@ -131,25 +131,25 @@ pub fn call_datetime_now_without_tzinfo(
 
 /// DTZ006
 pub fn call_datetime_fromtimestamp(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
     location: Range,
 ) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
     if !match_call_path(
         &call_path,
         "datetime.datetime",
         "fromtimestamp",
-        &xxxxxxxx.from_imports,
+        &checker.from_imports,
     ) {
         return;
     }
 
     // no args / no args unqualified
     if args.len() < 2 && keywords.is_empty() {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeFromtimestamp,
             location,
         ));
@@ -158,7 +158,7 @@ pub fn call_datetime_fromtimestamp(
 
     // none args
     if args.len() > 1 && is_const_none(&args[1]) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeFromtimestamp,
             location,
         ));
@@ -167,7 +167,7 @@ pub fn call_datetime_fromtimestamp(
 
     // wrong keywords / none keyword
     if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeFromtimestamp,
             location,
         ));
@@ -176,17 +176,17 @@ pub fn call_datetime_fromtimestamp(
 
 /// DTZ007
 pub fn call_datetime_strptime_without_zone(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
     location: Range,
 ) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
     if !match_call_path(
         &call_path,
         "datetime.datetime",
         "strptime",
-        &xxxxxxxx.from_imports,
+        &checker.from_imports,
     ) {
         return;
     }
@@ -202,8 +202,8 @@ pub fn call_datetime_strptime_without_zone(
         }
     };
 
-    let (Some(grandparent), Some(parent)) = (xxxxxxxx.current_expr_grandparent(), xxxxxxxx.current_expr_parent()) else {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+    let (Some(grandparent), Some(parent)) = (checker.current_expr_grandparent(), checker.current_expr_parent()) else {
+        checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeStrptimeWithoutZone,
             location,
         ));
@@ -226,32 +226,32 @@ pub fn call_datetime_strptime_without_zone(
         }
     }
 
-    xxxxxxxx.diagnostics.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::CallDatetimeStrptimeWithoutZone,
         location,
     ));
 }
 
 /// DTZ011
-pub fn call_date_today(xxxxxxxx: &mut xxxxxxxx, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
-    if match_call_path(&call_path, "datetime.date", "today", &xxxxxxxx.from_imports) {
-        xxxxxxxx
+pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
+    if match_call_path(&call_path, "datetime.date", "today", &checker.from_imports) {
+        checker
             .diagnostics
             .push(Diagnostic::new(violations::CallDateToday, location));
     }
 }
 
 /// DTZ012
-pub fn call_date_fromtimestamp(xxxxxxxx: &mut xxxxxxxx, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &xxxxxxxx.import_aliases);
+pub fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
+    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
     if match_call_path(
         &call_path,
         "datetime.date",
         "fromtimestamp",
-        &xxxxxxxx.from_imports,
+        &checker.from_imports,
     ) {
-        xxxxxxxx
+        checker
             .diagnostics
             .push(Diagnostic::new(violations::CallDateFromtimestamp, location));
     }

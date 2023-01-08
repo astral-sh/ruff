@@ -1,12 +1,12 @@
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// B003
-pub fn assignment_to_os_environ(xxxxxxxx: &mut xxxxxxxx, targets: &[Expr]) {
+pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
     if targets.len() != 1 {
         return;
     }
@@ -23,7 +23,7 @@ pub fn assignment_to_os_environ(xxxxxxxx: &mut xxxxxxxx, targets: &[Expr]) {
     if id != "os" {
         return;
     }
-    xxxxxxxx.diagnostics.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::AssignmentToOsEnviron,
         Range::from_located(target),
     ));

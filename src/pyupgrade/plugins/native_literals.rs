@@ -4,13 +4,13 @@ use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, LiteralType, RuleCode};
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// UP018
 pub fn native_literals(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -22,32 +22,32 @@ pub fn native_literals(
         return;
     }
 
-    if (id == "str" || id == "bytes") && xxxxxxxx.is_builtin(id) {
+    if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
             let mut check = Diagnostic::new(violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
             }), Range::from_located(expr));
-            if xxxxxxxx.patch(&RuleCode::UP018) {
+            if checker.patch(&RuleCode::UP018) {
                 check.amend(Fix::replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
                         content.push('b');
-                        content.push(xxxxxxxx.style.quote().into());
-                        content.push(xxxxxxxx.style.quote().into());
+                        content.push(checker.style.quote().into());
+                        content.push(checker.style.quote().into());
                         content
                     } else {
                         let mut content = String::with_capacity(2);
-                        content.push(xxxxxxxx.style.quote().into());
-                        content.push(xxxxxxxx.style.quote().into());
+                        content.push(checker.style.quote().into());
+                        content.push(checker.style.quote().into());
                         content
                     },
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
             return;
         };
 
@@ -80,7 +80,7 @@ pub fn native_literals(
         // rust-python merges adjacent string/bytes literals into one node, but we can't
         // safely remove the outer call in this situation. We're following pyupgrade
         // here and skip.
-        let arg_code = xxxxxxxx
+        let arg_code = checker
             .locator
             .slice_source_code_range(&Range::from_located(arg));
         if lexer::make_tokenizer(&arg_code)
@@ -100,13 +100,13 @@ pub fn native_literals(
             }),
             Range::from_located(expr),
         );
-        if xxxxxxxx.patch(&RuleCode::UP018) {
+        if checker.patch(&RuleCode::UP018) {
             check.amend(Fix::replacement(
                 arg_code.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        xxxxxxxx.diagnostics.push(check);
+        checker.diagnostics.push(check);
     }
 }

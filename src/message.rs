@@ -63,9 +63,9 @@ pub struct Source {
 impl Source {
     pub fn from_diagnostic(diagnostic: &Diagnostic, locator: &SourceCodeLocator) -> Self {
         let location = Location::new(diagnostic.location.row(), 0);
-        // Diagnostics can already extend one-past-the-end per Ropey's semantics. If they do,
-        // though, then they'll end at the start of a line. We need to avoid
-        // extending by yet another line past-the-end.
+        // Diagnostics can already extend one-past-the-end per Ropey's semantics. If
+        // they do, though, then they'll end at the start of a line. We need to
+        // avoid extending by yet another line past-the-end.
         let end_location = if diagnostic.end_location.column() == 0 {
             diagnostic.end_location
         } else {

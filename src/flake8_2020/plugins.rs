@@ -3,23 +3,23 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
 use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
-fn is_sys(xxxxxxxx: &xxxxxxxx, expr: &Expr, target: &str) -> bool {
+fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
     match_module_member(
         expr,
         "sys",
         target,
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     )
 }
 
 /// YTT101, YTT102, YTT301, YTT303
-pub fn subscript(xxxxxxxx: &mut xxxxxxxx, value: &Expr, slice: &Expr) {
-    if is_sys(xxxxxxxx, value, "version") {
+pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
+    if is_sys(checker, value, "version") {
         match &slice.node {
             ExprKind::Slice {
                 lower: None,
@@ -32,17 +32,16 @@ pub fn subscript(xxxxxxxx: &mut xxxxxxxx, value: &Expr, slice: &Expr) {
                     ..
                 } = &upper.node
                 {
-                    if *i == BigInt::from(1)
-                        && xxxxxxxx.settings.enabled.contains(&RuleCode::YTT303)
+                    if *i == BigInt::from(1) && checker.settings.enabled.contains(&RuleCode::YTT303)
                     {
-                        xxxxxxxx.diagnostics.push(Diagnostic::new(
+                        checker.diagnostics.push(Diagnostic::new(
                             violations::SysVersionSlice1Referenced,
                             Range::from_located(value),
                         ));
                     } else if *i == BigInt::from(3)
-                        && xxxxxxxx.settings.enabled.contains(&RuleCode::YTT101)
+                        && checker.settings.enabled.contains(&RuleCode::YTT101)
                     {
-                        xxxxxxxx.diagnostics.push(Diagnostic::new(
+                        checker.diagnostics.push(Diagnostic::new(
                             violations::SysVersionSlice3Referenced,
                             Range::from_located(value),
                         ));
@@ -54,15 +53,15 @@ pub fn subscript(xxxxxxxx: &mut xxxxxxxx, value: &Expr, slice: &Expr) {
                 value: Constant::Int(i),
                 ..
             } => {
-                if *i == BigInt::from(2) && xxxxxxxx.settings.enabled.contains(&RuleCode::YTT102) {
-                    xxxxxxxx.diagnostics.push(Diagnostic::new(
+                if *i == BigInt::from(2) && checker.settings.enabled.contains(&RuleCode::YTT102) {
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::SysVersion2Referenced,
                         Range::from_located(value),
                     ));
                 } else if *i == BigInt::from(0)
-                    && xxxxxxxx.settings.enabled.contains(&RuleCode::YTT301)
+                    && checker.settings.enabled.contains(&RuleCode::YTT301)
                 {
-                    xxxxxxxx.diagnostics.push(Diagnostic::new(
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::SysVersion0Referenced,
                         Range::from_located(value),
                     ));
@@ -75,9 +74,9 @@ pub fn subscript(xxxxxxxx: &mut xxxxxxxx, value: &Expr, slice: &Expr) {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub fn compare(xxxxxxxx: &mut xxxxxxxx, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
+pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
     match &left.node {
-        ExprKind::Subscript { value, slice, .. } if is_sys(xxxxxxxx, value, "version_info") => {
+        ExprKind::Subscript { value, slice, .. } if is_sys(checker, value, "version_info") => {
             if let ExprKind::Constant {
                 value: Constant::Int(i),
                 ..
@@ -97,9 +96,9 @@ pub fn compare(xxxxxxxx: &mut xxxxxxxx, left: &Expr, ops: &[Cmpop], comparators:
                     ) = (ops, comparators)
                     {
                         if *n == BigInt::from(3)
-                            && xxxxxxxx.settings.enabled.contains(&RuleCode::YTT201)
+                            && checker.settings.enabled.contains(&RuleCode::YTT201)
                         {
-                            xxxxxxxx.diagnostics.push(Diagnostic::new(
+                            checker.diagnostics.push(Diagnostic::new(
                                 violations::SysVersionInfo0Eq3Referenced,
                                 Range::from_located(left),
                             ));
@@ -118,8 +117,8 @@ pub fn compare(xxxxxxxx: &mut xxxxxxxx, left: &Expr, ops: &[Cmpop], comparators:
                         }],
                     ) = (ops, comparators)
                     {
-                        if xxxxxxxx.settings.enabled.contains(&RuleCode::YTT203) {
-                            xxxxxxxx.diagnostics.push(Diagnostic::new(
+                        if checker.settings.enabled.contains(&RuleCode::YTT203) {
+                            checker.diagnostics.push(Diagnostic::new(
                                 violations::SysVersionInfo1CmpInt,
                                 Range::from_located(left),
                             ));
@@ -130,7 +129,7 @@ pub fn compare(xxxxxxxx: &mut xxxxxxxx, left: &Expr, ops: &[Cmpop], comparators:
         }
 
         ExprKind::Attribute { value, attr, .. }
-            if is_sys(xxxxxxxx, value, "version_info") && attr == "minor" =>
+            if is_sys(checker, value, "version_info") && attr == "minor" =>
         {
             if let (
                 [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
@@ -144,8 +143,8 @@ pub fn compare(xxxxxxxx: &mut xxxxxxxx, left: &Expr, ops: &[Cmpop], comparators:
                 }],
             ) = (ops, comparators)
             {
-                if xxxxxxxx.settings.enabled.contains(&RuleCode::YTT204) {
-                    xxxxxxxx.diagnostics.push(Diagnostic::new(
+                if checker.settings.enabled.contains(&RuleCode::YTT204) {
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::SysVersionInfoMinorCmpInt,
                         Range::from_located(left),
                     ));
@@ -156,7 +155,7 @@ pub fn compare(xxxxxxxx: &mut xxxxxxxx, left: &Expr, ops: &[Cmpop], comparators:
         _ => {}
     }
 
-    if is_sys(xxxxxxxx, left, "version") {
+    if is_sys(checker, left, "version") {
         if let (
             [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
             [Located {
@@ -170,14 +169,14 @@ pub fn compare(xxxxxxxx: &mut xxxxxxxx, left: &Expr, ops: &[Cmpop], comparators:
         ) = (ops, comparators)
         {
             if s.len() == 1 {
-                if xxxxxxxx.settings.enabled.contains(&RuleCode::YTT302) {
-                    xxxxxxxx.diagnostics.push(Diagnostic::new(
+                if checker.settings.enabled.contains(&RuleCode::YTT302) {
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::SysVersionCmpStr10,
                         Range::from_located(left),
                     ));
                 }
-            } else if xxxxxxxx.settings.enabled.contains(&RuleCode::YTT103) {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+            } else if checker.settings.enabled.contains(&RuleCode::YTT103) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::SysVersionCmpStr3,
                     Range::from_located(left),
                 ));
@@ -187,15 +186,15 @@ pub fn compare(xxxxxxxx: &mut xxxxxxxx, left: &Expr, ops: &[Cmpop], comparators:
 }
 
 /// YTT202
-pub fn name_or_attribute(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
+pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     if match_module_member(
         expr,
         "six",
         "PY3",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     ) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::SixPY3Referenced,
             Range::from_located(expr),
         ));

@@ -2,7 +2,7 @@ use num_traits::identities::Zero;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::{collect_call_paths, compose_call_path, match_module_member};
-use crate::xxxxxxxxs::ast::xxxxxxxx;
+use crate::checkers::ast::Checker;
 
 const ITERABLE_INITIALIZERS: &[&str] = &["dict", "frozenset", "list", "tuple", "set"];
 
@@ -17,23 +17,23 @@ pub fn get_mark_name(decorator: &Expr) -> &str {
     collect_call_paths(decorator).last().unwrap()
 }
 
-pub fn is_pytest_fail(call: &Expr, xxxxxxxx: &xxxxxxxx) -> bool {
+pub fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
     match_module_member(
         call,
         "pytest",
         "fail",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     )
 }
 
-pub fn is_pytest_fixture(decorator: &Expr, xxxxxxxx: &xxxxxxxx) -> bool {
+pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
     match_module_member(
         decorator,
         "pytest",
         "fixture",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     )
 }
 
@@ -45,23 +45,23 @@ pub fn is_pytest_mark(decorator: &Expr) -> bool {
     }
 }
 
-pub fn is_pytest_yield_fixture(decorator: &Expr, xxxxxxxx: &xxxxxxxx) -> bool {
+pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
     match_module_member(
         decorator,
         "pytest",
         "yield_fixture",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     )
 }
 
-pub fn is_abstractmethod_decorator(decorator: &Expr, xxxxxxxx: &xxxxxxxx) -> bool {
+pub fn is_abstractmethod_decorator(decorator: &Expr, checker: &Checker) -> bool {
     match_module_member(
         decorator,
         "abc",
         "abstractmethod",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     )
 }
 
@@ -107,13 +107,13 @@ pub fn is_falsy_constant(expr: &Expr) -> bool {
     }
 }
 
-pub fn is_pytest_parametrize(decorator: &Expr, xxxxxxxx: &xxxxxxxx) -> bool {
+pub fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
     match_module_member(
         decorator,
         "pytest.mark",
         "parametrize",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     )
 }
 

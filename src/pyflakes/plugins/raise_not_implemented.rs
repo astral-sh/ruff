@@ -2,9 +2,9 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
     match &expr.node {
@@ -26,17 +26,17 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
 }
 
 /// F901
-pub fn raise_not_implemented(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
+pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
     let mut check = Diagnostic::new(violations::RaiseNotImplemented, Range::from_located(expr));
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             "NotImplementedError".to_string(),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }

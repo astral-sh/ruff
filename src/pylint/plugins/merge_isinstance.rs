@@ -3,12 +3,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Boolop, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
+use crate::checkers::ast::Checker;
 use crate::{violations, Diagnostic};
 
 /// PLR1701
-pub fn merge_isinstance(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, op: &Boolop, values: &[Expr]) {
-    if !matches!(op, Boolop::Or) || !xxxxxxxx.is_builtin("isinstance") {
+pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values: &[Expr]) {
+    if !matches!(op, Boolop::Or) || !checker.is_builtin("isinstance") {
         return;
     }
 
@@ -40,7 +40,7 @@ pub fn merge_isinstance(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, op: &Boolop, value
 
     for (obj, (num_calls, types)) in obj_to_types {
         if num_calls > 1 && types.len() > 1 {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::ConsiderMergingIsinstance(obj, types.into_iter().sorted().collect()),
                 Range::from_located(expr),
             ));

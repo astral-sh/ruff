@@ -1,13 +1,13 @@
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// B026
 pub fn star_arg_unpacking_after_keyword_arg(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     args: &[Expr],
     keywords: &[Keyword],
 ) {
@@ -21,7 +21,7 @@ pub fn star_arg_unpacking_after_keyword_arg(
         if arg.location <= keyword.location {
             continue;
         }
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::StarArgUnpackingAfterKeywordArg,
             Range::from_located(arg),
         ));

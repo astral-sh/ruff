@@ -9,6 +9,7 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext};
@@ -18,11 +19,10 @@ use crate::pydocstyle::settings::Convention;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub fn not_missing(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     definition: &Definition,
     visibility: &Visibility,
 ) -> bool {
@@ -32,8 +32,8 @@ pub fn not_missing(
 
     match definition.kind {
         DefinitionKind::Module => {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D100) {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::D100) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::PublicModule,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
@@ -41,8 +41,8 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Package => {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D104) {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::D104) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::PublicPackage,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
@@ -50,62 +50,62 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Class(stmt) => {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D101) {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::D101) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::PublicClass,
-                    identifier_range(stmt, xxxxxxxx.locator),
+                    identifier_range(stmt, checker.locator),
                 ));
             }
             false
         }
         DefinitionKind::NestedClass(stmt) => {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D106) {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::D106) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::PublicNestedClass,
-                    identifier_range(stmt, xxxxxxxx.locator),
+                    identifier_range(stmt, checker.locator),
                 ));
             }
             false
         }
         DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
-            if is_overload(xxxxxxxx, cast::decorator_list(stmt)) {
+            if is_overload(checker, cast::decorator_list(stmt)) {
                 true
             } else {
-                if xxxxxxxx.settings.enabled.contains(&RuleCode::D103) {
-                    xxxxxxxx.diagnostics.push(Diagnostic::new(
+                if checker.settings.enabled.contains(&RuleCode::D103) {
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::PublicFunction,
-                        identifier_range(stmt, xxxxxxxx.locator),
+                        identifier_range(stmt, checker.locator),
                     ));
                 }
                 false
             }
         }
         DefinitionKind::Method(stmt) => {
-            if is_overload(xxxxxxxx, cast::decorator_list(stmt))
-                || is_override(xxxxxxxx, cast::decorator_list(stmt))
+            if is_overload(checker, cast::decorator_list(stmt))
+                || is_override(checker, cast::decorator_list(stmt))
             {
                 true
             } else if is_magic(stmt) {
-                if xxxxxxxx.settings.enabled.contains(&RuleCode::D105) {
-                    xxxxxxxx.diagnostics.push(Diagnostic::new(
+                if checker.settings.enabled.contains(&RuleCode::D105) {
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::MagicMethod,
-                        identifier_range(stmt, xxxxxxxx.locator),
+                        identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
             } else if is_init(stmt) {
-                if xxxxxxxx.settings.enabled.contains(&RuleCode::D107) {
-                    xxxxxxxx.diagnostics.push(Diagnostic::new(
+                if checker.settings.enabled.contains(&RuleCode::D107) {
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::PublicInit,
-                        identifier_range(stmt, xxxxxxxx.locator),
+                        identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
             } else {
-                if xxxxxxxx.settings.enabled.contains(&RuleCode::D102) {
-                    xxxxxxxx.diagnostics.push(Diagnostic::new(
+                if checker.settings.enabled.contains(&RuleCode::D102) {
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::PublicMethod,
-                        identifier_range(stmt, xxxxxxxx.locator),
+                        identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
@@ -115,7 +115,7 @@ pub fn not_missing(
 }
 
 /// D200
-pub fn one_liner(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body;
 
     let mut line_count = 0;
@@ -131,7 +131,7 @@ pub fn one_liner(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
     }
 
     if non_empty_line_count == 1 && line_count > 1 {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::FitsOnOneLine,
             Range::from_located(docstring.expr),
         ));
@@ -144,7 +144,7 @@ static INNER_FUNCTION_OR_CLASS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s+(?:(?:class|def|async def)\s|@)").unwrap());
 
 /// D201, D202
-pub fn blank_before_after_function(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
     let (
         DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
@@ -153,8 +153,8 @@ pub fn blank_before_after_function(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstrin
         return;
     };
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D201) {
-        let (before, ..) = xxxxxxxx.locator.partition_source_code_at(
+    if checker.settings.enabled.contains(&RuleCode::D201) {
+        let (before, ..) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
             &Range::from_located(docstring.expr),
         );
@@ -170,19 +170,19 @@ pub fn blank_before_after_function(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstrin
                 violations::NoBlankLineBeforeFunction(blank_lines_before),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Delete the blank line before the docstring.
                 check.amend(Fix::deletion(
                     Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                     Location::new(docstring.expr.location.row(), 0),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D202) {
-        let (_, _, after) = xxxxxxxx.locator.partition_source_code_at(
+    if checker.settings.enabled.contains(&RuleCode::D202) {
+        let (_, _, after) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
             &Range::from_located(docstring.expr),
         );
@@ -211,7 +211,7 @@ pub fn blank_before_after_function(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstrin
                 violations::NoBlankLineAfterFunction(blank_lines_after),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Delete the blank line after the docstring.
                 check.amend(Fix::deletion(
                     Location::new(docstring.expr.end_location.unwrap().row() + 1, 0),
@@ -221,21 +221,21 @@ pub fn blank_before_after_function(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstrin
                     ),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 }
 
 /// D203, D204, D211
-pub fn blank_before_after_class(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     let (DefinitionKind::Class(parent) | DefinitionKind::NestedClass(parent)) = &docstring.kind else {
         return;
     };
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D203)
-        || xxxxxxxx.settings.enabled.contains(&RuleCode::D211)
+    if checker.settings.enabled.contains(&RuleCode::D203)
+        || checker.settings.enabled.contains(&RuleCode::D211)
     {
-        let (before, ..) = xxxxxxxx.locator.partition_source_code_at(
+        let (before, ..) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
             &Range::from_located(docstring.expr),
         );
@@ -246,29 +246,29 @@ pub fn blank_before_after_class(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) 
             .skip(1)
             .take_while(|line| line.trim().is_empty())
             .count();
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D211) {
+        if checker.settings.enabled.contains(&RuleCode::D211) {
             if blank_lines_before != 0 {
                 let mut check = Diagnostic::new(
                     violations::NoBlankLineBeforeClass(blank_lines_before),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Delete the blank line before the class.
                     check.amend(Fix::deletion(
                         Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                         Location::new(docstring.expr.location.row(), 0),
                     ));
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D203) {
+        if checker.settings.enabled.contains(&RuleCode::D203) {
             if blank_lines_before != 1 {
                 let mut check = Diagnostic::new(
                     violations::OneBlankLineBeforeClass(blank_lines_before),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Insert one blank line before the class.
                     check.amend(Fix::replacement(
                         "\n".to_string(),
@@ -276,13 +276,13 @@ pub fn blank_before_after_class(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) 
                         Location::new(docstring.expr.location.row(), 0),
                     ));
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D204) {
-        let (_, _, after) = xxxxxxxx.locator.partition_source_code_at(
+    if checker.settings.enabled.contains(&RuleCode::D204) {
+        let (_, _, after) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
             &Range::from_located(docstring.expr),
         );
@@ -305,7 +305,7 @@ pub fn blank_before_after_class(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) 
                 violations::OneBlankLineAfterClass(blank_lines_after),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Insert a blank line before the class (replacing any existing lines).
                 check.amend(Fix::replacement(
                     "\n".to_string(),
@@ -316,13 +316,13 @@ pub fn blank_before_after_class(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) 
                     ),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 }
 
 /// D205
-pub fn blank_after_summary(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body;
 
     let mut lines_count = 1;
@@ -340,7 +340,7 @@ pub fn blank_after_summary(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
             violations::BlankLineAfterSummary(blanks_count),
             Range::from_located(docstring.expr),
         );
-        if xxxxxxxx.patch(check.kind.code()) {
+        if checker.patch(check.kind.code()) {
             if blanks_count > 1 {
                 // Find the "summary" line (defined as the first non-blank line).
                 let mut summary_line = 0;
@@ -363,12 +363,12 @@ pub fn blank_after_summary(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
                 ));
             }
         }
-        xxxxxxxx.diagnostics.push(check);
+        checker.diagnostics.push(check);
     }
 }
 
 /// D206, D207, D208
-pub fn indent(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn indent(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body;
 
     // Split the docstring into lines.
@@ -399,7 +399,7 @@ pub fn indent(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
         // yet.
         has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D207) {
+        if checker.settings.enabled.contains(&RuleCode::D207) {
             // We report under-indentation on every line. This isn't great, but enables
             // autofix.
             if (i == lines.len() - 1 || !is_blank)
@@ -412,14 +412,14 @@ pub fn indent(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row() + i, 0),
                     ),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     check.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, line_indent.len()),
                     ));
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
 
@@ -438,16 +438,16 @@ pub fn indent(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D206) {
+    if checker.settings.enabled.contains(&RuleCode::D206) {
         if has_seen_tab {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::IndentWithSpaces,
                 Range::from_located(docstring.expr),
             ));
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D208) {
+    if checker.settings.enabled.contains(&RuleCode::D208) {
         // If every line (except the last) is over-indented...
         if is_over_indented {
             for i in over_indented_lines {
@@ -462,14 +462,14 @@ pub fn indent(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
                             Location::new(docstring.expr.location.row() + i, 0),
                         ),
                     );
-                    if xxxxxxxx.patch(check.kind.code()) {
+                    if checker.patch(check.kind.code()) {
                         check.amend(Fix::replacement(
                             whitespace::clean(docstring.indentation),
                             Location::new(docstring.expr.location.row() + i, 0),
                             Location::new(docstring.expr.location.row() + i, line_indent.len()),
                         ));
                     }
-                    xxxxxxxx.diagnostics.push(check);
+                    checker.diagnostics.push(check);
                 }
             }
         }
@@ -486,21 +486,21 @@ pub fn indent(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row() + i, 0),
                     ),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     check.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, line_indent.len()),
                     ));
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
     }
 }
 
 /// D209
-pub fn newline_after_last_paragraph(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
@@ -516,7 +516,7 @@ pub fn newline_after_last_paragraph(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstri
                         violations::NewLineAfterLastParagraph,
                         Range::from_located(docstring.expr),
                     );
-                    if xxxxxxxx.patch(check.kind.code()) {
+                    if checker.patch(check.kind.code()) {
                         // Insert a newline just before the end-quote(s).
                         let content = format!("\n{}", whitespace::clean(docstring.indentation));
                         check.amend(Fix::insertion(
@@ -527,7 +527,7 @@ pub fn newline_after_last_paragraph(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstri
                             ),
                         ));
                     }
-                    xxxxxxxx.diagnostics.push(check);
+                    checker.diagnostics.push(check);
                 }
             }
             return;
@@ -536,7 +536,7 @@ pub fn newline_after_last_paragraph(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstri
 }
 
 /// D210
-pub fn no_surrounding_whitespace(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
@@ -555,7 +555,7 @@ pub fn no_surrounding_whitespace(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring)
         violations::NoSurroundingWhitespace,
         Range::from_located(docstring.expr),
     );
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         if let Some(pattern) = leading_quote(contents) {
             if let Some(quote) = pattern.chars().last() {
                 // If removing whitespace would lead to an invalid string of quote
@@ -576,11 +576,11 @@ pub fn no_surrounding_whitespace(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring)
             }
         }
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// D212, D213
-pub fn multi_line_summary_start(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
@@ -595,15 +595,15 @@ pub fn multi_line_summary_start(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) 
         return;
     };
     if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D212) {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+        if checker.settings.enabled.contains(&RuleCode::D212) {
+            checker.diagnostics.push(Diagnostic::new(
                 violations::MultiLineSummaryFirstLine,
                 Range::from_located(docstring.expr),
             ));
         }
     } else {
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D213) {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+        if checker.settings.enabled.contains(&RuleCode::D213) {
+            checker.diagnostics.push(Diagnostic::new(
                 violations::MultiLineSummarySecondLine,
                 Range::from_located(docstring.expr),
             ));
@@ -612,7 +612,7 @@ pub fn multi_line_summary_start(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) 
 }
 
 /// D300
-pub fn triple_quotes(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
@@ -635,7 +635,7 @@ pub fn triple_quotes(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
             || first_line.starts_with("ur\"\"\"")
     };
     if !starts_with_triple {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::UsesTripleQuotes,
             Range::from_located(docstring.expr),
         ));
@@ -645,7 +645,7 @@ pub fn triple_quotes(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
 static BACKSLASH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\[^\nuN]").unwrap());
 
 /// D301
-pub fn backslashes(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
 
     // Docstring is already raw.
@@ -654,7 +654,7 @@ pub fn backslashes(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
     }
 
     if BACKSLASH_REGEX.is_match(contents) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::UsesRPrefixForBackslashedContent,
             Range::from_located(docstring.expr),
         ));
@@ -662,7 +662,7 @@ pub fn backslashes(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
 }
 
 /// D400
-pub fn ends_with_period(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
@@ -701,7 +701,7 @@ pub fn ends_with_period(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
                 Range::from_located(docstring.expr),
             );
             // Best-effort autofix: avoid adding a period after other punctuation marks.
-            if xxxxxxxx.patch(&RuleCode::D400) && !trimmed.ends_with(':') && !trimmed.ends_with(';')
+            if checker.patch(&RuleCode::D400) && !trimmed.ends_with(':') && !trimmed.ends_with(';')
             {
                 if let Some((row, column)) = if index == 0 {
                     leading_quote(contents).map(|pattern| {
@@ -721,13 +721,13 @@ pub fn ends_with_period(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
                     check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         };
     }
 }
 
 /// D402
-pub fn no_signature(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     let (
         DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
@@ -747,14 +747,14 @@ pub fn no_signature(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
     if !first_line.contains(&format!("{name}(")) {
         return;
     };
-    xxxxxxxx.diagnostics.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::NoSignature,
         Range::from_located(docstring.expr),
     ));
 }
 
 /// D403
-pub fn capitalized(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     if !matches!(docstring.kind, DefinitionKind::Function(_)) {
         return;
     }
@@ -778,14 +778,14 @@ pub fn capitalized(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
     if first_char.is_uppercase() {
         return;
     };
-    xxxxxxxx.diagnostics.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::FirstLineCapitalized,
         Range::from_located(docstring.expr),
     ));
 }
 
 /// D404
-pub fn starts_with_this(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body;
 
     let trimmed = body.trim();
@@ -803,14 +803,14 @@ pub fn starts_with_this(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
     {
         return;
     }
-    xxxxxxxx.diagnostics.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::NoThisPrefix,
         Range::from_located(docstring.expr),
     ));
 }
 
 /// D415
-pub fn ends_with_punctuation(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
@@ -848,7 +848,7 @@ pub fn ends_with_punctuation(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
                 Range::from_located(docstring.expr),
             );
             // Best-effort autofix: avoid adding a period after other punctuation marks.
-            if xxxxxxxx.patch(&RuleCode::D415) && !trimmed.ends_with(':') && !trimmed.ends_with(';')
+            if checker.patch(&RuleCode::D415) && !trimmed.ends_with(':') && !trimmed.ends_with(';')
             {
                 if let Some((row, column)) = if index == 0 {
                     leading_quote(contents).map(|pattern| {
@@ -868,13 +868,13 @@ pub fn ends_with_punctuation(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
                     check.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         };
     }
 }
 
 /// D418
-pub fn if_needed(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
+pub fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     let (
         DefinitionKind::Function(stmt)
         | DefinitionKind::NestedFunction(stmt)
@@ -882,23 +882,23 @@ pub fn if_needed(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) {
     ) = docstring.kind else {
         return
     };
-    if !is_overload(xxxxxxxx, cast::decorator_list(stmt)) {
+    if !is_overload(checker, cast::decorator_list(stmt)) {
         return;
     }
-    xxxxxxxx.diagnostics.push(Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         violations::SkipDocstring,
-        identifier_range(stmt, xxxxxxxx.locator),
+        identifier_range(stmt, checker.locator),
     ));
 }
 
 /// D419
-pub fn not_empty(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) -> bool {
+pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
     if !docstring.body.trim().is_empty() {
         return true;
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D419) {
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+    if checker.settings.enabled.contains(&RuleCode::D419) {
+        checker.diagnostics.push(Diagnostic::new(
             violations::NonEmpty,
             Range::from_located(docstring.expr),
         ));
@@ -908,7 +908,7 @@ pub fn not_empty(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring) -> bool {
 
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
-pub fn sections(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, convention: Option<&Convention>) {
+pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option<&Convention>) {
     let body = docstring.body;
 
     let lines: Vec<&str> = LinesWithTrailingNewline::from(body).collect();
@@ -919,12 +919,12 @@ pub fn sections(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, convention: Opti
     match convention {
         Some(Convention::Google) => {
             for context in &section_contexts(&lines, &SectionStyle::Google) {
-                google_section(xxxxxxxx, docstring, context);
+                google_section(checker, docstring, context);
             }
         }
         Some(Convention::Numpy) => {
             for context in &section_contexts(&lines, &SectionStyle::Numpy) {
-                numpy_section(xxxxxxxx, docstring, context);
+                numpy_section(checker, docstring, context);
             }
         }
         Some(Convention::Pep257) | None => {
@@ -932,13 +932,13 @@ pub fn sections(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, convention: Opti
             let mut found_numpy_section = false;
             for context in &section_contexts(&lines, &SectionStyle::Numpy) {
                 found_numpy_section = true;
-                numpy_section(xxxxxxxx, docstring, context);
+                numpy_section(checker, docstring, context);
             }
 
             // If no such sections were identified, interpret as Google-style sections.
             if !found_numpy_section {
                 for context in &section_contexts(&lines, &SectionStyle::Google) {
-                    google_section(xxxxxxxx, docstring, context);
+                    google_section(checker, docstring, context);
                 }
             }
         }
@@ -946,7 +946,7 @@ pub fn sections(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, convention: Opti
 }
 
 fn blanks_and_section_underline(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     docstring: &Docstring,
     context: &SectionContext,
 ) {
@@ -960,12 +960,12 @@ fn blanks_and_section_underline(
 
     // Nothing but blank lines after the section header.
     if blank_lines_after_header == context.following_lines.len() {
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D407) {
+        if checker.settings.enabled.contains(&RuleCode::D407) {
             let mut check = Diagnostic::new(
                 violations::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
@@ -980,10 +980,10 @@ fn blanks_and_section_underline(
                     ),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D414) {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+        if checker.settings.enabled.contains(&RuleCode::D414) {
+            checker.diagnostics.push(Diagnostic::new(
                 violations::NonEmptySection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             ));
@@ -998,12 +998,12 @@ fn blanks_and_section_underline(
 
     if dash_line_found {
         if blank_lines_after_header > 0 {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D408) {
+            if checker.settings.enabled.contains(&RuleCode::D408) {
                 let mut check = Diagnostic::new(
                     violations::SectionUnderlineAfterName(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Delete any blank lines between the header and the underline.
                     check.amend(Fix::deletion(
                         Location::new(
@@ -1019,7 +1019,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
 
@@ -1030,14 +1030,14 @@ fn blanks_and_section_underline(
             .count()
             != context.section_name.len()
         {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D409) {
+            if checker.settings.enabled.contains(&RuleCode::D409) {
                 let mut check = Diagnostic::new(
                     violations::SectionUnderlineMatchesSectionLength(
                         context.section_name.to_string(),
                     ),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Replace the existing underline with a line of the appropriate length.
                     let content = format!(
                         "{}{}\n",
@@ -1063,18 +1063,18 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 };
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
 
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D215) {
+        if checker.settings.enabled.contains(&RuleCode::D215) {
             let leading_space = whitespace::leading_space(non_empty_line);
             if leading_space.len() > docstring.indentation.len() {
                 let mut check = Diagnostic::new(
                     violations::SectionUnderlineNotOverIndented(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Replace the existing indentation with whitespace of the appropriate length.
                     check.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
@@ -1094,7 +1094,7 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 };
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
 
@@ -1109,21 +1109,21 @@ fn blanks_and_section_underline(
                     .take_while(|line| line.trim().is_empty())
                     .count();
                 if blank_lines_after_dashes == rest_of_lines.len() {
-                    if xxxxxxxx.settings.enabled.contains(&RuleCode::D414) {
-                        xxxxxxxx.diagnostics.push(Diagnostic::new(
+                    if checker.settings.enabled.contains(&RuleCode::D414) {
+                        checker.diagnostics.push(Diagnostic::new(
                             violations::NonEmptySection(context.section_name.to_string()),
                             Range::from_located(docstring.expr),
                         ));
                     }
                 } else {
-                    if xxxxxxxx.settings.enabled.contains(&RuleCode::D412) {
+                    if checker.settings.enabled.contains(&RuleCode::D412) {
                         let mut check = Diagnostic::new(
                             violations::NoBlankLinesBetweenHeaderAndContent(
                                 context.section_name.to_string(),
                             ),
                             Range::from_located(docstring.expr),
                         );
-                        if xxxxxxxx.patch(check.kind.code()) {
+                        if checker.patch(check.kind.code()) {
                             // Delete any blank lines between the header and content.
                             check.amend(Fix::deletion(
                                 Location::new(
@@ -1143,25 +1143,25 @@ fn blanks_and_section_underline(
                                 ),
                             ));
                         }
-                        xxxxxxxx.diagnostics.push(check);
+                        checker.diagnostics.push(check);
                     }
                 }
             }
         } else {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D414) {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+            if checker.settings.enabled.contains(&RuleCode::D414) {
+                checker.diagnostics.push(Diagnostic::new(
                     violations::NonEmptySection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 ));
             }
         }
     } else {
-        if xxxxxxxx.settings.enabled.contains(&RuleCode::D407) {
+        if checker.settings.enabled.contains(&RuleCode::D407) {
             let mut check = Diagnostic::new(
                 violations::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}\n",
@@ -1176,17 +1176,17 @@ fn blanks_and_section_underline(
                     ),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
         if blank_lines_after_header > 0 {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D412) {
+            if checker.settings.enabled.contains(&RuleCode::D412) {
                 let mut check = Diagnostic::new(
                     violations::NoBlankLinesBetweenHeaderAndContent(
                         context.section_name.to_string(),
                     ),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Delete any blank lines between the header and content.
                     check.amend(Fix::deletion(
                         Location::new(
@@ -1202,19 +1202,19 @@ fn blanks_and_section_underline(
                         ),
                     ));
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
     }
 }
 
 fn common_section(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     docstring: &Docstring,
     context: &SectionContext,
     style: &SectionStyle,
 ) {
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D405) {
+    if checker.settings.enabled.contains(&RuleCode::D405) {
         if !style.section_names().contains(&context.section_name) {
             let capitalized_section_name = titlecase::titlecase(context.section_name);
             if style
@@ -1225,7 +1225,7 @@ fn common_section(
                     violations::CapitalizeSectionName(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Replace the section title with the capitalized variant. This requires
                     // locating the start and end of the section name.
                     if let Some(index) = context.line.find(context.section_name) {
@@ -1245,19 +1245,19 @@ fn common_section(
                         ));
                     }
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D214) {
+    if checker.settings.enabled.contains(&RuleCode::D214) {
         let leading_space = whitespace::leading_space(context.line);
         if leading_space.len() > docstring.indentation.len() {
             let mut check = Diagnostic::new(
                 violations::SectionNotOverIndented(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
                 check.amend(Fix::replacement(
                     whitespace::clean(docstring.indentation),
@@ -1268,7 +1268,7 @@ fn common_section(
                     ),
                 ));
             };
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 
@@ -1278,12 +1278,12 @@ fn common_section(
         .map_or(true, |line| !line.trim().is_empty())
     {
         if context.is_last_section {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D413) {
+            if checker.settings.enabled.contains(&RuleCode::D413) {
                 let mut check = Diagnostic::new(
                     violations::BlankLineAfterLastSection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Add a newline after the section.
                     check.amend(Fix::insertion(
                         "\n".to_string(),
@@ -1296,15 +1296,15 @@ fn common_section(
                         ),
                     ));
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         } else {
-            if xxxxxxxx.settings.enabled.contains(&RuleCode::D410) {
+            if checker.settings.enabled.contains(&RuleCode::D410) {
                 let mut check = Diagnostic::new(
                     violations::BlankLineAfterSection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
                 );
-                if xxxxxxxx.patch(check.kind.code()) {
+                if checker.patch(check.kind.code()) {
                     // Add a newline after the section.
                     check.amend(Fix::insertion(
                         "\n".to_string(),
@@ -1317,32 +1317,32 @@ fn common_section(
                         ),
                     ));
                 }
-                xxxxxxxx.diagnostics.push(check);
+                checker.diagnostics.push(check);
             }
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D411) {
+    if checker.settings.enabled.contains(&RuleCode::D411) {
         if !context.previous_line.is_empty() {
             let mut check = Diagnostic::new(
                 violations::BlankLineBeforeSection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Add a blank line before the section.
                 check.amend(Fix::insertion(
                     "\n".to_string(),
                     Location::new(docstring.expr.location.row() + context.original_index, 0),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 
-    blanks_and_section_underline(xxxxxxxx, docstring, context);
+    blanks_and_section_underline(checker, docstring, context);
 }
 
-fn missing_args(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, docstrings_args: &FxHashSet<&str>) {
+fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<&str>) {
     let (
         DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
@@ -1372,7 +1372,7 @@ fn missing_args(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, docstrings_args:
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 matches!(docstring.kind, DefinitionKind::Method(_))
-                    && !is_staticmethod(xxxxxxxx, cast::decorator_list(parent)),
+                    && !is_staticmethod(checker, cast::decorator_list(parent)),
             ),
         )
     {
@@ -1407,20 +1407,20 @@ fn missing_args(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, docstrings_args:
 
     if !missing_arg_names.is_empty() {
         let names = missing_arg_names.into_iter().sorted().collect();
-        xxxxxxxx.diagnostics.push(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::DocumentAllArguments(names),
             Range::from_located(parent),
         ));
     }
 }
 
-// See: `GOOGLE_ARGS_REGEX` in `pydocstyle/xxxxxxxx.py`.
+// See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
 static GOOGLE_ARGS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:\n?\s*.+").unwrap());
 
-fn args_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &SectionContext) {
+fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     if context.following_lines.is_empty() {
-        missing_args(xxxxxxxx, docstring, &FxHashSet::default());
+        missing_args(checker, docstring, &FxHashSet::default());
         return;
     }
 
@@ -1465,10 +1465,10 @@ fn args_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &Sectio
         .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str()))
         .collect();
 
-    missing_args(xxxxxxxx, docstring, &docstrings_args);
+    missing_args(checker, docstring, &docstrings_args);
 }
 
-fn parameters_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &SectionContext) {
+fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
     let mut docstring_args: FxHashSet<&str> = FxHashSet::default();
     let section_level_indent = whitespace::leading_space(context.line);
@@ -1500,13 +1500,13 @@ fn parameters_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &
         }
     }
     // Validate that all arguments were documented.
-    missing_args(xxxxxxxx, docstring, &docstring_args);
+    missing_args(checker, docstring, &docstring_args);
 }
 
-fn numpy_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &SectionContext) {
-    common_section(xxxxxxxx, docstring, context, &SectionStyle::Numpy);
+fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
+    common_section(checker, docstring, context, &SectionStyle::Numpy);
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D406) {
+    if checker.settings.enabled.contains(&RuleCode::D406) {
         let suffix = context
             .line
             .trim()
@@ -1517,7 +1517,7 @@ fn numpy_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &Secti
                 violations::NewLineAfterSectionName(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Delete the suffix. This requires locating the end of the section name.
                 if let Some(index) = context.line.find(context.section_name) {
                     // Map from bytes to characters.
@@ -1537,22 +1537,22 @@ fn numpy_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &Secti
                     ));
                 }
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D417) {
+    if checker.settings.enabled.contains(&RuleCode::D417) {
         let capitalized_section_name = titlecase::titlecase(context.section_name);
         if capitalized_section_name == "Parameters" {
-            parameters_section(xxxxxxxx, docstring, context);
+            parameters_section(checker, docstring, context);
         }
     }
 }
 
-fn google_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &SectionContext) {
-    common_section(xxxxxxxx, docstring, context, &SectionStyle::Google);
+fn google_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
+    common_section(checker, docstring, context, &SectionStyle::Google);
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D416) {
+    if checker.settings.enabled.contains(&RuleCode::D416) {
         let suffix = context
             .line
             .trim()
@@ -1563,7 +1563,7 @@ fn google_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &Sect
                 violations::SectionNameEndsInColon(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
+            if checker.patch(check.kind.code()) {
                 // Replace the suffix. This requires locating the end of the section name.
                 if let Some(index) = context.line.find(context.section_name) {
                     // Map from bytes to characters.
@@ -1584,14 +1584,14 @@ fn google_section(xxxxxxxx: &mut xxxxxxxx, docstring: &Docstring, context: &Sect
                     ));
                 }
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::D417) {
+    if checker.settings.enabled.contains(&RuleCode::D417) {
         let capitalized_section_name = titlecase::titlecase(context.section_name);
         if capitalized_section_name == "Args" || capitalized_section_name == "Arguments" {
-            args_section(xxxxxxxx, docstring, context);
+            args_section(checker, docstring, context);
         }
     }
 }

@@ -2,17 +2,17 @@ use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::pyupgrade::checks;
 use crate::registry::DiagnosticKind;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// UP003
-pub fn type_of_primitive(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let Some(mut check) = checks::type_of_primitive(func, args, Range::from_located(expr)) else {
         return;
     };
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         if let DiagnosticKind::TypeOfPrimitive(violations::TypeOfPrimitive(primitive)) = &check.kind
         {
             check.amend(Fix::replacement(
@@ -22,5 +22,5 @@ pub fn type_of_primitive(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, func: &Expr, args
             ));
         }
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }

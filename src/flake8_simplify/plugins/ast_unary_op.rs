@@ -3,9 +3,9 @@ use rustpython_ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn is_exception_check(stmt: &Stmt) -> bool {
     let StmtKind::If {test: _, body, orelse: _} = &stmt.node else {
@@ -21,7 +21,7 @@ fn is_exception_check(stmt: &Stmt) -> bool {
 }
 
 /// SIM201
-pub fn negation_with_equal_op(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
@@ -31,18 +31,18 @@ pub fn negation_with_equal_op(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, op: &Unaryop
     if !matches!(&ops[..], [Cmpop::Eq]) {
         return;
     }
-    if is_exception_check(xxxxxxxx.current_stmt()) {
+    if is_exception_check(checker.current_stmt()) {
         return;
     }
 
     let mut check = Diagnostic::new(
         violations::NegateEqualOp(
-            unparse_expr(left, xxxxxxxx.style),
-            unparse_expr(&comparators[0], xxxxxxxx.style),
+            unparse_expr(left, checker.style),
+            unparse_expr(&comparators[0], checker.style),
         ),
         Range::from_located(operand),
     );
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
@@ -50,18 +50,18 @@ pub fn negation_with_equal_op(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, op: &Unaryop
                     ops: vec![Cmpop::NotEq],
                     comparators: comparators.clone(),
                 }),
-                xxxxxxxx.style,
+                checker.style,
             ),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM202
 pub fn negation_with_not_equal_op(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     expr: &Expr,
     op: &Unaryop,
     operand: &Expr,
@@ -75,18 +75,18 @@ pub fn negation_with_not_equal_op(
     if !matches!(&ops[..], [Cmpop::NotEq]) {
         return;
     }
-    if is_exception_check(xxxxxxxx.current_stmt()) {
+    if is_exception_check(checker.current_stmt()) {
         return;
     }
 
     let mut check = Diagnostic::new(
         violations::NegateNotEqualOp(
-            unparse_expr(left, xxxxxxxx.style),
-            unparse_expr(&comparators[0], xxxxxxxx.style),
+            unparse_expr(left, checker.style),
+            unparse_expr(&comparators[0], checker.style),
         ),
         Range::from_located(operand),
     );
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
@@ -94,17 +94,17 @@ pub fn negation_with_not_equal_op(
                     ops: vec![Cmpop::Eq],
                     comparators: comparators.clone(),
                 }),
-                xxxxxxxx.style,
+                checker.style,
             ),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM208
-pub fn double_negation(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
@@ -119,12 +119,12 @@ pub fn double_negation(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, op: &Unaryop, opera
         violations::DoubleNegation(operand.to_string()),
         Range::from_located(operand),
     );
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
-            unparse_expr(operand, xxxxxxxx.style),
+            unparse_expr(operand, checker.style),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }

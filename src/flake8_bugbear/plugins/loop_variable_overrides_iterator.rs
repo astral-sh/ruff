@@ -4,9 +4,9 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 #[derive(Default)]
 struct NameFinder<'a> {
@@ -42,7 +42,7 @@ where
 }
 
 /// B020
-pub fn loop_variable_overrides_iterator(xxxxxxxx: &mut xxxxxxxx, target: &Expr, iter: &Expr) {
+pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
     let target_names = {
         let mut target_finder = NameFinder::default();
         target_finder.visit_expr(target);
@@ -56,7 +56,7 @@ pub fn loop_variable_overrides_iterator(xxxxxxxx: &mut xxxxxxxx, target: &Expr, 
 
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::LoopVariableOverridesIterator(name.to_string()),
                 Range::from_located(expr),
             ));

@@ -4,9 +4,9 @@ use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 #[derive(Debug)]
 struct MiddleContent<'a> {
@@ -42,13 +42,13 @@ fn extract_middle(contents: &str) -> Option<MiddleContent> {
 }
 
 /// UP022
-pub fn replace_stdout_stderr(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, kwargs: &[Keyword]) {
+pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     if match_module_member(
         expr,
         "subprocess",
         "run",
-        &xxxxxxxx.from_imports,
-        &xxxxxxxx.import_aliases,
+        &checker.from_imports,
+        &checker.import_aliases,
     ) {
         // Find `stdout` and `stderr` kwargs.
         let Some(stdout) = find_keyword(kwargs, "stdout") else {
@@ -63,20 +63,20 @@ pub fn replace_stdout_stderr(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, kwargs: &[Key
             &stdout.node.value,
             "subprocess",
             "PIPE",
-            &xxxxxxxx.from_imports,
-            &xxxxxxxx.import_aliases,
+            &checker.from_imports,
+            &checker.import_aliases,
         ) || !match_module_member(
             &stderr.node.value,
             "subprocess",
             "PIPE",
-            &xxxxxxxx.from_imports,
-            &xxxxxxxx.import_aliases,
+            &checker.from_imports,
+            &checker.import_aliases,
         ) {
             return;
         }
 
         let mut check = Diagnostic::new(violations::ReplaceStdoutStderr, Range::from_located(expr));
-        if xxxxxxxx.patch(check.kind.code()) {
+        if checker.patch(check.kind.code()) {
             let first = if stdout.location < stderr.location {
                 stdout
             } else {
@@ -89,7 +89,7 @@ pub fn replace_stdout_stderr(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, kwargs: &[Key
             };
             let mut contents = String::from("capture_output=True");
             if let Some(middle) =
-                extract_middle(&xxxxxxxx.locator.slice_source_code_range(&Range::new(
+                extract_middle(&checker.locator.slice_source_code_range(&Range::new(
                     first.end_location.unwrap(),
                     last.location,
                 )))
@@ -97,7 +97,7 @@ pub fn replace_stdout_stderr(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, kwargs: &[Key
                 if middle.multi_line {
                     contents.push(',');
                     contents.push('\n');
-                    contents.push_str(&indentation(xxxxxxxx, first));
+                    contents.push_str(&indentation(checker, first));
                 } else {
                     contents.push(',');
                     contents.push(' ');
@@ -110,6 +110,6 @@ pub fn replace_stdout_stderr(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, kwargs: &[Key
                 last.end_location.unwrap(),
             ));
         }
-        xxxxxxxx.diagnostics.push(check);
+        checker.diagnostics.push(check);
     }
 }

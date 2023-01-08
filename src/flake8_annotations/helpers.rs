@@ -1,9 +1,9 @@
 use rustpython_ast::{Arguments, Expr, Stmt, StmtKind};
 
 use crate::ast::cast;
+use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::visibility;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 pub(super) fn match_function_def(
     stmt: &Stmt,
@@ -28,12 +28,12 @@ pub(super) fn match_function_def(
 }
 
 /// Return the name of the function, if it's overloaded.
-pub fn overloaded_name(xxxxxxxx: &xxxxxxxx, definition: &Definition) -> Option<String> {
+pub fn overloaded_name(checker: &Checker, definition: &Definition) -> Option<String> {
     if let DefinitionKind::Function(stmt)
     | DefinitionKind::NestedFunction(stmt)
     | DefinitionKind::Method(stmt) = definition.kind
     {
-        if visibility::is_overload(xxxxxxxx, cast::decorator_list(stmt)) {
+        if visibility::is_overload(checker, cast::decorator_list(stmt)) {
             let (name, ..) = match_function_def(stmt);
             Some(name.to_string())
         } else {
@@ -46,16 +46,12 @@ pub fn overloaded_name(xxxxxxxx: &xxxxxxxx, definition: &Definition) -> Option<S
 
 /// Return `true` if the definition is the implementation for an overloaded
 /// function.
-pub fn is_overload_impl(
-    xxxxxxxx: &xxxxxxxx,
-    definition: &Definition,
-    overloaded_name: &str,
-) -> bool {
+pub fn is_overload_impl(checker: &Checker, definition: &Definition, overloaded_name: &str) -> bool {
     if let DefinitionKind::Function(stmt)
     | DefinitionKind::NestedFunction(stmt)
     | DefinitionKind::Method(stmt) = definition.kind
     {
-        if visibility::is_overload(xxxxxxxx, cast::decorator_list(stmt)) {
+        if visibility::is_overload(checker, cast::decorator_list(stmt)) {
             false
         } else {
             let (name, ..) = match_function_def(stmt);

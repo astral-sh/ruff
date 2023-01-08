@@ -2,12 +2,12 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// SIM118
-fn key_in_dict(xxxxxxxx: &mut xxxxxxxx, left: &Expr, right: &Expr, range: Range) {
+fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
     let ExprKind::Call {
         func,
         args,
@@ -27,10 +27,10 @@ fn key_in_dict(xxxxxxxx: &mut xxxxxxxx, left: &Expr, right: &Expr, range: Range)
     }
 
     // Slice exact content to preserve formatting.
-    let left_content = xxxxxxxx
+    let left_content = checker
         .locator
         .slice_source_code_range(&Range::from_located(left));
-    let value_content = xxxxxxxx
+    let value_content = checker
         .locator
         .slice_source_code_range(&Range::from_located(value));
 
@@ -38,20 +38,20 @@ fn key_in_dict(xxxxxxxx: &mut xxxxxxxx, left: &Expr, right: &Expr, range: Range)
         violations::KeyInDict(left_content.to_string(), value_content.to_string()),
         range,
     );
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             value_content.to_string(),
             right.location,
             right.end_location.unwrap(),
         ));
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }
 
 /// SIM118 in a for loop
-pub fn key_in_dict_for(xxxxxxxx: &mut xxxxxxxx, target: &Expr, iter: &Expr) {
+pub fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
     key_in_dict(
-        xxxxxxxx,
+        checker,
         target,
         iter,
         Range::new(target.location, iter.end_location.unwrap()),
@@ -60,7 +60,7 @@ pub fn key_in_dict_for(xxxxxxxx: &mut xxxxxxxx, target: &Expr, iter: &Expr) {
 
 /// SIM118 in a comparison
 pub fn key_in_dict_compare(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[Cmpop],
@@ -75,5 +75,5 @@ pub fn key_in_dict_compare(
     }
     let right = comparators.first().unwrap();
 
-    key_in_dict(xxxxxxxx, left, right, Range::from_located(expr));
+    key_in_dict(checker, left, right, Range::from_located(expr));
 }

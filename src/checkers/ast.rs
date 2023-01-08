@@ -51,7 +51,7 @@ const GLOBAL_SCOPE_INDEX: usize = 0;
 type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 
 #[allow(clippy::struct_excessive_bools)]
-pub struct xxxxxxxx<'a> {
+pub struct Checker<'a> {
     // Input data.
     path: &'a Path,
     autofix: flags::Autofix,
@@ -102,7 +102,7 @@ pub struct xxxxxxxx<'a> {
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
 }
 
-impl<'a> xxxxxxxx<'a> {
+impl<'a> Checker<'a> {
     pub fn new(
         settings: &'a Settings,
         noqa_line_for: &'a IntMap<usize, usize>,
@@ -111,8 +111,8 @@ impl<'a> xxxxxxxx<'a> {
         path: &'a Path,
         locator: &'a SourceCodeLocator,
         style: &'a SourceCodeStyleDetector,
-    ) -> xxxxxxxx<'a> {
-        xxxxxxxx {
+    ) -> Checker<'a> {
+        Checker {
             settings,
             noqa_line_for,
             autofix,
@@ -217,7 +217,7 @@ impl<'a> xxxxxxxx<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for xxxxxxxx<'a>
+impl<'a, 'b> Visitor<'b> for Checker<'a>
 where
     'b: 'a,
 {
@@ -3121,7 +3121,7 @@ where
                         } {
                             if self.bindings[*index].used.is_none() {
                                 if self.settings.enabled.contains(&RuleCode::F841) {
-                                    let mut check = Diagnostic::new(
+                                    let mut diagnostic = Diagnostic::new(
                                         violations::UnusedVariable(name.to_string()),
                                         name_range,
                                     );
@@ -3131,7 +3131,7 @@ where
                                             self.locator,
                                         ) {
                                             Ok(fix) => {
-                                                check.amend(fix);
+                                                diagnostic.amend(fix);
                                             }
                                             Err(e) => {
                                                 error!(
@@ -3271,7 +3271,7 @@ where
     }
 }
 
-impl<'a> xxxxxxxx<'a> {
+impl<'a> Checker<'a> {
     fn push_parent(&mut self, parent: &'a Stmt) {
         let num_existing = self.parents.len();
         self.parents.push(RefEquality(parent));
@@ -3912,7 +3912,7 @@ impl<'a> xxxxxxxx<'a> {
             return;
         }
 
-        let mut checks: Vec<Diagnostic> = vec![];
+        let mut diagnostics: Vec<Diagnostic> = vec![];
         for scope in self
             .dead_scopes
             .iter()
@@ -3924,7 +3924,7 @@ impl<'a> xxxxxxxx<'a> {
                 for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
                     if matches!(binding.kind, BindingKind::Global) {
-                        checks.push(Diagnostic::new(
+                        diagnostics.push(Diagnostic::new(
                             violations::GlobalVariableNotAssigned((*name).to_string()),
                             binding.range,
                         ));
@@ -3953,7 +3953,7 @@ impl<'a> xxxxxxxx<'a> {
                         if let Some(names) = &all_names {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
-                                    checks.push(Diagnostic::new(
+                                    diagnostics.push(Diagnostic::new(
                                         violations::UndefinedExport(name.to_string()),
                                         all_binding.range,
                                     ));
@@ -3991,7 +3991,7 @@ impl<'a> xxxxxxxx<'a> {
 
                         if let Some(indices) = self.redefinitions.get(index) {
                             for index in indices {
-                                checks.push(Diagnostic::new(
+                                diagnostics.push(Diagnostic::new(
                                     violations::RedefinedWhileUnused(
                                         (*name).to_string(),
                                         binding.range.location.row(),
@@ -4022,7 +4022,7 @@ impl<'a> xxxxxxxx<'a> {
 
                             for &name in names {
                                 if !scope.values.contains_key(name) {
-                                    checks.push(Diagnostic::new(
+                                    diagnostics.push(Diagnostic::new(
                                         violations::ImportStarUsage(
                                             name.to_string(),
                                             from_list.clone(),
@@ -4137,19 +4137,19 @@ impl<'a> xxxxxxxx<'a> {
 
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
                             && child.location.row() != range.location.row()
                         {
-                            check.parent(child.location);
+                            diagnostic.parent(child.location);
                         }
                         if let Some(fix) = fix.as_ref() {
-                            check.amend(fix.clone());
+                            diagnostic.amend(fix.clone());
                         }
-                        checks.push(check);
+                        diagnostics.push(diagnostic);
                     }
                 }
                 for ((defined_by, ..), unused_imports) in ignored
@@ -4159,21 +4159,21 @@ impl<'a> xxxxxxxx<'a> {
                     let child: &Stmt = defined_by.into();
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
-                        let mut check = Diagnostic::new(
+                        let mut diagnostic = Diagnostic::new(
                             violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
                             && child.location.row() != range.location.row()
                         {
-                            check.parent(child.location);
+                            diagnostic.parent(child.location);
                         }
-                        checks.push(check);
+                        diagnostics.push(diagnostic);
                     }
                 }
             }
         }
-        self.diagnostics.extend(checks);
+        self.diagnostics.extend(diagnostics);
     }
 
     fn check_definitions(&mut self) {
@@ -4417,7 +4417,7 @@ pub fn check_ast(
     noqa: flags::Noqa,
     path: &Path,
 ) -> Vec<Diagnostic> {
-    let mut xxxxxxxx = xxxxxxxx::new(
+    let mut checker = Checker::new(
         settings,
         noqa_line_for,
         autofix,
@@ -4426,11 +4426,11 @@ pub fn check_ast(
         locator,
         stylist,
     );
-    xxxxxxxx.push_scope(Scope::new(ScopeKind::Module));
-    xxxxxxxx.bind_builtins();
+    checker.push_scope(Scope::new(ScopeKind::Module));
+    checker.bind_builtins();
 
     // Check for module docstring.
-    let python_ast = if xxxxxxxx.visit_docstring(python_ast) {
+    let python_ast = if checker.visit_docstring(python_ast) {
         &python_ast[1..]
     } else {
         python_ast
@@ -4438,24 +4438,24 @@ pub fn check_ast(
 
     // Iterate over the AST.
     for stmt in python_ast {
-        xxxxxxxx.visit_stmt(stmt);
+        checker.visit_stmt(stmt);
     }
 
     // Check any deferred statements.
-    xxxxxxxx.check_deferred_functions();
-    xxxxxxxx.check_deferred_lambdas();
-    xxxxxxxx.check_deferred_assignments();
-    xxxxxxxx.check_deferred_type_definitions();
+    checker.check_deferred_functions();
+    checker.check_deferred_lambdas();
+    checker.check_deferred_assignments();
+    checker.check_deferred_type_definitions();
     let mut allocator = vec![];
-    xxxxxxxx.check_deferred_string_type_definitions(&mut allocator);
+    checker.check_deferred_string_type_definitions(&mut allocator);
 
     // Reset the scope to module-level, and check all consumed scopes.
-    xxxxxxxx.scope_stack = vec![GLOBAL_SCOPE_INDEX];
-    xxxxxxxx.pop_scope();
-    xxxxxxxx.check_dead_scopes();
+    checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];
+    checker.pop_scope();
+    checker.check_dead_scopes();
 
     // Check docstrings.
-    xxxxxxxx.check_definitions();
+    checker.check_definitions();
 
-    xxxxxxxx.diagnostics
+    checker.diagnostics
 }

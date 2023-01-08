@@ -9,10 +9,10 @@ use rustpython_parser::token::Tok;
 use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
@@ -149,9 +149,9 @@ fn create_remove_param_fix(
 }
 
 /// UP015
-pub fn redundant_open_modes(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
+pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     // If `open` has been rebound, skip this check entirely.
-    if !xxxxxxxx.is_builtin(OPEN_FUNC_NAME) {
+    if !checker.is_builtin(OPEN_FUNC_NAME) {
         return;
     }
     let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
@@ -163,12 +163,12 @@ pub fn redundant_open_modes(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
             } = &keyword.node.value.node
             {
                 if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                    xxxxxxxx.diagnostics.push(create_check(
+                    checker.diagnostics.push(create_check(
                         expr,
                         &keyword.node.value,
                         mode.replacement_value(),
-                        xxxxxxxx.locator,
-                        xxxxxxxx.patch(&RuleCode::UP015),
+                        checker.locator,
+                        checker.patch(&RuleCode::UP015),
                     ));
                 }
             }
@@ -180,12 +180,12 @@ pub fn redundant_open_modes(xxxxxxxx: &mut xxxxxxxx, expr: &Expr) {
         } = &mode_param.node
         {
             if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                xxxxxxxx.diagnostics.push(create_check(
+                checker.diagnostics.push(create_check(
                     expr,
                     mode_param,
                     mode.replacement_value(),
-                    xxxxxxxx.locator,
-                    xxxxxxxx.patch(&RuleCode::UP015),
+                    checker.locator,
+                    checker.patch(&RuleCode::UP015),
                 ));
             }
         }

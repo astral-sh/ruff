@@ -2,12 +2,12 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn attribute(value: &Expr, attr: &str) -> Expr {
     Expr::new(
@@ -22,7 +22,7 @@ fn attribute(value: &Expr, attr: &str) -> Expr {
 }
 
 /// B009
-pub fn getattr_with_constant(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
     };
@@ -46,8 +46,8 @@ pub fn getattr_with_constant(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, func: &Expr, 
     }
 
     let mut check = Diagnostic::new(violations::GetAttrWithConstant, Range::from_located(expr));
-    if xxxxxxxx.patch(check.kind.code()) {
-        let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
+    if checker.patch(check.kind.code()) {
+        let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_expr(&attribute(obj, value), 0);
         check.amend(Fix::replacement(
             generator.generate(),
@@ -55,5 +55,5 @@ pub fn getattr_with_constant(xxxxxxxx: &mut xxxxxxxx, expr: &Expr, func: &Expr, 
             expr.end_location.unwrap(),
         ));
     }
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }

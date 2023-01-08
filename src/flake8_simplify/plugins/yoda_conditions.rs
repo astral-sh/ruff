@@ -2,13 +2,13 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 /// SIM300
 pub fn yoda_conditions(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[Cmpop],
@@ -34,10 +34,10 @@ pub fn yoda_conditions(
     }
 
     // Slice exact content to preserve formatting.
-    let left_content = xxxxxxxx
+    let left_content = checker
         .locator
         .slice_source_code_range(&Range::from_located(left));
-    let right_content = xxxxxxxx
+    let right_content = checker
         .locator
         .slice_source_code_range(&Range::from_located(right));
 
@@ -46,7 +46,7 @@ pub fn yoda_conditions(
         Range::from_located(expr),
     );
 
-    if xxxxxxxx.patch(check.kind.code()) {
+    if checker.patch(check.kind.code()) {
         check.amend(Fix::replacement(
             format!("{right_content} == {left_content}"),
             left.location,
@@ -54,5 +54,5 @@ pub fn yoda_conditions(
         ));
     }
 
-    xxxxxxxx.diagnostics.push(check);
+    checker.diagnostics.push(check);
 }

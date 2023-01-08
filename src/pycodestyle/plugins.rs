@@ -10,11 +10,11 @@ use crate::ast::helpers::{
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 pub fn compare(
     left: &Expr,
@@ -34,7 +34,7 @@ pub fn compare(
 
 /// E711, E712
 pub fn literal_comparisons(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[Cmpop],
@@ -68,7 +68,7 @@ pub fn literal_comparisons(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
-            if xxxxxxxx.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
+            if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::Is);
             }
             checks.push(check);
@@ -78,7 +78,7 @@ pub fn literal_comparisons(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
-            if xxxxxxxx.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
+            if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::IsNot);
             }
             checks.push(check);
@@ -96,7 +96,7 @@ pub fn literal_comparisons(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
-                if xxxxxxxx.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
+                if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
                     bad_ops.insert(0, Cmpop::Is);
                 }
                 checks.push(check);
@@ -106,7 +106,7 @@ pub fn literal_comparisons(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
-                if xxxxxxxx.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
+                if checker.patch(check.kind.code()) && !helpers::is_constant_non_singleton(next) {
                     bad_ops.insert(0, Cmpop::IsNot);
                 }
                 checks.push(check);
@@ -130,7 +130,7 @@ pub fn literal_comparisons(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
-                if xxxxxxxx.patch(check.kind.code())
+                if checker.patch(check.kind.code())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
                     bad_ops.insert(idx, Cmpop::Is);
@@ -142,7 +142,7 @@ pub fn literal_comparisons(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
-                if xxxxxxxx.patch(check.kind.code())
+                if checker.patch(check.kind.code())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
                     bad_ops.insert(idx, Cmpop::IsNot);
@@ -162,7 +162,7 @@ pub fn literal_comparisons(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if xxxxxxxx.patch(check.kind.code())
+                    if checker.patch(check.kind.code())
                         && !helpers::is_constant_non_singleton(comparator)
                     {
                         bad_ops.insert(idx, Cmpop::Is);
@@ -174,7 +174,7 @@ pub fn literal_comparisons(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if xxxxxxxx.patch(check.kind.code())
+                    if checker.patch(check.kind.code())
                         && !helpers::is_constant_non_singleton(comparator)
                     {
                         bad_ops.insert(idx, Cmpop::IsNot);
@@ -197,7 +197,7 @@ pub fn literal_comparisons(
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .cloned()
             .collect::<Vec<_>>();
-        let content = compare(left, &ops, comparators, xxxxxxxx.style);
+        let content = compare(left, &ops, comparators, checker.style);
         for check in &mut checks {
             check.amend(Fix::replacement(
                 content.to_string(),
@@ -207,12 +207,12 @@ pub fn literal_comparisons(
         }
     }
 
-    xxxxxxxx.diagnostics.extend(checks);
+    checker.diagnostics.extend(checks);
 }
 
 /// E713, E714
 pub fn not_tests(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     expr: &Expr,
     op: &Unaryop,
     operand: &Expr,
@@ -236,14 +236,14 @@ pub fn not_tests(
                                 violations::NotInTest,
                                 Range::from_located(operand),
                             );
-                            if xxxxxxxx.patch(check.kind.code()) && should_fix {
+                            if checker.patch(check.kind.code()) && should_fix {
                                 check.amend(Fix::replacement(
-                                    compare(left, &[Cmpop::NotIn], comparators, xxxxxxxx.style),
+                                    compare(left, &[Cmpop::NotIn], comparators, checker.style),
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
                             }
-                            xxxxxxxx.diagnostics.push(check);
+                            checker.diagnostics.push(check);
                         }
                     }
                     Cmpop::Is => {
@@ -252,14 +252,14 @@ pub fn not_tests(
                                 violations::NotIsTest,
                                 Range::from_located(operand),
                             );
-                            if xxxxxxxx.patch(check.kind.code()) && should_fix {
+                            if checker.patch(check.kind.code()) && should_fix {
                                 check.amend(Fix::replacement(
-                                    compare(left, &[Cmpop::IsNot], comparators, xxxxxxxx.style),
+                                    compare(left, &[Cmpop::IsNot], comparators, checker.style),
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
                             }
-                            xxxxxxxx.diagnostics.push(check);
+                            checker.diagnostics.push(check);
                         }
                     }
                     _ => {}
@@ -300,25 +300,24 @@ fn function(
 }
 
 /// E731
-pub fn do_not_assign_lambda(xxxxxxxx: &mut xxxxxxxx, target: &Expr, value: &Expr, stmt: &Stmt) {
+pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
     if let ExprKind::Name { id, .. } = &target.node {
         if let ExprKind::Lambda { args, body } = &value.node {
             let mut check = Diagnostic::new(
                 violations::DoNotAssignLambda(id.to_string()),
                 Range::from_located(stmt),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
-                if !match_leading_content(stmt, xxxxxxxx.locator)
-                    && !match_trailing_content(stmt, xxxxxxxx.locator)
+            if checker.patch(check.kind.code()) {
+                if !match_leading_content(stmt, checker.locator)
+                    && !match_trailing_content(stmt, checker.locator)
                 {
-                    let first_line = xxxxxxxx.locator.slice_source_code_range(&Range::new(
+                    let first_line = checker.locator.slice_source_code_range(&Range::new(
                         Location::new(stmt.location.row(), 0),
                         Location::new(stmt.location.row() + 1, 0),
                     ));
                     let indentation = &leading_space(&first_line);
                     let mut indented = String::new();
-                    for (idx, line) in function(id, args, body, xxxxxxxx.style).lines().enumerate()
-                    {
+                    for (idx, line) in function(id, args, body, checker.style).lines().enumerate() {
                         if idx == 0 {
                             indented.push_str(line);
                         } else {
@@ -334,7 +333,7 @@ pub fn do_not_assign_lambda(xxxxxxxx: &mut xxxxxxxx, target: &Expr, value: &Expr
                     ));
                 }
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 }

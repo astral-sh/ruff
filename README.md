@@ -344,7 +344,7 @@ Options:
       --isolated
           Ignore all configuration files
       --select <SELECT>
-          Comma-separated list of error codes to enable (or ALL, to enable all checks)
+          Comma-separated list of rule codes to enable (or ALL, to enable all rules)
       --extend-select <EXTEND_SELECT>
           Like --select, but adds additional error codes on top of the selected ones
       --ignore <IGNORE>
@@ -1418,7 +1418,7 @@ At time of writing, Pylint implements 409 total rules, while Ruff implements 224
 at least 60 overlap with the Pylint rule set. Subjectively, Pylint tends to implement more rules
 based on type inference (e.g., validating the number of arguments in a function call).
 
-Like Flake8, Pylint supports plugins (called "xxxxxxxxs"), while Ruff implements all checks natively.
+Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all checks natively.
 
 Unlike Pylint, Ruff is capable of automatically fixing its own lint errors.
 

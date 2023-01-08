@@ -3,9 +3,9 @@ use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Operator};
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path};
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 const MUTABLE_FUNCS: &[(&str, &str)] = &[
     ("", "dict"),
@@ -144,7 +144,7 @@ fn is_immutable_annotation(
 }
 
 /// B006
-pub fn mutable_argument_default(xxxxxxxx: &mut xxxxxxxx, arguments: &Arguments) {
+pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Scan in reverse order to right-align zip()
     for (arg, default) in arguments
         .kwonlyargs
@@ -160,12 +160,12 @@ pub fn mutable_argument_default(xxxxxxxx: &mut xxxxxxxx, arguments: &Arguments) 
                 .zip(arguments.defaults.iter().rev()),
         )
     {
-        if is_mutable_expr(default, &xxxxxxxx.from_imports, &xxxxxxxx.import_aliases)
+        if is_mutable_expr(default, &checker.from_imports, &checker.import_aliases)
             && arg.node.annotation.as_ref().map_or(true, |expr| {
-                !is_immutable_annotation(expr, &xxxxxxxx.from_imports, &xxxxxxxx.import_aliases)
+                !is_immutable_annotation(expr, &checker.from_imports, &checker.import_aliases)
             })
         {
-            xxxxxxxx.diagnostics.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 violations::MutableArgumentDefault,
                 Range::from_located(default),
             ));

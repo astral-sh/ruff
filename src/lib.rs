@@ -21,6 +21,7 @@ use crate::source_code_locator::SourceCodeLocator;
 mod ast;
 pub mod autofix;
 pub mod cache;
+mod checkers;
 pub mod cli;
 mod cst;
 mod directives;
@@ -77,7 +78,6 @@ mod vendor;
 mod violation;
 mod violations;
 pub mod visibility;
-mod xxxxxxxxs;
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {

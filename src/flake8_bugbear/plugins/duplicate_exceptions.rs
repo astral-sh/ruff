@@ -5,10 +5,10 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKi
 use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::violations;
-use crate::xxxxxxxxs::ast::xxxxxxxx;
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
     Expr::new(
@@ -22,7 +22,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
 }
 
 fn duplicate_handler_exceptions<'a>(
-    xxxxxxxx: &mut xxxxxxxx,
+    checker: &mut Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
 ) -> FxHashMap<Vec<&'a str>, &'a Expr> {
@@ -41,7 +41,7 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::B014) {
+    if checker.settings.enabled.contains(&RuleCode::B014) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut check = Diagnostic::new(
@@ -54,8 +54,8 @@ fn duplicate_handler_exceptions<'a>(
                 ),
                 Range::from_located(expr),
             );
-            if xxxxxxxx.patch(check.kind.code()) {
-                let mut generator: SourceCodeGenerator = xxxxxxxx.style.into();
+            if checker.patch(check.kind.code()) {
+                let mut generator: SourceCodeGenerator = checker.style.into();
                 if unique_elts.len() == 1 {
                     generator.unparse_expr(unique_elts[0], 0);
                 } else {
@@ -67,14 +67,14 @@ fn duplicate_handler_exceptions<'a>(
                     expr.end_location.unwrap(),
                 ));
             }
-            xxxxxxxx.diagnostics.push(check);
+            checker.diagnostics.push(check);
         }
     }
 
     seen
 }
 
-pub fn duplicate_exceptions(xxxxxxxx: &mut xxxxxxxx, handlers: &[Excepthandler]) {
+pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
     let mut seen: FxHashSet<Vec<&str>> = FxHashSet::default();
     let mut duplicates: FxHashMap<Vec<&str>, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
@@ -93,7 +93,7 @@ pub fn duplicate_exceptions(xxxxxxxx: &mut xxxxxxxx, handlers: &[Excepthandler])
                 }
             }
             ExprKind::Tuple { elts, .. } => {
-                for (name, expr) in duplicate_handler_exceptions(xxxxxxxx, type_, elts) {
+                for (name, expr) in duplicate_handler_exceptions(checker, type_, elts) {
                     if seen.contains(&name) {
                         duplicates.entry(name).or_default().push(expr);
                     } else {
@@ -105,10 +105,10 @@ pub fn duplicate_exceptions(xxxxxxxx: &mut xxxxxxxx, handlers: &[Excepthandler])
         }
     }
 
-    if xxxxxxxx.settings.enabled.contains(&RuleCode::B025) {
+    if checker.settings.enabled.contains(&RuleCode::B025) {
         for (name, exprs) in duplicates {
             for expr in exprs {
-                xxxxxxxx.diagnostics.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     violations::DuplicateTryBlockException(name.join(".")),
                     Range::from_located(expr),
                 ));
