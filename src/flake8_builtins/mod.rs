@@ -16,7 +16,7 @@ mod tests {
     #[test_case(RuleCode::A001, Path::new("A001.py"); "A001")]
     #[test_case(RuleCode::A002, Path::new("A002.py"); "A002")]
     #[test_case(RuleCode::A003, Path::new("A003.py"); "A003")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_builtins")

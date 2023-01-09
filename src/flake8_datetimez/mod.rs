@@ -1,4 +1,4 @@
-pub mod rules_mut;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -21,7 +21,7 @@ mod tests {
     #[test_case(RuleCode::DTZ007, Path::new("DTZ007.py"); "DTZ007")]
     #[test_case(RuleCode::DTZ011, Path::new("DTZ011.py"); "DTZ011")]
     #[test_case(RuleCode::DTZ012, Path::new("DTZ012.py"); "DTZ012")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_datetimez")

@@ -1,6 +1,6 @@
 mod fixes;
 pub mod helpers;
-pub mod rules_mut;
+pub mod rules;
 pub mod settings;
 
 #[cfg(test)]

@@ -1,6 +1,5 @@
 pub mod fixes;
 pub mod rules;
-pub mod rules_mut;
 pub mod settings;
 pub mod types;
 
@@ -51,7 +50,7 @@ mod tests {
     #[test_case(RuleCode::UP028, Path::new("UP028_0.py"); "UP028_0")]
     #[test_case(RuleCode::UP028, Path::new("UP028_1.py"); "UP028_1")]
     #[test_case(RuleCode::UP029, Path::new("UP029.py"); "UP029")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyupgrade")

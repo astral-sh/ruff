@@ -43,8 +43,8 @@ def main(*, name: str, code: str, plugin: str) -> None:
 
     with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/mod.rs"), "w") as fp:
         for line in content.splitlines():
-            if line.strip() == "fn diagnostics(check_code: RuleCode, path: &Path) -> Result<()> {":
-                indent = line.split("fn diagnostics(check_code: RuleCode, path: &Path) -> Result<()> {")[0]
+            if line.strip() == "fn rules(check_code: RuleCode, path: &Path) -> Result<()> {":
+                indent = line.split("fn rules(check_code: RuleCode, path: &Path) -> Result<()> {")[0]
                 fp.write(f'{indent}#[test_case(RuleCode::{code}, Path::new("{code}.py"); "{code}")]')
                 fp.write("\n")
 

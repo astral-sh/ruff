@@ -1,15 +1,35 @@
 use log::error;
-use rustpython_ast::{Expr, Stmt};
+use rustpython_ast::{Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::pyupgrade::rules;
+use crate::registry::Diagnostic;
+use crate::violations;
+
+fn rule(targets: &[Expr], value: &Expr, location: Range) -> Option<Diagnostic> {
+    if targets.len() != 1 {
+        return None;
+    }
+    let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() else {
+        return None;
+    };
+    if id != "__metaclass__" {
+        return None;
+    }
+    let ExprKind::Name { id, .. } = &value.node else {
+        return None;
+    };
+    if id != "type" {
+        return None;
+    }
+    Some(Diagnostic::new(violations::UselessMetaclassType, location))
+}
 
 /// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
     let Some(mut diagnostic) =
-        rules::useless_metaclass_type(targets, value, Range::from_located(stmt)) else {
+        rule(targets, value, Range::from_located(stmt)) else {
             return;
         };
     if checker.patch(diagnostic.kind.code()) {

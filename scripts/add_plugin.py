@@ -33,8 +33,8 @@ def main(*, plugin: str, url: str) -> None:
     os.makedirs(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}"), exist_ok=True)
     with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/rules"), "a"):
         pass
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/rules_mut"), "w+") as fp:
-        fp.write("pub mod rules_mut;\n")
+    with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/rules"), "w+") as fp:
+        fp.write("pub mod rules;\n")
         fp.write("\n")
         fp.write(
             """#[cfg(test)]
@@ -49,7 +49,7 @@ mod tests {
     use crate::linter::test_path;
     use crate::settings;
 
-    fn diagnostics(check_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(check_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let diagnostics =test_path(
             Path::new("./resources/test/fixtures/%s")

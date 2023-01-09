@@ -442,15 +442,15 @@ where
                 if self.settings.enabled.contains(&RuleCode::UP011)
                     && self.settings.target_version >= PythonVersion::Py38
                 {
-                    pyupgrade::rules_mut::unnecessary_lru_cache_params(self, decorator_list);
+                    pyupgrade::rules::unnecessary_lru_cache_params(self, decorator_list);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::B018) {
-                    flake8_bugbear::rules_mut::useless_expression(self, body);
+                    flake8_bugbear::rules::useless_expression(self, body);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::B019) {
-                    flake8_bugbear::rules_mut::cached_instance_method(self, decorator_list);
+                    flake8_bugbear::rules::cached_instance_method(self, decorator_list);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::RET501)
@@ -462,7 +462,7 @@ where
                     || self.settings.enabled.contains(&RuleCode::RET507)
                     || self.settings.enabled.contains(&RuleCode::RET508)
                 {
-                    flake8_return::rules_mut::function(self, body);
+                    flake8_return::rules::function(self, body);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::C901) {
@@ -483,7 +483,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PLR0206) {
-                    pylint::rules_mut::property_with_parameters(self, stmt, decorator_list, args);
+                    pylint::rules::property_with_parameters(self, stmt, decorator_list, args);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PT001)
@@ -498,7 +498,7 @@ where
                     || self.settings.enabled.contains(&RuleCode::PT024)
                     || self.settings.enabled.contains(&RuleCode::PT025)
                 {
-                    flake8_pytest_style::rules_mut::fixture(
+                    flake8_pytest_style::rules::fixture(
                         self,
                         stmt,
                         name,
@@ -511,13 +511,13 @@ where
                 if self.settings.enabled.contains(&RuleCode::PT006)
                     || self.settings.enabled.contains(&RuleCode::PT007)
                 {
-                    flake8_pytest_style::rules_mut::parametrize(self, decorator_list);
+                    flake8_pytest_style::rules::parametrize(self, decorator_list);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PT023)
                     || self.settings.enabled.contains(&RuleCode::PT026)
                 {
-                    flake8_pytest_style::rules_mut::marks(self, decorator_list);
+                    flake8_pytest_style::rules::marks(self, decorator_list);
                 }
 
                 self.check_builtin_shadowing(name, stmt, true);
@@ -594,9 +594,7 @@ where
                 body,
             } => {
                 if self.settings.enabled.contains(&RuleCode::UP004) {
-                    pyupgrade::rules_mut::useless_object_inheritance(
-                        self, stmt, name, bases, keywords,
-                    );
+                    pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::E742) {
@@ -627,23 +625,23 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::B018) {
-                    flake8_bugbear::rules_mut::useless_expression(self, body);
+                    flake8_bugbear::rules::useless_expression(self, body);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::B024)
                     || self.settings.enabled.contains(&RuleCode::B027)
                 {
-                    flake8_bugbear::rules_mut::abstract_base_class(
+                    flake8_bugbear::rules::abstract_base_class(
                         self, stmt, name, bases, keywords, body,
                     );
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PT023) {
-                    flake8_pytest_style::rules_mut::marks(self, decorator_list);
+                    flake8_pytest_style::rules::marks(self, decorator_list);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PIE794) {
-                    flake8_pie::rules_mut::dupe_class_field_definitions(self, bases, body);
+                    flake8_pie::rules::dupe_class_field_definitions(self, bases, body);
                 }
 
                 self.check_builtin_shadowing(name, stmt, false);
@@ -677,10 +675,10 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::UP023) {
-                    pyupgrade::rules_mut::replace_c_element_tree(self, stmt);
+                    pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP026) {
-                    pyupgrade::rules_mut::rewrite_mock_import(self, stmt);
+                    pyupgrade::rules::rewrite_mock_import(self, stmt);
                 }
 
                 for alias in names {
@@ -767,10 +765,10 @@ where
 
                     // pylint
                     if self.settings.enabled.contains(&RuleCode::PLC0414) {
-                        pylint::rules_mut::useless_import_alias(self, alias);
+                        pylint::rules::useless_import_alias(self, alias);
                     }
                     if self.settings.enabled.contains(&RuleCode::PLR0402) {
-                        pylint::rules_mut::use_from_import(self, alias);
+                        pylint::rules::use_from_import(self, alias);
                     }
 
                     if let Some(asname) = &alias.node.asname {
@@ -861,7 +859,7 @@ where
                     }
 
                     if self.settings.enabled.contains(&RuleCode::PT013) {
-                        if let Some(diagnostic) = flake8_pytest_style::rules_mut::import(
+                        if let Some(diagnostic) = flake8_pytest_style::rules::import(
                             stmt,
                             &alias.node.name,
                             alias.node.asname.as_deref(),
@@ -879,7 +877,7 @@ where
                 // Track `import from` statements, to ensure that we can correctly attribute
                 // references like `from typing import Union`.
                 if self.settings.enabled.contains(&RuleCode::UP023) {
-                    pyupgrade::rules_mut::replace_c_element_tree(self, stmt);
+                    pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
                 if level.map(|level| level == 0).unwrap_or(true) {
                     if let Some(module) = module {
@@ -906,15 +904,15 @@ where
 
                 if self.settings.enabled.contains(&RuleCode::UP010) {
                     if let Some("__future__") = module.as_deref() {
-                        pyupgrade::rules_mut::unnecessary_future_import(self, stmt, names);
+                        pyupgrade::rules::unnecessary_future_import(self, stmt, names);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::UP026) {
-                    pyupgrade::rules_mut::rewrite_mock_import(self, stmt);
+                    pyupgrade::rules::rewrite_mock_import(self, stmt);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP029) {
                     if let Some(module) = module.as_deref() {
-                        pyupgrade::rules_mut::unnecessary_builtin_import(self, stmt, module, names);
+                        pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
                     }
                 }
 
@@ -942,7 +940,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PT013) {
-                    if let Some(diagnostic) = flake8_pytest_style::rules_mut::import_from(
+                    if let Some(diagnostic) = flake8_pytest_style::rules::import_from(
                         stmt,
                         module.as_deref(),
                         level.as_ref(),
@@ -1166,7 +1164,7 @@ where
 
                         // pylint
                         if self.settings.enabled.contains(&RuleCode::PLC0414) {
-                            pylint::rules_mut::useless_import_alias(self, alias);
+                            pylint::rules::useless_import_alias(self, alias);
                         }
                     }
                 }
@@ -1174,12 +1172,12 @@ where
             StmtKind::Raise { exc, .. } => {
                 if self.settings.enabled.contains(&RuleCode::F901) {
                     if let Some(expr) = exc {
-                        pyflakes::rules_mut::raise_not_implemented(self, expr);
+                        pyflakes::rules::raise_not_implemented(self, expr);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::B016) {
                     if let Some(exc) = exc {
-                        flake8_bugbear::rules_mut::cannot_raise_literal(self, exc);
+                        flake8_bugbear::rules::cannot_raise_literal(self, exc);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::EM101)
@@ -1187,12 +1185,12 @@ where
                     || self.settings.enabled.contains(&RuleCode::EM103)
                 {
                     if let Some(exc) = exc {
-                        flake8_errmsg::rules_mut::string_in_exception(self, exc);
+                        flake8_errmsg::rules::string_in_exception(self, exc);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
                     if let Some(item) = exc {
-                        pyupgrade::rules_mut::os_error_alias(self, item);
+                        pyupgrade::rules::os_error_alias(self, item);
                     }
                 }
             }
@@ -1201,16 +1199,16 @@ where
             }
             StmtKind::If { test, .. } => {
                 if self.settings.enabled.contains(&RuleCode::F634) {
-                    pyflakes::rules_mut::if_tuple(self, stmt, test);
+                    pyflakes::rules::if_tuple(self, stmt, test);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM102) {
-                    flake8_simplify::rules_mut::nested_if_statements(self, stmt);
+                    flake8_simplify::rules::nested_if_statements(self, stmt);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM103) {
-                    flake8_simplify::rules_mut::return_bool_condition_directly(self, stmt);
+                    flake8_simplify::rules::return_bool_condition_directly(self, stmt);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM108) {
-                    flake8_simplify::rules_mut::use_ternary_operator(
+                    flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
                         self.current_stmt_parent().map(|parent| parent.0),
@@ -1219,10 +1217,10 @@ where
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.enabled.contains(&RuleCode::F631) {
-                    pyflakes::rules_mut::assert_tuple(self, stmt, test);
+                    pyflakes::rules::assert_tuple(self, stmt, test);
                 }
                 if self.settings.enabled.contains(&RuleCode::B011) {
-                    flake8_bugbear::rules_mut::assert_false(
+                    flake8_bugbear::rules::assert_false(
                         self,
                         stmt,
                         test,
@@ -1234,15 +1232,13 @@ where
                         .push(flake8_bandit::rules::assert_used(stmt));
                 }
                 if self.settings.enabled.contains(&RuleCode::PT015) {
-                    if let Some(diagnostic) =
-                        flake8_pytest_style::rules_mut::assert_falsy(stmt, test)
-                    {
+                    if let Some(diagnostic) = flake8_pytest_style::rules::assert_falsy(stmt, test) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::PT018) {
                     if let Some(diagnostic) =
-                        flake8_pytest_style::rules_mut::composite_condition(stmt, test)
+                        flake8_pytest_style::rules::composite_condition(stmt, test)
                     {
                         self.diagnostics.push(diagnostic);
                     }
@@ -1250,21 +1246,21 @@ where
             }
             StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
                 if self.settings.enabled.contains(&RuleCode::B017) {
-                    flake8_bugbear::rules_mut::assert_raises_exception(self, stmt, items);
+                    flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
                 if self.settings.enabled.contains(&RuleCode::PT012) {
-                    flake8_pytest_style::rules_mut::complex_raises(self, stmt, items, body);
+                    flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM117) {
-                    flake8_simplify::rules_mut::multiple_with_statements(self, stmt);
+                    flake8_simplify::rules::multiple_with_statements(self, stmt);
                 }
             }
             StmtKind::While { body, orelse, .. } => {
                 if self.settings.enabled.contains(&RuleCode::B023) {
-                    flake8_bugbear::rules_mut::function_uses_loop_variable(self, &Node::Stmt(stmt));
+                    flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
                 if self.settings.enabled.contains(&RuleCode::PLW0120) {
-                    pylint::rules_mut::useless_else_on_loop(self, stmt, body, orelse);
+                    pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
             }
             StmtKind::For {
@@ -1282,19 +1278,19 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&RuleCode::B007) {
-                    flake8_bugbear::rules_mut::unused_loop_control_variable(self, target, body);
+                    flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
                 }
                 if self.settings.enabled.contains(&RuleCode::B020) {
-                    flake8_bugbear::rules_mut::loop_variable_overrides_iterator(self, target, iter);
+                    flake8_bugbear::rules::loop_variable_overrides_iterator(self, target, iter);
                 }
                 if self.settings.enabled.contains(&RuleCode::B023) {
-                    flake8_bugbear::rules_mut::function_uses_loop_variable(self, &Node::Stmt(stmt));
+                    flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
                 if self.settings.enabled.contains(&RuleCode::PLW0120) {
-                    pylint::rules_mut::useless_else_on_loop(self, stmt, body, orelse);
+                    pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM118) {
-                    flake8_simplify::rules_mut::key_in_dict_for(self, target, iter);
+                    flake8_simplify::rules::key_in_dict_for(self, target, iter);
                 }
             }
             StmtKind::Try {
@@ -1314,26 +1310,26 @@ where
                 if self.settings.enabled.contains(&RuleCode::B014)
                     || self.settings.enabled.contains(&RuleCode::B025)
                 {
-                    flake8_bugbear::rules_mut::duplicate_exceptions(self, handlers);
+                    flake8_bugbear::rules::duplicate_exceptions(self, handlers);
                 }
                 if self.settings.enabled.contains(&RuleCode::B013) {
-                    flake8_bugbear::rules_mut::redundant_tuple_in_exception_handler(self, handlers);
+                    flake8_bugbear::rules::redundant_tuple_in_exception_handler(self, handlers);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
-                    pyupgrade::rules_mut::os_error_alias(self, handlers);
+                    pyupgrade::rules::os_error_alias(self, handlers);
                 }
                 if self.settings.enabled.contains(&RuleCode::PT017) {
                     self.diagnostics.extend(
-                        flake8_pytest_style::rules_mut::assert_in_exception_handler(handlers),
+                        flake8_pytest_style::rules::assert_in_exception_handler(handlers),
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM105) {
-                    flake8_simplify::rules_mut::use_contextlib_suppress(
+                    flake8_simplify::rules::use_contextlib_suppress(
                         self, stmt, handlers, orelse, finalbody,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM107) {
-                    flake8_simplify::rules_mut::return_in_try_except_finally(
+                    flake8_simplify::rules::return_in_try_except_finally(
                         self, body, handlers, finalbody,
                     );
                 }
@@ -1341,12 +1337,12 @@ where
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.enabled.contains(&RuleCode::E731) {
                     if let [target] = &targets[..] {
-                        pycodestyle::rules_mut::do_not_assign_lambda(self, target, value, stmt);
+                        pycodestyle::rules::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
 
                 if self.settings.enabled.contains(&RuleCode::B003) {
-                    flake8_bugbear::rules_mut::assignment_to_os_environ(self, targets);
+                    flake8_bugbear::rules::assignment_to_os_environ(self, targets);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::S105) {
@@ -1358,20 +1354,20 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::UP001) {
-                    pyupgrade::rules_mut::useless_metaclass_type(self, stmt, value, targets);
+                    pyupgrade::rules::useless_metaclass_type(self, stmt, value, targets);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP013) {
-                    pyupgrade::rules_mut::convert_typed_dict_functional_to_class(
+                    pyupgrade::rules::convert_typed_dict_functional_to_class(
                         self, stmt, targets, value,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::UP014) {
-                    pyupgrade::rules_mut::convert_named_tuple_functional_to_class(
+                    pyupgrade::rules::convert_named_tuple_functional_to_class(
                         self, stmt, targets, value,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::UP027) {
-                    pyupgrade::rules_mut::unpack_list_comprehension(self, targets, value);
+                    pyupgrade::rules::unpack_list_comprehension(self, targets, value);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PD901) {
@@ -1383,14 +1379,14 @@ where
             StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.enabled.contains(&RuleCode::E731) {
                     if let Some(value) = value {
-                        pycodestyle::rules_mut::do_not_assign_lambda(self, target, value, stmt);
+                        pycodestyle::rules::do_not_assign_lambda(self, target, value, stmt);
                     }
                 }
             }
             StmtKind::Delete { .. } => {}
             StmtKind::Expr { value, .. } => {
                 if self.settings.enabled.contains(&RuleCode::B015) {
-                    flake8_bugbear::rules_mut::useless_comparison(self, value);
+                    flake8_bugbear::rules::useless_comparison(self, value);
                 }
             }
             _ => {}
@@ -1414,7 +1410,7 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&RuleCode::B021) {
-                    flake8_bugbear::rules_mut::f_string_docstring(self, body);
+                    flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
@@ -1423,7 +1419,7 @@ where
                     &Documentable::Function,
                 );
                 if self.settings.enabled.contains(&RuleCode::UP028) {
-                    pyupgrade::rules_mut::rewrite_yield_from(self, stmt);
+                    pyupgrade::rules::rewrite_yield_from(self, stmt);
                 }
                 let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Function);
                 self.definitions
@@ -1475,7 +1471,7 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&RuleCode::B021) {
-                    flake8_bugbear::rules_mut::f_string_docstring(self, body);
+                    flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
@@ -1527,7 +1523,7 @@ where
             } => {
                 self.except_handlers.push(extract_handler_names(handlers));
                 if self.settings.enabled.contains(&RuleCode::B012) {
-                    flake8_bugbear::rules_mut::jump_statement_in_finally(self, finalbody);
+                    flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
                 self.visit_body(body);
                 self.except_handlers.pop();
@@ -1635,7 +1631,7 @@ where
                             && !self.settings.pyupgrade.keep_runtime_typing
                             && self.annotations_future_enabled))
                 {
-                    pyupgrade::rules_mut::use_pep604_annotation(self, expr, value, slice);
+                    pyupgrade::rules::use_pep604_annotation(self, expr, value, slice);
                 }
 
                 if self.match_typing_expr(value, "Literal") {
@@ -1647,7 +1643,7 @@ where
                     || self.settings.enabled.contains(&RuleCode::YTT301)
                     || self.settings.enabled.contains(&RuleCode::YTT303)
                 {
-                    flake8_2020::rules_mut::subscript(self, value, slice);
+                    flake8_2020::rules::subscript(self, value, slice);
                 }
             }
             ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
@@ -1670,7 +1666,7 @@ where
                 match ctx {
                     ExprContext::Load => {
                         if self.settings.enabled.contains(&RuleCode::UP019) {
-                            pyupgrade::rules_mut::typing_text_str_alias(self, expr);
+                            pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
 
                         // Ex) List[...]
@@ -1687,7 +1683,7 @@ where
                                 &self.import_aliases,
                             )
                         {
-                            pyupgrade::rules_mut::use_pep585_annotation(self, expr, id);
+                            pyupgrade::rules::use_pep585_annotation(self, expr, id);
                         }
 
                         self.handle_node_load(expr);
@@ -1710,11 +1706,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::YTT202) {
-                    flake8_2020::rules_mut::name_or_attribute(self, expr);
+                    flake8_2020::rules::name_or_attribute(self, expr);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PLE0118) {
-                    pylint::rules_mut::used_prior_global_declaration(self, id, expr);
+                    pylint::rules::used_prior_global_declaration(self, id, expr);
                 }
             }
             ExprKind::Attribute { attr, value, .. } => {
@@ -1727,27 +1723,27 @@ where
                             && self.in_annotation))
                     && typing::is_pep585_builtin(expr, &self.from_imports, &self.import_aliases)
                 {
-                    pyupgrade::rules_mut::use_pep585_annotation(self, expr, attr);
+                    pyupgrade::rules::use_pep585_annotation(self, expr, attr);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::UP016) {
-                    pyupgrade::rules_mut::remove_six_compat(self, expr);
+                    pyupgrade::rules::remove_six_compat(self, expr);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::UP017)
                     && self.settings.target_version >= PythonVersion::Py311
                 {
-                    pyupgrade::rules_mut::datetime_utc_alias(self, expr);
+                    pyupgrade::rules::datetime_utc_alias(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP019) {
-                    pyupgrade::rules_mut::typing_text_str_alias(self, expr);
+                    pyupgrade::rules::typing_text_str_alias(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP026) {
-                    pyupgrade::rules_mut::rewrite_mock_attribute(self, expr);
+                    pyupgrade::rules::rewrite_mock_attribute(self, expr);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::YTT202) {
-                    flake8_2020::rules_mut::name_or_attribute(self, expr);
+                    flake8_2020::rules::name_or_attribute(self, expr);
                 }
 
                 for (code, name) in vec![
@@ -1837,26 +1833,26 @@ where
                                     }
                                     Ok(summary) => {
                                         if self.settings.enabled.contains(&RuleCode::F522) {
-                                            pyflakes::rules_mut::string_dot_format_extra_named_arguments(self,
-                                                                                                         &summary, keywords, location,
+                                            pyflakes::rules::string_dot_format_extra_named_arguments(self,
+                                                                                                     &summary, keywords, location,
                                             );
                                         }
 
                                         if self.settings.enabled.contains(&RuleCode::F523) {
-                                            pyflakes::rules_mut::string_dot_format_extra_positional_arguments(
+                                            pyflakes::rules::string_dot_format_extra_positional_arguments(
                                                 self,
                                                 &summary, args, location,
                                             );
                                         }
 
                                         if self.settings.enabled.contains(&RuleCode::F524) {
-                                            pyflakes::rules_mut::string_dot_format_missing_argument(
+                                            pyflakes::rules::string_dot_format_missing_argument(
                                                 self, &summary, args, keywords, location,
                                             );
                                         }
 
                                         if self.settings.enabled.contains(&RuleCode::F525) {
-                                            pyflakes::rules_mut::string_dot_format_mixing_automatic(
+                                            pyflakes::rules::string_dot_format_mixing_automatic(
                                                 self, &summary, location,
                                             );
                                         }
@@ -1869,73 +1865,71 @@ where
 
                 // pyupgrade
                 if self.settings.enabled.contains(&RuleCode::UP003) {
-                    pyupgrade::rules_mut::type_of_primitive(self, expr, func, args);
+                    pyupgrade::rules::type_of_primitive(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP005) {
-                    pyupgrade::rules_mut::deprecated_unittest_alias(self, func);
+                    pyupgrade::rules::deprecated_unittest_alias(self, func);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP008) {
-                    pyupgrade::rules_mut::super_call_with_parameters(self, expr, func, args);
+                    pyupgrade::rules::super_call_with_parameters(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP012) {
-                    pyupgrade::rules_mut::unnecessary_encode_utf8(self, expr, func, args, keywords);
+                    pyupgrade::rules::unnecessary_encode_utf8(self, expr, func, args, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP015) {
-                    pyupgrade::rules_mut::redundant_open_modes(self, expr);
+                    pyupgrade::rules::redundant_open_modes(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP016) {
-                    pyupgrade::rules_mut::remove_six_compat(self, expr);
+                    pyupgrade::rules::remove_six_compat(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP018) {
-                    pyupgrade::rules_mut::native_literals(self, expr, func, args, keywords);
+                    pyupgrade::rules::native_literals(self, expr, func, args, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP020) {
-                    pyupgrade::rules_mut::open_alias(self, expr, func);
+                    pyupgrade::rules::open_alias(self, expr, func);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP021) {
-                    pyupgrade::rules_mut::replace_universal_newlines(self, expr, keywords);
+                    pyupgrade::rules::replace_universal_newlines(self, expr, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP022) {
-                    pyupgrade::rules_mut::replace_stdout_stderr(self, expr, keywords);
+                    pyupgrade::rules::replace_stdout_stderr(self, expr, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
-                    pyupgrade::rules_mut::os_error_alias(self, expr);
+                    pyupgrade::rules::os_error_alias(self, expr);
                 }
 
                 // flake8-print
                 if self.settings.enabled.contains(&RuleCode::T201)
                     || self.settings.enabled.contains(&RuleCode::T203)
                 {
-                    flake8_print::rules_mut::print_call(self, func, keywords);
+                    flake8_print::rules::print_call(self, func, keywords);
                 }
 
                 // flake8-bugbear
                 if self.settings.enabled.contains(&RuleCode::B004) {
-                    flake8_bugbear::rules_mut::unreliable_callable_check(self, expr, func, args);
+                    flake8_bugbear::rules::unreliable_callable_check(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::B005) {
-                    flake8_bugbear::rules_mut::strip_with_multi_characters(self, expr, func, args);
+                    flake8_bugbear::rules::strip_with_multi_characters(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::B009) {
-                    flake8_bugbear::rules_mut::getattr_with_constant(self, expr, func, args);
+                    flake8_bugbear::rules::getattr_with_constant(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::B010) {
-                    flake8_bugbear::rules_mut::setattr_with_constant(self, expr, func, args);
+                    flake8_bugbear::rules::setattr_with_constant(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::B022) {
-                    flake8_bugbear::rules_mut::useless_contextlib_suppress(self, expr, args);
+                    flake8_bugbear::rules::useless_contextlib_suppress(self, expr, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::B026) {
-                    flake8_bugbear::rules_mut::star_arg_unpacking_after_keyword_arg(
+                    flake8_bugbear::rules::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::B905)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
-                    flake8_bugbear::rules_mut::zip_without_explicit_strict(
-                        self, expr, func, keywords,
-                    );
+                    flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
                 }
 
                 // flake8-bandit
@@ -2209,7 +2203,7 @@ where
 
                 // flake8-boolean-trap
                 if self.settings.enabled.contains(&RuleCode::FBT003) {
-                    flake8_boolean_trap::rules_mut::check_boolean_positional_value_in_function_call(
+                    flake8_boolean_trap::rules::check_boolean_positional_value_in_function_call(
                         self, args, func,
                     );
                 }
@@ -2294,7 +2288,7 @@ where
 
                 // flake8-datetimez
                 if self.settings.enabled.contains(&RuleCode::DTZ001) {
-                    flake8_datetimez::rules_mut::call_datetime_without_tzinfo(
+                    flake8_datetimez::rules::call_datetime_without_tzinfo(
                         self,
                         func,
                         args,
@@ -2303,28 +2297,28 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::DTZ002) {
-                    flake8_datetimez::rules_mut::call_datetime_today(
+                    flake8_datetimez::rules::call_datetime_today(
                         self,
                         func,
                         Range::from_located(expr),
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::DTZ003) {
-                    flake8_datetimez::rules_mut::call_datetime_utcnow(
+                    flake8_datetimez::rules::call_datetime_utcnow(
                         self,
                         func,
                         Range::from_located(expr),
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::DTZ004) {
-                    flake8_datetimez::rules_mut::call_datetime_utcfromtimestamp(
+                    flake8_datetimez::rules::call_datetime_utcfromtimestamp(
                         self,
                         func,
                         Range::from_located(expr),
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::DTZ005) {
-                    flake8_datetimez::rules_mut::call_datetime_now_without_tzinfo(
+                    flake8_datetimez::rules::call_datetime_now_without_tzinfo(
                         self,
                         func,
                         args,
@@ -2333,7 +2327,7 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::DTZ006) {
-                    flake8_datetimez::rules_mut::call_datetime_fromtimestamp(
+                    flake8_datetimez::rules::call_datetime_fromtimestamp(
                         self,
                         func,
                         args,
@@ -2342,7 +2336,7 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::DTZ007) {
-                    flake8_datetimez::rules_mut::call_datetime_strptime_without_zone(
+                    flake8_datetimez::rules::call_datetime_strptime_without_zone(
                         self,
                         func,
                         args,
@@ -2350,14 +2344,10 @@ where
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::DTZ011) {
-                    flake8_datetimez::rules_mut::call_date_today(
-                        self,
-                        func,
-                        Range::from_located(expr),
-                    );
+                    flake8_datetimez::rules::call_date_today(self, func, Range::from_located(expr));
                 }
                 if self.settings.enabled.contains(&RuleCode::DTZ012) {
-                    flake8_datetimez::rules_mut::call_date_fromtimestamp(
+                    flake8_datetimez::rules::call_date_fromtimestamp(
                         self,
                         func,
                         Range::from_located(expr),
@@ -2366,30 +2356,30 @@ where
 
                 // pygrep-hooks
                 if self.settings.enabled.contains(&RuleCode::PGH001) {
-                    pygrep_hooks::rules_mut::no_eval(self, func);
+                    pygrep_hooks::rules::no_eval(self, func);
                 }
                 if self.settings.enabled.contains(&RuleCode::PGH002) {
-                    pygrep_hooks::rules_mut::deprecated_log_warn(self, func);
+                    pygrep_hooks::rules::deprecated_log_warn(self, func);
                 }
 
                 // pylint
                 if self.settings.enabled.contains(&RuleCode::PLC3002) {
-                    pylint::rules_mut::unnecessary_direct_lambda_call(self, expr, func);
+                    pylint::rules::unnecessary_direct_lambda_call(self, expr, func);
                 }
                 if self.settings.enabled.contains(&RuleCode::PLR1722) {
-                    pylint::rules_mut::use_sys_exit(self, func);
+                    pylint::rules::use_sys_exit(self, func);
                 }
 
                 // flake8-pytest-style
                 if self.settings.enabled.contains(&RuleCode::PT008) {
                     if let Some(diagnostic) =
-                        flake8_pytest_style::rules_mut::patch_with_lambda(func, args, keywords)
+                        flake8_pytest_style::rules::patch_with_lambda(func, args, keywords)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::PT009) {
-                    if let Some(diagnostic) = flake8_pytest_style::rules_mut::unittest_assertion(
+                    if let Some(diagnostic) = flake8_pytest_style::rules::unittest_assertion(
                         self, expr, func, args, keywords,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -2399,11 +2389,11 @@ where
                 if self.settings.enabled.contains(&RuleCode::PT010)
                     || self.settings.enabled.contains(&RuleCode::PT011)
                 {
-                    flake8_pytest_style::rules_mut::raises_call(self, func, args, keywords);
+                    flake8_pytest_style::rules::raises_call(self, func, args, keywords);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PT016) {
-                    flake8_pytest_style::rules_mut::fail_call(self, func, args, keywords);
+                    flake8_pytest_style::rules::fail_call(self, func, args, keywords);
                 }
 
                 // ruff
@@ -2418,7 +2408,7 @@ where
                 if self.settings.enabled.contains(&RuleCode::F601)
                     || self.settings.enabled.contains(&RuleCode::F602)
                 {
-                    pyflakes::rules_mut::repeated_keys(self, keys, values);
+                    pyflakes::rules::repeated_keys(self, keys, values);
                 }
             }
             ExprKind::Yield { .. } => {
@@ -2454,12 +2444,12 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::PLE1142) {
-                    pylint::rules_mut::await_outside_async(self, expr);
+                    pylint::rules::await_outside_async(self, expr);
                 }
             }
             ExprKind::JoinedStr { values } => {
                 if self.settings.enabled.contains(&RuleCode::F541) {
-                    pyflakes::rules_mut::f_string_missing_placeholders(expr, values, self);
+                    pyflakes::rules::f_string_missing_placeholders(expr, values, self);
                 }
             }
             ExprKind::BinOp {
@@ -2468,7 +2458,7 @@ where
                 ..
             } => {
                 if self.settings.enabled.contains(&RuleCode::F633) {
-                    pyflakes::rules_mut::invalid_print_syntax(self, left);
+                    pyflakes::rules::invalid_print_syntax(self, left);
                 }
             }
             ExprKind::BinOp {
@@ -2514,37 +2504,37 @@ where
                             }
                             Ok(summary) => {
                                 if self.settings.enabled.contains(&RuleCode::F502) {
-                                    pyflakes::rules_mut::percent_format_expected_mapping(
+                                    pyflakes::rules::percent_format_expected_mapping(
                                         self, &summary, right, location,
                                     );
                                 }
                                 if self.settings.enabled.contains(&RuleCode::F503) {
-                                    pyflakes::rules_mut::percent_format_expected_sequence(
+                                    pyflakes::rules::percent_format_expected_sequence(
                                         self, &summary, right, location,
                                     );
                                 }
                                 if self.settings.enabled.contains(&RuleCode::F504) {
-                                    pyflakes::rules_mut::percent_format_extra_named_arguments(
+                                    pyflakes::rules::percent_format_extra_named_arguments(
                                         self, &summary, right, location,
                                     );
                                 }
                                 if self.settings.enabled.contains(&RuleCode::F505) {
-                                    pyflakes::rules_mut::percent_format_missing_arguments(
+                                    pyflakes::rules::percent_format_missing_arguments(
                                         self, &summary, right, location,
                                     );
                                 }
                                 if self.settings.enabled.contains(&RuleCode::F506) {
-                                    pyflakes::rules_mut::percent_format_mixed_positional_and_named(
+                                    pyflakes::rules::percent_format_mixed_positional_and_named(
                                         self, &summary, location,
                                     );
                                 }
                                 if self.settings.enabled.contains(&RuleCode::F507) {
-                                    pyflakes::rules_mut::percent_format_positional_count_mismatch(
+                                    pyflakes::rules::percent_format_positional_count_mismatch(
                                         self, &summary, right, location,
                                     );
                                 }
                                 if self.settings.enabled.contains(&RuleCode::F508) {
-                                    pyflakes::rules_mut::percent_format_star_requires_sequence(
+                                    pyflakes::rules::percent_format_star_requires_sequence(
                                         self, &summary, right, location,
                                     );
                                 }
@@ -2566,7 +2556,7 @@ where
                 let check_not_in = self.settings.enabled.contains(&RuleCode::E713);
                 let check_not_is = self.settings.enabled.contains(&RuleCode::E714);
                 if check_not_in || check_not_is {
-                    pycodestyle::rules_mut::not_tests(
+                    pycodestyle::rules::not_tests(
                         self,
                         expr,
                         op,
@@ -2577,17 +2567,17 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::B002) {
-                    flake8_bugbear::rules_mut::unary_prefix_increment(self, expr, op, operand);
+                    flake8_bugbear::rules::unary_prefix_increment(self, expr, op, operand);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::SIM201) {
-                    flake8_simplify::rules_mut::negation_with_equal_op(self, expr, op, operand);
+                    flake8_simplify::rules::negation_with_equal_op(self, expr, op, operand);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM202) {
-                    flake8_simplify::rules_mut::negation_with_not_equal_op(self, expr, op, operand);
+                    flake8_simplify::rules::negation_with_not_equal_op(self, expr, op, operand);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM208) {
-                    flake8_simplify::rules_mut::double_negation(self, expr, op, operand);
+                    flake8_simplify::rules::double_negation(self, expr, op, operand);
                 }
             }
             ExprKind::Compare {
@@ -2598,7 +2588,7 @@ where
                 let check_none_comparisons = self.settings.enabled.contains(&RuleCode::E711);
                 let check_true_false_comparisons = self.settings.enabled.contains(&RuleCode::E712);
                 if check_none_comparisons || check_true_false_comparisons {
-                    pycodestyle::rules_mut::literal_comparisons(
+                    pycodestyle::rules::literal_comparisons(
                         self,
                         expr,
                         left,
@@ -2610,7 +2600,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::F632) {
-                    pyflakes::rules_mut::invalid_literal_comparison(
+                    pyflakes::rules::invalid_literal_comparison(
                         self,
                         left,
                         ops,
@@ -2633,7 +2623,7 @@ where
                     || self.settings.enabled.contains(&RuleCode::YTT204)
                     || self.settings.enabled.contains(&RuleCode::YTT302)
                 {
-                    flake8_2020::rules_mut::compare(self, left, ops, comparators);
+                    flake8_2020::rules::compare(self, left, ops, comparators);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::S105) {
@@ -2646,7 +2636,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PLC2201) {
-                    pylint::rules_mut::misplaced_comparison_constant(
+                    pylint::rules::misplaced_comparison_constant(
                         self,
                         expr,
                         left,
@@ -2656,17 +2646,11 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::SIM118) {
-                    flake8_simplify::rules_mut::key_in_dict_compare(
-                        self,
-                        expr,
-                        left,
-                        ops,
-                        comparators,
-                    );
+                    flake8_simplify::rules::key_in_dict_compare(self, expr, left, ops, comparators);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::SIM300) {
-                    flake8_simplify::rules_mut::yoda_conditions(self, expr, left, ops, comparators);
+                    flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
             }
             ExprKind::Constant {
@@ -2699,12 +2683,12 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::UP025) {
-                    pyupgrade::rules_mut::rewrite_unicode_literal(self, expr, kind.as_deref());
+                    pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
                 if self.settings.enabled.contains(&RuleCode::PIE807) {
-                    flake8_pie::rules_mut::prefer_list_builtin(self, expr);
+                    flake8_pie::rules::prefer_list_builtin(self, expr);
                 }
 
                 // Visit the arguments, but avoid the body, which will be deferred.
@@ -2743,19 +2727,17 @@ where
             }
             ExprKind::IfExp { test, body, orelse } => {
                 if self.settings.enabled.contains(&RuleCode::SIM210) {
-                    flake8_simplify::rules_mut::explicit_true_false_in_ifexpr(
+                    flake8_simplify::rules::explicit_true_false_in_ifexpr(
                         self, expr, test, body, orelse,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM211) {
-                    flake8_simplify::rules_mut::explicit_false_true_in_ifexpr(
+                    flake8_simplify::rules::explicit_false_true_in_ifexpr(
                         self, expr, test, body, orelse,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM212) {
-                    flake8_simplify::rules_mut::twisted_arms_in_ifexpr(
-                        self, expr, test, body, orelse,
-                    );
+                    flake8_simplify::rules::twisted_arms_in_ifexpr(self, expr, test, body, orelse);
                 }
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
@@ -2774,37 +2756,37 @@ where
                     };
                 }
                 if self.settings.enabled.contains(&RuleCode::B023) {
-                    flake8_bugbear::rules_mut::function_uses_loop_variable(self, &Node::Expr(expr));
+                    flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
                 self.push_scope(Scope::new(ScopeKind::Generator));
             }
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
                 if self.settings.enabled.contains(&RuleCode::B023) {
-                    flake8_bugbear::rules_mut::function_uses_loop_variable(self, &Node::Expr(expr));
+                    flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
                 self.push_scope(Scope::new(ScopeKind::Generator));
             }
             ExprKind::BoolOp { op, values } => {
                 if self.settings.enabled.contains(&RuleCode::PLR1701) {
-                    pylint::rules_mut::merge_isinstance(self, expr, op, values);
+                    pylint::rules::merge_isinstance(self, expr, op, values);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM101) {
-                    flake8_simplify::rules_mut::duplicate_isinstance_call(self, expr);
+                    flake8_simplify::rules::duplicate_isinstance_call(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM109) {
-                    flake8_simplify::rules_mut::compare_with_tuple(self, expr);
+                    flake8_simplify::rules::compare_with_tuple(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM220) {
-                    flake8_simplify::rules_mut::a_and_not_a(self, expr);
+                    flake8_simplify::rules::a_and_not_a(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM221) {
-                    flake8_simplify::rules_mut::a_or_not_a(self, expr);
+                    flake8_simplify::rules::a_or_not_a(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM222) {
-                    flake8_simplify::rules_mut::or_true(self, expr);
+                    flake8_simplify::rules::or_true(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM223) {
-                    flake8_simplify::rules_mut::and_false(self, expr);
+                    flake8_simplify::rules::and_false(self, expr);
                 }
             }
             _ => {}
@@ -3053,10 +3035,10 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::B904) {
-                    flake8_bugbear::rules_mut::raise_without_from_inside_except(self, body);
+                    flake8_bugbear::rules::raise_without_from_inside_except(self, body);
                 }
                 if self.settings.enabled.contains(&RuleCode::BLE001) {
-                    flake8_blind_except::rules_mut::blind_except(
+                    flake8_blind_except::rules::blind_except(
                         self,
                         type_.as_deref(),
                         name.as_deref(),
@@ -3167,7 +3149,7 @@ where
 
     fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
         if self.settings.enabled.contains(&RuleCode::SIM118) {
-            flake8_simplify::rules_mut::key_in_dict_for(
+            flake8_simplify::rules::key_in_dict_for(
                 self,
                 &comprehension.target,
                 &comprehension.iter,
@@ -3178,18 +3160,18 @@ where
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
         if self.settings.enabled.contains(&RuleCode::B006) {
-            flake8_bugbear::rules_mut::mutable_argument_default(self, arguments);
+            flake8_bugbear::rules::mutable_argument_default(self, arguments);
         }
         if self.settings.enabled.contains(&RuleCode::B008) {
-            flake8_bugbear::rules_mut::function_call_argument_default(self, arguments);
+            flake8_bugbear::rules::function_call_argument_default(self, arguments);
         }
 
         // flake8-boolean-trap
         if self.settings.enabled.contains(&RuleCode::FBT001) {
-            flake8_boolean_trap::rules_mut::check_positional_boolean_in_def(self, arguments);
+            flake8_boolean_trap::rules::check_positional_boolean_in_def(self, arguments);
         }
         if self.settings.enabled.contains(&RuleCode::FBT002) {
-            flake8_boolean_trap::rules_mut::check_boolean_default_value_in_function_definition(
+            flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
                 self, arguments,
             );
         }
@@ -3246,7 +3228,7 @@ where
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
         if self.settings.enabled.contains(&RuleCode::PIE790) {
-            flake8_pie::rules_mut::no_unnecessary_pass(self, body);
+            flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
         if self.settings.enabled.contains(&RuleCode::SIM110)
@@ -3256,7 +3238,7 @@ where
                 if matches!(stmt.node, StmtKind::For { .. })
                     && matches!(sibling.node, StmtKind::Return { .. })
                 {
-                    flake8_simplify::rules_mut::convert_loop_to_any_all(self, stmt, sibling);
+                    flake8_simplify::rules::convert_loop_to_any_all(self, stmt, sibling);
                 }
             }
         }
@@ -3611,22 +3593,20 @@ impl<'a> Checker<'a> {
                 if !self.current_scope().values.get(id).map_or(false, |index| {
                     matches!(self.bindings[*index].kind, BindingKind::Global)
                 }) {
-                    pep8_naming::rules_mut::non_lowercase_variable_in_function(
-                        self, expr, parent, id,
-                    );
+                    pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
             }
         }
 
         if self.settings.enabled.contains(&RuleCode::N815) {
             if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
-                pep8_naming::rules_mut::mixed_case_variable_in_class_scope(self, expr, parent, id);
+                pep8_naming::rules::mixed_case_variable_in_class_scope(self, expr, parent, id);
             }
         }
 
         if self.settings.enabled.contains(&RuleCode::N816) {
             if matches!(self.current_scope().kind, ScopeKind::Module) {
-                pep8_naming::rules_mut::mixed_case_variable_in_global_scope(self, expr, parent, id);
+                pep8_naming::rules::mixed_case_variable_in_global_scope(self, expr, parent, id);
             }
         }
 
@@ -3764,7 +3744,7 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         if self.settings.enabled.contains(&RuleCode::B021) {
-            flake8_bugbear::rules_mut::f_string_docstring(self, python_ast);
+            flake8_bugbear::rules::f_string_docstring(self, python_ast);
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
         self.definitions.push((
@@ -3874,10 +3854,10 @@ impl<'a> Checker<'a> {
             let scope_index = scopes[scopes.len() - 1];
             let parent_scope_index = scopes[scopes.len() - 2];
             if self.settings.enabled.contains(&RuleCode::F841) {
-                pyflakes::rules_mut::unused_variable(self, scope_index);
+                pyflakes::rules::unused_variable(self, scope_index);
             }
             if self.settings.enabled.contains(&RuleCode::F842) {
-                pyflakes::rules_mut::unused_annotation(self, scope_index);
+                pyflakes::rules::unused_annotation(self, scope_index);
             }
             if self.settings.enabled.contains(&RuleCode::ARG001)
                 || self.settings.enabled.contains(&RuleCode::ARG002)
@@ -4245,7 +4225,7 @@ impl<'a> Checker<'a> {
                         &overloaded_name,
                     )
                 }) {
-                    flake8_annotations::rules_mut::definition(self, &definition, &visibility);
+                    flake8_annotations::rules::definition(self, &definition, &visibility);
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
@@ -4253,7 +4233,7 @@ impl<'a> Checker<'a> {
             // pydocstyle
             if enforce_docstrings {
                 if definition.docstring.is_none() {
-                    pydocstyle::rules_mut::not_missing(self, &definition, &visibility);
+                    pydocstyle::rules::not_missing(self, &definition, &visibility);
                     continue;
                 }
 
@@ -4275,67 +4255,67 @@ impl<'a> Checker<'a> {
                     body,
                 };
 
-                if !pydocstyle::rules_mut::not_empty(self, &docstring) {
+                if !pydocstyle::rules::not_empty(self, &docstring) {
                     continue;
                 }
 
                 if self.settings.enabled.contains(&RuleCode::D200) {
-                    pydocstyle::rules_mut::one_liner(self, &docstring);
+                    pydocstyle::rules::one_liner(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D201)
                     || self.settings.enabled.contains(&RuleCode::D202)
                 {
-                    pydocstyle::rules_mut::blank_before_after_function(self, &docstring);
+                    pydocstyle::rules::blank_before_after_function(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D203)
                     || self.settings.enabled.contains(&RuleCode::D204)
                     || self.settings.enabled.contains(&RuleCode::D211)
                 {
-                    pydocstyle::rules_mut::blank_before_after_class(self, &docstring);
+                    pydocstyle::rules::blank_before_after_class(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D205) {
-                    pydocstyle::rules_mut::blank_after_summary(self, &docstring);
+                    pydocstyle::rules::blank_after_summary(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D206)
                     || self.settings.enabled.contains(&RuleCode::D207)
                     || self.settings.enabled.contains(&RuleCode::D208)
                 {
-                    pydocstyle::rules_mut::indent(self, &docstring);
+                    pydocstyle::rules::indent(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D209) {
-                    pydocstyle::rules_mut::newline_after_last_paragraph(self, &docstring);
+                    pydocstyle::rules::newline_after_last_paragraph(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D210) {
-                    pydocstyle::rules_mut::no_surrounding_whitespace(self, &docstring);
+                    pydocstyle::rules::no_surrounding_whitespace(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D212)
                     || self.settings.enabled.contains(&RuleCode::D213)
                 {
-                    pydocstyle::rules_mut::multi_line_summary_start(self, &docstring);
+                    pydocstyle::rules::multi_line_summary_start(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D300) {
-                    pydocstyle::rules_mut::triple_quotes(self, &docstring);
+                    pydocstyle::rules::triple_quotes(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D301) {
-                    pydocstyle::rules_mut::backslashes(self, &docstring);
+                    pydocstyle::rules::backslashes(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D400) {
-                    pydocstyle::rules_mut::ends_with_period(self, &docstring);
+                    pydocstyle::rules::ends_with_period(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D402) {
-                    pydocstyle::rules_mut::no_signature(self, &docstring);
+                    pydocstyle::rules::no_signature(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D403) {
-                    pydocstyle::rules_mut::capitalized(self, &docstring);
+                    pydocstyle::rules::capitalized(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D404) {
-                    pydocstyle::rules_mut::starts_with_this(self, &docstring);
+                    pydocstyle::rules::starts_with_this(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D415) {
-                    pydocstyle::rules_mut::ends_with_punctuation(self, &docstring);
+                    pydocstyle::rules::ends_with_punctuation(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D418) {
-                    pydocstyle::rules_mut::if_needed(self, &docstring);
+                    pydocstyle::rules::if_needed(self, &docstring);
                 }
                 if self.settings.enabled.contains(&RuleCode::D212)
                     || self.settings.enabled.contains(&RuleCode::D214)
@@ -4353,7 +4333,7 @@ impl<'a> Checker<'a> {
                     || self.settings.enabled.contains(&RuleCode::D416)
                     || self.settings.enabled.contains(&RuleCode::D417)
                 {
-                    pydocstyle::rules_mut::sections(
+                    pydocstyle::rules::sections(
                         self,
                         &docstring,
                         self.settings.pydocstyle.convention.as_ref(),

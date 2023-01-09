@@ -1,4 +1,4 @@
-pub mod rules_mut;
+pub mod rules;
 pub mod settings;
 
 #[cfg(test)]

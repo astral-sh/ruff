@@ -1,4 +1,4 @@
-pub mod rules_mut;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -15,7 +15,7 @@ mod tests {
     #[test_case(RuleCode::FBT001, Path::new("FBT.py"); "FBT001")]
     #[test_case(RuleCode::FBT002, Path::new("FBT.py"); "FBT002")]
     #[test_case(RuleCode::FBT003, Path::new("FBT.py"); "FBT003")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_boolean_trap")
