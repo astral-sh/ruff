@@ -180,8 +180,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         );
         if checker.patch(diagnostic.kind.code()) {
             let func_name_range = identifier_range(func, checker.locator);
-            let fix = Fix::insertion("_".to_string(), func_name_range.location);
-            diagnostic.amend(fix);
+            diagnostic.amend(Fix::insertion("_".to_string(), func_name_range.location));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -282,7 +281,6 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     violations::ErroneousUseFixturesOnFixture,
                     Range::from_located(mark),
                 );
-
                 if checker.patch(diagnostic.kind.code()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
