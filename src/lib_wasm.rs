@@ -86,6 +86,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
     Ok(serde_wasm_bindgen::to_value(&Options {
         // Propagate defaults.
         allowed_confusables: Some(Vec::default()),
+        builtins: Some(Vec::default()),
         dummy_variable_rgx: Some("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$".to_string()),
         extend_ignore: Some(Vec::default()),
         extend_select: Some(Vec::default()),
