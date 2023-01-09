@@ -383,7 +383,7 @@ fn categorize_imports<'a>(
     block_by_type
 }
 
-fn sort_imports(block: ImportBlock, order_by_type: bool) -> OrderedImportBlock {
+fn order_imports(block: ImportBlock, order_by_type: bool) -> OrderedImportBlock {
     let mut ordered = OrderedImportBlock::default();
 
     // Sort `StmtKind::Import`.
@@ -573,10 +573,24 @@ pub fn format_imports(
     // Generate replacement source code.
     let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
-        let mut import_block = sort_imports(import_block, order_by_type);
+        let mut imports = order_imports(import_block, order_by_type);
+
         if force_single_line {
-            import_block = force_single_line_imports(import_block, single_line_exclusions);
+            imports = force_single_line_imports(imports, single_line_exclusions);
         }
+
+        let imports = {
+            let mut imports = imports
+                .import
+                .into_iter()
+                .map(Import)
+                .chain(imports.import_from.into_iter().map(ImportFrom))
+                .collect::<Vec<EitherImport>>();
+            if force_sort_within_sections {
+                imports.sort_by(cmp_either_import);
+            };
+            imports
+        };
 
         // Add a blank line between every section.
         if is_first_block {
@@ -586,22 +600,7 @@ pub fn format_imports(
         }
 
         let mut is_first_statement = true;
-
-        let mut it = import_block
-            .import
-            .into_iter()
-            .map(Import)
-            .chain(import_block.import_from.into_iter().map(ImportFrom))
-            .collect::<Vec<EitherImport>>();
-
-        if force_sort_within_sections {
-            it = it
-                .into_iter()
-                .sorted_by(cmp_either_import)
-                .collect::<Vec<EitherImport>>();
-        }
-
-        for import in it {
+        for import in imports {
             match import {
                 Import((alias, comments)) => {
                     output.append(&format::format_import(
@@ -812,7 +811,7 @@ mod tests {
     #[test_case(Path::new("force_sort_within_sections.py"))]
     fn force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let mut diagnostics = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -822,11 +821,11 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(RuleCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -2852,9 +2852,9 @@ force-single-line = true
 
 #### [`force-sort-within-sections`](#force-sort-within-sections)
 
-Don't sort straight-style imports (like import sys) before from-style
-imports (like from itertools import groupby). Instead, sort the imports
-by module, independent of import style.
+Don't sort straight-style imports (like `import sys`) before from-style
+imports (like `from itertools import groupby`). Instead, sort the
+imports by module, independent of import style.
 
 **Default value**: `false`
 

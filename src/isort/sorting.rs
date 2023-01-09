@@ -76,14 +76,12 @@ pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromD
 pub fn cmp_either_import(a: &EitherImport, b: &EitherImport) -> Ordering {
     match (a, b) {
         (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2),
-        (ImportFrom((import_from, ..)), Import((alias, _))) => natord::compare_ignore_case(
-            import_from.module.as_ref().map_or("", |x| &**x),
-            alias.name,
-        ),
-        (Import((alias, _)), ImportFrom((import_from, ..))) => natord::compare_ignore_case(
-            alias.name,
-            import_from.module.as_ref().map_or("", |x| &**x),
-        ),
+        (ImportFrom((import_from, ..)), Import((alias, _))) => {
+            natord::compare_ignore_case(import_from.module.unwrap_or_default(), alias.name)
+        }
+        (Import((alias, _)), ImportFrom((import_from, ..))) => {
+            natord::compare_ignore_case(alias.name, import_from.module.unwrap_or_default())
+        }
         (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => {
             cmp_import_from(import_from1, import_from2)
         }

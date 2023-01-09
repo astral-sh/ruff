@@ -95,9 +95,9 @@ pub struct Options {
             force-sort-within-sections = true
         "#
     )]
-    /// Don't sort straight-style imports (like import sys) before from-style
-    /// imports (like from itertools import groupby). Instead, sort the imports
-    /// by module, independent of import style.
+    /// Don't sort straight-style imports (like `import sys`) before from-style
+    /// imports (like `from itertools import groupby`). Instead, sort the
+    /// imports by module, independent of import style.
     pub force_sort_within_sections: Option<bool>,
     #[option(
         default = r#"[]"#,
