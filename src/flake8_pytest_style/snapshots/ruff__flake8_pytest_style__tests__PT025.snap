@@ -1,6 +1,6 @@
 ---
 source: src/flake8_pytest_style/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     ErroneousUseFixturesOnFixture: ~
@@ -10,7 +10,14 @@ expression: checks
   end_location:
     row: 9
     column: 29
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 10
+      column: 0
   parent: ~
 - kind:
     ErroneousUseFixturesOnFixture: ~
@@ -20,6 +27,13 @@ expression: checks
   end_location:
     row: 16
     column: 29
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 17
+      column: 0
   parent: ~
 

@@ -4,7 +4,7 @@ use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
     is_pytest_yield_fixture, keyword_is_literal,
 };
-use crate::ast::helpers::{collect_arg_names, collect_call_paths};
+use crate::ast::helpers::{collect_arg_names, collect_call_paths, identifier_range};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -156,19 +156,34 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && visitor.has_return_with_value
         && func_name.starts_with('_')
     {
-        checker.diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::IncorrectFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
-        ));
+        );
+        if checker.patch(diagnostic.kind.code()) {
+            let func_name_range = identifier_range(func, checker.locator);
+            let num_underscores = func_name.len() - func_name.trim_start_matches('_').len();
+            diagnostic.amend(Fix::deletion(
+                func_name_range.location,
+                func_name_range.location.with_col_offset(num_underscores),
+            ));
+        }
+        checker.diagnostics.push(diagnostic);
     } else if checker.settings.enabled.contains(&RuleCode::PT004)
         && !visitor.has_return_with_value
         && !visitor.has_yield_from
         && !func_name.starts_with('_')
     {
-        checker.diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::MissingFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
-        ));
+        );
+        if checker.patch(diagnostic.kind.code()) {
+            let func_name_range = identifier_range(func, checker.locator);
+            let fix = Fix::insertion("_".to_string(), func_name_range.location);
+            diagnostic.amend(fix);
+        }
+        checker.diagnostics.push(diagnostic);
     }
 
     if checker.settings.enabled.contains(&RuleCode::PT022) {
@@ -248,19 +263,32 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
 
         if checker.settings.enabled.contains(&RuleCode::PT024) {
             if name == "asyncio" {
-                checker.diagnostics.push(Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::UnnecessaryAsyncioMarkOnFixture,
                     Range::from_located(mark),
-                ));
+                );
+                if checker.patch(diagnostic.kind.code()) {
+                    let start = Location::new(mark.location.row(), 0);
+                    let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
+                    diagnostic.amend(Fix::deletion(start, end));
+                }
+                checker.diagnostics.push(diagnostic);
             }
         }
 
         if checker.settings.enabled.contains(&RuleCode::PT025) {
             if name == "usefixtures" {
-                checker.diagnostics.push(Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     violations::ErroneousUseFixturesOnFixture,
                     Range::from_located(mark),
-                ));
+                );
+
+                if checker.patch(diagnostic.kind.code()) {
+                    let start = Location::new(mark.location.row(), 0);
+                    let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
+                    diagnostic.amend(Fix::deletion(start, end));
+                }
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
