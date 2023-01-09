@@ -1,4 +1,4 @@
-use libcst_native::{Arg, Codegen, CodegenState, Expression, parse_expression};
+use libcst_native::{parse_expression, Arg, Codegen, CodegenState, Expression};
 use num_bigint::{BigInt, Sign};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -9,8 +9,8 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
 use crate::cst::matchers::{match_call, match_expression};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 // The regex documentation says to do this because creating regexs is expensive:
@@ -52,41 +52,34 @@ fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Vec<Arg> {
     new_args
 }
 
-fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Option<String> {
-    println!("MINI 1");
-    println!("{:?}", module_text);
-    let mut expression = parse_expression(&module_text).unwrap();/* {
-        Err(_) => return None,
+/// Returns the new call string, or returns an error if it cannot create a new call string
+fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Result<String, ()> {
+    let mut expression = match parse_expression(&module_text) {
+        Err(_) => return Err(()),
         Ok(item) => item,
     };
-                                                                      */
-    println!("MINI 2");
     let mut call = match match_call(&mut expression) {
-        Err(_) => return None,
+        Err(_) => return Err(()),
         Ok(item) => item,
     };
-    println!("MINI 3");
     call.args = get_new_args(call.args.clone(), correct_order);
     // Create the new function
     if let Expression::Attribute(item) = &*call.func {
         // Converting the struct to a struct and then back is not very efficient, but
         // regexs were the simplest way I could find to remove the specifiers
-        println!("MINI 3.5");
         let mut state = CodegenState::default();
         item.codegen(&mut state);
         let cleaned = remove_specifiers(&state.to_string());
-        println!("MINI 4");
         match match_expression(&cleaned) {
-            Err(_) => return None,
+            Err(_) => return Err(()),
             Ok(item) => call.func = Box::new(item),
         };
-        println!("MINI 5");
         // Create the string
         let mut final_state = CodegenState::default();
         expression.codegen(&mut final_state);
-        return Some(final_state.to_string());
+        return Ok(final_state.to_string());
     }
-    None
+    Err(())
 }
 
 fn get_specifier_order(value_str: &str) -> Vec<u32> {
@@ -135,29 +128,41 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
             value: cons_value, ..
         } = &value.node
         {
-            println!("STARTING");
             if let Constant::Str(provided_string) = cons_value {
-                if attr == "format" && has_specifiers(provided_string) {
-                    println!("{:?}", expr);
-                    let as_ints = get_specifier_order(provided_string);
-                    let call_range = Range::from_located(expr);
-                    let call_text = checker.locator.slice_source_code_range(&call_range);
-                    let new_call = match get_new_call(&call_text, as_ints) {
-                        None => return,
-                        Some(item) => item,
-                    };
-                    println!("Checkpoint 3");
-                    let mut diagnostic =
-                        Diagnostic::new(violations::FormatSpecifiers, Range::from_located(expr));
-                    if checker.patch(diagnostic.kind.code()) {
-                        diagnostic.amend(Fix::replacement(
-                            new_call,
-                            expr.location,
-                            expr.end_location.unwrap(),
-                        ));
-                    }
-                    checker.diagnostics.push(diagnostic);
+                // The function must be a format function
+                if attr != "format" {
+                    return;
                 }
+                // The squigly brackets must have format specifiers inside of them
+                if !has_specifiers(provided_string) {
+                    return;
+                }
+                let as_ints = get_specifier_order(provided_string);
+                let call_range = Range::from_located(expr);
+                let call_text = checker.locator.slice_source_code_range(&call_range);
+                let mut diagnostic =
+                    Diagnostic::new(violations::FormatSpecifiers, Range::from_located(expr));
+                match get_new_call(&call_text, as_ints) {
+                    // If we get any errors, we know that there is an issue that we cannot fix
+                    // so we should just report that there is a formatting issue. Currently the
+                    // only issue we know of is a ParseError from a multi line format statement
+                    // inside a function call that does not explicitly say there are multiple
+                    // lines. Follow my Github issue here:
+                    // https://github.com/Instagram/LibCST/issues/846
+
+                    // Is there a way to specify that here this is not fixable, but below it is??
+                    Err(_) => checker.diagnostics.push(diagnostic),
+                    Ok(new_call) => {
+                        if checker.patch(diagnostic.kind.code()) {
+                            diagnostic.amend(Fix::replacement(
+                                new_call,
+                                expr.location,
+                                expr.end_location.unwrap(),
+                            ));
+                        }
+                        checker.diagnostics.push(diagnostic);
+                    }
+                };
             }
         }
     }
