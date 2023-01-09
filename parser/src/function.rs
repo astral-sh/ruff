@@ -43,7 +43,7 @@ pub fn validate_arguments(arguments: ast::Arguments) -> Result<ast::Arguments, L
 pub fn parse_params(
     params: (Vec<ParameterDef>, Vec<ParameterDef>),
 ) -> Result<ParameterDefs, LexicalError> {
-    let mut posonly = Vec::with_capacity(params.0.len());
+    let mut pos_only = Vec::with_capacity(params.0.len());
     let mut names = Vec::with_capacity(params.1.len());
     let mut defaults = vec![];
 
@@ -63,7 +63,7 @@ pub fn parse_params(
 
     for (name, default) in params.0 {
         try_default(&name, default)?;
-        posonly.push(name);
+        pos_only.push(name);
     }
 
     for (name, default) in params.1 {
@@ -71,7 +71,7 @@ pub fn parse_params(
         names.push(name);
     }
 
-    Ok((posonly, names, defaults))
+    Ok((pos_only, names, defaults))
 }
 
 type FunctionArgument = (
