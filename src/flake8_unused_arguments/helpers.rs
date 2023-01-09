@@ -1,19 +1,63 @@
 use rustpython_ast::{Constant, ExprKind, Stmt, StmtKind};
 
+/// Return `true` if a `Stmt` is a docstring.
+fn is_docstring_stmt(stmt: &Stmt) -> bool {
+    if let StmtKind::Expr { value } = &stmt.node {
+        matches!(
+            value.node,
+            ExprKind::Constant {
+                value: Constant::Str { .. },
+                ..
+            }
+        )
+    } else {
+        false
+    }
+}
+
+/// Return `true` if a `Stmt` is a "empty": a `pass`, `...`, `raise
+/// NotImplementedError`, or `raise NotImplemented` (with or without arguments).
+fn is_empty_stmt(stmt: &Stmt) -> bool {
+    match &stmt.node {
+        StmtKind::Pass => return true,
+        StmtKind::Expr { value } => {
+            return matches!(
+                value.node,
+                ExprKind::Constant {
+                    value: Constant::Ellipsis,
+                    ..
+                }
+            )
+        }
+        StmtKind::Raise { exc, cause } => {
+            if cause.is_none() {
+                if let Some(exc) = exc {
+                    match &exc.node {
+                        ExprKind::Name { id, .. } => {
+                            return id.as_str() == "NotImplementedError"
+                                || id.as_str() == "NotImplemented";
+                        }
+                        ExprKind::Call { func, .. } => {
+                            if let ExprKind::Name { id, .. } = &func.node {
+                                return id.as_str() == "NotImplementedError"
+                                    || id.as_str() == "NotImplemented";
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    false
+}
+
 pub fn is_empty(body: &[Stmt]) -> bool {
     match &body {
         [] => true,
-        // Also allow: raise NotImplementedError, raise NotImplemented
-        [stmt] => match &stmt.node {
-            StmtKind::Pass => true,
-            StmtKind::Expr { value } => match &value.node {
-                ExprKind::Constant { value, .. } => {
-                    matches!(value, Constant::Str(_) | Constant::Ellipsis)
-                }
-                _ => false,
-            },
-            _ => false,
-        },
+        [stmt] => is_docstring_stmt(stmt) || is_empty_stmt(stmt),
+        [docstring, stmt] => is_docstring_stmt(docstring) && is_empty_stmt(stmt),
         _ => false,
     }
 }
