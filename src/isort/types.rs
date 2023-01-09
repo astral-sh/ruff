@@ -84,13 +84,22 @@ pub struct ImportBlock<'a> {
 
 type AliasDataWithComments<'a> = (AliasData<'a>, CommentSet<'a>);
 
+type Import<'a> = AliasDataWithComments<'a>;
+
+type ImportFrom<'a> = (
+    ImportFromData<'a>,
+    CommentSet<'a>,
+    TrailingComma,
+    Vec<AliasDataWithComments<'a>>,
+);
+
+pub enum EitherImport<'a> {
+    Import(Import<'a>),
+    ImportFrom(ImportFrom<'a>),
+}
+
 #[derive(Debug, Default)]
 pub struct OrderedImportBlock<'a> {
-    pub import: Vec<AliasDataWithComments<'a>>,
-    pub import_from: Vec<(
-        ImportFromData<'a>,
-        CommentSet<'a>,
-        TrailingComma,
-        Vec<AliasDataWithComments<'a>>,
-    )>,
+    pub import: Vec<Import<'a>>,
+    pub import_from: Vec<ImportFrom<'a>>,
 }

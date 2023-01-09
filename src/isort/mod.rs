@@ -11,11 +11,12 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::helpers::trailing_comma;
-use crate::isort::sorting::{cmp_import_from, cmp_members, cmp_modules};
+use crate::isort::sorting::{cmp_either_import, cmp_import_from, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
+use crate::isort::types::EitherImport::{Import, ImportFrom};
 use crate::isort::types::{
-    AliasData, CommentSet, ImportBlock, ImportFromData, Importable, OrderedImportBlock,
-    TrailingComma,
+    AliasData, CommentSet, EitherImport, ImportBlock, ImportFromData, Importable,
+    OrderedImportBlock, TrailingComma,
 };
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::SourceCodeLocator;
@@ -382,7 +383,7 @@ fn categorize_imports<'a>(
     block_by_type
 }
 
-fn sort_imports(block: ImportBlock, order_by_type: bool) -> OrderedImportBlock {
+fn order_imports(block: ImportBlock, order_by_type: bool) -> OrderedImportBlock {
     let mut ordered = OrderedImportBlock::default();
 
     // Sort `StmtKind::Import`.
@@ -549,6 +550,7 @@ pub fn format_imports(
     force_single_line: bool,
     single_line_exclusions: &BTreeSet<String>,
     order_by_type: bool,
+    force_sort_within_sections: bool,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -571,10 +573,24 @@ pub fn format_imports(
     // Generate replacement source code.
     let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
-        let mut import_block = sort_imports(import_block, order_by_type);
+        let mut imports = order_imports(import_block, order_by_type);
+
         if force_single_line {
-            import_block = force_single_line_imports(import_block, single_line_exclusions);
+            imports = force_single_line_imports(imports, single_line_exclusions);
         }
+
+        let imports = {
+            let mut imports = imports
+                .import
+                .into_iter()
+                .map(Import)
+                .chain(imports.import_from.into_iter().map(ImportFrom))
+                .collect::<Vec<EitherImport>>();
+            if force_sort_within_sections {
+                imports.sort_by(cmp_either_import);
+            };
+            imports
+        };
 
         // Add a blank line between every section.
         if is_first_block {
@@ -584,30 +600,29 @@ pub fn format_imports(
         }
 
         let mut is_first_statement = true;
-
-        // Format `StmtKind::Import` statements.
-        for (alias, comments) in &import_block.import {
-            output.append(&format::format_import(
-                alias,
-                comments,
-                is_first_statement,
-                stylist,
-            ));
-            is_first_statement = false;
-        }
-
-        // Format `StmtKind::ImportFrom` statements.
-        for (import_from, comments, trailing_comma, aliases) in &import_block.import_from {
-            output.append(&format::format_import_from(
-                import_from,
-                comments,
-                aliases,
-                line_length,
-                stylist,
-                force_wrap_aliases,
-                is_first_statement,
-                split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
-            ));
+        for import in imports {
+            match import {
+                Import((alias, comments)) => {
+                    output.append(&format::format_import(
+                        &alias,
+                        &comments,
+                        is_first_statement,
+                        stylist,
+                    ));
+                }
+                ImportFrom((import_from, comments, trailing_comma, aliases)) => {
+                    output.append(&format::format_import_from(
+                        &import_from,
+                        &comments,
+                        &aliases,
+                        line_length,
+                        stylist,
+                        force_wrap_aliases,
+                        is_first_statement,
+                        split_on_trailing_comma && matches!(trailing_comma, TrailingComma::Present),
+                    ));
+                }
+            }
             is_first_statement = false;
         }
     }
@@ -643,6 +658,7 @@ mod tests {
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
+    #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("inline_comments.py"))]
@@ -781,6 +797,27 @@ mod tests {
             &Settings {
                 isort: isort::settings::Settings {
                     order_by_type: false,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(RuleCode::I001)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_sort_within_sections.py"))]
+    fn force_sort_within_sections(path: &Path) -> Result<()> {
+        let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
+        let mut diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    force_sort_within_sections: true,
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
