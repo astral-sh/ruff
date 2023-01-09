@@ -112,6 +112,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         show_source: None,
         src: None,
         unfixable: None,
+        typing_modules: None,
         task_tags: None,
         update_check: None,
         // Use default options for all plugins.

@@ -174,9 +174,26 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &[&str], target: &str) -> bool {
-        match_call_path(call_path, "typing", target, &self.from_imports)
-            || (typing::in_extensions(target)
-                && match_call_path(call_path, "typing_extensions", target, &self.from_imports))
+        if match_call_path(call_path, "typing", target, &self.from_imports) {
+            return true;
+        }
+
+        if typing::TYPING_EXTENSIONS.contains(target) {
+            if match_call_path(call_path, "typing_extensions", target, &self.from_imports) {
+                return true;
+            }
+        }
+
+        if self
+            .settings
+            .typing_modules
+            .iter()
+            .any(|module| match_call_path(call_path, module, target, &self.from_imports))
+        {
+            return true;
+        }
+
+        false
     }
 
     /// Return the current `Binding` for a given `name`.
@@ -2954,6 +2971,7 @@ where
                         value,
                         &self.from_imports,
                         &self.import_aliases,
+                        self.settings.typing_modules.iter().map(String::as_str),
                         |member| self.is_builtin(member),
                     ) {
                         Some(subscript) => {

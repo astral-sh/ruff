@@ -2288,6 +2288,30 @@ task-tags = ["HACK"]
 
 ---
 
+#### [`typing-modules`](#typing-modules)
+
+A list of modules whose imports should be treated equivalently to
+members of the `typing` module.
+
+This is useful for ensuring proper type annotation inference for
+projects that re-export `typing` and `typing_extensions` members
+from a compatibility module. If omitted, any members imported from
+modules apart from `typing` and `typing_extensions` will be treated
+as ordinary Python objects.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+typing-modules = ["airflow.typing_compat"]
+```
+
+---
+
 #### [`unfixable`](#unfixable)
 
 A list of check code prefixes to consider un-autofix-able.

@@ -340,16 +340,6 @@ pub struct Options {
     /// and instead must be specified explicitly (as seen below).
     pub target_version: Option<PythonVersion>,
     #[option(
-        default = "[]",
-        value_type = "Vec<RuleCodePrefix>",
-        example = r#"
-            # Disable autofix for unused imports (`F401`).
-            unfixable = ["F401"]
-        "#
-    )]
-    /// A list of check code prefixes to consider un-autofix-able.
-    pub unfixable: Option<Vec<RuleCodePrefix>>,
-    #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
         value_type = "Vec<String>",
         example = r#"task-tags = ["HACK"]"#
@@ -360,6 +350,30 @@ pub struct Options {
     /// detection (`ERA`), and skipped by line-length checks (`E501`) if
     /// `ignore-overlong-task-comments` is set to `true`.
     pub task_tags: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"typing-modules = ["airflow.typing_compat"]"#
+    )]
+    /// A list of modules whose imports should be treated equivalently to
+    /// members of the `typing` module.
+    ///
+    /// This is useful for ensuring proper type annotation inference for
+    /// projects that re-export `typing` and `typing_extensions` members
+    /// from a compatibility module. If omitted, any members imported from
+    /// modules apart from `typing` and `typing_extensions` will be treated
+    /// as ordinary Python objects.
+    pub typing_modules: Option<Vec<String>>,
+    #[option(
+        default = "[]",
+        value_type = "Vec<RuleCodePrefix>",
+        example = r#"
+            # Disable autofix for unused imports (`F401`).
+            unfixable = ["F401"]
+        "#
+    )]
+    /// A list of check code prefixes to consider un-autofix-able.
+    pub unfixable: Option<Vec<RuleCodePrefix>>,
     #[option(
         default = "true",
         value_type = "bool",
