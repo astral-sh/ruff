@@ -16,7 +16,7 @@ use crate::violations;
 // The regex documentation says to do this because creating regexs is expensive:
 // https://docs.rs/regex/latest/regex/#example-avoid-compiling-the-same-regex-in-a-loop
 static FORMAT_SPECIFIER: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\{(?P<int>\d+)?(?P<fmt>.*?)\}").unwrap());
+    Lazy::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)\}").unwrap());
 
 /// Convert a python integer to a unsigned 32 but integer. We are assuming this
 /// will never overflow because people will probably never have more than 2^32

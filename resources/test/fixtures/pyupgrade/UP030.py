@@ -26,6 +26,6 @@ print(
 x = "foo {0}" \
     "bar {1}".format(1, 2)
 
-'("{0}").format(1)'
+("{0}").format(1)
 
 "\N{snowman} {0}".format(1)
