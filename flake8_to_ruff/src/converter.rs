@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
+use colored::Colorize;
 use ruff::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
@@ -12,7 +13,7 @@ use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
 use ruff::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
+    flake8_tidy_imports, mccabe, pep8_naming, pydocstyle, warn_user,
 };
 
 use crate::black::Black;
@@ -104,7 +105,9 @@ pub fn convert(
                 }
                 "max-line-length" | "max_line_length" => match value.clone().parse::<usize>() {
                     Ok(line_length) => options.line_length = Some(line_length),
-                    Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    Err(e) => {
+                        warn_user!("Unable to parse '{key}' property: {e}");
+                    }
                 },
                 "select" => {
                     // No-op (handled above).
@@ -133,7 +136,9 @@ pub fn convert(
                             options.per_file_ignores =
                                 Some(parser::collect_per_file_ignores(per_file_ignores));
                         }
-                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                        Err(e) => {
+                            warn_user!("Unable to parse '{key}' property: {e}");
+                        }
                     }
                 }
                 // flake8-bugbear
@@ -145,46 +150,62 @@ pub fn convert(
                 "suppress-none-returning" | "suppress_none_returning" => {
                     match parser::parse_bool(value.as_ref()) {
                         Ok(bool) => flake8_annotations.suppress_none_returning = Some(bool),
-                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                        Err(e) => {
+                            warn_user!("Unable to parse '{key}' property: {e}");
+                        }
                     }
                 }
                 "suppress-dummy-args" | "suppress_dummy_args" => {
                     match parser::parse_bool(value.as_ref()) {
                         Ok(bool) => flake8_annotations.suppress_dummy_args = Some(bool),
-                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                        Err(e) => {
+                            warn_user!("Unable to parse '{key}' property: {e}");
+                        }
                     }
                 }
                 "mypy-init-return" | "mypy_init_return" => {
                     match parser::parse_bool(value.as_ref()) {
                         Ok(bool) => flake8_annotations.mypy_init_return = Some(bool),
-                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                        Err(e) => {
+                            warn_user!("Unable to parse '{key}' property: {e}");
+                        }
                     }
                 }
                 "allow-star-arg-any" | "allow_star_arg_any" => {
                     match parser::parse_bool(value.as_ref()) {
                         Ok(bool) => flake8_annotations.allow_star_arg_any = Some(bool),
-                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                        Err(e) => {
+                            warn_user!("Unable to parse '{key}' property: {e}");
+                        }
                     }
                 }
                 // flake8-quotes
                 "quotes" | "inline-quotes" | "inline_quotes" => match value.trim() {
                     "'" | "single" => flake8_quotes.inline_quotes = Some(Quote::Single),
                     "\"" | "double" => flake8_quotes.inline_quotes = Some(Quote::Double),
-                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    _ => {
+                        warn_user!("Unexpected '{key}' value: {value}");
+                    }
                 },
                 "multiline-quotes" | "multiline_quotes" => match value.trim() {
                     "'" | "single" => flake8_quotes.multiline_quotes = Some(Quote::Single),
                     "\"" | "double" => flake8_quotes.multiline_quotes = Some(Quote::Double),
-                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    _ => {
+                        warn_user!("Unexpected '{key}' value: {value}");
+                    }
                 },
                 "docstring-quotes" | "docstring_quotes" => match value.trim() {
                     "'" | "single" => flake8_quotes.docstring_quotes = Some(Quote::Single),
                     "\"" | "double" => flake8_quotes.docstring_quotes = Some(Quote::Double),
-                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    _ => {
+                        warn_user!("Unexpected '{key}' value: {value}");
+                    }
                 },
                 "avoid-escape" | "avoid_escape" => match parser::parse_bool(value.as_ref()) {
                     Ok(bool) => flake8_quotes.avoid_escape = Some(bool),
-                    Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    Err(e) => {
+                        warn_user!("Unable to parse '{key}' property: {e}");
+                    }
                 },
                 // pep8-naming
                 "ignore-names" | "ignore_names" => {
@@ -204,7 +225,9 @@ pub fn convert(
                     "parents" => {
                         flake8_tidy_imports.ban_relative_imports = Some(Strictness::Parents);
                     }
-                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    _ => {
+                        warn_user!("Unexpected '{key}' value: {value}");
+                    }
                 },
                 // flake8-docstrings
                 "docstring-convention" => match value.trim() {
@@ -212,12 +235,16 @@ pub fn convert(
                     "numpy" => pydocstyle.convention = Some(Convention::Numpy),
                     "pep257" => pydocstyle.convention = Some(Convention::Pep257),
                     "all" => pydocstyle.convention = None,
-                    _ => eprintln!("Unexpected '{key}' value: {value}"),
+                    _ => {
+                        warn_user!("Unexpected '{key}' value: {value}");
+                    }
                 },
                 // mccabe
                 "max-complexity" | "max_complexity" => match value.clone().parse::<usize>() {
                     Ok(max_complexity) => mccabe.max_complexity = Some(max_complexity),
-                    Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                    Err(e) => {
+                        warn_user!("Unable to parse '{key}' property: {e}");
+                    }
                 },
                 // flake8-errmsg
                 "errmsg-max-string-length" | "errmsg_max_string_length" => {
@@ -225,14 +252,18 @@ pub fn convert(
                         Ok(max_string_length) => {
                             flake8_errmsg.max_string_length = Some(max_string_length);
                         }
-                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                        Err(e) => {
+                            warn_user!("Unable to parse '{key}' property: {e}");
+                        }
                     }
                 }
                 // flake8-pytest-style
                 "pytest-fixture-no-parentheses" | "pytest_fixture_no_parentheses " => {
                     match parser::parse_bool(value.as_ref()) {
                         Ok(bool) => flake8_pytest_style.fixture_parentheses = Some(!bool),
-                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                        Err(e) => {
+                            warn_user!("Unable to parse '{key}' property: {e}");
+                        }
                     }
                 }
                 "pytest-parametrize-names-type" | "pytest_parametrize_names_type" => {
@@ -249,7 +280,9 @@ pub fn convert(
                             flake8_pytest_style.parametrize_names_type =
                                 Some(ParametrizeNameType::List);
                         }
-                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                        _ => {
+                            warn_user!("Unexpected '{key}' value: {value}");
+                        }
                     }
                 }
                 "pytest-parametrize-values-type" | "pytest_parametrize_values_type" => {
@@ -262,7 +295,9 @@ pub fn convert(
                             flake8_pytest_style.parametrize_values_type =
                                 Some(ParametrizeValuesType::List);
                         }
-                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                        _ => {
+                            warn_user!("Unexpected '{key}' value: {value}");
+                        }
                     }
                 }
                 "pytest-parametrize-values-row-type" | "pytest_parametrize_values_row_type" => {
@@ -275,7 +310,9 @@ pub fn convert(
                             flake8_pytest_style.parametrize_values_row_type =
                                 Some(ParametrizeValuesRowType::List);
                         }
-                        _ => eprintln!("Unexpected '{key}' value: {value}"),
+                        _ => {
+                            warn_user!("Unexpected '{key}' value: {value}");
+                        }
                     }
                 }
                 "pytest-raises-require-match-for" | "pytest_raises_require_match_for" => {
@@ -285,11 +322,15 @@ pub fn convert(
                 "pytest-mark-no-parentheses" | "pytest_mark_no_parentheses" => {
                     match parser::parse_bool(value.as_ref()) {
                         Ok(bool) => flake8_pytest_style.mark_parentheses = Some(!bool),
-                        Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
+                        Err(e) => {
+                            warn_user!("Unable to parse '{key}' property: {e}");
+                        }
                     }
                 }
                 // Unknown
-                _ => eprintln!("Skipping unsupported property: {key}"),
+                _ => {
+                    warn_user!("Skipping unsupported property: {}", key);
+                }
             }
         }
     }

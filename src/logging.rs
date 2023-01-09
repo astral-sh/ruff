@@ -2,17 +2,36 @@ use anyhow::Result;
 use fern;
 
 #[macro_export]
-macro_rules! one_time_warning {
+macro_rules! warn_user_once {
     ($($arg:tt)*) => {
         static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
         if !WARNED.swap(true, std::sync::atomic::Ordering::SeqCst) {
-            eprintln!($($arg)*);
+            let message = format!("{}", format_args!($($arg)*));
+            eprintln!(
+                "{}{} {}",
+                "warning".yellow().bold(),
+                ":".bold(),
+                message.bold(),
+            );
         }
     };
 }
 
 #[macro_export]
-macro_rules! tell_user {
+macro_rules! warn_user {
+    ($($arg:tt)*) => {
+        let message = format!("{}", format_args!($($arg)*));
+        eprintln!(
+            "{}{} {}",
+            "warning".yellow().bold(),
+            ":".bold(),
+            message.bold(),
+        );
+    };
+}
+
+#[macro_export]
+macro_rules! notify_user {
     ($($arg:tt)*) => {
         println!(
             "[{}] {}",

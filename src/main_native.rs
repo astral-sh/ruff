@@ -13,7 +13,7 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
-use ::ruff::{commands, one_time_warning};
+use ::ruff::{commands, warn_user_once};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
@@ -171,31 +171,16 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     if cache {
         // `--no-cache` doesn't respect code changes, and so is often confusing during
         // development.
-        one_time_warning!(
-            "{}{} {}",
-            "warning".yellow().bold(),
-            ":".bold(),
-            "debug build without --no-cache.".bold()
-        );
+        warn_user_once!("debug build without --no-cache.");
     }
 
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
     if cli.watch {
         if !matches!(autofix, fixer::Mode::None) {
-            one_time_warning!(
-                "{}{} {}",
-                "warning".yellow().bold(),
-                ":".bold(),
-                "--fix is not enabled in watch mode.".bold()
-            );
+            warn_user_once!("--fix is not enabled in watch mode.");
         }
         if format != SerializationFormat::Text {
-            one_time_warning!(
-                "{}{} {}",
-                "warning".yellow().bold(),
-                ":".bold(),
-                "--format 'text' is used in watch mode.".bold()
-            );
+            warn_user_once!("--format 'text' is used in watch mode.");
         }
 
         // Perform an initial run instantly.
