@@ -18,3 +18,4 @@ mod marks;
 mod parametrize;
 mod patch;
 mod raises;
+mod unittest_assert;

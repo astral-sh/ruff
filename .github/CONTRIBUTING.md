@@ -56,33 +56,35 @@ prior to merging.
 
 There are four phases to adding a new lint rule:
 
-1. Define the rule in `src/registry.rs`.
-2. Define the _logic_ for triggering the rule in `src/checkers/ast.rs` (for AST-based checks),
+1. Define the violation in `src/violations.rs` (e.g., `ModuleImportNotAtTopOfFile`).
+2. Map the violation to a code in `src/registry.rs` (e.g., `E402`).
+3. Define the _logic_ for triggering the violation in `src/checkers/ast.rs` (for AST-based checks),
    `src/checkers/tokens.rs` (for token-based checks), or `src/checkers/lines.rs` (for text-based checks).
-3. Add a test fixture.
-4. Update the generated files (documentation and generated code).
+4. Add a test fixture.
+5. Update the generated files (documentation and generated code).
 
-To define the rule, open up `src/registry.rs`. You'll need to define both a `CheckCode` and
-`CheckKind`. As an example, you can grep for `E402` and `ModuleImportNotAtTopOfFile`, and follow the
-pattern implemented therein.
+To define the violation, open up `src/violations.rs`, and define a new struct using the
+`define_violation!` macro. There are plenty of examples in that file, so feel free to pattern-match
+against the existing structs.
 
-To trigger the rule, you'll likely want to augment the logic in `src/checkers/ast.rs`, which defines
-the Python AST visitor, responsible for iterating over the abstract syntax tree and collecting
-lint-rule violations as it goes. If you need to inspect the AST, you can run
-`cargo +nightly dev print-ast` with a Python file. Grep for the `Check::new` invocations to
-understand how other, similar rules are implemented.
+To trigger the violation, you'll likely want to augment the logic in `src/checkers/ast.rs`, which
+defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
+collecting diagnostics as it goes.
+
+If you need to inspect the AST, you can run `cargo +nightly dev print-ast` with a Python file. Grep
+for the `Check::new` invocations to understand how other, similar rules are implemented.
 
 To add a test fixture, create a file under `resources/test/fixtures/[plugin-name]`, named to match
-the `CheckCode` you defined earlier (e.g., `E402.py`). This file should contain a variety of
+the code you defined earlier (e.g., `E402.py`). This file should contain a variety of
 violations and non-violations designed to evaluate and demonstrate the behavior of your lint rule.
 
 Run `cargo +nightly dev generate-all` to generate the code for your new fixture. Then run Ruff
 locally with (e.g.) `cargo run resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `src/[plugin-name]/mod.rs` file. Then, run `cargo test`. Your
-test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the generated
-snapshot, then commit the snapshot file alongside the rest of your changes.
+`test_case` macro in the relevant `src/[plugin-name]/mod.rs` file. Then, run `cargo test --all`.
+Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
+generated snapshot, then commit the snapshot file alongside the rest of your changes.
 
 Finally, regenerate the documentation and generated code with `cargo +nightly dev generate-all`.
 

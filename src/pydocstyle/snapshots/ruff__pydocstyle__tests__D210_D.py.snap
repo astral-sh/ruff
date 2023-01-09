@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: NoSurroundingWhitespace
+- kind:
+    NoSurroundingWhitespace: ~
   location:
     row: 288
     column: 4
@@ -18,7 +19,8 @@ expression: checks
       row: 288
       column: 30
   parent: ~
-- kind: NoSurroundingWhitespace
+- kind:
+    NoSurroundingWhitespace: ~
   location:
     row: 293
     column: 4
@@ -34,7 +36,8 @@ expression: checks
       row: 293
       column: 34
   parent: ~
-- kind: NoSurroundingWhitespace
+- kind:
+    NoSurroundingWhitespace: ~
   location:
     row: 299
     column: 4
@@ -50,7 +53,8 @@ expression: checks
       row: 299
       column: 36
   parent: ~
-- kind: NoSurroundingWhitespace
+- kind:
+    NoSurroundingWhitespace: ~
   location:
     row: 581
     column: 4

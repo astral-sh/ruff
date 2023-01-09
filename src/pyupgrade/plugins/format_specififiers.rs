@@ -9,8 +9,9 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
 use crate::cst::matchers::{match_call, match_expression};
+use crate::violations;
 
 // The regex documentation says to do this because creating regexs is expensive:
 // https://docs.rs/regex/latest/regex/#example-avoid-compiling-the-same-regex-in-a-loop
@@ -146,16 +147,16 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
                         Some(item) => item,
                     };
                     println!("Checkpoint 3");
-                    let mut check =
-                        Check::new(CheckKind::FormatSpecifiers, Range::from_located(expr));
-                    if checker.patch(check.kind.code()) {
-                        check.amend(Fix::replacement(
+                    let mut diagnostic =
+                        Diagnostic::new(violations::FormatSpecifiers, Range::from_located(expr));
+                    if checker.patch(diagnostic.kind.code()) {
+                        diagnostic.amend(Fix::replacement(
                             new_call,
                             expr.location,
                             expr.end_location.unwrap(),
                         ));
                     }
-                    checker.add_check(check);
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }

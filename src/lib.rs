@@ -10,10 +10,11 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
+#![forbid(unsafe_code)]
 
 use cfg_if::cfg_if;
 
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::settings::Settings;
 use crate::source_code_locator::SourceCodeLocator;
 
@@ -74,6 +75,8 @@ pub mod source_code_generator;
 pub mod source_code_locator;
 pub mod source_code_style;
 mod vendor;
+mod violation;
+mod violations;
 pub mod visibility;
 
 cfg_if! {

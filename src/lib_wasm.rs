@@ -6,7 +6,7 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::linter::check_path;
-use crate::registry::{CheckCode, CheckCodePrefix};
+use crate::registry::{RuleCode, RuleCodePrefix};
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
@@ -52,7 +52,7 @@ export interface Check {
 
 #[derive(Serialize)]
 struct ExpandedMessage {
-    code: CheckCode,
+    code: RuleCode,
     message: String,
     location: Location,
     end_location: Location,
@@ -92,7 +92,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
         line_length: Some(88),
-        select: Some(vec![CheckCodePrefix::E, CheckCodePrefix::F]),
+        select: Some(vec![RuleCodePrefix::E, RuleCodePrefix::F]),
         target_version: Some(PythonVersion::default()),
         // Ignore a bunch of options that don't make sense in a single-file editor.
         cache_dir: None,
@@ -155,10 +155,10 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(&tokens, &locator, directives::Flags::empty());
+    let directives = directives::extract_directives(&tokens, directives::Flags::empty());
 
     // Generate checks.
-    let checks = check_path(
+    let diagnostics = check_path(
         Path::new("<filename>"),
         None,
         contents,
@@ -172,16 +172,16 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     )
     .map_err(|e| e.to_string())?;
 
-    let messages: Vec<ExpandedMessage> = checks
+    let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
-        .map(|check| ExpandedMessage {
-            code: check.kind.code().clone(),
-            message: check.kind.body(),
-            location: check.location,
-            end_location: check.end_location,
-            fix: check.fix.map(|fix| ExpandedFix {
+        .map(|diagnostic| ExpandedMessage {
+            code: diagnostic.kind.code().clone(),
+            message: diagnostic.kind.body(),
+            location: diagnostic.location,
+            end_location: diagnostic.end_location,
+            fix: diagnostic.fix.map(|fix| ExpandedFix {
                 content: fix.content,
-                message: check.kind.commit(),
+                message: diagnostic.kind.commit(),
                 location: fix.location,
                 end_location: fix.end_location,
             }),
@@ -217,7 +217,7 @@ mod test {
             "if (1, 2): pass",
             r#"{}"#,
             [ExpandedMessage {
-                code: CheckCode::F634,
+                code: RuleCode::F634,
                 message: "If test is a tuple, which is always `True`".to_string(),
                 location: Location::new(1, 0),
                 end_location: Location::new(1, 15),

@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: UsesTripleQuotes
+- kind:
+    UsesTripleQuotes: ~
   location:
     row: 307
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: UsesTripleQuotes
+- kind:
+    UsesTripleQuotes: ~
   location:
     row: 312
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: UsesTripleQuotes
+- kind:
+    UsesTripleQuotes: ~
   location:
     row: 317
     column: 4
@@ -29,7 +32,8 @@ expression: checks
     column: 15
   fix: ~
   parent: ~
-- kind: UsesTripleQuotes
+- kind:
+    UsesTripleQuotes: ~
   location:
     row: 322
     column: 4
@@ -38,7 +42,8 @@ expression: checks
     column: 15
   fix: ~
   parent: ~
-- kind: UsesTripleQuotes
+- kind:
+    UsesTripleQuotes: ~
   location:
     row: 328
     column: 4

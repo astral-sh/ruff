@@ -12,9 +12,11 @@ use crate::ast::whitespace::indentation;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
-use crate::registry::{Check, CheckCode, CheckKind, MockReference};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::violations;
+use crate::violations::MockReference;
 
 /// Return a vector of all non-`mock` imports.
 fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Option<AsName>>) {
@@ -203,18 +205,18 @@ fn format_import_from(
 pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
         if collect_call_paths(value) == ["mock", "mock"] {
-            let mut check = Check::new(
-                CheckKind::RewriteMockImport(MockReference::Attribute),
+            let mut diagnostic = Diagnostic::new(
+                violations::RewriteMockImport(MockReference::Attribute),
                 Range::from_located(value),
             );
-            if checker.patch(&CheckCode::UP026) {
-                check.amend(Fix::replacement(
+            if checker.patch(&RuleCode::UP026) {
+                diagnostic.amend(Fix::replacement(
                     "mock".to_string(),
                     value.location,
                     value.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -229,7 +231,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| name.node.name == "mock" || name.node.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(&CheckCode::UP026) {
+                let content = if checker.patch(&RuleCode::UP026) {
                     let indent = indentation(checker, stmt);
                     match format_import(stmt, &indent, checker.locator, checker.style) {
                         Ok(content) => Some(content),
@@ -242,21 +244,21 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     None
                 };
 
-                // Add a `Check` for each `mock` import.
+                // Add a `Diagnostic` for each `mock` import.
                 for name in names {
                     if name.node.name == "mock" || name.node.name == "mock.mock" {
-                        let mut check = Check::new(
-                            CheckKind::RewriteMockImport(MockReference::Import),
+                        let mut diagnostic = Diagnostic::new(
+                            violations::RewriteMockImport(MockReference::Import),
                             Range::from_located(name),
                         );
                         if let Some(content) = content.as_ref() {
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 content.clone(),
                                 stmt.location,
                                 stmt.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -271,15 +273,15 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
             }
 
             if module == "mock" {
-                let mut check = Check::new(
-                    CheckKind::RewriteMockImport(MockReference::Import),
+                let mut diagnostic = Diagnostic::new(
+                    violations::RewriteMockImport(MockReference::Import),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&CheckCode::UP026) {
+                if checker.patch(&RuleCode::UP026) {
                     let indent = indentation(checker, stmt);
                     match format_import_from(stmt, &indent, checker.locator, checker.style) {
                         Ok(content) => {
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 content,
                                 stmt.location,
                                 stmt.end_location.unwrap(),
@@ -288,7 +290,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                         Err(e) => error!("Failed to rewrite `mock` import: {e}"),
                     }
                 }
-                checker.add_check(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
         _ => (),

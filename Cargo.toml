@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "ruff"
-version = "0.0.212"
+version = "0.0.215"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -29,7 +29,7 @@ bitflags = { version = "1.3.2" }
 cachedir = { version = "0.3.0" }
 cfg-if = { version = "1.0.0" }
 chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
-clap = { version = "4.0.1", features = ["derive"] }
+clap = { version = "4.0.1", features = ["derive", "env"] }
 clap_complete_command = { version = "0.4.0" }
 colored = { version = "2.0.0" }
 dirs = { version = "4.0.0" }
@@ -51,11 +51,11 @@ path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix
 quick-junit = { version = "0.3.2" }
 regex = { version = "1.6.0" }
 ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
-ruff_macros = { version = "0.0.212", path = "ruff_macros" }
+ruff_macros = { version = "0.0.215", path = "ruff_macros" }
 rustc-hash = { version = "1.1.0" }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "4d53c7cb27c0379adf8b51c4d3d0d2174f41d590" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "4d53c7cb27c0379adf8b51c4d3d0d2174f41d590" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "4d53c7cb27c0379adf8b51c4d3d0d2174f41d590" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
 schemars = { version = "0.8.11" }
 semver = { version = "1.0.16" }
 serde = { version = "1.0.147", features = ["derive"] }

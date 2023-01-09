@@ -2,7 +2,8 @@
 source: src/flake8_bandit/mod.rs
 expression: checks
 ---
-- kind: AssertUsed
+- kind:
+    AssertUsed: ~
   location:
     row: 2
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: AssertUsed
+- kind:
+    AssertUsed: ~
   location:
     row: 8
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 17
   fix: ~
   parent: ~
-- kind: AssertUsed
+- kind:
+    AssertUsed: ~
   location:
     row: 11
     column: 4

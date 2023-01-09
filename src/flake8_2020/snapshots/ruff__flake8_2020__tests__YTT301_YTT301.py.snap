@@ -2,7 +2,8 @@
 source: src/flake8_2020/mod.rs
 expression: checks
 ---
-- kind: SysVersion0Referenced
+- kind:
+    SysVersion0Referenced: ~
   location:
     row: 4
     column: 11
@@ -11,7 +12,8 @@ expression: checks
     column: 22
   fix: ~
   parent: ~
-- kind: SysVersion0Referenced
+- kind:
+    SysVersion0Referenced: ~
   location:
     row: 5
     column: 11

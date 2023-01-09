@@ -1,5 +1,6 @@
 pub mod branch_detection;
 pub mod cast;
+pub mod comparable;
 pub mod function_type;
 pub mod helpers;
 pub mod operations;

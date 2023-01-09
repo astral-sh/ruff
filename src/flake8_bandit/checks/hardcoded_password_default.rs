@@ -2,23 +2,24 @@ use rustpython_ast::{ArgData, Arguments, Expr, Located};
 
 use crate::ast::types::Range;
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
-fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Check> {
+fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Diagnostic> {
     let string = string_literal(default)?;
     let kwarg_name = &arg.node.arg;
     if !matches_password_name(kwarg_name) {
         return None;
     }
-    Some(Check::new(
-        CheckKind::HardcodedPasswordDefault(string.to_string()),
+    Some(Diagnostic::new(
+        violations::HardcodedPasswordDefault(string.to_string()),
         Range::from_located(default),
     ))
 }
 
 /// S107
-pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Check> {
-    let mut checks: Vec<Check> = Vec::new();
+pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     let defaults_start =
         arguments.posonlyargs.len() + arguments.args.len() - arguments.defaults.len();
@@ -30,8 +31,8 @@ pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Check> {
     {
         if let Some(i) = i.checked_sub(defaults_start) {
             let default = &arguments.defaults[i];
-            if let Some(check) = check_password_kwarg(arg, default) {
-                checks.push(check);
+            if let Some(diagnostic) = check_password_kwarg(arg, default) {
+                diagnostics.push(diagnostic);
             }
         }
     }
@@ -40,11 +41,11 @@ pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Check> {
     for (i, kwarg) in arguments.kwonlyargs.iter().enumerate() {
         if let Some(i) = i.checked_sub(defaults_start) {
             let default = &arguments.kw_defaults[i];
-            if let Some(check) = check_password_kwarg(kwarg, default) {
-                checks.push(check);
+            if let Some(diagnostic) = check_password_kwarg(kwarg, default) {
+                diagnostics.push(diagnostic);
             }
         }
     }
 
-    checks
+    diagnostics
 }

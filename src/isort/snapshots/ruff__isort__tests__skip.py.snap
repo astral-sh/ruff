@@ -2,36 +2,38 @@
 source: src/isort/mod.rs
 expression: checks
 ---
-- kind: UnsortedImports
+- kind:
+    UnsortedImports: ~
   location:
-    row: 7
+    row: 12
     column: 0
   end_location:
-    row: 8
+    row: 14
     column: 0
   fix:
-    content: "import sys\n\n"
+    content: "    import abc\n    import collections\n"
     location:
-      row: 7
+      row: 12
       column: 0
     end_location:
-      row: 8
+      row: 14
       column: 0
   parent: ~
-- kind: UnsortedImports
+- kind:
+    UnsortedImports: ~
   location:
-    row: 9
+    row: 19
     column: 0
   end_location:
-    row: 11
+    row: 21
     column: 0
   fix:
-    content: "import abc\nimport collections\n"
+    content: "    import abc\n    import collections\n"
     location:
-      row: 9
+      row: 19
       column: 0
     end_location:
-      row: 11
+      row: 21
       column: 0
   parent: ~
 

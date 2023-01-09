@@ -1,23 +1,23 @@
 use anyhow::{bail, Result};
-use log::error;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Location, Stmt, StmtKind};
+use log::debug;
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use crate::ast::helpers::match_module_member;
+use crate::ast::helpers::{create_expr, create_stmt, match_module_member, unparse_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
-use crate::registry::{Check, CheckKind};
-use crate::source_code_generator::SourceCodeGenerator;
+use crate::registry::Diagnostic;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::violations;
 
-/// Return the typename, args, keywords and mother class
+/// Return the typename, args, keywords, and base class.
 fn match_named_tuple_assign<'a>(
     checker: &Checker,
     targets: &'a [Expr],
     value: &'a Expr,
-) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a ExprKind)> {
+) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
     let ExprKind::Name { id: typename, .. } = &target.node else {
         return None;
@@ -38,43 +38,25 @@ fn match_named_tuple_assign<'a>(
     ) {
         return None;
     }
-    Some((typename, args, keywords, &func.node))
+    Some((typename, args, keywords, func))
 }
 
 /// Generate a `StmtKind::AnnAssign` representing the provided property
 /// definition.
 fn create_property_assignment_stmt(
     property: &str,
-    annotation: &ExprKind,
-    value: Option<&ExprKind>,
+    annotation: &Expr,
+    value: Option<&Expr>,
 ) -> Stmt {
-    Stmt::new(
-        Location::default(),
-        Location::default(),
-        StmtKind::AnnAssign {
-            target: Box::new(Expr::new(
-                Location::default(),
-                Location::default(),
-                ExprKind::Name {
-                    id: property.to_string(),
-                    ctx: ExprContext::Load,
-                },
-            )),
-            annotation: Box::new(Expr::new(
-                Location::default(),
-                Location::default(),
-                annotation.clone(),
-            )),
-            value: value.map(|v| {
-                Box::new(Expr::new(
-                    Location::default(),
-                    Location::default(),
-                    v.clone(),
-                ))
-            }),
-            simple: 1,
-        },
-    )
+    create_stmt(StmtKind::AnnAssign {
+        target: Box::new(create_expr(ExprKind::Name {
+            id: property.to_string(),
+            ctx: ExprContext::Load,
+        })),
+        annotation: Box::new(annotation.clone()),
+        value: value.map(|value| Box::new(value.clone())),
+        simple: 1,
+    })
 }
 
 /// Match the `defaults` keyword in a `NamedTuple(...)` call.
@@ -104,7 +86,6 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
     let ExprKind::List { elts, .. } = &fields.node else {
         bail!("Expected argument to be `ExprKind::List`");
     };
-
     let padded_defaults = if elts.len() >= defaults.len() {
         std::iter::repeat(None)
             .take(elts.len() - defaults.len())
@@ -131,9 +112,7 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
                 bail!("Invalid property name: {}", property)
             }
             Ok(create_property_assignment_stmt(
-                property,
-                &annotation.node,
-                default.map(|d| &d.node),
+                property, annotation, default,
             ))
         })
         .collect()
@@ -141,35 +120,26 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body and
 /// keywords.
-fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &ExprKind) -> Stmt {
-    Stmt::new(
-        Location::default(),
-        Location::default(),
-        StmtKind::ClassDef {
-            name: typename.to_string(),
-            bases: vec![Expr::new(
-                Location::default(),
-                Location::default(),
-                base_class.clone(),
-            )],
-            keywords: vec![],
-            body,
-            decorator_list: vec![],
-        },
-    )
+fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
+    create_stmt(StmtKind::ClassDef {
+        name: typename.to_string(),
+        bases: vec![base_class.clone()],
+        keywords: vec![],
+        body,
+        decorator_list: vec![],
+    })
 }
 
+/// Generate a `Fix` to convert a `NamedTuple` assignment to a class definition.
 fn convert_to_class(
     stmt: &Stmt,
     typename: &str,
     body: Vec<Stmt>,
-    base_class: &ExprKind,
+    base_class: &Expr,
     stylist: &SourceCodeStyleDetector,
 ) -> Fix {
-    let mut generator: SourceCodeGenerator = stylist.into();
-    generator.unparse_stmt(&create_class_def_stmt(typename, body, base_class));
     Fix::replacement(
-        generator.generate(),
+        unparse_stmt(&create_class_def_stmt(typename, body, base_class), stylist),
         stmt.location,
         stmt.end_location.unwrap(),
     )
@@ -187,26 +157,25 @@ pub fn convert_named_tuple_functional_to_class(
     {
         return;
     };
-    match match_defaults(keywords) {
-        Ok(defaults) => match create_properties_from_args(args, defaults) {
+    let mut diagnostic = Diagnostic::new(
+        violations::ConvertNamedTupleFunctionalToClass(typename.to_string()),
+        Range::from_located(stmt),
+    );
+    if checker.patch(diagnostic.kind.code()) {
+        match match_defaults(keywords)
+            .and_then(|defaults| create_properties_from_args(args, defaults))
+        {
             Ok(properties) => {
-                let mut check = Check::new(
-                    CheckKind::ConvertNamedTupleFunctionalToClass(typename.to_string()),
-                    Range::from_located(stmt),
-                );
-                if checker.patch(check.kind.code()) {
-                    check.amend(convert_to_class(
-                        stmt,
-                        typename,
-                        properties,
-                        base_class,
-                        checker.style,
-                    ));
-                }
-                checker.add_check(check);
+                diagnostic.amend(convert_to_class(
+                    stmt,
+                    typename,
+                    properties,
+                    base_class,
+                    checker.style,
+                ));
             }
-            Err(err) => error!("Failed to create properties: {err}"),
-        },
-        Err(err) => error!("Failed to parse defaults: {err}"),
+            Err(err) => debug!("Skipping ineligible `NamedTuple` \"{typename}\": {err}"),
+        };
     }
+    checker.diagnostics.push(diagnostic);
 }

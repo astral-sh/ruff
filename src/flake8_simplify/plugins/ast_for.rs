@@ -6,9 +6,10 @@ use crate::ast::helpers::{create_expr, create_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
 use crate::source_code_style::SourceCodeStyleDetector;
+use crate::violations;
 
 struct Loop<'a> {
     return_value: bool,
@@ -109,7 +110,7 @@ fn return_stmt(
 pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stmt) {
     if let Some(loop_info) = return_values(stmt, sibling) {
         if loop_info.return_value && !loop_info.next_return_value {
-            if checker.settings.enabled.contains(&CheckCode::SIM110) {
+            if checker.settings.enabled.contains(&RuleCode::SIM110) {
                 let content = return_stmt(
                     "any",
                     loop_info.test,
@@ -117,23 +118,23 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     loop_info.iter,
                     checker.style,
                 );
-                let mut check = Check::new(
-                    CheckKind::ConvertLoopToAny(content.clone()),
+                let mut diagnostic = Diagnostic::new(
+                    violations::ConvertLoopToAny(content.clone()),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&CheckCode::SIM110) {
-                    check.amend(Fix::replacement(
+                if checker.patch(&RuleCode::SIM110) {
+                    diagnostic.amend(Fix::replacement(
                         content,
                         stmt.location,
                         sibling.end_location.unwrap(),
                     ));
                 }
-                checker.add_check(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
 
         if !loop_info.return_value && loop_info.next_return_value {
-            if checker.settings.enabled.contains(&CheckCode::SIM111) {
+            if checker.settings.enabled.contains(&RuleCode::SIM111) {
                 // Invert the condition.
                 let test = {
                     if let ExprKind::UnaryOp {
@@ -156,18 +157,18 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     loop_info.iter,
                     checker.style,
                 );
-                let mut check = Check::new(
-                    CheckKind::ConvertLoopToAll(content.clone()),
+                let mut diagnostic = Diagnostic::new(
+                    violations::ConvertLoopToAll(content.clone()),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&CheckCode::SIM111) {
-                    check.amend(Fix::replacement(
+                if checker.patch(&RuleCode::SIM111) {
+                    diagnostic.amend(Fix::replacement(
                         content,
                         stmt.location,
                         sibling.end_location.unwrap(),
                     ));
                 }
-                checker.add_check(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }

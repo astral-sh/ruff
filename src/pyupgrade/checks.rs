@@ -8,11 +8,16 @@ use crate::ast::helpers::{self};
 use crate::ast::types::{Binding, BindingKind, Range, Scope, ScopeKind};
 use crate::autofix::Fix;
 use crate::pyupgrade::types::Primitive;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
+use crate::violations;
 
 /// UP001
-pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -> Option<Check> {
+pub fn useless_metaclass_type(
+    targets: &[Expr],
+    value: &Expr,
+    location: Range,
+) -> Option<Diagnostic> {
     if targets.len() != 1 {
         return None;
     }
@@ -28,11 +33,11 @@ pub fn useless_metaclass_type(targets: &[Expr], value: &Expr, location: Range) -
     if id != "type" {
         return None;
     }
-    Some(Check::new(CheckKind::UselessMetaclassType, location))
+    Some(Diagnostic::new(violations::UselessMetaclassType, location))
 }
 
 /// UP003
-pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<Check> {
+pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<Diagnostic> {
     // Validate the arguments.
     if args.len() != 1 {
         return None;
@@ -50,7 +55,10 @@ pub fn type_of_primitive(func: &Expr, args: &[Expr], location: Range) -> Option<
     };
 
     let primitive = Primitive::from_constant(value)?;
-    Some(Check::new(CheckKind::TypeOfPrimitive(primitive), location))
+    Some(Diagnostic::new(
+        violations::TypeOfPrimitive(primitive),
+        location,
+    ))
 }
 
 /// UP004
@@ -59,7 +67,7 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     scope: &Scope,
     bindings: &[Binding],
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     for expr in bases {
         let ExprKind::Name { id, .. } = &expr.node else {
             continue;
@@ -79,8 +87,8 @@ pub fn useless_object_inheritance(
         ) {
             continue;
         }
-        return Some(Check::new(
-            CheckKind::UselessObjectInheritance(name.to_string()),
+        return Some(Diagnostic::new(
+            violations::UselessObjectInheritance(name.to_string()),
             Range::from_located(expr),
         ));
     }
@@ -95,7 +103,7 @@ pub fn super_args(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if !helpers::is_super_call_with_arguments(func, args) {
         return None;
     }
@@ -151,8 +159,8 @@ pub fn super_args(
     };
 
     if first_arg_id == parent_name && second_arg_id == parent_arg {
-        return Some(Check::new(
-            CheckKind::SuperCallWithParameters,
+        return Some(Diagnostic::new(
+            violations::SuperCallWithParameters,
             Range::from_located(expr),
         ));
     }
@@ -165,20 +173,20 @@ static CODING_COMMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").unwrap());
 
 /// UP009
-pub fn unnecessary_coding_comment(lineno: usize, line: &str, autofix: bool) -> Option<Check> {
+pub fn unnecessary_coding_comment(lineno: usize, line: &str, autofix: bool) -> Option<Diagnostic> {
     // PEP3120 makes utf-8 the default encoding.
     if CODING_COMMENT_REGEX.is_match(line) {
-        let mut check = Check::new(
-            CheckKind::PEP3120UnnecessaryCodingComment,
+        let mut diagnostic = Diagnostic::new(
+            violations::PEP3120UnnecessaryCodingComment,
             Range::new(Location::new(lineno + 1, 0), Location::new(lineno + 2, 0)),
         );
         if autofix {
-            check.amend(Fix::deletion(
+            diagnostic.amend(Fix::deletion(
                 Location::new(lineno + 1, 0),
                 Location::new(lineno + 2, 0),
             ));
         }
-        Some(check)
+        Some(diagnostic)
     } else {
         None
     }
@@ -190,7 +198,7 @@ pub fn unnecessary_lru_cache_params(
     target_version: PythonVersion,
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     for expr in decorator_list.iter() {
         let ExprKind::Call {
             func,
@@ -216,7 +224,10 @@ pub fn unnecessary_lru_cache_params(
         let range = Range::new(func.end_location.unwrap(), expr.end_location.unwrap());
         // Ex) `functools.lru_cache()`
         if keywords.is_empty() {
-            return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
+            return Some(Diagnostic::new(
+                violations::UnnecessaryLRUCacheParams,
+                range,
+            ));
         }
         // Ex) `functools.lru_cache(maxsize=None)`
         if !(target_version >= PythonVersion::Py39 && keywords.len() == 1) {
@@ -235,7 +246,10 @@ pub fn unnecessary_lru_cache_params(
         {
             continue;
         }
-        return Some(Check::new(CheckKind::UnnecessaryLRUCacheParams, range));
+        return Some(Diagnostic::new(
+            violations::UnnecessaryLRUCacheParams,
+            range,
+        ));
     }
     None
 }

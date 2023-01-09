@@ -139,6 +139,16 @@ expression: checks
       column: 65
   parent: ~
 - kind:
+    ConvertTypedDictFunctionalToClass: MyType9
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 55
+  fix: ~
+  parent: ~
+- kind:
     ConvertTypedDictFunctionalToClass: MyType10
   location:
     row: 30

@@ -180,7 +180,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.212'
+  rev: 'v0.0.215'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -341,8 +341,10 @@ Options:
           Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
   -n, --no-cache
           Disable cache reads
+      --isolated
+          Ignore all configuration files
       --select <SELECT>
-          Comma-separated list of error codes to enable (or ALL, to enable all checks)
+          Comma-separated list of rule codes to enable (or ALL, to enable all rules)
       --extend-select <EXTEND_SELECT>
           Like --select, but adds additional error codes on top of the selected ones
       --ignore <IGNORE>
@@ -360,11 +362,11 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [possible values: text, json, junit, grouped, github, gitlab]
+          Output serialization format for error messages [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
       --cache-dir <CACHE_DIR>
-          Path to the cache directory
+          Path to the cache directory [env: RUFF_CACHE_DIR=]
       --show-source
           Show violations with source code
       --respect-gitignore
@@ -551,8 +553,8 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): ... |  |
 | F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
 | F541 | FStringMissingPlaceholders | f-string without any placeholders | 🛠 |
-| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal repeated |  |
-| F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated |  |
+| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal `...` repeated | 🛠 |
+| F602 | MultiValueRepeatedKeyVariable | Dictionary key `...` repeated | 🛠 |
 | F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |  |
 | F622 | TwoStarredExpressions | Two starred expressions in assignment |  |
 | F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |  |
@@ -569,7 +571,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 | F821 | UndefinedName | Undefined name `...` |  |
 | F822 | UndefinedExport | Undefined name `...` in `__all__` |  |
 | F823 | UndefinedLocal | Local variable `...` referenced before assignment |  |
-| F841 | UnusedVariable | Local variable `...` is assigned to but never used |  |
+| F841 | UnusedVariable | Local variable `...` is assigned to but never used | 🛠 |
 | F842 | UnusedAnnotation | Local variable `...` is annotated but never used |  |
 | F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
@@ -918,20 +920,20 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
-| PT008 | PatchWithLambda | Use `return_value=` instead of patching with lambda |  |
-| PT009 | UnittestAssertion | Use a regular assert instead of unittest-style '...' |  |
+| PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
+| PT009 | UnittestAssertion | Use a regular `assert` instead of unittest-style `...` | 🛠 |
 | PT010 | RaisesWithoutException | set the expected exception in `pytest.raises()` |  |
 | PT011 | RaisesTooBroad | `pytest.raises(...)` is too broad, set the `match` parameter or use a more specific exception |  |
 | PT012 | RaisesWithMultipleStatements | `pytest.raises()` block should contain a single simple statement |  |
 | PT013 | IncorrectPytestImport | Found incorrect import of pytest, use simple `import pytest` instead |  |
 | PT015 | AssertAlwaysFalse | Assertion always fails, replace with `pytest.fail()` |  |
 | PT016 | FailWithoutMessage | No message passed to `pytest.fail()` |  |
-| PT017 | AssertInExcept | Found assertion on exception ... in except block, use pytest.raises() instead |  |
+| PT017 | AssertInExcept | Found assertion on exception `...` in except block, use `pytest.raises()` instead |  |
 | PT018 | CompositeAssertion | Assertion should be broken down into multiple parts |  |
-| PT019 | FixtureParamWithoutValue | Fixture ... without value is injected as parameter, use @pytest.mark.usefixtures instead |  |
+| PT019 | FixtureParamWithoutValue | Fixture `...` without value is injected as parameter, use `@pytest.mark.usefixtures` instead |  |
 | PT020 | DeprecatedYieldFixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
 | PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
-| PT022 | UselessYieldFixture | No teardown in fixture ..., use `return` instead of `yield` | 🛠 |
+| PT022 | UselessYieldFixture | No teardown in fixture `...`, use `return` instead of `yield` | 🛠 |
 | PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark....` over `@pytest.mark....()` | 🛠 |
 | PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures |  |
 | PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures |  |
@@ -971,9 +973,10 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | ---- | ---- | ------- | --- |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
+| SIM103 | ReturnBoolConditionDirectly | Return the condition `...` directly | 🛠 |
 | SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
 | SIM107 | ReturnInTryExceptFinally | Don't use `return` in `try`/`except` and `finally` |  |
-| SIM108 | UseTernaryOperator | Use ternary operator `..` instead of if-else-block | 🛠 |
+| SIM108 | UseTernaryOperator | Use ternary operator `...` instead of if-else-block | 🛠 |
 | SIM109 | CompareWithTuple | Use `value in (..., ...)` instead of `value == ... or value == ...` | 🛠 |
 | SIM110 | ConvertLoopToAny | Use `return any(x for x in y)` instead of `for` loop | 🛠 |
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
@@ -982,6 +985,9 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
 | SIM202 | NegateNotEqualOp | Use `left == right` instead of `not left != right` | 🛠 |
 | SIM208 | DoubleNegation | Use `expr` instead of `not (not expr)` | 🛠 |
+| SIM210 | IfExprWithTrueFalse | Use `bool(expr)` instead of `True if expr else False` | 🛠 |
+| SIM211 | IfExprWithFalseTrue | Use `not expr` instead of `False if expr else True` | 🛠 |
+| SIM212 | IfExprWithTwistedArms | Use `b if b else a` instead of `a if not b else b` | 🛠 |
 | SIM220 | AAndNotA | Use `False` instead of `... and not ...` | 🛠 |
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
@@ -1861,7 +1867,7 @@ by `ignore`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -1880,7 +1886,7 @@ by `select`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -1955,7 +1961,7 @@ A list of check code prefixes to consider autofix-able.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -2027,7 +2033,7 @@ specific prefixes.
 
 **Default value**: `[]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -2086,7 +2092,7 @@ when considering any matching files.
 
 **Default value**: `{}`
 
-**Type**: `HashMap<String, Vec<CheckCodePrefix>>`
+**Type**: `HashMap<String, Vec<RuleCodePrefix>>`
 
 **Example usage**:
 
@@ -2150,7 +2156,7 @@ specific prefixes.
 
 **Default value**: `["E", "F"]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 
@@ -2270,7 +2276,7 @@ A list of check code prefixes to consider un-autofix-able.
 
 **Default value**: `[]`
 
-**Type**: `Vec<CheckCodePrefix>`
+**Type**: `Vec<RuleCodePrefix>`
 
 **Example usage**:
 

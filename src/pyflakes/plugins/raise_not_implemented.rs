@@ -3,7 +3,8 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
     match &expr.node {
@@ -29,13 +30,14 @@ pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
-    let mut check = Check::new(CheckKind::RaiseNotImplemented, Range::from_located(expr));
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    let mut diagnostic =
+        Diagnostic::new(violations::RaiseNotImplemented, Range::from_located(expr));
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             "NotImplementedError".to_string(),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

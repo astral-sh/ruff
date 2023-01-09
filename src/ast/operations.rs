@@ -212,7 +212,7 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
                 ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
             );
             // In `(a, b) = coords = (1, 2)`, `(a, b)` and `coords` are the targets, and
-            // `(a, b`) is a tuple. (We use "tuple" as a placeholder for any
+            // `(a, b)` is a tuple. (We use "tuple" as a placeholder for any
             // unpackable expression.)
             let targets_are_tuples = targets.iter().all(|item| {
                 matches!(

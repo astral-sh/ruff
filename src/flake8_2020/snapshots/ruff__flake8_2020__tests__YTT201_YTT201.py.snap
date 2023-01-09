@@ -2,7 +2,8 @@
 source: src/flake8_2020/mod.rs
 expression: checks
 ---
-- kind: SysVersionInfo0Eq3Referenced
+- kind:
+    SysVersionInfo0Eq3Referenced: ~
   location:
     row: 7
     column: 6
@@ -11,7 +12,8 @@ expression: checks
     column: 25
   fix: ~
   parent: ~
-- kind: SysVersionInfo0Eq3Referenced
+- kind:
+    SysVersionInfo0Eq3Referenced: ~
   location:
     row: 8
     column: 6
@@ -20,7 +22,8 @@ expression: checks
     column: 21
   fix: ~
   parent: ~
-- kind: SysVersionInfo0Eq3Referenced
+- kind:
+    SysVersionInfo0Eq3Referenced: ~
   location:
     row: 9
     column: 6
@@ -29,7 +32,8 @@ expression: checks
     column: 25
   fix: ~
   parent: ~
-- kind: SysVersionInfo0Eq3Referenced
+- kind:
+    SysVersionInfo0Eq3Referenced: ~
   location:
     row: 10
     column: 6

@@ -2,7 +2,8 @@
 source: src/flake8_pytest_style/mod.rs
 expression: checks
 ---
-- kind: ErroneousUseFixturesOnFixture
+- kind:
+    ErroneousUseFixturesOnFixture: ~
   location:
     row: 9
     column: 1
@@ -11,7 +12,8 @@ expression: checks
     column: 29
   fix: ~
   parent: ~
-- kind: ErroneousUseFixturesOnFixture
+- kind:
+    ErroneousUseFixturesOnFixture: ~
   location:
     row: 16
     column: 1

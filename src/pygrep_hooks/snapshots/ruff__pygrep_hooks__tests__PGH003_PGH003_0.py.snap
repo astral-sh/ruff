@@ -2,7 +2,8 @@
 source: src/pygrep_hooks/mod.rs
 expression: checks
 ---
-- kind: BlanketTypeIgnore
+- kind:
+    BlanketTypeIgnore: ~
   location:
     row: 1
     column: 7
@@ -11,7 +12,8 @@ expression: checks
     column: 21
   fix: ~
   parent: ~
-- kind: BlanketTypeIgnore
+- kind:
+    BlanketTypeIgnore: ~
   location:
     row: 2
     column: 7
@@ -20,7 +22,8 @@ expression: checks
     column: 20
   fix: ~
   parent: ~
-- kind: BlanketTypeIgnore
+- kind:
+    BlanketTypeIgnore: ~
   location:
     row: 3
     column: 7

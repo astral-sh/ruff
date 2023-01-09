@@ -3,7 +3,8 @@ use rustpython_parser::ast::{Constant, Expr};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::{Diagnostic, DiagnosticKind};
+use crate::violations;
 
 const FUNC_NAME_ALLOWLIST: &[&str] = &[
     "assertEqual",
@@ -46,9 +47,11 @@ fn is_boolean_arg(arg: &Expr) -> bool {
     )
 }
 
-fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: CheckKind) {
+fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     if is_boolean_arg(arg) {
-        checker.add_check(Check::new(kind, Range::from_located(arg)));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(kind, Range::from_located(arg)));
     }
 }
 
@@ -73,8 +76,8 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Argume
         if !hint {
             continue;
         }
-        checker.add_check(Check::new(
-            CheckKind::BooleanPositionalArgInFunctionDefinition,
+        checker.diagnostics.push(Diagnostic::new(
+            violations::BooleanPositionalArgInFunctionDefinition,
             Range::from_located(arg),
         ));
     }
@@ -88,7 +91,7 @@ pub fn check_boolean_default_value_in_function_definition(
         add_if_boolean(
             checker,
             arg,
-            CheckKind::BooleanDefaultValueInFunctionDefinition,
+            violations::BooleanDefaultValueInFunctionDefinition.into(),
         );
     }
 }
@@ -105,7 +108,7 @@ pub fn check_boolean_positional_value_in_function_call(
         add_if_boolean(
             checker,
             arg,
-            CheckKind::BooleanPositionalValueInFunctionCall,
+            violations::BooleanPositionalValueInFunctionCall.into(),
         );
     }
 }

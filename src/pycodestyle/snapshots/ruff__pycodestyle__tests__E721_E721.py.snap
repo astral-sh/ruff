@@ -2,7 +2,8 @@
 source: src/pycodestyle/mod.rs
 expression: checks
 ---
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 2
     column: 3
@@ -11,7 +12,8 @@ expression: checks
     column: 24
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 5
     column: 3
@@ -20,7 +22,8 @@ expression: checks
     column: 24
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 10
     column: 3
@@ -29,7 +32,8 @@ expression: checks
     column: 23
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 15
     column: 3
@@ -38,7 +42,8 @@ expression: checks
     column: 34
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 18
     column: 7
@@ -47,7 +52,8 @@ expression: checks
     column: 31
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 20
     column: 7
@@ -56,7 +62,8 @@ expression: checks
     column: 28
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 22
     column: 7
@@ -65,7 +72,8 @@ expression: checks
     column: 28
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 24
     column: 7
@@ -74,7 +82,8 @@ expression: checks
     column: 30
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 26
     column: 7
@@ -83,7 +92,8 @@ expression: checks
     column: 29
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 28
     column: 7
@@ -92,7 +102,8 @@ expression: checks
     column: 30
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 30
     column: 7
@@ -101,7 +112,8 @@ expression: checks
     column: 30
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 32
     column: 7
@@ -110,7 +122,8 @@ expression: checks
     column: 34
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 34
     column: 7
@@ -119,7 +132,8 @@ expression: checks
     column: 1
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 40
     column: 7
@@ -128,7 +142,8 @@ expression: checks
     column: 28
   fix: ~
   parent: ~
-- kind: TypeComparison
+- kind:
+    TypeComparison: ~
   location:
     row: 42
     column: 7

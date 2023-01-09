@@ -4,10 +4,10 @@ use rustpython_ast::{Expr, ExprKind, Keyword, KeywordData, Location};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::registry::CheckKind;
+use crate::registry::DiagnosticKind;
 use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
-use crate::{Check, Settings};
+use crate::{violations, Diagnostic, Settings};
 
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
 static CONFUSABLES: Lazy<FxHashMap<u32, u32>> = Lazy::new(|| {
@@ -1611,8 +1611,8 @@ pub fn ambiguous_unicode_character(
     context: Context,
     settings: &Settings,
     autofix: flags::Autofix,
-) -> Vec<Check> {
-    let mut checks = vec![];
+) -> Vec<Diagnostic> {
+    let mut diagnostics = vec![];
 
     let text = locator.slice_source_code_range(&Range::new(start, end));
 
@@ -1630,34 +1630,37 @@ pub fn ambiguous_unicode_character(
                     };
                     let location = Location::new(start.row() + row_offset, col);
                     let end_location = Location::new(location.row(), location.column() + 1);
-                    let mut check = Check::new(
+                    let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
                         match context {
-                            Context::String => CheckKind::AmbiguousUnicodeCharacterString(
+                            Context::String => violations::AmbiguousUnicodeCharacterString(
                                 current_char,
                                 representant,
-                            ),
-                            Context::Docstring => CheckKind::AmbiguousUnicodeCharacterDocstring(
+                            )
+                            .into(),
+                            Context::Docstring => violations::AmbiguousUnicodeCharacterDocstring(
                                 current_char,
                                 representant,
-                            ),
-                            Context::Comment => CheckKind::AmbiguousUnicodeCharacterComment(
+                            )
+                            .into(),
+                            Context::Comment => violations::AmbiguousUnicodeCharacterComment(
                                 current_char,
                                 representant,
-                            ),
+                            )
+                            .into(),
                         },
                         Range::new(location, end_location),
                     );
-                    if settings.enabled.contains(check.kind.code()) {
+                    if settings.enabled.contains(diagnostic.kind.code()) {
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(check.kind.code())
+                            && settings.fixable.contains(diagnostic.kind.code())
                         {
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 representant.to_string(),
                                 location,
                                 end_location,
                             ));
                         }
-                        checks.push(check);
+                        diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -1672,12 +1675,15 @@ pub fn ambiguous_unicode_character(
         }
     }
 
-    checks
+    diagnostics
 }
 
 /// RUF004
-pub fn keyword_argument_before_star_argument(args: &[Expr], keywords: &[Keyword]) -> Vec<Check> {
-    let mut checks = vec![];
+pub fn keyword_argument_before_star_argument(
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Vec<Diagnostic> {
+    let mut diagnostics = vec![];
     if let Some(arg) = args
         .iter()
         .rfind(|arg| matches!(arg.node, ExprKind::Starred { .. }))
@@ -1686,13 +1692,13 @@ pub fn keyword_argument_before_star_argument(args: &[Expr], keywords: &[Keyword]
             if keyword.location < arg.location {
                 let KeywordData { arg, .. } = &keyword.node;
                 if let Some(arg) = arg {
-                    checks.push(Check::new(
-                        CheckKind::KeywordArgumentBeforeStarArgument(arg.to_string()),
+                    diagnostics.push(Diagnostic::new(
+                        violations::KeywordArgumentBeforeStarArgument(arg.to_string()),
                         Range::from_located(keyword),
                     ));
                 }
             }
         }
     }
-    checks
+    diagnostics
 }

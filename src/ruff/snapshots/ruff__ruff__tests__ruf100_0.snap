@@ -136,7 +136,14 @@ expression: checks
   end_location:
     row: 29
     column: 5
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 29
+      column: 0
+    end_location:
+      row: 30
+      column: 0
   parent: ~
 - kind:
     UnusedNOQA:

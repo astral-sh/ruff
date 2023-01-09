@@ -2,7 +2,8 @@
 source: src/flake8_pytest_style/mod.rs
 expression: checks
 ---
-- kind: UseFixturesWithoutParameters
+- kind:
+    UseFixturesWithoutParameters: ~
   location:
     row: 19
     column: 1
@@ -18,7 +19,8 @@ expression: checks
       row: 19
       column: 26
   parent: ~
-- kind: UseFixturesWithoutParameters
+- kind:
+    UseFixturesWithoutParameters: ~
   location:
     row: 24
     column: 1

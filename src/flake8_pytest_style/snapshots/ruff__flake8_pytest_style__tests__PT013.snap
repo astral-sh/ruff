@@ -2,7 +2,8 @@
 source: src/flake8_pytest_style/mod.rs
 expression: checks
 ---
-- kind: IncorrectPytestImport
+- kind:
+    IncorrectPytestImport: ~
   location:
     row: 11
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 27
   fix: ~
   parent: ~
-- kind: IncorrectPytestImport
+- kind:
+    IncorrectPytestImport: ~
   location:
     row: 12
     column: 0
@@ -20,7 +22,8 @@ expression: checks
     column: 26
   fix: ~
   parent: ~
-- kind: IncorrectPytestImport
+- kind:
+    IncorrectPytestImport: ~
   location:
     row: 13
     column: 0

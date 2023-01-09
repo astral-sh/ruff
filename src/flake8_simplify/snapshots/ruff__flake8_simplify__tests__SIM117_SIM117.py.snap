@@ -2,7 +2,8 @@
 source: src/flake8_simplify/mod.rs
 expression: checks
 ---
-- kind: MultipleWithStatements
+- kind:
+    MultipleWithStatements: ~
   location:
     row: 1
     column: 0

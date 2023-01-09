@@ -4,10 +4,10 @@ use rustpython_ast::{Alias, AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
+use crate::{autofix, violations};
 
 const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
     "nested_scopes",
@@ -53,8 +53,8 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
     if unused_imports.is_empty() {
         return;
     }
-    let mut check = Check::new(
-        CheckKind::UnnecessaryFutureImport(
+    let mut diagnostic = Diagnostic::new(
+        violations::UnnecessaryFutureImport(
             unused_imports
                 .iter()
                 .map(|alias| alias.node.name.to_string())
@@ -64,7 +64,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         Range::from_located(stmt),
     );
 
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
@@ -87,10 +87,10 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 if fix.content.is_empty() || fix.content == "pass" {
                     checker.deletions.insert(defined_by.clone());
                 }
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to remove `__future__` import: {e}"),
         }
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

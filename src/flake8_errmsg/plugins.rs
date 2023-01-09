@@ -2,7 +2,8 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
+use crate::violations;
 
 /// EM101, EM102, EM103
 pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
@@ -14,10 +15,10 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                     value: Constant::Str(string),
                     ..
                 } => {
-                    if checker.settings.enabled.contains(&CheckCode::EM101) {
+                    if checker.settings.enabled.contains(&RuleCode::EM101) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
-                            checker.add_check(Check::new(
-                                CheckKind::RawStringInException,
+                            checker.diagnostics.push(Diagnostic::new(
+                                violations::RawStringInException,
                                 Range::from_located(first),
                             ));
                         }
@@ -25,20 +26,20 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                 }
                 // Check for f-strings
                 ExprKind::JoinedStr { .. } => {
-                    if checker.settings.enabled.contains(&CheckCode::EM102) {
-                        checker.add_check(Check::new(
-                            CheckKind::FStringInException,
+                    if checker.settings.enabled.contains(&RuleCode::EM102) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            violations::FStringInException,
                             Range::from_located(first),
                         ));
                     }
                 }
                 // Check for .format() calls
                 ExprKind::Call { func, .. } => {
-                    if checker.settings.enabled.contains(&CheckCode::EM103) {
+                    if checker.settings.enabled.contains(&RuleCode::EM103) {
                         if let ExprKind::Attribute { value, attr, .. } = &func.node {
                             if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
-                                checker.add_check(Check::new(
-                                    CheckKind::DotFormatInException,
+                                checker.diagnostics.push(Diagnostic::new(
+                                    violations::DotFormatInException,
                                     Range::from_located(first),
                                 ));
                             }

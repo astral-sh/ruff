@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 1
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 3
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 14
     column: 4
@@ -20,7 +22,8 @@ expression: checks
     column: 28
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 22
     column: 4
@@ -29,7 +32,8 @@ expression: checks
     column: 28
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 30
     column: 4
@@ -38,7 +42,8 @@ expression: checks
     column: 28
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 38
     column: 4
@@ -47,7 +52,8 @@ expression: checks
     column: 28
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 46
     column: 4
@@ -56,7 +62,8 @@ expression: checks
     column: 24
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 54
     column: 4
@@ -65,7 +72,8 @@ expression: checks
     column: 24
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 62
     column: 4
@@ -74,7 +82,8 @@ expression: checks
     column: 24
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 70
     column: 4
@@ -83,7 +92,8 @@ expression: checks
     column: 24
   fix: ~
   parent: ~
-- kind: FStringDocstring
+- kind:
+    FStringDocstring: ~
   location:
     row: 74
     column: 4

@@ -5,11 +5,12 @@ use crate::ast::helpers::{collect_call_paths, dealias_call_path, is_const_none, 
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// T201, T203
 pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
-    let mut check = {
+    let mut diagnostic = {
         let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
         if match_call_path(&call_path, "", "print", &checker.from_imports) {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
@@ -27,19 +28,19 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                     }
                 }
             }
-            Check::new(CheckKind::PrintFound, Range::from_located(func))
+            Diagnostic::new(violations::PrintFound, Range::from_located(func))
         } else if match_call_path(&call_path, "pprint", "pprint", &checker.from_imports) {
-            Check::new(CheckKind::PPrintFound, Range::from_located(func))
+            Diagnostic::new(violations::PPrintFound, Range::from_located(func))
         } else {
             return;
         }
     };
 
-    if !checker.settings.enabled.contains(check.kind.code()) {
+    if !checker.settings.enabled.contains(diagnostic.kind.code()) {
         return;
     }
 
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         let defined_by = checker.current_stmt();
         let defined_in = checker.current_stmt_parent();
         if matches!(defined_by.node, StmtKind::Expr { .. }) {
@@ -58,12 +59,12 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                     if fix.content.is_empty() || fix.content == "pass" {
                         checker.deletions.insert(defined_by.clone());
                     }
-                    check.amend(fix);
+                    diagnostic.amend(fix);
                 }
                 Err(e) => error!("Failed to remove print call: {e}"),
             }
         }
     }
 
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

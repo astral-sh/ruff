@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
 use crate::autofix::Fix;
-use crate::registry::{Check, CheckKind};
+use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::source_code_locator::SourceCodeLocator;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
-    pub kind: CheckKind,
+    pub kind: DiagnosticKind,
     pub location: Location,
     pub end_location: Location,
     pub fix: Option<Fix>,
@@ -19,12 +19,19 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn from_check(check: Check, filename: String, source: Option<Source>) -> Self {
+    pub fn from_diagnostic(
+        diagnostic: Diagnostic,
+        filename: String,
+        source: Option<Source>,
+    ) -> Self {
         Self {
-            kind: check.kind,
-            location: Location::new(check.location.row(), check.location.column() + 1),
-            end_location: Location::new(check.end_location.row(), check.end_location.column() + 1),
-            fix: check.fix,
+            kind: diagnostic.kind,
+            location: Location::new(diagnostic.location.row(), diagnostic.location.column() + 1),
+            end_location: Location::new(
+                diagnostic.end_location.row(),
+                diagnostic.end_location.column() + 1,
+            ),
+            fix: diagnostic.fix,
             filename,
             source,
         }
@@ -54,26 +61,26 @@ pub struct Source {
 }
 
 impl Source {
-    pub fn from_check(check: &Check, locator: &SourceCodeLocator) -> Self {
-        let location = Location::new(check.location.row(), 0);
-        // Checks can already extend one-past-the-end per Ropey's semantics. If they do,
-        // though, then they'll end at the start of a line. We need to avoid
-        // extending by yet another line past-the-end.
-        let end_location = if check.end_location.column() == 0 {
-            check.end_location
+    pub fn from_diagnostic(diagnostic: &Diagnostic, locator: &SourceCodeLocator) -> Self {
+        let location = Location::new(diagnostic.location.row(), 0);
+        // Diagnostics can already extend one-past-the-end per Ropey's semantics. If
+        // they do, though, then they'll end at the start of a line. We need to
+        // avoid extending by yet another line past-the-end.
+        let end_location = if diagnostic.end_location.column() == 0 {
+            diagnostic.end_location
         } else {
-            Location::new(check.end_location.row() + 1, 0)
+            Location::new(diagnostic.end_location.row() + 1, 0)
         };
         let source = locator.slice_source_code_range(&Range::new(location, end_location));
         let num_chars_in_range = locator
-            .slice_source_code_range(&Range::new(check.location, check.end_location))
+            .slice_source_code_range(&Range::new(diagnostic.location, diagnostic.end_location))
             .chars()
             .count();
         Source {
             contents: source.to_string(),
             range: (
-                check.location.column(),
-                check.location.column() + num_chars_in_range,
+                diagnostic.location.column(),
+                diagnostic.location.column() + num_chars_in_range,
             ),
         }
     }

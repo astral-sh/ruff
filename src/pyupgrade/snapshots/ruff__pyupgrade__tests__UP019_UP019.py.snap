@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: TypingTextStrAlias
+- kind:
+    TypingTextStrAlias: ~
   location:
     row: 7
     column: 21
@@ -18,7 +19,8 @@ expression: checks
       row: 7
       column: 25
   parent: ~
-- kind: TypingTextStrAlias
+- kind:
+    TypingTextStrAlias: ~
   location:
     row: 11
     column: 28
@@ -34,7 +36,8 @@ expression: checks
       row: 11
       column: 39
   parent: ~
-- kind: TypingTextStrAlias
+- kind:
+    TypingTextStrAlias: ~
   location:
     row: 15
     column: 27
@@ -50,7 +53,8 @@ expression: checks
       row: 15
       column: 37
   parent: ~
-- kind: TypingTextStrAlias
+- kind:
+    TypingTextStrAlias: ~
   location:
     row: 19
     column: 28

@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: NoUnderIndentation
+- kind:
+    NoUnderIndentation: ~
   location:
     row: 232
     column: 0
@@ -18,7 +19,8 @@ expression: checks
       row: 232
       column: 0
   parent: ~
-- kind: NoUnderIndentation
+- kind:
+    NoUnderIndentation: ~
   location:
     row: 244
     column: 0
@@ -34,7 +36,8 @@ expression: checks
       row: 244
       column: 0
   parent: ~
-- kind: NoUnderIndentation
+- kind:
+    NoUnderIndentation: ~
   location:
     row: 440
     column: 0
@@ -50,7 +53,8 @@ expression: checks
       row: 440
       column: 4
   parent: ~
-- kind: NoUnderIndentation
+- kind:
+    NoUnderIndentation: ~
   location:
     row: 441
     column: 0

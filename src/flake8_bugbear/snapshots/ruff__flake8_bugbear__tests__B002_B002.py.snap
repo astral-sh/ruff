@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: UnaryPrefixIncrement
+- kind:
+    UnaryPrefixIncrement: ~
   location:
     row: 15
     column: 8
@@ -11,7 +12,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: UnaryPrefixIncrement
+- kind:
+    UnaryPrefixIncrement: ~
   location:
     row: 20
     column: 11

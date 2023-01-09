@@ -8,11 +8,11 @@ use crate::pyupgrade::checks;
 
 /// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
-    let Some(mut check) =
+    let Some(mut diagnostic) =
         checks::useless_metaclass_type(targets, value, Range::from_located(stmt)) else {
             return;
         };
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
@@ -30,10 +30,10 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
                 if fix.content.is_empty() || fix.content == "pass" {
                     checker.deletions.insert(defined_by.clone());
                 }
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to fix remove metaclass type: {e}"),
         }
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

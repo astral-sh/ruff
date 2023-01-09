@@ -4,7 +4,8 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 fn is_exception_check(stmt: &Stmt) -> bool {
     let StmtKind::If {test: _, body, orelse: _} = &stmt.node else {
@@ -34,15 +35,15 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         return;
     }
 
-    let mut check = Check::new(
-        CheckKind::NegateEqualOp(
+    let mut diagnostic = Diagnostic::new(
+        violations::NegateEqualOp(
             unparse_expr(left, checker.style),
             unparse_expr(&comparators[0], checker.style),
         ),
         Range::from_located(operand),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
                     left: left.clone(),
@@ -55,7 +56,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM202
@@ -78,15 +79,15 @@ pub fn negation_with_not_equal_op(
         return;
     }
 
-    let mut check = Check::new(
-        CheckKind::NegateNotEqualOp(
+    let mut diagnostic = Diagnostic::new(
+        violations::NegateNotEqualOp(
             unparse_expr(left, checker.style),
             unparse_expr(&comparators[0], checker.style),
         ),
         Range::from_located(operand),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
                     left: left.clone(),
@@ -99,7 +100,7 @@ pub fn negation_with_not_equal_op(
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM208
@@ -114,16 +115,16 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
         return;
     }
 
-    let mut check = Check::new(
-        CheckKind::DoubleNegation(operand.to_string()),
+    let mut diagnostic = Diagnostic::new(
+        violations::DoubleNegation(operand.to_string()),
         Range::from_located(operand),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             unparse_expr(operand, checker.style),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

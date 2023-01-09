@@ -1,10 +1,11 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use crate::ast::helpers::{create_expr, create_stmt, unparse_expr, unparse_stmt};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
+use crate::violations;
 
 fn is_main_check(expr: &Expr) -> bool {
     if let ExprKind::Compare {
@@ -59,10 +60,49 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.add_check(Check::new(
-        CheckKind::NestedIfStatements,
+    checker.diagnostics.push(Diagnostic::new(
+        violations::NestedIfStatements,
         Range::from_located(stmt),
     ));
+}
+
+fn is_one_line_return_bool(stmts: &[Stmt]) -> bool {
+    if stmts.len() != 1 {
+        return false;
+    }
+    let StmtKind::Return { value } = &stmts[0].node else {
+        return false;
+    };
+    let Some(ExprKind::Constant { value, .. }) = value.as_ref().map(|value| &value.node) else {
+        return false;
+    };
+    matches!(value, Constant::Bool(_))
+}
+
+/// SIM103
+pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
+    let StmtKind::If { test, body, orelse } = &stmt.node else {
+        return;
+    };
+    if !(is_one_line_return_bool(body) && is_one_line_return_bool(orelse)) {
+        return;
+    }
+    let condition = unparse_expr(test, checker.style);
+    let mut diagnostic = Diagnostic::new(
+        violations::ReturnBoolConditionDirectly(condition),
+        Range::from_located(stmt),
+    );
+    if checker.patch(&RuleCode::SIM103) {
+        let return_stmt = create_stmt(StmtKind::Return {
+            value: Some(test.clone()),
+        });
+        diagnostic.amend(Fix::replacement(
+            unparse_stmt(&return_stmt, checker.style),
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
@@ -138,16 +178,16 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let ternary = ternary(target_var, body_value, test, orelse_value);
     let content = unparse_stmt(&ternary, checker.style);
-    let mut check = Check::new(
-        CheckKind::UseTernaryOperator(content.clone()),
+    let mut diagnostic = Diagnostic::new(
+        violations::UseTernaryOperator(content.clone()),
         Range::from_located(stmt),
     );
-    if checker.patch(&CheckCode::SIM108) {
-        check.amend(Fix::replacement(
+    if checker.patch(&RuleCode::SIM108) {
+        diagnostic.amend(Fix::replacement(
             content,
             stmt.location,
             stmt.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

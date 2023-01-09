@@ -2,7 +2,8 @@
 source: src/flake8_simplify/mod.rs
 expression: checks
 ---
-- kind: OrTrue
+- kind:
+    OrTrue: ~
   location:
     row: 1
     column: 8
@@ -11,7 +12,8 @@ expression: checks
     column: 12
   fix: ~
   parent: ~
-- kind: OrTrue
+- kind:
+    OrTrue: ~
   location:
     row: 4
     column: 15
@@ -20,7 +22,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: OrTrue
+- kind:
+    OrTrue: ~
   location:
     row: 7
     column: 14

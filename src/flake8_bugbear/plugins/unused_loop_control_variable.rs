@@ -6,7 +6,8 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// Identify all `ExprKind::Name` nodes in an AST.
 struct NameFinder<'a> {
@@ -61,18 +62,18 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
             continue;
         }
 
-        let mut check = Check::new(
-            CheckKind::UnusedLoopControlVariable(name.to_string()),
+        let mut diagnostic = Diagnostic::new(
+            violations::UnusedLoopControlVariable(name.to_string()),
             Range::from_located(expr),
         );
-        if checker.patch(check.kind.code()) {
+        if checker.patch(diagnostic.kind.code()) {
             // Prefix the variable name with an underscore.
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 format!("_{name}"),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

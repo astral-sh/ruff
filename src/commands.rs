@@ -16,17 +16,17 @@ use serde::Serialize;
 use walkdir::WalkDir;
 
 use crate::autofix::fixer;
-use crate::cache::DEFAULT_CACHE_DIR_NAME;
+use crate::cache::CACHE_DIR_NAME;
 use crate::cli::Overrides;
 use crate::iterators::par_iter;
 use crate::linter::{add_noqa_to_path, lint_path, lint_stdin, Diagnostics};
 use crate::logging::LogLevel;
 use crate::message::Message;
-use crate::registry::{CheckCode, CheckKind};
+use crate::registry::RuleCode;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{cache, fs, one_time_warning, packages, resolver};
+use crate::{cache, fs, one_time_warning, packages, resolver, violations};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -117,9 +117,9 @@ pub fn run(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    if settings.enabled.contains(&CheckCode::E902) {
+                    if settings.enabled.contains(&RuleCode::E902) {
                         Diagnostics::new(vec![Message {
-                            kind: CheckKind::IOError(message),
+                            kind: violations::IOError(message).into(),
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,
@@ -298,18 +298,18 @@ pub fn show_files(
 #[derive(Serialize)]
 struct Explanation<'a> {
     code: &'a str,
-    category: &'a str,
+    origin: &'a str,
     summary: &'a str,
 }
 
-/// Explain a `CheckCode` to the user.
-pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
+/// Explain a `RuleCode` to the user.
+pub fn explain(code: &RuleCode, format: &SerializationFormat) -> Result<()> {
     match format {
         SerializationFormat::Text | SerializationFormat::Grouped => {
             println!(
                 "{} ({}): {}",
                 code.as_ref(),
-                code.category().title(),
+                code.origin().title(),
                 code.kind().summary()
             );
         }
@@ -318,7 +318,7 @@ pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
                     code: code.as_ref(),
-                    category: code.category().title(),
+                    origin: code.origin().title(),
                     summary: &code.kind().summary(),
                 })?
             );
@@ -340,10 +340,10 @@ pub fn explain(code: &CheckCode, format: &SerializationFormat) -> Result<()> {
 pub fn clean(level: &LogLevel) -> Result<()> {
     for entry in WalkDir::new(&*path_dedot::CWD)
         .into_iter()
-        .filter_map(std::result::Result::ok)
+        .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_dir())
     {
-        let cache = entry.path().join(DEFAULT_CACHE_DIR_NAME);
+        let cache = entry.path().join(CACHE_DIR_NAME);
         if cache.is_dir() {
             if level >= &LogLevel::Default {
                 eprintln!("Removing cache at: {}", fs::relativize_path(&cache).bold());

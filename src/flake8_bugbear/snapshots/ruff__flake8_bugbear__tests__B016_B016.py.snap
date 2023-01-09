@@ -2,7 +2,8 @@
 source: src/flake8_bugbear/mod.rs
 expression: checks
 ---
-- kind: CannotRaiseLiteral
+- kind:
+    CannotRaiseLiteral: ~
   location:
     row: 6
     column: 6
@@ -11,7 +12,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: CannotRaiseLiteral
+- kind:
+    CannotRaiseLiteral: ~
   location:
     row: 7
     column: 6
@@ -20,7 +22,8 @@ expression: checks
     column: 7
   fix: ~
   parent: ~
-- kind: CannotRaiseLiteral
+- kind:
+    CannotRaiseLiteral: ~
   location:
     row: 8
     column: 6

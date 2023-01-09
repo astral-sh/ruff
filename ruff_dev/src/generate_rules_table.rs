@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::Args;
 use itertools::Itertools;
-use ruff::registry::{CheckCategory, CheckCode};
+use ruff::registry::{RuleCode, RuleOrigin};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -25,24 +25,24 @@ pub fn main(cli: &Cli) -> Result<()> {
     // Generate the table string.
     let mut table_out = String::new();
     let mut toc_out = String::new();
-    for check_category in CheckCategory::iter() {
-        let codes_csv: String = check_category.codes().iter().map(AsRef::as_ref).join(", ");
-        table_out.push_str(&format!("### {} ({codes_csv})", check_category.title()));
+    for origin in RuleOrigin::iter() {
+        let codes_csv: String = origin.codes().iter().map(AsRef::as_ref).join(", ");
+        table_out.push_str(&format!("### {} ({codes_csv})", origin.title()));
         table_out.push('\n');
         table_out.push('\n');
 
         toc_out.push_str(&format!(
             "   1. [{} ({})](#{}-{})\n",
-            check_category.title(),
+            origin.title(),
             codes_csv,
-            check_category.title().to_lowercase().replace(' ', "-"),
+            origin.title().to_lowercase().replace(' ', "-"),
             codes_csv.to_lowercase().replace(',', "-").replace(' ', "")
         ));
 
-        if let Some((url, platform)) = check_category.url() {
+        if let Some((url, platform)) = origin.url() {
             table_out.push_str(&format!(
                 "For more, see [{}]({}) on {}.",
-                check_category.title(),
+                origin.title(),
                 url,
                 platform
             ));
@@ -55,15 +55,15 @@ pub fn main(cli: &Cli) -> Result<()> {
         table_out.push_str("| ---- | ---- | ------- | --- |");
         table_out.push('\n');
 
-        for check_code in CheckCode::iter() {
-            if check_code.category() == check_category {
-                let check_kind = check_code.kind();
-                let fix_token = if check_kind.fixable() { "🛠" } else { "" };
+        for rule_code in RuleCode::iter() {
+            if rule_code.origin() == origin {
+                let kind = rule_code.kind();
+                let fix_token = if kind.fixable() { "🛠" } else { "" };
                 table_out.push_str(&format!(
                     "| {} | {} | {} | {} |",
-                    check_kind.code().as_ref(),
-                    check_kind.as_ref(),
-                    check_kind.summary().replace('|', r"\|"),
+                    kind.code().as_ref(),
+                    kind.as_ref(),
+                    kind.summary().replace('|', r"\|"),
                     fix_token
                 ));
                 table_out.push('\n');

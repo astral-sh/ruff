@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: PercentFormatExpectedMapping
+- kind:
+    PercentFormatExpectedMapping: ~
   location:
     row: 6
     column: 0
@@ -11,7 +12,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: PercentFormatExpectedMapping
+- kind:
+    PercentFormatExpectedMapping: ~
   location:
     row: 7
     column: 0
@@ -20,7 +22,8 @@ expression: checks
     column: 20
   fix: ~
   parent: ~
-- kind: PercentFormatExpectedMapping
+- kind:
+    PercentFormatExpectedMapping: ~
   location:
     row: 8
     column: 0
@@ -29,7 +32,8 @@ expression: checks
     column: 19
   fix: ~
   parent: ~
-- kind: PercentFormatExpectedMapping
+- kind:
+    PercentFormatExpectedMapping: ~
   location:
     row: 9
     column: 0
@@ -38,7 +42,8 @@ expression: checks
     column: 22
   fix: ~
   parent: ~
-- kind: PercentFormatExpectedMapping
+- kind:
+    PercentFormatExpectedMapping: ~
   location:
     row: 11
     column: 0
@@ -47,7 +52,8 @@ expression: checks
     column: 37
   fix: ~
   parent: ~
-- kind: PercentFormatExpectedMapping
+- kind:
+    PercentFormatExpectedMapping: ~
   location:
     row: 12
     column: 0
@@ -56,7 +62,8 @@ expression: checks
     column: 37
   fix: ~
   parent: ~
-- kind: PercentFormatExpectedMapping
+- kind:
+    PercentFormatExpectedMapping: ~
   location:
     row: 13
     column: 0

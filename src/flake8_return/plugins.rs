@@ -8,8 +8,9 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::flake8_return::helpers::result_exists;
 use crate::flake8_return::visitor::{ReturnVisitor, Stack};
-use crate::registry::{Branch, CheckCode, CheckKind};
-use crate::Check;
+use crate::registry::RuleCode;
+use crate::violations::Branch;
+use crate::{violations, Diagnostic};
 
 /// RET501
 fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
@@ -26,15 +27,16 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         ) {
             continue;
         }
-        let mut check = Check::new(CheckKind::UnnecessaryReturnNone, Range::from_located(stmt));
-        if checker.patch(&CheckCode::RET501) {
-            check.amend(Fix::replacement(
+        let mut diagnostic =
+            Diagnostic::new(violations::UnnecessaryReturnNone, Range::from_located(stmt));
+        if checker.patch(&RuleCode::RET501) {
+            diagnostic.amend(Fix::replacement(
                 "return".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -44,15 +46,16 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if expr.is_some() {
             continue;
         }
-        let mut check = Check::new(CheckKind::ImplicitReturnValue, Range::from_located(stmt));
-        if checker.patch(&CheckCode::RET502) {
-            check.amend(Fix::replacement(
+        let mut diagnostic =
+            Diagnostic::new(violations::ImplicitReturnValue, Range::from_located(stmt));
+        if checker.patch(&RuleCode::RET502) {
+            diagnostic.amend(Fix::replacement(
                 "return None".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -61,8 +64,8 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
     match &last_stmt.node {
         StmtKind::If { body, orelse, .. } => {
             if body.is_empty() || orelse.is_empty() {
-                checker.add_check(Check::new(
-                    CheckKind::ImplicitReturn,
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::ImplicitReturn,
                     Range::from_located(last_stmt),
                 ));
                 return;
@@ -100,18 +103,19 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         | StmtKind::Raise { .. }
         | StmtKind::Try { .. } => {}
         _ => {
-            let mut check = Check::new(CheckKind::ImplicitReturn, Range::from_located(last_stmt));
-            if checker.patch(&CheckCode::RET503) {
+            let mut diagnostic =
+                Diagnostic::new(violations::ImplicitReturn, Range::from_located(last_stmt));
+            if checker.patch(&RuleCode::RET503) {
                 let mut content = String::new();
                 content.push_str(&indentation(checker, last_stmt));
                 content.push_str("return None");
                 content.push('\n');
-                check.amend(Fix::insertion(
+                diagnostic.amend(Fix::insertion(
                     content,
                     Location::new(last_stmt.end_location.unwrap().row() + 1, 0),
                 ));
             }
-            checker.add_check(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -190,8 +194,8 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         }
 
         if !stack.refs.contains_key(id.as_str()) {
-            checker.add_check(Check::new(
-                CheckKind::UnnecessaryAssign,
+            checker.diagnostics.push(Diagnostic::new(
+                violations::UnnecessaryAssign,
                 Range::from_located(expr),
             ));
             return;
@@ -207,8 +211,8 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
-        checker.add_check(Check::new(
-            CheckKind::UnnecessaryAssign,
+        checker.diagnostics.push(Diagnostic::new(
+            violations::UnnecessaryAssign,
             Range::from_located(expr),
         ));
     }
@@ -221,36 +225,36 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
     };
     for child in body {
         if matches!(child.node, StmtKind::Return { .. }) {
-            if checker.settings.enabled.contains(&CheckCode::RET505) {
-                checker.add_check(Check::new(
-                    CheckKind::SuperfluousElseReturn(branch),
+            if checker.settings.enabled.contains(&RuleCode::RET505) {
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::SuperfluousElseReturn(branch),
                     Range::from_located(stmt),
                 ));
             }
             return true;
         }
         if matches!(child.node, StmtKind::Break) {
-            if checker.settings.enabled.contains(&CheckCode::RET508) {
-                checker.add_check(Check::new(
-                    CheckKind::SuperfluousElseBreak(branch),
+            if checker.settings.enabled.contains(&RuleCode::RET508) {
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::SuperfluousElseBreak(branch),
                     Range::from_located(stmt),
                 ));
             }
             return true;
         }
         if matches!(child.node, StmtKind::Raise { .. }) {
-            if checker.settings.enabled.contains(&CheckCode::RET506) {
-                checker.add_check(Check::new(
-                    CheckKind::SuperfluousElseRaise(branch),
+            if checker.settings.enabled.contains(&RuleCode::RET506) {
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::SuperfluousElseRaise(branch),
                     Range::from_located(stmt),
                 ));
             }
             return true;
         }
         if matches!(child.node, StmtKind::Continue) {
-            if checker.settings.enabled.contains(&CheckCode::RET507) {
-                checker.add_check(Check::new(
-                    CheckKind::SuperfluousElseContinue(branch),
+            if checker.settings.enabled.contains(&RuleCode::RET507) {
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::SuperfluousElseContinue(branch),
                     Range::from_located(stmt),
                 ));
             }
@@ -310,10 +314,10 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
         visitor.stack
     };
 
-    if checker.settings.enabled.contains(&CheckCode::RET505)
-        || checker.settings.enabled.contains(&CheckCode::RET506)
-        || checker.settings.enabled.contains(&CheckCode::RET507)
-        || checker.settings.enabled.contains(&CheckCode::RET508)
+    if checker.settings.enabled.contains(&RuleCode::RET505)
+        || checker.settings.enabled.contains(&RuleCode::RET506)
+        || checker.settings.enabled.contains(&RuleCode::RET507)
+        || checker.settings.enabled.contains(&RuleCode::RET508)
     {
         if superfluous_elif(checker, &stack) {
             return;
@@ -329,20 +333,20 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
     }
 
     if !result_exists(&stack.returns) {
-        if checker.settings.enabled.contains(&CheckCode::RET501) {
+        if checker.settings.enabled.contains(&RuleCode::RET501) {
             unnecessary_return_none(checker, &stack);
         }
         return;
     }
 
-    if checker.settings.enabled.contains(&CheckCode::RET502) {
+    if checker.settings.enabled.contains(&RuleCode::RET502) {
         implicit_return_value(checker, &stack);
     }
-    if checker.settings.enabled.contains(&CheckCode::RET503) {
+    if checker.settings.enabled.contains(&RuleCode::RET503) {
         implicit_return(checker, last_stmt);
     }
 
-    if checker.settings.enabled.contains(&CheckCode::RET504) {
+    if checker.settings.enabled.contains(&RuleCode::RET504) {
         for (_, expr) in &stack.returns {
             if let Some(expr) = expr {
                 unnecessary_assign(checker, &stack, expr);

@@ -5,7 +5,9 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind, LiteralType};
+use crate::registry::{Diagnostic, RuleCode};
+use crate::violations;
+use crate::violations::LiteralType;
 
 /// UP018
 pub fn native_literals(
@@ -23,13 +25,13 @@ pub fn native_literals(
 
     if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let mut check = Check::new(CheckKind::NativeLiterals(if id == "str" {
+            let mut diagnostic = Diagnostic::new(violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
             }), Range::from_located(expr));
-            if checker.patch(&CheckCode::UP018) {
-                check.amend(Fix::replacement(
+            if checker.patch(&RuleCode::UP018) {
+                diagnostic.amend(Fix::replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
                         content.push('b');
@@ -46,7 +48,7 @@ pub fn native_literals(
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.diagnostics.push(diagnostic);
             return;
         };
 
@@ -91,21 +93,21 @@ pub fn native_literals(
             return;
         }
 
-        let mut check = Check::new(
-            CheckKind::NativeLiterals(if id == "str" {
+        let mut diagnostic = Diagnostic::new(
+            violations::NativeLiterals(if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
             }),
             Range::from_located(expr),
         );
-        if checker.patch(&CheckCode::UP018) {
-            check.amend(Fix::replacement(
+        if checker.patch(&RuleCode::UP018) {
+            diagnostic.amend(Fix::replacement(
                 arg_code.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

@@ -6,8 +6,9 @@ use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::violations;
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
     Expr::new(
@@ -40,11 +41,11 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::B014) {
+    if checker.settings.enabled.contains(&RuleCode::B014) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
-            let mut check = Check::new(
-                CheckKind::DuplicateHandlerException(
+            let mut diagnostic = Diagnostic::new(
+                violations::DuplicateHandlerException(
                     duplicates
                         .into_iter()
                         .map(|call_path| call_path.join("."))
@@ -53,20 +54,20 @@ fn duplicate_handler_exceptions<'a>(
                 ),
                 Range::from_located(expr),
             );
-            if checker.patch(check.kind.code()) {
+            if checker.patch(diagnostic.kind.code()) {
                 let mut generator: SourceCodeGenerator = checker.style.into();
                 if unique_elts.len() == 1 {
                     generator.unparse_expr(unique_elts[0], 0);
                 } else {
                     generator.unparse_expr(&type_pattern(unique_elts), 0);
                 }
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     generator.generate(),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
             }
-            checker.add_check(check);
+            checker.diagnostics.push(diagnostic);
         }
     }
 
@@ -104,11 +105,11 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
         }
     }
 
-    if checker.settings.enabled.contains(&CheckCode::B025) {
+    if checker.settings.enabled.contains(&RuleCode::B025) {
         for (name, exprs) in duplicates {
             for expr in exprs {
-                checker.add_check(Check::new(
-                    CheckKind::DuplicateTryBlockException(name.join(".")),
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::DuplicateTryBlockException(name.join(".")),
                     Range::from_located(expr),
                 ));
             }

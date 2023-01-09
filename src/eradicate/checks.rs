@@ -3,9 +3,9 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::eradicate::detection::comment_contains_code;
-use crate::registry::{CheckCode, CheckKind};
+use crate::registry::RuleCode;
 use crate::settings::flags;
-use crate::{Check, Settings, SourceCodeLocator};
+use crate::{violations, Diagnostic, Settings, SourceCodeLocator};
 
 fn is_standalone_comment(line: &str) -> bool {
     for char in line.chars() {
@@ -25,20 +25,20 @@ pub fn commented_out_code(
     end: Location,
     settings: &Settings,
     autofix: flags::Autofix,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let location = Location::new(start.row(), 0);
     let end_location = Location::new(end.row() + 1, 0);
     let line = locator.slice_source_code_range(&Range::new(location, end_location));
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(&line) && comment_contains_code(&line, &settings.task_tags[..]) {
-        let mut check = Check::new(CheckKind::CommentedOutCode, Range::new(start, end));
+        let mut diagnostic = Diagnostic::new(violations::CommentedOutCode, Range::new(start, end));
         if matches!(autofix, flags::Autofix::Enabled)
-            && settings.fixable.contains(&CheckCode::ERA001)
+            && settings.fixable.contains(&RuleCode::ERA001)
         {
-            check.amend(Fix::deletion(location, end_location));
+            diagnostic.amend(Fix::deletion(location, end_location));
         }
-        Some(check)
+        Some(diagnostic)
     } else {
         None
     }

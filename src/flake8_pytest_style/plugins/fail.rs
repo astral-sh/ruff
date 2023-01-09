@@ -4,7 +4,8 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 pub fn fail_call(checker: &mut Checker, call: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_fail(call, checker) {
@@ -13,14 +14,14 @@ pub fn fail_call(checker: &mut Checker, call: &Expr, args: &[Expr], keywords: &[
 
         if let Some(msg) = msg {
             if is_empty_or_null_string(msg) {
-                checker.add_check(Check::new(
-                    CheckKind::FailWithoutMessage,
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::FailWithoutMessage,
                     Range::from_located(call),
                 ));
             }
         } else {
-            checker.add_check(Check::new(
-                CheckKind::FailWithoutMessage,
+            checker.diagnostics.push(Diagnostic::new(
+                violations::FailWithoutMessage,
                 Range::from_located(call),
             ));
         }

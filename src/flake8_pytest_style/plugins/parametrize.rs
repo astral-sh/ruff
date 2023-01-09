@@ -6,8 +6,9 @@ use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::flake8_pytest_style::types;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::violations;
 
 fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators
@@ -79,11 +80,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
-                        let mut check = Check::new(
-                            CheckKind::ParametrizeNamesWrongType(names_type),
+                        let mut diagnostic = Diagnostic::new(
+                            violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
@@ -100,20 +101,20 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 1,
                             );
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 generator.generate(),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
-                        let mut check = Check::new(
-                            CheckKind::ParametrizeNamesWrongType(names_type),
+                        let mut diagnostic = Diagnostic::new(
+                            violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
@@ -130,13 +131,13 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 0,
                             );
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 generator.generate(),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::CSV => {}
                 }
@@ -151,11 +152,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
                     types::ParametrizeNameType::List => {
-                        let mut check = Check::new(
-                            CheckKind::ParametrizeNamesWrongType(names_type),
+                        let mut diagnostic = Diagnostic::new(
+                            violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
@@ -164,29 +165,29 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 0,
                             );
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 generator.generate(),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::CSV => {
-                        let mut check = Check::new(
-                            CheckKind::ParametrizeNamesWrongType(names_type),
+                        let mut diagnostic = Diagnostic::new(
+                            violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                check.amend(Fix::replacement(
+                                diagnostic.amend(Fix::replacement(
                                     content,
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
                             }
                         }
-                        checker.add_check(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             };
@@ -200,11 +201,11 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::List => {}
                     types::ParametrizeNameType::Tuple => {
-                        let mut check = Check::new(
-                            CheckKind::ParametrizeNamesWrongType(names_type),
+                        let mut diagnostic = Diagnostic::new(
+                            violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             let mut generator: SourceCodeGenerator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
@@ -213,29 +214,29 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                 }),
                                 1, // so tuple is generated with parentheses
                             );
-                            check.amend(Fix::replacement(
+                            diagnostic.amend(Fix::replacement(
                                 generator.generate(),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
                         }
-                        checker.add_check(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::CSV => {
-                        let mut check = Check::new(
-                            CheckKind::ParametrizeNamesWrongType(names_type),
+                        let mut diagnostic = Diagnostic::new(
+                            violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(check.kind.code()) {
+                        if checker.patch(diagnostic.kind.code()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                check.amend(Fix::replacement(
+                                diagnostic.amend(Fix::replacement(
                                     content,
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
                             }
                         }
-                        checker.add_check(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             };
@@ -256,8 +257,8 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
     match &expr.node {
         ExprKind::List { elts, .. } => {
             if values_type != types::ParametrizeValuesType::List {
-                checker.add_check(Check::new(
-                    CheckKind::ParametrizeValuesWrongType(values_type, values_row_type),
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::ParametrizeValuesWrongType(values_type, values_row_type),
                     Range::from_located(expr),
                 ));
             }
@@ -265,8 +266,8 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
         }
         ExprKind::Tuple { elts, .. } => {
             if values_type != types::ParametrizeValuesType::Tuple {
-                checker.add_check(Check::new(
-                    CheckKind::ParametrizeValuesWrongType(values_type, values_row_type),
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::ParametrizeValuesWrongType(values_type, values_row_type),
                     Range::from_located(expr),
                 ));
             }
@@ -277,21 +278,21 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
 }
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
-    let mut check = Check::new(
-        CheckKind::ParametrizeNamesWrongType(types::ParametrizeNameType::CSV),
+    let mut diagnostic = Diagnostic::new(
+        violations::ParametrizeNamesWrongType(types::ParametrizeNameType::CSV),
         Range::from_located(expr),
     );
 
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             generator.generate(),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 fn handle_value_rows(
@@ -304,16 +305,16 @@ fn handle_value_rows(
         match &elt.node {
             ExprKind::Tuple { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
-                    checker.add_check(Check::new(
-                        CheckKind::ParametrizeValuesWrongType(values_type, values_row_type),
+                    checker.diagnostics.push(Diagnostic::new(
+                        violations::ParametrizeValuesWrongType(values_type, values_row_type),
                         Range::from_located(elt),
                     ));
                 }
             }
             ExprKind::List { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
-                    checker.add_check(Check::new(
-                        CheckKind::ParametrizeValuesWrongType(values_type, values_row_type),
+                    checker.diagnostics.push(Diagnostic::new(
+                        violations::ParametrizeValuesWrongType(values_type, values_row_type),
                         Range::from_located(elt),
                     ));
                 }
@@ -327,12 +328,12 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     let decorator = get_parametrize_decorator(checker, decorators);
     if let Some(decorator) = decorator {
         if let ExprKind::Call { args, .. } = &decorator.node {
-            if checker.settings.enabled.contains(&CheckCode::PT006) {
+            if checker.settings.enabled.contains(&RuleCode::PT006) {
                 if let Some(arg) = args.get(0) {
                     check_names(checker, arg);
                 }
             }
-            if checker.settings.enabled.contains(&CheckCode::PT007) {
+            if checker.settings.enabled.contains(&RuleCode::PT007) {
                 if let Some(arg) = args.get(1) {
                     check_values(checker, arg);
                 }

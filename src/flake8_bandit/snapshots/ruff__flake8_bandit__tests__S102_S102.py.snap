@@ -2,7 +2,8 @@
 source: src/flake8_bandit/mod.rs
 expression: checks
 ---
-- kind: ExecUsed
+- kind:
+    ExecUsed: ~
   location:
     row: 3
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 17
   fix: ~
   parent: ~
-- kind: ExecUsed
+- kind:
+    ExecUsed: ~
   location:
     row: 5
     column: 0

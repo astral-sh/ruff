@@ -2,7 +2,8 @@ use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// PGH001 - no eval
 pub fn no_eval(checker: &mut Checker, func: &Expr) {
@@ -15,5 +16,8 @@ pub fn no_eval(checker: &mut Checker, func: &Expr) {
     if !checker.is_builtin("eval") {
         return;
     }
-    checker.add_check(Check::new(CheckKind::NoEval, Range::from_located(func)));
+    checker.diagnostics.push(Diagnostic::new(
+        violations::NoEval,
+        Range::from_located(func),
+    ));
 }

@@ -8,7 +8,7 @@ use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
 use crate::isort;
 use crate::isort::track::ImportTracker;
-use crate::registry::Check;
+use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
@@ -20,18 +20,18 @@ fn check_import_blocks(
     stylist: &SourceCodeStyleDetector,
     autofix: flags::Autofix,
     package: Option<&Path>,
-) -> Vec<Check> {
-    let mut checks = vec![];
+) -> Vec<Diagnostic> {
+    let mut diagnostics = vec![];
     for block in tracker.into_iter() {
         if !block.imports.is_empty() {
-            if let Some(check) =
+            if let Some(diagnostic) =
                 isort::plugins::check_imports(&block, locator, settings, stylist, autofix, package)
             {
-                checks.push(check);
+                diagnostics.push(diagnostic);
             }
         }
     }
-    checks
+    diagnostics
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -44,7 +44,7 @@ pub fn check_imports(
     autofix: flags::Autofix,
     path: &Path,
     package: Option<&Path>,
-) -> Vec<Check> {
+) -> Vec<Diagnostic> {
     let mut tracker = ImportTracker::new(locator, directives, path);
     for stmt in python_ast {
         tracker.visit_stmt(stmt);

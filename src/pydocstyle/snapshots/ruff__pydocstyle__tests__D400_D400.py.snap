@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 2
     column: 4
@@ -18,7 +19,8 @@ expression: checks
       row: 2
       column: 35
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 7
     column: 4
@@ -34,7 +36,8 @@ expression: checks
       row: 7
       column: 37
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 12
     column: 4
@@ -50,7 +53,8 @@ expression: checks
       row: 14
       column: 28
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 20
     column: 4
@@ -66,7 +70,8 @@ expression: checks
       row: 20
       column: 37
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 25
     column: 4
@@ -82,7 +87,8 @@ expression: checks
       row: 27
       column: 28
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 32
     column: 4
@@ -98,7 +104,8 @@ expression: checks
       row: 34
       column: 48
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 39
     column: 4
@@ -114,7 +121,8 @@ expression: checks
       row: 39
       column: 36
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 44
     column: 4
@@ -130,7 +138,8 @@ expression: checks
       row: 44
       column: 38
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 49
     column: 4
@@ -146,7 +155,8 @@ expression: checks
       row: 51
       column: 28
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 57
     column: 4
@@ -162,7 +172,8 @@ expression: checks
       row: 57
       column: 38
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 62
     column: 4
@@ -178,7 +189,8 @@ expression: checks
       row: 64
       column: 28
   parent: ~
-- kind: EndsInPeriod
+- kind:
+    EndsInPeriod: ~
   location:
     row: 69
     column: 4
