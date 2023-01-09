@@ -13,8 +13,14 @@ use crate::cst::matchers::{match_call, match_expression};
 use crate::registry::Diagnostic;
 use crate::violations;
 
+// This checks for a an opening squiggly bracket, followed by any integer, followed by any text,
+// follow be a squiggly closing bracket
 static FORMAT_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)\}").unwrap());
+
+// When we check for a nested format specifier, the closing bracket will be removed, so we just
+// need to check for the opening bracket and an integer
+static FIRST_HALF: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{(\d+)").unwrap());
 
 /// Convert a python integer to a unsigned 32 but integer. We are assuming this
 /// will never overflow because people will probably never have more than 2^32
@@ -35,11 +41,11 @@ fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Result<Vec<Arg>,
         // We need to keep the formatting in the same order but move the values
         let values = match old_args.get(given_idx.to_owned() as usize) {
             None => return Err(()),
-            Some(item) => item
+            Some(item) => item,
         };
         let formatting = match old_args.get(i) {
             None => return Err(()),
-            Some(item) => item
+            Some(item) => item,
         };
         let new_arg = Arg {
             value: values.value.clone(),
@@ -124,13 +130,22 @@ fn remove_specifiers(raw_specifiers: &str) -> String {
 /// Checks if there is a single specifier in the string. The string must either
 /// have all formatterts or no formatters (or else an error will be thrown), so
 /// this will work as long as the python code is valid
-fn has_specifiers(raw_specifiers: &str) -> bool {
-    FORMAT_SPECIFIER.is_match(raw_specifiers)
+fn has_valid_specifiers(raw_specifiers: &str) -> bool {
+    // If there is at least one match we should return a true
+    let mut at_least_one = false;
+    for cap in FORMAT_SPECIFIER.captures_iter(raw_specifiers) {
+        at_least_one = true;
+        // If we have a nested format specifier we need to return a false
+        if FIRST_HALF.is_match(&cap[2]) {
+            return false;
+        }
+    }
+    at_least_one
 }
 
 /// Checks if the string has specifiers and that they are in the correct order
 fn valid_specifiers(raw_specifiers: &str) -> bool {
-    if !has_specifiers(raw_specifiers) {
+    if !has_valid_specifiers(raw_specifiers) {
         return false;
     }
     let mut specifiers = get_specifier_order(raw_specifiers);
