@@ -13,13 +13,13 @@ use crate::cst::matchers::{match_call, match_expression};
 use crate::registry::Diagnostic;
 use crate::violations;
 
-// This checks for a an opening squiggly bracket, followed by any integer, followed by any text,
-// follow be a squiggly closing bracket
+// This checks for a an opening squiggly bracket, followed by any integer,
+// followed by any text, follow be a squiggly closing bracket
 static FORMAT_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)\}").unwrap());
 
-// When we check for a nested format specifier, the closing bracket will be removed, so we just
-// need to check for the opening bracket and an integer
+// When we check for a nested format specifier, the closing bracket will be
+// removed, so we just need to check for the opening bracket and an integer
 static FIRST_HALF: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{(\d+)").unwrap());
 
 /// Convert a python integer to a unsigned 32 but integer. We are assuming this
@@ -29,7 +29,7 @@ static FIRST_HALF: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{(\d+)").unwrap());
 fn convert_big_int(bigint: BigInt) -> Option<u32> {
     let (sign, digits) = bigint.to_u32_digits();
     match sign {
-        Sign::Plus => digits.get(0).copied(),
+        Sign::Plus => digits.first().copied(),
         Sign::Minus => None,
         Sign::NoSign => Some(0),
     }
@@ -62,9 +62,10 @@ fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Result<Vec<Arg>,
     Ok(new_args)
 }
 
-/// Returns the new call string, or returns an error if it cannot create a new call string
+/// Returns the new call string, or returns an error if it cannot create a new
+/// call string
 fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Result<String, ()> {
-    let mut expression = match parse_expression(&module_text) {
+    let mut expression = match parse_expression(module_text) {
         Err(_) => return Err(()),
         Ok(item) => item,
     };
@@ -165,46 +166,43 @@ fn valid_specifiers(raw_specifiers: &str) -> bool {
 pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
         if let ExprKind::Constant {
-            value: cons_value, ..
+            value: Constant::Str(provided_string), ..
         } = &value.node
         {
-            if let Constant::Str(provided_string) = cons_value {
-                // The function must be a format function
-                if attr != "format" {
-                    return;
-                }
-                // The squigly brackets must have format specifiers inside of them
-                if !valid_specifiers(provided_string) {
-                    return;
-                }
-                println!("{:?}", expr);
-                let as_ints = get_specifier_order(provided_string);
-                let call_range = Range::from_located(expr);
-                let call_text = checker.locator.slice_source_code_range(&call_range);
-                let mut diagnostic =
-                    Diagnostic::new(violations::FormatSpecifiers, Range::from_located(expr));
-                match get_new_call(&call_text, as_ints) {
-                    // If we get any errors, we know that there is an issue that we cannot fix
-                    // so we should just report that there is a formatting issue. Currently the
-                    // only issue we know of is a ParseError from a multi line format statement
-                    // inside a function call that does not explicitly say there are multiple
-                    // lines. Follow my Github issue here:
-                    // https://github.com/Instagram/LibCST/issues/846
-
-                    // Is there a way to specify that here this is not fixable, but below it is??
-                    Err(_) => checker.diagnostics.push(diagnostic),
-                    Ok(new_call) => {
-                        if checker.patch(diagnostic.kind.code()) {
-                            diagnostic.amend(Fix::replacement(
-                                new_call,
-                                expr.location,
-                                expr.end_location.unwrap(),
-                            ));
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
-                };
+            // The function must be a format function
+            if attr != "format" {
+                return;
             }
+            // The squigly brackets must have format specifiers inside of them
+            if !valid_specifiers(provided_string) {
+                return;
+            }
+            let as_ints = get_specifier_order(provided_string);
+            let call_range = Range::from_located(expr);
+            let call_text = checker.locator.slice_source_code_range(&call_range);
+            let mut diagnostic =
+                Diagnostic::new(violations::FormatSpecifiers, Range::from_located(expr));
+            match get_new_call(&call_text, as_ints) {
+                // If we get any errors, we know that there is an issue that we cannot fix
+                // so we should just report that there is a formatting issue. Currently the
+                // only issue we know of is a ParseError from a multi line format statement
+                // inside a function call that does not explicitly say there are multiple
+                // lines. Follow my Github issue here:
+                // https://github.com/Instagram/LibCST/issues/846
+
+                // Is there a way to specify that here this is not fixable, but below it is??
+                Err(_) => checker.diagnostics.push(diagnostic),
+                Ok(new_call) => {
+                    if checker.patch(diagnostic.kind.code()) {
+                        diagnostic.amend(Fix::replacement(
+                            new_call,
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
+                    }
+                    checker.diagnostics.push(diagnostic);
+                }
+            };
         }
     }
 }
