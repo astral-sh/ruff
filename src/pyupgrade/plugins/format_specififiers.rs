@@ -177,6 +177,7 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
                 if !valid_specifiers(provided_string) {
                     return;
                 }
+                println!("{:?}", expr);
                 let as_ints = get_specifier_order(provided_string);
                 let call_range = Range::from_located(expr);
                 let call_text = checker.locator.slice_source_code_range(&call_range);

@@ -1,0 +1,178 @@
+---
+source: src/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 33
+  fix:
+    content: "\"{}\" \"{}\" \"{}\".format(1, 2, 3)"
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 33
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 6
+    column: 1
+  fix:
+    content: "\"a {} complicated {} string with {} {}\".format(\n    \"fourth\", \"second\", \"first\", \"third\"\n)"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 6
+      column: 1
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 15
+  fix:
+    content: "'{}'.format(1)"
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 15
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 18
+  fix:
+    content: "'{:x}'.format(30)"
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 18
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 19
+  fix:
+    content: "'{}'.format(1)"
+    location:
+      row: 12
+      column: 4
+    end_location:
+      row: 12
+      column: 19
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 29
+  fix:
+    content: "'''{}\\n{}\\n'''.format(1, 2)"
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 14
+      column: 29
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 17
+    column: 26
+  fix:
+    content: "\"foo {}\" \\\n    \"bar {}\".format(1, 2)"
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 17
+      column: 26
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 17
+  fix:
+    content: "(\"{}\").format(1)"
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 17
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 27
+  fix:
+    content: "\"\\N{snowman} {}\".format(1)"
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 21
+      column: 27
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 26
+    column: 4
+  end_location:
+    row: 27
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    FormatSpecifiers: ~
+  location:
+    row: 31
+    column: 4
+  end_location:
+    row: 32
+    column: 25
+  fix: ~
+  parent: ~
+
