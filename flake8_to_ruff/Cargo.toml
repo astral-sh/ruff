@@ -9,6 +9,7 @@ name = "flake8_to_ruff"
 [dependencies]
 anyhow = { version = "1.0.66" }
 clap = { version = "4.0.1", features = ["derive"] }
+colored = { version = "2.0.0" }
 configparser = { version = "3.0.2" }
 once_cell = { version = "1.16.0" }
 regex = { version = "1.6.0" }

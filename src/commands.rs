@@ -26,7 +26,7 @@ use crate::registry::RuleCode;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{cache, fs, one_time_warning, packages, resolver, violations};
+use crate::{cache, fs, packages, resolver, violations, warn_user_once};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -45,12 +45,7 @@ pub fn run(
     debug!("Identified files to lint in: {:?}", duration);
 
     if paths.is_empty() {
-        one_time_warning!(
-            "{}{} {}",
-            "warning".yellow().bold(),
-            ":".bold(),
-            "No Python files found under the given path(s)".bold()
-        );
+        warn_user_once!("No Python files found under the given path(s)");
         return Ok(Diagnostics::default());
     }
 
@@ -196,12 +191,7 @@ pub fn add_noqa(
     debug!("Identified files to lint in: {:?}", duration);
 
     if paths.is_empty() {
-        one_time_warning!(
-            "{}{} {}",
-            "warning".yellow().bold(),
-            ":".bold(),
-            "No Python files found under the given path(s)".bold()
-        );
+        warn_user_once!("No Python files found under the given path(s)");
         return Ok(0);
     }
 
@@ -271,12 +261,7 @@ pub fn show_files(
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
 
     if paths.is_empty() {
-        one_time_warning!(
-            "{}{} {}",
-            "warning".yellow().bold(),
-            ":".bold(),
-            "No Python files found under the given path(s)".bold()
-        );
+        warn_user_once!("No Python files found under the given path(s)");
         return Ok(());
     }
 

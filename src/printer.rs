@@ -15,9 +15,9 @@ use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
+use crate::notify_user;
 use crate::registry::RuleCode;
 use crate::settings::types::SerializationFormat;
-use crate::tell_user;
 
 /// Enum to control whether lint violations are shown to the user.
 pub enum Violations {
@@ -67,7 +67,7 @@ impl<'a> Printer<'a> {
 
     pub fn write_to_user(&self, message: &str) {
         if self.log_level >= &LogLevel::Default {
-            tell_user!("{}", message);
+            notify_user!("{}", message);
         }
     }
 
@@ -289,7 +289,7 @@ impl<'a> Printer<'a> {
         }
 
         if self.log_level >= &LogLevel::Default {
-            tell_user!(
+            notify_user!(
                 "Found {} error(s). Watching for file changes.",
                 diagnostics.messages.len()
             );

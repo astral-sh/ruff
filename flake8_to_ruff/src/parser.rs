@@ -1,10 +1,12 @@
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
+use colored::Colorize;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff::registry::{RuleCodePrefix, PREFIX_REDIRECTS};
 use ruff::settings::types::PatternPrefixPair;
+use ruff::warn_user;
 use rustc_hash::FxHashMap;
 
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
@@ -23,7 +25,7 @@ pub fn parse_prefix_codes(value: &str) -> Vec<RuleCodePrefix> {
         } else if let Ok(code) = RuleCodePrefix::from_str(code) {
             codes.push(code);
         } else {
-            eprintln!("Unsupported prefix code: {code}");
+            warn_user!("Unsupported prefix code: {code}");
         }
     }
     codes
@@ -101,7 +103,7 @@ impl State {
                     });
                 }
             } else {
-                eprintln!("Unsupported prefix code: {code}");
+                warn_user!("Unsupported prefix code: {code}");
             }
         }
         codes

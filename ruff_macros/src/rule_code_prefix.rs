@@ -212,11 +212,8 @@ fn generate_impls(
         if let Some(target) = PREFIX_REDIRECTS.get(prefix_str.as_str()) {
             quote! {
                 #prefix_ident::#prefix => {
-                    crate::one_time_warning!(
-                        "{}{} {}",
-                        "warning".yellow().bold(),
-                        ":".bold(),
-                        format!("`{}` has been remapped to `{}`", #prefix_str, #target).bold()
+                    crate::warn_user_once!(
+                        "`{}` has been remapped to `{}`", #prefix_str, #target
                     );
                     vec![#(#codes),*]
                 }

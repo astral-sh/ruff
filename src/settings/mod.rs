@@ -25,7 +25,7 @@ use crate::settings::types::{
 use crate::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, one_time_warning, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade, warn_user_once,
 };
 
 pub mod configuration;
@@ -429,12 +429,7 @@ fn resolve_codes<'a>(specs: impl Iterator<Item = RuleCodeSpec<'a>>) -> FxHashSet
 fn validate_enabled(enabled: FxHashSet<RuleCode>) -> FxHashSet<RuleCode> {
     for (a, b, message) in INCOMPATIBLE_CODES {
         if enabled.contains(a) && enabled.contains(b) {
-            one_time_warning!(
-                "{}{} {}",
-                "warning".yellow().bold(),
-                ":".bold(),
-                message.bold()
-            );
+            warn_user_once!("{}", message);
         }
     }
     enabled
