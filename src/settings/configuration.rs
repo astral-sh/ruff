@@ -28,6 +28,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct Configuration {
     pub allowed_confusables: Option<Vec<char>>,
+    pub builtins: Option<Vec<String>>,
     pub cache_dir: Option<PathBuf>,
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
@@ -80,6 +81,7 @@ impl Configuration {
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         Ok(Configuration {
             allowed_confusables: options.allowed_confusables,
+            builtins: options.builtins,
             cache_dir: options
                 .cache_dir
                 .map(|dir| {
@@ -177,6 +179,7 @@ impl Configuration {
     pub fn combine(self, config: Configuration) -> Self {
         Self {
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
+            builtins: self.builtins.or(config.builtins),
             cache_dir: self.cache_dir.or(config.cache_dir),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
             exclude: self.exclude.or(config.exclude),

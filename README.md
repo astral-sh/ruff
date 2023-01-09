@@ -1739,6 +1739,24 @@ allowed-confusables = ["−", "ρ", "∗"]
 
 ---
 
+#### [`builtins`](#builtins)
+
+A list of builtins to treat as defined references, in addition to the
+system builtins.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+builtins = ["_"]
+```
+
+---
+
 #### [`cache-dir`](#cache-dir)
 
 A path to the cache directory.

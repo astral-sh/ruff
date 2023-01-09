@@ -3291,7 +3291,12 @@ impl<'a> Checker<'a> {
     fn bind_builtins(&mut self) {
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
 
-        for builtin in BUILTINS.iter().chain(MAGIC_GLOBALS.iter()) {
+        for builtin in BUILTINS
+            .iter()
+            .chain(MAGIC_GLOBALS.iter())
+            .copied()
+            .chain(self.settings.builtins.iter().map(String::as_str))
+        {
             let index = self.bindings.len();
             self.bindings.push(Binding {
                 kind: BindingKind::Builtin,

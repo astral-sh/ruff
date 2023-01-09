@@ -99,6 +99,9 @@ pub fn convert(
         if let Some(value) = value {
             match key.as_str() {
                 // flake8
+                "builtins" => {
+                    options.builtins = Some(parser::parse_strings(value.as_ref()));
+                }
                 "max-line-length" | "max_line_length" => match value.clone().parse::<usize>() {
                     Ok(line_length) => options.line_length = Some(line_length),
                     Err(e) => eprintln!("Unable to parse '{key}' property: {e}"),
@@ -362,6 +365,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            builtins: None,
             cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
@@ -425,6 +429,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            builtins: None,
             cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
@@ -488,6 +493,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            builtins: None,
             cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
@@ -551,6 +557,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            builtins: None,
             cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
@@ -614,6 +621,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            builtins: None,
             cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
@@ -685,6 +693,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            builtins: None,
             cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
@@ -751,6 +760,7 @@ mod tests {
         )?;
         let expected = Pyproject::new(Options {
             allowed_confusables: None,
+            builtins: None,
             cache_dir: None,
             dummy_variable_rgx: None,
             exclude: None,
