@@ -26,7 +26,7 @@ static FIRST_HALF: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{(\d+)").unwrap());
 /// will never overflow because people will probably never have more than 2^32
 /// arguments to a format string. I am also ignoring the signed, I personally
 /// checked and negative numbers are not allowed in format strings
-fn convert_big_int(bigint: BigInt) -> Option<u32> {
+fn convert_big_int(bigint: &BigInt) -> Option<u32> {
     let (sign, digits) = bigint.to_u32_digits();
     match sign {
         Sign::Plus => digits.first().copied(),
@@ -35,7 +35,7 @@ fn convert_big_int(bigint: BigInt) -> Option<u32> {
     }
 }
 
-fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Result<Vec<Arg>, ()> {
+fn get_new_args<'a>(old_args: &[Arg<'a>], correct_order: &'a [u32]) -> Result<Vec<Arg<'a>>, ()> {
     let mut new_args: Vec<Arg> = Vec::new();
     for (i, given_idx) in correct_order.iter().enumerate() {
         // We need to keep the formatting in the same order but move the values
@@ -64,7 +64,7 @@ fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Result<Vec<Arg>,
 
 /// Returns the new call string, or returns an error if it cannot create a new
 /// call string
-fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Result<String, ()> {
+fn get_new_call(module_text: &str, correct_order: &[u32]) -> Result<String, ()> {
     let mut expression = match parse_expression(module_text) {
         Err(_) => return Err(()),
         Ok(item) => item,
@@ -73,7 +73,7 @@ fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Result<String, ()
         Err(_) => return Err(()),
         Ok(item) => item,
     };
-    call.args = match get_new_args(call.args.clone(), correct_order) {
+    call.args = match get_new_args(&call.args, correct_order) {
         Err(_) => return Err(()),
         Ok(item) => item,
     };
@@ -113,7 +113,7 @@ fn get_specifier_order(value_str: &str) -> Vec<u32> {
             prev_l_brace = true;
         } else if let Tok::Int { value } = tok {
             if prev_l_brace {
-                if let Some(int_val) = convert_big_int(value) {
+                if let Some(int_val) = convert_big_int(&value) {
                     specifier_ints.push(int_val);
                 }
             }
@@ -156,7 +156,7 @@ fn valid_specifiers(raw_specifiers: &str) -> bool {
         return false;
     }
     let mut specifiers = get_specifier_order(raw_specifiers);
-    specifiers.sort();
+    specifiers.sort_unstable();
     let mut current = 0;
     for item in specifiers {
         if item == current {
@@ -189,7 +189,7 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
             let call_text = checker.locator.slice_source_code_range(&call_range);
             let mut diagnostic =
                 Diagnostic::new(violations::FormatSpecifiers, Range::from_located(expr));
-            match get_new_call(&call_text, as_ints) {
+            match get_new_call(&call_text, &as_ints) {
                 // If we get any errors, we know that there is an issue that we cannot fix
                 // so we should just report that there is a formatting issue. Currently the
                 // only issue we know of is a ParseError from a multi line format statement
