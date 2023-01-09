@@ -1,4 +1,4 @@
-pub mod plugins;
+pub mod rules;
 pub mod settings;
 
 #[cfg(test)]

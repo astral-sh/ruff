@@ -1,5 +1,5 @@
-pub mod checks;
 pub mod helpers;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {

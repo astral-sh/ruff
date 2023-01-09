@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, Stmt};
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
 use crate::pyupgrade;
-use crate::pyupgrade::checks;
+use crate::pyupgrade::rules;
 
 /// UP008
 pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
@@ -18,7 +18,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
         .iter()
         .map(std::convert::Into::into)
         .collect();
-    let Some(mut diagnostic) = checks::super_args(scope, &parents, expr, func, args) else {
+    let Some(mut diagnostic) = rules::super_args(scope, &parents, expr, func, args) else {
         return;
     };
     if checker.patch(diagnostic.kind.code()) {

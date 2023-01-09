@@ -1,5 +1,5 @@
 mod helpers;
-pub mod plugins;
+pub mod rules;
 mod visitor;
 
 #[cfg(test)]
@@ -21,7 +21,7 @@ mod tests {
     #[test_case(RuleCode::RET506, Path::new("RET506.py"); "RET506")]
     #[test_case(RuleCode::RET507, Path::new("RET507.py"); "RET507")]
     #[test_case(RuleCode::RET508, Path::new("RET508.py"); "RET508")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_return")

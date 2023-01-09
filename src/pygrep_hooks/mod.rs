@@ -1,4 +1,4 @@
-pub mod plugins;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -18,7 +18,7 @@ mod tests {
     #[test_case(RuleCode::PGH002, Path::new("PGH002_1.py"); "PGH002_1")]
     #[test_case(RuleCode::PGH003, Path::new("PGH003_0.py"); "PGH003_0")]
     #[test_case(RuleCode::PGH004, Path::new("PGH004_0.py"); "PGH004_0")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pygrep-hooks")

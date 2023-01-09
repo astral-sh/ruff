@@ -1,4 +1,4 @@
-pub mod plugins;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -22,7 +22,7 @@ mod tests {
     #[test_case(RuleCode::YTT301, Path::new("YTT301.py"); "YTT301")]
     #[test_case(RuleCode::YTT302, Path::new("YTT302.py"); "YTT302")]
     #[test_case(RuleCode::YTT303, Path::new("YTT303.py"); "YTT303")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_2020")

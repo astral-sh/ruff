@@ -1,6 +1,6 @@
 //! Module for Ruff-specific rules.
 
-pub mod checks;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -14,7 +14,7 @@ mod tests {
     use crate::registry::RuleCode;
     use crate::settings;
     #[test_case(RuleCode::RUF004, Path::new("RUF004.py"); "RUF004")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff")

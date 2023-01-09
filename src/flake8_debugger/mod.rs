@@ -1,4 +1,4 @@
-pub mod checks;
+pub mod rules;
 pub mod types;
 
 #[cfg(test)]
@@ -14,7 +14,7 @@ mod tests {
     use crate::settings;
 
     #[test_case(RuleCode::T100, Path::new("T100.py"); "T100")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_debugger")

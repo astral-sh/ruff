@@ -1,22 +1,66 @@
 use itertools::izip;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Arguments, Location, StmtKind};
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Stmt, Unaryop};
+use rustpython_ast::{Arguments, Constant, Excepthandler, Location, Stmt, StmtKind, Unaryop};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::helpers;
 use crate::ast::helpers::{
-    create_expr, match_leading_content, match_trailing_content, unparse_expr,
+    create_expr, except_range, match_leading_content, match_trailing_content, unparse_expr,
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::settings::Settings;
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
 use crate::violations;
 
-pub fn compare(
+static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
+
+/// E501
+pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
+    let line_length = line.chars().count();
+
+    if line_length <= settings.line_length {
+        return None;
+    }
+
+    let mut chunks = line.split_whitespace();
+    let (Some(first), Some(second)) = (chunks.next(), chunks.next()) else {
+        // Single word / no printable chars - no way to make the line shorter
+        return None;
+    };
+
+    if first == "#" {
+        if settings.pycodestyle.ignore_overlong_task_comments {
+            let second = second.trim_end_matches(':');
+            if settings.task_tags.iter().any(|tag| tag == second) {
+                return None;
+            }
+        }
+
+        // Do not enforce the line length for commented lines that end with a URL
+        // or contain only a single word.
+        if chunks.last().map_or(true, |c| URL_REGEX.is_match(c)) {
+            return None;
+        }
+    }
+
+    Some(Diagnostic::new(
+        violations::LineTooLong(line_length, settings.line_length),
+        Range::new(
+            Location::new(lineno + 1, settings.line_length),
+            Location::new(lineno + 1, line_length),
+        ),
+    ))
+}
+
+fn compare(
     left: &Expr,
     ops: &[Cmpop],
     comparators: &[Expr],
@@ -273,6 +317,72 @@ pub fn not_tests(
     }
 }
 
+/// E721
+pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Diagnostic> {
+    let mut diagnostics: Vec<Diagnostic> = vec![];
+
+    for (op, right) in izip!(ops, comparators) {
+        if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
+            continue;
+        }
+        match &right.node {
+            ExprKind::Call { func, args, .. } => {
+                if let ExprKind::Name { id, .. } = &func.node {
+                    // Ex) type(False)
+                    if id == "type" {
+                        if let Some(arg) = args.first() {
+                            // Allow comparison for types which are not obvious.
+                            if !matches!(
+                                arg.node,
+                                ExprKind::Name { .. }
+                                    | ExprKind::Constant {
+                                        value: Constant::None,
+                                        kind: None
+                                    }
+                            ) {
+                                diagnostics
+                                    .push(Diagnostic::new(violations::TypeComparison, location));
+                            }
+                        }
+                    }
+                }
+            }
+            ExprKind::Attribute { value, .. } => {
+                if let ExprKind::Name { id, .. } = &value.node {
+                    // Ex) types.IntType
+                    if id == "types" {
+                        diagnostics.push(Diagnostic::new(violations::TypeComparison, location));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    diagnostics
+}
+
+/// E722
+pub fn do_not_use_bare_except(
+    type_: Option<&Expr>,
+    body: &[Stmt],
+    handler: &Excepthandler,
+    locator: &SourceCodeLocator,
+) -> Option<Diagnostic> {
+    if type_.is_none()
+        && !body
+            .iter()
+            .any(|stmt| matches!(stmt.node, StmtKind::Raise { exc: None, .. }))
+    {
+        Some(Diagnostic::new(
+            violations::DoNotUseBareExcept,
+            except_range(handler, locator),
+        ))
+    } else {
+        None
+    }
+}
+
 fn function(
     name: &str,
     args: &Arguments,
@@ -340,4 +450,154 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+fn is_ambiguous_name(name: &str) -> bool {
+    name == "l" || name == "I" || name == "O"
+}
+
+/// E741
+pub fn ambiguous_variable_name(name: &str, range: Range) -> Option<Diagnostic> {
+    if is_ambiguous_name(name) {
+        Some(Diagnostic::new(
+            violations::AmbiguousVariableName(name.to_string()),
+            range,
+        ))
+    } else {
+        None
+    }
+}
+
+/// E742
+pub fn ambiguous_class_name<F>(name: &str, locate: F) -> Option<Diagnostic>
+where
+    F: FnOnce() -> Range,
+{
+    if is_ambiguous_name(name) {
+        Some(Diagnostic::new(
+            violations::AmbiguousClassName(name.to_string()),
+            locate(),
+        ))
+    } else {
+        None
+    }
+}
+
+/// E743
+pub fn ambiguous_function_name<F>(name: &str, locate: F) -> Option<Diagnostic>
+where
+    F: FnOnce() -> Range,
+{
+    if is_ambiguous_name(name) {
+        Some(Diagnostic::new(
+            violations::AmbiguousFunctionName(name.to_string()),
+            locate(),
+        ))
+    } else {
+        None
+    }
+}
+
+/// W292
+pub fn no_newline_at_end_of_file(contents: &str, autofix: bool) -> Option<Diagnostic> {
+    if !contents.ends_with('\n') {
+        // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
+        // want to raise W292 anyway).
+        if let Some(line) = contents.lines().last() {
+            // Both locations are at the end of the file (and thus the same).
+            let location = Location::new(contents.lines().count(), line.len());
+            let mut diagnostic = Diagnostic::new(
+                violations::NoNewLineAtEndOfFile,
+                Range::new(location, location),
+            );
+            if autofix {
+                diagnostic.amend(Fix::insertion("\n".to_string(), location));
+            }
+            return Some(diagnostic);
+        }
+    }
+    None
+}
+
+// See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+const VALID_ESCAPE_SEQUENCES: &[char; 23] = &[
+    '\n', '\\', '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v', '0', '1', '2', '3', '4', '5', '6',
+    '7', 'x', // Escape sequences only recognized in string literals
+    'N', 'u', 'U',
+];
+
+/// Return the quotation markers used for a String token.
+fn extract_quote(text: &str) -> &str {
+    for quote in ["'''", "\"\"\"", "'", "\""] {
+        if text.ends_with(quote) {
+            return quote;
+        }
+    }
+
+    panic!("Unable to find quotation mark for String token")
+}
+
+/// W605
+pub fn invalid_escape_sequence(
+    locator: &SourceCodeLocator,
+    start: Location,
+    end: Location,
+    autofix: bool,
+) -> Vec<Diagnostic> {
+    let mut diagnostics = vec![];
+
+    let text = locator.slice_source_code_range(&Range::new(start, end));
+
+    // Determine whether the string is single- or triple-quoted.
+    let quote = extract_quote(&text);
+    let quote_pos = text.find(quote).unwrap();
+    let prefix = text[..quote_pos].to_lowercase();
+    let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];
+
+    if !prefix.contains('r') {
+        for (row_offset, line) in body.lines().enumerate() {
+            let chars: Vec<char> = line.chars().collect();
+            for col_offset in 0..chars.len() {
+                if chars[col_offset] != '\\' {
+                    continue;
+                }
+
+                // If the previous character was also a backslash, skip.
+                if col_offset > 0 && chars[col_offset - 1] == '\\' {
+                    continue;
+                }
+
+                // If we're at the end of the line, skip.
+                if col_offset == chars.len() - 1 {
+                    continue;
+                }
+
+                // If the next character is a valid escape sequence, skip.
+                let next_char = chars[col_offset + 1];
+                if VALID_ESCAPE_SEQUENCES.contains(&next_char) {
+                    continue;
+                }
+
+                // Compute the location of the escape sequence by offsetting the location of the
+                // string token by the characters we've seen thus far.
+                let col = if row_offset == 0 {
+                    start.column() + prefix.len() + quote.len() + col_offset
+                } else {
+                    col_offset
+                };
+                let location = Location::new(start.row() + row_offset, col);
+                let end_location = Location::new(location.row(), location.column() + 2);
+                let mut diagnostic = Diagnostic::new(
+                    violations::InvalidEscapeSequence(next_char),
+                    Range::new(location, end_location),
+                );
+                if autofix {
+                    diagnostic.amend(Fix::insertion(r"\".to_string(), location));
+                }
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    diagnostics
 }
