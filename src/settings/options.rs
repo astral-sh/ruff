@@ -31,6 +31,16 @@ pub struct Options {
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     pub allowed_confusables: Option<Vec<char>>,
     #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"
+            builtins = ["_"]
+        "#
+    )]
+    /// A list of builtins to treat as defined references, in addition to the
+    /// system builtins.
+    pub builtins: Option<Vec<String>>,
+    #[option(
         default = ".ruff_cache",
         value_type = "PathBuf",
         example = r#"cache-dir = "~/.cache/ruff""#

@@ -40,6 +40,7 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub allowed_confusables: FxHashSet<char>,
+    pub builtins: Vec<String>,
     pub cache_dir: PathBuf,
     pub dummy_variable_rgx: Regex,
     pub enabled: FxHashSet<RuleCode>,
@@ -113,6 +114,7 @@ impl Settings {
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
                 .unwrap_or_default(),
+            builtins: config.builtins.unwrap_or_default(),
             cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
@@ -216,6 +218,7 @@ impl Settings {
     pub fn for_rule(rule_code: RuleCode) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
+            builtins: vec![],
             cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([rule_code.clone()]),
@@ -258,6 +261,7 @@ impl Settings {
     pub fn for_rules(rule_codes: Vec<RuleCode>) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
+            builtins: vec![],
             cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(rule_codes.clone()),

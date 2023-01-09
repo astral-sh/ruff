@@ -164,6 +164,7 @@ mod tests {
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     cache_dir: None,
                     dummy_variable_rgx: None,
                     exclude: None,
@@ -221,6 +222,7 @@ line-length = 79
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend: None,
@@ -278,6 +280,7 @@ exclude = ["foo.py"]
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     cache_dir: None,
                     dummy_variable_rgx: None,
                     exclude: Some(vec!["foo.py".to_string()]),
@@ -335,6 +338,7 @@ select = ["E501"]
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     cache_dir: None,
                     dummy_variable_rgx: None,
                     exclude: None,
@@ -393,6 +397,7 @@ ignore = ["E501"]
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     cache_dir: None,
                     dummy_variable_rgx: None,
                     exclude: None,
@@ -485,6 +490,7 @@ other-attribute = 1
             config,
             Options {
                 allowed_confusables: Some(vec!['−', 'ρ', '∗']),
+                builtins: None,
                 line_length: Some(88),
                 fix: None,
                 fix_only: None,
