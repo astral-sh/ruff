@@ -13,8 +13,6 @@ use crate::cst::matchers::{match_call, match_expression};
 use crate::registry::Diagnostic;
 use crate::violations;
 
-// The regex documentation says to do this because creating regexs is expensive:
-// https://docs.rs/regex/latest/regex/#example-avoid-compiling-the-same-regex-in-a-loop
 static FORMAT_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)\}").unwrap());
 
@@ -31,12 +29,18 @@ fn convert_big_int(bigint: BigInt) -> Option<u32> {
     }
 }
 
-fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Vec<Arg> {
+fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Result<Vec<Arg>, ()> {
     let mut new_args: Vec<Arg> = Vec::new();
     for (i, given_idx) in correct_order.iter().enumerate() {
         // We need to keep the formatting in the same order but move the values
-        let values = old_args.get(given_idx.to_owned() as usize).unwrap();
-        let formatting = old_args.get(i).unwrap();
+        let values = match old_args.get(given_idx.to_owned() as usize) {
+            None => return Err(()),
+            Some(item) => item
+        };
+        let formatting = match old_args.get(i) {
+            None => return Err(()),
+            Some(item) => item
+        };
         let new_arg = Arg {
             value: values.value.clone(),
             comma: formatting.comma.clone(),
@@ -49,7 +53,7 @@ fn get_new_args(old_args: Vec<Arg>, correct_order: Vec<u32>) -> Vec<Arg> {
         };
         new_args.push(new_arg);
     }
-    new_args
+    Ok(new_args)
 }
 
 /// Returns the new call string, or returns an error if it cannot create a new call string
@@ -62,7 +66,10 @@ fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Result<String, ()
         Err(_) => return Err(()),
         Ok(item) => item,
     };
-    call.args = get_new_args(call.args.clone(), correct_order);
+    call.args = match get_new_args(call.args.clone(), correct_order) {
+        Err(_) => return Err(()),
+        Ok(item) => item,
+    };
     // Create the new function
     if let Expression::Attribute(item) = &*call.func {
         // Converting the struct to a struct and then back is not very efficient, but
@@ -121,6 +128,24 @@ fn has_specifiers(raw_specifiers: &str) -> bool {
     FORMAT_SPECIFIER.is_match(raw_specifiers)
 }
 
+/// Checks if the string has specifiers and that they are in the correct order
+fn valid_specifiers(raw_specifiers: &str) -> bool {
+    if !has_specifiers(raw_specifiers) {
+        return false;
+    }
+    let mut specifiers = get_specifier_order(raw_specifiers);
+    specifiers.sort();
+    let mut current = 0;
+    for item in specifiers {
+        if item == current {
+            current += 1;
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
 /// UP030
 pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
@@ -134,7 +159,7 @@ pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
                     return;
                 }
                 // The squigly brackets must have format specifiers inside of them
-                if !has_specifiers(provided_string) {
+                if !valid_specifiers(provided_string) {
                     return;
                 }
                 let as_ints = get_specifier_order(provided_string);
