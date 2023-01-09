@@ -1,6 +1,6 @@
 ---
 source: src/flake8_pytest_style/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     IncorrectFixtureNameUnderscore: _my_fixture
@@ -10,7 +10,14 @@ expression: checks
   end_location:
     row: 42
     column: 12
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 41
+      column: 4
+    end_location:
+      row: 41
+      column: 5
   parent: ~
 - kind:
     IncorrectFixtureNameUnderscore: _activate_context
@@ -20,7 +27,14 @@ expression: checks
   end_location:
     row: 48
     column: 21
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 46
+      column: 4
+    end_location:
+      row: 46
+      column: 5
   parent: ~
 - kind:
     IncorrectFixtureNameUnderscore: _activate_context
@@ -30,6 +44,13 @@ expression: checks
   end_location:
     row: 57
     column: 34
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 52
+      column: 4
+    end_location:
+      row: 52
+      column: 5
   parent: ~
 

@@ -916,8 +916,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT001 | IncorrectFixtureParenthesesStyle | Use `@pytest.fixture()` over `@pytest.fixture` | 🛠 |
 | PT002 | FixturePositionalArgs | Configuration for fixture `...` specified via positional args, use kwargs |  |
 | PT003 | ExtraneousScopeFunction | `scope='function'` is implied in `@pytest.fixture()` |  |
-| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore |  |
-| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
+| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore | 🛠 |
+| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore | 🛠 |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
 | PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
@@ -935,8 +935,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
 | PT022 | UselessYieldFixture | No teardown in fixture `...`, use `return` instead of `yield` | 🛠 |
 | PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark....` over `@pytest.mark....()` | 🛠 |
-| PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures |  |
-| PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures |  |
+| PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures | 🛠 |
+| PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures | 🛠 |
 | PT026 | UseFixturesWithoutParameters | Useless `pytest.mark.usefixtures` without parameters | 🛠 |
 
 ### flake8-quotes (Q)

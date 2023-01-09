@@ -1,6 +1,6 @@
 ---
 source: src/flake8_pytest_style/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     UnnecessaryAsyncioMarkOnFixture: ~
@@ -10,7 +10,14 @@ expression: checks
   end_location:
     row: 14
     column: 22
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 15
+      column: 0
   parent: ~
 - kind:
     UnnecessaryAsyncioMarkOnFixture: ~
@@ -20,7 +27,14 @@ expression: checks
   end_location:
     row: 20
     column: 20
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 21
+      column: 0
   parent: ~
 - kind:
     UnnecessaryAsyncioMarkOnFixture: ~
@@ -30,7 +44,14 @@ expression: checks
   end_location:
     row: 27
     column: 22
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 28
+      column: 0
   parent: ~
 - kind:
     UnnecessaryAsyncioMarkOnFixture: ~
@@ -40,6 +61,13 @@ expression: checks
   end_location:
     row: 33
     column: 20
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 33
+      column: 0
+    end_location:
+      row: 34
+      column: 0
   parent: ~
 
