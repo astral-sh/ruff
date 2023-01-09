@@ -18,7 +18,7 @@ f"{0}".format(1)
 print(f"{0}".format(1))
 
 # I did not include the following tests because ruff does not seem to work with
-# invlaid python syntax (which is a good thing)
+# invalid python syntax (which is a good thing)
 
 # "{0}"format(1)
 # '{'.format(1)", "'}'.format(1)

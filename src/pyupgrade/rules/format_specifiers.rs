@@ -166,7 +166,8 @@ fn valid_specifiers(raw_specifiers: &str) -> bool {
 pub fn format_specifiers(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
         if let ExprKind::Constant {
-            value: Constant::Str(provided_string), ..
+            value: Constant::Str(provided_string),
+            ..
         } = &value.node
         {
             // The function must be a format function
