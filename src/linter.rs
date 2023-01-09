@@ -84,10 +84,11 @@ pub(crate) fn check_path(
         .enabled
         .iter()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::AST));
-    let use_imports = settings
-        .enabled
-        .iter()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
+    let use_imports = !directives.isort.skip_file
+        && settings
+            .enabled
+            .iter()
+            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
@@ -105,6 +106,7 @@ pub(crate) fn check_path(
                 }
                 if use_imports {
                     diagnostics.extend(check_imports(
+                        contents,
                         &python_ast,
                         locator,
                         &directives.isort,

@@ -33,6 +33,7 @@ impl Flags {
 pub struct IsortDirectives {
     pub exclusions: IntSet<usize>,
     pub splits: Vec<usize>,
+    pub skip_file: bool,
 }
 
 pub struct Directives {
@@ -130,14 +131,7 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
         }
     }
 
-    if skip_file {
-        // Enforce `isort: skip_file`.
-        if let Some(end) = last {
-            for row in 1..=end.row() {
-                exclusions.insert(row);
-            }
-        }
-    } else if let Some(start) = off {
+    if let Some(start) = off {
         // Enforce unterminated `isort: off`.
         if let Some(end) = last {
             for row in start.row() + 1..=end.row() {
@@ -145,7 +139,11 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
             }
         }
     }
-    IsortDirectives { exclusions, splits }
+    IsortDirectives {
+        exclusions,
+        splits,
+        skip_file,
+    }
 }
 
 #[cfg(test)]
