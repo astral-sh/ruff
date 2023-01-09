@@ -5,8 +5,9 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::violations;
 
 fn attribute(value: &Expr, attr: &str) -> Expr {
     Expr::new(
@@ -44,15 +45,16 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         return;
     }
 
-    let mut check = Check::new(CheckKind::GetAttrWithConstant, Range::from_located(expr));
-    if checker.patch(check.kind.code()) {
+    let mut diagnostic =
+        Diagnostic::new(violations::GetAttrWithConstant, Range::from_located(expr));
+    if checker.patch(diagnostic.kind.code()) {
         let mut generator: SourceCodeGenerator = checker.style.into();
         generator.unparse_expr(&attribute(obj, value), 0);
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             generator.generate(),
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

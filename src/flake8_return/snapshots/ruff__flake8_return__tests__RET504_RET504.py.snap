@@ -2,7 +2,8 @@
 source: src/flake8_return/mod.rs
 expression: checks
 ---
-- kind: UnnecessaryAssign
+- kind:
+    UnnecessaryAssign: ~
   location:
     row: 6
     column: 11
@@ -11,7 +12,8 @@ expression: checks
     column: 12
   fix: ~
   parent: ~
-- kind: UnnecessaryAssign
+- kind:
+    UnnecessaryAssign: ~
   location:
     row: 13
     column: 11
@@ -20,7 +22,8 @@ expression: checks
     column: 12
   fix: ~
   parent: ~
-- kind: UnnecessaryAssign
+- kind:
+    UnnecessaryAssign: ~
   location:
     row: 19
     column: 15
@@ -29,7 +32,8 @@ expression: checks
     column: 16
   fix: ~
   parent: ~
-- kind: UnnecessaryAssign
+- kind:
+    UnnecessaryAssign: ~
   location:
     row: 31
     column: 11
@@ -38,7 +42,8 @@ expression: checks
     column: 17
   fix: ~
   parent: ~
-- kind: UnnecessaryAssign
+- kind:
+    UnnecessaryAssign: ~
   location:
     row: 39
     column: 11

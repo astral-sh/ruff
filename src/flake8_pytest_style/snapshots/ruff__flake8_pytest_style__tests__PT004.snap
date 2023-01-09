@@ -1,6 +1,6 @@
 ---
 source: src/flake8_pytest_style/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     MissingFixtureNameUnderscore: patch_something
@@ -10,7 +10,14 @@ expression: checks
   end_location:
     row: 52
     column: 30
-  fix: ~
+  fix:
+    content: _
+    location:
+      row: 51
+      column: 4
+    end_location:
+      row: 51
+      column: 4
   parent: ~
 - kind:
     MissingFixtureNameUnderscore: activate_context
@@ -20,6 +27,13 @@ expression: checks
   end_location:
     row: 58
     column: 13
-  fix: ~
+  fix:
+    content: _
+    location:
+      row: 56
+      column: 4
+    end_location:
+      row: 56
+      column: 4
   parent: ~
 

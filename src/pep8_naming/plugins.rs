@@ -3,8 +3,7 @@ use rustpython_ast::{Expr, Stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::pep8_naming::helpers;
-use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Diagnostic};
 
 /// N806
 pub fn non_lowercase_variable_in_function(
@@ -16,8 +15,8 @@ pub fn non_lowercase_variable_in_function(
     if name.to_lowercase() != name
         && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
     {
-        checker.add_check(Check::new(
-            CheckKind::NonLowercaseVariableInFunction(name.to_string()),
+        checker.diagnostics.push(Diagnostic::new(
+            violations::NonLowercaseVariableInFunction(name.to_string()),
             Range::from_located(expr),
         ));
     }
@@ -33,8 +32,8 @@ pub fn mixed_case_variable_in_class_scope(
     if helpers::is_mixed_case(name)
         && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
     {
-        checker.add_check(Check::new(
-            CheckKind::MixedCaseVariableInClassScope(name.to_string()),
+        checker.diagnostics.push(Diagnostic::new(
+            violations::MixedCaseVariableInClassScope(name.to_string()),
             Range::from_located(expr),
         ));
     }
@@ -50,8 +49,8 @@ pub fn mixed_case_variable_in_global_scope(
     if helpers::is_mixed_case(name)
         && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
     {
-        checker.add_check(Check::new(
-            CheckKind::MixedCaseVariableInGlobalScope(name.to_string()),
+        checker.diagnostics.push(Diagnostic::new(
+            violations::MixedCaseVariableInGlobalScope(name.to_string()),
             Range::from_located(expr),
         ));
     }

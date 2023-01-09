@@ -15,7 +15,7 @@ use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
-use crate::registry::CheckCode;
+use crate::registry::RuleCode;
 use crate::settings::types::SerializationFormat;
 use crate::tell_user;
 
@@ -35,7 +35,7 @@ struct ExpandedFix<'a> {
 
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {
-    code: &'a CheckCode,
+    code: &'a RuleCode,
     message: String,
     fix: Option<ExpandedFix<'a>>,
     location: Location,
@@ -223,19 +223,30 @@ impl<'a> Printer<'a> {
                 self.post_text(diagnostics);
             }
             SerializationFormat::Github => {
-                // Generate error workflow command in GitHub Actions format
-                // https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
+                // Generate error workflow command in GitHub Actions format.
+                // See: https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
                 diagnostics.messages.iter().for_each(|message| {
+                    let label = format!(
+                        "{}{}{}{}{}{} {} {}",
+                        relativize_path(Path::new(&message.filename)),
+                        ":",
+                        message.location.row(),
+                        ":",
+                        message.location.column(),
+                        ":",
+                        message.kind.code().as_ref(),
+                        message.kind.body(),
+                    );
                     println!(
-                        "::notice title=Ruff,file={},line={},col={},endLine={},endColumn={}::({}) \
-                         {}",
+                        "::error title=Ruff \
+                         ({}),file={},line={},col={},endLine={},endColumn={}::{}",
+                        message.kind.code(),
                         relativize_path(Path::new(&message.filename)),
                         message.location.row(),
                         message.location.column(),
                         message.end_location.row(),
                         message.end_location.column(),
-                        message.kind.code(),
-                        message.kind.body(),
+                        label,
                     );
                 });
             }

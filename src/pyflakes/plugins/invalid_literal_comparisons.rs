@@ -7,7 +7,8 @@ use crate::ast::operations::locate_cmpops;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// F632
 pub fn invalid_literal_comparison(
@@ -24,8 +25,8 @@ pub fn invalid_literal_comparison(
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right))
         {
-            let mut check = Check::new(CheckKind::IsLiteral(op.into()), location);
-            if checker.patch(check.kind.code()) {
+            let mut diagnostic = Diagnostic::new(violations::IsLiteral(op.into()), location);
+            if checker.patch(diagnostic.kind.code()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(&located_op.node, op);
                     if let Some(content) = match &located_op.node {
@@ -36,7 +37,7 @@ pub fn invalid_literal_comparison(
                             None
                         }
                     } {
-                        check.amend(Fix::replacement(
+                        diagnostic.amend(Fix::replacement(
                             content,
                             helpers::to_absolute(located_op.location, location.location),
                             helpers::to_absolute(
@@ -49,7 +50,7 @@ pub fn invalid_literal_comparison(
                     eprintln!("Failed to fix invalid comparison due to missing op");
                 }
             }
-            checker.add_check(check);
+            checker.diagnostics.push(diagnostic);
         }
         left = right;
     }

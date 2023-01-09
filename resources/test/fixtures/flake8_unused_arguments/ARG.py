@@ -77,6 +77,34 @@ class C:
     def f(x):
         ...
 
+    def f(self, x):
+        """Docstring."""
+
+    def f(self, x):
+        """Docstring."""
+        ...
+
+    def f(self, x):
+        pass
+
+    def f(self, x):
+        raise NotImplementedError
+
+    def f(self, x):
+        raise NotImplementedError()
+
+    def f(self, x):
+        raise NotImplementedError("...")
+
+    def f(self, x):
+        raise NotImplemented
+
+    def f(self, x):
+        raise NotImplemented()
+
+    def f(self, x):
+        raise NotImplemented("...")
+
     ###
     # Unused functions attached to abstract methods (OK).
     ###

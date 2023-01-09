@@ -6,7 +6,8 @@ use crate::ast::types::Range;
 use crate::autofix::helpers::delete_stmt;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
+use crate::violations;
 
 /// PIE790
 pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
@@ -26,19 +27,21 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             }
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
-                let mut check =
-                    Check::new(CheckKind::NoUnnecessaryPass, Range::from_located(pass_stmt));
-                if checker.patch(&CheckCode::PIE790) {
+                let mut diagnostic = Diagnostic::new(
+                    violations::NoUnnecessaryPass,
+                    Range::from_located(pass_stmt),
+                );
+                if checker.patch(&RuleCode::PIE790) {
                     match delete_stmt(pass_stmt, None, &[], checker.locator) {
                         Ok(fix) => {
-                            check.amend(fix);
+                            diagnostic.amend(fix);
                         }
                         Err(e) => {
                             error!("Failed to delete `pass` statement: {}", e);
                         }
                     }
                 }
-                checker.add_check(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -75,14 +78,14 @@ pub fn dupe_class_field_definitions(checker: &mut Checker, bases: &[Expr], body:
         };
 
         if seen_targets.contains(target) {
-            let mut check = Check::new(
-                CheckKind::DupeClassFieldDefinitions(target.to_string()),
+            let mut diagnostic = Diagnostic::new(
+                violations::DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(&CheckCode::PIE794) {
-                check.amend(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
+            if checker.patch(&RuleCode::PIE794) {
+                diagnostic.amend(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
             }
-            checker.add_check(check);
+            checker.diagnostics.push(diagnostic);
         } else {
             seen_targets.insert(target);
         }
@@ -97,15 +100,16 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     if args.args.is_empty() {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
-                let mut check = Check::new(CheckKind::PreferListBuiltin, Range::from_located(expr));
-                if checker.patch(&CheckCode::PIE807) {
-                    check.amend(Fix::replacement(
+                let mut diagnostic =
+                    Diagnostic::new(violations::PreferListBuiltin, Range::from_located(expr));
+                if checker.patch(&RuleCode::PIE807) {
+                    diagnostic.amend(Fix::replacement(
                         "list".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
                     ));
                 }
-                checker.add_check(check);
+                checker.diagnostics.push(diagnostic);
             }
         }
     }

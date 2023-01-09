@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: ReplaceStdoutStderr
+- kind:
+    ReplaceStdoutStderr: ~
   location:
     row: 4
     column: 9
@@ -18,7 +19,8 @@ expression: checks
       row: 4
       column: 68
   parent: ~
-- kind: ReplaceStdoutStderr
+- kind:
+    ReplaceStdoutStderr: ~
   location:
     row: 6
     column: 9
@@ -34,7 +36,8 @@ expression: checks
       row: 6
       column: 79
   parent: ~
-- kind: ReplaceStdoutStderr
+- kind:
+    ReplaceStdoutStderr: ~
   location:
     row: 8
     column: 9
@@ -50,7 +53,8 @@ expression: checks
       row: 8
       column: 85
   parent: ~
-- kind: ReplaceStdoutStderr
+- kind:
+    ReplaceStdoutStderr: ~
   location:
     row: 10
     column: 9
@@ -66,7 +70,8 @@ expression: checks
       row: 11
       column: 71
   parent: ~
-- kind: ReplaceStdoutStderr
+- kind:
+    ReplaceStdoutStderr: ~
   location:
     row: 14
     column: 9
@@ -82,7 +87,8 @@ expression: checks
       row: 15
       column: 71
   parent: ~
-- kind: ReplaceStdoutStderr
+- kind:
+    ReplaceStdoutStderr: ~
   location:
     row: 18
     column: 9
@@ -98,7 +104,8 @@ expression: checks
       row: 22
       column: 26
   parent: ~
-- kind: ReplaceStdoutStderr
+- kind:
+    ReplaceStdoutStderr: ~
   location:
     row: 29
     column: 13

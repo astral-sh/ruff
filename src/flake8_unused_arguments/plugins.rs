@@ -10,7 +10,7 @@ use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeK
 use crate::checkers::ast::Checker;
 use crate::flake8_unused_arguments::helpers;
 use crate::flake8_unused_arguments::types::Argumentable;
-use crate::{visibility, Check};
+use crate::{visibility, Diagnostic};
 
 /// Check a plain function for unused arguments.
 fn function(
@@ -20,8 +20,8 @@ fn function(
     bindings: &[Binding],
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
-) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
+) -> Vec<Diagnostic> {
+    let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args
         .posonlyargs
         .iter()
@@ -46,14 +46,14 @@ fn function(
                 && matches!(binding.kind, BindingKind::Argument)
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
-                checks.push(Check::new(
+                diagnostics.push(Diagnostic::new(
                     argumentable.check_for(arg.node.arg.to_string()),
                     binding.range,
                 ));
             }
         }
     }
-    checks
+    diagnostics
 }
 
 /// Check a method for unused arguments.
@@ -64,8 +64,8 @@ fn method(
     bindings: &[Binding],
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
-) -> Vec<Check> {
-    let mut checks: Vec<Check> = vec![];
+) -> Vec<Diagnostic> {
+    let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args
         .posonlyargs
         .iter()
@@ -91,14 +91,14 @@ fn method(
                 && matches!(binding.kind, BindingKind::Argument)
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
-                checks.push(Check::new(
+                diagnostics.push(Diagnostic::new(
                     argumentable.check_for(arg.node.arg.to_string()),
                     binding.range,
                 ));
             }
         }
     }
-    checks
+    diagnostics
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
@@ -107,7 +107,7 @@ pub fn unused_arguments(
     parent: &Scope,
     scope: &Scope,
     bindings: &[Binding],
-) -> Vec<Check> {
+) -> Vec<Diagnostic> {
     match &scope.kind {
         ScopeKind::Function(FunctionDef {
             name,
@@ -129,7 +129,7 @@ pub fn unused_arguments(
                     if checker
                         .settings
                         .enabled
-                        .contains(Argumentable::Function.check_code())
+                        .contains(Argumentable::Function.rule_code())
                         && !visibility::is_overload(checker, decorator_list)
                     {
                         function(
@@ -151,7 +151,7 @@ pub fn unused_arguments(
                     if checker
                         .settings
                         .enabled
-                        .contains(Argumentable::Method.check_code())
+                        .contains(Argumentable::Method.rule_code())
                         && !helpers::is_empty(body)
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
@@ -176,7 +176,7 @@ pub fn unused_arguments(
                     if checker
                         .settings
                         .enabled
-                        .contains(Argumentable::ClassMethod.check_code())
+                        .contains(Argumentable::ClassMethod.rule_code())
                         && !helpers::is_empty(body)
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
@@ -201,7 +201,7 @@ pub fn unused_arguments(
                     if checker
                         .settings
                         .enabled
-                        .contains(Argumentable::StaticMethod.check_code())
+                        .contains(Argumentable::StaticMethod.rule_code())
                         && !helpers::is_empty(body)
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
@@ -228,7 +228,7 @@ pub fn unused_arguments(
             if checker
                 .settings
                 .enabled
-                .contains(Argumentable::Lambda.check_code())
+                .contains(Argumentable::Lambda.rule_code())
             {
                 function(
                     &Argumentable::Lambda,

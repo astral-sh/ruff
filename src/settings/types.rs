@@ -1,4 +1,3 @@
-use std::env;
 use std::hash::Hash;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -12,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::fs;
-use crate::registry::{CheckCode, CheckCodePrefix};
+use crate::registry::{RuleCode, RuleCodePrefix};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
@@ -95,12 +94,12 @@ impl FromStr for FilePattern {
 pub struct PerFileIgnore {
     pub basename: String,
     pub absolute: PathBuf,
-    pub codes: FxHashSet<CheckCode>,
+    pub codes: FxHashSet<RuleCode>,
 }
 
 impl PerFileIgnore {
-    pub fn new(basename: String, absolute: PathBuf, prefixes: &[CheckCodePrefix]) -> Self {
-        let codes = prefixes.iter().flat_map(CheckCodePrefix::codes).collect();
+    pub fn new(basename: String, absolute: PathBuf, prefixes: &[RuleCodePrefix]) -> Self {
+        let codes = prefixes.iter().flat_map(RuleCodePrefix::codes).collect();
         Self {
             basename,
             absolute,
@@ -112,11 +111,11 @@ impl PerFileIgnore {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PatternPrefixPair {
     pub pattern: String,
-    pub prefix: CheckCodePrefix,
+    pub prefix: RuleCodePrefix,
 }
 
 impl PatternPrefixPair {
-    const EXPECTED_PATTERN: &'static str = "<FilePattern>:<CheckCode> pattern";
+    const EXPECTED_PATTERN: &'static str = "<FilePattern>:<RuleCode> pattern";
 }
 
 impl<'de> Deserialize<'de> for PatternPrefixPair {
@@ -146,7 +145,7 @@ impl FromStr for PatternPrefixPair {
             (tokens[0].trim(), tokens[1].trim())
         };
         let pattern = pattern_str.into();
-        let prefix = CheckCodePrefix::from_str(code_string)?;
+        let prefix = RuleCodePrefix::from_str(code_string)?;
         Ok(Self { pattern, prefix })
     }
 }
@@ -164,17 +163,6 @@ pub enum SerializationFormat {
 
 impl Default for SerializationFormat {
     fn default() -> Self {
-        if let Ok(github_actions) = env::var("GITHUB_ACTIONS") {
-            if github_actions == "true" {
-                return Self::Github;
-            }
-        }
-
-        if let Ok(gitlab_ci) = env::var("GITLAB_CI") {
-            if gitlab_ci == "true" {
-                return Self::Gitlab;
-            }
-        }
         Self::Text
     }
 }

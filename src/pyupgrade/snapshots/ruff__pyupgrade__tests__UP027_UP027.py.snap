@@ -2,7 +2,8 @@
 source: src/pyupgrade/mod.rs
 expression: checks
 ---
-- kind: RewriteListComprehension
+- kind:
+    RewriteListComprehension: ~
   location:
     row: 2
     column: 16
@@ -18,7 +19,8 @@ expression: checks
       row: 2
       column: 38
   parent: ~
-- kind: RewriteListComprehension
+- kind:
+    RewriteListComprehension: ~
   location:
     row: 4
     column: 15
@@ -34,7 +36,8 @@ expression: checks
       row: 4
       column: 37
   parent: ~
-- kind: RewriteListComprehension
+- kind:
+    RewriteListComprehension: ~
   location:
     row: 6
     column: 25
@@ -50,7 +53,8 @@ expression: checks
       row: 6
       column: 47
   parent: ~
-- kind: RewriteListComprehension
+- kind:
+    RewriteListComprehension: ~
   location:
     row: 8
     column: 16
@@ -66,7 +70,8 @@ expression: checks
       row: 8
       column: 51
   parent: ~
-- kind: RewriteListComprehension
+- kind:
+    RewriteListComprehension: ~
   location:
     row: 10
     column: 16

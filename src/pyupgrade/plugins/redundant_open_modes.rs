@@ -10,8 +10,9 @@ use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
@@ -78,14 +79,14 @@ fn create_check(
     replacement_value: Option<String>,
     locator: &SourceCodeLocator,
     patch: bool,
-) -> Check {
-    let mut check = Check::new(
-        CheckKind::RedundantOpenModes(replacement_value.clone()),
+) -> Diagnostic {
+    let mut diagnostic = Diagnostic::new(
+        violations::RedundantOpenModes(replacement_value.clone()),
         Range::from_located(expr),
     );
     if patch {
         if let Some(content) = replacement_value {
-            check.amend(Fix::replacement(
+            diagnostic.amend(Fix::replacement(
                 content,
                 mode_param.location,
                 mode_param.end_location.unwrap(),
@@ -93,13 +94,13 @@ fn create_check(
         } else {
             match create_remove_param_fix(locator, expr, mode_param) {
                 Ok(fix) => {
-                    check.amend(fix);
+                    diagnostic.amend(fix);
                 }
                 Err(e) => error!("Failed to remove parameter: {e}"),
             }
         }
     }
-    check
+    diagnostic
 }
 
 fn create_remove_param_fix(
@@ -162,12 +163,12 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
             } = &keyword.node.value.node
             {
                 if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                    checker.add_check(create_check(
+                    checker.diagnostics.push(create_check(
                         expr,
                         &keyword.node.value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&CheckCode::UP015),
+                        checker.patch(&RuleCode::UP015),
                     ));
                 }
             }
@@ -179,12 +180,12 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
         } = &mode_param.node
         {
             if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                checker.add_check(create_check(
+                checker.diagnostics.push(create_check(
                     expr,
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&CheckCode::UP015),
+                    checker.patch(&RuleCode::UP015),
                 ));
             }
         }

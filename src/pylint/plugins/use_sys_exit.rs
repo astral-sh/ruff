@@ -3,7 +3,8 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::types::{BindingKind, Range};
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// Return `true` if the `module` was imported using a star import (e.g., `from
 /// sys import *`).
@@ -74,19 +75,19 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
         if !checker.is_builtin(name) {
             continue;
         }
-        let mut check = Check::new(
-            CheckKind::UseSysExit(name.to_string()),
+        let mut diagnostic = Diagnostic::new(
+            violations::UseSysExit(name.to_string()),
             Range::from_located(func),
         );
-        if checker.patch(check.kind.code()) {
+        if checker.patch(diagnostic.kind.code()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
-                check.amend(Fix::replacement(
+                diagnostic.amend(Fix::replacement(
                     content,
                     func.location,
                     func.end_location.unwrap(),
                 ));
             }
         }
-        checker.add_check(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

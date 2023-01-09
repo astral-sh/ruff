@@ -2,7 +2,8 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::flake8_bandit::helpers::{matches_password_name, string_literal};
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 fn is_password_target(target: &Expr) -> bool {
     let target_name = match &target.node {
@@ -25,7 +26,7 @@ fn is_password_target(target: &Expr) -> bool {
 }
 
 /// S105
-pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -> Vec<Check> {
+pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -> Vec<Diagnostic> {
     comparators
         .iter()
         .filter_map(|comp| {
@@ -33,8 +34,8 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
             if !is_password_target(left) {
                 return None;
             }
-            Some(Check::new(
-                CheckKind::HardcodedPasswordString(string.to_string()),
+            Some(Diagnostic::new(
+                violations::HardcodedPasswordString(string.to_string()),
                 Range::from_located(comp),
             ))
         })
@@ -42,12 +43,12 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
 }
 
 /// S105
-pub fn assign_hardcoded_password_string(value: &Expr, targets: &[Expr]) -> Option<Check> {
+pub fn assign_hardcoded_password_string(value: &Expr, targets: &[Expr]) -> Option<Diagnostic> {
     if let Some(string) = string_literal(value) {
         for target in targets {
             if is_password_target(target) {
-                return Some(Check::new(
-                    CheckKind::HardcodedPasswordString(string.to_string()),
+                return Some(Diagnostic::new(
+                    violations::HardcodedPasswordString(string.to_string()),
                     Range::from_located(value),
                 ));
             }

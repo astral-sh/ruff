@@ -10,22 +10,22 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::RuleCode;
     use crate::{flake8_import_conventions, Settings};
 
     #[test]
     fn defaults() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
-            &Settings::for_rule(CheckCode::ICN001),
+            &Settings::for_rule(RuleCode::ICN001),
         )?;
-        insta::assert_yaml_snapshot!("defaults", checks);
+        insta::assert_yaml_snapshot!("defaults", diagnostics);
         Ok(())
     }
 
     #[test]
     fn custom() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/custom.py"),
             &Settings {
                 flake8_import_conventions: flake8_import_conventions::settings::Options {
@@ -36,16 +36,16 @@ mod tests {
                     ])),
                 }
                 .into(),
-                ..Settings::for_rule(CheckCode::ICN001)
+                ..Settings::for_rule(RuleCode::ICN001)
             },
         )?;
-        insta::assert_yaml_snapshot!("custom", checks);
+        insta::assert_yaml_snapshot!("custom", diagnostics);
         Ok(())
     }
 
     #[test]
     fn remove_defaults() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/remove_default.py"),
             &Settings {
                 flake8_import_conventions: flake8_import_conventions::settings::Options {
@@ -58,16 +58,16 @@ mod tests {
                     extend_aliases: None,
                 }
                 .into(),
-                ..Settings::for_rule(CheckCode::ICN001)
+                ..Settings::for_rule(RuleCode::ICN001)
             },
         )?;
-        insta::assert_yaml_snapshot!("remove_default", checks);
+        insta::assert_yaml_snapshot!("remove_default", diagnostics);
         Ok(())
     }
 
     #[test]
     fn override_defaults() -> Result<()> {
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/override_default.py"),
             &Settings {
                 flake8_import_conventions: flake8_import_conventions::settings::Options {
@@ -78,10 +78,10 @@ mod tests {
                     )])),
                 }
                 .into(),
-                ..Settings::for_rule(CheckCode::ICN001)
+                ..Settings::for_rule(RuleCode::ICN001)
             },
         )?;
-        insta::assert_yaml_snapshot!("override_default", checks);
+        insta::assert_yaml_snapshot!("override_default", diagnostics);
         Ok(())
     }
 }

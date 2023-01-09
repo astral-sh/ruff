@@ -4,9 +4,9 @@ use rustpython_ast::{Alias, AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::{autofix, violations};
 
 const BUILTINS: &[&str] = &[
     "*",
@@ -68,8 +68,8 @@ pub fn unnecessary_builtin_import(
     if unused_imports.is_empty() {
         return;
     }
-    let mut check = Check::new(
-        CheckKind::UnnecessaryBuiltinImport(
+    let mut diagnostic = Diagnostic::new(
+        violations::UnnecessaryBuiltinImport(
             unused_imports
                 .iter()
                 .map(|alias| alias.node.name.to_string())
@@ -79,7 +79,7 @@ pub fn unnecessary_builtin_import(
         Range::from_located(stmt),
     );
 
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
@@ -102,10 +102,10 @@ pub fn unnecessary_builtin_import(
                 if fix.content.is_empty() || fix.content == "pass" {
                     checker.deletions.insert(defined_by.clone());
                 }
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to remove builtin import: {e}"),
         }
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

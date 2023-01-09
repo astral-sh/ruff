@@ -2,7 +2,8 @@
 source: src/pep8_naming/mod.rs
 expression: checks
 ---
-- kind: InvalidFirstArgumentNameForClassMethod
+- kind:
+    InvalidFirstArgumentNameForClassMethod: ~
   location:
     row: 30
     column: 26
@@ -11,7 +12,8 @@ expression: checks
     column: 30
   fix: ~
   parent: ~
-- kind: InvalidFirstArgumentNameForClassMethod
+- kind:
+    InvalidFirstArgumentNameForClassMethod: ~
   location:
     row: 38
     column: 55
@@ -20,7 +22,8 @@ expression: checks
     column: 59
   fix: ~
   parent: ~
-- kind: InvalidFirstArgumentNameForClassMethod
+- kind:
+    InvalidFirstArgumentNameForClassMethod: ~
   location:
     row: 43
     column: 19

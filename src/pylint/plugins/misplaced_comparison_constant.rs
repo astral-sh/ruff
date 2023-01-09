@@ -3,8 +3,7 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::CheckKind;
-use crate::Check;
+use crate::{violations, Diagnostic};
 
 /// PLC2201
 pub fn misplaced_comparison_constant(
@@ -41,16 +40,16 @@ pub fn misplaced_comparison_constant(
         _ => unreachable!("Expected comparison operator"),
     };
     let suggestion = format!("{right} {reversed_op} {left}");
-    let mut check = Check::new(
-        CheckKind::MisplacedComparisonConstant(suggestion.clone()),
+    let mut diagnostic = Diagnostic::new(
+        violations::MisplacedComparisonConstant(suggestion.clone()),
         Range::from_located(expr),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(Fix::replacement(
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
             suggestion,
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }

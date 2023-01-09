@@ -45,19 +45,19 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::registry::CheckCode;
+    use crate::registry::RuleCode;
     use crate::linter::test_path;
     use crate::settings;
 
-    fn checks(check_code: CheckCode, path: &Path) -> Result<()> {
+    fn diagnostics(check_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics =test_path(
             Path::new("./resources/test/fixtures/%s")
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rule(check_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }
@@ -90,8 +90,8 @@ mod tests {
                 fp.write(f'{indent}CheckCategory::{pascal_case(plugin)} => "{plugin}",')
                 fp.write("\n")
 
-            elif line.strip() == "CheckCategory::Ruff => vec![CheckCodePrefix::RUF],":
-                indent = line.split("CheckCategory::Ruff => vec![CheckCodePrefix::RUF],")[0]
+            elif line.strip() == "CheckCategory::Ruff => vec![RuleCodePrefix::RUF],":
+                indent = line.split("CheckCategory::Ruff => vec![RuleCodePrefix::RUF],")[0]
                 fp.write(
                     f"{indent}CheckCategory::{pascal_case(plugin)} => vec![\n"
                     f'{indent}    todo!("Fill-in prefix after generating codes")\n'

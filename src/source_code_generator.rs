@@ -1,6 +1,6 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use std::fmt;
+use std::fmt::{self, Write};
 use std::ops::Deref;
 
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Suite, Withitem};
@@ -37,7 +37,7 @@ pub struct SourceCodeGenerator<'a> {
     quote: &'a Quote,
     /// The line ending to use.
     line_ending: &'a LineEnding,
-    buffer: Vec<u8>,
+    buffer: String,
     indent_depth: usize,
     num_newlines: usize,
     initial: bool,
@@ -49,7 +49,7 @@ impl<'a> From<&'a SourceCodeStyleDetector<'a>> for SourceCodeGenerator<'a> {
             indent: stylist.indentation(),
             quote: stylist.quote(),
             line_ending: stylist.line_ending(),
-            buffer: Vec::new(),
+            buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
             initial: true,
@@ -65,7 +65,7 @@ impl<'a> SourceCodeGenerator<'a> {
             quote,
             line_ending,
             // Internal state.
-            buffer: vec![],
+            buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
             initial: true,
@@ -73,7 +73,7 @@ impl<'a> SourceCodeGenerator<'a> {
     }
 
     pub fn generate(self) -> String {
-        String::from_utf8(self.buffer).expect("Generated source code is not valid UTF-8")
+        self.buffer
     }
 
     fn newline(&mut self) {
@@ -99,11 +99,11 @@ impl<'a> SourceCodeGenerator<'a> {
     fn p(&mut self, s: &str) {
         if self.num_newlines > 0 {
             for _ in 0..self.num_newlines {
-                self.buffer.extend(self.line_ending.as_bytes());
+                self.buffer += self.line_ending;
             }
             self.num_newlines = 0;
         }
-        self.buffer.extend(s.as_bytes());
+        self.buffer += s;
     }
 
     fn p_if(&mut self, cond: bool, s: &str) {
@@ -117,7 +117,7 @@ impl<'a> SourceCodeGenerator<'a> {
     }
 
     fn write_fmt(&mut self, f: fmt::Arguments<'_>) {
-        self.buffer.extend(format!("{f}").as_bytes());
+        self.buffer.write_fmt(f).unwrap();
     }
 
     pub fn unparse_suite<U>(&mut self, suite: &Suite<U>) {
@@ -964,21 +964,19 @@ impl<'a> SourceCodeGenerator<'a> {
     fn unparse_formatted<U>(&mut self, val: &Expr<U>, conversion: usize, spec: Option<&Expr<U>>) {
         let mut generator = SourceCodeGenerator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::TEST + 1);
-        let brace = if generator.buffer.starts_with("{".as_bytes()) {
+        let brace = if generator.buffer.starts_with('{') {
             // put a space to avoid escaping the bracket
             "{ "
         } else {
             "{"
         };
         self.p(brace);
-        self.buffer.extend(generator.buffer);
+        self.buffer += &generator.buffer;
 
         if conversion != ConversionFlag::None as usize {
             self.p("!");
             #[allow(clippy::cast_possible_truncation)]
-            let buf = &[conversion as u8];
-            let c = std::str::from_utf8(buf).unwrap();
-            self.p(c);
+            self.p(&format!("{}", conversion as u8 as char));
         }
 
         if let Some(spec) = spec {
@@ -1020,7 +1018,7 @@ impl<'a> SourceCodeGenerator<'a> {
             self.p("f");
             let mut generator = SourceCodeGenerator::new(self.indent, self.quote, self.line_ending);
             generator.unparse_fstring_body(values, is_spec);
-            let body = std::str::from_utf8(&generator.buffer).unwrap();
+            let body = &generator.buffer;
             self.p(&format!("{}", str::repr(body, self.quote.into())));
         }
     }

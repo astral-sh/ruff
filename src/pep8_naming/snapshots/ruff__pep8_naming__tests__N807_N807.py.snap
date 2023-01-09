@@ -2,7 +2,8 @@
 source: src/pep8_naming/mod.rs
 expression: checks
 ---
-- kind: DunderFunctionName
+- kind:
+    DunderFunctionName: ~
   location:
     row: 1
     column: 4
@@ -11,7 +12,8 @@ expression: checks
     column: 11
   fix: ~
   parent: ~
-- kind: DunderFunctionName
+- kind:
+    DunderFunctionName: ~
   location:
     row: 14
     column: 8

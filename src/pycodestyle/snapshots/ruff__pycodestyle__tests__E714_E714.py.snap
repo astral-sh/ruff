@@ -2,7 +2,8 @@
 source: src/pycodestyle/mod.rs
 expression: checks
 ---
-- kind: NotIsTest
+- kind:
+    NotIsTest: ~
   location:
     row: 2
     column: 7
@@ -18,7 +19,8 @@ expression: checks
       row: 2
       column: 13
   parent: ~
-- kind: NotIsTest
+- kind:
+    NotIsTest: ~
   location:
     row: 5
     column: 7
@@ -34,7 +36,8 @@ expression: checks
       row: 5
       column: 15
   parent: ~
-- kind: NotIsTest
+- kind:
+    NotIsTest: ~
   location:
     row: 8
     column: 7

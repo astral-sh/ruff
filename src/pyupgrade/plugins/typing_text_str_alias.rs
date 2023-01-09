@@ -4,7 +4,8 @@ use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// UP019
 pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
@@ -15,14 +16,15 @@ pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
         &checker.from_imports,
         &checker.import_aliases,
     ) {
-        let mut check = Check::new(CheckKind::TypingTextStrAlias, Range::from_located(expr));
-        if checker.patch(check.kind.code()) {
-            check.amend(Fix::replacement(
+        let mut diagnostic =
+            Diagnostic::new(violations::TypingTextStrAlias, Range::from_located(expr));
+        if checker.patch(diagnostic.kind.code()) {
+            diagnostic.amend(Fix::replacement(
                 "str".to_string(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         }
-        checker.add_check(check);
+        checker.diagnostics.push(diagnostic);
     }
 }

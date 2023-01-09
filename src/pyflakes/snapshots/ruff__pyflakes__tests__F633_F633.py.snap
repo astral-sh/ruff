@@ -2,7 +2,8 @@
 source: src/pyflakes/mod.rs
 expression: checks
 ---
-- kind: InvalidPrintSyntax
+- kind:
+    InvalidPrintSyntax: ~
   location:
     row: 4
     column: 0

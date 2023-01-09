@@ -4,7 +4,8 @@ use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
+use crate::violations;
 
 fn pytest_mark_parentheses(
     checker: &mut Checker,
@@ -13,18 +14,18 @@ fn pytest_mark_parentheses(
     preferred: &str,
     actual: &str,
 ) {
-    let mut check = Check::new(
-        CheckKind::IncorrectMarkParenthesesStyle(
+    let mut diagnostic = Diagnostic::new(
+        violations::IncorrectMarkParenthesesStyle(
             get_mark_name(decorator).to_string(),
             preferred.to_string(),
             actual.to_string(),
         ),
         Range::from_located(decorator),
     );
-    if checker.patch(check.kind.code()) {
-        check.amend(fix);
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(fix);
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr) {
@@ -70,21 +71,21 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
     }
 
     if !has_parameters {
-        let mut check = Check::new(
-            CheckKind::UseFixturesWithoutParameters,
+        let mut diagnostic = Diagnostic::new(
+            violations::UseFixturesWithoutParameters,
             Range::from_located(decorator),
         );
-        if checker.patch(check.kind.code()) {
+        if checker.patch(diagnostic.kind.code()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
-            check.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
+            diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
         }
-        checker.add_check(check);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
 pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
-    let enforce_parentheses = checker.settings.enabled.contains(&CheckCode::PT023);
-    let enforce_useless_usefixtures = checker.settings.enabled.contains(&CheckCode::PT026);
+    let enforce_parentheses = checker.settings.enabled.contains(&RuleCode::PT023);
+    let enforce_useless_usefixtures = checker.settings.enabled.contains(&RuleCode::PT026);
 
     for mark in get_mark_decorators(decorators) {
         if enforce_parentheses {

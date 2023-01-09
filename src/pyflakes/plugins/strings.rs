@@ -12,7 +12,8 @@ use crate::pyflakes::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
 };
 use crate::pyflakes::format::FormatSummary;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
     keywords.iter().any(|k| {
@@ -41,8 +42,8 @@ pub(crate) fn percent_format_expected_mapping(
             | ExprKind::Set { .. }
             | ExprKind::ListComp { .. }
             | ExprKind::SetComp { .. }
-            | ExprKind::GeneratorExp { .. } => checker.add_check(Check::new(
-                CheckKind::PercentFormatExpectedMapping,
+            | ExprKind::GeneratorExp { .. } => checker.diagnostics.push(Diagnostic::new(
+                violations::PercentFormatExpectedMapping,
                 location,
             )),
             _ => {}
@@ -63,8 +64,8 @@ pub(crate) fn percent_format_expected_sequence(
             ExprKind::Dict { .. } | ExprKind::DictComp { .. }
         )
     {
-        checker.add_check(Check::new(
-            CheckKind::PercentFormatExpectedSequence,
+        checker.diagnostics.push(Diagnostic::new(
+            violations::PercentFormatExpectedSequence,
             location,
         ));
     }
@@ -109,21 +110,21 @@ pub(crate) fn percent_format_extra_named_arguments(
         return;
     }
 
-    let mut check = Check::new(
-        CheckKind::PercentFormatExtraNamedArguments(
+    let mut diagnostic = Diagnostic::new(
+        violations::PercentFormatExtraNamedArguments(
             missing.iter().map(|&arg| arg.to_string()).collect(),
         ),
         location,
     );
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         match remove_unused_format_arguments_from_dict(&missing, right, checker.locator) {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to remove unused format arguments: {e}"),
         }
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// F505
@@ -164,8 +165,8 @@ pub(crate) fn percent_format_missing_arguments(
             .collect();
 
         if !missing.is_empty() {
-            checker.add_check(Check::new(
-                CheckKind::PercentFormatMissingArgument(
+            checker.diagnostics.push(Diagnostic::new(
+                violations::PercentFormatMissingArgument(
                     missing.iter().map(|&s| s.clone()).collect(),
                 ),
                 location,
@@ -181,8 +182,8 @@ pub(crate) fn percent_format_mixed_positional_and_named(
     location: Range,
 ) {
     if !(summary.num_positional == 0 || summary.keywords.is_empty()) {
-        checker.add_check(Check::new(
-            CheckKind::PercentFormatMixedPositionalAndNamed,
+        checker.diagnostics.push(Diagnostic::new(
+            violations::PercentFormatMixedPositionalAndNamed,
             location,
         ));
     }
@@ -210,8 +211,8 @@ pub(crate) fn percent_format_positional_count_mismatch(
             }
 
             if found != summary.num_positional {
-                checker.add_check(Check::new(
-                    CheckKind::PercentFormatPositionalCountMismatch(summary.num_positional, found),
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::PercentFormatPositionalCountMismatch(summary.num_positional, found),
                     location,
                 ));
             }
@@ -229,10 +230,9 @@ pub(crate) fn percent_format_star_requires_sequence(
 ) {
     if summary.starred {
         match &right.node {
-            ExprKind::Dict { .. } | ExprKind::DictComp { .. } => checker.add_check(Check::new(
-                CheckKind::PercentFormatStarRequiresSequence,
-                location,
-            )),
+            ExprKind::Dict { .. } | ExprKind::DictComp { .. } => checker.diagnostics.push(
+                Diagnostic::new(violations::PercentFormatStarRequiresSequence, location),
+            ),
             _ => {}
         }
     }
@@ -268,22 +268,22 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
-    let mut check = Check::new(
-        CheckKind::StringDotFormatExtraNamedArguments(
+    let mut diagnostic = Diagnostic::new(
+        violations::StringDotFormatExtraNamedArguments(
             missing.iter().map(|&arg| arg.to_string()).collect(),
         ),
         location,
     );
-    if checker.patch(check.kind.code()) {
+    if checker.patch(diagnostic.kind.code()) {
         match remove_unused_keyword_arguments_from_format_call(&missing, location, checker.locator)
         {
             Ok(fix) => {
-                check.amend(fix);
+                diagnostic.amend(fix);
             }
             Err(e) => error!("Failed to remove unused keyword arguments: {e}"),
         }
     }
-    checker.add_check(check);
+    checker.diagnostics.push(diagnostic);
 }
 
 /// F523
@@ -305,8 +305,8 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         return;
     }
 
-    checker.add_check(Check::new(
-        CheckKind::StringDotFormatExtraPositionalArguments(
+    checker.diagnostics.push(Diagnostic::new(
+        violations::StringDotFormatExtraPositionalArguments(
             missing
                 .iter()
                 .map(std::string::ToString::to_string)
@@ -352,8 +352,8 @@ pub(crate) fn string_dot_format_missing_argument(
         .collect();
 
     if !missing.is_empty() {
-        checker.add_check(Check::new(
-            CheckKind::StringDotFormatMissingArguments(missing),
+        checker.diagnostics.push(Diagnostic::new(
+            violations::StringDotFormatMissingArguments(missing),
             location,
         ));
     }
@@ -366,8 +366,8 @@ pub(crate) fn string_dot_format_mixing_automatic(
     location: Range,
 ) {
     if !(summary.autos.is_empty() || summary.indexes.is_empty()) {
-        checker.add_check(Check::new(
-            CheckKind::StringDotFormatMixingAutomatic,
+        checker.diagnostics.push(Diagnostic::new(
+            violations::StringDotFormatMixingAutomatic,
             location,
         ));
     }

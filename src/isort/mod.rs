@@ -649,7 +649,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::CheckCode;
+    use crate::registry::RuleCode;
     use crate::{isort, Settings};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
@@ -691,23 +691,23 @@ mod tests {
     #[test_case(Path::new("type_comments.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
             &Settings {
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(RuleCode::I001)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("combine_as_imports.py"))]
     fn combine_as_imports(path: &Path) -> Result<()> {
         let snapshot = format!("combine_as_imports_{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -717,17 +717,17 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(RuleCode::I001)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("force_wrap_aliases.py"))]
     fn force_wrap_aliases(path: &Path) -> Result<()> {
         let snapshot = format!("force_wrap_aliases_{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -738,17 +738,17 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(RuleCode::I001)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("magic_trailing_comma.py"))]
     fn no_split_on_trailing_comma(path: &Path) -> Result<()> {
         let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -758,17 +758,17 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(RuleCode::I001)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("force_single_line.py"))]
     fn force_single_line(path: &Path) -> Result<()> {
         let snapshot = format!("force_single_line_{}", path.to_string_lossy());
-        let checks = test_path(
+        let diagnostics = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -781,17 +781,17 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(RuleCode::I001)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("order_by_type.py"))]
     fn order_by_type(path: &Path) -> Result<()> {
         let snapshot = format!("order_by_type_false_{}", path.to_string_lossy());
-        let mut checks = test_path(
+        let mut diagnostics = test_path(
             Path::new("./resources/test/fixtures/isort")
                 .join(path)
                 .as_path(),
@@ -801,11 +801,11 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(CheckCode::I001)
+                ..Settings::for_rule(RuleCode::I001)
             },
         )?;
-        checks.sort_by_key(|check| check.location);
-        insta::assert_yaml_snapshot!(snapshot, checks);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 

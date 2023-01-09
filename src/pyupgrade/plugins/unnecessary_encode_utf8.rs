@@ -3,8 +3,9 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::registry::{Check, CheckCode, CheckKind};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
@@ -57,19 +58,21 @@ fn delete_default_encode_arg_or_kwarg(
     args: &[Expr],
     kwargs: &[Keyword],
     patch: bool,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     if let Some(arg) = args.get(0) {
-        let mut check = Check::new(CheckKind::UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut diagnostic =
+            Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
-            check.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
+            diagnostic.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
         }
-        Some(check)
+        Some(diagnostic)
     } else if let Some(kwarg) = kwargs.get(0) {
-        let mut check = Check::new(CheckKind::UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut diagnostic =
+            Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
-            check.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
+            diagnostic.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
-        Some(check)
+        Some(diagnostic)
     } else {
         None
     }
@@ -81,8 +84,9 @@ fn replace_with_bytes_literal(
     constant: &Expr,
     locator: &SourceCodeLocator,
     patch: bool,
-) -> Check {
-    let mut check = Check::new(CheckKind::UnnecessaryEncodeUTF8, Range::from_located(expr));
+) -> Diagnostic {
+    let mut diagnostic =
+        Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
         let content = locator.slice_source_code_range(&Range::new(
             constant.location,
@@ -92,13 +96,13 @@ fn replace_with_bytes_literal(
             "b{}",
             content.trim_start_matches('u').trim_start_matches('U')
         );
-        check.amend(Fix::replacement(
+        diagnostic.amend(Fix::replacement(
             content,
             expr.location,
             expr.end_location.unwrap(),
         ));
     }
-    check
+    diagnostic
 }
 
 /// UP012
@@ -122,21 +126,21 @@ pub fn unnecessary_encode_utf8(
             if is_default_encode(args, kwargs) {
                 if literal.is_ascii() {
                     // "foo".encode()
-                    checker.add_check(replace_with_bytes_literal(
+                    checker.diagnostics.push(replace_with_bytes_literal(
                         expr,
                         variable,
                         checker.locator,
-                        checker.patch(&CheckCode::UP012),
+                        checker.patch(&RuleCode::UP012),
                     ));
                 } else {
                     // "unicode text©".encode("utf-8")
-                    if let Some(check) = delete_default_encode_arg_or_kwarg(
+                    if let Some(diagnostic) = delete_default_encode_arg_or_kwarg(
                         expr,
                         args,
                         kwargs,
-                        checker.patch(&CheckCode::UP012),
+                        checker.patch(&RuleCode::UP012),
                     ) {
-                        checker.add_check(check);
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -144,13 +148,13 @@ pub fn unnecessary_encode_utf8(
         // f"foo{bar}".encode(*args, **kwargs)
         ExprKind::JoinedStr { .. } => {
             if is_default_encode(args, kwargs) {
-                if let Some(check) = delete_default_encode_arg_or_kwarg(
+                if let Some(diagnostic) = delete_default_encode_arg_or_kwarg(
                     expr,
                     args,
                     kwargs,
-                    checker.patch(&CheckCode::UP012),
+                    checker.patch(&RuleCode::UP012),
                 ) {
-                    checker.add_check(check);
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }

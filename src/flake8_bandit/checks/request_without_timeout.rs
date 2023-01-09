@@ -4,7 +4,8 @@ use rustpython_parser::ast::Constant;
 
 use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
-use crate::registry::{Check, CheckKind};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 const HTTP_VERBS: [&str; 7] = ["get", "options", "head", "post", "put", "patch", "delete"];
 
@@ -15,7 +16,7 @@ pub fn request_without_timeout(
     keywords: &[Keyword],
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
-) -> Option<Check> {
+) -> Option<Diagnostic> {
     let call_path = dealias_call_path(collect_call_paths(func), import_aliases);
     for func_name in &HTTP_VERBS {
         if match_call_path(&call_path, "requests", func_name, from_imports) {
@@ -28,14 +29,14 @@ pub fn request_without_timeout(
                     } => Some(value.to_string()),
                     _ => None,
                 } {
-                    return Some(Check::new(
-                        CheckKind::RequestWithoutTimeout(Some(timeout)),
+                    return Some(Diagnostic::new(
+                        violations::RequestWithoutTimeout(Some(timeout)),
                         Range::from_located(timeout_arg),
                     ));
                 }
             } else {
-                return Some(Check::new(
-                    CheckKind::RequestWithoutTimeout(None),
+                return Some(Diagnostic::new(
+                    violations::RequestWithoutTimeout(None),
                     Range::from_located(func),
                 ));
             }

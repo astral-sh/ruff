@@ -2,7 +2,8 @@
 source: src/pydocstyle/mod.rs
 expression: checks
 ---
-- kind: NewLineAfterLastParagraph
+- kind:
+    NewLineAfterLastParagraph: ~
   location:
     row: 281
     column: 4
