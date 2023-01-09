@@ -91,6 +91,12 @@ fn get_new_call(module_text: &str, correct_order: Vec<u32>) -> Result<String, ()
         // Create the string
         let mut final_state = CodegenState::default();
         expression.codegen(&mut final_state);
+        // FOR REVIEWER: If the new and old are identical, don't create a fix. Pyupgrade
+        // doesnt even want me to report this, so we could just have an enum for errors,
+        // and if a special one is returned here then we dont even report a fix
+        if module_text == final_state.to_string() {
+            return Err(());
+        }
         return Ok(final_state.to_string());
     }
     Err(())
