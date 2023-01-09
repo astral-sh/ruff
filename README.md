@@ -180,7 +180,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.215'
+  rev: 'v0.0.216'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -916,8 +916,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT001 | IncorrectFixtureParenthesesStyle | Use `@pytest.fixture()` over `@pytest.fixture` | 🛠 |
 | PT002 | FixturePositionalArgs | Configuration for fixture `...` specified via positional args, use kwargs |  |
 | PT003 | ExtraneousScopeFunction | `scope='function'` is implied in `@pytest.fixture()` |  |
-| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore |  |
-| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
+| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore | 🛠 |
+| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore | 🛠 |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
 | PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
@@ -935,8 +935,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
 | PT022 | UselessYieldFixture | No teardown in fixture `...`, use `return` instead of `yield` | 🛠 |
 | PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark....` over `@pytest.mark....()` | 🛠 |
-| PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures |  |
-| PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures |  |
+| PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures | 🛠 |
+| PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures | 🛠 |
 | PT026 | UseFixturesWithoutParameters | Useless `pytest.mark.usefixtures` without parameters | 🛠 |
 
 ### flake8-quotes (Q)
@@ -1903,7 +1903,7 @@ extend-select = ["B", "Q"]
 A list of check codes that are unsupported by Ruff, but should be
 preserved when (e.g.) validating `# noqa` directives. Useful for
 retaining `# noqa` directives that cover plugins not yet implemented
-in Ruff.
+by Ruff.
 
 **Default value**: `[]`
 
@@ -2846,6 +2846,25 @@ Forces all from imports to appear on their own line.
 ```toml
 [tool.ruff.isort]
 force-single-line = true
+```
+
+---
+
+#### [`force-sort-within-sections`](#force-sort-within-sections)
+
+Don't sort straight-style imports (like `import sys`) before from-style
+imports (like `from itertools import groupby`). Instead, sort the
+imports by module, independent of import style.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+force-sort-within-sections = true
 ```
 
 ---

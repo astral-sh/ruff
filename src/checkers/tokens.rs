@@ -4,7 +4,7 @@ use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::ruff::checks::Context;
+use crate::ruff::rules::Context;
 use crate::settings::flags;
 use crate::source_code_locator::SourceCodeLocator;
 use crate::{eradicate, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff, Settings};
@@ -40,7 +40,7 @@ pub fn check_tokens(
         // RUF001, RUF002, RUF003
         if enforce_ambiguous_unicode_character {
             if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
-                diagnostics.extend(ruff::checks::ambiguous_unicode_character(
+                diagnostics.extend(ruff::rules::ambiguous_unicode_character(
                     locator,
                     start,
                     end,
@@ -62,7 +62,7 @@ pub fn check_tokens(
         // flake8-quotes
         if enforce_quotes {
             if matches!(tok, Tok::String { .. }) {
-                if let Some(diagnostic) = flake8_quotes::checks::quotes(
+                if let Some(diagnostic) = flake8_quotes::rules::quotes(
                     locator,
                     start,
                     end,
@@ -80,7 +80,7 @@ pub fn check_tokens(
         if enforce_commented_out_code {
             if matches!(tok, Tok::Comment(_)) {
                 if let Some(diagnostic) =
-                    eradicate::checks::commented_out_code(locator, start, end, settings, autofix)
+                    eradicate::rules::commented_out_code(locator, start, end, settings, autofix)
                 {
                     diagnostics.push(diagnostic);
                 }
@@ -90,7 +90,7 @@ pub fn check_tokens(
         // W605
         if enforce_invalid_escape_sequence {
             if matches!(tok, Tok::String { .. }) {
-                diagnostics.extend(pycodestyle::checks::invalid_escape_sequence(
+                diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
                     locator,
                     start,
                     end,
@@ -104,7 +104,7 @@ pub fn check_tokens(
     // ISC001, ISC002
     if enforce_implicit_string_concatenation {
         diagnostics.extend(
-            flake8_implicit_str_concat::checks::implicit(tokens, locator)
+            flake8_implicit_str_concat::rules::implicit(tokens, locator)
                 .into_iter()
                 .filter(|diagnostic| settings.enabled.contains(diagnostic.kind.code())),
         );

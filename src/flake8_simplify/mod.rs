@@ -1,4 +1,4 @@
-pub mod plugins;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -34,7 +34,7 @@ mod tests {
     #[test_case(RuleCode::SIM222, Path::new("SIM222.py"); "SIM222")]
     #[test_case(RuleCode::SIM223, Path::new("SIM223.py"); "SIM223")]
     #[test_case(RuleCode::SIM300, Path::new("SIM300.py"); "SIM300")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_simplify")

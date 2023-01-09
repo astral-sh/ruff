@@ -77,7 +77,7 @@
       }
     },
     "external": {
-      "description": "A list of check codes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented in Ruff.",
+      "description": "A list of check codes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
       "type": [
         "array",
         "null"
@@ -754,6 +754,13 @@
         },
         "force-single-line": {
           "description": "Forces all from imports to appear on their own line.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "force-sort-within-sections": {
+          "description": "Don't sort straight-style imports (like `import sys`) before from-style imports (like `from itertools import groupby`). Instead, sort the imports by module, independent of import style.",
           "type": [
             "boolean",
             "null"

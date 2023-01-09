@@ -1,4 +1,4 @@
-pub mod plugins;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -29,7 +29,7 @@ mod tests {
     #[test_case(RuleCode::PLR1722, Path::new("consider_using_sys_exit_6.py"); "PLR1722_6")]
     #[test_case(RuleCode::PLW0120, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(RuleCode::PLW0602, Path::new("global_variable_not_assigned.py"); "PLW0602")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pylint")

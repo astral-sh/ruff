@@ -1,5 +1,5 @@
-pub mod checks;
 mod helpers;
+pub mod rules;
 pub mod settings;
 
 #[cfg(test)]
@@ -25,7 +25,7 @@ mod tests {
     #[test_case(RuleCode::S324, Path::new("S324.py"); "S324")]
     #[test_case(RuleCode::S501, Path::new("S501.py"); "S501")]
     #[test_case(RuleCode::S506, Path::new("S506.py"); "S506")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_bandit")

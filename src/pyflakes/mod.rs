@@ -1,8 +1,7 @@
 pub mod cformat;
-pub mod checks;
 pub mod fixes;
 pub mod format;
-pub mod plugins;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -106,7 +105,7 @@ mod tests {
     #[test_case(RuleCode::F841, Path::new("F841_3.py"); "F841_3")]
     #[test_case(RuleCode::F842, Path::new("F842.py"); "F842")]
     #[test_case(RuleCode::F901, Path::new("F901.py"); "F901")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyflakes")

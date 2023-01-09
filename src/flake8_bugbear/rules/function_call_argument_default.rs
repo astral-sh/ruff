@@ -8,7 +8,7 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::flake8_bugbear::plugins::mutable_argument_default::is_mutable_func;
+use crate::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violations;
 

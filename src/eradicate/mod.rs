@@ -1,5 +1,5 @@
-pub mod checks;
 pub mod detection;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -14,7 +14,7 @@ mod tests {
     use crate::settings;
 
     #[test_case(RuleCode::ERA001, Path::new("ERA001.py"); "ERA001")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/eradicate")

@@ -1,4 +1,4 @@
-pub mod plugins;
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -13,7 +13,7 @@ mod tests {
     use crate::settings;
 
     #[test_case(RuleCode::BLE001, Path::new("BLE.py"); "BLE001")]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_blind_except")

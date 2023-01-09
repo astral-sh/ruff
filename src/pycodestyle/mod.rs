@@ -1,5 +1,4 @@
-pub mod checks;
-pub mod plugins;
+pub mod rules;
 pub mod settings;
 
 #[cfg(test)]
@@ -37,7 +36,7 @@ mod tests {
     #[test_case(RuleCode::W292, Path::new("W292_4.py"))]
     #[test_case(RuleCode::W605, Path::new("W605_0.py"))]
     #[test_case(RuleCode::W605, Path::new("W605_1.py"))]
-    fn diagnostics(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pycodestyle")

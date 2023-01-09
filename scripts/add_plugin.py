@@ -31,10 +31,10 @@ def main(*, plugin: str, url: str) -> None:
 
     # Create the Rust module.
     os.makedirs(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}"), exist_ok=True)
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/plugins.rs"), "a"):
+    with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/rules"), "a"):
         pass
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/mod.rs"), "w+") as fp:
-        fp.write("pub mod plugins;\n")
+    with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/rules"), "w+") as fp:
+        fp.write("pub mod rules;\n")
         fp.write("\n")
         fp.write(
             """#[cfg(test)]
@@ -49,7 +49,7 @@ mod tests {
     use crate::linter::test_path;
     use crate::settings;
 
-    fn diagnostics(check_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(check_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", check_code.as_ref(), path.to_string_lossy());
         let diagnostics =test_path(
             Path::new("./resources/test/fixtures/%s")

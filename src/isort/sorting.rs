@@ -1,7 +1,8 @@
 /// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
 use std::cmp::Ordering;
 
-use crate::isort::types::{AliasData, ImportFromData};
+use crate::isort::types::EitherImport::{Import, ImportFrom};
+use crate::isort::types::{AliasData, EitherImport, ImportFromData};
 use crate::python::string;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
@@ -68,4 +69,21 @@ pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromD
                 .then_with(|| natord::compare(module1, module2)),
         }
     })
+}
+
+/// Compare two `EitherImport` enums which may be `Import` or `ImportFrom`
+/// structs.
+pub fn cmp_either_import(a: &EitherImport, b: &EitherImport) -> Ordering {
+    match (a, b) {
+        (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2),
+        (ImportFrom((import_from, ..)), Import((alias, _))) => {
+            natord::compare_ignore_case(import_from.module.unwrap_or_default(), alias.name)
+        }
+        (Import((alias, _)), ImportFrom((import_from, ..))) => {
+            natord::compare_ignore_case(alias.name, import_from.module.unwrap_or_default())
+        }
+        (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => {
+            cmp_import_from(import_from1, import_from2)
+        }
+    }
 }

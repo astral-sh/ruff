@@ -5375,10 +5375,14 @@ impl Violation for ExtraneousScopeFunction {
 define_violation!(
     pub struct MissingFixtureNameUnderscore(pub String);
 );
-impl Violation for MissingFixtureNameUnderscore {
+impl AlwaysAutofixableViolation for MissingFixtureNameUnderscore {
     fn message(&self) -> String {
         let MissingFixtureNameUnderscore(function) = self;
         format!("Fixture `{function}` does not return anything, add leading underscore")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add leading underscore".to_string()
     }
 
     fn placeholder() -> Self {
@@ -5389,10 +5393,14 @@ impl Violation for MissingFixtureNameUnderscore {
 define_violation!(
     pub struct IncorrectFixtureNameUnderscore(pub String);
 );
-impl Violation for IncorrectFixtureNameUnderscore {
+impl AlwaysAutofixableViolation for IncorrectFixtureNameUnderscore {
     fn message(&self) -> String {
         let IncorrectFixtureNameUnderscore(function) = self;
         format!("Fixture `{function}` returns a value, remove leading underscore")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove leading underscore".to_string()
     }
 
     fn placeholder() -> Self {
@@ -5661,9 +5669,13 @@ impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
 define_violation!(
     pub struct UnnecessaryAsyncioMarkOnFixture;
 );
-impl Violation for UnnecessaryAsyncioMarkOnFixture {
+impl AlwaysAutofixableViolation for UnnecessaryAsyncioMarkOnFixture {
     fn message(&self) -> String {
         "`pytest.mark.asyncio` is unnecessary for fixtures".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove `pytest.mark.asyncio`".to_string()
     }
 
     fn placeholder() -> Self {
@@ -5674,9 +5686,13 @@ impl Violation for UnnecessaryAsyncioMarkOnFixture {
 define_violation!(
     pub struct ErroneousUseFixturesOnFixture;
 );
-impl Violation for ErroneousUseFixturesOnFixture {
+impl AlwaysAutofixableViolation for ErroneousUseFixturesOnFixture {
     fn message(&self) -> String {
         "`pytest.mark.usefixtures` has no effect on fixtures".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove `pytest.mark.usefixtures`".to_string()
     }
 
     fn placeholder() -> Self {
