@@ -4618,6 +4618,25 @@ impl AlwaysAutofixableViolation for UnsortedImports {
     }
 }
 
+define_violation!(
+    pub struct MissingRequiredImport(pub String);
+);
+impl AlwaysAutofixableViolation for MissingRequiredImport {
+    fn message(&self) -> String {
+        let MissingRequiredImport(name) = self;
+        format!("Missing required import: `{name}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let MissingRequiredImport(name) = self;
+        format!("Insert required import: `{name}`")
+    }
+
+    fn placeholder() -> Self {
+        MissingRequiredImport("from __future__ import ...".to_string())
+    }
+}
+
 // eradicate
 
 define_violation!(

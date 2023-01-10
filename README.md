@@ -614,6 +614,7 @@ For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | I001 | UnsortedImports | Import block is un-sorted or un-formatted | 🛠 |
+| I002 | MissingRequiredImport | Missing required import: `from __future__ import ...` | 🛠 |
 
 ### pydocstyle (D)
 
@@ -2998,6 +2999,23 @@ alphabetically.
 ```toml
 [tool.ruff.isort]
 order-by-type = true
+```
+
+---
+
+#### [`required-imports`](#required-imports)
+
+Add the specified import line to all files.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+add-import = ["from __future__ import annotations"]
 ```
 
 ---

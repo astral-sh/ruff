@@ -820,6 +820,16 @@
             "null"
           ]
         },
+        "required-imports": {
+          "description": "Add the specified import line to all files.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "single-line-exclusions": {
           "description": "One or more modules to exclude from the single line rule.",
           "type": [
@@ -1268,6 +1278,7 @@
         "I0",
         "I00",
         "I001",
+        "I002",
         "I2",
         "I25",
         "I252",

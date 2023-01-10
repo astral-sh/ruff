@@ -129,36 +129,47 @@ pub struct Options {
     /// A list of modules to consider standard-library, in addition to those
     /// known to Ruff in advance.
     pub extra_standard_library: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"
+            add-import = ["from __future__ import annotations"]
+        "#
+    )]
+    /// Add the specified import line to all files.
+    pub required_imports: Option<Vec<String>>,
 }
 
 #[derive(Debug, Hash)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
+    pub required_imports: BTreeSet<String>,
     pub combine_as_imports: bool,
-    pub force_wrap_aliases: bool,
-    pub split_on_trailing_comma: bool,
+    pub extra_standard_library: BTreeSet<String>,
     pub force_single_line: bool,
-    pub order_by_type: bool,
     pub force_sort_within_sections: bool,
-    pub single_line_exclusions: BTreeSet<String>,
+    pub force_wrap_aliases: bool,
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
-    pub extra_standard_library: BTreeSet<String>,
+    pub order_by_type: bool,
+    pub single_line_exclusions: BTreeSet<String>,
+    pub split_on_trailing_comma: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            required_imports: BTreeSet::new(),
             combine_as_imports: false,
-            force_wrap_aliases: false,
-            split_on_trailing_comma: true,
+            extra_standard_library: BTreeSet::new(),
             force_single_line: false,
-            order_by_type: true,
             force_sort_within_sections: false,
-            single_line_exclusions: BTreeSet::new(),
+            force_wrap_aliases: false,
             known_first_party: BTreeSet::new(),
             known_third_party: BTreeSet::new(),
-            extra_standard_library: BTreeSet::new(),
+            order_by_type: true,
+            single_line_exclusions: BTreeSet::new(),
+            split_on_trailing_comma: true,
         }
     }
 }
@@ -166,20 +177,21 @@ impl Default for Settings {
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
+            required_imports: BTreeSet::from_iter(options.required_imports.unwrap_or_default()),
             combine_as_imports: options.combine_as_imports.unwrap_or(false),
-            force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
-            split_on_trailing_comma: options.split_on_trailing_comma.unwrap_or(true),
-            force_single_line: options.force_single_line.unwrap_or(false),
-            order_by_type: options.order_by_type.unwrap_or(true),
-            force_sort_within_sections: options.force_sort_within_sections.unwrap_or(false),
-            single_line_exclusions: BTreeSet::from_iter(
-                options.single_line_exclusions.unwrap_or_default(),
-            ),
-            known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
-            known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
             extra_standard_library: BTreeSet::from_iter(
                 options.extra_standard_library.unwrap_or_default(),
             ),
+            force_single_line: options.force_single_line.unwrap_or(false),
+            force_sort_within_sections: options.force_sort_within_sections.unwrap_or(false),
+            force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
+            known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
+            known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
+            order_by_type: options.order_by_type.unwrap_or(true),
+            single_line_exclusions: BTreeSet::from_iter(
+                options.single_line_exclusions.unwrap_or_default(),
+            ),
+            split_on_trailing_comma: options.split_on_trailing_comma.unwrap_or(true),
         }
     }
 }
@@ -187,16 +199,17 @@ impl From<Options> for Settings {
 impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
+            required_imports: Some(settings.required_imports.into_iter().collect()),
             combine_as_imports: Some(settings.combine_as_imports),
-            force_wrap_aliases: Some(settings.force_wrap_aliases),
-            split_on_trailing_comma: Some(settings.split_on_trailing_comma),
+            extra_standard_library: Some(settings.extra_standard_library.into_iter().collect()),
             force_single_line: Some(settings.force_single_line),
-            order_by_type: Some(settings.order_by_type),
             force_sort_within_sections: Some(settings.force_sort_within_sections),
-            single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
+            force_wrap_aliases: Some(settings.force_wrap_aliases),
             known_first_party: Some(settings.known_first_party.into_iter().collect()),
             known_third_party: Some(settings.known_third_party.into_iter().collect()),
-            extra_standard_library: Some(settings.extra_standard_library.into_iter().collect()),
+            order_by_type: Some(settings.order_by_type),
+            single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
+            split_on_trailing_comma: Some(settings.split_on_trailing_comma),
         }
     }
 }
