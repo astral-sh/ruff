@@ -2677,6 +2677,24 @@ impl Violation for SysVersionSlice1Referenced {
 }
 
 // flake8-simplify
+define_violation!(
+    pub struct UseCapitalEnvironmentVariables(pub String, pub String);
+);
+impl AlwaysAutofixableViolation for UseCapitalEnvironmentVariables {
+    fn message(&self) -> String {
+        let UseCapitalEnvironmentVariables(expected, original) = self;
+        format!("Use capitalized environment variable `{expected}` instead of `{original}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let UseCapitalEnvironmentVariables(expected, original) = self;
+        format!("Replace `{original}` with `{expected}`")
+    }
+
+    fn placeholder() -> Self {
+        UseCapitalEnvironmentVariables("...".to_string(), "...".to_string())
+    }
+}
 
 define_violation!(
     pub struct DuplicateIsinstanceCall(pub String);
@@ -4809,6 +4827,33 @@ impl Violation for UnsafeYAMLLoad {
     }
 }
 
+define_violation!(
+    pub struct SnmpInsecureVersion;
+);
+impl Violation for SnmpInsecureVersion {
+    fn message(&self) -> String {
+        "The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.".to_string()
+    }
+
+    fn placeholder() -> Self {
+        SnmpInsecureVersion
+    }
+}
+
+define_violation!(
+    pub struct SnmpWeakCryptography;
+);
+impl Violation for SnmpWeakCryptography {
+    fn message(&self) -> String {
+        "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
+            .to_string()
+    }
+
+    fn placeholder() -> Self {
+        SnmpWeakCryptography
+    }
+}
+
 // flake8-boolean-trap
 
 define_violation!(
@@ -5103,7 +5148,7 @@ define_violation!(
 );
 impl Violation for BlanketTypeIgnore {
     fn message(&self) -> String {
-        "Use specific error codes when ignoring type issues".to_string()
+        "Use specific rule codes when ignoring type issues".to_string()
     }
 
     fn placeholder() -> Self {
@@ -5116,7 +5161,7 @@ define_violation!(
 );
 impl Violation for BlanketNOQA {
     fn message(&self) -> String {
-        "Use specific error codes when using `noqa`".to_string()
+        "Use specific rule codes when using `noqa`".to_string()
     }
 
     fn placeholder() -> Self {

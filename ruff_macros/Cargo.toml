@@ -1,10 +1,11 @@
 [package]
 name = "ruff_macros"
-version = "0.0.216"
+version = "0.0.217"
 edition = "2021"
 
 [lib]
 proc-macro = true
+doctest = false
 
 [dependencies]
 once_cell = { version = "1.17.0" }

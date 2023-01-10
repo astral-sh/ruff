@@ -164,6 +164,7 @@ mod tests {
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     cache_dir: None,
                     dummy_variable_rgx: None,
                     exclude: None,
@@ -188,6 +189,7 @@ mod tests {
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    typing_modules: None,
                     task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
@@ -221,6 +223,7 @@ line-length = 79
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     dummy_variable_rgx: None,
                     exclude: None,
                     extend: None,
@@ -244,6 +247,7 @@ line-length = 79
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    typing_modules: None,
                     task_tags: None,
                     update_check: None,
                     cache_dir: None,
@@ -278,6 +282,7 @@ exclude = ["foo.py"]
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     cache_dir: None,
                     dummy_variable_rgx: None,
                     exclude: Some(vec!["foo.py".to_string()]),
@@ -302,6 +307,7 @@ exclude = ["foo.py"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    typing_modules: None,
                     task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
@@ -335,6 +341,7 @@ select = ["E501"]
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     cache_dir: None,
                     dummy_variable_rgx: None,
                     exclude: None,
@@ -359,6 +366,7 @@ select = ["E501"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    typing_modules: None,
                     task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
@@ -393,6 +401,7 @@ ignore = ["E501"]
             Some(Tools {
                 ruff: Some(Options {
                     allowed_confusables: None,
+                    builtins: None,
                     cache_dir: None,
                     dummy_variable_rgx: None,
                     exclude: None,
@@ -417,6 +426,7 @@ ignore = ["E501"]
                     src: None,
                     target_version: None,
                     unfixable: None,
+                    typing_modules: None,
                     task_tags: None,
                     update_check: None,
                     flake8_annotations: None,
@@ -485,6 +495,7 @@ other-attribute = 1
             config,
             Options {
                 allowed_confusables: Some(vec!['−', 'ρ', '∗']),
+                builtins: None,
                 line_length: Some(88),
                 fix: None,
                 fix_only: None,
@@ -505,6 +516,7 @@ other-attribute = 1
                 format: None,
                 force_exclude: None,
                 unfixable: None,
+                typing_modules: None,
                 task_tags: None,
                 update_check: None,
                 cache_dir: None,

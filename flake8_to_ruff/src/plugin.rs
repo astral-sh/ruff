@@ -127,27 +127,6 @@ impl Plugin {
     }
 }
 
-pub enum DocstringConvention {
-    All,
-    Pep257,
-    Numpy,
-    Google,
-}
-
-impl FromStr for DocstringConvention {
-    type Err = anyhow::Error;
-
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        match string {
-            "all" => Ok(DocstringConvention::All),
-            "pep257" => Ok(DocstringConvention::Pep257),
-            "numpy" => Ok(DocstringConvention::Numpy),
-            "google" => Ok(DocstringConvention::Google),
-            _ => Err(anyhow!("Unknown docstring convention: {string}")),
-        }
-    }
-}
-
 /// Infer the enabled plugins based on user-provided options.
 ///
 /// For example, if the user specified a `mypy-init-return` setting, we should

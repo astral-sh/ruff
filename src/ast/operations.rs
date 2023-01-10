@@ -4,6 +4,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
+use crate::ast::helpers::any_over_expr;
 use crate::ast::types::{Binding, BindingKind, Scope};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -129,76 +130,13 @@ pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool 
     })
 }
 
-/// Returns `true` if `parent` contains `child`.
-fn contains(parent: &Expr, child: &Expr) -> bool {
-    match &parent.node {
-        ExprKind::BoolOp { values, .. } => values.iter().any(|parent| contains(parent, child)),
-        ExprKind::NamedExpr { target, value } => contains(target, child) || contains(value, child),
-        ExprKind::BinOp { left, right, .. } => contains(left, child) || contains(right, child),
-        ExprKind::UnaryOp { operand, .. } => contains(operand, child),
-        ExprKind::Lambda { body, .. } => contains(body, child),
-        ExprKind::IfExp { test, body, orelse } => {
-            contains(test, child) || contains(body, child) || contains(orelse, child)
-        }
-        ExprKind::Dict { keys, values } => keys
-            .iter()
-            .chain(values.iter())
-            .any(|parent| contains(parent, child)),
-        ExprKind::Set { elts } => elts.iter().any(|parent| contains(parent, child)),
-        ExprKind::ListComp { elt, .. } => contains(elt, child),
-        ExprKind::SetComp { elt, .. } => contains(elt, child),
-        ExprKind::DictComp { key, value, .. } => contains(key, child) || contains(value, child),
-        ExprKind::GeneratorExp { elt, .. } => contains(elt, child),
-        ExprKind::Await { value } => contains(value, child),
-        ExprKind::Yield { value } => value.as_ref().map_or(false, |value| contains(value, child)),
-        ExprKind::YieldFrom { value } => contains(value, child),
-        ExprKind::Compare {
-            left, comparators, ..
-        } => contains(left, child) || comparators.iter().any(|parent| contains(parent, child)),
-        ExprKind::Call {
-            func,
-            args,
-            keywords,
-        } => {
-            contains(func, child)
-                || args.iter().any(|parent| contains(parent, child))
-                || keywords
-                    .iter()
-                    .any(|keyword| contains(&keyword.node.value, child))
-        }
-        ExprKind::FormattedValue {
-            value, format_spec, ..
-        } => {
-            contains(value, child)
-                || format_spec
-                    .as_ref()
-                    .map_or(false, |value| contains(value, child))
-        }
-        ExprKind::JoinedStr { values } => values.iter().any(|parent| contains(parent, child)),
-        ExprKind::Constant { .. } => false,
-        ExprKind::Attribute { value, .. } => contains(value, child),
-        ExprKind::Subscript { value, slice, .. } => {
-            contains(value, child) || contains(slice, child)
-        }
-        ExprKind::Starred { value, .. } => contains(value, child),
-        ExprKind::Name { .. } => parent == child,
-        ExprKind::List { elts, .. } => elts.iter().any(|parent| contains(parent, child)),
-        ExprKind::Tuple { elts, .. } => elts.iter().any(|parent| contains(parent, child)),
-        ExprKind::Slice { lower, upper, step } => {
-            lower.as_ref().map_or(false, |value| contains(value, child))
-                || upper.as_ref().map_or(false, |value| contains(value, child))
-                || step.as_ref().map_or(false, |value| contains(value, child))
-        }
-    }
-}
-
 /// Check if a node represents an unpacking assignment.
 pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
     match &parent.node {
         StmtKind::With { items, .. } => items.iter().any(|item| {
             if let Some(optional_vars) = &item.optional_vars {
                 if matches!(optional_vars.node, ExprKind::Tuple { .. }) {
-                    if contains(optional_vars, child) {
+                    if any_over_expr(optional_vars, &|expr| expr == child) {
                         return true;
                     }
                 }
@@ -227,7 +165,7 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
                     matches!(
                         item.node,
                         ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
-                    ) && contains(item, child)
+                    ) && any_over_expr(item, &|expr| expr == child)
                 });
 
             // If our child is a tuple, and value is not, it's always an unpacking

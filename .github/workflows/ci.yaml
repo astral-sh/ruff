@@ -26,21 +26,9 @@ jobs:
           profile: minimal
           toolchain: nightly-2022-11-01
           override: true
-          components: rustfmt
-      - uses: actions/cache@v3
-        env:
-          cache-name: cache-cargo
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
-      - run: cargo build --all --release
-      - run: ./target/release/ruff_dev generate-all
+      - uses: Swatinem/rust-cache@v1
+      - run: cargo build --all
+      - run: ./target/debug/ruff_dev generate-all
       - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo +nightly dev generate-all'."
       - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo +nightly dev generate-all'."
       - run: git diff --exit-code -- README.md ruff.schema.json
@@ -56,18 +44,6 @@ jobs:
           toolchain: nightly-2022-11-01
           override: true
           components: rustfmt
-      - uses: actions/cache@v3
-        env:
-          cache-name: cache-cargo
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
       - run: cargo fmt --all --check
 
   cargo_clippy:
@@ -82,18 +58,7 @@ jobs:
           override: true
           components: clippy
           target: wasm32-unknown-unknown
-      - uses: actions/cache@v3
-        env:
-          cache-name: cache-cargo
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
+      - uses: Swatinem/rust-cache@v1
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
       - run: cargo clippy --workspace --target wasm32-unknown-unknown --all-features -- -D warnings -W clippy::pedantic
 
@@ -107,18 +72,7 @@ jobs:
           profile: minimal
           toolchain: nightly-2022-11-01
           override: true
-      - uses: actions/cache@v3
-        env:
-          cache-name: cache-cargo
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
+      - uses: Swatinem/rust-cache@v1
       - run: cargo install cargo-insta
       - run: pip install black[d]==22.12.0
       - name: Run tests
@@ -167,22 +121,11 @@ jobs:
           profile: minimal
           toolchain: nightly-2022-11-01
           override: true
+      - uses: Swatinem/rust-cache@v1
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
       - run: pip install maturin
-      - uses: actions/cache@v3
-        env:
-          cache-name: cache-cargo
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
       - run: maturin build -b bin
 
   typos:

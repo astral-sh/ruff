@@ -179,6 +179,131 @@ pub fn match_call_path(
     }
 }
 
+/// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
+pub fn contains_call_path(
+    expr: &Expr,
+    module: &str,
+    member: &str,
+    import_aliases: &FxHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+) -> bool {
+    any_over_expr(expr, &|expr| {
+        let call_path = collect_call_paths(expr);
+        if !call_path.is_empty() {
+            if match_call_path(
+                &dealias_call_path(call_path, import_aliases),
+                module,
+                member,
+                from_imports,
+            ) {
+                return true;
+            }
+        }
+        false
+    })
+}
+
+/// Call `func` over every `Expr` in `expr`, returning `true` if any expression
+/// returns `true`..
+pub fn any_over_expr<F>(expr: &Expr, func: &F) -> bool
+where
+    F: Fn(&Expr) -> bool,
+{
+    if func(expr) {
+        return true;
+    }
+    match &expr.node {
+        ExprKind::BoolOp { values, .. } | ExprKind::JoinedStr { values } => {
+            values.iter().any(|expr| any_over_expr(expr, func))
+        }
+        ExprKind::NamedExpr { target, value } => {
+            any_over_expr(target, func) || any_over_expr(value, func)
+        }
+        ExprKind::BinOp { left, right, .. } => {
+            any_over_expr(left, func) || any_over_expr(right, func)
+        }
+        ExprKind::UnaryOp { operand, .. } => any_over_expr(operand, func),
+        ExprKind::Lambda { body, .. } => any_over_expr(body, func),
+        ExprKind::IfExp { test, body, orelse } => {
+            any_over_expr(test, func) || any_over_expr(body, func) || any_over_expr(orelse, func)
+        }
+        ExprKind::Dict { keys, values } => values
+            .iter()
+            .chain(keys.iter())
+            .any(|expr| any_over_expr(expr, func)),
+        ExprKind::Set { elts } | ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
+            elts.iter().any(|expr| any_over_expr(expr, func))
+        }
+        ExprKind::ListComp { elt, generators }
+        | ExprKind::SetComp { elt, generators }
+        | ExprKind::GeneratorExp { elt, generators } => {
+            any_over_expr(elt, func)
+                || generators.iter().any(|generator| {
+                    any_over_expr(&generator.target, func)
+                        || any_over_expr(&generator.iter, func)
+                        || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
+                })
+        }
+        ExprKind::DictComp {
+            key,
+            value,
+            generators,
+        } => {
+            any_over_expr(key, func)
+                || any_over_expr(value, func)
+                || generators.iter().any(|generator| {
+                    any_over_expr(&generator.target, func)
+                        || any_over_expr(&generator.iter, func)
+                        || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
+                })
+        }
+        ExprKind::Await { value }
+        | ExprKind::YieldFrom { value }
+        | ExprKind::Attribute { value, .. }
+        | ExprKind::Starred { value, .. } => any_over_expr(value, func),
+        ExprKind::Yield { value } => value
+            .as_ref()
+            .map_or(false, |value| any_over_expr(value, func)),
+        ExprKind::Compare {
+            left, comparators, ..
+        } => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
+        ExprKind::Call {
+            func: call_func,
+            args,
+            keywords,
+        } => {
+            any_over_expr(call_func, func)
+                || args.iter().any(|expr| any_over_expr(expr, func))
+                || keywords
+                    .iter()
+                    .any(|keyword| any_over_expr(&keyword.node.value, func))
+        }
+        ExprKind::FormattedValue {
+            value, format_spec, ..
+        } => {
+            any_over_expr(value, func)
+                || format_spec
+                    .as_ref()
+                    .map_or(false, |value| any_over_expr(value, func))
+        }
+        ExprKind::Subscript { value, slice, .. } => {
+            any_over_expr(value, func) || any_over_expr(slice, func)
+        }
+        ExprKind::Slice { lower, upper, step } => {
+            lower
+                .as_ref()
+                .map_or(false, |value| any_over_expr(value, func))
+                || upper
+                    .as_ref()
+                    .map_or(false, |value| any_over_expr(value, func))
+                || step
+                    .as_ref()
+                    .map_or(false, |value| any_over_expr(value, func))
+        }
+        ExprKind::Name { .. } | ExprKind::Constant { .. } => false,
+    }
+}
+
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
 /// Return `true` if the `Stmt` is an assignment to a dunder (like `__all__`).
@@ -191,12 +316,12 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
                 return false;
             }
             match &targets[0].node {
-                ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
+                ExprKind::Name { id, .. } => DUNDER_REGEX.is_match(id),
                 _ => false,
             }
         }
         StmtKind::AnnAssign { target, .. } => match &target.node {
-            ExprKind::Name { id, ctx: _ } => DUNDER_REGEX.is_match(id),
+            ExprKind::Name { id, .. } => DUNDER_REGEX.is_match(id),
             _ => false,
         },
         _ => false,
@@ -633,6 +758,11 @@ impl<'a> SimpleCallArgs<'a> {
             }
         }
         None
+    }
+
+    /// Get the number of positional and keyword arguments used.
+    pub fn len(&self) -> usize {
+        self.args.len() + self.kwargs.len()
     }
 }
 

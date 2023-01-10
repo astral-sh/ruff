@@ -26,7 +26,7 @@ pub struct Options {
         value_type = "bool",
         example = "suppress-dummy-args = true"
     )]
-    /// Whether to suppress `ANN000`-level errors for arguments matching the
+    /// Whether to suppress `ANN000`-level violations for arguments matching the
     /// "dummy" variable regex (like `_`).
     pub suppress_dummy_args: Option<bool>,
     #[option(
@@ -34,8 +34,8 @@ pub struct Options {
         value_type = "bool",
         example = "suppress-none-returning = true"
     )]
-    /// Whether to suppress `ANN200`-level errors for functions that meet either
-    /// of the following criteria:
+    /// Whether to suppress `ANN200`-level violations for functions that meet
+    /// either of the following criteria:
     ///
     /// - Contain no `return` statement.
     /// - Explicit `return` statement(s) all return `None` (explicitly or

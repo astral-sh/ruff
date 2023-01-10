@@ -1,7 +1,11 @@
 [package]
 name = "ruff_dev"
-version = "0.0.216"
+version = "0.0.217"
 edition = "2021"
+
+[lib]
+name = "ruff_dev"
+doctest = false
 
 [dependencies]
 anyhow = { version = "1.0.66" }

@@ -25,26 +25,26 @@ pub struct Cli {
     /// Enable verbose logging.
     #[arg(short, long, group = "verbosity")]
     pub verbose: bool,
-    /// Only log errors.
+    /// Print lint violations, but nothing else.
     #[arg(short, long, group = "verbosity")]
     pub quiet: bool,
     /// Disable all logging (but still exit with status code "1" upon detecting
-    /// errors).
+    /// lint violations).
     #[arg(short, long, group = "verbosity")]
     pub silent: bool,
-    /// Exit with status code "0", even upon detecting errors.
+    /// Exit with status code "0", even upon detecting lint violations.
     #[arg(short, long)]
     pub exit_zero: bool,
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
     pub watch: bool,
-    /// Attempt to automatically fix lint errors.
+    /// Attempt to automatically fix lint violations.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
     #[clap(long, overrides_with("fix"), hide = true)]
     no_fix: bool,
-    /// Fix any fixable lint errors, but don't report on leftover violations.
-    /// Implies `--fix`.
+    /// Fix any fixable lint violations, but don't report on leftover
+    /// violations. Implies `--fix`.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
@@ -63,36 +63,36 @@ pub struct Cli {
     /// rules).
     #[arg(long, value_delimiter = ',')]
     pub select: Option<Vec<RuleCodePrefix>>,
-    /// Like --select, but adds additional error codes on top of the selected
+    /// Like --select, but adds additional rule codes on top of the selected
     /// ones.
     #[arg(long, value_delimiter = ',')]
     pub extend_select: Option<Vec<RuleCodePrefix>>,
-    /// Comma-separated list of error codes to disable.
+    /// Comma-separated list of rule codes to disable.
     #[arg(long, value_delimiter = ',')]
     pub ignore: Option<Vec<RuleCodePrefix>>,
-    /// Like --ignore, but adds additional error codes on top of the ignored
+    /// Like --ignore, but adds additional rule codes on top of the ignored
     /// ones.
     #[arg(long, value_delimiter = ',')]
     pub extend_ignore: Option<Vec<RuleCodePrefix>>,
-    /// List of paths, used to exclude files and/or directories from checks.
+    /// List of paths, used to omit files and/or directories from analysis.
     #[arg(long, value_delimiter = ',')]
     pub exclude: Option<Vec<FilePattern>>,
-    /// Like --exclude, but adds additional files and directories on top of the
-    /// excluded ones.
+    /// Like --exclude, but adds additional files and directories on top of
+    /// those already excluded.
     #[arg(long, value_delimiter = ',')]
     pub extend_exclude: Option<Vec<FilePattern>>,
-    /// List of error codes to treat as eligible for autofix. Only applicable
+    /// List of rule codes to treat as eligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',')]
     pub fixable: Option<Vec<RuleCodePrefix>>,
-    /// List of error codes to treat as ineligible for autofix. Only applicable
+    /// List of rule codes to treat as ineligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',')]
     pub unfixable: Option<Vec<RuleCodePrefix>>,
     /// List of mappings from file pattern to code to exclude
     #[arg(long, value_delimiter = ',')]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    /// Output serialization format for error messages.
+    /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
     /// The name of the file when passing it through stdin.
@@ -129,7 +129,7 @@ pub struct Cli {
     /// The minimum Python version that should be supported.
     #[arg(long)]
     pub target_version: Option<PythonVersion>,
-    /// Set the line-length for length-associated checks and automatic
+    /// Set the line-length for length-associated rules and automatic
     /// formatting.
     #[arg(long)]
     pub line_length: Option<usize>,
@@ -212,7 +212,7 @@ pub struct Cli {
         conflicts_with = "watch",
     )]
     pub show_files: bool,
-    /// See the settings Ruff will use to check a given Python file.
+    /// See the settings Ruff will use to lint a given Python file.
     #[arg(
         long,
         // Fake subcommands.

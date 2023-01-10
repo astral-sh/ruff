@@ -28,6 +28,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct Configuration {
     pub allowed_confusables: Option<Vec<char>>,
+    pub builtins: Option<Vec<String>>,
     pub cache_dir: Option<PathBuf>,
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
@@ -51,8 +52,9 @@ pub struct Configuration {
     pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
-    pub unfixable: Option<Vec<RuleCodePrefix>>,
     pub task_tags: Option<Vec<String>>,
+    pub typing_modules: Option<Vec<String>>,
+    pub unfixable: Option<Vec<RuleCodePrefix>>,
     pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
@@ -80,6 +82,7 @@ impl Configuration {
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         Ok(Configuration {
             allowed_confusables: options.allowed_confusables,
+            builtins: options.builtins,
             cache_dir: options
                 .cache_dir
                 .map(|dir| {
@@ -151,8 +154,9 @@ impl Configuration {
                 .map(|src| resolve_src(&src, project_root))
                 .transpose()?,
             target_version: options.target_version,
-            unfixable: options.unfixable,
             task_tags: options.task_tags,
+            typing_modules: options.typing_modules,
+            unfixable: options.unfixable,
             update_check: options.update_check,
             // Plugins
             flake8_annotations: options.flake8_annotations,
@@ -177,6 +181,7 @@ impl Configuration {
     pub fn combine(self, config: Configuration) -> Self {
         Self {
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
+            builtins: self.builtins.or(config.builtins),
             cache_dir: self.cache_dir.or(config.cache_dir),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
             exclude: self.exclude.or(config.exclude),
@@ -214,8 +219,9 @@ impl Configuration {
             show_source: self.show_source.or(config.show_source),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
-            unfixable: self.unfixable.or(config.unfixable),
             task_tags: self.task_tags.or(config.task_tags),
+            typing_modules: self.typing_modules.or(config.typing_modules),
+            unfixable: self.unfixable.or(config.unfixable),
             update_check: self.update_check.or(config.update_check),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),

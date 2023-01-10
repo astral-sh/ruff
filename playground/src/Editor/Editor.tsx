@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
-import init, { check, Check, currentVersion, defaultSettings } from "../pkg";
+import init, {
+  check,
+  Diagnostic,
+  currentVersion,
+  defaultSettings,
+} from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
 import { useTheme } from "./theme";
@@ -18,7 +23,7 @@ export default function Editor() {
   const [edit, setEdit] = useState<number>(0);
   const [settingsSource, setSettingsSource] = useState<string | null>(null);
   const [pythonSource, setPythonSource] = useState<string | null>(null);
-  const [checks, setChecks] = useState<Check[]>([]);
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
 
@@ -32,25 +37,25 @@ export default function Editor() {
     }
 
     let config: any;
-    let checks: Check[];
+    let diagnostics: Diagnostic[];
 
     try {
       config = JSON.parse(settingsSource);
     } catch (e) {
-      setChecks([]);
+      setDiagnostics([]);
       setError((e as Error).message);
       return;
     }
 
     try {
-      checks = check(pythonSource, config);
+      diagnostics = check(pythonSource, config);
     } catch (e) {
       setError(e as string);
       return;
     }
 
     setError(null);
-    setChecks(checks);
+    setDiagnostics(diagnostics);
   }, [initialized, settingsSource, pythonSource]);
 
   useEffect(() => {
@@ -122,7 +127,7 @@ export default function Editor() {
               visible={tab === "Source"}
               source={pythonSource}
               theme={theme}
-              checks={checks}
+              diagnostics={diagnostics}
               onChange={handlePythonSourceChange}
             />
             <SettingsEditor

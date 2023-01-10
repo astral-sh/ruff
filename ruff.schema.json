@@ -15,6 +15,16 @@
         "minLength": 1
       }
     },
+    "builtins": {
+      "description": "A list of builtins to treat as defined references, in addition to the system builtins.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "cache-dir": {
       "description": "A path to the cache directory.\n\nBy default, Ruff stores cache results in a `.ruff_cache` directory in the current project root.\n\nHowever, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes precedence over that default.\n\nThis setting will override even the `RUFF_CACHE_DIR` environment variable, if set.",
       "type": [
@@ -23,7 +33,7 @@
       ]
     },
     "dummy-variable-rgx": {
-      "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when evaluating (e.g.) unused-variable checks. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
+      "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
       "type": [
         "string",
         "null"
@@ -57,7 +67,7 @@
       }
     },
     "extend-ignore": {
-      "description": "A list of check code prefixes to ignore, in addition to those specified by `ignore`.",
+      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
       "type": [
         "array",
         "null"
@@ -67,7 +77,7 @@
       }
     },
     "extend-select": {
-      "description": "A list of check code prefixes to enable, in addition to those specified by `select`.",
+      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
       "type": [
         "array",
         "null"
@@ -77,7 +87,7 @@
       }
     },
     "external": {
-      "description": "A list of check codes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
+      "description": "A list of rule codes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
       "type": [
         "array",
         "null"
@@ -101,7 +111,7 @@
       ]
     },
     "fixable": {
-      "description": "A list of check code prefixes to consider autofix-able.",
+      "description": "A list of rule codes or prefixes to consider autofixable.",
       "type": [
         "array",
         "null"
@@ -228,7 +238,7 @@
       ]
     },
     "ignore": {
-      "description": "A list of check code prefixes to ignore. Prefixes can specify exact checks (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled checks (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
       "type": [
         "array",
         "null"
@@ -287,7 +297,7 @@
       ]
     },
     "per-file-ignores": {
-      "description": "A list of mappings from file pattern to check code prefixes to exclude, when considering any matching files.",
+      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files.",
       "type": [
         "object",
         "null"
@@ -351,7 +361,7 @@
       ]
     },
     "select": {
-      "description": "A list of check code prefixes to enable. Prefixes can specify exact checks (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled checks (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
       "type": [
         "array",
         "null"
@@ -361,7 +371,7 @@
       }
     },
     "show-source": {
-      "description": "Whether to show source code snippets when reporting lint error violations (overridden by the `--show-source` command-line flag).",
+      "description": "Whether to show source code snippets when reporting lint violations (overridden by the `--show-source` command-line flag).",
       "type": [
         "boolean",
         "null"
@@ -389,7 +399,17 @@
       ]
     },
     "task-tags": {
-      "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length checks (`E501`) if `ignore-overlong-task-comments` is set to `true`.",
+      "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length rules (`E501`) if `ignore-overlong-task-comments` is set to `true`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "typing-modules": {
+      "description": "A list of modules whose imports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
       "type": [
         "array",
         "null"
@@ -399,7 +419,7 @@
       }
     },
     "unfixable": {
-      "description": "A list of check code prefixes to consider un-autofix-able.",
+      "description": "A list of rule codes or prefixes to consider non-autofix-able.",
       "type": [
         "array",
         "null"
@@ -474,14 +494,14 @@
           ]
         },
         "suppress-dummy-args": {
-          "description": "Whether to suppress `ANN000`-level errors for arguments matching the \"dummy\" variable regex (like `_`).",
+          "description": "Whether to suppress `ANN000`-level violations for arguments matching the \"dummy\" variable regex (like `_`).",
           "type": [
             "boolean",
             "null"
           ]
         },
         "suppress-none-returning": {
-          "description": "Whether to suppress `ANN200`-level errors for functions that meet either of the following criteria:\n\n- Contain no `return` statement. - Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
+          "description": "Whether to suppress `ANN200`-level violations for functions that meet either of the following criteria:\n\n- Contain no `return` statement. - Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
           "type": [
             "boolean",
             "null"
@@ -520,7 +540,7 @@
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
-          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., `no-mutable-default-argument` checks (`B006`).",
+          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`).",
           "type": [
             "array",
             "null"
@@ -577,14 +597,14 @@
       "type": "object",
       "properties": {
         "fixture-parentheses": {
-          "description": "Boolean flag specifying whether `@pytest.fixture()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.fixture()` is valid and `@pytest.fixture` is an error. If set to `false`, `@pytest.fixture` is valid and `@pytest.fixture()` is an error.",
+          "description": "Boolean flag specifying whether `@pytest.fixture()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.fixture()` is valid and `@pytest.fixture` is invalid. If set to `false`, `@pytest.fixture` is valid and `@pytest.fixture()` is invalid.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "mark-parentheses": {
-          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is an error. If set to `false`, `@pytest.fixture` is valid and `@pytest.mark.foo()` is an error.",
+          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is invalid. If set to `false`, `@pytest.fixture` is valid and `@pytest.mark.foo()` is invalid.",
           "type": [
             "boolean",
             "null"
@@ -707,7 +727,7 @@
           ]
         },
         "banned-api": {
-          "description": "Specific modules or module members that may not be imported or accessed. Note that this check is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
+          "description": "Specific modules or module members that may not be imported or accessed. Note that this rule is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
           "type": [
             "object",
             "null"
@@ -910,7 +930,7 @@
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
-          "description": "Whether or not line-length checks (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
+          "description": "Whether or not line-length violations (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
           "type": [
             "boolean",
             "null"
@@ -1473,6 +1493,8 @@
         "S50",
         "S501",
         "S506",
+        "S508",
+        "S509",
         "SIM",
         "SIM1",
         "SIM10",
@@ -1486,6 +1508,7 @@
         "SIM11",
         "SIM110",
         "SIM111",
+        "SIM112",
         "SIM117",
         "SIM118",
         "SIM2",

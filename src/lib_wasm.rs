@@ -24,7 +24,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
-export interface Check {
+export interface Diagnostic {
     code: string;
     message: string;
     location: {
@@ -86,6 +86,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
     Ok(serde_wasm_bindgen::to_value(&Options {
         // Propagate defaults.
         allowed_confusables: Some(Vec::default()),
+        builtins: Some(Vec::default()),
         dummy_variable_rgx: Some("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$".to_string()),
         extend_ignore: Some(Vec::default()),
         extend_select: Some(Vec::default()),
@@ -111,6 +112,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         show_source: None,
         src: None,
         unfixable: None,
+        typing_modules: None,
         task_tags: None,
         update_check: None,
         // Use default options for all plugins.

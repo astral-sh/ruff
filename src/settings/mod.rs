@@ -25,7 +25,7 @@ use crate::settings::types::{
 use crate::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, one_time_warning, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade, warn_user_once,
 };
 
 pub mod configuration;
@@ -40,6 +40,7 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub allowed_confusables: FxHashSet<char>,
+    pub builtins: Vec<String>,
     pub cache_dir: PathBuf,
     pub dummy_variable_rgx: Regex,
     pub enabled: FxHashSet<RuleCode>,
@@ -60,6 +61,7 @@ pub struct Settings {
     pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
     pub task_tags: Vec<String>,
+    pub typing_modules: Vec<String>,
     pub update_check: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -113,6 +115,7 @@ impl Settings {
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
                 .unwrap_or_default(),
+            builtins: config.builtins.unwrap_or_default(),
             cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
@@ -178,6 +181,7 @@ impl Settings {
             task_tags: config.task_tags.unwrap_or_else(|| {
                 vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()]
             }),
+            typing_modules: config.typing_modules.unwrap_or_default(),
             update_check: config.update_check.unwrap_or(true),
             // Plugins
             flake8_annotations: config
@@ -216,6 +220,7 @@ impl Settings {
     pub fn for_rule(rule_code: RuleCode) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
+            builtins: vec![],
             cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([rule_code.clone()]),
@@ -235,7 +240,8 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
-            task_tags: vec!["TODO".to_string(), "FIXME".to_string()],
+            task_tags: vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()],
+            typing_modules: vec![],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
@@ -258,6 +264,7 @@ impl Settings {
     pub fn for_rules(rule_codes: Vec<RuleCode>) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
+            builtins: vec![],
             cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(rule_codes.clone()),
@@ -277,7 +284,8 @@ impl Settings {
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
             target_version: PythonVersion::Py310,
-            task_tags: vec!["TODO".to_string()],
+            task_tags: vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()],
+            typing_modules: vec![],
             update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
@@ -317,6 +325,7 @@ impl Hash for Settings {
         for confusable in &self.allowed_confusables {
             confusable.hash(state);
         }
+        self.builtins.hash(state);
         self.dummy_variable_rgx.as_str().hash(state);
         for value in self.enabled.iter().sorted() {
             value.hash(state);
@@ -339,6 +348,8 @@ impl Hash for Settings {
         self.show_source.hash(state);
         self.src.hash(state);
         self.target_version.hash(state);
+        self.task_tags.hash(state);
+        self.typing_modules.hash(state);
         // Add plugin properties in alphabetical order.
         self.flake8_annotations.hash(state);
         self.flake8_bandit.hash(state);
@@ -392,7 +403,7 @@ struct RuleCodeSpec<'a> {
 }
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
-/// error codes.
+/// rule codes.
 fn resolve_codes<'a>(specs: impl Iterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<RuleCode> {
     let mut codes: FxHashSet<RuleCode> = FxHashSet::default();
     for spec in specs {
@@ -425,12 +436,7 @@ fn resolve_codes<'a>(specs: impl Iterator<Item = RuleCodeSpec<'a>>) -> FxHashSet
 fn validate_enabled(enabled: FxHashSet<RuleCode>) -> FxHashSet<RuleCode> {
     for (a, b, message) in INCOMPATIBLE_CODES {
         if enabled.contains(a) && enabled.contains(b) {
-            one_time_warning!(
-                "{}{} {}",
-                "warning".yellow().bold(),
-                ":".bold(),
-                message.bold()
-            );
+            warn_user_once!("{}", message);
         }
     }
     enabled

@@ -1,6 +1,8 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers::{create_expr, create_stmt, unparse_expr, unparse_stmt};
+use crate::ast::helpers::{
+    contains_call_path, create_expr, create_stmt, unparse_expr, unparse_stmt,
+};
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
@@ -144,7 +146,28 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         return;
     }
 
-    let target_var = &body_targets[0];
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if contains_call_path(
+        test,
+        "sys",
+        "version_info",
+        &checker.import_aliases,
+        &checker.from_imports,
+    ) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
+    // checks.
+    if contains_call_path(
+        test,
+        "sys",
+        "platform",
+        &checker.import_aliases,
+        &checker.from_imports,
+    ) {
+        return;
+    }
 
     // It's part of a bigger if-elif block:
     // https://github.com/MartinThoma/flake8-simplify/issues/115
@@ -176,6 +199,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         }
     }
 
+    let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
     let content = unparse_stmt(&ternary, checker.style);
     let mut diagnostic = Diagnostic::new(

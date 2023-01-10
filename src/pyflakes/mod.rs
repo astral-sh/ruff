@@ -141,6 +141,52 @@ mod tests {
     }
 
     #[test]
+    fn default_builtins() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pyflakes/builtins.py"),
+            &settings::Settings::for_rules(vec![RuleCode::F821]),
+        )?;
+        insta::assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extra_builtins() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pyflakes/builtins.py"),
+            &settings::Settings {
+                builtins: vec!["_".to_string()],
+                ..settings::Settings::for_rules(vec![RuleCode::F821])
+            },
+        )?;
+        insta::assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn default_typing_modules() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pyflakes/typing_modules.py"),
+            &settings::Settings::for_rules(vec![RuleCode::F821]),
+        )?;
+        insta::assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extra_typing_modules() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pyflakes/typing_modules.py"),
+            &settings::Settings {
+                typing_modules: vec!["airflow.typing_compat".to_string()],
+                ..settings::Settings::for_rules(vec![RuleCode::F821])
+            },
+        )?;
+        insta::assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn future_annotations() -> Result<()> {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyflakes/future_annotations.py"),

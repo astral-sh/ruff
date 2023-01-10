@@ -10,14 +10,7 @@ expression: diagnostics
   end_location:
     row: 52
     column: 30
-  fix:
-    content: _
-    location:
-      row: 51
-      column: 4
-    end_location:
-      row: 51
-      column: 4
+  fix: ~
   parent: ~
 - kind:
     MissingFixtureNameUnderscore: activate_context
@@ -27,13 +20,6 @@ expression: diagnostics
   end_location:
     row: 58
     column: 13
-  fix:
-    content: _
-    location:
-      row: 56
-      column: 4
-    end_location:
-      row: 56
-      column: 4
+  fix: ~
   parent: ~
 

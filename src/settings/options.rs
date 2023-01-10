@@ -31,6 +31,16 @@ pub struct Options {
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     pub allowed_confusables: Option<Vec<char>>,
     #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"
+            builtins = ["_"]
+        "#
+    )]
+    /// A list of builtins to treat as defined references, in addition to the
+    /// system builtins.
+    pub builtins: Option<Vec<String>>,
+    #[option(
         default = ".ruff_cache",
         value_type = "PathBuf",
         example = r#"cache-dir = "~/.cache/ruff""#
@@ -55,7 +65,7 @@ pub struct Options {
         "#
     )]
     /// A regular expression used to identify "dummy" variables, or those which
-    /// should be ignored when evaluating (e.g.) unused-variable checks. The
+    /// should be ignored when enforcing (e.g.) unused-variable rules. The
     /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     pub dummy_variable_rgx: Option<String>,
     #[option(
@@ -113,12 +123,12 @@ pub struct Options {
         default = "[]",
         value_type = "Vec<RuleCodePrefix>",
         example = r#"
-            # Skip unused variable checks (`F841`).
+            # Skip unused variable rules (`F841`).
             extend-ignore = ["F841"]
         "#
     )]
-    /// A list of check code prefixes to ignore, in addition to those specified
-    /// by `ignore`.
+    /// A list of rule codes or prefixes to ignore, in addition to those
+    /// specified by `ignore`.
     pub extend_ignore: Option<Vec<RuleCodePrefix>>,
     #[option(
         default = "[]",
@@ -128,8 +138,8 @@ pub struct Options {
             extend-select = ["B", "Q"]
         "#
     )]
-    /// A list of check code prefixes to enable, in addition to those specified
-    /// by `select`.
+    /// A list of rule codes or prefixes to enable, in addition to those
+    /// specified by `select`.
     pub extend_select: Option<Vec<RuleCodePrefix>>,
     #[option(
         default = "[]",
@@ -140,7 +150,7 @@ pub struct Options {
             external = ["V101"]
         "#
     )]
-    /// A list of check codes that are unsupported by Ruff, but should be
+    /// A list of rule codes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
     /// retaining `# noqa` directives that cover plugins not yet implemented
     /// by Ruff.
@@ -156,11 +166,11 @@ pub struct Options {
         default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]"#,
         value_type = "Vec<RuleCodePrefix>",
         example = r#"
-            # Only allow autofix behavior for `E` and `F` checks.
+            # Only allow autofix behavior for `E` and `F` rules.
             fixable = ["E", "F"]
         "#
     )]
-    /// A list of check code prefixes to consider autofix-able.
+    /// A list of rule codes or prefixes to consider autofixable.
     pub fixable: Option<Vec<RuleCodePrefix>>,
     #[option(
         default = r#""text""#,
@@ -198,15 +208,15 @@ pub struct Options {
         default = "[]",
         value_type = "Vec<RuleCodePrefix>",
         example = r#"
-            # Skip unused variable checks (`F841`).
+            # Skip unused variable rules (`F841`).
             ignore = ["F841"]
         "#
     )]
-    /// A list of check code prefixes to ignore. Prefixes can specify exact
-    /// checks (like `F841`), entire categories (like `F`), or anything in
+    /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
+    /// rules (like `F841`), entire categories (like `F`), or anything in
     /// between.
     ///
-    /// When breaking ties between enabled and disabled checks (via `select` and
+    /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
     pub ignore: Option<Vec<RuleCodePrefix>>,
@@ -264,11 +274,11 @@ pub struct Options {
             select = ["E", "F", "B", "Q"]
         "#
     )]
-    /// A list of check code prefixes to enable. Prefixes can specify exact
-    /// checks (like `F841`), entire categories (like `F`), or anything in
+    /// A list of rule codes or prefixes to enable. Prefixes can specify exact
+    /// rules (like `F841`), entire categories (like `F`), or anything in
     /// between.
     ///
-    /// When breaking ties between enabled and disabled checks (via `select` and
+    /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
     pub select: Option<Vec<RuleCodePrefix>>,
@@ -280,8 +290,8 @@ pub struct Options {
             show-source = true
         "#
     )]
-    /// Whether to show source code snippets when reporting lint error
-    /// violations (overridden by the `--show-source` command-line flag).
+    /// Whether to show source code snippets when reporting lint violations
+    /// (overridden by the `--show-source` command-line flag).
     pub show_source: Option<bool>,
     #[option(
         default = r#"["."]"#,
@@ -330,16 +340,6 @@ pub struct Options {
     /// and instead must be specified explicitly (as seen below).
     pub target_version: Option<PythonVersion>,
     #[option(
-        default = "[]",
-        value_type = "Vec<RuleCodePrefix>",
-        example = r#"
-            # Disable autofix for unused imports (`F401`).
-            unfixable = ["F401"]
-        "#
-    )]
-    /// A list of check code prefixes to consider un-autofix-able.
-    pub unfixable: Option<Vec<RuleCodePrefix>>,
-    #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
         value_type = "Vec<String>",
         example = r#"task-tags = ["HACK"]"#
@@ -347,9 +347,33 @@ pub struct Options {
     /// A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
     ///
     /// Comments starting with these tags will be ignored by commented-out code
-    /// detection (`ERA`), and skipped by line-length checks (`E501`) if
+    /// detection (`ERA`), and skipped by line-length rules (`E501`) if
     /// `ignore-overlong-task-comments` is set to `true`.
     pub task_tags: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"typing-modules = ["airflow.typing_compat"]"#
+    )]
+    /// A list of modules whose imports should be treated equivalently to
+    /// members of the `typing` module.
+    ///
+    /// This is useful for ensuring proper type annotation inference for
+    /// projects that re-export `typing` and `typing_extensions` members
+    /// from a compatibility module. If omitted, any members imported from
+    /// modules apart from `typing` and `typing_extensions` will be treated
+    /// as ordinary Python objects.
+    pub typing_modules: Option<Vec<String>>,
+    #[option(
+        default = "[]",
+        value_type = "Vec<RuleCodePrefix>",
+        example = r#"
+            # Disable autofix for unused imports (`F401`).
+            unfixable = ["F401"]
+        "#
+    )]
+    /// A list of rule codes or prefixes to consider non-autofix-able.
+    pub unfixable: Option<Vec<RuleCodePrefix>>,
     #[option(
         default = "true",
         value_type = "bool",
@@ -414,7 +438,7 @@ pub struct Options {
             "path/to/file.py" = ["E402"]
         "#
     )]
-    /// A list of mappings from file pattern to check code prefixes to exclude,
-    /// when considering any matching files.
+    /// A list of mappings from file pattern to rule codes or prefixes to
+    /// exclude, when considering any matching files.
     pub per_file_ignores: Option<FxHashMap<String, Vec<RuleCodePrefix>>>,
 }

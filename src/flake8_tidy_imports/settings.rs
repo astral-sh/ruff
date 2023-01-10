@@ -54,7 +54,7 @@ pub struct Options {
         "#
     )]
     /// Specific modules or module members that may not be imported or accessed.
-    /// Note that this check is only meant to flag accidental uses,
+    /// Note that this rule is only meant to flag accidental uses,
     /// and can be circumvented via `eval` or `importlib`.
     pub banned_api: Option<FxHashMap<String, BannedApi>>,
 }
