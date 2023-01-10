@@ -3191,4 +3191,4 @@ MIT
 ## Contributing
 
 Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/.github/CONTRIBUTING.md).
+[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
