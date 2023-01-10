@@ -1,0 +1,25 @@
+---
+source: src/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    SnmpWeakCriptography: ~
+  location:
+    row: 4
+    column: 11
+  end_location:
+    row: 4
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    SnmpWeakCriptography: ~
+  location:
+    row: 5
+    column: 15
+  end_location:
+    row: 5
+    column: 26
+  fix: ~
+  parent: ~
+

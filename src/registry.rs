@@ -416,6 +416,8 @@ define_rule_mapping!(
     S324 => violations::HashlibInsecureHashFunction,
     S501 => violations::RequestWithNoCertValidation,
     S506 => violations::UnsafeYAMLLoad,
+    S508 => violations::SnmpInsecureVesion,
+    S509 => violations::SnmpWeakCriptography,
     // flake8-boolean-trap
     FBT001 => violations::BooleanPositionalArgInFunctionDefinition,
     FBT002 => violations::BooleanDefaultValueInFunctionDefinition,
@@ -1100,6 +1102,8 @@ impl RuleCode {
             RuleCode::S324 => RuleOrigin::Flake8Bandit,
             RuleCode::S501 => RuleOrigin::Flake8Bandit,
             RuleCode::S506 => RuleOrigin::Flake8Bandit,
+            RuleCode::S508 => RuleOrigin::Flake8Bandit,
+            RuleCode::S509 => RuleOrigin::Flake8Bandit,
             // flake8-simplify
             RuleCode::SIM103 => RuleOrigin::Flake8Simplify,
             RuleCode::SIM101 => RuleOrigin::Flake8Simplify,

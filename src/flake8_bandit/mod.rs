@@ -25,6 +25,8 @@ mod tests {
     #[test_case(RuleCode::S324, Path::new("S324.py"); "S324")]
     #[test_case(RuleCode::S501, Path::new("S501.py"); "S501")]
     #[test_case(RuleCode::S506, Path::new("S506.py"); "S506")]
+    #[test_case(RuleCode::S508, Path::new("S508.py"); "S508")]
+    #[test_case(RuleCode::S509, Path::new("S509.py"); "S509")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

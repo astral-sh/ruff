@@ -4792,6 +4792,33 @@ impl Violation for UnsafeYAMLLoad {
     }
 }
 
+define_violation!(
+    pub struct SnmpInsecureVesion;
+);
+impl Violation for SnmpInsecureVesion {
+    fn message(&self) -> String {
+        "Possible insecure use of SNMPv1 and SNMPv2. You should use SNMPv3 if able".to_string()
+    }
+
+    fn placeholder() -> Self {
+        SnmpInsecureVesion
+    }
+}
+
+define_violation!(
+    pub struct SnmpWeakCriptography;
+);
+impl Violation for SnmpWeakCriptography {
+    fn message(&self) -> String {
+        "Possible use of SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure"
+            .to_string()
+    }
+
+    fn placeholder() -> Self {
+        SnmpWeakCriptography
+    }
+}
+
 // flake8-boolean-trap
 
 define_violation!(

@@ -1,0 +1,25 @@
+---
+source: src/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    SnmpInsecureVesion: ~
+  location:
+    row: 4
+    column: 36
+  end_location:
+    row: 4
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    SnmpInsecureVesion: ~
+  location:
+    row: 5
+    column: 36
+  end_location:
+    row: 5
+    column: 37
+  fix: ~
+  parent: ~
+

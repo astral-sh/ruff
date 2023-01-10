@@ -759,6 +759,11 @@ impl<'a> SimpleCallArgs<'a> {
         }
         None
     }
+
+    /// Get the number of positional and keyword arguments used.
+    pub fn len(&self) -> usize {
+        self.args.len() + self.kwargs.len()
+    }
 }
 
 #[cfg(test)]
