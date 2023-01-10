@@ -164,9 +164,9 @@ pacman -S ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff path/to/code/to/check.py  # Run Ruff over `check.py`
-ruff path/to/code/             # Run Ruff over all files in `/path/to/code` (and any subdirectories)
-ruff path/to/code/*.py         # Run Ruff over all `.py` files in `/path/to/code`
+ruff path/to/code/to/lint.py  # Run Ruff over `lint.py`
+ruff path/to/code/            # Run Ruff over all files in `/path/to/code` (and any subdirectories)
+ruff path/to/code/*.py        # Run Ruff over all `.py` files in `/path/to/code`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
@@ -237,9 +237,9 @@ target-version = "py310"
 max-complexity = 10
 ```
 
-As an example, the following would configure Ruff to: (1) avoid checking for line-length
-violations (`E501`); (2) never remove unused imports (`F401`); and (3) ignore import-at-top-of-file
-errors (`E402`) in `__init__.py` files:
+As an example, the following would configure Ruff to: (1) avoid enforcing line-length violations
+(`E501`); (2) never remove unused imports (`F401`); and (3) ignore import-at-top-of-file violations
+(`E402`) in `__init__.py` files:
 
 ```toml
 [tool.ruff]
@@ -269,16 +269,16 @@ select = ["E", "F", "Q"]
 docstring-quotes = "double"
 ```
 
-Ruff mirrors Flake8's error code system, in which each error code consists of a one-to-three letter
-prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the error
-code (e.g., `F` for Pyflakes, `E` for `pycodestyle`, `ANN` for `flake8-annotations`). The set of
-enabled errors is determined by the `select` and `ignore` options, which support both the full
-error code (e.g., `F401`) and the prefix (e.g., `F`).
+Ruff mirrors Flake8's rule code system, in which each rule code consists of a one-to-three letter
+prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
+(e.g., `F` for Pyflakes, `E` for `pycodestyle`, `ANN` for `flake8-annotations`). The set of enabled
+rules is determined by the `select` and `ignore` options, which support both the full code (e.g.,
+`F401`) and the prefix (e.g., `F`).
 
-As a special-case, Ruff also supports the `ALL` error code, which enables all error codes. Note that
-some of the `pydocstyle` error codes are conflicting (e.g., `D203` and `D211`) as they represent
-alternative docstring formats. Enabling `ALL` without further configuration may result in suboptimal
-behavior, especially for the `pydocstyle` plugin.
+As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some of the
+`pydocstyle` rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
+formats. Enabling `ALL` without further configuration may result in suboptimal behavior, especially
+for the `pydocstyle` plugin.
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
 an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the
@@ -326,17 +326,17 @@ Options:
   -v, --verbose
           Enable verbose logging
   -q, --quiet
-          Only log errors
+          Print lint violations, but nothing else
   -s, --silent
-          Disable all logging (but still exit with status code "1" upon detecting errors)
+          Disable all logging (but still exit with status code "1" upon detecting lint violations)
   -e, --exit-zero
-          Exit with status code "0", even upon detecting errors
+          Exit with status code "0", even upon detecting lint violations
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix
-          Attempt to automatically fix lint errors
+          Attempt to automatically fix lint violations
       --fix-only
-          Fix any fixable lint errors, but don't report on leftover violations. Implies `--fix`
+          Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
       --diff
           Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
   -n, --no-cache
@@ -346,23 +346,23 @@ Options:
       --select <SELECT>
           Comma-separated list of rule codes to enable (or ALL, to enable all rules)
       --extend-select <EXTEND_SELECT>
-          Like --select, but adds additional error codes on top of the selected ones
+          Like --select, but adds additional rule codes on top of the selected ones
       --ignore <IGNORE>
-          Comma-separated list of error codes to disable
+          Comma-separated list of rule codes to disable
       --extend-ignore <EXTEND_IGNORE>
-          Like --ignore, but adds additional error codes on top of the ignored ones
+          Like --ignore, but adds additional rule codes on top of the ignored ones
       --exclude <EXCLUDE>
-          List of paths, used to exclude files and/or directories from checks
+          List of paths, used to omit files and/or directories from analysis
       --extend-exclude <EXTEND_EXCLUDE>
-          Like --exclude, but adds additional files and directories on top of the excluded ones
+          Like --exclude, but adds additional files and directories on top of those already excluded
       --fixable <FIXABLE>
-          List of error codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+          List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --unfixable <UNFIXABLE>
-          List of error codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+          List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for error messages [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab]
+          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
       --cache-dir <CACHE_DIR>
@@ -380,7 +380,7 @@ Options:
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported
       --line-length <LINE_LENGTH>
-          Set the line-length for length-associated checks and automatic formatting
+          Set the line-length for length-associated rules and automatic formatting
       --max-complexity <MAX_COMPLEXITY>
           Maximum McCabe complexity allowed for a given function
       --add-noqa
@@ -392,7 +392,7 @@ Options:
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
-          See the settings Ruff will use to check a given Python file
+          See the settings Ruff will use to lint a given Python file
   -h, --help
           Print help information
   -V, --version
@@ -449,16 +449,16 @@ in each directory's `pyproject.toml` file.
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
 `.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](#respect-gitignore)).
 
-Files that are passed to `ruff` directly are always checked, regardless of the above criteria.
-For example, `ruff /path/to/excluded/file.py` will always check `file.py`.
+Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
+For example, `ruff /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Ignoring errors
 
-To omit a lint check entirely, add it to the "ignore" list via [`ignore`](#ignore) or
+To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](#ignore) or
 [`extend-ignore`](#extend-ignore), either on the command-line or in your `pyproject.toml` file.
 
-To ignore an error inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
-To ignore an individual error, add `# noqa: {code}` to the end of the line, like so:
+To ignore a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
+To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
 
 ```python
 # Ignore F841.
@@ -467,7 +467,7 @@ x = 1  # noqa: F841
 # Ignore E741 and F841.
 i = 1  # noqa: E741, F841
 
-# Ignore _all_ errors.
+# Ignore _all_ violations.
 x = 1  # noqa
 ```
 
@@ -481,9 +481,9 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 """  # noqa: E501
 ```
 
-To ignore all errors across an entire file, Ruff supports Flake8's `# flake8: noqa` directive (or,
-equivalently, `# ruff: noqa`). Adding either of those directives to any part of a file will disable
-error reporting for the entire file.
+To ignore all violations across an entire file, Ruff supports Flake8's `# flake8: noqa` directive
+(or, equivalently, `# ruff: noqa`). Adding either of those directives to any part of a file will
+disable enforcement across the entire file.
 
 For targeted exclusions across entire files (e.g., "Ignore all F841 violations in
 `/path/to/file.py`"), see the [`per-file-ignores`](#per-file-ignores) configuration setting.
@@ -502,8 +502,8 @@ for more.
 
 Ruff supports several workflows to aid in `noqa` management.
 
-First, Ruff provides a special error code, `RUF100`, to enforce that your `noqa` directives are
-"valid", in that the errors they _say_ they ignore are actually being triggered on that line (and
+First, Ruff provides a special rule code, `RUF100`, to enforce that your `noqa` directives are
+"valid", in that the violations they _say_ they ignore are actually being triggered on that line (and
 thus suppressed). You can run `ruff /path/to/file.py --extend-select RUF100` to flag unused `noqa`
 directives.
 
@@ -513,13 +513,13 @@ You can run `ruff /path/to/file.py --extend-select RUF100 --fix` to automaticall
 
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
 migrating a new codebase to Ruff. You can run `ruff /path/to/file.py --add-noqa` to automatically
-add `noqa` directives to all failing lines, with the appropriate error codes.
+add `noqa` directives to all failing lines, with the appropriate rule codes.
 
 ## Supported Rules
 
 Regardless of the rule's origin, Ruff re-implements every rule in Rust as a first-party feature.
 
-By default, Ruff enables all `E` and `F` error codes, which correspond to those built-in to Flake8.
+By default, Ruff enables all `E` and `F` rule codes, which correspond to those built-in to Flake8.
 
 The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` command-line option.
 
@@ -1066,8 +1066,8 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 | ---- | ---- | ------- | --- |
 | PGH001 | NoEval | No builtin `eval()` allowed |  |
 | PGH002 | DeprecatedLogWarn | `warn` is deprecated in favor of `warning` |  |
-| PGH003 | BlanketTypeIgnore | Use specific error codes when ignoring type issues |  |
-| PGH004 | BlanketNOQA | Use specific error codes when using `noqa` |  |
+| PGH003 | BlanketTypeIgnore | Use specific rule codes when ignoring type issues |  |
+| PGH004 | BlanketNOQA | Use specific rule codes when using `noqa` |  |
 
 ### Pylint (PLC, PLE, PLR, PLW)
 
@@ -1393,7 +1393,7 @@ natively, including:
 - [`pyupgrade`](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827))
 - [`yesqa`](https://github.com/asottile/yesqa)
 
-Note that, in some cases, Ruff uses different error code prefixes than would be found in the
+Note that, in some cases, Ruff uses different rule codes and prefixes than would be found in the
 originating Flake8 plugins. For example, Ruff uses `TID252` to represent the `I252` rule from
 `flake8-tidy-imports`. This helps minimize conflicts across plugins and allows any individual plugin
 to be toggled on or off with a single (e.g.) `--select TID`, as opposed to `--select I2` (to avoid
@@ -1418,9 +1418,9 @@ At time of writing, Pylint implements 409 total rules, while Ruff implements 224
 at least 60 overlap with the Pylint rule set. Subjectively, Pylint tends to implement more rules
 based on type inference (e.g., validating the number of arguments in a function call).
 
-Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all checks natively.
+Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively.
 
-Unlike Pylint, Ruff is capable of automatically fixing its own lint errors.
+Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
 
 Pylint parity is being tracked in [#689](https://github.com/charliermarsh/ruff/issues/689).
 
@@ -1533,7 +1533,7 @@ For example, if you're coming from `flake8-docstrings`, and your originating con
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside `convention`, you'll want to explicitly enable the `D` error code class, like so:
+Alongside `convention`, you'll want to explicitly enable the `D` rule code prefix, like so:
 
 ```toml
 [tool.ruff]
@@ -1786,7 +1786,7 @@ cache-dir = "~/.cache/ruff"
 #### [`dummy-variable-rgx`](#dummy-variable-rgx)
 
 A regular expression used to identify "dummy" variables, or those which
-should be ignored when evaluating (e.g.) unused-variable checks. The
+should be ignored when enforcing (e.g.) unused-variable rules. The
 default expression matches `_`, `__`, and `_var`, but not `_var_`.
 
 **Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"`
@@ -1880,8 +1880,8 @@ extend-exclude = ["tests", "src/bad.py"]
 
 #### [`extend-ignore`](#extend-ignore)
 
-A list of check code prefixes to ignore, in addition to those specified
-by `ignore`.
+A list of rule codes or prefixes to ignore, in addition to those
+specified by `ignore`.
 
 **Default value**: `[]`
 
@@ -1891,7 +1891,7 @@ by `ignore`.
 
 ```toml
 [tool.ruff]
-# Skip unused variable checks (`F841`).
+# Skip unused variable rules (`F841`).
 extend-ignore = ["F841"]
 ```
 
@@ -1899,8 +1899,8 @@ extend-ignore = ["F841"]
 
 #### [`extend-select`](#extend-select)
 
-A list of check code prefixes to enable, in addition to those specified
-by `select`.
+A list of rule codes or prefixes to enable, in addition to those
+specified by `select`.
 
 **Default value**: `[]`
 
@@ -1918,7 +1918,7 @@ extend-select = ["B", "Q"]
 
 #### [`external`](#external)
 
-A list of check codes that are unsupported by Ruff, but should be
+A list of rule codes that are unsupported by Ruff, but should be
 preserved when (e.g.) validating `# noqa` directives. Useful for
 retaining `# noqa` directives that cover plugins not yet implemented
 by Ruff.
@@ -1975,7 +1975,7 @@ fix-only = true
 
 #### [`fixable`](#fixable)
 
-A list of check code prefixes to consider autofix-able.
+A list of rule codes or prefixes to consider autofixable.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
 
@@ -1985,7 +1985,7 @@ A list of check code prefixes to consider autofix-able.
 
 ```toml
 [tool.ruff]
-# Only allow autofix behavior for `E` and `F` checks.
+# Only allow autofix behavior for `E` and `F` rules.
 fixable = ["E", "F"]
 ```
 
@@ -2041,11 +2041,11 @@ format = "grouped"
 
 #### [`ignore`](#ignore)
 
-A list of check code prefixes to ignore. Prefixes can specify exact
-checks (like `F841`), entire categories (like `F`), or anything in
+A list of rule codes or prefixes to ignore. Prefixes can specify exact
+rules (like `F841`), entire categories (like `F`), or anything in
 between.
 
-When breaking ties between enabled and disabled checks (via `select` and
+When breaking ties between enabled and disabled rules (via `select` and
 `ignore`, respectively), more specific prefixes override less
 specific prefixes.
 
@@ -2057,7 +2057,7 @@ specific prefixes.
 
 ```toml
 [tool.ruff]
-# Skip unused variable checks (`F841`).
+# Skip unused variable rules (`F841`).
 ignore = ["F841"]
 ```
 
@@ -2105,8 +2105,8 @@ line-length = 120
 
 #### [`per-file-ignores`](#per-file-ignores)
 
-A list of mappings from file pattern to check code prefixes to exclude,
-when considering any matching files.
+A list of mappings from file pattern to rule codes or prefixes to
+exclude, when considering any matching files.
 
 **Default value**: `{}`
 
@@ -2164,11 +2164,11 @@ respect_gitignore = false
 
 #### [`select`](#select)
 
-A list of check code prefixes to enable. Prefixes can specify exact
-checks (like `F841`), entire categories (like `F`), or anything in
+A list of rule codes or prefixes to enable. Prefixes can specify exact
+rules (like `F841`), entire categories (like `F`), or anything in
 between.
 
-When breaking ties between enabled and disabled checks (via `select` and
+When breaking ties between enabled and disabled rules (via `select` and
 `ignore`, respectively), more specific prefixes override less
 specific prefixes.
 
@@ -2188,8 +2188,8 @@ select = ["E", "F", "B", "Q"]
 
 #### [`show-source`](#show-source)
 
-Whether to show source code snippets when reporting lint error
-violations (overridden by the `--show-source` command-line flag).
+Whether to show source code snippets when reporting lint violations
+(overridden by the `--show-source` command-line flag).
 
 **Default value**: `false`
 
@@ -2272,7 +2272,7 @@ target-version = "py37"
 A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
 
 Comments starting with these tags will be ignored by commented-out code
-detection (`ERA`), and skipped by line-length checks (`E501`) if
+detection (`ERA`), and skipped by line-length rules (`E501`) if
 `ignore-overlong-task-comments` is set to `true`.
 
 **Default value**: `["TODO", "FIXME", "XXX"]`
@@ -2314,7 +2314,7 @@ typing-modules = ["airflow.typing_compat"]
 
 #### [`unfixable`](#unfixable)
 
-A list of check code prefixes to consider un-autofix-able.
+A list of rule codes or prefixes to consider non-autofix-able.
 
 **Default value**: `[]`
 
@@ -2388,7 +2388,7 @@ mypy-init-return = true
 
 #### [`suppress-dummy-args`](#suppress-dummy-args)
 
-Whether to suppress `ANN000`-level errors for arguments matching the
+Whether to suppress `ANN000`-level violations for arguments matching the
 "dummy" variable regex (like `_`).
 
 **Default value**: `false`
@@ -2406,8 +2406,8 @@ suppress-dummy-args = true
 
 #### [`suppress-none-returning`](#suppress-none-returning)
 
-Whether to suppress `ANN200`-level errors for functions that meet either
-of the following criteria:
+Whether to suppress `ANN200`-level violations for functions that meet
+either of the following criteria:
 
 - Contain no `return` statement.
 - Explicit `return` statement(s) all return `None` (explicitly or
@@ -2468,7 +2468,7 @@ extend-hardcoded-tmp-directory = ["/foo/bar"]
 #### [`extend-immutable-calls`](#extend-immutable-calls)
 
 Additional callable functions to consider "immutable" when evaluating,
-e.g., `no-mutable-default-argument` checks (`B006`).
+e.g., the `no-mutable-default-argument` rule (`B006`).
 
 **Default value**: `[]`
 
@@ -2555,9 +2555,9 @@ will be added to the `aliases` mapping.
 
 Boolean flag specifying whether `@pytest.fixture()` without parameters
 should have parentheses. If the option is set to `true` (the
-default), `@pytest.fixture()` is valid and `@pytest.fixture` is an
-error. If set to `false`, `@pytest.fixture` is valid and
-`@pytest.fixture()` is an error.
+default), `@pytest.fixture()` is valid and `@pytest.fixture` is
+invalid. If set to `false`, `@pytest.fixture` is valid and
+`@pytest.fixture()` is invalid.
 
 **Default value**: `true`
 
@@ -2576,9 +2576,9 @@ fixture-parentheses = true
 
 Boolean flag specifying whether `@pytest.mark.foo()` without parameters
 should have parentheses. If the option is set to `true` (the
-default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is an
-error. If set to `false`, `@pytest.fixture` is valid and
-`@pytest.mark.foo()` is an error.
+default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is
+invalid. If set to `false`, `@pytest.fixture` is valid and
+`@pytest.mark.foo()` is invalid.
 
 **Default value**: `true`
 
@@ -2800,7 +2800,7 @@ ban-relative-imports = "all"
 #### [`banned-api`](#banned-api)
 
 Specific modules or module members that may not be imported or accessed.
-Note that this check is only meant to flag accidental uses,
+Note that this rule is only meant to flag accidental uses,
 and can be circumvented via `eval` or `importlib`.
 
 **Default value**: `{}`
@@ -3120,7 +3120,7 @@ staticmethod-decorators = ["staticmethod", "stcmthd"]
 
 #### [`ignore-overlong-task-comments`](#ignore-overlong-task-comments)
 
-Whether or not line-length checks (`E501`) should be triggered for
+Whether or not line-length violations (`E501`) should be triggered for
 comments starting with `task-tags` (by default: ["TODO", "FIXME",
 and "XXX"]).
 

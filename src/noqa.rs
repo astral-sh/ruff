@@ -169,7 +169,7 @@ fn add_noqa_inner(
                         count += 1;
                     }
                     Directive::Codes(_, start, _, existing) => {
-                        // Reconstruct the line based on the preserved check codes.
+                        // Reconstruct the line based on the preserved rule codes.
                         // This enables us to tally the number of edits.
                         let mut formatted = String::new();
 

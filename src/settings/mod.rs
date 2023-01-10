@@ -403,7 +403,7 @@ struct RuleCodeSpec<'a> {
 }
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
-/// error codes.
+/// rule codes.
 fn resolve_codes<'a>(specs: impl Iterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<RuleCode> {
     let mut codes: FxHashSet<RuleCode> = FxHashSet::default();
     for spec in specs {

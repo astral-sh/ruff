@@ -22,7 +22,7 @@ pub struct Options {
         "#
     )]
     /// Additional callable functions to consider "immutable" when evaluating,
-    /// e.g., `no-mutable-default-argument` checks (`B006`).
+    /// e.g., the `no-mutable-default-argument` rule (`B006`).
     pub extend_immutable_calls: Option<Vec<String>>,
 }
 

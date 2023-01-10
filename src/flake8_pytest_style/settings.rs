@@ -36,9 +36,9 @@ pub struct Options {
     )]
     /// Boolean flag specifying whether `@pytest.fixture()` without parameters
     /// should have parentheses. If the option is set to `true` (the
-    /// default), `@pytest.fixture()` is valid and `@pytest.fixture` is an
-    /// error. If set to `false`, `@pytest.fixture` is valid and
-    /// `@pytest.fixture()` is an error.
+    /// default), `@pytest.fixture()` is valid and `@pytest.fixture` is
+    /// invalid. If set to `false`, `@pytest.fixture` is valid and
+    /// `@pytest.fixture()` is invalid.
     pub fixture_parentheses: Option<bool>,
     #[option(
         default = "tuple",
@@ -104,9 +104,9 @@ pub struct Options {
     )]
     /// Boolean flag specifying whether `@pytest.mark.foo()` without parameters
     /// should have parentheses. If the option is set to `true` (the
-    /// default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is an
-    /// error. If set to `false`, `@pytest.fixture` is valid and
-    /// `@pytest.mark.foo()` is an error.
+    /// default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is
+    /// invalid. If set to `false`, `@pytest.fixture` is valid and
+    /// `@pytest.mark.foo()` is invalid.
     pub mark_parentheses: Option<bool>,
 }
 
