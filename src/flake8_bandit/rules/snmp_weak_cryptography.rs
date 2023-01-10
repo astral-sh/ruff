@@ -21,7 +21,7 @@ pub fn snmp_weak_cryptography(
 
         if call_args.len() < 3 {
             return Some(Diagnostic::new(
-                violations::SnmpWeakCriptography,
+                violations::SnmpWeakCryptography,
                 Range::from_located(func),
             ));
         }
