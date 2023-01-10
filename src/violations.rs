@@ -4806,7 +4806,7 @@ impl Violation for SnmpInsecureVersion {
 }
 
 define_violation!(
-    pub struct SnmpWeakCriptography;
+    pub struct SnmpWeakCryptography;
 );
 impl Violation for SnmpWeakCriptography {
     fn message(&self) -> String {
