@@ -5,6 +5,7 @@ edition = "2021"
 
 [lib]
 name = "flake8_to_ruff"
+doctest = false
 
 [dependencies]
 anyhow = { version = "1.0.66" }
