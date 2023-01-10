@@ -24,11 +24,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          default: true
+        run: rustup show
       - name: Build wheels - x86_64
         uses: messense/maturin-action@v1
         with:
@@ -51,11 +47,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          default: true
+        run: rustup show
       - name: Build wheels - universal2
         uses: messense/maturin-action@v1
         with:
@@ -81,11 +73,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.target }}
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          default: true
+        run: rustup show
       - name: Build wheels
         uses: messense/maturin-action@v1
         with:
