@@ -27,7 +27,7 @@ fn extract_indentation_range(body: &[&Stmt]) -> Range {
 }
 
 /// I001
-pub fn check_imports(
+pub fn organize_imports(
     block: &Block,
     locator: &SourceCodeLocator,
     settings: &Settings,
