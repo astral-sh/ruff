@@ -2677,6 +2677,24 @@ impl Violation for SysVersionSlice1Referenced {
 }
 
 // flake8-simplify
+define_violation!(
+    pub struct UseCapitalEnvironmentVariables(pub String, pub String);
+);
+impl AlwaysAutofixableViolation for UseCapitalEnvironmentVariables {
+    fn message(&self) -> String {
+        let UseCapitalEnvironmentVariables(expected, original) = self;
+        format!("Use capitalized environment variable `{expected}` instead of `{original}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let UseCapitalEnvironmentVariables(expected, original) = self;
+        format!("Replace `{original}` with `{expected}`")
+    }
+
+    fn placeholder() -> Self {
+        UseCapitalEnvironmentVariables("...".to_string(), "...".to_string())
+    }
+}
 
 define_violation!(
     pub struct DuplicateIsinstanceCall(pub String);
