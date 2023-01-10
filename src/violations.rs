@@ -4815,7 +4815,7 @@ impl Violation for SnmpWeakCryptography {
     }
 
     fn placeholder() -> Self {
-        SnmpWeakCriptography
+        SnmpWeakCryptography
     }
 }
 
