@@ -179,6 +179,221 @@ pub fn match_call_path(
     }
 }
 
+/// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
+pub fn contains_call_path(
+    expr: &Expr,
+    module: &str,
+    member: &str,
+    import_aliases: &FxHashMap<&str, &str>,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+) -> bool {
+    let call_path = collect_call_paths(expr);
+    if !call_path.is_empty() {
+        if match_call_path(
+            &dealias_call_path(call_path, import_aliases),
+            module,
+            member,
+            from_imports,
+        ) {
+            return true;
+        }
+    }
+
+    match &expr.node {
+        ExprKind::BoolOp { values, .. } => values
+            .iter()
+            .any(|expr| contains_call_path(expr, module, member, import_aliases, from_imports)),
+        ExprKind::NamedExpr { target, value } => {
+            contains_call_path(target, module, member, import_aliases, from_imports)
+                || contains_call_path(value, module, member, import_aliases, from_imports)
+        }
+        ExprKind::BinOp { left, right, .. } => {
+            contains_call_path(left, module, member, import_aliases, from_imports)
+                || contains_call_path(right, module, member, import_aliases, from_imports)
+        }
+        ExprKind::UnaryOp { operand, .. } => {
+            contains_call_path(operand, module, member, import_aliases, from_imports)
+        }
+        ExprKind::Lambda { body, .. } => {
+            contains_call_path(body, module, member, import_aliases, from_imports)
+        }
+        ExprKind::IfExp { test, body, orelse } => {
+            contains_call_path(test, module, member, import_aliases, from_imports)
+                || contains_call_path(body, module, member, import_aliases, from_imports)
+                || contains_call_path(orelse, module, member, import_aliases, from_imports)
+        }
+        ExprKind::Dict { keys, values } => values
+            .iter()
+            .chain(keys.iter())
+            .any(|expr| contains_call_path(expr, module, member, import_aliases, from_imports)),
+        ExprKind::Set { elts } => elts
+            .iter()
+            .any(|expr| contains_call_path(expr, module, member, import_aliases, from_imports)),
+        ExprKind::ListComp { elt, generators } => {
+            contains_call_path(elt, module, member, import_aliases, from_imports)
+                || generators.iter().any(|generator| {
+                    contains_call_path(
+                        &generator.target,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    ) || contains_call_path(
+                        &generator.iter,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    ) || generator.ifs.iter().any(|expr| {
+                        contains_call_path(expr, module, member, import_aliases, from_imports)
+                    })
+                })
+        }
+        ExprKind::SetComp { elt, generators } => {
+            contains_call_path(elt, module, member, import_aliases, from_imports)
+                || generators.iter().any(|generator| {
+                    contains_call_path(
+                        &generator.target,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    ) || contains_call_path(
+                        &generator.iter,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    ) || generator.ifs.iter().any(|expr| {
+                        contains_call_path(expr, module, member, import_aliases, from_imports)
+                    })
+                })
+        }
+        ExprKind::DictComp {
+            key,
+            value,
+            generators,
+        } => {
+            contains_call_path(key, module, member, import_aliases, from_imports)
+                || contains_call_path(value, module, member, import_aliases, from_imports)
+                || generators.iter().any(|generator| {
+                    contains_call_path(
+                        &generator.target,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    ) || contains_call_path(
+                        &generator.iter,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    ) || generator.ifs.iter().any(|expr| {
+                        contains_call_path(expr, module, member, import_aliases, from_imports)
+                    })
+                })
+        }
+        ExprKind::GeneratorExp { elt, generators } => {
+            contains_call_path(elt, module, member, import_aliases, from_imports) || {
+                generators.iter().any(|generator| {
+                    contains_call_path(
+                        &generator.target,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    ) || contains_call_path(
+                        &generator.iter,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    ) || generator.ifs.iter().any(|expr| {
+                        contains_call_path(expr, module, member, import_aliases, from_imports)
+                    })
+                })
+            }
+        }
+        ExprKind::Await { value } => {
+            contains_call_path(value, module, member, import_aliases, from_imports)
+        }
+        ExprKind::Yield { value } => value.as_ref().map_or(false, |value| {
+            contains_call_path(value, module, member, import_aliases, from_imports)
+        }),
+        ExprKind::YieldFrom { value } => {
+            contains_call_path(value, module, member, import_aliases, from_imports)
+        }
+        ExprKind::Compare {
+            left,
+            ops: _,
+            comparators,
+        } => {
+            contains_call_path(left, module, member, import_aliases, from_imports)
+                || comparators.iter().any(|expr| {
+                    contains_call_path(expr, module, member, import_aliases, from_imports)
+                })
+        }
+        ExprKind::Call {
+            func,
+            args,
+            keywords,
+        } => {
+            contains_call_path(func, module, member, import_aliases, from_imports)
+                || args.iter().any(|expr| {
+                    contains_call_path(expr, module, member, import_aliases, from_imports)
+                })
+                || keywords.iter().any(|keyword| {
+                    contains_call_path(
+                        &keyword.node.value,
+                        module,
+                        member,
+                        import_aliases,
+                        from_imports,
+                    )
+                })
+        }
+        ExprKind::FormattedValue {
+            value, format_spec, ..
+        } => {
+            contains_call_path(value, module, member, import_aliases, from_imports)
+                || format_spec.as_ref().map_or(false, |value| {
+                    contains_call_path(value, module, member, import_aliases, from_imports)
+                })
+        }
+        ExprKind::JoinedStr { values } => values
+            .iter()
+            .any(|expr| contains_call_path(expr, module, member, import_aliases, from_imports)),
+        ExprKind::Constant { .. } => false,
+        ExprKind::Attribute { value, .. } => {
+            contains_call_path(value, module, member, import_aliases, from_imports)
+        }
+        ExprKind::Subscript { value, slice, .. } => {
+            contains_call_path(value, module, member, import_aliases, from_imports)
+                || contains_call_path(slice, module, member, import_aliases, from_imports)
+        }
+        ExprKind::Starred { value, ctx: _ } => {
+            contains_call_path(value, module, member, import_aliases, from_imports)
+        }
+        ExprKind::Name { .. } => false,
+        ExprKind::List { elts, .. } => elts
+            .iter()
+            .any(|expr| contains_call_path(expr, module, member, import_aliases, from_imports)),
+        ExprKind::Tuple { elts, .. } => elts
+            .iter()
+            .any(|expr| contains_call_path(expr, module, member, import_aliases, from_imports)),
+        ExprKind::Slice { lower, upper, step } => {
+            lower.as_ref().map_or(false, |value| {
+                contains_call_path(value, module, member, import_aliases, from_imports)
+            }) || upper.as_ref().map_or(false, |value| {
+                contains_call_path(value, module, member, import_aliases, from_imports)
+            }) || step.as_ref().map_or(false, |value| {
+                contains_call_path(value, module, member, import_aliases, from_imports)
+            })
+        }
+    }
+}
+
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
 /// Return `true` if the `Stmt` is an assignment to a dunder (like `__all__`).
