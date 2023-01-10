@@ -90,16 +90,10 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
 pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
     let mut exclusions: IntSet<usize> = IntSet::default();
     let mut splits: Vec<usize> = Vec::default();
-    let mut skip_file: bool = false;
     let mut off: Option<Location> = None;
     let mut last: Option<Location> = None;
     for &(start, ref tok, end) in lxr.iter().flatten() {
         last = Some(end);
-
-        // No need to keep processing, but we do need to determine the last token.
-        if skip_file {
-            continue;
-        }
 
         let Tok::Comment(comment_text) = tok else {
             continue;
@@ -112,7 +106,10 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
         if comment_text == "# isort: split" {
             splits.push(start.row());
         } else if comment_text == "# isort: skip_file" || comment_text == "# isort:skip_file" {
-            skip_file = true;
+            return IsortDirectives {
+                skip_file: true,
+                ..IsortDirectives::default()
+            };
         } else if off.is_some() {
             if comment_text == "# isort: on" {
                 if let Some(start) = off {
@@ -142,7 +139,7 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
     IsortDirectives {
         exclusions,
         splits,
-        skip_file,
+        ..IsortDirectives::default()
     }
 }
 
@@ -281,10 +278,7 @@ x = 1
 y = 2
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        assert_eq!(
-            extract_isort_directives(&lxr).exclusions,
-            IntSet::from_iter([1, 2, 3, 4])
-        );
+        assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
 
         let contents = "# isort: off
 x = 1
@@ -293,10 +287,7 @@ y = 2
 # isort: skip_file
 z = x + 1";
         let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
-        assert_eq!(
-            extract_isort_directives(&lxr).exclusions,
-            IntSet::from_iter([1, 2, 3, 4, 5, 6])
-        );
+        assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
     }
 
     #[test]

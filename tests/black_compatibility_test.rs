@@ -191,8 +191,11 @@ fn test_ruff_black_compatibility() -> Result<()> {
         &codes,
     ];
 
+    println!("ruff args: {:?}", ruff_args);
+
     for entry in paths {
         let path = entry.path();
+        println!("path: {}", path.display());
         run_test(path, &blackd, &ruff_args).context(format!("Testing {}", path.display()))?;
     }
 

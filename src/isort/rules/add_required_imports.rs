@@ -23,6 +23,15 @@ struct ImportFrom<'a> {
     level: Option<&'a usize>,
 }
 
+struct Import<'a> {
+    name: Alias<'a>,
+}
+
+enum AnyImport<'a> {
+    Import(Import<'a>),
+    ImportFrom(ImportFrom<'a>),
+}
+
 impl fmt::Display for ImportFrom<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "from ")?;
@@ -32,30 +41,63 @@ impl fmt::Display for ImportFrom<'_> {
         if let Some(module) = self.module {
             write!(f, "{module}")?;
         }
-        write!(f, " import {}", self.name.name)
+        write!(f, " import {}", self.name.name)?;
+        Ok(())
     }
 }
 
-fn has_required_import(block: &Block, required_import: &ImportFrom) -> bool {
-    block.imports.iter().any(|import| {
-        let StmtKind::ImportFrom {
-            module,
-            names,
-            level,
-        } = &import.node else {
-            return false;
-        };
+impl fmt::Display for Import<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "import {}", self.name.name)?;
+        if let Some(as_name) = self.name.as_name {
+            write!(f, " as {as_name}")?;
+        }
+        Ok(())
+    }
+}
 
-        module.as_deref() == required_import.module
-            && level.as_ref() == required_import.level
-            && names.iter().any(|alias| {
+impl fmt::Display for AnyImport<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AnyImport::Import(import) => write!(f, "{import}"),
+            AnyImport::ImportFrom(import_from) => write!(f, "{import_from}"),
+        }
+    }
+}
+
+fn contains(block: &Block, required_import: &AnyImport) -> bool {
+    block.imports.iter().any(|import| match required_import {
+        AnyImport::Import(required_import) => {
+            let StmtKind::Import {
+                names,
+            } = &import.node else {
+                return false;
+            };
+            names.iter().any(|alias| {
                 alias.node.name == required_import.name.name
                     && alias.node.asname.as_deref() == required_import.name.as_name
             })
+        }
+        AnyImport::ImportFrom(required_import) => {
+            let StmtKind::ImportFrom {
+                module,
+                names,
+                level,
+            } = &import.node else {
+                return false;
+            };
+            module.as_deref() == required_import.module
+                && level.as_ref() == required_import.level
+                && names.iter().any(|alias| {
+                    alias.node.name == required_import.name.name
+                        && alias.node.asname.as_deref() == required_import.name.as_name
+                })
+        }
     })
 }
 
-/// Find the first token that isn't a docstring, comment, or whitespace.
+/// Find the end of the first token that isn't a docstring, comment, or
+/// whitespace.
 fn find_splice_location(contents: &str) -> Location {
     let mut splice = Location::default();
     for (.., tok, end) in lexer::make_tokenizer(contents).flatten() {
@@ -69,7 +111,7 @@ fn find_splice_location(contents: &str) -> Location {
 }
 
 fn add_required_import(
-    required_import: &ImportFrom,
+    required_import: &AnyImport,
     contents: &str,
     blocks: &[&Block],
     settings: &Settings,
@@ -79,7 +121,7 @@ fn add_required_import(
     if blocks
         .iter()
         .filter(|block| !block.nested)
-        .any(|block| has_required_import(block, required_import))
+        .any(|block| contains(block, required_import))
     {
         return None;
     }
@@ -131,26 +173,47 @@ pub fn add_required_imports(
                 error!("Expected require import to contain a single statement: `{}`", required_import);
                 return vec![];
             }
-            let StmtKind::ImportFrom { module, names, level } = &body[0].node else {
-                error!("Expected required import to be in import-from style: `{}`", required_import);
-                return vec![];
-            };
-            names.iter().filter_map(|name| {
-                add_required_import(
-                    &ImportFrom {
-                        module: module.as_ref().map(String::as_str),
-                        name: Alias {
-                            name: name.node.name.as_str(),
-                            as_name: name.node.asname.as_deref(),
-                        },
-                        level: level.as_ref(),
-                    },
-                    contents,
-                    blocks,
-                    settings,
-                    autofix,
-                )
-            }).collect()
+
+            match &body[0].node {
+                StmtKind::ImportFrom { module, names, level } => {
+                    names.iter().filter_map(|name| {
+                        add_required_import(
+                            &AnyImport::ImportFrom(ImportFrom {
+                                module: module.as_ref().map(String::as_str),
+                                name: Alias {
+                                    name: name.node.name.as_str(),
+                                    as_name: name.node.asname.as_deref(),
+                                },
+                                level: level.as_ref(),
+                            }),
+                            contents,
+                            blocks,
+                            settings,
+                            autofix,
+                        )
+                    }).collect()
+                }
+                StmtKind::Import { names } => {
+                    names.iter().filter_map(|name| {
+                        add_required_import(
+                            &AnyImport::Import(Import {
+                                name: Alias {
+                                    name: name.node.name.as_str(),
+                                    as_name: name.node.asname.as_deref(),
+                                },
+                            }),
+                            contents,
+                            blocks,
+                            settings,
+                            autofix,
+                        )
+                    }).collect()
+                }
+                _ => {
+                    error!("Expected required import to be in import-from style: `{}`", required_import);
+                    vec![]
+                }
+            }
         })
         .collect()
 }
