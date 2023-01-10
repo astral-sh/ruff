@@ -4793,15 +4793,15 @@ impl Violation for UnsafeYAMLLoad {
 }
 
 define_violation!(
-    pub struct SnmpInsecureVesion;
+    pub struct SnmpInsecureVersion;
 );
-impl Violation for SnmpInsecureVesion {
+impl Violation for SnmpInsecureVersion {
     fn message(&self) -> String {
         "Possible insecure use of SNMPv1 and SNMPv2. You should use SNMPv3 if able".to_string()
     }
 
     fn placeholder() -> Self {
-        SnmpInsecureVesion
+        SnmpInsecureVersion
     }
 }
 

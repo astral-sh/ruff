@@ -29,7 +29,7 @@ pub fn snmp_insecure_version(
             {
                 if value.is_zero() || value.is_one() {
                     return Some(Diagnostic::new(
-                        violations::SnmpInsecureVesion,
+                        violations::SnmpInsecureVersion,
                         Range::from_located(mp_model_arg),
                     ));
                 }

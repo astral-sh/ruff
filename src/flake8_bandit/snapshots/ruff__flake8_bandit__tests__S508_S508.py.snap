@@ -3,7 +3,7 @@ source: src/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SnmpInsecureVesion: ~
+    SnmpInsecureVersion: ~
   location:
     row: 4
     column: 36
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SnmpInsecureVesion: ~
+    SnmpInsecureVersion: ~
   location:
     row: 5
     column: 36
