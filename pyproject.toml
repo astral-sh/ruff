@@ -42,9 +42,3 @@ license-files = [
   "LICENSE",
   "licenses/*",
 ]
-
-[tool.isort]
-add_imports = "from __future__ import annotations"
-
-[tool.ruff.isort]
-required-imports = ["from __future__ import annotations"]

@@ -1,15 +1,16 @@
 use std::fmt;
 
 use log::error;
-use rustpython_ast::{Location, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
+use rustpython_ast::{Location, StmtKind, Suite};
 
+use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
+use crate::isort::helpers;
 use crate::isort::track::Block;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::{flags, Settings};
+use crate::source_code_locator::SourceCodeLocator;
 use crate::violations;
 
 struct Alias<'a> {
@@ -96,24 +97,11 @@ fn contains(block: &Block, required_import: &AnyImport) -> bool {
     })
 }
 
-/// Find the end of the first token that isn't a docstring, comment, or
-/// whitespace.
-fn find_splice_location(contents: &str) -> Location {
-    let mut splice = Location::default();
-    for (.., tok, end) in lexer::make_tokenizer(contents).flatten() {
-        if matches!(tok, Tok::String { .. } | Tok::Comment(..) | Tok::Newline) {
-            splice = end;
-        } else {
-            break;
-        }
-    }
-    splice
-}
-
 fn add_required_import(
     required_import: &AnyImport,
-    contents: &str,
     blocks: &[&Block],
+    python_ast: &Suite,
+    locator: &SourceCodeLocator,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Diagnostic> {
@@ -126,26 +114,38 @@ fn add_required_import(
         return None;
     }
 
+    // Don't add imports to semantically-empty files.
+    if python_ast.iter().all(is_docstring_stmt) {
+        return None;
+    }
+
     // Always insert the diagnostic at top-of-file.
+    let required_import = required_import.to_string();
     let mut diagnostic = Diagnostic::new(
-        violations::MissingRequiredImport(required_import.to_string()),
+        violations::MissingRequiredImport(required_import.clone()),
         Range::new(Location::default(), Location::default()),
     );
     if matches!(autofix, flags::Autofix::Enabled) && settings.fixable.contains(&RuleCode::I002) {
         // Determine the location at which the import should be inserted.
-        let splice = find_splice_location(contents);
+        let splice = helpers::find_splice_location(python_ast, locator);
 
-        // Generate the edit. If we're inserting beyond the start of the file, we need
-        // to add a newline, since the splice represents the _end_ of the last
+        // Generate the edit.
+        let mut contents = String::with_capacity(required_import.len() + 1);
+
+        // If we're inserting beyond the start of the file, we add
+        // a newline _before_, since the splice represents the _end_ of the last
         // irrelevant token (e.g., the end of a comment or the end of
         // docstring). This ensures that we properly handle awkward cases like
         // docstrings that are followed by semicolons.
-        let mut contents = String::new();
         if splice > Location::default() {
             contents.push('\n');
         }
-        contents.push_str(&required_import.to_string());
-        contents.push('\n');
+        contents.push_str(&required_import);
+
+        // If we're inserting at the start of the file, add a trailing newline instead.
+        if splice == Location::default() {
+            contents.push('\n');
+        }
 
         // Construct the fix.
         diagnostic.amend(Fix::insertion(contents, splice));
@@ -155,8 +155,9 @@ fn add_required_import(
 
 /// I002
 pub fn add_required_imports(
-    contents: &str,
     blocks: &[&Block],
+    python_ast: &Suite,
+    locator: &SourceCodeLocator,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
@@ -186,8 +187,9 @@ pub fn add_required_imports(
                                 },
                                 level: level.as_ref(),
                             }),
-                            contents,
                             blocks,
+                            python_ast,
+                            locator,
                             settings,
                             autofix,
                         )
@@ -202,8 +204,9 @@ pub fn add_required_imports(
                                     as_name: name.node.asname.as_deref(),
                                 },
                             }),
-                            contents,
                             blocks,
+                            python_ast,
+    locator,
                             settings,
                             autofix,
                         )

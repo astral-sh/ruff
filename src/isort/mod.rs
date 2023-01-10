@@ -828,4 +828,99 @@ mod tests {
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring_only.py"))]
+    #[test_case(Path::new("empty.py"))]
+    fn required_import(path: &Path) -> Result<()> {
+        let snapshot = format!("required_import_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort/required_imports")
+                .join(path)
+                .as_path(),
+            &Settings {
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                isort: isort::settings::Settings {
+                    required_imports: BTreeSet::from([
+                        "from __future__ import annotations".to_string()
+                    ]),
+                    ..isort::settings::Settings::default()
+                },
+                ..Settings::for_rule(RuleCode::I002)
+            },
+        )?;
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring_only.py"))]
+    #[test_case(Path::new("empty.py"))]
+    fn required_imports(path: &Path) -> Result<()> {
+        let snapshot = format!("required_imports_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort/required_imports")
+                .join(path)
+                .as_path(),
+            &Settings {
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                isort: isort::settings::Settings {
+                    required_imports: BTreeSet::from([
+                        "from __future__ import annotations".to_string(),
+                        "from __future__ import generator_stop".to_string(),
+                    ]),
+                    ..isort::settings::Settings::default()
+                },
+                ..Settings::for_rule(RuleCode::I002)
+            },
+        )?;
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring_only.py"))]
+    #[test_case(Path::new("empty.py"))]
+    fn combined_required_imports(path: &Path) -> Result<()> {
+        let snapshot = format!("combined_required_imports_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort/required_imports")
+                .join(path)
+                .as_path(),
+            &Settings {
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                isort: isort::settings::Settings {
+                    required_imports: BTreeSet::from(["from __future__ import annotations, \
+                                                       generator_stop"
+                        .to_string()]),
+                    ..isort::settings::Settings::default()
+                },
+                ..Settings::for_rule(RuleCode::I002)
+            },
+        )?;
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring_only.py"))]
+    #[test_case(Path::new("empty.py"))]
+    fn straight_required_import(path: &Path) -> Result<()> {
+        let snapshot = format!("straight_required_import_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort/required_imports")
+                .join(path)
+                .as_path(),
+            &Settings {
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                isort: isort::settings::Settings {
+                    required_imports: BTreeSet::from(["import os".to_string()]),
+                    ..isort::settings::Settings::default()
+                },
+                ..Settings::for_rule(RuleCode::I002)
+            },
+        )?;
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
 }

@@ -15,7 +15,6 @@ use crate::source_code_style::SourceCodeStyleDetector;
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_imports(
-    contents: &str,
     python_ast: &Suite,
     locator: &SourceCodeLocator,
     directives: &IsortDirectives,
@@ -25,11 +24,6 @@ pub fn check_imports(
     path: &Path,
     package: Option<&Path>,
 ) -> Vec<Diagnostic> {
-    // Don't enforce import rules on empty files (like `__init__.py`).
-    if contents.is_empty() {
-        return vec![];
-    }
-
     // Extract all imports from the AST.
     let tracker = {
         let mut tracker = ImportTracker::new(locator, directives, path);
@@ -55,7 +49,7 @@ pub fn check_imports(
     }
     if settings.enabled.contains(&RuleCode::I002) {
         diagnostics.extend(isort::rules::add_required_imports(
-            contents, &blocks, settings, autofix,
+            &blocks, python_ast, locator, settings, autofix,
         ));
     }
     diagnostics

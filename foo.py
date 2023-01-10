@@ -1,1 +1,0 @@
-"%s" % "Hello, world!"

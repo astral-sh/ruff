@@ -106,7 +106,6 @@ pub(crate) fn check_path(
                 }
                 if use_imports {
                     diagnostics.extend(check_imports(
-                        contents,
                         &python_ast,
                         locator,
                         &directives.isort,
