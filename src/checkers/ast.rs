@@ -1991,6 +1991,28 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.settings.enabled.contains(&RuleCode::S508) {
+                    if let Some(diagnostic) = flake8_bandit::rules::snmp_insecure_version(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+                if self.settings.enabled.contains(&RuleCode::S509) {
+                    if let Some(diagnostic) = flake8_bandit::rules::snmp_weak_cryptography(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.enabled.contains(&RuleCode::S106) {
                     self.diagnostics
                         .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));

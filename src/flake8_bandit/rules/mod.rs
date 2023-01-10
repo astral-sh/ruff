@@ -11,6 +11,8 @@ pub use hardcoded_tmp_directory::hardcoded_tmp_directory;
 pub use hashlib_insecure_hash_functions::hashlib_insecure_hash_functions;
 pub use request_with_no_cert_validation::request_with_no_cert_validation;
 pub use request_without_timeout::request_without_timeout;
+pub use snmp_insecure_version::snmp_insecure_version;
+pub use snmp_weak_cryptography::snmp_weak_cryptography;
 pub use unsafe_yaml_load::unsafe_yaml_load;
 
 mod assert_used;
@@ -24,4 +26,6 @@ mod hardcoded_tmp_directory;
 mod hashlib_insecure_hash_functions;
 mod request_with_no_cert_validation;
 mod request_without_timeout;
+mod snmp_insecure_version;
+mod snmp_weak_cryptography;
 mod unsafe_yaml_load;
