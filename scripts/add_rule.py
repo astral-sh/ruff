@@ -116,33 +116,6 @@ impl Violation for %s {
                 fp.write("\n")
                 has_written = True
 
-    # Add the relevant code-to-origin pair to `src/registry.rs`.
-    with open(os.path.join(ROOT_DIR, "src/registry.rs")) as fp:
-        content = fp.read()
-
-    seen_impl = False
-    has_written = False
-    with open(os.path.join(ROOT_DIR, "src/registry.rs"), "w") as fp:
-        for line in content.splitlines():
-            fp.write(line)
-            fp.write("\n")
-
-            if has_written:
-                continue
-
-            if line.startswith("impl RuleCode"):
-                seen_impl = True
-                continue
-
-            if not seen_impl:
-                continue
-
-            if line.strip() == f"// {origin}":
-                indent = line.split("//")[0]
-                fp.write(f"{indent}RuleCode::{code} => RuleOrigin::{pascal_case(origin)},")
-                fp.write("\n")
-                has_written = True
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

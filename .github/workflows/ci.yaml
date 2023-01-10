@@ -80,6 +80,7 @@ jobs:
           cargo insta test --all --delete-unreferenced-snapshots
           git diff --exit-code
       - run: cargo test --package ruff --test black_compatibility_test -- --ignored
+      - run: cargo test --package ruff_macros
 
 # TODO(charlie): Re-enable the `wasm-pack` tests.
 # See: https://github.com/charliermarsh/ruff/issues/1425
