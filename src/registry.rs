@@ -417,7 +417,7 @@ define_rule_mapping!(
     S501 => violations::RequestWithNoCertValidation,
     S506 => violations::UnsafeYAMLLoad,
     S508 => violations::SnmpInsecureVersion,
-    S509 => violations::SnmpWeakCriptography,
+    S509 => violations::SnmpWeakCryptography,
     // flake8-boolean-trap
     FBT001 => violations::BooleanPositionalArgInFunctionDefinition,
     FBT002 => violations::BooleanDefaultValueInFunctionDefinition,
