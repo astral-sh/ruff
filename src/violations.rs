@@ -4808,7 +4808,7 @@ impl Violation for SnmpInsecureVersion {
 define_violation!(
     pub struct SnmpWeakCryptography;
 );
-impl Violation for SnmpWeakCriptography {
+impl Violation for SnmpWeakCryptography {
     fn message(&self) -> String {
         "Possible use of SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure"
             .to_string()
