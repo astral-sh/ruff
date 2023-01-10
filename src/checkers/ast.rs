@@ -1405,6 +1405,9 @@ where
                 if self.settings.enabled.contains(&RuleCode::B015) {
                     flake8_bugbear::rules::useless_comparison(self, value);
                 }
+                if self.settings.enabled.contains(&RuleCode::SIM112) {
+                    flake8_simplify::rules::use_capital_environment_variables(self, value);
+                }
             }
             _ => {}
         }
