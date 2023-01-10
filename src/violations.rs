@@ -4797,7 +4797,7 @@ define_violation!(
 );
 impl Violation for SnmpInsecureVersion {
     fn message(&self) -> String {
-        "Possible insecure use of SNMPv1 and SNMPv2. You should use SNMPv3 if able".to_string()
+        "The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.".to_string()
     }
 
     fn placeholder() -> Self {
@@ -4810,7 +4810,7 @@ define_violation!(
 );
 impl Violation for SnmpWeakCryptography {
     fn message(&self) -> String {
-        "Possible use of SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure"
+        "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
             .to_string()
     }
 

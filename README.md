@@ -777,8 +777,8 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "..." |  |
 | S501 | RequestWithNoCertValidation | Probable use of `...` call with `verify=False` disabling SSL certificate checks |  |
 | S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
-| S508 | SnmpInsecureVersion | Possible insecure use of SNMPv1 and SNMPv2. You should use SNMPv3 if able |  |
-| S509 | SnmpWeakCryptography | Possible use of SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure |  |
+| S508 | SnmpInsecureVersion | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
+| S509 | SnmpWeakCryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
 
 ### flake8-blind-except (BLE)
 
