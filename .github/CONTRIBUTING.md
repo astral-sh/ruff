@@ -56,9 +56,9 @@ prior to merging.
 
 There are four phases to adding a new lint rule:
 
-1. Define the violation in `src/violations.rs` (e.g., `ModuleImportNotAtTopOfFile`).
-2. Map the violation to a code in `src/registry.rs` (e.g., `E402`).
-3. Define the _logic_ for triggering the violation in `src/checkers/ast.rs` (for AST-based checks),
+1. Define the violation struct in `src/violations.rs` (e.g., `ModuleImportNotAtTopOfFile`).
+2. Map the violation struct to a rule code in `src/registry.rs` (e.g., `E402`).
+3. Define the logic for triggering the violation in `src/checkers/ast.rs` (for AST-based checks),
    `src/checkers/tokens.rs` (for token-based checks), or `src/checkers/lines.rs` (for text-based checks).
 4. Add a test fixture.
 5. Update the generated files (documentation and generated code).
@@ -74,15 +74,16 @@ collecting diagnostics as it goes.
 If you need to inspect the AST, you can run `cargo +nightly dev print-ast` with a Python file. Grep
 for the `Check::new` invocations to understand how other, similar rules are implemented.
 
-To add a test fixture, create a file under `resources/test/fixtures/[plugin-name]`, named to match
-the code you defined earlier (e.g., `E402.py`). This file should contain a variety of
-violations and non-violations designed to evaluate and demonstrate the behavior of your lint rule.
+To add a test fixture, create a file under `resources/test/fixtures/[origin]`, named to match
+the code you defined earlier (e.g., `resources/test/fixtures/pycodestyle/E402.py`). This file should
+contain a variety of violations and non-violations designed to evaluate and demonstrate the behavior
+of your lint rule.
 
 Run `cargo +nightly dev generate-all` to generate the code for your new fixture. Then run Ruff
 locally with (e.g.) `cargo run resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `src/[plugin-name]/mod.rs` file. Then, run `cargo test --all`.
+`test_case` macro in the relevant `src/[origin]/mod.rs` file. Then, run `cargo test --all`.
 Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
 generated snapshot, then commit the snapshot file alongside the rest of your changes.
 

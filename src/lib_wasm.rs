@@ -24,7 +24,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
-export interface Check {
+export interface Diagnostic {
     code: string;
     message: string;
     location: {

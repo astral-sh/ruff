@@ -30,7 +30,7 @@ pub fn convert(
         .get("flake8")
         .expect("Unable to find flake8 section in INI file");
 
-    // Extract all referenced check code prefixes, to power plugin inference.
+    // Extract all referenced rule code prefixes, to power plugin inference.
     let mut referenced_codes: BTreeSet<RuleCodePrefix> = BTreeSet::default();
     for (key, value) in flake8 {
         if let Some(value) = value {

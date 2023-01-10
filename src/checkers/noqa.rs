@@ -47,7 +47,7 @@ pub fn check_noqa(
             continue;
         }
 
-        // Is the check ignored by a `noqa` directive on the parent line?
+        // Is the violation ignored by a `noqa` directive on the parent line?
         if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
             let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
             if commented_lines.contains(noqa_lineno) {

@@ -5,19 +5,19 @@
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { MarkerSeverity, MarkerTag } from "monaco-editor";
 import { useCallback, useEffect } from "react";
-import { Check } from "../pkg";
+import { Diagnostic } from "../pkg";
 import { Theme } from "./theme";
 
 export default function SourceEditor({
   visible,
   source,
   theme,
-  checks,
+  diagnostics,
   onChange,
 }: {
   visible: boolean;
   source: string;
-  checks: Check[];
+  diagnostics: Diagnostic[];
   theme: Theme;
   onChange: (pythonSource: string) => void;
 }) {
@@ -33,15 +33,15 @@ export default function SourceEditor({
     editor.setModelMarkers(
       model,
       "owner",
-      checks.map((check) => ({
-        startLineNumber: check.location.row,
-        startColumn: check.location.column + 1,
-        endLineNumber: check.end_location.row,
-        endColumn: check.end_location.column + 1,
-        message: `${check.code}: ${check.message}`,
+      diagnostics.map((diagnostic) => ({
+        startLineNumber: diagnostic.location.row,
+        startColumn: diagnostic.location.column + 1,
+        endLineNumber: diagnostic.end_location.row,
+        endColumn: diagnostic.end_location.column + 1,
+        message: `${diagnostic.code}: ${diagnostic.message}`,
         severity: MarkerSeverity.Error,
         tags:
-          check.code === "F401" || check.code === "F841"
+          diagnostic.code === "F401" || diagnostic.code === "F841"
             ? [MarkerTag.Unnecessary]
             : [],
       })),
@@ -52,7 +52,7 @@ export default function SourceEditor({
       {
         // @ts-expect-error: The type definition is wrong.
         provideCodeActions: function (model, position) {
-          const actions = checks
+          const actions = diagnostics
             .filter((check) => position.startLineNumber === check.location.row)
             .filter((check) => check.fix)
             .map((check) => ({
@@ -89,7 +89,7 @@ export default function SourceEditor({
     return () => {
       codeActionProvider?.dispose();
     };
-  }, [checks, monaco]);
+  }, [diagnostics, monaco]);
 
   const handleChange = useCallback(
     (value: string | undefined) => {

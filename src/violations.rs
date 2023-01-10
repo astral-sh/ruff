@@ -5086,7 +5086,7 @@ define_violation!(
 );
 impl Violation for BlanketTypeIgnore {
     fn message(&self) -> String {
-        "Use specific error codes when ignoring type issues".to_string()
+        "Use specific rule codes when ignoring type issues".to_string()
     }
 
     fn placeholder() -> Self {
@@ -5099,7 +5099,7 @@ define_violation!(
 );
 impl Violation for BlanketNOQA {
     fn message(&self) -> String {
-        "Use specific error codes when using `noqa`".to_string()
+        "Use specific rule codes when using `noqa`".to_string()
     }
 
     fn placeholder() -> Self {
