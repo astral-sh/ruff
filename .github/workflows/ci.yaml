@@ -27,8 +27,8 @@ jobs:
           toolchain: nightly-2022-11-01
           override: true
       - uses: Swatinem/rust-cache@v1
-      - run: cargo build --all --release
-      - run: ./target/release/ruff_dev generate-all
+      - run: cargo build --all
+      - run: ./target/debug/ruff_dev generate-all
       - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo +nightly dev generate-all'."
       - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo +nightly dev generate-all'."
       - run: git diff --exit-code -- README.md ruff.schema.json
