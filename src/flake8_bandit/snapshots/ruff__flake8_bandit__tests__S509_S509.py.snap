@@ -3,7 +3,7 @@ source: src/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SnmpWeakCriptography: ~
+    SnmpWeakCryptography: ~
   location:
     row: 4
     column: 11
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SnmpWeakCriptography: ~
+    SnmpWeakCryptography: ~
   location:
     row: 5
     column: 15
