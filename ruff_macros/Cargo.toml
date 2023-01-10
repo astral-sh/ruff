@@ -5,6 +5,7 @@ edition = "2021"
 
 [lib]
 proc-macro = true
+doctest = false
 
 [dependencies]
 once_cell = { version = "1.17.0" }

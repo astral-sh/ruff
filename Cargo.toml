@@ -19,6 +19,7 @@ license = "MIT"
 [lib]
 name = "ruff"
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [dependencies]
 annotate-snippets = { version = "0.9.1", features = ["color"] }
