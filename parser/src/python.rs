@@ -1,3 +1,3 @@
 #![allow(clippy::all)]
 #![allow(unused)]
-include!("../python.rs");
+include!(concat!(env!("OUT_DIR"), "/python.rs"));

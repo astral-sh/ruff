@@ -1,22 +1,22 @@
 use std::fmt::Write as _;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tiny_keccak::{Hasher, Sha3};
 
 fn main() -> anyhow::Result<()> {
     const SOURCE: &str = "python.lalrpop";
-    const TARGET: &str = "python.rs";
+    let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
 
     println!("cargo:rerun-if-changed={SOURCE}");
 
-    try_lalrpop(SOURCE, TARGET)?;
-    gen_phf();
+    try_lalrpop(SOURCE, &out_dir.join("python.rs"))?;
+    gen_phf(&out_dir);
 
     Ok(())
 }
 
-fn requires_lalrpop(source: &str, target: &str) -> Option<String> {
+fn requires_lalrpop(source: &str, target: &Path) -> Option<String> {
     let Ok(target) = File::open(target) else {
         return Some("python.rs doesn't exist. regenerate.".to_owned());
     };
@@ -68,16 +68,22 @@ fn requires_lalrpop(source: &str, target: &str) -> Option<String> {
     None
 }
 
-fn try_lalrpop(source: &str, target: &str) -> anyhow::Result<()> {
+fn try_lalrpop(source: &str, target: &Path) -> anyhow::Result<()> {
     let Some(_message) = requires_lalrpop(source, target) else {
         return Ok(());
     };
 
     #[cfg(feature = "lalrpop")]
-    lalrpop::process_root().unwrap_or_else(|e| {
-        println!("cargo:warning={_message}");
-        panic!("running lalrpop failed. {e:?}");
-    });
+    // We are not using lalrpop::process_root() or Configuration::process_current_dir()
+    // because of https://github.com/lalrpop/lalrpop/issues/699.
+    lalrpop::Configuration::new()
+        .use_cargo_dir_conventions()
+        .set_in_dir(Path::new("."))
+        .process()
+        .unwrap_or_else(|e| {
+            println!("cargo:warning={_message}");
+            panic!("running lalrpop failed. {e:?}");
+        });
 
     #[cfg(not(feature = "lalrpop"))]
     {
@@ -98,8 +104,7 @@ fn sha_equal(expected_sha3_str: &str, actual_sha3: &[u8; 32]) -> bool {
     *actual_sha3 == expected_sha3
 }
 
-fn gen_phf() {
-    let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+fn gen_phf(out_dir: &Path) {
     let mut kwds = phf_codegen::Map::new();
     let kwds = kwds
         // Alphabetical keywords:
