@@ -2049,167 +2049,74 @@ where
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&RuleCode::C400) {
                     flake8_comprehensions::rules::unnecessary_generator_list(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C400),
-                        Range::from_located(expr),
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C401) {
                     flake8_comprehensions::rules::unnecessary_generator_set(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C401),
-                        Range::from_located(expr),
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C402) {
                     flake8_comprehensions::rules::unnecessary_generator_dict(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C402),
-                        Range::from_located(expr),
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C403) {
                     flake8_comprehensions::rules::unnecessary_list_comprehension_set(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C403),
-                        Range::from_located(expr),
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C404) {
                     flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C404),
-                        Range::from_located(expr),
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C405) {
                     flake8_comprehensions::rules::unnecessary_literal_set(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C405),
-                        Range::from_located(expr),
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C406) {
                     flake8_comprehensions::rules::unnecessary_literal_dict(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C406),
-                        Range::from_located(expr),
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C408) {
                     flake8_comprehensions::rules::unnecessary_collection_call(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C408),
-                        Range::from_located(expr),
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C409) {
                     flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        self.locator,
-                        self.patch(&RuleCode::C409),
-                        Range::from_located(expr),
+                        self, expr, func, args,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C410) {
                     flake8_comprehensions::rules::unnecessary_literal_within_list_call(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        self.locator,
-                        self.patch(&RuleCode::C410),
-                        Range::from_located(expr),
+                        self, expr, func, args,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C411) {
-                    flake8_comprehensions::rules::unnecessary_list_call(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        self.locator,
-                        self.patch(&RuleCode::C411),
-                        Range::from_located(expr),
-                    );
+                    flake8_comprehensions::rules::unnecessary_list_call(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::C413) {
                     flake8_comprehensions::rules::unnecessary_call_around_sorted(
-                        self,
-                        expr,
-                        func,
-                        args,
-                        self.locator,
-                        self.patch(&RuleCode::C413),
-                        Range::from_located(expr),
+                        self, expr, func, args,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C414) {
                     flake8_comprehensions::rules::unnecessary_double_cast_or_process(
-                        self,
-                        func,
-                        args,
-                        Range::from_located(expr),
+                        self, expr, func, args,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C415) {
                     flake8_comprehensions::rules::unnecessary_subscript_reversal(
-                        self,
-                        func,
-                        args,
-                        Range::from_located(expr),
+                        self, expr, func, args,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::C417) {
-                    flake8_comprehensions::rules::unnecessary_map(
-                        self,
-                        func,
-                        args,
-                        Range::from_located(expr),
-                    );
+                    flake8_comprehensions::rules::unnecessary_map(self, expr, func, args);
                 }
 
                 // flake8-boolean-trap
@@ -2754,13 +2661,7 @@ where
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&RuleCode::C416) {
                     flake8_comprehensions::rules::unnecessary_comprehension(
-                        self,
-                        expr,
-                        elt,
-                        generators,
-                        self.locator,
-                        self.patch(&RuleCode::C416),
-                        Range::from_located(expr),
+                        self, expr, elt, generators,
                     );
                 }
                 if self.settings.enabled.contains(&RuleCode::B023) {
