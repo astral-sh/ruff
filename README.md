@@ -123,6 +123,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
    1. [flake8-pie (PIE)](#flake8-pie-pie)
+   1. [flake8-commas (C8)](#flake8-commas-c8)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1128,6 +1129,16 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
 | PIE790 | NoUnnecessaryPass | Unnecessary `pass` statement | 🛠 |
 | PIE794 | DupeClassFieldDefinitions | Class field `...` is defined multiple times | 🛠 |
 | PIE807 | PreferListBuiltin | Prefer `list()` over useless lambda | 🛠 |
+
+### flake8-commas (C8)
+
+For more, see [flake8-commas](https://pypi.org/project/flake8-commas/2.1.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| C812 | TrailingCommaMissing | Trailing comma missing | 🛠 |
+| C818 | TrailingCommaOnBareTupleProhibited | Trailing comma on bare tuple prohibited |  |
+| C819 | TrailingCommaProhibited | Trailing comma prohibited | 🛠 |
 
 ### Ruff-specific rules (RUF)
 

@@ -1,0 +1,789 @@
+---
+source: src/rules/flake8_commas/mod.rs
+expression: diagnostics
+---
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 4
+    column: 17
+  end_location:
+    row: 4
+    column: 17
+  fix:
+    content: ","
+    location:
+      row: 4
+      column: 17
+    end_location:
+      row: 4
+      column: 17
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 10
+    column: 5
+  end_location:
+    row: 10
+    column: 5
+  fix:
+    content: ","
+    location:
+      row: 10
+      column: 5
+    end_location:
+      row: 10
+      column: 5
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 16
+    column: 5
+  end_location:
+    row: 16
+    column: 5
+  fix:
+    content: ","
+    location:
+      row: 16
+      column: 5
+    end_location:
+      row: 16
+      column: 5
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 23
+    column: 5
+  end_location:
+    row: 23
+    column: 5
+  fix:
+    content: ","
+    location:
+      row: 23
+      column: 5
+    end_location:
+      row: 23
+      column: 5
+  parent: ~
+- kind:
+    TrailingCommaOnBareTupleProhibited: ~
+  location:
+    row: 36
+    column: 7
+  end_location:
+    row: 36
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    TrailingCommaOnBareTupleProhibited: ~
+  location:
+    row: 38
+    column: 18
+  end_location:
+    row: 38
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    TrailingCommaOnBareTupleProhibited: ~
+  location:
+    row: 45
+    column: 7
+  end_location:
+    row: 45
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    TrailingCommaOnBareTupleProhibited: ~
+  location:
+    row: 49
+    column: 9
+  end_location:
+    row: 49
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    TrailingCommaOnBareTupleProhibited: ~
+  location:
+    row: 56
+    column: 31
+  end_location:
+    row: 56
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    TrailingCommaOnBareTupleProhibited: ~
+  location:
+    row: 58
+    column: 25
+  end_location:
+    row: 58
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    TrailingCommaOnBareTupleProhibited: ~
+  location:
+    row: 61
+    column: 16
+  end_location:
+    row: 61
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 70
+    column: 7
+  end_location:
+    row: 70
+    column: 7
+  fix:
+    content: ","
+    location:
+      row: 70
+      column: 7
+    end_location:
+      row: 70
+      column: 7
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 78
+    column: 7
+  end_location:
+    row: 78
+    column: 7
+  fix:
+    content: ","
+    location:
+      row: 78
+      column: 7
+    end_location:
+      row: 78
+      column: 7
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 86
+    column: 7
+  end_location:
+    row: 86
+    column: 7
+  fix:
+    content: ","
+    location:
+      row: 86
+      column: 7
+    end_location:
+      row: 86
+      column: 7
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 152
+    column: 5
+  end_location:
+    row: 152
+    column: 5
+  fix:
+    content: ","
+    location:
+      row: 152
+      column: 5
+    end_location:
+      row: 152
+      column: 5
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 158
+    column: 10
+  end_location:
+    row: 158
+    column: 10
+  fix:
+    content: ","
+    location:
+      row: 158
+      column: 10
+    end_location:
+      row: 158
+      column: 10
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 293
+    column: 14
+  end_location:
+    row: 293
+    column: 14
+  fix:
+    content: ","
+    location:
+      row: 293
+      column: 14
+    end_location:
+      row: 293
+      column: 14
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 304
+    column: 13
+  end_location:
+    row: 304
+    column: 13
+  fix:
+    content: ","
+    location:
+      row: 304
+      column: 13
+    end_location:
+      row: 304
+      column: 13
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 310
+    column: 13
+  end_location:
+    row: 310
+    column: 13
+  fix:
+    content: ","
+    location:
+      row: 310
+      column: 13
+    end_location:
+      row: 310
+      column: 13
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 316
+    column: 9
+  end_location:
+    row: 316
+    column: 9
+  fix:
+    content: ","
+    location:
+      row: 316
+      column: 9
+    end_location:
+      row: 316
+      column: 9
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 322
+    column: 14
+  end_location:
+    row: 322
+    column: 14
+  fix:
+    content: ","
+    location:
+      row: 322
+      column: 14
+    end_location:
+      row: 322
+      column: 14
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 368
+    column: 14
+  end_location:
+    row: 368
+    column: 14
+  fix:
+    content: ","
+    location:
+      row: 368
+      column: 14
+    end_location:
+      row: 368
+      column: 14
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 375
+    column: 14
+  end_location:
+    row: 375
+    column: 14
+  fix:
+    content: ","
+    location:
+      row: 375
+      column: 14
+    end_location:
+      row: 375
+      column: 14
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 404
+    column: 14
+  end_location:
+    row: 404
+    column: 14
+  fix:
+    content: ","
+    location:
+      row: 404
+      column: 14
+    end_location:
+      row: 404
+      column: 14
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 432
+    column: 14
+  end_location:
+    row: 432
+    column: 14
+  fix:
+    content: ","
+    location:
+      row: 432
+      column: 14
+    end_location:
+      row: 432
+      column: 14
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 485
+    column: 20
+  end_location:
+    row: 485
+    column: 21
+  fix:
+    content: ""
+    location:
+      row: 485
+      column: 20
+    end_location:
+      row: 485
+      column: 21
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 487
+    column: 12
+  end_location:
+    row: 487
+    column: 13
+  fix:
+    content: ""
+    location:
+      row: 487
+      column: 12
+    end_location:
+      row: 487
+      column: 13
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 489
+    column: 17
+  end_location:
+    row: 489
+    column: 18
+  fix:
+    content: ""
+    location:
+      row: 489
+      column: 17
+    end_location:
+      row: 489
+      column: 18
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 494
+    column: 5
+  end_location:
+    row: 494
+    column: 6
+  fix:
+    content: ""
+    location:
+      row: 494
+      column: 5
+    end_location:
+      row: 494
+      column: 6
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 496
+    column: 20
+  end_location:
+    row: 496
+    column: 21
+  fix:
+    content: ""
+    location:
+      row: 496
+      column: 20
+    end_location:
+      row: 496
+      column: 21
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 498
+    column: 12
+  end_location:
+    row: 498
+    column: 13
+  fix:
+    content: ""
+    location:
+      row: 498
+      column: 12
+    end_location:
+      row: 498
+      column: 13
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 500
+    column: 17
+  end_location:
+    row: 500
+    column: 18
+  fix:
+    content: ""
+    location:
+      row: 500
+      column: 17
+    end_location:
+      row: 500
+      column: 18
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 505
+    column: 5
+  end_location:
+    row: 505
+    column: 6
+  fix:
+    content: ""
+    location:
+      row: 505
+      column: 5
+    end_location:
+      row: 505
+      column: 6
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 511
+    column: 9
+  end_location:
+    row: 511
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 511
+      column: 9
+    end_location:
+      row: 511
+      column: 10
+  parent: ~
+- kind:
+    TrailingCommaProhibited: ~
+  location:
+    row: 513
+    column: 8
+  end_location:
+    row: 513
+    column: 9
+  fix:
+    content: ""
+    location:
+      row: 513
+      column: 8
+    end_location:
+      row: 513
+      column: 9
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 519
+    column: 12
+  end_location:
+    row: 519
+    column: 12
+  fix:
+    content: ","
+    location:
+      row: 519
+      column: 12
+    end_location:
+      row: 519
+      column: 12
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 526
+    column: 9
+  end_location:
+    row: 526
+    column: 9
+  fix:
+    content: ","
+    location:
+      row: 526
+      column: 9
+    end_location:
+      row: 526
+      column: 9
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 534
+    column: 15
+  end_location:
+    row: 534
+    column: 15
+  fix:
+    content: ","
+    location:
+      row: 534
+      column: 15
+    end_location:
+      row: 534
+      column: 15
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 541
+    column: 12
+  end_location:
+    row: 541
+    column: 12
+  fix:
+    content: ","
+    location:
+      row: 541
+      column: 12
+    end_location:
+      row: 541
+      column: 12
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 547
+    column: 23
+  end_location:
+    row: 547
+    column: 23
+  fix:
+    content: ","
+    location:
+      row: 547
+      column: 23
+    end_location:
+      row: 547
+      column: 23
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 554
+    column: 14
+  end_location:
+    row: 554
+    column: 14
+  fix:
+    content: ","
+    location:
+      row: 554
+      column: 14
+    end_location:
+      row: 554
+      column: 14
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 561
+    column: 12
+  end_location:
+    row: 561
+    column: 12
+  fix:
+    content: ","
+    location:
+      row: 561
+      column: 12
+    end_location:
+      row: 561
+      column: 12
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 565
+    column: 12
+  end_location:
+    row: 565
+    column: 12
+  fix:
+    content: ","
+    location:
+      row: 565
+      column: 12
+    end_location:
+      row: 565
+      column: 12
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 573
+    column: 9
+  end_location:
+    row: 573
+    column: 9
+  fix:
+    content: ","
+    location:
+      row: 573
+      column: 9
+    end_location:
+      row: 573
+      column: 9
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 577
+    column: 9
+  end_location:
+    row: 577
+    column: 9
+  fix:
+    content: ","
+    location:
+      row: 577
+      column: 9
+    end_location:
+      row: 577
+      column: 9
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 583
+    column: 9
+  end_location:
+    row: 583
+    column: 9
+  fix:
+    content: ","
+    location:
+      row: 583
+      column: 9
+    end_location:
+      row: 583
+      column: 9
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 590
+    column: 12
+  end_location:
+    row: 590
+    column: 12
+  fix:
+    content: ","
+    location:
+      row: 590
+      column: 12
+    end_location:
+      row: 590
+      column: 12
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 598
+    column: 14
+  end_location:
+    row: 598
+    column: 14
+  fix:
+    content: ","
+    location:
+      row: 598
+      column: 14
+    end_location:
+      row: 598
+      column: 14
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 627
+    column: 19
+  end_location:
+    row: 627
+    column: 19
+  fix:
+    content: ","
+    location:
+      row: 627
+      column: 19
+    end_location:
+      row: 627
+      column: 19
+  parent: ~
+

@@ -8,6 +8,7 @@ pub const PREFIX_TO_ORIGIN: &[(&str, &str)] = &[
     ("BLE", "Flake8BlindExcept"),
     ("B", "Flake8Bugbear"),
     ("C4", "Flake8Comprehensions"),
+    ("C8", "Flake8Commas"),
     ("C9", "McCabe"),
     ("DTZ", "Flake8Datetimez"),
     ("D", "Pydocstyle"),

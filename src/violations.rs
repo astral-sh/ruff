@@ -6027,6 +6027,55 @@ impl AlwaysAutofixableViolation for PreferListBuiltin {
     }
 }
 
+// flake8-commas
+
+define_violation!(
+    pub struct TrailingCommaMissing;
+);
+impl AlwaysAutofixableViolation for TrailingCommaMissing {
+    fn message(&self) -> String {
+        "Trailing comma missing".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add trailing comma".to_string()
+    }
+
+    fn placeholder() -> Self {
+        TrailingCommaMissing
+    }
+}
+
+define_violation!(
+    pub struct TrailingCommaOnBareTupleProhibited;
+);
+impl Violation for TrailingCommaOnBareTupleProhibited {
+    fn message(&self) -> String {
+        "Trailing comma on bare tuple prohibited".to_string()
+    }
+
+    fn placeholder() -> Self {
+        TrailingCommaOnBareTupleProhibited
+    }
+}
+
+define_violation!(
+    pub struct TrailingCommaProhibited;
+);
+impl AlwaysAutofixableViolation for TrailingCommaProhibited {
+    fn message(&self) -> String {
+        "Trailing comma prohibited".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove trailing comma".to_string()
+    }
+
+    fn placeholder() -> Self {
+        TrailingCommaProhibited
+    }
+}
+
 // Ruff
 
 define_violation!(
