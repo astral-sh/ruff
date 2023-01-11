@@ -658,7 +658,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PIE794) {
-                    flake8_pie::rules::dupe_class_field_definitions(self, bases, body);
+                    flake8_pie::rules::dupe_class_field_definitions(self, stmt, body);
                 }
 
                 self.check_builtin_shadowing(name, stmt, false);
