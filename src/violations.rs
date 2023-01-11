@@ -3643,6 +3643,23 @@ impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
     }
 }
 
+define_violation!(
+    pub struct FormatLiterals;
+);
+impl AlwaysAutofixableViolation for FormatLiterals {
+    fn message(&self) -> String {
+        "Use implicit references for positional format fields".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove explicit positional indexes".to_string()
+    }
+
+    fn placeholder() -> Self {
+        FormatLiterals
+    }
+}
+
 // pydocstyle
 
 define_violation!(

@@ -1830,6 +1830,8 @@ where
                     || self.settings.enabled.contains(&RuleCode::F523)
                     || self.settings.enabled.contains(&RuleCode::F524)
                     || self.settings.enabled.contains(&RuleCode::F525)
+                    // pyupgrade
+                    || self.settings.enabled.contains(&RuleCode::UP030)
                 {
                     if let ExprKind::Attribute { value, attr, .. } = &func.node {
                         if let ExprKind::Constant {
@@ -1875,6 +1877,10 @@ where
                                             pyflakes::rules::string_dot_format_mixing_automatic(
                                                 self, &summary, location,
                                             );
+                                        }
+
+                                        if self.settings.enabled.contains(&RuleCode::UP030) {
+                                            pyupgrade::rules::format_literals(self, &summary, expr);
                                         }
                                     }
                                 }
