@@ -820,6 +820,16 @@
             "null"
           ]
         },
+        "required-imports": {
+          "description": "Add the specified import line to all files.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "single-line-exclusions": {
           "description": "One or more modules to exclude from the single line rule.",
           "type": [
@@ -1268,6 +1278,7 @@
         "I0",
         "I00",
         "I001",
+        "I002",
         "I2",
         "I25",
         "I252",
@@ -1493,6 +1504,8 @@
         "S50",
         "S501",
         "S506",
+        "S508",
+        "S509",
         "SIM",
         "SIM1",
         "SIM10",
@@ -1506,6 +1519,7 @@
         "SIM11",
         "SIM110",
         "SIM111",
+        "SIM112",
         "SIM117",
         "SIM118",
         "SIM2",
@@ -1592,6 +1606,8 @@
         "UP027",
         "UP028",
         "UP029",
+        "UP03",
+        "UP030",
         "W",
         "W2",
         "W29",

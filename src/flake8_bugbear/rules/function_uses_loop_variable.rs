@@ -12,7 +12,9 @@ use crate::violations;
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
     // Tuple of: name, defining expression, and defining range.
-    names: Vec<(&'a str, &'a Expr, Range)>,
+    loaded: Vec<(&'a str, &'a Expr, Range)>,
+    // Tuple of: name, defining expression, and defining range.
+    stored: Vec<(&'a str, &'a Expr, Range)>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -22,12 +24,11 @@ where
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
-            ExprKind::JoinedStr { .. } => {
-                visitor::walk_expr(self, expr);
-            }
-            ExprKind::Name { id, ctx } if matches!(ctx, ExprContext::Load) => {
-                self.names.push((id, expr, Range::from_located(expr)));
-            }
+            ExprKind::Name { id, ctx } => match ctx {
+                ExprContext::Load => self.loaded.push((id, expr, Range::from_located(expr))),
+                ExprContext::Store => self.stored.push((id, expr, Range::from_located(expr))),
+                ExprContext::Del => {}
+            },
             _ => visitor::walk_expr(self, expr),
         }
     }
@@ -36,6 +37,7 @@ where
 #[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
     names: Vec<(&'a str, &'a Expr, Range)>,
+    safe_functions: Vec<&'a Expr>,
 }
 
 /// `Visitor` to collect all suspicious variables (those referenced in
@@ -50,45 +52,90 @@ where
             | StmtKind::AsyncFunctionDef { args, body, .. } => {
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
-                for stmt in body {
-                    visitor.visit_stmt(stmt);
-                }
+                visitor.visit_body(body);
 
                 // Collect all argument names.
-                let arg_names = collect_arg_names(args);
+                let mut arg_names = collect_arg_names(args);
+                arg_names.extend(visitor.stored.iter().map(|(id, ..)| id));
 
                 // Treat any non-arguments as "suspicious".
                 self.names.extend(
                     visitor
-                        .names
-                        .into_iter()
+                        .loaded
+                        .iter()
                         .filter(|(id, ..)| !arg_names.contains(id)),
                 );
             }
-            _ => visitor::walk_stmt(self, stmt),
+            StmtKind::Return { value: Some(value) } => {
+                // Mark `return lambda: x` as safe.
+                if matches!(value.node, ExprKind::Lambda { .. }) {
+                    self.safe_functions.push(value);
+                }
+            }
+            _ => {}
         }
+        visitor::walk_stmt(self, stmt);
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
-            ExprKind::Lambda { args, body } => {
-                // Collect all loaded variable names.
-                let mut visitor = LoadedNamesVisitor::default();
-                visitor.visit_expr(body);
-
-                // Collect all argument names.
-                let arg_names = collect_arg_names(args);
-
-                // Treat any non-arguments as "suspicious".
-                self.names.extend(
-                    visitor
-                        .names
-                        .into_iter()
-                        .filter(|(id, ..)| !arg_names.contains(id)),
-                );
+            ExprKind::Call {
+                func,
+                args,
+                keywords,
+            } => {
+                if let ExprKind::Name { id, .. } = &func.node {
+                    if id == "filter" || id == "reduce" || id == "map" {
+                        for arg in args {
+                            if matches!(arg.node, ExprKind::Lambda { .. }) {
+                                self.safe_functions.push(arg);
+                            }
+                        }
+                    }
+                }
+                if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                    if attr == "reduce" {
+                        if let ExprKind::Name { id, .. } = &value.node {
+                            if id == "functools" {
+                                for arg in args {
+                                    if matches!(arg.node, ExprKind::Lambda { .. }) {
+                                        self.safe_functions.push(arg);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                for keyword in keywords {
+                    if keyword.node.arg.as_ref().map_or(false, |arg| arg == "key")
+                        && matches!(keyword.node.value.node, ExprKind::Lambda { .. })
+                    {
+                        self.safe_functions.push(&keyword.node.value);
+                    }
+                }
             }
-            _ => visitor::walk_expr(self, expr),
+            ExprKind::Lambda { args, body } => {
+                if !self.safe_functions.contains(&expr) {
+                    // Collect all loaded variable names.
+                    let mut visitor = LoadedNamesVisitor::default();
+                    visitor.visit_expr(body);
+
+                    // Collect all argument names.
+                    let mut arg_names = collect_arg_names(args);
+                    arg_names.extend(visitor.stored.iter().map(|(id, ..)| id));
+
+                    // Treat any non-arguments as "suspicious".
+                    self.names.extend(
+                        visitor
+                            .loaded
+                            .iter()
+                            .filter(|(id, ..)| !arg_names.contains(id)),
+                    );
+                }
+            }
+            _ => {}
         }
+        visitor::walk_expr(self, expr);
     }
 }
 

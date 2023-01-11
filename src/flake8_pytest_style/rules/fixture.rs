@@ -4,7 +4,7 @@ use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
     is_pytest_yield_fixture, keyword_is_literal,
 };
-use crate::ast::helpers::{collect_arg_names, collect_call_paths, identifier_range};
+use crate::ast::helpers::{collect_arg_names, collect_call_paths};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -156,33 +156,19 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && visitor.has_return_with_value
         && func_name.starts_with('_')
     {
-        let mut diagnostic = Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::IncorrectFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
-        );
-        if checker.patch(diagnostic.kind.code()) {
-            let func_name_range = identifier_range(func, checker.locator);
-            let num_underscores = func_name.len() - func_name.trim_start_matches('_').len();
-            diagnostic.amend(Fix::deletion(
-                func_name_range.location,
-                func_name_range.location.with_col_offset(num_underscores),
-            ));
-        }
-        checker.diagnostics.push(diagnostic);
+        ));
     } else if checker.settings.enabled.contains(&RuleCode::PT004)
         && !visitor.has_return_with_value
         && !visitor.has_yield_from
         && !func_name.starts_with('_')
     {
-        let mut diagnostic = Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             violations::MissingFixtureNameUnderscore(func_name.to_string()),
             Range::from_located(func),
-        );
-        if checker.patch(diagnostic.kind.code()) {
-            let func_name_range = identifier_range(func, checker.locator);
-            diagnostic.amend(Fix::insertion("_".to_string(), func_name_range.location));
-        }
-        checker.diagnostics.push(diagnostic);
+        ));
     }
 
     if checker.settings.enabled.contains(&RuleCode::PT022) {

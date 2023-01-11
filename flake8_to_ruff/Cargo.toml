@@ -1,10 +1,11 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.217-dev.0"
+version = "0.0.218-dev.0"
 edition = "2021"
 
 [lib]
 name = "flake8_to_ruff"
+doctest = false
 
 [dependencies]
 anyhow = { version = "1.0.66" }

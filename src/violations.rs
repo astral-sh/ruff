@@ -2677,6 +2677,24 @@ impl Violation for SysVersionSlice1Referenced {
 }
 
 // flake8-simplify
+define_violation!(
+    pub struct UseCapitalEnvironmentVariables(pub String, pub String);
+);
+impl AlwaysAutofixableViolation for UseCapitalEnvironmentVariables {
+    fn message(&self) -> String {
+        let UseCapitalEnvironmentVariables(expected, original) = self;
+        format!("Use capitalized environment variable `{expected}` instead of `{original}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let UseCapitalEnvironmentVariables(expected, original) = self;
+        format!("Replace `{original}` with `{expected}`")
+    }
+
+    fn placeholder() -> Self {
+        UseCapitalEnvironmentVariables("...".to_string(), "...".to_string())
+    }
+}
 
 define_violation!(
     pub struct DuplicateIsinstanceCall(pub String);
@@ -3648,6 +3666,23 @@ impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
     }
 }
 
+define_violation!(
+    pub struct FormatLiterals;
+);
+impl AlwaysAutofixableViolation for FormatLiterals {
+    fn message(&self) -> String {
+        "Use implicit references for positional format fields".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove explicit positional indexes".to_string()
+    }
+
+    fn placeholder() -> Self {
+        FormatLiterals
+    }
+}
+
 // pydocstyle
 
 define_violation!(
@@ -4606,6 +4641,25 @@ impl AlwaysAutofixableViolation for UnsortedImports {
     }
 }
 
+define_violation!(
+    pub struct MissingRequiredImport(pub String);
+);
+impl AlwaysAutofixableViolation for MissingRequiredImport {
+    fn message(&self) -> String {
+        let MissingRequiredImport(name) = self;
+        format!("Missing required import: `{name}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let MissingRequiredImport(name) = self;
+        format!("Insert required import: `{name}`")
+    }
+
+    fn placeholder() -> Self {
+        MissingRequiredImport("from __future__ import ...".to_string())
+    }
+}
+
 // eradicate
 
 define_violation!(
@@ -4812,6 +4866,33 @@ impl Violation for UnsafeYAMLLoad {
 
     fn placeholder() -> Self {
         UnsafeYAMLLoad(None)
+    }
+}
+
+define_violation!(
+    pub struct SnmpInsecureVersion;
+);
+impl Violation for SnmpInsecureVersion {
+    fn message(&self) -> String {
+        "The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.".to_string()
+    }
+
+    fn placeholder() -> Self {
+        SnmpInsecureVersion
+    }
+}
+
+define_violation!(
+    pub struct SnmpWeakCryptography;
+);
+impl Violation for SnmpWeakCryptography {
+    fn message(&self) -> String {
+        "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
+            .to_string()
+    }
+
+    fn placeholder() -> Self {
+        SnmpWeakCryptography
     }
 }
 

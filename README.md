@@ -180,7 +180,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.217'
+  rev: 'v0.0.218'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -614,6 +614,7 @@ For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | I001 | UnsortedImports | Import block is un-sorted or un-formatted | 🛠 |
+| I002 | MissingRequiredImport | Missing required import: `from __future__ import ...` | 🛠 |
 
 ### pydocstyle (D)
 
@@ -701,6 +702,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP027 | RewriteListComprehension | Replace unpacked list comprehension with a generator expression | 🛠 |
 | UP028 | RewriteYieldFrom | Replace `yield` over `for` loop with `yield from` | 🛠 |
 | UP029 | UnnecessaryBuiltinImport | Unnecessary builtin import: `...` | 🛠 |
+| UP030 | FormatLiterals | Use implicit references for positional format fields | 🛠 |
 
 ### pep8-naming (N)
 
@@ -777,6 +779,8 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "..." |  |
 | S501 | RequestWithNoCertValidation | Probable use of `...` call with `verify=False` disabling SSL certificate checks |  |
 | S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
+| S508 | SnmpInsecureVersion | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
+| S509 | SnmpWeakCryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
 
 ### flake8-blind-except (BLE)
 
@@ -980,6 +984,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM109 | CompareWithTuple | Use `value in (..., ...)` instead of `value == ... or value == ...` | 🛠 |
 | SIM110 | ConvertLoopToAny | Use `return any(x for x in y)` instead of `for` loop | 🛠 |
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
+| SIM112 | UseCapitalEnvironmentVariables | Use capitalized environment variable `...` instead of `...` | 🛠 |
 | SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
@@ -2998,6 +3003,23 @@ order-by-type = true
 
 ---
 
+#### [`required-imports`](#required-imports)
+
+Add the specified import line to all files.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+add-import = ["from __future__ import annotations"]
+```
+
+---
+
 #### [`single-line-exclusions`](#single-line-exclusions)
 
 One or more modules to exclude from the single line rule.
@@ -3191,4 +3213,4 @@ MIT
 ## Contributing
 
 Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/.github/CONTRIBUTING.md).
+[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).

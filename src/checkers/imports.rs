@@ -7,32 +7,11 @@ use rustpython_parser::ast::Suite;
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
 use crate::isort;
-use crate::isort::track::ImportTracker;
-use crate::registry::Diagnostic;
+use crate::isort::track::{Block, ImportTracker};
+use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::{flags, Settings};
 use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-
-fn check_import_blocks(
-    tracker: ImportTracker,
-    locator: &SourceCodeLocator,
-    settings: &Settings,
-    stylist: &SourceCodeStyleDetector,
-    autofix: flags::Autofix,
-    package: Option<&Path>,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-    for block in tracker.into_iter() {
-        if !block.imports.is_empty() {
-            if let Some(diagnostic) =
-                isort::rules::check_imports(&block, locator, settings, stylist, autofix, package)
-            {
-                diagnostics.push(diagnostic);
-            }
-        }
-    }
-    diagnostics
-}
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_imports(
@@ -45,9 +24,33 @@ pub fn check_imports(
     path: &Path,
     package: Option<&Path>,
 ) -> Vec<Diagnostic> {
-    let mut tracker = ImportTracker::new(locator, directives, path);
-    for stmt in python_ast {
-        tracker.visit_stmt(stmt);
+    // Extract all imports from the AST.
+    let tracker = {
+        let mut tracker = ImportTracker::new(locator, directives, path);
+        for stmt in python_ast {
+            tracker.visit_stmt(stmt);
+        }
+        tracker
+    };
+    let blocks: Vec<&Block> = tracker.iter().collect();
+
+    // Enforce import rules.
+    let mut diagnostics = vec![];
+    if settings.enabled.contains(&RuleCode::I001) {
+        for block in &blocks {
+            if !block.imports.is_empty() {
+                if let Some(diagnostic) = isort::rules::organize_imports(
+                    block, locator, settings, stylist, autofix, package,
+                ) {
+                    diagnostics.push(diagnostic);
+                }
+            }
+        }
     }
-    check_import_blocks(tracker, locator, settings, stylist, autofix, package)
+    if settings.enabled.contains(&RuleCode::I002) {
+        diagnostics.extend(isort::rules::add_required_imports(
+            &blocks, python_ast, locator, settings, autofix,
+        ));
+    }
+    diagnostics
 }

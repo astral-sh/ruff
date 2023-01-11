@@ -1410,6 +1410,9 @@ where
                 if self.settings.enabled.contains(&RuleCode::B015) {
                     flake8_bugbear::rules::useless_comparison(self, value);
                 }
+                if self.settings.enabled.contains(&RuleCode::SIM112) {
+                    flake8_simplify::rules::use_capital_environment_variables(self, value);
+                }
             }
             _ => {}
         }
@@ -1832,6 +1835,8 @@ where
                     || self.settings.enabled.contains(&RuleCode::F523)
                     || self.settings.enabled.contains(&RuleCode::F524)
                     || self.settings.enabled.contains(&RuleCode::F525)
+                    // pyupgrade
+                    || self.settings.enabled.contains(&RuleCode::UP030)
                 {
                     if let ExprKind::Attribute { value, attr, .. } = &func.node {
                         if let ExprKind::Constant {
@@ -1877,6 +1882,10 @@ where
                                             pyflakes::rules::string_dot_format_mixing_automatic(
                                                 self, &summary, location,
                                             );
+                                        }
+
+                                        if self.settings.enabled.contains(&RuleCode::UP030) {
+                                            pyupgrade::rules::format_literals(self, &summary, expr);
                                         }
                                     }
                                 }
@@ -1984,6 +1993,28 @@ where
                 }
                 if self.settings.enabled.contains(&RuleCode::S506) {
                     if let Some(diagnostic) = flake8_bandit::rules::unsafe_yaml_load(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+                if self.settings.enabled.contains(&RuleCode::S508) {
+                    if let Some(diagnostic) = flake8_bandit::rules::snmp_insecure_version(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+                if self.settings.enabled.contains(&RuleCode::S509) {
+                    if let Some(diagnostic) = flake8_bandit::rules::snmp_weak_cryptography(
                         func,
                         args,
                         keywords,

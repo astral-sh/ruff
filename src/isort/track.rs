@@ -20,6 +20,7 @@ pub enum Trailer {
 
 #[derive(Debug, Default)]
 pub struct Block<'a> {
+    pub nested: bool,
     pub imports: Vec<&'a Stmt>,
     pub trailer: Option<Trailer>,
 }
@@ -52,6 +53,7 @@ impl<'a> ImportTracker<'a> {
     fn track_import(&mut self, stmt: &'a Stmt) {
         let index = self.blocks.len() - 1;
         self.blocks[index].imports.push(stmt);
+        self.blocks[index].nested = self.nested;
     }
 
     fn trailer_for(&self, stmt: &'a Stmt) -> Option<Trailer> {
@@ -105,8 +107,11 @@ impl<'a> ImportTracker<'a> {
         }
     }
 
-    pub fn into_iter(self) -> impl IntoIterator<Item = Block<'a>> {
-        self.blocks.into_iter()
+    pub fn iter<'b>(&'a self) -> impl Iterator<Item = &'b Block<'a>>
+    where
+        'a: 'b,
+    {
+        self.blocks.iter()
     }
 }
 

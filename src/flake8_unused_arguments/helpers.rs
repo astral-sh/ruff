@@ -1,19 +1,6 @@
 use rustpython_ast::{Constant, ExprKind, Stmt, StmtKind};
 
-/// Return `true` if a `Stmt` is a docstring.
-fn is_docstring_stmt(stmt: &Stmt) -> bool {
-    if let StmtKind::Expr { value } = &stmt.node {
-        matches!(
-            value.node,
-            ExprKind::Constant {
-                value: Constant::Str { .. },
-                ..
-            }
-        )
-    } else {
-        false
-    }
-}
+use crate::ast::helpers::is_docstring_stmt;
 
 /// Return `true` if a `Stmt` is a "empty": a `pass`, `...`, `raise
 /// NotImplementedError`, or `raise NotImplemented` (with or without arguments).

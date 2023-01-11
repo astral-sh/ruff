@@ -714,6 +714,21 @@ pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &SourceCodeLocator
     match_trailing_content(stmt, locator)
 }
 
+/// Return `true` if a `Stmt` is a docstring.
+pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
+    if let StmtKind::Expr { value } = &stmt.node {
+        matches!(
+            value.node,
+            ExprKind::Constant {
+                value: Constant::Str { .. },
+                ..
+            }
+        )
+    } else {
+        false
+    }
+}
+
 #[derive(Default)]
 /// A simple representation of a call's positional and keyword arguments.
 pub struct SimpleCallArgs<'a> {
@@ -758,6 +773,11 @@ impl<'a> SimpleCallArgs<'a> {
             }
         }
         None
+    }
+
+    /// Get the number of positional and keyword arguments used.
+    pub fn len(&self) -> usize {
+        self.args.len() + self.kwargs.len()
     }
 }
 
