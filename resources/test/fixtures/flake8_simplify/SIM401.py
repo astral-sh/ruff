@@ -14,8 +14,28 @@ if key in a_dict:  # default has complex expr
 else:
     var = val1 + val2
 
+if keys[idx] in a_dict:  # complex expr in key
+    var = a_dict[keys[idx]]
+else:
+    var = "default"
+
+if key in dicts[idx]:  # complex expr in dict
+    var = dicts[idx][key]
+else:
+    var = "default"
+
+if key in a_dict:   # complex expr in var
+    vars[idx] = a_dict[key]
+else:
+    vars[idx] = "default"
+
 
 # Negative cases
+if not key in a_dict:  # negated test : could be a nice-to-have
+    var = "default"
+else:
+    var = a_dict[key]
+
 if key in a_dict:  # different dict
     var = other_dict[key]
 else:
@@ -42,23 +62,3 @@ if key in a_dict:  # extra vars in orelse
 else:
     var2 = value2
     var = "default"
-
-if not key in a_dict:  # negated test : could be a nice-to-have
-    var = "default"
-else:
-    var = a_dict[key]
-
-if keys[idx] in a_dict:  # complex expr in key : nice-to-have
-    var = a_dict[keys[idx]]
-else:
-    var = "default"
-
-if key in dicts[idx]:  # complex expr in dict : nice-to-have
-    var = dicts[idx][key]
-else:
-    var = "default"
-
-if key in a_dict:   # complex expr in var: nice-to-have
-    vars[idx] = a_dict[key]
-else:
-    vars[idx] = "default"

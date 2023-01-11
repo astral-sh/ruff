@@ -7,7 +7,7 @@ expression: diagnostics
       - var
       - a_dict
       - key
-      - var
+      - "\"default1\""
   location:
     row: 2
     column: 0
@@ -28,7 +28,7 @@ expression: diagnostics
       - var
       - a_dict
       - key
-      - var
+      - "\"default2\""
   location:
     row: 7
     column: 0
@@ -49,7 +49,7 @@ expression: diagnostics
       - var
       - a_dict
       - key
-      - var
+      - val1 + val2
   location:
     row: 12
     column: 0
@@ -64,5 +64,68 @@ expression: diagnostics
     end_location:
       row: 15
       column: 21
+  parent: ~
+- kind:
+    VerboseDictGetWithDefault:
+      - var
+      - a_dict
+      - "keys[idx]"
+      - "\"default\""
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 20
+    column: 19
+  fix:
+    content: "var = a_dict.get(keys[idx], \"default\")"
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 20
+      column: 19
+  parent: ~
+- kind:
+    VerboseDictGetWithDefault:
+      - var
+      - "dicts[idx]"
+      - key
+      - "\"default\""
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 25
+    column: 19
+  fix:
+    content: "var = dicts[idx].get(key, \"default\")"
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 25
+      column: 19
+  parent: ~
+- kind:
+    VerboseDictGetWithDefault:
+      - "vars[idx]"
+      - a_dict
+      - key
+      - "\"default\""
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 30
+    column: 25
+  fix:
+    content: "vars[idx] = a_dict.get(key, \"default\")"
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 30
+      column: 25
   parent: ~
 
