@@ -1,6 +1,6 @@
 [package]
 name = "rustpython-parser"
-version = "0.1.2"
+version = "0.2.0"
 description = "Parser for python code."
 authors = ["RustPython Team"]
 build = "build.rs"
@@ -18,8 +18,8 @@ phf_codegen = "0.10"
 tiny-keccak = { version = "2", features = ["sha3"] }
 
 [dependencies]
-rustpython-ast = { path = "../ast" }
-rustpython-compiler-core = { path = "../core" }
+rustpython-ast = { path = "../ast", version = "0.2.0" }
+rustpython-compiler-core = { path = "../core", version = "0.2.0" }
 
 ahash = "0.7.6"
 itertools = "0.10.3"

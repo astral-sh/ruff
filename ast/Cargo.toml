@@ -1,8 +1,11 @@
 [package]
 name = "rustpython-ast"
-version = "0.1.0"
+version = "0.2.0"
+description = "AST definitions for RustPython"
 authors = ["RustPython Team"]
 edition = "2021"
+repository = "https://github.com/RustPython/RustPython"
+license = "MIT"
 
 [features]
 default = ["constant-optimization", "fold"]
@@ -12,5 +15,5 @@ unparse = ["rustpython-common"]
 
 [dependencies]
 num-bigint = "0.4.3"
-rustpython-compiler-core = { path = "../core" }
-rustpython-common = { path = "../../common", optional = true }
+rustpython-compiler-core = { path = "../core", version = "0.2.0" }
+rustpython-common = { path = "../../common", version = "0.2.0", optional = true }
