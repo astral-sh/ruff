@@ -1207,7 +1207,7 @@ where
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
                     if let Some(item) = exc {
-                        pyupgrade::rules::os_error_alias(self, item);
+                        pyupgrade::rules::os_error_alias(self, &item);
                     }
                 }
             }
@@ -1333,7 +1333,7 @@ where
                     flake8_bugbear::rules::redundant_tuple_in_exception_handler(self, handlers);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
-                    pyupgrade::rules::os_error_alias(self, handlers);
+                    pyupgrade::rules::os_error_alias(self, &handlers);
                 }
                 if self.settings.enabled.contains(&RuleCode::PT017) {
                     self.diagnostics.extend(
@@ -1921,7 +1921,7 @@ where
                     pyupgrade::rules::replace_stdout_stderr(self, expr, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
-                    pyupgrade::rules::os_error_alias(self, expr);
+                    pyupgrade::rules::os_error_alias(self, &expr);
                 }
 
                 // flake8-print
