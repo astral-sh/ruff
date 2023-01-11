@@ -1,4 +1,4 @@
-f = open('foo.txt')  # S508
+f = open('foo.txt')  # SIM115
 data = f.read()
 f.close()
 
