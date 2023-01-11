@@ -41,6 +41,23 @@ fn contains_good_docstring(quote: &Quote, raw_str: &str) -> bool {
         Quote::Single => raw_str.contains("'''"),
         Quote::Double => raw_str.contains("\"\"\"") || raw_str.contains("\""),
     }
+    /*
+    let triple_single = raw_str.starts_with("'''")
+            || raw_str.starts_with("u'''")
+            || raw_str.starts_with("r'''")
+            || raw_str.starts_with("ur'''");
+
+    let triple_double = raw_str.starts_with("\"\"\"")
+            || raw_str.starts_with("u\"\"\"")
+            || raw_str.starts_with("r\"\"\"")
+            || raw_str.starts_with("ur\"\"\"");
+
+    let single_double = raw_str.starts_with("\"")
+            || raw_str.starts_with("u\"")
+            || raw_str.starts_with("r\"")
+            || raw_str.starts_with("ur\"");
+    triple_single || triple_double || single_double
+    */
 }
 
 pub fn quotes(
