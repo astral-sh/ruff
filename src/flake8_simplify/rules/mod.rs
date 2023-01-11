@@ -2,7 +2,10 @@ pub use ast_bool_op::{
     a_and_not_a, a_or_not_a, and_false, compare_with_tuple, duplicate_isinstance_call, or_true,
 };
 pub use ast_for::convert_loop_to_any_all;
-pub use ast_if::{nested_if_statements, return_bool_condition_directly, use_ternary_operator};
+pub use ast_if::{
+    nested_if_statements, return_bool_condition_directly, use_dict_get_with_default,
+    use_ternary_operator,
+};
 pub use ast_ifexp::{
     explicit_false_true_in_ifexpr, explicit_true_false_in_ifexpr, twisted_arms_in_ifexpr,
 };

@@ -308,6 +308,7 @@ define_rule_mapping!(
     SIM222 => violations::OrTrue,
     SIM223 => violations::AndFalse,
     SIM300 => violations::YodaConditions,
+    SIM401 => violations::VerboseDictGetWithDefault,
     // pyupgrade
     UP001 => violations::UselessMetaclassType,
     UP003 => violations::TypeOfPrimitive,
@@ -1123,6 +1124,7 @@ impl RuleCode {
             RuleCode::SIM222 => RuleOrigin::Flake8Simplify,
             RuleCode::SIM223 => RuleOrigin::Flake8Simplify,
             RuleCode::SIM300 => RuleOrigin::Flake8Simplify,
+            RuleCode::SIM401 => RuleOrigin::Flake8Simplify,
             // flake8-debugger
             RuleCode::T100 => RuleOrigin::Flake8Debugger,
             // flake8-print

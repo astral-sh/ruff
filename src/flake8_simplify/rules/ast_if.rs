@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::{
     contains_call_path, create_expr, create_stmt, unparse_expr, unparse_stmt,
@@ -209,6 +209,104 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     if checker.patch(&RuleCode::SIM108) {
         diagnostic.amend(Fix::replacement(
             content,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+fn is_same_name_expr(expr1: &Expr, expr2: &Expr) -> bool {
+    let ExprKind::Name { id: expr1_id, ..} = &expr1.node else {
+        return false;
+    };
+    let ExprKind::Name { id: expr2_id, ..} = &expr2.node else {
+        return false;
+    };
+    expr1_id.eq(expr2_id)
+}
+
+// SIM401
+pub fn use_dict_get_with_default(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &Vec<Stmt>,
+    orelse: &Vec<Stmt>,
+) {
+    if body.len() != 1 || orelse.len() != 1 {
+        return;
+    }
+    let StmtKind::Assign { targets: body_lhs, value: body_rhs, ..} = &body[0].node else {
+        return;
+    };
+    if body_lhs.len() != 1 {
+        return;
+    };
+    let StmtKind::Assign { targets: orelse_lhs, value: orelse_rhs, .. } = &orelse[0].node else {
+        return;
+    };
+    if orelse_lhs.len() != 1 {
+        return;
+    };
+    let  ExprKind::Compare { left: test_lhs, ops , comparators: test_rhs } = &test.node else {
+        return;
+    };
+    if test_rhs.len() != 1 {
+        return;
+    }
+
+    let (expected_lhs, expected_rhs, default_lhs, default_rhs) = match ops[..] {
+        [Cmpop::In] => (&body_lhs[0], body_rhs, &orelse_lhs[0], orelse_rhs),
+        [Cmpop::NotIn] => (&orelse_lhs[0], orelse_rhs, &body_lhs[0], body_rhs),
+        _ => {
+            return;
+        }
+    };
+    let test_rhs = &test_rhs[0];
+
+    let ExprKind::Subscript { value: subscript_var, slice, .. }  =  &expected_rhs.node else {
+        return;
+    };
+
+    // check: dict-key, target-variable, dict-name are same
+    if !is_same_name_expr(slice, test_lhs)
+        || !is_same_name_expr(expected_lhs, default_lhs)
+        || !is_same_name_expr(test_rhs, subscript_var)
+    {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        violations::VerboseDictGetWithDefault(
+            unparse_expr(expected_lhs, checker.style),
+            unparse_expr(subscript_var, checker.style),
+            unparse_expr(test_lhs, checker.style),
+            unparse_expr(default_lhs, checker.style),
+        ),
+        Range::from_located(stmt),
+    );
+    if checker.patch(&RuleCode::SIM401) {
+        diagnostic.amend(Fix::replacement(
+            unparse_stmt(
+                &create_stmt(StmtKind::Assign {
+                    targets: vec![create_expr(expected_lhs.node.clone())],
+                    value: Box::new(create_expr(ExprKind::Call {
+                        func: Box::new(create_expr(ExprKind::Attribute {
+                            value: subscript_var.clone(),
+                            attr: "get".to_string(),
+                            ctx: ExprContext::Load,
+                        })),
+                        args: vec![
+                            create_expr(test_lhs.node.clone()),
+                            create_expr(default_rhs.node.clone()),
+                        ],
+                        keywords: vec![],
+                    })),
+                    type_comment: None,
+                }),
+                checker.style,
+            ),
             stmt.location,
             stmt.end_location.unwrap(),
         ));

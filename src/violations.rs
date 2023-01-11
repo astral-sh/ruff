@@ -3075,6 +3075,29 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
     }
 }
 
+define_violation!(
+    pub struct VerboseDictGetWithDefault(pub String, pub String, pub String, pub String);
+);
+impl AlwaysAutofixableViolation for VerboseDictGetWithDefault {
+    fn message(&self) -> String {
+        let VerboseDictGetWithDefault(lhs, dict, key, default) = self;
+        format!("Use `{lhs} = {dict}.get({key}, {default})` instead of verbose If statement.")
+    }
+
+    fn autofix_title(&self) -> String {
+        let VerboseDictGetWithDefault(lhs, dict, key, default) = self;
+        format!("Replace with `{lhs} = {dict}.get([{key}], {default})`")
+    }
+
+    fn placeholder() -> Self {
+        VerboseDictGetWithDefault(
+            "var".to_string(),
+            "a_dict".to_string(),
+            "key".to_string(),
+            "default_value".to_string(),
+        )
+    }
+}
 // pyupgrade
 
 define_violation!(
