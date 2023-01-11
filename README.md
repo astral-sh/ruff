@@ -998,6 +998,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
 | SIM300 | YodaConditions | Yoda conditions are discouraged, use `left == right` instead | 🛠 |
+| SIM401 | VerboseDictGetWithDefault | Use `var = a_dict.get(key, default_value)` instead of verbose If statement. | 🛠 |
 
 ### flake8-tidy-imports (TID)
 
