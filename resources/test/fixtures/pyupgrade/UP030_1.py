@@ -1,4 +1,4 @@
-# These should NOT change
+# Valid calls; no errors expected.
 
 '{}'.format(1)
 
@@ -8,8 +8,6 @@ x = ('{0} {1}',)
 '{0} {0}'.format(1)
 
 '{0:<{1}}'.format(1, 4)
-
-'{' '0}'.format(1)
 
 f"{0}".format(a)
 

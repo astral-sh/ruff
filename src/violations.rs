@@ -3644,19 +3644,19 @@ impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
 }
 
 define_violation!(
-    pub struct FormatSpecifiers;
+    pub struct FormatLiterals;
 );
-impl AlwaysAutofixableViolation for FormatSpecifiers {
+impl AlwaysAutofixableViolation for FormatLiterals {
     fn message(&self) -> String {
-        "Remove specifiers from inside the string's brackets".to_string()
+        "Use implicit references for positional format fields".to_string()
     }
 
     fn autofix_title(&self) -> String {
-        "Removed format specifiers from string".to_string()
+        "Remove explicit positional indexes".to_string()
     }
 
     fn placeholder() -> Self {
-        FormatSpecifiers
+        FormatLiterals
     }
 }
 

@@ -3,175 +3,185 @@ source: src/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 2
+    row: 3
     column: 0
   end_location:
-    row: 2
+    row: 3
     column: 33
   fix:
     content: "\"{}\" \"{}\" \"{}\".format(1, 2, 3)"
     location:
-      row: 2
+      row: 3
       column: 0
     end_location:
-      row: 2
+      row: 3
       column: 33
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 4
+    row: 5
     column: 0
   end_location:
-    row: 6
+    row: 7
     column: 1
   fix:
     content: "\"a {} complicated {} string with {} {}\".format(\n    \"fourth\", \"second\", \"first\", \"third\"\n)"
     location:
-      row: 4
+      row: 5
       column: 0
     end_location:
-      row: 6
+      row: 7
       column: 1
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 8
+    row: 9
     column: 0
   end_location:
-    row: 8
+    row: 9
     column: 15
   fix:
     content: "'{}'.format(1)"
     location:
-      row: 8
+      row: 9
       column: 0
     end_location:
-      row: 8
+      row: 9
       column: 15
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 10
+    row: 11
     column: 0
   end_location:
-    row: 10
+    row: 11
     column: 18
   fix:
     content: "'{:x}'.format(30)"
     location:
-      row: 10
+      row: 11
       column: 0
     end_location:
-      row: 10
+      row: 11
       column: 18
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 12
+    row: 13
     column: 4
   end_location:
-    row: 12
+    row: 13
     column: 19
   fix:
     content: "'{}'.format(1)"
     location:
-      row: 12
+      row: 13
       column: 4
     end_location:
-      row: 12
+      row: 13
       column: 19
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 14
+    row: 15
     column: 0
   end_location:
-    row: 14
+    row: 15
     column: 29
   fix:
     content: "'''{}\\n{}\\n'''.format(1, 2)"
     location:
-      row: 14
+      row: 15
       column: 0
     end_location:
-      row: 14
+      row: 15
       column: 29
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 16
+    row: 17
     column: 4
   end_location:
-    row: 17
+    row: 18
     column: 26
   fix:
     content: "\"foo {}\" \\\n    \"bar {}\".format(1, 2)"
     location:
-      row: 16
+      row: 17
       column: 4
     end_location:
-      row: 17
+      row: 18
       column: 26
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 19
+    row: 20
     column: 0
   end_location:
-    row: 19
+    row: 20
     column: 17
   fix:
     content: "(\"{}\").format(1)"
     location:
-      row: 19
+      row: 20
       column: 0
     end_location:
-      row: 19
+      row: 20
       column: 17
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 21
+    row: 22
     column: 0
   end_location:
-    row: 21
+    row: 22
     column: 27
   fix:
     content: "\"\\N{snowman} {}\".format(1)"
     location:
-      row: 21
+      row: 22
       column: 0
     end_location:
-      row: 21
+      row: 22
       column: 27
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 26
+    row: 24
+    column: 0
+  end_location:
+    row: 24
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    FormatLiterals: ~
+  location:
+    row: 29
     column: 4
   end_location:
-    row: 27
+    row: 30
     column: 25
   fix: ~
   parent: ~
 - kind:
-    FormatSpecifiers: ~
+    FormatLiterals: ~
   location:
-    row: 31
+    row: 34
     column: 4
   end_location:
-    row: 32
+    row: 35
     column: 25
   fix: ~
   parent: ~

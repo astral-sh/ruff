@@ -1918,7 +1918,7 @@ where
                     pyupgrade::rules::os_error_alias(self, expr);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP030) {
-                    pyupgrade::rules::format_specifiers(self, expr, func);
+                    pyupgrade::rules::format_literals(self, expr, func);
                 }
 
                 // flake8-print
