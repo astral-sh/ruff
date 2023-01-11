@@ -13,8 +13,8 @@ use rustpython_parser::token::StringKind;
 
 use crate::ast::types::{Binding, BindingKind, Range};
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::SourceCodeLocator;
 
 /// Create an `Expr` with default location from an `ExprKind`.
 pub fn create_expr(node: ExprKind) -> Expr {

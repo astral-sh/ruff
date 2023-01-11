@@ -1,7 +1,7 @@
-pub mod cformat;
-pub mod fixes;
-pub mod format;
-pub mod rules;
+pub(crate) mod cformat;
+pub(crate) mod fixes;
+pub(crate) mod format;
+pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {

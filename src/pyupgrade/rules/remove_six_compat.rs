@@ -6,8 +6,9 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::{violations, SourceCodeLocator};
+use crate::violations;
 
 /// Return `true` if the `Expr` is a reference to `${module}.${any}`.
 fn is_module_member(call_path: &[&str], module: &str) -> bool {

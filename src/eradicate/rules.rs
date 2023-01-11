@@ -3,9 +3,10 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::autofix::Fix;
 use crate::eradicate::detection::comment_contains_code;
-use crate::registry::RuleCode;
-use crate::settings::flags;
-use crate::{violations, Diagnostic, Settings, SourceCodeLocator};
+use crate::registry::{Diagnostic, RuleCode};
+use crate::settings::{flags, Settings};
+use crate::source_code_locator::SourceCodeLocator;
+use crate::violations;
 
 fn is_standalone_comment(line: &str) -> bool {
     for char in line.chars() {

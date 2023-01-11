@@ -11,9 +11,11 @@ use crate::ast::whitespace::leading_space;
 use crate::autofix::Fix;
 use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
-use crate::settings::flags;
+use crate::registry::Diagnostic;
+use crate::settings::{flags, Settings};
+use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::{violations, Diagnostic, Settings, SourceCodeLocator};
+use crate::violations;
 
 fn extract_range(body: &[&Stmt]) -> Range {
     let location = body.first().unwrap().location;

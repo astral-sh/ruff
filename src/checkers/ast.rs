@@ -3238,16 +3238,6 @@ impl<'a> Checker<'a> {
         self.parents.iter().rev().nth(1)
     }
 
-    /// Return the grandparent `Stmt` of the current `Stmt`, if any.
-    pub fn current_stmt_grandparent(&self) -> Option<&RefEquality<'a, Stmt>> {
-        self.parents.iter().rev().nth(2)
-    }
-
-    /// Return the current `Expr`.
-    pub fn current_expr(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().next()
-    }
-
     /// Return the parent `Expr` of the current `Expr`.
     pub fn current_expr_parent(&self) -> Option<&RefEquality<'a, Expr>> {
         self.exprs.iter().rev().nth(1)

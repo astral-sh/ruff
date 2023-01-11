@@ -1,6 +1,6 @@
 mod fixes;
-pub mod helpers;
-pub mod rules;
+pub(crate) mod helpers;
+pub(crate) mod rules;
 pub mod settings;
 
 #[cfg(test)]
@@ -9,9 +9,10 @@ mod tests {
 
     use anyhow::Result;
 
+    use crate::flake8_annotations;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::{flake8_annotations, Settings};
+    use crate::settings::Settings;
 
     #[test]
     fn defaults() -> Result<()> {

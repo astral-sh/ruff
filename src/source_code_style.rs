@@ -71,7 +71,7 @@ impl From<&Quote> for vendor::str::Quote {
 }
 
 impl fmt::Display for Quote {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Quote::Single => write!(f, "\'"),
             Quote::Double => write!(f, "\""),
@@ -186,10 +186,10 @@ fn detect_line_ending(contents: &str) -> Option<LineEnding> {
 
 #[cfg(test)]
 mod tests {
+    use crate::source_code_locator::SourceCodeLocator;
     use crate::source_code_style::{
         detect_indentation, detect_line_ending, detect_quote, Indentation, LineEnding, Quote,
     };
-    use crate::SourceCodeLocator;
 
     #[test]
     fn indentation() {

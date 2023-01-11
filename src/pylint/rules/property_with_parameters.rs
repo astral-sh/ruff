@@ -2,7 +2,8 @@ use rustpython_ast::{Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::{violations, Diagnostic};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// PLR0206
 pub fn property_with_parameters(

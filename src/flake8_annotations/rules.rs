@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::flake8_annotations::fixes;
 use crate::flake8_annotations::helpers::match_function_def;
-use crate::registry::RuleCode;
+use crate::registry::{Diagnostic, RuleCode};
 use crate::visibility::Visibility;
-use crate::{violations, visibility, Diagnostic};
+use crate::{violations, visibility};
 
 #[derive(Default)]
 struct ReturnStatementVisitor<'a> {

@@ -18,18 +18,18 @@ use crate::isort::types::{
     AliasData, CommentSet, EitherImport, ImportBlock, ImportFromData, Importable,
     OrderedImportBlock, TrailingComma,
 };
+use crate::source_code_locator::SourceCodeLocator;
 use crate::source_code_style::SourceCodeStyleDetector;
-use crate::SourceCodeLocator;
 
 mod categorize;
 mod comments;
-pub mod format;
-pub mod helpers;
-pub mod rules;
+mod format;
+mod helpers;
+pub(crate) mod rules;
 pub mod settings;
 mod sorting;
-pub mod track;
-pub mod types;
+pub(crate) mod track;
+mod types;
 
 #[derive(Debug)]
 pub struct AnnotatedAliasData<'a> {
@@ -647,9 +647,10 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::isort;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::{isort, Settings};
+    use crate::settings::Settings;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]

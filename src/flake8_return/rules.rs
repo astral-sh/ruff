@@ -8,9 +8,9 @@ use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::flake8_return::helpers::result_exists;
 use crate::flake8_return::visitor::{ReturnVisitor, Stack};
-use crate::registry::RuleCode;
+use crate::registry::{Diagnostic, RuleCode};
+use crate::violations;
 use crate::violations::Branch;
-use crate::{violations, Diagnostic};
 
 /// RET501
 fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {

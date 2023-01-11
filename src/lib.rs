@@ -12,15 +12,9 @@
 )]
 #![forbid(unsafe_code)]
 
-use cfg_if::cfg_if;
-
-use crate::registry::Diagnostic;
-use crate::settings::Settings;
-use crate::source_code_locator::SourceCodeLocator;
-
 mod ast;
 pub mod autofix;
-pub mod cache;
+mod cache;
 mod checkers;
 pub mod cli;
 mod cst;
@@ -77,7 +71,9 @@ pub mod source_code_style;
 mod vendor;
 mod violation;
 mod violations;
-pub mod visibility;
+mod visibility;
+
+use cfg_if::cfg_if;
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {

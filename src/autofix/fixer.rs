@@ -29,7 +29,7 @@ impl From<bool> for Mode {
 }
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file<'a>(
+pub(crate) fn fix_file<'a>(
     diagnostics: &'a [Diagnostic],
     locator: &'a SourceCodeLocator<'a>,
 ) -> Option<(Cow<'a, str>, usize)> {
@@ -93,7 +93,7 @@ mod tests {
 
     use crate::autofix::fixer::apply_fixes;
     use crate::autofix::Fix;
-    use crate::SourceCodeLocator;
+    use crate::source_code_locator::SourceCodeLocator;
 
     #[test]
     fn empty_file() {

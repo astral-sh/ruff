@@ -1,5 +1,5 @@
-pub mod rules;
-pub mod types;
+pub(crate) mod rules;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod tests {

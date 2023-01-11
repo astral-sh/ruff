@@ -5,7 +5,7 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
-use crate::SourceCodeLocator;
+use crate::source_code_locator::SourceCodeLocator;
 
 #[derive(Debug)]
 pub struct Comment<'a> {
