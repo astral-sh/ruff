@@ -1,7 +1,7 @@
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::{
-    contains_call_path, create_expr, create_stmt, unparse_expr, unparse_stmt,
+    contains_call_path, create_expr, create_stmt, match_name_expr, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -216,16 +216,6 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     checker.diagnostics.push(diagnostic);
 }
 
-fn is_same_name_expr(expr1: &Expr, expr2: &Expr) -> bool {
-    let ExprKind::Name { id: expr1_id, ..} = &expr1.node else {
-        return false;
-    };
-    let ExprKind::Name { id: expr2_id, ..} = &expr2.node else {
-        return false;
-    };
-    expr1_id.eq(expr2_id)
-}
-
 // SIM401
 pub fn use_dict_get_with_default(
     checker: &mut Checker,
@@ -270,9 +260,9 @@ pub fn use_dict_get_with_default(
     };
 
     // check: dict-key, target-variable, dict-name are same
-    if !is_same_name_expr(slice, test_lhs)
-        || !is_same_name_expr(expected_lhs, default_lhs)
-        || !is_same_name_expr(test_rhs, subscript_var)
+    if !match_name_expr(slice, test_lhs)
+        || !match_name_expr(expected_lhs, default_lhs)
+        || !match_name_expr(test_rhs, subscript_var)
     {
         return;
     }
