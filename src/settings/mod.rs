@@ -182,7 +182,7 @@ impl Settings {
                 vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()]
             }),
             typing_modules: config.typing_modules.unwrap_or_default(),
-            update_check: config.update_check.unwrap_or(true),
+            update_check: config.update_check.unwrap_or_default(),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations

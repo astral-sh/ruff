@@ -180,7 +180,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.217'
+  rev: 'v0.0.218'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -2340,7 +2340,7 @@ unfixable = ["F401"]
 Enable or disable automatic update checks (overridden by the
 `--update-check` and `--no-update-check` command-line flags).
 
-**Default value**: `true`
+**Default value**: `false`
 
 **Type**: `bool`
 
@@ -2348,7 +2348,7 @@ Enable or disable automatic update checks (overridden by the
 
 ```toml
 [tool.ruff]
-update-check = false
+update-check = true
 ```
 
 ---
