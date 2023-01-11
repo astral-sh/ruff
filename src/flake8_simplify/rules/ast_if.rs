@@ -1,7 +1,8 @@
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
+use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    contains_call_path, create_expr, create_stmt, match_name_expr, unparse_expr, unparse_stmt,
+    contains_call_path, create_expr, create_stmt, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -216,6 +217,13 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     checker.diagnostics.push(diagnostic);
 }
 
+// compare two expressions converting them to ComparableExpr type
+fn match_comp_expr(expr1: &Expr, expr2: &Expr) -> bool {
+    let expr1_comp: &ComparableExpr = &ComparableExpr::from(expr1);
+    let expr2_comp: &ComparableExpr = &ComparableExpr::from(expr2);
+    expr1_comp.eq(expr2_comp)
+}
+
 // SIM401
 pub fn use_dict_get_with_default(
     checker: &mut Checker,
@@ -227,52 +235,52 @@ pub fn use_dict_get_with_default(
     if body.len() != 1 || orelse.len() != 1 {
         return;
     }
-    let StmtKind::Assign { targets: body_lhs, value: body_rhs, ..} = &body[0].node else {
+    let StmtKind::Assign { targets: body_var, value: body_val, ..} = &body[0].node else {
         return;
     };
-    if body_lhs.len() != 1 {
+    if body_var.len() != 1 {
         return;
     };
-    let StmtKind::Assign { targets: orelse_lhs, value: orelse_rhs, .. } = &orelse[0].node else {
+    let StmtKind::Assign { targets: orelse_var, value: orelse_val, .. } = &orelse[0].node else {
         return;
     };
-    if orelse_lhs.len() != 1 {
+    if orelse_var.len() != 1 {
         return;
     };
-    let  ExprKind::Compare { left: test_lhs, ops , comparators: test_rhs } = &test.node else {
+    let  ExprKind::Compare { left: test_key, ops , comparators: test_dict } = &test.node else {
         return;
     };
-    if test_rhs.len() != 1 {
+    if test_dict.len() != 1 {
         return;
     }
 
-    let (expected_lhs, expected_rhs, default_lhs, default_rhs) = match ops[..] {
-        [Cmpop::In] => (&body_lhs[0], body_rhs, &orelse_lhs[0], orelse_rhs),
-        [Cmpop::NotIn] => (&orelse_lhs[0], orelse_rhs, &body_lhs[0], body_rhs),
+    let (expected_var, expected_val, default_var, default_val) = match ops[..] {
+        [Cmpop::In] => (&body_var[0], body_val, &orelse_var[0], orelse_val),
+        [Cmpop::NotIn] => (&orelse_var[0], orelse_val, &body_var[0], body_val),
         _ => {
             return;
         }
     };
-    let test_rhs = &test_rhs[0];
+    let test_dict = &test_dict[0];
 
-    let ExprKind::Subscript { value: subscript_var, slice, .. }  =  &expected_rhs.node else {
+    let ExprKind::Subscript { value: expected_subscript, slice: expected_slice, .. }  =  &expected_val.node else {
         return;
     };
 
     // check: dict-key, target-variable, dict-name are same
-    if !match_name_expr(slice, test_lhs)
-        || !match_name_expr(expected_lhs, default_lhs)
-        || !match_name_expr(test_rhs, subscript_var)
+    if !match_comp_expr(expected_slice, test_key)
+        || !match_comp_expr(expected_var, default_var)
+        || !match_comp_expr(test_dict, expected_subscript)
     {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(
         violations::VerboseDictGetWithDefault(
-            unparse_expr(expected_lhs, checker.style),
-            unparse_expr(subscript_var, checker.style),
-            unparse_expr(test_lhs, checker.style),
-            unparse_expr(default_lhs, checker.style),
+            unparse_expr(expected_var, checker.style),
+            unparse_expr(expected_subscript, checker.style),
+            unparse_expr(test_key, checker.style),
+            unparse_expr(default_val, checker.style),
         ),
         Range::from_located(stmt),
     );
@@ -280,16 +288,16 @@ pub fn use_dict_get_with_default(
         diagnostic.amend(Fix::replacement(
             unparse_stmt(
                 &create_stmt(StmtKind::Assign {
-                    targets: vec![create_expr(expected_lhs.node.clone())],
+                    targets: vec![create_expr(expected_var.node.clone())],
                     value: Box::new(create_expr(ExprKind::Call {
                         func: Box::new(create_expr(ExprKind::Attribute {
-                            value: subscript_var.clone(),
+                            value: expected_subscript.clone(),
                             attr: "get".to_string(),
                             ctx: ExprContext::Load,
                         })),
                         args: vec![
-                            create_expr(test_lhs.node.clone()),
-                            create_expr(default_rhs.node.clone()),
+                            create_expr(test_key.node.clone()),
+                            create_expr(default_val.node.clone()),
                         ],
                         keywords: vec![],
                     })),

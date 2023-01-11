@@ -729,17 +729,6 @@ pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     }
 }
 
-/// Return true if expr1 and expr2 are referring to same `Expr::Name` variable
-pub fn match_name_expr(expr1: &Expr, expr2: &Expr) -> bool {
-    let ExprKind::Name { id: expr1_id, ..} = &expr1.node else {
-        return false;
-    };
-    let ExprKind::Name { id: expr2_id, ..} = &expr2.node else {
-        return false;
-    };
-    expr1_id.eq(expr2_id)
-}
-
 #[derive(Default)]
 /// A simple representation of a call's positional and keyword arguments.
 pub struct SimpleCallArgs<'a> {
