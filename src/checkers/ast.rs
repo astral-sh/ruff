@@ -2048,82 +2048,68 @@ where
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&RuleCode::C400) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_generator_list(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C400),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_generator_list(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(&RuleCode::C400),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C401) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_generator_set(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C401),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_generator_set(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(&RuleCode::C401),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C402) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_generator_dict(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C402),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_generator_dict(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(&RuleCode::C402),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C403) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_list_comprehension_set(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C403),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_list_comprehension_set(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(&RuleCode::C403),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C404) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C404),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(&RuleCode::C404),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C405) {
-                    if let Some(diagnostic) = flake8_comprehensions::rules::unnecessary_literal_set(
+                    flake8_comprehensions::rules::unnecessary_literal_set(
+                        self,
                         expr,
                         func,
                         args,
@@ -2131,12 +2117,11 @@ where
                         self.locator,
                         self.patch(&RuleCode::C405),
                         Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C406) {
-                    if let Some(diagnostic) = flake8_comprehensions::rules::unnecessary_literal_dict(
+                    flake8_comprehensions::rules::unnecessary_literal_dict(
+                        self,
                         expr,
                         func,
                         args,
@@ -2144,109 +2129,87 @@ where
                         self.locator,
                         self.patch(&RuleCode::C406),
                         Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C408) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_collection_call(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C408),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_collection_call(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.locator,
+                        self.patch(&RuleCode::C408),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C409) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
-                            expr,
-                            func,
-                            args,
-                            self.locator,
-                            self.patch(&RuleCode::C409),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        self.locator,
+                        self.patch(&RuleCode::C409),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C410) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_literal_within_list_call(
-                            expr,
-                            func,
-                            args,
-                            self.locator,
-                            self.patch(&RuleCode::C410),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_literal_within_list_call(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        self.locator,
+                        self.patch(&RuleCode::C410),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C411) {
-                    if let Some(diagnostic) = flake8_comprehensions::rules::unnecessary_list_call(
+                    flake8_comprehensions::rules::unnecessary_list_call(
+                        self,
                         expr,
                         func,
                         args,
                         self.locator,
                         self.patch(&RuleCode::C411),
                         Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C413) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_call_around_sorted(
-                            expr,
-                            func,
-                            args,
-                            self.locator,
-                            self.patch(&RuleCode::C413),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_call_around_sorted(
+                        self,
+                        expr,
+                        func,
+                        args,
+                        self.locator,
+                        self.patch(&RuleCode::C413),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C414) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_double_cast_or_process(
-                            func,
-                            args,
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
-                }
-                if self.settings.enabled.contains(&RuleCode::C415) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_subscript_reversal(
-                            func,
-                            args,
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
-                }
-                if self.settings.enabled.contains(&RuleCode::C417) {
-                    if let Some(diagnostic) = flake8_comprehensions::rules::unnecessary_map(
+                    flake8_comprehensions::rules::unnecessary_double_cast_or_process(
+                        self,
                         func,
                         args,
                         Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    );
+                }
+                if self.settings.enabled.contains(&RuleCode::C415) {
+                    flake8_comprehensions::rules::unnecessary_subscript_reversal(
+                        self,
+                        func,
+                        args,
+                        Range::from_located(expr),
+                    );
+                }
+                if self.settings.enabled.contains(&RuleCode::C417) {
+                    flake8_comprehensions::rules::unnecessary_map(
+                        self,
+                        func,
+                        args,
+                        Range::from_located(expr),
+                    );
                 }
 
                 // flake8-boolean-trap
@@ -2790,18 +2753,15 @@ where
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&RuleCode::C416) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_comprehension(
-                            expr,
-                            elt,
-                            generators,
-                            self.locator,
-                            self.patch(&RuleCode::C416),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_comprehension(
+                        self,
+                        expr,
+                        elt,
+                        generators,
+                        self.locator,
+                        self.patch(&RuleCode::C416),
+                        Range::from_located(expr),
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::B023) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
