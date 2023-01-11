@@ -729,7 +729,7 @@ pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     }
 }
 
-/// Return true if expr1 and expr2 are refering to same Expr::Name variable
+/// Return true if expr1 and expr2 are referring to same `Expr::Name` variable
 pub fn match_name_expr(expr1: &Expr, expr2: &Expr) -> bool {
     let ExprKind::Name { id: expr1_id, ..} = &expr1.node else {
         return false;
