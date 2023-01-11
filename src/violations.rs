@@ -3487,6 +3487,25 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 }
 
 define_violation!(
+    pub struct PrintfStringFormatting;
+);
+impl AlwaysAutofixableViolation for PrintfStringFormatting {
+    fn message(&self) -> String {
+        "Use builtin `open`".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with builtin `open`".to_string()
+    }
+
+    fn placeholder() -> Self {
+        // FOR REVIEWER: Should we switch all of these to self? Is there any way to do this automatically when
+        // defining the trait (im pretty sure the answer is no, but I want to confirm)
+        Self
+    }
+}
+
+define_violation!(
     pub struct ReplaceStdoutStderr;
 );
 impl AlwaysAutofixableViolation for ReplaceStdoutStderr {

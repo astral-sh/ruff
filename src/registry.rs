@@ -347,6 +347,7 @@ define_rule_mapping!(
     UP028 => violations::RewriteYieldFrom,
     UP029 => violations::UnnecessaryBuiltinImport,
     UP030 => violations::FormatLiterals,
+    UP031 => violations::PrintfStringFormatting,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,

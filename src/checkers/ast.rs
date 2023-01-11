@@ -2589,6 +2589,9 @@ where
                             }
                         }
                     }
+                    if self.settings.enabled.contains(&RuleCode::UP031) {
+                        pyupgrade::rules::printf_string_formatting(self, left, right);
+                    }
                 }
             }
             ExprKind::BinOp {
