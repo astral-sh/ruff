@@ -375,9 +375,9 @@ pub struct Options {
     /// A list of rule codes or prefixes to consider non-autofix-able.
     pub unfixable: Option<Vec<RuleCodePrefix>>,
     #[option(
-        default = "true",
+        default = "false",
         value_type = "bool",
-        example = "update-check = false"
+        example = "update-check = true"
     )]
     /// Enable or disable automatic update checks (overridden by the
     /// `--update-check` and `--no-update-check` command-line flags).
