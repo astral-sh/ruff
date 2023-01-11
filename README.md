@@ -920,8 +920,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT001 | IncorrectFixtureParenthesesStyle | Use `@pytest.fixture()` over `@pytest.fixture` | 🛠 |
 | PT002 | FixturePositionalArgs | Configuration for fixture `...` specified via positional args, use kwargs |  |
 | PT003 | ExtraneousScopeFunction | `scope='function'` is implied in `@pytest.fixture()` |  |
-| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore | 🛠 |
-| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore | 🛠 |
+| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore |  |
+| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
 | PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
