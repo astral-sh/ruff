@@ -2340,7 +2340,7 @@ unfixable = ["F401"]
 Enable or disable automatic update checks (overridden by the
 `--update-check` and `--no-update-check` command-line flags).
 
-**Default value**: `true`
+**Default value**: `false`
 
 **Type**: `bool`
 
@@ -2348,7 +2348,7 @@ Enable or disable automatic update checks (overridden by the
 
 ```toml
 [tool.ruff]
-update-check = false
+update-check = true
 ```
 
 ---
