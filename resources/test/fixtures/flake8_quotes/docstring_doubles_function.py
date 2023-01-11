@@ -20,3 +20,6 @@ def fun_with_params_no_docstring(a, b="""
 def fun_with_params_no_docstring2(a, b=c[foo():], c=\
     """ not a docstring """):
     pass
+
+def function_with_single_docstring(a):
+    "Single line docstring"

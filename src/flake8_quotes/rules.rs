@@ -34,10 +34,12 @@ fn good_multiline_ending(quote: &Quote) -> &str {
     }
 }
 
-fn good_docstring(quote: &Quote) -> &str {
+/// A valid docstring for a function starts with `"`, `"""`, or "'''". This function returns true
+/// if the docstring is one of these, and false if it is not.
+fn contains_good_docstring(quote: &Quote, raw_str: &str) -> bool {
     match quote {
-        Quote::Single => "'''",
-        Quote::Double => "\"\"\"",
+        Quote::Single => raw_str.contains("'''"),
+        Quote::Double => raw_str.contains("\"\"\"") || raw_str.contains("\""),
     }
 }
 
@@ -68,10 +70,11 @@ pub fn quotes(
     };
 
     if is_docstring {
-        if raw_text.contains(good_docstring(&settings.docstring_quotes)) {
+        if contains_good_docstring(&settings.docstring_quotes, raw_text) {
             return None;
         }
 
+        // This is get triggered incorrectly
         Some(Diagnostic::new(
             violations::BadQuotesDocstring(settings.docstring_quotes.clone()),
             Range::new(start, end),
