@@ -1,6 +1,6 @@
 ---
 source: src/flake8_unused_arguments/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     UnusedMethodArgument: x
@@ -30,6 +30,16 @@ expression: checks
   end_location:
     row: 41
     column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument: x
+  location:
+    row: 190
+    column: 23
+  end_location:
+    row: 190
+    column: 24
   fix: ~
   parent: ~
 
