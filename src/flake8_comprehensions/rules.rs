@@ -57,6 +57,9 @@ pub fn unnecessary_generator_list(
     let Some(argument) = exactly_one_argument_with_matching_function("list", func, args, keywords) else {
         return;
     };
+    if !checker.is_builtin("list") {
+        return;
+    }
     if let ExprKind::GeneratorExp { .. } = argument {
         let mut diagnostic = Diagnostic::new(
             violations::UnnecessaryGeneratorList,
@@ -85,6 +88,9 @@ pub fn unnecessary_generator_set(
     let Some(argument) = exactly_one_argument_with_matching_function("set", func, args, keywords) else {
         return;
     };
+    if !checker.is_builtin("set") {
+        return;
+    }
     if let ExprKind::GeneratorExp { .. } = argument {
         let mut diagnostic = Diagnostic::new(
             violations::UnnecessaryGeneratorSet,
@@ -146,6 +152,9 @@ pub fn unnecessary_list_comprehension_set(
     let Some(argument) = exactly_one_argument_with_matching_function("set", func, args, keywords) else {
         return;
     };
+    if !checker.is_builtin("set") {
+        return;
+    }
     if let ExprKind::ListComp { .. } = &argument {
         let mut diagnostic = Diagnostic::new(
             violations::UnnecessaryListComprehensionSet,
@@ -174,6 +183,9 @@ pub fn unnecessary_list_comprehension_dict(
     let Some(argument) = exactly_one_argument_with_matching_function("dict", func, args, keywords) else {
         return;
     };
+    if !checker.is_builtin("dict") {
+        return;
+    }
     let ExprKind::ListComp { elt, .. } = &argument else {
         return;
     };
@@ -209,6 +221,9 @@ pub fn unnecessary_literal_set(
     let Some(argument) = exactly_one_argument_with_matching_function("set", func, args, keywords) else {
         return;
     };
+    if !checker.is_builtin("set") {
+        return;
+    }
     let kind = match argument {
         ExprKind::List { .. } => "list",
         ExprKind::Tuple { .. } => "tuple",
@@ -240,6 +255,9 @@ pub fn unnecessary_literal_dict(
     let Some(argument) = exactly_one_argument_with_matching_function("dict", func, args, keywords) else {
         return;
     };
+    if !checker.is_builtin("dict") {
+        return;
+    }
     let (kind, elts) = match argument {
         ExprKind::Tuple { elts, .. } => ("tuple", elts),
         ExprKind::List { elts, .. } => ("list", elts),
@@ -290,6 +308,9 @@ pub fn unnecessary_collection_call(
         }
         _ => return,
     };
+    if !checker.is_builtin(id) {
+        return;
+    }
     let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryCollectionCall(id.to_string()),
         Range::from_located(expr),
@@ -315,6 +336,9 @@ pub fn unnecessary_literal_within_tuple_call(
     let Some(argument) = first_argument_with_matching_function("tuple", func, args) else {
         return;
     };
+    if !checker.is_builtin("tuple") {
+        return;
+    }
     let argument_kind = match argument {
         ExprKind::Tuple { .. } => "tuple",
         ExprKind::List { .. } => "list",
@@ -345,6 +369,9 @@ pub fn unnecessary_literal_within_list_call(
     let Some(argument) = first_argument_with_matching_function("list", func, args) else {
         return;
     };
+    if !checker.is_builtin("list") {
+        return;
+    }
     let argument_kind = match argument {
         ExprKind::Tuple { .. } => "tuple",
         ExprKind::List { .. } => "list",
@@ -370,6 +397,9 @@ pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     let Some(argument) = first_argument_with_matching_function("list", func, args) else {
         return;
     };
+    if !checker.is_builtin("list") {
+        return;
+    }
     if !matches!(argument, ExprKind::ListComp { .. }) {
         return;
     }
@@ -411,7 +441,9 @@ pub fn unnecessary_call_around_sorted(
     if inner != "sorted" {
         return;
     }
-
+    if !checker.is_builtin(inner) || !checker.is_builtin(outer) {
+        return;
+    }
     let mut diagnostic = Diagnostic::new(
         violations::UnnecessaryCallAroundSorted(outer.to_string()),
         Range::from_located(expr),
@@ -444,20 +476,26 @@ pub fn unnecessary_double_cast_or_process(
     let Some(outer) = function_name(func) else {
         return;
     };
-    if !["list", "tuple", "set", "reversed", "sorted"].contains(&outer) {
+    if !(outer == "list"
+        || outer == "tuple"
+        || outer == "set"
+        || outer == "reversed"
+        || outer == "sorted")
+    {
         return;
     }
-
     let Some(arg) = args.first() else {
         return;
     };
     let ExprKind::Call { func, .. } = &arg.node else {
         return;
     };
-
     let Some(inner) = function_name(func) else {
         return;
     };
+    if !checker.is_builtin(inner) || !checker.is_builtin(outer) {
+        return;
+    }
 
     // Ex) set(tuple(...))
     if (outer == "set" || outer == "sorted")
@@ -498,8 +536,10 @@ pub fn unnecessary_subscript_reversal(
     let Some(id) = function_name(func) else {
         return;
     };
-
-    if !["set", "sorted", "reversed"].contains(&id) {
+    if !(id == "set" || id == "sorted" || id == "reversed") {
+        return;
+    }
+    if !checker.is_builtin(id) {
         return;
     }
     let ExprKind::Subscript { slice, .. } = &first_arg.node else {
@@ -559,13 +599,16 @@ pub fn unnecessary_comprehension(
     if elt_id != target_id {
         return;
     }
-    let expr_kind = match &expr.node {
+    let id = match &expr.node {
         ExprKind::ListComp { .. } => "list",
         ExprKind::SetComp { .. } => "set",
         _ => return,
     };
+    if !checker.is_builtin(id) {
+        return;
+    }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryComprehension(expr_kind.to_string()),
+        violations::UnnecessaryComprehension(id.to_string()),
         Range::from_located(expr),
     );
     if checker.patch(&RuleCode::C416) {
@@ -590,6 +633,10 @@ pub fn unnecessary_map(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[
     };
     match id {
         "map" => {
+            if !checker.is_builtin(id) {
+                return;
+            }
+
             if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda { .. }) {
                 checker
                     .diagnostics
@@ -597,6 +644,10 @@ pub fn unnecessary_map(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[
             }
         }
         "list" | "set" => {
+            if !checker.is_builtin(id) {
+                return;
+            }
+
             if let Some(arg) = args.first() {
                 if let ExprKind::Call { func, args, .. } = &arg.node {
                     let Some(argument) = first_argument_with_matching_function("map", func, args) else {
@@ -611,6 +662,10 @@ pub fn unnecessary_map(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[
             }
         }
         "dict" => {
+            if !checker.is_builtin(id) {
+                return;
+            }
+
             if args.len() == 1 {
                 if let ExprKind::Call { func, args, .. } = &args[0].node {
                     let Some(argument) = first_argument_with_matching_function("map", func, args) else {
