@@ -35,6 +35,7 @@ urls = { repository = "https://github.com/charliermarsh/ruff" }
 
 [tool.maturin]
 bindings = "bin"
+python-source = "python"
 strip = true
 
 [tool.setuptools]
