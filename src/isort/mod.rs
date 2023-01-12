@@ -943,7 +943,7 @@ mod tests {
                 .as_path(),
             &Settings {
                 isort: isort::settings::Settings {
-                    relative_imports_order: RelatveImportsOrder::ClosestToFurther,
+                    relative_imports_order: RelatveImportsOrder::ClosestToFurthest,
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],

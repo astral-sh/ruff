@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub enum RelatveImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
     /// "further" imports (more `.` characters, least local).
-    ClosestToFurther,
+    ClosestToFurthest,
     /// Place "further" imports (more `.` characters, least local) imports
     /// before "closer" imports (fewer `.` characters, most local).
     FurthestToClosest,

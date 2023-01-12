@@ -60,7 +60,7 @@ pub fn cmp_levels(
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
         (Some(level1), Some(level2)) => match relative_imports_order {
-            RelatveImportsOrder::ClosestToFurther => level1.cmp(level2),
+            RelatveImportsOrder::ClosestToFurthest => level1.cmp(level2),
             RelatveImportsOrder::FurthestToClosest => level2.cmp(level1),
         },
     }

@@ -1024,7 +1024,7 @@
           "description": "Place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local).",
           "type": "string",
           "enum": [
-            "closest-to-further"
+            "closest-to-furthest"
           ]
         },
         {
