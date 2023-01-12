@@ -231,7 +231,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 }
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
-    expr1.eq(&expr2)
+    expr1.eq(expr2)
 }
 
 /// SIM401
