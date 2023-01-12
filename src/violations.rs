@@ -2793,13 +2793,13 @@ define_violation!(
 );
 impl AlwaysAutofixableViolation for UseTernaryOperator {
     fn message(&self) -> String {
-        let UseTernaryOperator(new_code) = self;
-        format!("Use ternary operator `{new_code}` instead of if-else-block")
+        let UseTernaryOperator(contents) = self;
+        format!("Use ternary operator `{contents}` instead of if-else-block")
     }
 
     fn autofix_title(&self) -> String {
-        let UseTernaryOperator(new_code) = self;
-        format!("Replace if-else-block with `{new_code}`")
+        let UseTernaryOperator(contents) = self;
+        format!("Replace if-else-block with `{contents}`")
     }
 
     fn placeholder() -> Self {
@@ -3108,26 +3108,21 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
 }
 
 define_violation!(
-    pub struct VerboseDictGetWithDefault(pub String, pub String, pub String, pub String);
+    pub struct DictGetWithDefault(pub String);
 );
-impl AlwaysAutofixableViolation for VerboseDictGetWithDefault {
+impl AlwaysAutofixableViolation for DictGetWithDefault {
     fn message(&self) -> String {
-        let VerboseDictGetWithDefault(lhs, dict, key, default) = self;
-        format!("Use `{lhs} = {dict}.get({key}, {default})` instead of verbose If statement.")
+        let DictGetWithDefault(contents) = self;
+        format!("Use `{contents}` instead of an `if` block")
     }
 
     fn autofix_title(&self) -> String {
-        let VerboseDictGetWithDefault(lhs, dict, key, default) = self;
-        format!("Replace with `{lhs} = {dict}.get([{key}], {default})`")
+        let DictGetWithDefault(contents) = self;
+        format!("Replace with `{contents}`")
     }
 
     fn placeholder() -> Self {
-        VerboseDictGetWithDefault(
-            "var".to_string(),
-            "a_dict".to_string(),
-            "key".to_string(),
-            "default_value".to_string(),
-        )
+        DictGetWithDefault("var = dict.get(key, \"default\")".to_string())
     }
 }
 // pyupgrade

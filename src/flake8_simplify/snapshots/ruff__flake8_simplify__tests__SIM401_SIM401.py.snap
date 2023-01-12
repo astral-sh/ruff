@@ -3,53 +3,24 @@ source: src/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    VerboseDictGetWithDefault:
-      - var
-      - a_dict
-      - key
-      - "\"default1\""
+    DictGetWithDefault: "var = a_dict.get(key, \"default1\")"
   location:
-    row: 2
+    row: 6
     column: 0
   end_location:
-    row: 5
+    row: 9
     column: 20
   fix:
     content: "var = a_dict.get(key, \"default1\")"
     location:
-      row: 2
+      row: 6
       column: 0
     end_location:
-      row: 5
+      row: 9
       column: 20
   parent: ~
 - kind:
-    VerboseDictGetWithDefault:
-      - var
-      - a_dict
-      - key
-      - "\"default2\""
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 10
-    column: 21
-  fix:
-    content: "var = a_dict.get(key, \"default2\")"
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 10
-      column: 21
-  parent: ~
-- kind:
-    VerboseDictGetWithDefault:
-      - var
-      - a_dict
-      - key
-      - val1 + val2
+    DictGetWithDefault: "var = a_dict.get(key, \"default2\")"
   location:
     row: 12
     column: 0
@@ -57,7 +28,7 @@ expression: diagnostics
     row: 15
     column: 21
   fix:
-    content: "var = a_dict.get(key, val1 + val2)"
+    content: "var = a_dict.get(key, \"default2\")"
     location:
       row: 12
       column: 0
@@ -66,66 +37,71 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    VerboseDictGetWithDefault:
-      - var
-      - a_dict
-      - "keys[idx]"
-      - "\"default\""
+    DictGetWithDefault: "var = a_dict.get(key, val1 + val2)"
   location:
-    row: 17
+    row: 18
     column: 0
   end_location:
-    row: 20
+    row: 21
+    column: 21
+  fix:
+    content: "var = a_dict.get(key, val1 + val2)"
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 21
+      column: 21
+  parent: ~
+- kind:
+    DictGetWithDefault: "var = a_dict.get(keys[idx], \"default\")"
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 27
     column: 19
   fix:
     content: "var = a_dict.get(keys[idx], \"default\")"
     location:
-      row: 17
+      row: 24
       column: 0
     end_location:
-      row: 20
+      row: 27
       column: 19
   parent: ~
 - kind:
-    VerboseDictGetWithDefault:
-      - var
-      - "dicts[idx]"
-      - key
-      - "\"default\""
+    DictGetWithDefault: "var = dicts[idx].get(key, \"default\")"
   location:
-    row: 22
+    row: 30
     column: 0
   end_location:
-    row: 25
+    row: 33
     column: 19
   fix:
     content: "var = dicts[idx].get(key, \"default\")"
     location:
-      row: 22
+      row: 30
       column: 0
     end_location:
-      row: 25
+      row: 33
       column: 19
   parent: ~
 - kind:
-    VerboseDictGetWithDefault:
-      - "vars[idx]"
-      - a_dict
-      - key
-      - "\"default\""
+    DictGetWithDefault: "vars[idx] = a_dict.get(key, \"default\")"
   location:
-    row: 27
+    row: 36
     column: 0
   end_location:
-    row: 30
+    row: 39
     column: 25
   fix:
     content: "vars[idx] = a_dict.get(key, \"default\")"
     location:
-      row: 27
+      row: 36
       column: 0
     end_location:
-      row: 30
+      row: 39
       column: 25
   parent: ~
 

@@ -1,63 +1,80 @@
+###
+# Positive cases
+###
 
-if key in a_dict:  # pattern-1
+# SIM401 (pattern-1)
+if key in a_dict:
     var = a_dict[key]
 else:
     var = "default1"
 
-if key not in a_dict:  # pattern-2
+# SIM401 (pattern-2)
+if key not in a_dict:
     var = "default2"
 else:
     var = a_dict[key]
 
-if key in a_dict:  # default has complex expr
+# SIM401 (default with a complex expression)
+if key in a_dict:
     var = a_dict[key]
 else:
     var = val1 + val2
 
-if keys[idx] in a_dict:  # complex expr in key
+# SIM401 (complex expression in key)
+if keys[idx] in a_dict:
     var = a_dict[keys[idx]]
 else:
     var = "default"
 
-if key in dicts[idx]:  # complex expr in dict
+# SIM401 (complex expression in dict)
+if key in dicts[idx]:
     var = dicts[idx][key]
 else:
     var = "default"
 
-if key in a_dict:   # complex expr in var
+# SIM401 (complex expression in var)
+if key in a_dict:
     vars[idx] = a_dict[key]
 else:
     vars[idx] = "default"
 
-
+###
 # Negative cases
-if not key in a_dict:  # negated test : could be a nice-to-have
+###
+
+# OK (false negative)
+if not key in a_dict:
     var = "default"
 else:
     var = a_dict[key]
 
-if key in a_dict:  # different dict
+# OK (different dict)
+if key in a_dict:
     var = other_dict[key]
 else:
     var = "default"
 
-if key in a_dict:  # different key
+# OK (different key)
+if key in a_dict:
     var = a_dict[other_key]
 else:
     var = "default"
 
-if key in a_dict:  # different var
+# OK (different var)
+if key in a_dict:
     var = a_dict[key]
 else:
     other_var = "default"
 
-if key in a_dict:  # extra vars in body
+# OK (extra vars in body)
+if key in a_dict:
     var = a_dict[key]
     var2 = value2
 else:
     var = "default"
 
-if key in a_dict:  # extra vars in orelse
+# OK (extra vars in orelse)
+if key in a_dict:
     var = a_dict[key]
 else:
     var2 = value2

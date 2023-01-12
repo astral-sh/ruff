@@ -318,7 +318,7 @@ define_rule_mapping!(
     SIM222 => violations::OrTrue,
     SIM223 => violations::AndFalse,
     SIM300 => violations::YodaConditions,
-    SIM401 => violations::VerboseDictGetWithDefault,
+    SIM401 => violations::DictGetWithDefault,
     // pyupgrade
     UP001 => violations::UselessMetaclassType,
     UP003 => violations::TypeOfPrimitive,

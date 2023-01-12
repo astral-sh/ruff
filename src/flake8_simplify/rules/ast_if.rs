@@ -230,14 +230,11 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     checker.diagnostics.push(diagnostic);
 }
 
-// compare two expressions converting them to ComparableExpr type
-fn match_comp_expr(expr1: &Expr, expr2: &Expr) -> bool {
-    let expr1_comp: &ComparableExpr = &ComparableExpr::from(expr1);
-    let expr2_comp: &ComparableExpr = &ComparableExpr::from(expr2);
-    expr1_comp.eq(expr2_comp)
+fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
+    expr1.eq(&expr2)
 }
 
-// SIM401
+/// SIM401
 pub fn use_dict_get_with_default(
     checker: &mut Checker,
     stmt: &Stmt,
@@ -266,7 +263,6 @@ pub fn use_dict_get_with_default(
     if test_dict.len() != 1 {
         return;
     }
-
     let (expected_var, expected_val, default_var, default_val) = match ops[..] {
         [Cmpop::In] => (&body_var[0], body_val, &orelse_var[0], orelse_val),
         [Cmpop::NotIn] => (&orelse_var[0], orelse_val, &body_var[0], body_val),
@@ -275,49 +271,58 @@ pub fn use_dict_get_with_default(
         }
     };
     let test_dict = &test_dict[0];
-
     let ExprKind::Subscript { value: expected_subscript, slice: expected_slice, .. }  =  &expected_val.node else {
         return;
     };
 
-    // check: dict-key, target-variable, dict-name are same
-    if !match_comp_expr(expected_slice, test_key)
-        || !match_comp_expr(expected_var, default_var)
-        || !match_comp_expr(test_dict, expected_subscript)
+    // Check that the dictionary key, target variables, and dictionary name are all
+    // equivalent.
+    if !compare_expr(&expected_slice.into(), &test_key.into())
+        || !compare_expr(&expected_var.into(), &default_var.into())
+        || !compare_expr(&test_dict.into(), &expected_subscript.into())
     {
         return;
     }
 
+    let contents = unparse_stmt(
+        &create_stmt(StmtKind::Assign {
+            targets: vec![create_expr(expected_var.node.clone())],
+            value: Box::new(create_expr(ExprKind::Call {
+                func: Box::new(create_expr(ExprKind::Attribute {
+                    value: expected_subscript.clone(),
+                    attr: "get".to_string(),
+                    ctx: ExprContext::Load,
+                })),
+                args: vec![
+                    create_expr(test_key.node.clone()),
+                    create_expr(default_val.node.clone()),
+                ],
+                keywords: vec![],
+            })),
+            type_comment: None,
+        }),
+        checker.style,
+    );
+
+    // Don't flag for simplified `dict.get` if the resulting expression would exceed
+    // the maximum line length.
+    if stmt.location.column() + contents.len() > checker.settings.line_length {
+        return;
+    }
+
+    // Don't flag for simplified `dict.get` if the if-expression contains any
+    // comments.
+    if has_comments(stmt, checker.locator) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
-        violations::VerboseDictGetWithDefault(
-            unparse_expr(expected_var, checker.style),
-            unparse_expr(expected_subscript, checker.style),
-            unparse_expr(test_key, checker.style),
-            unparse_expr(default_val, checker.style),
-        ),
+        violations::DictGetWithDefault(contents.clone()),
         Range::from_located(stmt),
     );
     if checker.patch(&RuleCode::SIM401) {
         diagnostic.amend(Fix::replacement(
-            unparse_stmt(
-                &create_stmt(StmtKind::Assign {
-                    targets: vec![create_expr(expected_var.node.clone())],
-                    value: Box::new(create_expr(ExprKind::Call {
-                        func: Box::new(create_expr(ExprKind::Attribute {
-                            value: expected_subscript.clone(),
-                            attr: "get".to_string(),
-                            ctx: ExprContext::Load,
-                        })),
-                        args: vec![
-                            create_expr(test_key.node.clone()),
-                            create_expr(default_val.node.clone()),
-                        ],
-                        keywords: vec![],
-                    })),
-                    type_comment: None,
-                }),
-                checker.style,
-            ),
+            contents,
             stmt.location,
             stmt.end_location.unwrap(),
         ));
