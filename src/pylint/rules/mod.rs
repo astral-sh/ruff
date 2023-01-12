@@ -1,4 +1,5 @@
 pub use await_outside_async::await_outside_async;
+pub use magic_value_comparison::magic_value_comparison;
 pub use merge_isinstance::merge_isinstance;
 pub use misplaced_comparison_constant::misplaced_comparison_constant;
 pub use property_with_parameters::property_with_parameters;
@@ -10,6 +11,7 @@ pub use useless_else_on_loop::useless_else_on_loop;
 pub use useless_import_alias::useless_import_alias;
 
 mod await_outside_async;
+mod magic_value_comparison;
 mod merge_isinstance;
 mod misplaced_comparison_constant;
 mod property_with_parameters;

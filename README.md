@@ -1095,6 +1095,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR0402 | ConsiderUsingFromImport | Use `from ... import ...` in lieu of alias |  |
 | PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
 | PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
+| PLR2004 | MagicValueComparison | Magic number used in comparison, consider replacing magic with a constant variable |  |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 | PLW0602 | GlobalVariableNotAssigned | Using global for `...` but no assignment is done |  |
 

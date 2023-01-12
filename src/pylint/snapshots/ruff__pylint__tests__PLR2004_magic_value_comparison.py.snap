@@ -1,0 +1,35 @@
+---
+source: src/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    MagicValueComparison: "10"
+  location:
+    row: 5
+    column: 3
+  end_location:
+    row: 5
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    MagicValueComparison: "100"
+  location:
+    row: 8
+    column: 3
+  end_location:
+    row: 8
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    MagicValueComparison: "10"
+  location:
+    row: 8
+    column: 3
+  end_location:
+    row: 8
+    column: 12
+  fix: ~
+  parent: ~
+

@@ -27,6 +27,7 @@ mod tests {
     #[test_case(RuleCode::PLR1722, Path::new("consider_using_sys_exit_4.py"); "PLR1722_4")]
     #[test_case(RuleCode::PLR1722, Path::new("consider_using_sys_exit_5.py"); "PLR1722_5")]
     #[test_case(RuleCode::PLR1722, Path::new("consider_using_sys_exit_6.py"); "PLR1722_6")]
+    #[test_case(RuleCode::PLR2004, Path::new("magic_value_comparison.py"); "PLR2004")]
     #[test_case(RuleCode::PLW0120, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(RuleCode::PLW0602, Path::new("global_variable_not_assigned.py"); "PLW0602")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
