@@ -4712,12 +4712,11 @@ impl Violation for Jinja2AutoescapeFalse {
         let Jinja2AutoescapeFalse(value) = self;
         match value {
             true => "Using jinja2 templates with `autoescape=False` is dangerous and can lead to \
-                     XSS. Ensure `autoescape=True` or use the `select_autoescape` function to \
-                     mitigate XSS vulnerabilities."
+                     XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
                 .to_string(),
-            false => "By default, jinja2 sets autoescape to False. Consider using \
-                      `autoescape=True` or use the `select_autoescape` function to mitigate XSS \
-                      vulnerabilities"
+            false => "By default, jinja2 sets `autoescape` to `False`. Consider using \
+                      `autoescape=True` or the `select_autoescape` function to mitigate XSS \
+                      vulnerabilities."
                 .to_string(),
         }
     }

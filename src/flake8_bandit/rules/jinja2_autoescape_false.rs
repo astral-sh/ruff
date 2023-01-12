@@ -15,9 +15,12 @@ pub fn jinja2_autoescape_false(
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
     import_aliases: &FxHashMap<&str, &str>,
 ) -> Option<Diagnostic> {
-    let call_path = dealias_call_path(collect_call_paths(func), import_aliases);
-
-    if match_call_path(&call_path, "jinja2", "Environment", from_imports) {
+    if match_call_path(
+        &dealias_call_path(collect_call_paths(func), import_aliases),
+        "jinja2",
+        "Environment",
+        from_imports,
+    ) {
         let call_args = SimpleCallArgs::new(args, keywords);
 
         if let Some(autoescape_arg) = call_args.get_argument("autoescape", None) {
