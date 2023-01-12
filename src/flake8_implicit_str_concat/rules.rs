@@ -4,11 +4,11 @@ use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 /// ISC001, ISC002
-pub fn implicit(tokens: &[LexResult], locator: &SourceCodeLocator) -> Vec<Diagnostic> {
+pub fn implicit(tokens: &[LexResult], locator: &Locator) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
     for ((a_start, a_tok, a_end), (b_start, b_tok, b_end)) in
         tokens.iter().flatten().tuple_windows()

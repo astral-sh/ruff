@@ -9,12 +9,11 @@ use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 use crate::ast::helpers::collect_call_paths;
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Locator, Stylist};
 use crate::violations;
 use crate::violations::MockReference;
 
@@ -84,11 +83,7 @@ fn includes_mock_member(aliases: &[ImportAlias]) -> bool {
     false
 }
 
-fn format_mocks(
-    aliases: Vec<Option<AsName>>,
-    indent: &str,
-    stylist: &SourceCodeStyleDetector,
-) -> String {
+fn format_mocks(aliases: Vec<Option<AsName>>, indent: &str, stylist: &Stylist) -> String {
     let mut content = String::new();
     for alias in aliases {
         match alias {
@@ -118,8 +113,8 @@ fn format_mocks(
 fn format_import(
     stmt: &Stmt,
     indent: &str,
-    locator: &SourceCodeLocator,
-    stylist: &SourceCodeStyleDetector,
+    locator: &Locator,
+    stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text)?;
@@ -148,8 +143,8 @@ fn format_import(
 fn format_import_from(
     stmt: &Stmt,
     indent: &str,
-    locator: &SourceCodeLocator,
-    stylist: &SourceCodeStyleDetector,
+    locator: &Locator,
+    stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text).unwrap();

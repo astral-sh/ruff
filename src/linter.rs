@@ -11,8 +11,7 @@ use rustpython_parser::lexer::LexResult;
 use similar::TextDiff;
 
 use crate::ast::types::Range;
-use crate::autofix::fixer;
-use crate::autofix::fixer::fix_file;
+use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
 use crate::checkers::imports::check_imports;
 use crate::checkers::lines::check_lines;
@@ -24,9 +23,8 @@ use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::registry::{Diagnostic, LintSource, RuleCode};
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
-use crate::{cache, directives, fs, rustpython_helpers, violations};
+use crate::source_code::{Locator, Stylist};
+use crate::{cache, directives, fix, fs, rustpython_helpers, violations};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -58,8 +56,8 @@ pub(crate) fn check_path(
     package: Option<&Path>,
     contents: &str,
     tokens: Vec<LexResult>,
-    locator: &SourceCodeLocator,
-    stylist: &SourceCodeStyleDetector,
+    locator: &Locator,
+    stylist: &Stylist,
     directives: &Directives,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -200,7 +198,7 @@ pub fn lint_path(
     package: Option<&Path>,
     settings: &Settings,
     cache: flags::Cache,
-    autofix: fixer::Mode,
+    autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Validate the `Settings` and return any errors.
     settings.validate()?;
@@ -212,7 +210,7 @@ pub fn lint_path(
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
     let metadata = if matches!(cache, flags::Cache::Enabled)
-        && matches!(autofix, fixer::Mode::None | fixer::Mode::Generate)
+        && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
     {
         let metadata = path.metadata()?;
         if let Some(messages) = cache::get(path, &metadata, settings, autofix.into()) {
@@ -228,12 +226,12 @@ pub fn lint_path(
     let contents = fs::read_file(path)?;
 
     // Lint the file.
-    let (messages, fixed) = if matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff) {
+    let (messages, fixed) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
         let (transformed, fixed, messages) = lint_fix(&contents, path, package, settings)?;
         if fixed > 0 {
-            if matches!(autofix, fixer::Mode::Apply) {
+            if matches!(autofix, fix::FixMode::Apply) {
                 write(path, transformed)?;
-            } else if matches!(autofix, fixer::Mode::Diff) {
+            } else if matches!(autofix, fix::FixMode::Diff) {
                 let mut stdout = io::stdout().lock();
                 TextDiff::from_lines(&contents, &transformed)
                     .unified_diff()
@@ -270,10 +268,10 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
 
     // Map row and column locations to byte slices (lazily).
-    let locator = SourceCodeLocator::new(&contents);
+    let locator = Locator::new(&contents);
 
     // Detect the current code style (lazily).
-    let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+    let stylist = Stylist::from_contents(&contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives =
@@ -310,13 +308,13 @@ pub fn lint_stdin(
     package: Option<&Path>,
     contents: &str,
     settings: &Settings,
-    autofix: fixer::Mode,
+    autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Validate the `Settings` and return any errors.
     settings.validate()?;
 
     // Lint the inputs.
-    let (messages, fixed) = if matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff) {
+    let (messages, fixed) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
         let (transformed, fixed, messages) = lint_fix(
             contents,
             path.unwrap_or_else(|| Path::new("-")),
@@ -324,10 +322,10 @@ pub fn lint_stdin(
             settings,
         )?;
 
-        if matches!(autofix, fixer::Mode::Apply) {
+        if matches!(autofix, fix::FixMode::Apply) {
             // Write the contents to stdout, regardless of whether any errors were fixed.
             io::stdout().write_all(transformed.as_bytes())?;
-        } else if matches!(autofix, fixer::Mode::Diff) {
+        } else if matches!(autofix, fix::FixMode::Diff) {
             // But only write a diff if it's non-empty.
             if fixed > 0 {
                 let text_diff = TextDiff::from_lines(contents, &transformed);
@@ -372,10 +370,10 @@ fn lint_only(
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
-    let locator = SourceCodeLocator::new(contents);
+    let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
-    let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
+    let stylist = Stylist::from_contents(contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives =
@@ -432,10 +430,10 @@ fn lint_fix(
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
 
         // Map row and column locations to byte slices (lazily).
-        let locator = SourceCodeLocator::new(&contents);
+        let locator = Locator::new(&contents);
 
         // Detect the current code style (lazily).
-        let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+        let stylist = Stylist::from_contents(&contents, &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives =
@@ -511,8 +509,8 @@ quoting the contents of `{}`, along with the `pyproject.toml` settings and execu
 pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
-    let locator = SourceCodeLocator::new(&contents);
-    let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+    let locator = Locator::new(&contents);
+    let stylist = Stylist::from_contents(&contents, &locator);
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
     let mut diagnostics = check_path(
@@ -540,8 +538,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
 
         loop {
             let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
-            let locator = SourceCodeLocator::new(&contents);
-            let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+            let locator = Locator::new(&contents);
+            let stylist = Stylist::from_contents(&contents, &locator);
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
             let diagnostics = check_path(

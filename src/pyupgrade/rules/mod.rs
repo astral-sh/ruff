@@ -33,7 +33,7 @@ pub(crate) use useless_object_inheritance::useless_object_inheritance;
 
 use crate::ast::helpers::{self};
 use crate::ast::types::{Range, Scope, ScopeKind};
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violations;
 

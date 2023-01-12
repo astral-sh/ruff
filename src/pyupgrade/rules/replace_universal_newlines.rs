@@ -2,8 +2,8 @@ use rustpython_ast::{Expr, Keyword, Location};
 
 use crate::ast::helpers::{find_keyword, match_module_member};
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violations;
 

@@ -13,16 +13,15 @@ mod tests {
     use crate::linter::check_path;
     use crate::registry::{RuleCode, RuleCodePrefix};
     use crate::settings::flags;
-    use crate::source_code_locator::SourceCodeLocator;
-    use crate::source_code_style::SourceCodeStyleDetector;
+    use crate::source_code::{Locator, Stylist};
     use crate::{directives, rustpython_helpers, settings};
 
     fn rule_code(contents: &str, expected: &[RuleCode]) -> Result<()> {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(RuleCodePrefix::PD.codes());
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
-        let locator = SourceCodeLocator::new(&contents);
-        let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+        let locator = Locator::new(&contents);
+        let stylist = Stylist::from_contents(&contents, &locator);
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
         let diagnostics = check_path(

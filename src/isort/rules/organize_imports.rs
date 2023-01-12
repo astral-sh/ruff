@@ -8,13 +8,12 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Locator, Stylist};
 use crate::violations;
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -31,9 +30,9 @@ fn extract_indentation_range(body: &[&Stmt]) -> Range {
 /// I001
 pub fn organize_imports(
     block: &Block,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     settings: &Settings,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {

@@ -10,14 +10,13 @@ use rustpython_parser::ast::Location;
 use serde::Serialize;
 use serde_json::json;
 
-use crate::autofix::fixer;
 use crate::fs::relativize_path;
 use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
-use crate::notify_user;
 use crate::registry::RuleCode;
 use crate::settings::types::SerializationFormat;
+use crate::{fix, notify_user};
 
 /// Enum to control whether lint violations are shown to the user.
 pub enum Violations {
@@ -46,7 +45,7 @@ struct ExpandedMessage<'a> {
 pub struct Printer<'a> {
     format: &'a SerializationFormat,
     log_level: &'a LogLevel,
-    autofix: &'a fixer::Mode,
+    autofix: &'a fix::FixMode,
     violations: &'a Violations,
 }
 
@@ -54,7 +53,7 @@ impl<'a> Printer<'a> {
     pub fn new(
         format: &'a SerializationFormat,
         log_level: &'a LogLevel,
-        autofix: &'a fixer::Mode,
+        autofix: &'a fix::FixMode,
         violations: &'a Violations,
     ) -> Self {
         Self {
@@ -84,7 +83,7 @@ impl<'a> Printer<'a> {
                         println!("Found {remaining} error(s).");
                     }
 
-                    if !matches!(self.autofix, fixer::Mode::Apply) {
+                    if !matches!(self.autofix, fix::FixMode::Apply) {
                         let num_fixable = diagnostics
                             .messages
                             .iter()
@@ -98,9 +97,9 @@ impl<'a> Printer<'a> {
                 Violations::Hide => {
                     let fixed = diagnostics.fixed;
                     if fixed > 0 {
-                        if matches!(self.autofix, fixer::Mode::Apply) {
+                        if matches!(self.autofix, fix::FixMode::Apply) {
                             println!("Fixed {fixed} error(s).");
-                        } else if matches!(self.autofix, fixer::Mode::Diff) {
+                        } else if matches!(self.autofix, fix::FixMode::Diff) {
                             println!("Would fix {fixed} error(s).");
                         }
                     }

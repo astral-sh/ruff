@@ -7,8 +7,8 @@ use rustpython_ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unary
 
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 

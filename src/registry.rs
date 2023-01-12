@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::violation::Violation;
 use crate::violations;
 

@@ -1,5 +1,4 @@
-/// Simple flags used to drive program behavior.
-use crate::autofix::fixer;
+use crate::fix;
 
 #[derive(Debug, Copy, Clone, Hash)]
 pub enum Autofix {
@@ -17,11 +16,11 @@ impl From<bool> for Autofix {
     }
 }
 
-impl From<fixer::Mode> for Autofix {
-    fn from(value: fixer::Mode) -> Self {
+impl From<fix::FixMode> for Autofix {
+    fn from(value: fix::FixMode) -> Self {
         match value {
-            fixer::Mode::Generate | fixer::Mode::Diff | fixer::Mode::Apply => Autofix::Enabled,
-            fixer::Mode::None => Autofix::Disabled,
+            fix::FixMode::Generate | fix::FixMode::Diff | fix::FixMode::Apply => Autofix::Enabled,
+            fix::FixMode::None => Autofix::Disabled,
         }
     }
 }

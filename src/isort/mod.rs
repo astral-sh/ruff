@@ -18,8 +18,7 @@ use crate::isort::types::{
     AliasData, CommentSet, EitherImport, ImportBlock, ImportFromData, Importable,
     OrderedImportBlock, TrailingComma,
 };
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Locator, Stylist};
 
 mod categorize;
 mod comments;
@@ -59,7 +58,7 @@ pub enum AnnotatedImport<'a> {
 fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     split_on_trailing_comma: bool,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut annotated = vec![];
@@ -536,9 +535,9 @@ fn force_single_line_imports<'a>(
 pub fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     line_length: usize,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
     known_first_party: &BTreeSet<String>,

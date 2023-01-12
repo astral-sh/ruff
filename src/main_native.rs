@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use ::ruff::autofix::fixer;
 use ::ruff::cli::{extract_log_level, Cli, Overrides};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::printer::{Printer, Violations};
@@ -13,7 +12,7 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
-use ::ruff::{commands, warn_user_once};
+use ::ruff::{commands, fix, warn_user_once};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
@@ -152,13 +151,13 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     // but not apply fixes. That would allow us to avoid special-casing JSON
     // here.
     let autofix = if cli.diff {
-        fixer::Mode::Diff
+        fix::FixMode::Diff
     } else if fix || fix_only {
-        fixer::Mode::Apply
+        fix::FixMode::Apply
     } else if matches!(format, SerializationFormat::Json) {
-        fixer::Mode::Generate
+        fix::FixMode::Generate
     } else {
-        fixer::Mode::None
+        fix::FixMode::None
     };
     let violations = if cli.diff || fix_only {
         Violations::Hide
@@ -176,7 +175,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
 
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
     if cli.watch {
-        if !matches!(autofix, fixer::Mode::None) {
+        if !matches!(autofix, fix::FixMode::None) {
             warn_user_once!("--fix is not enabled in watch mode.");
         }
         if format != SerializationFormat::Text {
@@ -193,7 +192,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
             &file_strategy,
             &overrides,
             cache.into(),
-            fixer::Mode::None,
+            fix::FixMode::None,
         )?;
         printer.write_continuously(&messages)?;
 
@@ -223,7 +222,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
                             &file_strategy,
                             &overrides,
                             cache.into(),
-                            fixer::Mode::None,
+                            fix::FixMode::None,
                         )?;
                         printer.write_continuously(&messages)?;
                     }
@@ -263,7 +262,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff)) {
+        if !(is_stdin && matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff)) {
             printer.write_once(&diagnostics)?;
         }
 

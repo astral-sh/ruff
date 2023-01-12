@@ -12,8 +12,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Locator, Stylist};
 use crate::{
     directives, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
@@ -151,10 +150,10 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let tokens: Vec<LexResult> = tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
-    let locator = SourceCodeLocator::new(contents);
+    let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
-    let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
+    let stylist = Stylist::from_contents(contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(&tokens, directives::Flags::empty());

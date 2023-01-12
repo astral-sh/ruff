@@ -9,7 +9,7 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::registry::{Diagnostic, RuleCode, CODE_REDIRECTS};
-use crate::source_code_style::LineEnding;
+use crate::source_code::LineEnding;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -207,7 +207,6 @@ fn add_noqa_inner(
 
 #[cfg(test)]
 mod tests {
-
     use nohash_hasher::IntMap;
     use rustc_hash::FxHashSet;
     use rustpython_parser::ast::Location;
@@ -215,7 +214,7 @@ mod tests {
     use crate::ast::types::Range;
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::Diagnostic;
-    use crate::source_code_style::LineEnding;
+    use crate::source_code::LineEnding;
     use crate::violations;
 
     #[test]

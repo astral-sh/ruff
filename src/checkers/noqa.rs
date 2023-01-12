@@ -6,7 +6,7 @@ use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::noqa::{is_file_exempt, Directive};
 use crate::registry::{Diagnostic, DiagnosticKind, RuleCode, CODE_REDIRECTS};
 use crate::settings::{flags, Settings};

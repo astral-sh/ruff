@@ -5,9 +5,9 @@ use regex::Regex;
 use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call, match_expression};
+use crate::fix::Fix;
 use crate::pyflakes::format::FormatSummary;
 use crate::registry::Diagnostic;
 use crate::violations;

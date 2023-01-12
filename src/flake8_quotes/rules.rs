@@ -3,7 +3,7 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::flake8_quotes::settings::{Quote, Settings};
 use crate::registry::Diagnostic;
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 fn good_single(quote: &Quote) -> char {
@@ -42,7 +42,7 @@ fn good_docstring(quote: &Quote) -> &str {
 }
 
 pub fn quotes(
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     start: Location,
     end: Location,
     is_docstring: bool,

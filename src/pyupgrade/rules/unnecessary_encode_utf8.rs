@@ -1,10 +1,10 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
@@ -82,7 +82,7 @@ fn delete_default_encode_arg_or_kwarg(
 fn replace_with_bytes_literal(
     expr: &Expr,
     constant: &Expr,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     patch: bool,
 ) -> Diagnostic {
     let mut diagnostic =

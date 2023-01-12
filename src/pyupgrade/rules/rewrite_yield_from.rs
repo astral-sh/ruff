@@ -4,8 +4,8 @@ use rustpython_ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind};
 use crate::ast::types::{Range, RefEquality};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violations;
 

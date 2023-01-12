@@ -3,10 +3,10 @@ use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Keyword, KeywordData, Location};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
@@ -1605,7 +1605,7 @@ pub enum Context {
 }
 
 pub fn ambiguous_unicode_character(
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     start: Location,
     end: Location,
     context: Context,

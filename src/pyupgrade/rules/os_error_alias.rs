@@ -3,8 +3,8 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
 use crate::ast::helpers::{compose_call_path, match_module_member};
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violations;
 

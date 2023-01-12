@@ -1,11 +1,11 @@
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::eradicate::detection::comment_contains_code;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 fn is_standalone_comment(line: &str) -> bool {
@@ -21,7 +21,7 @@ fn is_standalone_comment(line: &str) -> bool {
 
 /// ERA001
 pub fn commented_out_code(
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     start: Location,
     end: Location,
     settings: &Settings,

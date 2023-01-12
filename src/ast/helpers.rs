@@ -12,9 +12,7 @@ use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
 
 use crate::ast::types::{Binding, BindingKind, Range};
-use crate::source_code_generator::SourceCodeGenerator;
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Generator, Locator, Stylist};
 
 /// Create an `Expr` with default location from an `ExprKind`.
 pub fn create_expr(node: ExprKind) -> Expr {
@@ -27,15 +25,15 @@ pub fn create_stmt(node: StmtKind) -> Stmt {
 }
 
 /// Generate source code from an `Expr`.
-pub fn unparse_expr(expr: &Expr, stylist: &SourceCodeStyleDetector) -> String {
-    let mut generator: SourceCodeGenerator = stylist.into();
+pub fn unparse_expr(expr: &Expr, stylist: &Stylist) -> String {
+    let mut generator: Generator = stylist.into();
     generator.unparse_expr(expr, 0);
     generator.generate()
 }
 
 /// Generate source code from an `Stmt`.
-pub fn unparse_stmt(stmt: &Stmt, stylist: &SourceCodeStyleDetector) -> String {
-    let mut generator: SourceCodeGenerator = stylist.into();
+pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
+    let mut generator: Generator = stylist.into();
     generator.unparse_stmt(stmt);
     generator.generate()
 }
@@ -431,7 +429,7 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 }
 
 /// Returns `true` if a statement or expression includes at least one comment.
-pub fn has_comments<T>(located: &Located<T>, locator: &SourceCodeLocator) -> bool {
+pub fn has_comments<T>(located: &Located<T>, locator: &Locator) -> bool {
     lexer::make_tokenizer(&locator.slice_source_code_range(&Range::from_located(located)))
         .flatten()
         .any(|(_, tok, _)| matches!(tok, Tok::Comment(..)))
@@ -483,14 +481,14 @@ pub fn to_absolute(relative: Location, base: Location) -> Location {
 }
 
 /// Return `true` if a `Stmt` has leading content.
-pub fn match_leading_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+pub fn match_leading_content(stmt: &Stmt, locator: &Locator) -> bool {
     let range = Range::new(Location::new(stmt.location.row(), 0), stmt.location);
     let prefix = locator.slice_source_code_range(&range);
     prefix.chars().any(|char| !char.is_whitespace())
 }
 
 /// Return `true` if a `Stmt` has trailing content.
-pub fn match_trailing_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+pub fn match_trailing_content(stmt: &Stmt, locator: &Locator) -> bool {
     let range = Range::new(
         stmt.end_location.unwrap(),
         Location::new(stmt.end_location.unwrap().row() + 1, 0),
@@ -508,7 +506,7 @@ pub fn match_trailing_content(stmt: &Stmt, locator: &SourceCodeLocator) -> bool 
 }
 
 /// Return the number of trailing empty lines following a statement.
-pub fn count_trailing_lines(stmt: &Stmt, locator: &SourceCodeLocator) -> usize {
+pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
     let suffix =
         locator.slice_source_code_at(&Location::new(stmt.end_location.unwrap().row() + 1, 0));
     suffix
@@ -520,7 +518,7 @@ pub fn count_trailing_lines(stmt: &Stmt, locator: &SourceCodeLocator) -> usize {
 /// Return the appropriate visual `Range` for any message that spans a `Stmt`.
 /// Specifically, this method returns the range of a function or class name,
 /// rather than that of the entire function or class body.
-pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
+pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
     if matches!(
         stmt.node,
         StmtKind::ClassDef { .. }
@@ -539,7 +537,7 @@ pub fn identifier_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Range {
 }
 
 /// Like `identifier_range`, but accepts a `Binding`.
-pub fn binding_range(binding: &Binding, locator: &SourceCodeLocator) -> Range {
+pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
     if matches!(
         binding.kind,
         BindingKind::ClassDefinition | BindingKind::FunctionDefinition
@@ -555,7 +553,7 @@ pub fn binding_range(binding: &Binding, locator: &SourceCodeLocator) -> Range {
 }
 
 // Return the ranges of `Name` tokens within a specified node.
-pub fn find_names<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Vec<Range> {
+pub fn find_names<T>(located: &Located<T>, locator: &Locator) -> Vec<Range> {
     let contents = locator.slice_source_code_range(&Range::from_located(located));
     lexer::make_tokenizer_located(&contents, located.location)
         .flatten()
@@ -568,10 +566,7 @@ pub fn find_names<T>(located: &Located<T>, locator: &SourceCodeLocator) -> Vec<R
 }
 
 /// Return the `Range` of `name` in `Excepthandler`.
-pub fn excepthandler_name_range(
-    handler: &Excepthandler,
-    locator: &SourceCodeLocator,
-) -> Option<Range> {
+pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> Option<Range> {
     let ExcepthandlerKind::ExceptHandler {
         name, type_, body, ..
     } = &handler.node;
@@ -594,7 +589,7 @@ pub fn excepthandler_name_range(
 }
 
 /// Return the `Range` of `except` in `Excepthandler`.
-pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Range {
+pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
     let ExcepthandlerKind::ExceptHandler { body, type_, .. } = &handler.node;
     let end = if let Some(type_) = type_ {
         type_.location
@@ -619,7 +614,7 @@ pub fn except_range(handler: &Excepthandler, locator: &SourceCodeLocator) -> Ran
 }
 
 /// Find f-strings that don't contain any formatted values in a `JoinedStr`.
-pub fn find_useless_f_strings(expr: &Expr, locator: &SourceCodeLocator) -> Vec<(Range, Range)> {
+pub fn find_useless_f_strings(expr: &Expr, locator: &Locator) -> Vec<(Range, Range)> {
     let contents = locator.slice_source_code_range(&Range::from_located(expr));
     lexer::make_tokenizer_located(&contents, expr.location)
         .flatten()
@@ -656,7 +651,7 @@ pub fn find_useless_f_strings(expr: &Expr, locator: &SourceCodeLocator) -> Vec<(
 }
 
 /// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
-pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
+pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
     match &stmt.node {
         StmtKind::For { body, orelse, .. }
         | StmtKind::AsyncFor { body, orelse, .. }
@@ -690,7 +685,7 @@ pub fn else_range(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Range> {
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
-pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+pub fn preceded_by_continuation(stmt: &Stmt, locator: &Locator) -> bool {
     // Does the previous line end in a continuation? This will have a specific
     // false-positive, which is that if the previous line ends in a comment, it
     // will be treated as a continuation. So we should only use this information to
@@ -711,13 +706,13 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &SourceCodeLocator) -> boo
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
-pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
     match_leading_content(stmt, locator) || preceded_by_continuation(stmt, locator)
 }
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements following it.
-pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
     match_trailing_content(stmt, locator)
 }
 
@@ -799,7 +794,7 @@ mod tests {
         else_range, identifier_range, match_module_member, match_trailing_content,
     };
     use crate::ast::types::Range;
-    use crate::source_code_locator::SourceCodeLocator;
+    use crate::source_code::Locator;
 
     #[test]
     fn builtin() -> Result<()> {
@@ -949,25 +944,25 @@ mod tests {
         let contents = "x = 1";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert!(!match_trailing_content(stmt, &locator));
 
         let contents = "x = 1; y = 2";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert!(match_trailing_content(stmt, &locator));
 
         let contents = "x = 1  ";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert!(!match_trailing_content(stmt, &locator));
 
         let contents = "x = 1  # Comment";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert!(!match_trailing_content(stmt, &locator));
 
         let contents = r#"
@@ -977,7 +972,7 @@ y = 2
         .trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert!(!match_trailing_content(stmt, &locator));
 
         Ok(())
@@ -988,7 +983,7 @@ y = 2
         let contents = "def f(): pass".trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
             Range::new(Location::new(1, 4), Location::new(1, 5),)
@@ -1002,7 +997,7 @@ def \
         .trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
             Range::new(Location::new(2, 2), Location::new(2, 3),)
@@ -1011,7 +1006,7 @@ def \
         let contents = "class Class(): pass".trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
             Range::new(Location::new(1, 6), Location::new(1, 11),)
@@ -1020,7 +1015,7 @@ def \
         let contents = "class Class: pass".trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
             Range::new(Location::new(1, 6), Location::new(1, 11),)
@@ -1034,7 +1029,7 @@ class Class():
         .trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
             Range::new(Location::new(2, 6), Location::new(2, 11),)
@@ -1043,7 +1038,7 @@ class Class():
         let contents = r#"x = y + 1"#.trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             identifier_range(stmt, &locator),
             Range::new(Location::new(1, 0), Location::new(1, 9),)
@@ -1063,7 +1058,7 @@ else:
         .trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         let range = else_range(stmt, &locator).unwrap();
         assert_eq!(range.location.row(), 3);
         assert_eq!(range.location.column(), 0);
