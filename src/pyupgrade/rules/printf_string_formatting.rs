@@ -58,13 +58,9 @@ impl PercentFormat {
     }
 }
 
-fn must_match<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: usize) -> Option<Match<'a>> {
-    regex.find_at(string, position)
-}
-
 /// Gets the match from a regex and potentiall updated the value of a given integer
 fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -> Option<String> {
-    let flag_match = must_match(regex, string, *position);
+    let flag_match = regex.find_at(string, *position);
     if let Some(flag_match) = flag_match {
         *position = flag_match.end();
         let the_string = flag_match.as_str().to_string();
@@ -105,7 +101,9 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
             if let Some(key_item) = MAPPING_KEY_RE.captures(&string[i..]) {
                 if let Some(match_item) = key_item.get(1) {
                     key = Some(match_item.as_str().to_string());
-                    i += match_item.end();
+                    // Have to use another regex because the rust Capture object does not have an
+                    // end() method
+                    i = MAPPING_KEY_RE.find_at(string, i).unwrap().end();
                 }
             };
 
@@ -114,7 +112,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
             let precision = get_flag(&PRECISION_RE, string, &mut i);
 
             // length modifier is ignored
-            i = must_match(&LENGTH_RE, string, i).unwrap().end();
+            i = LENGTH_RE.find_at(string, i).unwrap().end();
             // I use clone because nth consumes characters before position n
             let conversion = match string.clone().chars().nth(i) {
                 None => panic!("end-of-string while parsing format"),
@@ -201,6 +199,18 @@ mod test {
         let e2 = PercentFormat::new("\"".to_string(), Some(sube1));
         let e3 = PercentFormat::default();
         let expected = vec![e2, e1, e3];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_word_in_paren() {
+        let sample = "\"%(hi)s\"";
+        let sube1 = PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
         assert_eq!(received, expected);
