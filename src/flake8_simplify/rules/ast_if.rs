@@ -2,7 +2,8 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKin
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    contains_call_path, create_expr, create_stmt, has_comments, unparse_expr, unparse_stmt,
+    any_over_expr, contains_call_path, create_expr, create_stmt, has_comments, unparse_expr,
+    unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -257,7 +258,7 @@ pub fn use_dict_get_with_default(
     if orelse_var.len() != 1 {
         return;
     };
-    let  ExprKind::Compare { left: test_key, ops , comparators: test_dict } = &test.node else {
+    let ExprKind::Compare { left: test_key, ops , comparators: test_dict } = &test.node else {
         return;
     };
     if test_dict.len() != 1 {
@@ -281,6 +282,23 @@ pub fn use_dict_get_with_default(
         || !compare_expr(&expected_var.into(), &default_var.into())
         || !compare_expr(&test_dict.into(), &expected_subscript.into())
     {
+        return;
+    }
+
+    // Check that the default value is not "complex".
+    if any_over_expr(default_val, &|expr| {
+        matches!(
+            expr.node,
+            ExprKind::Call { .. }
+                | ExprKind::Await { .. }
+                | ExprKind::GeneratorExp { .. }
+                | ExprKind::ListComp { .. }
+                | ExprKind::SetComp { .. }
+                | ExprKind::DictComp { .. }
+                | ExprKind::Yield { .. }
+                | ExprKind::YieldFrom { .. }
+        )
+    }) {
         return;
     }
 
