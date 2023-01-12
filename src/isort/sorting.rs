@@ -1,6 +1,7 @@
 /// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
 use std::cmp::Ordering;
 
+use crate::isort::settings::RelatveImportsOrder;
 use crate::isort::types::EitherImport::{Import, ImportFrom};
 use crate::isort::types::{AliasData, EitherImport, ImportFromData};
 use crate::python::string;
@@ -49,31 +50,49 @@ pub fn cmp_members(alias1: &AliasData, alias2: &AliasData, order_by_type: bool) 
 }
 
 /// Compare two relative import levels.
-pub fn cmp_levels(level1: Option<&usize>, level2: Option<&usize>) -> Ordering {
+pub fn cmp_levels(
+    level1: Option<&usize>,
+    level2: Option<&usize>,
+    relative_imports_order: RelatveImportsOrder,
+) -> Ordering {
     match (level1, level2) {
         (None, None) => Ordering::Equal,
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
-        (Some(level1), Some(level2)) => level2.cmp(level1),
+        (Some(level1), Some(level2)) => match relative_imports_order {
+            RelatveImportsOrder::ClosestToFurther => level1.cmp(level2),
+            RelatveImportsOrder::FurthestToClosest => level2.cmp(level1),
+        },
     }
 }
 
 /// Compare two `StmtKind::ImportFrom` blocks.
-pub fn cmp_import_from(import_from1: &ImportFromData, import_from2: &ImportFromData) -> Ordering {
-    cmp_levels(import_from1.level, import_from2.level).then_with(|| {
-        match (&import_from1.module, import_from2.module) {
-            (None, None) => Ordering::Equal,
-            (None, Some(_)) => Ordering::Less,
-            (Some(_), None) => Ordering::Greater,
-            (Some(module1), Some(module2)) => natord::compare_ignore_case(module1, module2)
-                .then_with(|| natord::compare(module1, module2)),
-        }
+pub fn cmp_import_from(
+    import_from1: &ImportFromData,
+    import_from2: &ImportFromData,
+    relative_imports_order: RelatveImportsOrder,
+) -> Ordering {
+    cmp_levels(
+        import_from1.level,
+        import_from2.level,
+        relative_imports_order,
+    )
+    .then_with(|| match (&import_from1.module, import_from2.module) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(module1), Some(module2)) => natord::compare_ignore_case(module1, module2)
+            .then_with(|| natord::compare(module1, module2)),
     })
 }
 
 /// Compare two `EitherImport` enums which may be `Import` or `ImportFrom`
 /// structs.
-pub fn cmp_either_import(a: &EitherImport, b: &EitherImport) -> Ordering {
+pub fn cmp_either_import(
+    a: &EitherImport,
+    b: &EitherImport,
+    relative_imports_order: RelatveImportsOrder,
+) -> Ordering {
     match (a, b) {
         (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2),
         (ImportFrom((import_from, ..)), Import((alias, _))) => {
@@ -83,7 +102,7 @@ pub fn cmp_either_import(a: &EitherImport, b: &EitherImport) -> Ordering {
             natord::compare_ignore_case(alias.name, import_from.module.unwrap_or_default())
         }
         (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => {
-            cmp_import_from(import_from1, import_from2)
+            cmp_import_from(import_from1, import_from2, relative_imports_order)
         }
     }
 }
