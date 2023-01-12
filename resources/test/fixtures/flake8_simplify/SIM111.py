@@ -51,6 +51,44 @@ def f():
 
 
 def f():
+    # SIM110
+    for x in iterable:
+        if check(x):
+            return True
+    else:
+        return False
+
+
+def f():
+    # SIM111
+    for x in iterable:
+        if check(x):
+            return False
+    else:
+        return True
+
+
+def f():
+    # SIM110
+    for x in iterable:
+        if check(x):
+            return True
+    else:
+        return False
+    return True
+
+
+def f():
+    # SIM111
+    for x in iterable:
+        if check(x):
+            return False
+    else:
+        return True
+    return False
+
+
+def f():
     for x in iterable:
         if check(x):
             return True

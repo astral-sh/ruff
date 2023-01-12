@@ -18,9 +18,72 @@ struct Loop<'a> {
     iter: &'a Expr,
 }
 
-/// Extract the returned boolean values from subsequent `StmtKind::If` and
+/// Extract the returned boolean values a `StmtKind::For` with an `else` body.
+fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
+    let StmtKind::For {
+        body,
+        target,
+        iter,
+        orelse,
+        ..
+    } = &stmt.node else {
+        return None;
+    };
+
+    // The loop itself should contain a single `if` statement, with an `else`
+    // containing a single `return True` or `return False`.
+    if body.len() != 1 {
+        return None;
+    }
+    if orelse.len() != 1 {
+        return None;
+    }
+    let StmtKind::If {
+        body: nested_body,
+        test: nested_test,
+        orelse: nested_orelse,
+    } = &body[0].node else {
+        return None;
+    };
+    if nested_body.len() != 1 {
+        return None;
+    }
+    if !nested_orelse.is_empty() {
+        return None;
+    }
+    let StmtKind::Return { value } = &nested_body[0].node else {
+        return None;
+    };
+    let Some(value) = value else {
+        return None;
+    };
+    let ExprKind::Constant { value: Constant::Bool(value), .. } = &value.node else {
+        return None;
+    };
+
+    // The `else` block has to contain a single `return True` or `return False`.
+    let StmtKind::Return { value: next_value } = &orelse[0].node else {
+        return None;
+    };
+    let Some(next_value) = next_value else {
+        return None;
+    };
+    let ExprKind::Constant { value: Constant::Bool(next_value), .. } = &next_value.node else {
+        return None;
+    };
+
+    Some(Loop {
+        return_value: *value,
+        next_return_value: *next_value,
+        test: nested_test,
+        target,
+        iter,
+    })
+}
+
+/// Extract the returned boolean values from subsequent `StmtKind::For` and
 /// `StmtKind::Return` statements, or `None`.
-fn return_values<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Loop<'a>> {
+fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Loop<'a>> {
     let StmtKind::For {
         body,
         target,
@@ -36,14 +99,13 @@ fn return_values<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Loop<'a>> {
     if body.len() != 1 {
         return None;
     }
-    // TODO(charlie): If we have `else: return True` or `else: return False`, we
-    // should still be able to simplify.
     if !orelse.is_empty() {
         return None;
     }
     let StmtKind::If {
         body: nested_body,
-        test: nested_test, orelse: nested_orelse,
+        test: nested_test,
+        orelse: nested_orelse,
     } = &body[0].node else {
         return None;
     };
@@ -108,8 +170,13 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Styl
 }
 
 /// SIM110, SIM111
-pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stmt) {
-    if let Some(loop_info) = return_values(stmt, sibling) {
+pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: Option<&Stmt>) {
+    if let Some(loop_info) = match sibling {
+        // Ex) `for` loop with an `else: return True` or `else: return False`.
+        None => return_values_for_else(stmt),
+        // Ex) `for` loop followed by `return True` or `return False`
+        Some(sibling) => return_values_for_siblings(stmt, sibling),
+    } {
         if loop_info.return_value && !loop_info.next_return_value {
             if checker.settings.enabled.contains(&RuleCode::SIM110) {
                 let contents = return_stmt(
@@ -133,7 +200,10 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,
-                        sibling.end_location.unwrap(),
+                        match sibling {
+                            None => stmt.end_location.unwrap(),
+                            Some(sibling) => sibling.end_location.unwrap(),
+                        },
                     ));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -178,7 +248,10 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,
-                        sibling.end_location.unwrap(),
+                        match sibling {
+                            None => stmt.end_location.unwrap(),
+                            Some(sibling) => sibling.end_location.unwrap(),
+                        },
                     ));
                 }
                 checker.diagnostics.push(diagnostic);
