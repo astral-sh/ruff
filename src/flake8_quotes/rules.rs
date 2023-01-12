@@ -85,8 +85,13 @@ pub fn quotes(
             let quote_count = if is_multiline { 3 } else { 1 };
             let string_contents = &raw_text[quote_count..raw_text.len() - quote_count];
             let quote = good_docstring(&quotes_settings.docstring_quotes).repeat(quote_count);
-            let new_string = format!("{prefix}{quote}{string_contents}{quote}");
-            diagnostic.amend(Fix::replacement(new_string, start, end));
+            let mut fixed_contents =
+                String::with_capacity(prefix.len() + string_contents.len() + quote.len() * 2);
+            fixed_contents.push_str(prefix);
+            fixed_contents.push_str(&quote);
+            fixed_contents.push_str(string_contents);
+            fixed_contents.push_str(&quote);
+            diagnostic.amend(Fix::replacement(fixed_contents, start, end));
         }
         Some(diagnostic)
     } else if is_multiline {
@@ -109,8 +114,13 @@ pub fn quotes(
         {
             let string_contents = &raw_text[3..raw_text.len() - 3];
             let quote = good_multiline(&quotes_settings.multiline_quotes);
-            let new_string = format!("{prefix}{quote}{string_contents}{quote}");
-            diagnostic.amend(Fix::replacement(new_string, start, end));
+            let mut fixed_contents =
+                String::with_capacity(prefix.len() + string_contents.len() + quote.len() * 2);
+            fixed_contents.push_str(prefix);
+            fixed_contents.push_str(quote);
+            fixed_contents.push_str(string_contents);
+            fixed_contents.push_str(quote);
+            diagnostic.amend(Fix::replacement(fixed_contents, start, end));
         }
         Some(diagnostic)
     } else {
@@ -130,26 +140,31 @@ pub fn quotes(
                     && settings.fixable.contains(&RuleCode::Q003)
                 {
                     let quote = bad_single(&quotes_settings.inline_quotes);
+
+                    let mut fixed_contents =
+                        String::with_capacity(prefix.len() + string_contents.len() + 2);
+                    fixed_contents.push_str(prefix);
+                    fixed_contents.push(quote);
+
                     let chars: Vec<char> = string_contents.chars().collect();
-                    let mut new_chars = Vec::with_capacity(chars.len());
                     let mut backslash_count = 0;
                     for col_offset in 0..chars.len() {
                         let char = chars[col_offset];
                         if char != '\\' {
-                            new_chars.push(char);
+                            fixed_contents.push(char);
                             continue;
                         }
                         backslash_count += 1;
                         // If the previous character was also a backslash
                         if col_offset > 0 && chars[col_offset - 1] == '\\' && backslash_count == 2 {
-                            new_chars.push(char);
+                            fixed_contents.push(char);
                             // reset to 0
                             backslash_count = 0;
                             continue;
                         }
                         // If we're at the end of the line
                         if col_offset == chars.len() - 1 {
-                            new_chars.push(char);
+                            fixed_contents.push(char);
                             continue;
                         }
                         let next_char = chars[col_offset + 1];
@@ -159,11 +174,12 @@ pub fn quotes(
                             backslash_count = 0;
                             continue;
                         }
-                        new_chars.push(char);
+                        fixed_contents.push(char);
                     }
-                    let new_string_contents: String = new_chars.iter().collect();
-                    let new_string = format!("{prefix}{quote}{new_string_contents}{quote}");
-                    diagnostic.amend(Fix::replacement(new_string, start, end));
+
+                    fixed_contents.push(quote);
+
+                    diagnostic.amend(Fix::replacement(fixed_contents, start, end));
                 }
                 return Some(diagnostic);
             }
@@ -180,8 +196,13 @@ pub fn quotes(
                 && settings.fixable.contains(&RuleCode::Q000)
             {
                 let quote = good_single(&quotes_settings.inline_quotes);
-                let new_string = format!("{prefix}{quote}{string_contents}{quote}");
-                diagnostic.amend(Fix::replacement(new_string, start, end));
+                let mut fixed_contents =
+                    String::with_capacity(prefix.len() + string_contents.len() + 2);
+                fixed_contents.push_str(prefix);
+                fixed_contents.push(quote);
+                fixed_contents.push_str(string_contents);
+                fixed_contents.push(quote);
+                diagnostic.amend(Fix::replacement(fixed_contents, start, end));
             }
             return Some(diagnostic);
         }
