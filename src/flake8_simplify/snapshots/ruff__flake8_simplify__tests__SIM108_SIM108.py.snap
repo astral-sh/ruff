@@ -1,6 +1,6 @@
 ---
 source: src/flake8_simplify/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     UseTernaryOperator: b = c if a else d
@@ -18,5 +18,22 @@ expression: checks
     end_location:
       row: 5
       column: 9
+  parent: ~
+- kind:
+    UseTernaryOperator: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
+  location:
+    row: 82
+    column: 0
+  end_location:
+    row: 85
+    column: 45
+  fix:
+    content: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
+    location:
+      row: 82
+      column: 0
+    end_location:
+      row: 85
+      column: 45
   parent: ~
 
