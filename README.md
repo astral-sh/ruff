@@ -952,10 +952,10 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| Q000 | BadQuotesInlineString | Single quotes found but double quotes preferred |  |
-| Q001 | BadQuotesMultilineString | Single quote multiline found but double quotes preferred |  |
-| Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred |  |
-| Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes |  |
+| Q000 | BadQuotesInlineString | Single quotes found but double quotes preferred | 🛠 |
+| Q001 | BadQuotesMultilineString | Single quote multiline found but double quotes preferred | 🛠 |
+| Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred | 🛠 |
+| Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
 ### flake8-return (RET)
 

@@ -1,6 +1,6 @@
 ---
 source: src/flake8_quotes/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     BadQuotesMultilineString: single
@@ -10,7 +10,14 @@ expression: checks
   end_location:
     row: 3
     column: 27
-  fix: ~
+  fix:
+    content: "''' Not a docstring '''"
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 27
   parent: ~
 - kind:
     BadQuotesMultilineString: single
@@ -20,6 +27,13 @@ expression: checks
   end_location:
     row: 5
     column: 43
-  fix: ~
+  fix:
+    content: "'''not a docstring'''"
+    location:
+      row: 5
+      column: 22
+    end_location:
+      row: 5
+      column: 43
   parent: ~
 

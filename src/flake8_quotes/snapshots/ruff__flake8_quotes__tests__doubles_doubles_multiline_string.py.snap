@@ -1,6 +1,6 @@
 ---
 source: src/flake8_quotes/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     BadQuotesMultilineString: single
@@ -10,6 +10,13 @@ expression: checks
   end_location:
     row: 3
     column: 12
-  fix: ~
+  fix:
+    content: "''' This \"should\"\nbe\n\"linted\" '''"
+    location:
+      row: 1
+      column: 4
+    end_location:
+      row: 3
+      column: 12
   parent: ~
 
