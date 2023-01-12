@@ -31,3 +31,10 @@ class User(BaseModel):
     @buzz.setter
     def buzz(self, value: str | int) -> None:
         ...
+
+
+class User:
+    bar: str = StringField()
+    foo: bool = BooleanField()
+    # ...
+    bar = StringField()  # PIE794

@@ -5453,14 +5453,10 @@ impl Violation for ExtraneousScopeFunction {
 define_violation!(
     pub struct MissingFixtureNameUnderscore(pub String);
 );
-impl AlwaysAutofixableViolation for MissingFixtureNameUnderscore {
+impl Violation for MissingFixtureNameUnderscore {
     fn message(&self) -> String {
         let MissingFixtureNameUnderscore(function) = self;
         format!("Fixture `{function}` does not return anything, add leading underscore")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add leading underscore".to_string()
     }
 
     fn placeholder() -> Self {
@@ -5471,14 +5467,10 @@ impl AlwaysAutofixableViolation for MissingFixtureNameUnderscore {
 define_violation!(
     pub struct IncorrectFixtureNameUnderscore(pub String);
 );
-impl AlwaysAutofixableViolation for IncorrectFixtureNameUnderscore {
+impl Violation for IncorrectFixtureNameUnderscore {
     fn message(&self) -> String {
         let IncorrectFixtureNameUnderscore(function) = self;
         format!("Fixture `{function}` returns a value, remove leading underscore")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove leading underscore".to_string()
     }
 
     fn placeholder() -> Self {
