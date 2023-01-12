@@ -48,6 +48,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 
 - [pandas](https://github.com/pandas-dev/pandas)
 - [FastAPI](https://github.com/tiangolo/fastapi)
+- [Apache Airflow](https://github.com/apache/airflow)
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
 - [Pydantic](https://github.com/pydantic/pydantic)
@@ -60,7 +61,6 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Ibis](https://github.com/ibis-project/ibis)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
 - [`pyca/cryptography`](https://github.com/pyca/cryptography)
-- [Apache Airflow](https://github.com/apache/airflow)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
