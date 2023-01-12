@@ -112,20 +112,26 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
     if let Some(loop_info) = return_values(stmt, sibling) {
         if loop_info.return_value && !loop_info.next_return_value {
             if checker.settings.enabled.contains(&RuleCode::SIM110) {
-                let content = return_stmt(
+                let contents = return_stmt(
                     "any",
                     loop_info.test,
                     loop_info.target,
                     loop_info.iter,
                     checker.style,
                 );
+
+                // Don't flag if the resulting expression would exceed the maximum line length.
+                if stmt.location.column() + contents.len() > checker.settings.line_length {
+                    return;
+                }
+
                 let mut diagnostic = Diagnostic::new(
-                    violations::ConvertLoopToAny(content.clone()),
+                    violations::ConvertLoopToAny(contents.clone()),
                     Range::from_located(stmt),
                 );
                 if checker.patch(&RuleCode::SIM110) {
                     diagnostic.amend(Fix::replacement(
-                        content,
+                        contents,
                         stmt.location,
                         sibling.end_location.unwrap(),
                     ));
@@ -151,20 +157,26 @@ pub fn convert_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: &Stm
                         })
                     }
                 };
-                let content = return_stmt(
+                let contents = return_stmt(
                     "all",
                     &test,
                     loop_info.target,
                     loop_info.iter,
                     checker.style,
                 );
+
+                // Don't flag if the resulting expression would exceed the maximum line length.
+                if stmt.location.column() + contents.len() > checker.settings.line_length {
+                    return;
+                }
+
                 let mut diagnostic = Diagnostic::new(
-                    violations::ConvertLoopToAll(content.clone()),
+                    violations::ConvertLoopToAll(contents.clone()),
                     Range::from_located(stmt),
                 );
                 if checker.patch(&RuleCode::SIM111) {
                     diagnostic.amend(Fix::replacement(
-                        content,
+                        contents,
                         stmt.location,
                         sibling.end_location.unwrap(),
                     ));

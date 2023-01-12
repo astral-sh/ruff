@@ -205,14 +205,12 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     let ternary = ternary(target_var, body_value, test, orelse_value);
     let contents = unparse_stmt(&ternary, checker.style);
 
-    // Don't flag for simplified ternaries if the resulting expression would exceed
-    // the maximum line length.
+    // Don't flag if the resulting expression would exceed the maximum line length.
     if stmt.location.column() + contents.len() > checker.settings.line_length {
         return;
     }
 
-    // Don't flag for simplified ternaries if the if-expression contains any
-    // comments.
+    // Don't flag if the statement expression contains any comments.
     if has_comments(stmt, checker.locator) {
         return;
     }
@@ -322,14 +320,12 @@ pub fn use_dict_get_with_default(
         checker.style,
     );
 
-    // Don't flag for simplified `dict.get` if the resulting expression would exceed
-    // the maximum line length.
+    // Don't flag if the resulting expression would exceed the maximum line length.
     if stmt.location.column() + contents.len() > checker.settings.line_length {
         return;
     }
 
-    // Don't flag for simplified `dict.get` if the if-expression contains any
-    // comments.
+    // Don't flag if the statement expression contains any comments.
     if has_comments(stmt, checker.locator) {
         return;
     }
