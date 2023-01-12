@@ -1214,7 +1214,7 @@ where
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
             }
-            StmtKind::If { test, .. } => {
+            StmtKind::If { test, body, orelse } => {
                 if self.settings.enabled.contains(&RuleCode::F634) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
@@ -1229,6 +1229,11 @@ where
                         self,
                         stmt,
                         self.current_stmt_parent().map(|parent| parent.0),
+                    );
+                }
+                if self.settings.enabled.contains(&RuleCode::SIM401) {
+                    flake8_simplify::rules::use_dict_get_with_default(
+                        self, stmt, test, body, orelse,
                     );
                 }
             }

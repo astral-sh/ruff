@@ -388,6 +388,12 @@ impl<'a> From<&'a Box<Expr>> for Box<ComparableExpr<'a>> {
     }
 }
 
+impl<'a> From<&'a Box<Expr>> for ComparableExpr<'a> {
+    fn from(expr: &'a Box<Expr>) -> Self {
+        (&**expr).into()
+    }
+}
+
 impl<'a> From<&'a Expr> for ComparableExpr<'a> {
     fn from(expr: &'a Expr) -> Self {
         match &expr.node {
