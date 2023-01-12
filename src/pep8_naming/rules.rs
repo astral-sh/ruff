@@ -9,15 +9,11 @@ use crate::pep8_naming::helpers;
 use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
 use crate::registry::Diagnostic;
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 /// N801
-pub fn invalid_class_name(
-    class_def: &Stmt,
-    name: &str,
-    locator: &SourceCodeLocator,
-) -> Option<Diagnostic> {
+pub fn invalid_class_name(class_def: &Stmt, name: &str, locator: &Locator) -> Option<Diagnostic> {
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
         return Some(Diagnostic::new(
@@ -33,7 +29,7 @@ pub fn invalid_function_name(
     func_def: &Stmt,
     name: &str,
     ignore_names: &[String],
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if name.to_lowercase() != name && !ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return Some(Diagnostic::new(
@@ -153,7 +149,7 @@ pub fn dunder_function_name(
     scope: &Scope,
     stmt: &Stmt,
     name: &str,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
@@ -177,7 +173,7 @@ pub fn constant_imported_as_non_constant(
     import_from: &Stmt,
     name: &str,
     asname: &str,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if string::is_upper(name) && !string::is_upper(asname) {
         return Some(Diagnostic::new(
@@ -193,7 +189,7 @@ pub fn lowercase_imported_as_non_lowercase(
     import_from: &Stmt,
     name: &str,
     asname: &str,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if !string::is_upper(name) && string::is_lower(name) && asname.to_lowercase() != asname {
         return Some(Diagnostic::new(
@@ -209,7 +205,7 @@ pub fn camelcase_imported_as_lowercase(
     import_from: &Stmt,
     name: &str,
     asname: &str,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name) && string::is_lower(asname) {
         return Some(Diagnostic::new(
@@ -225,7 +221,7 @@ pub fn camelcase_imported_as_constant(
     import_from: &Stmt,
     name: &str,
     asname: &str,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name)
         && !string::is_lower(asname)
@@ -279,7 +275,7 @@ pub fn camelcase_imported_as_acronym(
     import_from: &Stmt,
     name: &str,
     asname: &str,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name)
         && !string::is_lower(asname)
@@ -299,7 +295,7 @@ pub fn error_suffix_on_exception_name(
     class_def: &Stmt,
     bases: &[Expr],
     name: &str,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if !bases.iter().any(|base| {
         if let ExprKind::Name { id, .. } = &base.node {

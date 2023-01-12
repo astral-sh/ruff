@@ -53,6 +53,7 @@ fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: flags::Autof
     hasher.finish()
 }
 
+#[allow(dead_code)]
 /// Initialize the cache at the specified `Path`.
 pub fn init(path: &Path) -> Result<()> {
     // Create the cache directories.

@@ -18,18 +18,17 @@ use crate::isort::types::{
     AliasData, CommentSet, EitherImport, ImportBlock, ImportFromData, Importable,
     OrderedImportBlock, TrailingComma,
 };
-use crate::source_code_style::SourceCodeStyleDetector;
-use crate::SourceCodeLocator;
+use crate::source_code::{Locator, Stylist};
 
 mod categorize;
 mod comments;
-pub mod format;
-pub mod helpers;
-pub mod rules;
+mod format;
+mod helpers;
+pub(crate) mod rules;
 pub mod settings;
 mod sorting;
-pub mod track;
-pub mod types;
+pub(crate) mod track;
+mod types;
 
 #[derive(Debug)]
 pub struct AnnotatedAliasData<'a> {
@@ -59,7 +58,7 @@ pub enum AnnotatedImport<'a> {
 fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     split_on_trailing_comma: bool,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut annotated = vec![];
@@ -536,9 +535,9 @@ fn force_single_line_imports<'a>(
 pub fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     line_length: usize,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
     known_first_party: &BTreeSet<String>,
@@ -647,9 +646,10 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::isort;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::{isort, Settings};
+    use crate::settings::Settings;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]

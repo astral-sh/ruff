@@ -8,14 +8,14 @@ use rustpython_ast::Location;
 
 use crate::ast::types::Range;
 
-pub struct SourceCodeLocator<'a> {
+pub struct Locator<'a> {
     contents: &'a str,
     rope: OnceCell<Rope>,
 }
 
-impl<'a> SourceCodeLocator<'a> {
+impl<'a> Locator<'a> {
     pub fn new(contents: &'a str) -> Self {
-        SourceCodeLocator {
+        Locator {
             contents,
             rope: OnceCell::default(),
         }

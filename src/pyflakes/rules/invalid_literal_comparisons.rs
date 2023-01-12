@@ -5,8 +5,8 @@ use rustpython_ast::{Cmpop, Expr};
 use crate::ast::helpers;
 use crate::ast::operations::locate_cmpops;
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violations;
 

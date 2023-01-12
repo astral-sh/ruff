@@ -1,7 +1,7 @@
-pub mod fixes;
-pub mod rules;
+mod fixes;
+pub(crate) mod rules;
 pub mod settings;
-pub mod types;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod tests {

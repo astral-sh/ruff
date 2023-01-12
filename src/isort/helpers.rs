@@ -5,11 +5,11 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
 use crate::isort::types::TrailingComma;
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 
 /// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
 /// trailing comma.
-pub fn trailing_comma(stmt: &Stmt, locator: &SourceCodeLocator) -> TrailingComma {
+pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     let contents = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut count: usize = 0;
     let mut trailing_comma = TrailingComma::Absent;
@@ -37,7 +37,7 @@ pub fn trailing_comma(stmt: &Stmt, locator: &SourceCodeLocator) -> TrailingComma
 }
 
 /// Return `true` if a `Stmt` is preceded by a "comment break"
-pub fn has_comment_break(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     // Starting from the `Stmt` (`def f(): pass`), we want to detect patterns like
     // this:
     //
@@ -108,7 +108,7 @@ fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
 
 /// Find the end of the first token that isn't a docstring, comment, or
 /// whitespace.
-pub fn find_splice_location(body: &[Stmt], locator: &SourceCodeLocator) -> Location {
+pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
     // Find the first AST node that isn't a docstring.
     let mut splice = match_docstring_end(body).unwrap_or_default();
 
@@ -132,11 +132,11 @@ mod tests {
     use rustpython_parser::parser;
 
     use crate::isort::helpers::find_splice_location;
-    use crate::source_code_locator::SourceCodeLocator;
+    use crate::source_code::Locator;
 
     fn splice_contents(contents: &str) -> Result<Location> {
         let program = parser::parse_program(contents, "<filename>")?;
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         Ok(find_splice_location(&program, &locator))
     }
 

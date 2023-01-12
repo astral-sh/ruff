@@ -4,8 +4,8 @@ use rustpython_parser::ast::Expr;
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
 use crate::violations;

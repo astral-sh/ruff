@@ -1,4 +1,4 @@
-pub mod rules;
+pub(crate) mod rules;
 pub mod settings;
 
 #[cfg(test)]
@@ -8,10 +8,11 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::flake8_quotes;
     use crate::flake8_quotes::settings::Quote;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::{flake8_quotes, Settings};
+    use crate::settings::Settings;
 
     #[test_case(Path::new("doubles.py"))]
     #[test_case(Path::new("doubles_escaped.py"))]

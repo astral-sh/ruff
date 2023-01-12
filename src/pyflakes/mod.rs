@@ -1,7 +1,7 @@
-pub mod cformat;
-pub mod fixes;
-pub mod format;
-pub mod rules;
+pub(crate) mod cformat;
+pub(crate) mod fixes;
+pub(crate) mod format;
+pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -17,8 +17,7 @@ mod tests {
     use crate::linter::{check_path, test_path};
     use crate::registry::{RuleCode, RuleCodePrefix};
     use crate::settings::flags;
-    use crate::source_code_locator::SourceCodeLocator;
-    use crate::source_code_style::SourceCodeStyleDetector;
+    use crate::source_code::{Locator, Stylist};
     use crate::{directives, rustpython_helpers, settings};
 
     #[test_case(RuleCode::F401, Path::new("F401_0.py"); "F401_0")]
@@ -212,8 +211,8 @@ mod tests {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(RuleCodePrefix::F.codes());
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
-        let locator = SourceCodeLocator::new(&contents);
-        let stylist = SourceCodeStyleDetector::from_contents(&contents, &locator);
+        let locator = Locator::new(&contents);
+        let stylist = Stylist::from_contents(&contents, &locator);
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
         let mut diagnostics = check_path(

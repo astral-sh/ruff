@@ -5,12 +5,12 @@ use rustpython_parser::lexer::{LexResult, Tok};
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::ruff::rules::Context;
-use crate::settings::flags;
-use crate::source_code_locator::SourceCodeLocator;
-use crate::{eradicate, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff, Settings};
+use crate::settings::{flags, Settings};
+use crate::source_code::Locator;
+use crate::{eradicate, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff};
 
 pub fn check_tokens(
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     tokens: &[LexResult],
     settings: &Settings,
     autofix: flags::Autofix,

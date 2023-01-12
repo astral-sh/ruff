@@ -9,10 +9,10 @@ use crate::ast::helpers;
 use crate::ast::helpers::to_absolute;
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
-use crate::autofix::Fix;
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;
-use crate::source_code_locator::SourceCodeLocator;
+use crate::fix::Fix;
+use crate::source_code::Locator;
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -78,7 +78,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
 
 /// Return the location of a trailing semicolon following a `Stmt`, if it's part
 /// of a multi-statement line.
-fn trailing_semicolon(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Location> {
+fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
     let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
     for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
         let trimmed = line.trim();
@@ -100,7 +100,7 @@ fn trailing_semicolon(stmt: &Stmt, locator: &SourceCodeLocator) -> Option<Locati
 }
 
 /// Find the next valid break for a `Stmt` after a semicolon.
-fn next_stmt_break(semicolon: Location, locator: &SourceCodeLocator) -> Location {
+fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
     let contents = locator.slice_source_code_at(&start_location);
     for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
@@ -133,7 +133,7 @@ fn next_stmt_break(semicolon: Location, locator: &SourceCodeLocator) -> Location
 }
 
 /// Return `true` if a `Stmt` occurs at the end of a file.
-fn is_end_of_file(stmt: &Stmt, locator: &SourceCodeLocator) -> bool {
+fn is_end_of_file(stmt: &Stmt, locator: &Locator) -> bool {
     let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
     contents.is_empty()
 }
@@ -155,7 +155,7 @@ pub fn delete_stmt(
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Result<Fix> {
     if parent
         .map(|parent| is_lone_child(stmt, parent, deleted))
@@ -197,7 +197,7 @@ pub fn remove_unused_imports<'a>(
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text)?;
@@ -299,20 +299,20 @@ mod tests {
     use rustpython_parser::parser;
 
     use crate::autofix::helpers::{next_stmt_break, trailing_semicolon};
-    use crate::source_code_locator::SourceCodeLocator;
+    use crate::source_code::Locator;
 
     #[test]
     fn find_semicolon() -> Result<()> {
         let contents = "x = 1";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt, &locator), None);
 
         let contents = "x = 1; y = 1";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt, &locator),
             Some(Location::new(1, 5))
@@ -321,7 +321,7 @@ mod tests {
         let contents = "x = 1 ; y = 1";
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt, &locator),
             Some(Location::new(1, 6))
@@ -334,7 +334,7 @@ x = 1 \
         .trim();
         let program = parser::parse_program(contents, "<filename>")?;
         let stmt = program.first().unwrap();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt, &locator),
             Some(Location::new(2, 2))
@@ -346,14 +346,14 @@ x = 1 \
     #[test]
     fn find_next_stmt_break() {
         let contents = "x = 1; y = 1";
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             next_stmt_break(Location::new(1, 4), &locator),
             Location::new(1, 5)
         );
 
         let contents = "x = 1 ; y = 1";
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             next_stmt_break(Location::new(1, 5), &locator),
             Location::new(1, 6)
@@ -364,7 +364,7 @@ x = 1 \
   ; y = 1
 "#
         .trim();
-        let locator = SourceCodeLocator::new(contents);
+        let locator = Locator::new(contents);
         assert_eq!(
             next_stmt_break(Location::new(2, 2), &locator),
             Location::new(2, 4)

@@ -1,4 +1,4 @@
-pub mod rules;
+pub(crate) mod rules;
 pub mod settings;
 
 #[cfg(test)]
@@ -8,9 +8,10 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::flake8_bugbear;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::{flake8_bugbear, Settings};
+    use crate::settings::Settings;
 
     #[test_case(RuleCode::B002, Path::new("B002.py"); "B002")]
     #[test_case(RuleCode::B003, Path::new("B003.py"); "B003")]

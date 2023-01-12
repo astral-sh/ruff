@@ -102,7 +102,7 @@ pub fn detect_package_roots<'a>(files: &[&'a Path]) -> FxHashMap<&'a Path, Optio
 mod tests {
     use std::path::PathBuf;
 
-    use crate::packages::detect_package_root;
+    use crate::packaging::detect_package_root;
 
     #[test]
     fn package_detection() {

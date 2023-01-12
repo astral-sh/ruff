@@ -10,16 +10,15 @@ use crate::isort;
 use crate::isort::track::{Block, ImportTracker};
 use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Locator, Stylist};
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_imports(
     python_ast: &Suite,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     directives: &IsortDirectives,
     settings: &Settings,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
     autofix: flags::Autofix,
     path: &Path,
     package: Option<&Path>,

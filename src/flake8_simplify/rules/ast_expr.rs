@@ -2,8 +2,8 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::helpers::{create_expr, match_module_member, unparse_expr};
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 

@@ -1,4 +1,4 @@
-pub mod rules;
+pub(crate) mod rules;
 pub mod settings;
 
 #[cfg(test)]
@@ -9,8 +9,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
+    use crate::mccabe;
     use crate::registry::RuleCode;
-    use crate::{mccabe, Settings};
+    use crate::settings::Settings;
 
     #[test_case(0)]
     #[test_case(3)]

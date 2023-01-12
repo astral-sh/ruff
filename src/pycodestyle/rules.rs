@@ -11,13 +11,11 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::Settings;
-use crate::source_code_generator::SourceCodeGenerator;
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Generator, Locator, Stylist};
 use crate::violations;
 
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
@@ -106,12 +104,7 @@ pub fn doc_line_too_long(lineno: usize, line: &str, settings: &Settings) -> Opti
     }
 }
 
-fn compare(
-    left: &Expr,
-    ops: &[Cmpop],
-    comparators: &[Expr],
-    stylist: &SourceCodeStyleDetector,
-) -> String {
+fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr], stylist: &Stylist) -> String {
     unparse_expr(
         &create_expr(ExprKind::Compare {
             left: Box::new(left.clone()),
@@ -413,7 +406,7 @@ pub fn do_not_use_bare_except(
     type_: Option<&Expr>,
     body: &[Stmt],
     handler: &Excepthandler,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if type_.is_none()
         && !body
@@ -429,12 +422,7 @@ pub fn do_not_use_bare_except(
     }
 }
 
-fn function(
-    name: &str,
-    args: &Arguments,
-    body: &Expr,
-    stylist: &SourceCodeStyleDetector,
-) -> String {
+fn function(name: &str, args: &Arguments, body: &Expr, stylist: &Stylist) -> String {
     let body = Stmt::new(
         Location::default(),
         Location::default(),
@@ -454,7 +442,7 @@ fn function(
             type_comment: None,
         },
     );
-    let mut generator: SourceCodeGenerator = stylist.into();
+    let mut generator: Generator = stylist.into();
     generator.unparse_stmt(&func);
     generator.generate()
 }
@@ -585,7 +573,7 @@ fn extract_quote(text: &str) -> &str {
 
 /// W605
 pub fn invalid_escape_sequence(
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     start: Location,
     end: Location,
     autofix: bool,

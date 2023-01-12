@@ -2,12 +2,11 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, StmtKind};
 
 use crate::ast::helpers::{collect_call_paths, create_expr, create_stmt, dealias_call_path};
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::source_code_generator::SourceCodeGenerator;
-use crate::source_code_style::SourceCodeStyleDetector;
-use crate::{violations, SourceCodeLocator};
+use crate::source_code::{Generator, Locator, Stylist};
+use crate::violations;
 
 /// Return `true` if the `Expr` is a reference to `${module}.${any}`.
 fn is_module_member(call_path: &[&str], module: &str) -> bool {
@@ -55,7 +54,7 @@ fn replace_by_str_literal(
     binary: bool,
     expr: &Expr,
     patch: bool,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     match &arg.node {
         ExprKind::Constant { .. } => {
@@ -88,7 +87,7 @@ fn replace_call_on_arg_by_arg_attribute(
     arg: &Expr,
     expr: &Expr,
     patch: bool,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> Diagnostic {
     let attribute = ExprKind::Attribute {
         value: Box::new(arg.clone()),
@@ -104,7 +103,7 @@ fn replace_call_on_arg_by_arg_method_call(
     args: &[Expr],
     expr: &Expr,
     patch: bool,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> Option<Diagnostic> {
     if args.is_empty() {
         None
@@ -128,15 +127,10 @@ fn replace_call_on_arg_by_arg_method_call(
 }
 
 // `expr` => `Expr(expr_kind)`
-fn replace_by_expr_kind(
-    node: ExprKind,
-    expr: &Expr,
-    patch: bool,
-    stylist: &SourceCodeStyleDetector,
-) -> Diagnostic {
+fn replace_by_expr_kind(node: ExprKind, expr: &Expr, patch: bool, stylist: &Stylist) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
-        let mut generator: SourceCodeGenerator = stylist.into();
+        let mut generator: Generator = stylist.into();
         generator.unparse_expr(&create_expr(node), 0);
         diagnostic.amend(Fix::replacement(
             generator.generate(),
@@ -147,15 +141,10 @@ fn replace_by_expr_kind(
     diagnostic
 }
 
-fn replace_by_stmt_kind(
-    node: StmtKind,
-    expr: &Expr,
-    patch: bool,
-    stylist: &SourceCodeStyleDetector,
-) -> Diagnostic {
+fn replace_by_stmt_kind(node: StmtKind, expr: &Expr, patch: bool, stylist: &Stylist) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
-        let mut generator: SourceCodeGenerator = stylist.into();
+        let mut generator: Generator = stylist.into();
         generator.unparse_stmt(&create_stmt(node));
         diagnostic.amend(Fix::replacement(
             generator.generate(),
@@ -172,7 +161,7 @@ fn replace_by_raise_from(
     cause: Option<ExprKind>,
     expr: &Expr,
     patch: bool,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> Diagnostic {
     let stmt_kind = StmtKind::Raise {
         exc: exc.map(|exc| Box::new(create_expr(exc))),
@@ -186,7 +175,7 @@ fn replace_by_index_on_arg(
     index: &ExprKind,
     expr: &Expr,
     patch: bool,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> Diagnostic {
     let index = ExprKind::Subscript {
         value: Box::new(create_expr(arg.node.clone())),
@@ -200,7 +189,7 @@ fn handle_reraise(
     args: &[Expr],
     expr: &Expr,
     patch: bool,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> Option<Diagnostic> {
     if let [_, exc, tb] = args {
         Some(replace_by_raise_from(
@@ -242,8 +231,8 @@ fn handle_func(
     keywords: &[Keyword],
     expr: &Expr,
     patch: bool,
-    stylist: &SourceCodeStyleDetector,
-    locator: &SourceCodeLocator,
+    stylist: &Stylist,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     let func_name = match &func.node {
         ExprKind::Attribute { attr, .. } => attr,

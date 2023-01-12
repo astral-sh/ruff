@@ -29,11 +29,12 @@ use crate::{
 };
 
 pub mod configuration;
-pub mod flags;
+pub(crate) mod flags;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
 pub mod types;
+
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]

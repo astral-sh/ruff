@@ -2,8 +2,8 @@ use rustpython_ast::{Expr, ExprKind, Location};
 
 use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 

@@ -33,8 +33,7 @@ use crate::python::typing::SubscriptKind;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Locator, Stylist};
 use crate::violations::DeferralKeyword;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
@@ -59,8 +58,8 @@ pub struct Checker<'a> {
     noqa: flags::Noqa,
     pub(crate) settings: &'a Settings,
     pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
-    pub(crate) locator: &'a SourceCodeLocator<'a>,
-    pub(crate) style: &'a SourceCodeStyleDetector<'a>,
+    pub(crate) locator: &'a Locator<'a>,
+    pub(crate) style: &'a Stylist<'a>,
     // Computed diagnostics.
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Function and class definition tracking (e.g., for docstring enforcement).
@@ -110,8 +109,8 @@ impl<'a> Checker<'a> {
         autofix: flags::Autofix,
         noqa: flags::Noqa,
         path: &'a Path,
-        locator: &'a SourceCodeLocator,
-        style: &'a SourceCodeStyleDetector,
+        locator: &'a Locator,
+        style: &'a Stylist,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -3238,16 +3237,6 @@ impl<'a> Checker<'a> {
         self.parents.iter().rev().nth(1)
     }
 
-    /// Return the grandparent `Stmt` of the current `Stmt`, if any.
-    pub fn current_stmt_grandparent(&self) -> Option<&RefEquality<'a, Stmt>> {
-        self.parents.iter().rev().nth(2)
-    }
-
-    /// Return the current `Expr`.
-    pub fn current_expr(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().next()
-    }
-
     /// Return the parent `Expr` of the current `Expr`.
     pub fn current_expr_parent(&self) -> Option<&RefEquality<'a, Expr>> {
         self.exprs.iter().rev().nth(1)
@@ -4308,8 +4297,8 @@ impl<'a> Checker<'a> {
 #[allow(clippy::too_many_arguments)]
 pub fn check_ast(
     python_ast: &Suite,
-    locator: &SourceCodeLocator,
-    stylist: &SourceCodeStyleDetector,
+    locator: &Locator,
+    stylist: &Stylist,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: flags::Autofix,

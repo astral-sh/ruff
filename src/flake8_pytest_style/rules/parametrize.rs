@@ -3,11 +3,11 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 use super::helpers::is_pytest_parametrize;
 use crate::ast::helpers::create_expr;
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::flake8_pytest_style::types;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code::Generator;
 use crate::violations;
 
 fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
@@ -31,7 +31,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         return None;
     }
 
-    let mut generator: SourceCodeGenerator = checker.style.into();
+    let mut generator: Generator = checker.style.into();
     generator.unparse_expr(
         &create_expr(ExprKind::Constant {
             value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
@@ -85,7 +85,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: SourceCodeGenerator = checker.style.into();
+                            let mut generator: Generator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: names
@@ -115,7 +115,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: SourceCodeGenerator = checker.style.into();
+                            let mut generator: Generator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: names
@@ -157,7 +157,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: SourceCodeGenerator = checker.style.into();
+                            let mut generator: Generator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: elts.clone(),
@@ -206,7 +206,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: SourceCodeGenerator = checker.style.into();
+                            let mut generator: Generator = checker.style.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: elts.clone(),
@@ -284,7 +284,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.code()) {
-        let mut generator: SourceCodeGenerator = checker.style.into();
+        let mut generator: Generator = checker.style.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
         diagnostic.amend(Fix::replacement(
             generator.generate(),

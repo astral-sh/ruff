@@ -4,12 +4,12 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtK
 
 use crate::ast::helpers::{create_expr, create_stmt, match_module_member, unparse_stmt};
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::Stylist;
 use crate::violations;
 
 /// Return the typename, args, keywords, and base class.
@@ -136,7 +136,7 @@ fn convert_to_class(
     typename: &str,
     body: Vec<Stmt>,
     base_class: &Expr,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> Fix {
     Fix::replacement(
         unparse_stmt(&create_class_def_stmt(typename, body, base_class), stylist),

@@ -10,7 +10,8 @@ use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeK
 use crate::checkers::ast::Checker;
 use crate::flake8_unused_arguments::helpers;
 use crate::flake8_unused_arguments::types::Argumentable;
-use crate::{visibility, Diagnostic};
+use crate::registry::Diagnostic;
+use crate::visibility;
 
 /// Check a plain function for unused arguments.
 fn function(

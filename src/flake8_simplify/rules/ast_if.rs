@@ -5,8 +5,8 @@ use crate::ast::helpers::{
     contains_call_path, create_expr, create_stmt, has_comments, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 

@@ -1,16 +1,15 @@
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::python::identifiers::IDENTIFIER_REGEX;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
-use crate::source_code_generator::SourceCodeGenerator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Generator, Stylist};
 use crate::violations;
 
-fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &SourceCodeStyleDetector) -> String {
+fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String {
     let stmt = Stmt::new(
         Location::default(),
         Location::default(),
@@ -28,7 +27,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &SourceCodeStyleDet
             type_comment: None,
         },
     );
-    let mut generator: SourceCodeGenerator = stylist.into();
+    let mut generator: Generator = stylist.into();
     generator.unparse_stmt(&stmt);
     generator.generate()
 }

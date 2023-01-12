@@ -15,7 +15,6 @@ use rustpython_ast::Location;
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::autofix::fixer;
 use crate::cache::CACHE_DIR_NAME;
 use crate::cli::Overrides;
 use crate::iterators::par_iter;
@@ -26,7 +25,7 @@ use crate::registry::RuleCode;
 use crate::resolver::{FileDiscovery, PyprojectDiscovery};
 use crate::settings::flags;
 use crate::settings::types::SerializationFormat;
-use crate::{cache, fs, packages, resolver, violations, warn_user_once};
+use crate::{cache, fix, fs, packaging, resolver, violations, warn_user_once};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -35,7 +34,7 @@ pub fn run(
     file_strategy: &FileDiscovery,
     overrides: &Overrides,
     cache: flags::Cache,
-    autofix: fixer::Mode,
+    autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -77,7 +76,7 @@ pub fn run(
     };
 
     // Discover the package root for each Python file.
-    let package_roots = packages::detect_package_roots(
+    let package_roots = packaging::detect_package_roots(
         &paths
             .iter()
             .flatten()
@@ -156,7 +155,7 @@ pub fn run_stdin(
     pyproject_strategy: &PyprojectDiscovery,
     file_strategy: &FileDiscovery,
     overrides: &Overrides,
-    autofix: fixer::Mode,
+    autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     if let Some(filename) = filename {
         if !resolver::python_file_at_path(filename, pyproject_strategy, file_strategy, overrides)? {
@@ -169,7 +168,7 @@ pub fn run_stdin(
     };
     let package_root = filename
         .and_then(Path::parent)
-        .and_then(packages::detect_package_root);
+        .and_then(packaging::detect_package_root);
     let stdin = read_from_stdin()?;
     let mut diagnostics = lint_stdin(filename, package_root, &stdin, settings, autofix)?;
     diagnostics.messages.sort_unstable();

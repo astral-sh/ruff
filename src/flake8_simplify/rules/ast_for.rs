@@ -4,11 +4,10 @@ use rustpython_ast::{
 
 use crate::ast::helpers::{create_expr, create_stmt};
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::source_code_generator::SourceCodeGenerator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Generator, Stylist};
 use crate::violations;
 
 struct Loop<'a> {
@@ -77,14 +76,8 @@ fn return_values<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Loop<'a>> {
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(
-    id: &str,
-    test: &Expr,
-    target: &Expr,
-    iter: &Expr,
-    stylist: &SourceCodeStyleDetector,
-) -> String {
-    let mut generator: SourceCodeGenerator = stylist.into();
+fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Stylist) -> String {
+    let mut generator: Generator = stylist.into();
     generator.unparse_stmt(&create_stmt(StmtKind::Return {
         value: Some(Box::new(create_expr(ExprKind::Call {
             func: Box::new(create_expr(ExprKind::Name {

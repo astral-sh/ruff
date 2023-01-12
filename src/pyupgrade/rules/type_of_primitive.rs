@@ -1,8 +1,8 @@
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::pyupgrade::types::Primitive;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violations;
