@@ -240,7 +240,7 @@ impl<'a> Printer<'a> {
                         "::error title=Ruff \
                          ({}),file={},line={},col={},endLine={},endColumn={}::{}",
                         message.kind.code(),
-                        relativize_path(Path::new(&message.filename)),
+                        message.filename,
                         message.location.row(),
                         message.location.column(),
                         message.end_location.row(),
@@ -264,7 +264,7 @@ impl<'a> Printer<'a> {
                                     "severity": "major",
                                     "fingerprint": message.kind.code(),
                                     "location": {
-                                        "path": relativize_path(Path::new(&message.filename)),
+                                        "path": message.filename,
                                         "lines": {
                                             "begin": message.location.row(),
                                             "end": message.end_location.row()
