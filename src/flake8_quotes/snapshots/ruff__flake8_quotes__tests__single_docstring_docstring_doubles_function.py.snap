@@ -10,7 +10,14 @@ expression: diagnostics
   end_location:
     row: 2
     column: 56
-  fix: ~
+  fix:
+    content: "'''function without params, single line docstring'''"
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 56
   parent: ~
 - kind:
     BadQuotesDocstring: single
@@ -20,7 +27,14 @@ expression: diagnostics
   end_location:
     row: 10
     column: 7
-  fix: ~
+  fix:
+    content: "'''\n        function without params, multiline docstring\n    '''"
+    location:
+      row: 8
+      column: 4
+    end_location:
+      row: 10
+      column: 7
   parent: ~
 - kind:
     BadQuotesDocstring: single
@@ -30,6 +44,13 @@ expression: diagnostics
   end_location:
     row: 27
     column: 27
-  fix: ~
+  fix:
+    content: "'Single line docstring'"
+    location:
+      row: 27
+      column: 4
+    end_location:
+      row: 27
+      column: 27
   parent: ~
 

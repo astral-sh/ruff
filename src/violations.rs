@@ -2334,12 +2334,20 @@ impl AlwaysAutofixableViolation for PPrintFound {
 define_violation!(
     pub struct BadQuotesInlineString(pub Quote);
 );
-impl Violation for BadQuotesInlineString {
+impl AlwaysAutofixableViolation for BadQuotesInlineString {
     fn message(&self) -> String {
         let BadQuotesInlineString(quote) = self;
         match quote {
             Quote::Single => "Double quotes found but single quotes preferred".to_string(),
             Quote::Double => "Single quotes found but double quotes preferred".to_string(),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesInlineString(quote) = self;
+        match quote {
+            Quote::Single => "Replace double quotes with single quotes".to_string(),
+            Quote::Double => "Replace single quotes with double quotes".to_string(),
         }
     }
 
@@ -2351,12 +2359,20 @@ impl Violation for BadQuotesInlineString {
 define_violation!(
     pub struct BadQuotesMultilineString(pub Quote);
 );
-impl Violation for BadQuotesMultilineString {
+impl AlwaysAutofixableViolation for BadQuotesMultilineString {
     fn message(&self) -> String {
         let BadQuotesMultilineString(quote) = self;
         match quote {
             Quote::Single => "Double quote multiline found but single quotes preferred".to_string(),
             Quote::Double => "Single quote multiline found but double quotes preferred".to_string(),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesMultilineString(quote) = self;
+        match quote {
+            Quote::Single => "Replace double multiline quotes with single quotes".to_string(),
+            Quote::Double => "Replace single multiline quotes with double quotes".to_string(),
         }
     }
 
@@ -2368,12 +2384,20 @@ impl Violation for BadQuotesMultilineString {
 define_violation!(
     pub struct BadQuotesDocstring(pub Quote);
 );
-impl Violation for BadQuotesDocstring {
+impl AlwaysAutofixableViolation for BadQuotesDocstring {
     fn message(&self) -> String {
         let BadQuotesDocstring(quote) = self;
         match quote {
             Quote::Single => "Double quote docstring found but single quotes preferred".to_string(),
             Quote::Double => "Single quote docstring found but double quotes preferred".to_string(),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesDocstring(quote) = self;
+        match quote {
+            Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
+            Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
         }
     }
 
@@ -2385,8 +2409,12 @@ impl Violation for BadQuotesDocstring {
 define_violation!(
     pub struct AvoidQuoteEscape;
 );
-impl Violation for AvoidQuoteEscape {
+impl AlwaysAutofixableViolation for AvoidQuoteEscape {
     fn message(&self) -> String {
+        "Change outer quotes to avoid escaping inner quotes".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
         "Change outer quotes to avoid escaping inner quotes".to_string()
     }
 

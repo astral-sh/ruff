@@ -67,7 +67,8 @@ pub fn check_tokens(
                     start,
                     end,
                     is_docstring,
-                    &settings.flake8_quotes,
+                    settings,
+                    autofix,
                 ) {
                     if settings.enabled.contains(diagnostic.kind.code()) {
                         diagnostics.push(diagnostic);

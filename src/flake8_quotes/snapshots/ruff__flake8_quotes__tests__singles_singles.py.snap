@@ -1,6 +1,6 @@
 ---
 source: src/flake8_quotes/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     BadQuotesInlineString: double
@@ -10,7 +10,14 @@ expression: checks
   end_location:
     row: 1
     column: 45
-  fix: ~
+  fix:
+    content: "\"single quote string\""
+    location:
+      row: 1
+      column: 24
+    end_location:
+      row: 1
+      column: 45
   parent: ~
 - kind:
     BadQuotesInlineString: double
@@ -20,6 +27,13 @@ expression: checks
   end_location:
     row: 2
     column: 46
-  fix: ~
+  fix:
+    content: "u\"double quote string\""
+    location:
+      row: 2
+      column: 24
+    end_location:
+      row: 2
+      column: 46
   parent: ~
 
