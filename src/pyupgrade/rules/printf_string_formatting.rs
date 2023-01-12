@@ -2,6 +2,10 @@ use crate::checkers::ast::Checker;
 use once_cell::sync::Lazy;
 use regex::{Match, Regex};
 use rustpython_ast::Expr;
+use std::default::Default;
+
+// Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
+// Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
 
 static MAPPING_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\(([^()]*)\)").unwrap());
 static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").unwrap());
@@ -42,6 +46,12 @@ struct PercentFormat {
     parts: Option<PercentFormatPart>,
 }
 
+impl Default for PercentFormat {
+    fn default() -> Self {
+        Self {item: "\"".to_string(), parts: None}
+    }
+}
+
 impl PercentFormat {
     fn new(item: String, parts: Option<PercentFormatPart>) -> Self {
         Self { item, parts }
@@ -57,7 +67,12 @@ fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -
     let flag_match = must_match(regex, string, *position);
     if let Some(flag_match) = flag_match {
         *position = flag_match.end();
-        Some(flag_match.as_str().to_string())
+        let the_string = flag_match.as_str().to_string();
+        if the_string.is_empty() {
+            None
+        } else {
+            Some(the_string)
+        }
     } else {
         None
     }
@@ -77,7 +92,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                     let fmt_full = PercentFormat::new(string[string_start..].to_string(), None);
                     formats.push(fmt_full);
                     return formats;
-                },
+                }
                 Some(item) => item,
             };
             string_end = i;
@@ -147,6 +162,18 @@ mod test {
         let sample = "\"\"";
         let e1 = PercentFormat::new("\"\"".to_string(), None);
         let expected = vec![e1];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_double_percent() {
+        let sample = "\"%%\"";
+        let sube1 = PercentFormatPart::new(None, None, None, None, "%".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
         assert_eq!(received, expected);
