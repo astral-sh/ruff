@@ -12,7 +12,6 @@ use regex::Regex;
 use shellexpand;
 use shellexpand::LookupError;
 
-use crate::cli::{collect_per_file_ignores, Overrides};
 use crate::registry::RuleCodePrefix;
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
@@ -243,85 +242,6 @@ impl Configuration {
             pycodestyle: self.pycodestyle.or(config.pycodestyle),
             pydocstyle: self.pydocstyle.or(config.pydocstyle),
             pyupgrade: self.pyupgrade.or(config.pyupgrade),
-        }
-    }
-
-    pub fn apply(&mut self, overrides: Overrides) {
-        if let Some(cache_dir) = overrides.cache_dir {
-            self.cache_dir = Some(cache_dir);
-        }
-        if let Some(dummy_variable_rgx) = overrides.dummy_variable_rgx {
-            self.dummy_variable_rgx = Some(dummy_variable_rgx);
-        }
-        if let Some(exclude) = overrides.exclude {
-            self.exclude = Some(exclude);
-        }
-        if let Some(extend_exclude) = overrides.extend_exclude {
-            self.extend_exclude.extend(extend_exclude);
-        }
-        if let Some(fix) = overrides.fix {
-            self.fix = Some(fix);
-        }
-        if let Some(fix_only) = overrides.fix_only {
-            self.fix_only = Some(fix_only);
-        }
-        if let Some(fixable) = overrides.fixable {
-            self.fixable = Some(fixable);
-        }
-        if let Some(format) = overrides.format {
-            self.format = Some(format);
-        }
-        if let Some(force_exclude) = overrides.force_exclude {
-            self.force_exclude = Some(force_exclude);
-        }
-        if let Some(ignore) = overrides.ignore {
-            self.ignore = Some(ignore);
-        }
-        if let Some(line_length) = overrides.line_length {
-            self.line_length = Some(line_length);
-        }
-        if let Some(max_complexity) = overrides.max_complexity {
-            self.mccabe = Some(mccabe::settings::Options {
-                max_complexity: Some(max_complexity),
-            });
-        }
-        if let Some(per_file_ignores) = overrides.per_file_ignores {
-            self.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores));
-        }
-        if let Some(respect_gitignore) = overrides.respect_gitignore {
-            self.respect_gitignore = Some(respect_gitignore);
-        }
-        if let Some(select) = overrides.select {
-            self.select = Some(select);
-        }
-        if let Some(show_source) = overrides.show_source {
-            self.show_source = Some(show_source);
-        }
-        if let Some(target_version) = overrides.target_version {
-            self.target_version = Some(target_version);
-        }
-        if let Some(unfixable) = overrides.unfixable {
-            self.unfixable = Some(unfixable);
-        }
-        if let Some(update_check) = overrides.update_check {
-            self.update_check = Some(update_check);
-        }
-        // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so
-        // push an empty array if only one of the two is provided.
-        match (overrides.extend_ignore, overrides.extend_select) {
-            (Some(extend_ignore), Some(extend_select)) => {
-                self.extend_ignore.push(extend_ignore);
-                self.extend_select.push(extend_select);
-            }
-            (Some(extend_ignore), None) => {
-                self.extend_ignore.push(extend_ignore);
-                self.extend_select.push(Vec::new());
-            }
-            (None, Some(extend_select)) => {
-                self.extend_ignore.push(Vec::new());
-                self.extend_select.push(extend_select);
-            }
-            (None, None) => {}
         }
     }
 }

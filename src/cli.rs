@@ -4,12 +4,13 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use crate::fs;
 use crate::logging::LogLevel;
 use crate::registry::{RuleCode, RuleCodePrefix};
+use crate::resolver::ConfigProcessor;
 use crate::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
+use crate::{fs, mccabe};
 
 #[derive(Debug, Parser)]
 #[command(author, about = "Ruff: An extremely fast Python linter.")]
@@ -342,6 +343,87 @@ pub struct Overrides {
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
     pub update_check: Option<bool>,
+}
+
+impl ConfigProcessor for &Overrides {
+    fn process_config(&self, config: &mut crate::settings::configuration::Configuration) {
+        if let Some(cache_dir) = &self.cache_dir {
+            config.cache_dir = Some(cache_dir.clone());
+        }
+        if let Some(dummy_variable_rgx) = &self.dummy_variable_rgx {
+            config.dummy_variable_rgx = Some(dummy_variable_rgx.clone());
+        }
+        if let Some(exclude) = &self.exclude {
+            config.exclude = Some(exclude.clone());
+        }
+        if let Some(extend_exclude) = &self.extend_exclude {
+            config.extend_exclude.extend(extend_exclude.clone());
+        }
+        if let Some(fix) = &self.fix {
+            config.fix = Some(*fix);
+        }
+        if let Some(fix_only) = &self.fix_only {
+            config.fix_only = Some(*fix_only);
+        }
+        if let Some(fixable) = &self.fixable {
+            config.fixable = Some(fixable.clone());
+        }
+        if let Some(format) = &self.format {
+            config.format = Some(*format);
+        }
+        if let Some(force_exclude) = &self.force_exclude {
+            config.force_exclude = Some(*force_exclude);
+        }
+        if let Some(ignore) = &self.ignore {
+            config.ignore = Some(ignore.clone());
+        }
+        if let Some(line_length) = &self.line_length {
+            config.line_length = Some(*line_length);
+        }
+        if let Some(max_complexity) = &self.max_complexity {
+            config.mccabe = Some(mccabe::settings::Options {
+                max_complexity: Some(*max_complexity),
+            });
+        }
+        if let Some(per_file_ignores) = &self.per_file_ignores {
+            config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
+        }
+        if let Some(respect_gitignore) = &self.respect_gitignore {
+            config.respect_gitignore = Some(*respect_gitignore);
+        }
+        if let Some(select) = &self.select {
+            config.select = Some(select.clone());
+        }
+        if let Some(show_source) = &self.show_source {
+            config.show_source = Some(*show_source);
+        }
+        if let Some(target_version) = &self.target_version {
+            config.target_version = Some(*target_version);
+        }
+        if let Some(unfixable) = &self.unfixable {
+            config.unfixable = Some(unfixable.clone());
+        }
+        if let Some(update_check) = &self.update_check {
+            config.update_check = Some(*update_check);
+        }
+        // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so
+        // push an empty array if only one of the two is provided.
+        match (&self.extend_ignore, &self.extend_select) {
+            (Some(extend_ignore), Some(extend_select)) => {
+                config.extend_ignore.push(extend_ignore.clone());
+                config.extend_select.push(extend_select.clone());
+            }
+            (Some(extend_ignore), None) => {
+                config.extend_ignore.push(extend_ignore.clone());
+                config.extend_select.push(Vec::new());
+            }
+            (None, Some(extend_select)) => {
+                config.extend_ignore.push(Vec::new());
+                config.extend_select.push(extend_select.clone());
+            }
+            (None, None) => {}
+        }
+    }
 }
 
 /// Map the CLI settings to a `LogLevel`.
