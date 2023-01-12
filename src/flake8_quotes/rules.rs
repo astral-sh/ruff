@@ -36,8 +36,8 @@ fn good_multiline_ending(quote: &Quote) -> &str {
 
 fn good_docstring(quote: &Quote) -> &str {
     match quote {
-        Quote::Single => "'''",
-        Quote::Double => "\"\"\"",
+        Quote::Single => "'",
+        Quote::Double => "\"",
     }
 }
 
