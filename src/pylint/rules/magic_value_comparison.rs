@@ -1,4 +1,3 @@
-use num_bigint::BigInt;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -9,11 +8,7 @@ use crate::violations;
 fn is_magic_value(constant: &Constant) -> Option<String> {
     match constant {
         Constant::Int(value) => {
-            if vec![-1, 0, 1]
-                .iter()
-                .map(|&v| BigInt::from(v))
-                .any(|v| v == *value)
-            {
+            if matches!(value.try_into(), Ok(-1 | 0 | 1)) {
                 None
             } else {
                 Some(value.to_string())
