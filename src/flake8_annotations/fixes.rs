@@ -4,11 +4,11 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
-use crate::source_code_locator::SourceCodeLocator;
+use crate::fix::Fix;
+use crate::source_code::Locator;
 
 /// ANN204
-pub fn add_return_none_annotation(locator: &SourceCodeLocator, stmt: &Stmt) -> Result<Fix> {
+pub fn add_return_none_annotation(locator: &Locator, stmt: &Stmt) -> Result<Fix> {
     let range = Range::from_located(stmt);
     let contents = locator.slice_source_code_range(&range);
 

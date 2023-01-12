@@ -40,7 +40,7 @@
       ]
     },
     "exclude": {
-      "description": "A list of file patterns to exclude from linting.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
+      "description": "A list of file patterns to exclude from linting.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
       "type": [
         "array",
         "null"
@@ -57,7 +57,7 @@
       ]
     },
     "extend-exclude": {
-      "description": "A list of file patterns to omit from linting, in addition to those specified by `exclude`.",
+      "description": "A list of file patterns to omit from linting, in addition to those specified by `exclude`.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -820,6 +820,17 @@
             "null"
           ]
         },
+        "relative-imports-order": {
+          "description": "Whether to place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local), or vice versa.\n\nThe default (\"furthest-to-closest\") is equivalent to isort's `reverse-relative` default (`reverse-relative = false`); setting this to \"closest-to-furthest\" is equivalent to isort's `reverse-relative = true`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RelatveImportsOrder"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "required-imports": {
           "description": "Add the specified import line to all files.",
           "type": [
@@ -945,6 +956,15 @@
             "boolean",
             "null"
           ]
+        },
+        "max-doc-length": {
+          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -994,6 +1014,24 @@
           "type": "string",
           "enum": [
             "double"
+          ]
+        }
+      ]
+    },
+    "RelatveImportsOrder": {
+      "oneOf": [
+        {
+          "description": "Place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local).",
+          "type": "string",
+          "enum": [
+            "closest-to-furthest"
+          ]
+        },
+        {
+          "description": "Place \"further\" imports (more `.` characters, least local) imports before \"closer\" imports (fewer `.` characters, most local).",
+          "type": "string",
+          "enum": [
+            "furthest-to-closest"
           ]
         }
       ]
@@ -1506,6 +1544,9 @@
         "S506",
         "S508",
         "S509",
+        "S7",
+        "S70",
+        "S701",
         "SIM",
         "SIM1",
         "SIM10",
@@ -1520,6 +1561,7 @@
         "SIM110",
         "SIM111",
         "SIM112",
+        "SIM115",
         "SIM117",
         "SIM118",
         "SIM2",
@@ -1539,6 +1581,9 @@
         "SIM3",
         "SIM30",
         "SIM300",
+        "SIM4",
+        "SIM40",
+        "SIM401",
         "T",
         "T1",
         "T10",
@@ -1612,6 +1657,9 @@
         "W2",
         "W29",
         "W292",
+        "W5",
+        "W50",
+        "W505",
         "W6",
         "W60",
         "W605",

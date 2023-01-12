@@ -1,5 +1,5 @@
 use crate::isort::types::{AliasData, CommentSet, ImportFromData, Importable};
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::Stylist;
 
 // Hard-code four-space indentation for the imports themselves, to match Black.
 const INDENT: &str = "    ";
@@ -12,7 +12,7 @@ pub fn format_import(
     alias: &AliasData,
     comments: &CommentSet,
     is_first: bool,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> String {
     let mut output = String::with_capacity(CAPACITY);
     if !is_first && !comments.atop.is_empty() {
@@ -46,7 +46,7 @@ pub fn format_import_from(
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
     line_length: usize,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
     force_wrap_aliases: bool,
     is_first: bool,
     trailing_comma: bool,
@@ -89,7 +89,7 @@ fn format_single_line(
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> (String, usize) {
     let mut output = String::with_capacity(CAPACITY);
     let mut line_length = 0;
@@ -149,7 +149,7 @@ fn format_multi_line(
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
 ) -> String {
     let mut output = String::with_capacity(CAPACITY);
 

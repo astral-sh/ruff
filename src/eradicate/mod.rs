@@ -1,5 +1,5 @@
-pub mod detection;
-pub mod rules;
+pub(crate) mod detection;
+pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {

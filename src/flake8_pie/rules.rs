@@ -2,10 +2,10 @@ use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::types::Range;
+use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
@@ -48,12 +48,14 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// PIE794
-pub fn dupe_class_field_definitions(checker: &mut Checker, bases: &[Expr], body: &[Stmt]) {
-    if bases.is_empty() {
-        return;
-    }
-
-    let mut seen_targets = FxHashSet::default();
+pub fn dupe_class_field_definitions<'a, 'b>(
+    checker: &mut Checker<'a>,
+    parent: &'b Stmt,
+    body: &'b [Stmt],
+) where
+    'b: 'a,
+{
+    let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
         let target = match &stmt.node {
@@ -77,17 +79,29 @@ pub fn dupe_class_field_definitions(checker: &mut Checker, bases: &[Expr], body:
             _ => continue,
         };
 
-        if seen_targets.contains(target) {
+        if !seen_targets.insert(target) {
             let mut diagnostic = Diagnostic::new(
                 violations::DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
             if checker.patch(&RuleCode::PIE794) {
-                diagnostic.amend(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
+                let deleted: Vec<&Stmt> = checker
+                    .deletions
+                    .iter()
+                    .map(std::convert::Into::into)
+                    .collect();
+                let locator = checker.locator;
+                match delete_stmt(stmt, Some(parent), &deleted, locator) {
+                    Ok(fix) => {
+                        checker.deletions.insert(RefEquality(stmt));
+                        diagnostic.amend(fix);
+                    }
+                    Err(err) => {
+                        error!("Failed to remove duplicate class definition: {}", err);
+                    }
+                }
             }
             checker.diagnostics.push(diagnostic);
-        } else {
-            seen_targets.insert(target);
         }
     }
 }

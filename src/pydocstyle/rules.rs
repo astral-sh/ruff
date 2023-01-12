@@ -8,17 +8,19 @@ use crate::ast::helpers::identifier_range;
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
 use crate::docstrings::constants;
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;
+use crate::fix::Fix;
 use crate::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::pydocstyle::settings::Convention;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
-use crate::visibility::{is_init, is_magic, is_overload, is_override, is_staticmethod, Visibility};
+use crate::visibility::{
+    is_call, is_init, is_magic, is_new, is_overload, is_override, is_staticmethod, Visibility,
+};
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub fn not_missing(
@@ -85,18 +87,26 @@ pub fn not_missing(
                 || is_override(checker, cast::decorator_list(stmt))
             {
                 true
-            } else if is_magic(stmt) {
-                if checker.settings.enabled.contains(&RuleCode::D105) {
+            } else if is_init(cast::name(stmt)) {
+                if checker.settings.enabled.contains(&RuleCode::D107) {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::MagicMethod,
+                        violations::PublicInit,
                         identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
-            } else if is_init(stmt) {
-                if checker.settings.enabled.contains(&RuleCode::D107) {
+            } else if is_new(cast::name(stmt)) || is_call(cast::name(stmt)) {
+                if checker.settings.enabled.contains(&RuleCode::D102) {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::PublicInit,
+                        violations::PublicMethod,
+                        identifier_range(stmt, checker.locator),
+                    ));
+                }
+                true
+            } else if is_magic(cast::name(stmt)) {
+                if checker.settings.enabled.contains(&RuleCode::D105) {
+                    checker.diagnostics.push(Diagnostic::new(
+                        violations::MagicMethod,
                         identifier_range(stmt, checker.locator),
                     ));
                 }

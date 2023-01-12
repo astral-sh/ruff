@@ -33,8 +33,7 @@ use crate::python::typing::SubscriptKind;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Locator, Stylist};
 use crate::violations::DeferralKeyword;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{
@@ -59,8 +58,8 @@ pub struct Checker<'a> {
     noqa: flags::Noqa,
     pub(crate) settings: &'a Settings,
     pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
-    pub(crate) locator: &'a SourceCodeLocator<'a>,
-    pub(crate) style: &'a SourceCodeStyleDetector<'a>,
+    pub(crate) locator: &'a Locator<'a>,
+    pub(crate) style: &'a Stylist<'a>,
     // Computed diagnostics.
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Function and class definition tracking (e.g., for docstring enforcement).
@@ -110,8 +109,8 @@ impl<'a> Checker<'a> {
         autofix: flags::Autofix,
         noqa: flags::Noqa,
         path: &'a Path,
-        locator: &'a SourceCodeLocator,
-        style: &'a SourceCodeStyleDetector,
+        locator: &'a Locator,
+        style: &'a Stylist,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -658,7 +657,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PIE794) {
-                    flake8_pie::rules::dupe_class_field_definitions(self, bases, body);
+                    flake8_pie::rules::dupe_class_field_definitions(self, stmt, body);
                 }
 
                 self.check_builtin_shadowing(name, stmt, false);
@@ -1207,14 +1206,14 @@ where
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
                     if let Some(item) = exc {
-                        pyupgrade::rules::os_error_alias(self, item);
+                        pyupgrade::rules::os_error_alias(self, &item);
                     }
                 }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
             }
-            StmtKind::If { test, .. } => {
+            StmtKind::If { test, body, orelse } => {
                 if self.settings.enabled.contains(&RuleCode::F634) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
@@ -1229,6 +1228,11 @@ where
                         self,
                         stmt,
                         self.current_stmt_parent().map(|parent| parent.0),
+                    );
+                }
+                if self.settings.enabled.contains(&RuleCode::SIM401) {
+                    flake8_simplify::rules::use_dict_get_with_default(
+                        self, stmt, test, body, orelse,
                     );
                 }
             }
@@ -1333,7 +1337,7 @@ where
                     flake8_bugbear::rules::redundant_tuple_in_exception_handler(self, handlers);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
-                    pyupgrade::rules::os_error_alias(self, handlers);
+                    pyupgrade::rules::os_error_alias(self, &handlers);
                 }
                 if self.settings.enabled.contains(&RuleCode::PT017) {
                     self.diagnostics.extend(
@@ -1921,7 +1925,7 @@ where
                     pyupgrade::rules::replace_stdout_stderr(self, expr, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP024) {
-                    pyupgrade::rules::os_error_alias(self, expr);
+                    pyupgrade::rules::os_error_alias(self, &expr);
                 }
 
                 // flake8-print
@@ -2019,6 +2023,17 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.settings.enabled.contains(&RuleCode::S701) {
+                    if let Some(diagnostic) = flake8_bandit::rules::jinja2_autoescape_false(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.enabled.contains(&RuleCode::S106) {
                     self.diagnostics
                         .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));
@@ -2048,205 +2063,75 @@ where
 
                 // flake8-comprehensions
                 if self.settings.enabled.contains(&RuleCode::C400) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_generator_list(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C400),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_generator_list(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C401) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_generator_set(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C401),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_generator_set(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C402) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_generator_dict(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C402),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_generator_dict(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C403) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_list_comprehension_set(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C403),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_list_comprehension_set(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C404) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C404),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C405) {
-                    if let Some(diagnostic) = flake8_comprehensions::rules::unnecessary_literal_set(
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C405),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_literal_set(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C406) {
-                    if let Some(diagnostic) = flake8_comprehensions::rules::unnecessary_literal_dict(
-                        expr,
-                        func,
-                        args,
-                        keywords,
-                        self.locator,
-                        self.patch(&RuleCode::C406),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_literal_dict(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C408) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_collection_call(
-                            expr,
-                            func,
-                            args,
-                            keywords,
-                            self.locator,
-                            self.patch(&RuleCode::C408),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_collection_call(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C409) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
-                            expr,
-                            func,
-                            args,
-                            self.locator,
-                            self.patch(&RuleCode::C409),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
+                        self, expr, func, args,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C410) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_literal_within_list_call(
-                            expr,
-                            func,
-                            args,
-                            self.locator,
-                            self.patch(&RuleCode::C410),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_literal_within_list_call(
+                        self, expr, func, args,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C411) {
-                    if let Some(diagnostic) = flake8_comprehensions::rules::unnecessary_list_call(
-                        expr,
-                        func,
-                        args,
-                        self.locator,
-                        self.patch(&RuleCode::C411),
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_list_call(self, expr, func, args);
                 }
                 if self.settings.enabled.contains(&RuleCode::C413) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_call_around_sorted(
-                            expr,
-                            func,
-                            args,
-                            self.locator,
-                            self.patch(&RuleCode::C413),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_call_around_sorted(
+                        self, expr, func, args,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C414) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_double_cast_or_process(
-                            func,
-                            args,
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_double_cast_or_process(
+                        self, expr, func, args,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C415) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_subscript_reversal(
-                            func,
-                            args,
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_subscript_reversal(
+                        self, expr, func, args,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::C417) {
-                    if let Some(diagnostic) = flake8_comprehensions::rules::unnecessary_map(
-                        func,
-                        args,
-                        Range::from_located(expr),
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_map(self, expr, func, args);
                 }
 
                 // flake8-boolean-trap
@@ -2450,6 +2335,11 @@ where
                         .extend(ruff::rules::keyword_argument_before_star_argument(
                             args, keywords,
                         ));
+                }
+
+                // flake8-simplify
+                if self.settings.enabled.contains(&RuleCode::SIM115) {
+                    flake8_simplify::rules::open_file_with_context_handler(self, func);
                 }
             }
             ExprKind::Dict { keys, values } => {
@@ -2793,18 +2683,9 @@ where
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.enabled.contains(&RuleCode::C416) {
-                    if let Some(diagnostic) =
-                        flake8_comprehensions::rules::unnecessary_comprehension(
-                            expr,
-                            elt,
-                            generators,
-                            self.locator,
-                            self.patch(&RuleCode::C416),
-                            Range::from_located(expr),
-                        )
-                    {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    flake8_comprehensions::rules::unnecessary_comprehension(
+                        self, expr, elt, generators,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::B023) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
@@ -3368,16 +3249,6 @@ impl<'a> Checker<'a> {
     /// Return the parent `Stmt` of the current `Stmt`, if any.
     pub fn current_stmt_parent(&self) -> Option<&RefEquality<'a, Stmt>> {
         self.parents.iter().rev().nth(1)
-    }
-
-    /// Return the grandparent `Stmt` of the current `Stmt`, if any.
-    pub fn current_stmt_grandparent(&self) -> Option<&RefEquality<'a, Stmt>> {
-        self.parents.iter().rev().nth(2)
-    }
-
-    /// Return the current `Expr`.
-    pub fn current_expr(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().next()
     }
 
     /// Return the parent `Expr` of the current `Expr`.
@@ -4440,8 +4311,8 @@ impl<'a> Checker<'a> {
 #[allow(clippy::too_many_arguments)]
 pub fn check_ast(
     python_ast: &Suite,
-    locator: &SourceCodeLocator,
-    stylist: &SourceCodeStyleDetector,
+    locator: &Locator,
+    stylist: &Stylist,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: flags::Autofix,

@@ -8,10 +8,10 @@ use rustpython_parser::token::Tok;
 
 use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 const OPEN_FUNC_NAME: &str = "open";
@@ -77,7 +77,7 @@ fn create_check(
     expr: &Expr,
     mode_param: &Expr,
     replacement_value: Option<String>,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     patch: bool,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
@@ -103,11 +103,7 @@ fn create_check(
     diagnostic
 }
 
-fn create_remove_param_fix(
-    locator: &SourceCodeLocator,
-    expr: &Expr,
-    mode_param: &Expr,
-) -> Result<Fix> {
+fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Fix> {
     let content =
         locator.slice_source_code_range(&Range::new(expr.location, expr.end_location.unwrap()));
     // Find the last comma before mode_param and create a deletion fix

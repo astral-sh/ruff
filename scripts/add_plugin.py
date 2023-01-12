@@ -34,7 +34,7 @@ def main(*, plugin: str, url: str) -> None:
     with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/rules.rs"), "w+") as fp:
         fp.write("use crate::checkers::ast::Checker;\n")
     with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/mod.rs"), "w+") as fp:
-        fp.write("pub mod rules;\n")
+        fp.write("pub(crate) mod rules;\n")
         fp.write("\n")
         fp.write(
             """#[cfg(test)]

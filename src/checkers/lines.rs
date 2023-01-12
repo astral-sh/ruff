@@ -1,6 +1,6 @@
 //! Lint rules based on checking raw physical lines.
 
-use crate::pycodestyle::rules::{line_too_long, no_newline_at_end_of_file};
+use crate::pycodestyle::rules::{doc_line_too_long, line_too_long, no_newline_at_end_of_file};
 use crate::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::pyupgrade::rules::unnecessary_coding_comment;
 use crate::registry::{Diagnostic, RuleCode};
@@ -9,18 +9,21 @@ use crate::settings::{flags, Settings};
 pub fn check_lines(
     contents: &str,
     commented_lines: &[usize],
+    doc_lines: &[usize],
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_unnecessary_coding_comment = settings.enabled.contains(&RuleCode::UP009);
+    let enforce_blanket_noqa = settings.enabled.contains(&RuleCode::PGH004);
+    let enforce_blanket_type_ignore = settings.enabled.contains(&RuleCode::PGH003);
+    let enforce_doc_line_too_long = settings.enabled.contains(&RuleCode::W505);
     let enforce_line_too_long = settings.enabled.contains(&RuleCode::E501);
     let enforce_no_newline_at_end_of_file = settings.enabled.contains(&RuleCode::W292);
-    let enforce_blanket_type_ignore = settings.enabled.contains(&RuleCode::PGH003);
-    let enforce_blanket_noqa = settings.enabled.contains(&RuleCode::PGH004);
+    let enforce_unnecessary_coding_comment = settings.enabled.contains(&RuleCode::UP009);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
+    let mut doc_lines_iter = doc_lines.iter().peekable();
     for (index, line) in contents.lines().enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
@@ -40,18 +43,25 @@ pub fn check_lines(
             }
 
             if enforce_blanket_type_ignore {
-                if commented_lines.contains(&(index + 1)) {
-                    if let Some(diagnostic) = blanket_type_ignore(index, line) {
-                        diagnostics.push(diagnostic);
-                    }
+                if let Some(diagnostic) = blanket_type_ignore(index, line) {
+                    diagnostics.push(diagnostic);
                 }
             }
 
             if enforce_blanket_noqa {
-                if commented_lines.contains(&(index + 1)) {
-                    if let Some(diagnostic) = blanket_noqa(index, line) {
-                        diagnostics.push(diagnostic);
-                    }
+                if let Some(diagnostic) = blanket_noqa(index, line) {
+                    diagnostics.push(diagnostic);
+                }
+            }
+        }
+
+        while doc_lines_iter
+            .next_if(|lineno| &(index + 1) == *lineno)
+            .is_some()
+        {
+            if enforce_doc_line_too_long {
+                if let Some(diagnostic) = doc_line_too_long(index, line, settings) {
+                    diagnostics.push(diagnostic);
                 }
             }
         }
@@ -89,6 +99,7 @@ mod tests {
         let check_with_max_line_length = |line_length: usize| {
             check_lines(
                 line,
+                &[],
                 &[],
                 &Settings {
                     line_length,

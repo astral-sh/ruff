@@ -735,7 +735,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.218-dev.0"
+version = "0.0.219-dev.0"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
@@ -1874,7 +1874,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.218"
+version = "0.0.219"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1942,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.218"
+version = "0.0.219"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
@@ -1962,7 +1962,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.218"
+version = "0.0.219"
 dependencies = [
  "once_cell",
  "proc-macro2",

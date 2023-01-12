@@ -1,4 +1,4 @@
-pub mod rules;
+pub(crate) mod rules;
 pub mod settings;
 
 #[cfg(test)]
@@ -67,11 +67,28 @@ mod tests {
             &settings::Settings {
                 pycodestyle: Settings {
                     ignore_overlong_task_comments,
+                    ..Settings::default()
                 },
                 ..settings::Settings::for_rule(RuleCode::E501)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn max_doc_length() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pycodestyle/W505.py"),
+            &settings::Settings {
+                pycodestyle: Settings {
+                    max_doc_length: Some(50),
+                    ..Settings::default()
+                },
+                ..settings::Settings::for_rule(RuleCode::W505)
+            },
+        )?;
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

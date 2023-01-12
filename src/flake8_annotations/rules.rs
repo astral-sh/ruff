@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::flake8_annotations::fixes;
 use crate::flake8_annotations::helpers::match_function_def;
-use crate::registry::RuleCode;
+use crate::registry::{Diagnostic, RuleCode};
 use crate::visibility::Visibility;
-use crate::{violations, visibility, Diagnostic};
+use crate::{violations, visibility};
 
 #[derive(Default)]
 struct ReturnStatementVisitor<'a> {
@@ -319,7 +319,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
-                } else if visibility::is_init(stmt) {
+                } else if visibility::is_init(cast::name(stmt)) {
                     // Allow omission of return annotation in `__init__` functions, as long as at
                     // least one argument is typed.
                     if checker.settings.enabled.contains(&RuleCode::ANN204) {
@@ -341,7 +341,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             checker.diagnostics.push(diagnostic);
                         }
                     }
-                } else if visibility::is_magic(stmt) {
+                } else if visibility::is_magic(cast::name(stmt)) {
                     if checker.settings.enabled.contains(&RuleCode::ANN204) {
                         checker.diagnostics.push(Diagnostic::new(
                             violations::MissingReturnTypeSpecialMethod(name.to_string()),

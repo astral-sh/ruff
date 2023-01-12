@@ -5,12 +5,12 @@ use rustpython_ast::{Location, StmtKind, Suite};
 
 use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::isort::helpers;
 use crate::isort::track::Block;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::{flags, Settings};
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 struct Alias<'a> {
@@ -101,7 +101,7 @@ fn add_required_import(
     required_import: &AnyImport,
     blocks: &[&Block],
     python_ast: &Suite,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Diagnostic> {
@@ -157,7 +157,7 @@ fn add_required_import(
 pub fn add_required_imports(
     blocks: &[&Block],
     python_ast: &Suite,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {

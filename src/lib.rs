@@ -12,21 +12,18 @@
 )]
 #![forbid(unsafe_code)]
 
-use cfg_if::cfg_if;
-
-use crate::registry::Diagnostic;
-use crate::settings::Settings;
-use crate::source_code_locator::SourceCodeLocator;
-
 mod ast;
-pub mod autofix;
-pub mod cache;
+mod autofix;
+mod cache;
 mod checkers;
 pub mod cli;
 mod cst;
+mod diagnostics;
 mod directives;
+mod doc_lines;
 mod docstrings;
 mod eradicate;
+pub mod fix;
 mod flake8_2020;
 pub mod flake8_annotations;
 pub mod flake8_bandit;
@@ -40,6 +37,7 @@ mod flake8_debugger;
 pub mod flake8_errmsg;
 mod flake8_implicit_str_concat;
 mod flake8_import_conventions;
+pub mod flake8_pie;
 mod flake8_print;
 pub mod flake8_pytest_style;
 pub mod flake8_quotes;
@@ -71,18 +69,19 @@ pub mod resolver;
 mod ruff;
 mod rustpython_helpers;
 pub mod settings;
-pub mod source_code_generator;
-pub mod source_code_locator;
-pub mod source_code_style;
+pub mod source_code;
 mod vendor;
 mod violation;
 mod violations;
-pub mod visibility;
+mod visibility;
+
+use cfg_if::cfg_if;
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
         pub mod commands;
-        mod packages;
+        mod packaging;
+
         #[cfg(all(feature = "update-informer"))]
         pub mod updates;
 
@@ -93,4 +92,3 @@ cfg_if! {
         pub use lib_wasm::check;
     }
 }
-pub mod flake8_pie;

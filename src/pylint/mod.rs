@@ -1,4 +1,4 @@
-pub mod rules;
+pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
@@ -9,7 +9,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::Settings;
+    use crate::settings::Settings;
 
     #[test_case(RuleCode::PLC0414, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(RuleCode::PLC2201, Path::new("misplaced_comparison_constant.py"); "PLC2201")]

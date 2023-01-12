@@ -4,13 +4,13 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::whitespace::indentation;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::flake8_return::helpers::result_exists;
 use crate::flake8_return::visitor::{ReturnVisitor, Stack};
-use crate::registry::RuleCode;
+use crate::registry::{Diagnostic, RuleCode};
+use crate::violations;
 use crate::violations::Branch;
-use crate::{violations, Diagnostic};
 
 /// RET501
 fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {

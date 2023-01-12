@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::violation::Violation;
 use crate::violations;
 
@@ -132,6 +132,7 @@ define_rule_mapping!(
     E999 => violations::SyntaxError,
     // pycodestyle warnings
     W292 => violations::NoNewLineAtEndOfFile,
+    W505 => violations::DocLineTooLong,
     W605 => violations::InvalidEscapeSequence,
     // pyflakes
     F401 => violations::UnusedImport,
@@ -294,6 +295,7 @@ define_rule_mapping!(
     YTT302 => violations::SysVersionCmpStr10,
     YTT303 => violations::SysVersionSlice1Referenced,
     // flake8-simplify
+    SIM115 => violations::OpenFileWithContextHandler,
     SIM101 => violations::DuplicateIsinstanceCall,
     SIM102 => violations::NestedIfStatements,
     SIM103 => violations::ReturnBoolConditionDirectly,
@@ -317,6 +319,7 @@ define_rule_mapping!(
     SIM222 => violations::OrTrue,
     SIM223 => violations::AndFalse,
     SIM300 => violations::YodaConditions,
+    SIM401 => violations::DictGetWithDefault,
     // pyupgrade
     UP001 => violations::UselessMetaclassType,
     UP003 => violations::TypeOfPrimitive,
@@ -428,8 +431,9 @@ define_rule_mapping!(
     S324 => violations::HashlibInsecureHashFunction,
     S501 => violations::RequestWithNoCertValidation,
     S506 => violations::UnsafeYAMLLoad,
-        S508 => violations::SnmpInsecureVersion,
+    S508 => violations::SnmpInsecureVersion,
     S509 => violations::SnmpWeakCryptography,
+    S701 => violations::Jinja2AutoescapeFalse,
     // flake8-boolean-trap
     FBT001 => violations::BooleanPositionalArgInFunctionDefinition,
     FBT002 => violations::BooleanDefaultValueInFunctionDefinition,
@@ -785,6 +789,7 @@ impl RuleCode {
             RuleCode::RUF100 => &LintSource::NoQA,
             RuleCode::E501
             | RuleCode::W292
+            | RuleCode::W505
             | RuleCode::UP009
             | RuleCode::PGH003
             | RuleCode::PGH004 => &LintSource::Lines,

@@ -10,18 +10,17 @@ use crate::resolver::Relativity;
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::{flags, pyproject, Settings};
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
-use crate::{directives, packages, resolver};
+use crate::source_code::{Locator, Stylist};
+use crate::{directives, packaging, resolver};
 
 /// Load the relevant `Settings` for a given `Path`.
 fn resolve(path: &Path) -> Result<Settings> {
     if let Some(pyproject) = pyproject::find_settings_toml(path)? {
         // First priority: `pyproject.toml` in the current `Path`.
-        resolver::resolve_settings(&pyproject, &Relativity::Parent, None)
+        resolver::resolve_settings(&pyproject, &Relativity::Parent)
     } else if let Some(pyproject) = pyproject::find_user_settings_toml() {
         // Second priority: user-specific `pyproject.toml`.
-        resolver::resolve_settings(&pyproject, &Relativity::Cwd, None)
+        resolver::resolve_settings(&pyproject, &Relativity::Cwd)
     } else {
         // Fallback: default settings.
         Settings::from_configuration(Configuration::default(), &path_dedot::CWD)
@@ -40,10 +39,10 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
     let tokens: Vec<LexResult> = tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
-    let locator = SourceCodeLocator::new(contents);
+    let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
-    let stylist = SourceCodeStyleDetector::from_contents(contents, &locator);
+    let stylist = Stylist::from_contents(contents, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives =
@@ -52,7 +51,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
     // Generate diagnostics.
     let diagnostics = check_path(
         path,
-        packages::detect_package_root(path),
+        packaging::detect_package_root(path),
         contents,
         tokens,
         &locator,

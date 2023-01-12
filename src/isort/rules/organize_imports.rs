@@ -8,12 +8,13 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::isort::track::Block;
 use crate::isort::{comments, format_imports};
-use crate::settings::flags;
-use crate::source_code_style::SourceCodeStyleDetector;
-use crate::{violations, Diagnostic, Settings, SourceCodeLocator};
+use crate::registry::Diagnostic;
+use crate::settings::{flags, Settings};
+use crate::source_code::{Locator, Stylist};
+use crate::violations;
 
 fn extract_range(body: &[&Stmt]) -> Range {
     let location = body.first().unwrap().location;
@@ -29,9 +30,9 @@ fn extract_indentation_range(body: &[&Stmt]) -> Range {
 /// I001
 pub fn organize_imports(
     block: &Block,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     settings: &Settings,
-    stylist: &SourceCodeStyleDetector,
+    stylist: &Stylist,
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
@@ -72,16 +73,17 @@ pub fn organize_imports(
         stylist,
         &settings.src,
         package,
+        settings.isort.combine_as_imports,
+        &settings.isort.extra_standard_library,
+        settings.isort.force_single_line,
+        settings.isort.force_sort_within_sections,
+        settings.isort.force_wrap_aliases,
         &settings.isort.known_first_party,
         &settings.isort.known_third_party,
-        &settings.isort.extra_standard_library,
-        settings.isort.combine_as_imports,
-        settings.isort.force_wrap_aliases,
-        settings.isort.split_on_trailing_comma,
-        settings.isort.force_single_line,
-        &settings.isort.single_line_exclusions,
         settings.isort.order_by_type,
-        settings.isort.force_sort_within_sections,
+        settings.isort.relative_imports_order,
+        &settings.isort.single_line_exclusions,
+        settings.isort.split_on_trailing_comma,
     );
 
     // Expand the span the entire range, including leading and trailing space.

@@ -3,17 +3,18 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use ::ruff::autofix::fixer;
 use ::ruff::cli::{extract_log_level, Cli, Overrides};
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::printer::{Printer, Violations};
-use ::ruff::resolver::{resolve_settings, FileDiscovery, PyprojectDiscovery, Relativity};
+use ::ruff::resolver::{
+    resolve_settings_with_processor, ConfigProcessor, FileDiscovery, PyprojectDiscovery, Relativity,
+};
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
-use ::ruff::{commands, warn_user_once};
+use ::ruff::{commands, fix, warn_user_once};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
@@ -31,14 +32,14 @@ fn resolve(
     if isolated {
         // First priority: if we're running in isolated mode, use the default settings.
         let mut config = Configuration::default();
-        config.apply(overrides.clone());
+        overrides.process_config(&mut config);
         let settings = Settings::from_configuration(config, &path_dedot::CWD)?;
         Ok(PyprojectDiscovery::Fixed(settings))
     } else if let Some(pyproject) = config {
         // Second priority: the user specified a `pyproject.toml` file. Use that
         // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
         // current working directory. (This matches ESLint's behavior.)
-        let settings = resolve_settings(pyproject, &Relativity::Cwd, Some(overrides))?;
+        let settings = resolve_settings_with_processor(pyproject, &Relativity::Cwd, overrides)?;
         Ok(PyprojectDiscovery::Fixed(settings))
     } else if let Some(pyproject) = pyproject::find_settings_toml(
         stdin_filename
@@ -50,14 +51,14 @@ fn resolve(
         // that directory. (With `Strategy::Hierarchical`, we'll end up finding
         // the "closest" `pyproject.toml` file for every Python file later on,
         // so these act as the "default" settings.)
-        let settings = resolve_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
+        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Parent, overrides)?;
         Ok(PyprojectDiscovery::Hierarchical(settings))
     } else if let Some(pyproject) = pyproject::find_user_settings_toml() {
         // Fourth priority: find a user-specific `pyproject.toml`, but resolve all paths
         // relative the current working directory. (With `Strategy::Hierarchical`, we'll
         // end up the "closest" `pyproject.toml` file for every Python file later on, so
         // these act as the "default" settings.)
-        let settings = resolve_settings(&pyproject, &Relativity::Cwd, Some(overrides))?;
+        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
         Ok(PyprojectDiscovery::Hierarchical(settings))
     } else {
         // Fallback: load Ruff's default settings, and resolve all paths relative to the
@@ -65,7 +66,7 @@ fn resolve(
         // "closest" `pyproject.toml` file for every Python file later on, so these act
         // as the "default" settings.)
         let mut config = Configuration::default();
-        config.apply(overrides.clone());
+        overrides.process_config(&mut config);
         let settings = Settings::from_configuration(config, &path_dedot::CWD)?;
         Ok(PyprojectDiscovery::Hierarchical(settings))
     }
@@ -152,13 +153,13 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
     // but not apply fixes. That would allow us to avoid special-casing JSON
     // here.
     let autofix = if cli.diff {
-        fixer::Mode::Diff
+        fix::FixMode::Diff
     } else if fix || fix_only {
-        fixer::Mode::Apply
+        fix::FixMode::Apply
     } else if matches!(format, SerializationFormat::Json) {
-        fixer::Mode::Generate
+        fix::FixMode::Generate
     } else {
-        fixer::Mode::None
+        fix::FixMode::None
     };
     let violations = if cli.diff || fix_only {
         Violations::Hide
@@ -176,7 +177,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
 
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
     if cli.watch {
-        if !matches!(autofix, fixer::Mode::None) {
+        if !matches!(autofix, fix::FixMode::None) {
             warn_user_once!("--fix is not enabled in watch mode.");
         }
         if format != SerializationFormat::Text {
@@ -193,7 +194,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
             &file_strategy,
             &overrides,
             cache.into(),
-            fixer::Mode::None,
+            fix::FixMode::None,
         )?;
         printer.write_continuously(&messages)?;
 
@@ -223,7 +224,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
                             &file_strategy,
                             &overrides,
                             cache.into(),
-                            fixer::Mode::None,
+                            fix::FixMode::None,
                         )?;
                         printer.write_continuously(&messages)?;
                     }
@@ -263,7 +264,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, fixer::Mode::Apply | fixer::Mode::Diff)) {
+        if !(is_stdin && matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff)) {
             printer.write_once(&diagnostics)?;
         }
 

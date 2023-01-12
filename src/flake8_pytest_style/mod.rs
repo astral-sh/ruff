@@ -1,4 +1,4 @@
-pub mod rules;
+pub(crate) mod rules;
 pub mod settings;
 pub mod types;
 

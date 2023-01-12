@@ -34,7 +34,7 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, S
 use crate::ast::helpers::except_range;
 use crate::ast::types::{Binding, Range, Scope, ScopeKind};
 use crate::registry::Diagnostic;
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 use crate::violations;
 
 /// F821
@@ -62,7 +62,7 @@ pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &[Binding]) -> O
 /// F707
 pub fn default_except_not_last(
     handlers: &[Excepthandler],
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;

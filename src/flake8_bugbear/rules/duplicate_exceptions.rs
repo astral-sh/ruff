@@ -4,10 +4,10 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKi
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::source_code_generator::SourceCodeGenerator;
+use crate::source_code::Generator;
 use crate::violations;
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
@@ -55,7 +55,7 @@ fn duplicate_handler_exceptions<'a>(
                 Range::from_located(expr),
             );
             if checker.patch(diagnostic.kind.code()) {
-                let mut generator: SourceCodeGenerator = checker.style.into();
+                let mut generator: Generator = checker.style.into();
                 if unique_elts.len() == 1 {
                     generator.unparse_expr(unique_elts[0], 0);
                 } else {

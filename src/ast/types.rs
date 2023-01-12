@@ -74,7 +74,6 @@ pub enum ScopeKind<'a> {
     Function(FunctionDef<'a>),
     Generator,
     Module,
-    Arg,
     Lambda(Lambda<'a>),
 }
 

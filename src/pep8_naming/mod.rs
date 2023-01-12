@@ -1,5 +1,5 @@
 mod helpers;
-pub mod rules;
+pub(crate) mod rules;
 pub mod settings;
 
 #[cfg(test)]

@@ -2,7 +2,8 @@ use rustpython_ast::Expr;
 
 use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::{violations, Diagnostic};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// PLE0118
 pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {

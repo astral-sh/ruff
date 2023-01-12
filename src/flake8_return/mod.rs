@@ -1,5 +1,5 @@
 mod helpers;
-pub mod rules;
+pub(crate) mod rules;
 mod visitor;
 
 #[cfg(test)]
@@ -11,7 +11,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::Settings;
+    use crate::settings::Settings;
 
     #[test_case(RuleCode::RET501, Path::new("RET501.py"); "RET501")]
     #[test_case(RuleCode::RET502, Path::new("RET502.py"); "RET502")]

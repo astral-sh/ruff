@@ -4,9 +4,9 @@ use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
@@ -61,7 +61,7 @@ pub struct Source {
 }
 
 impl Source {
-    pub fn from_diagnostic(diagnostic: &Diagnostic, locator: &SourceCodeLocator) -> Self {
+    pub fn from_diagnostic(diagnostic: &Diagnostic, locator: &Locator) -> Self {
         let location = Location::new(diagnostic.location.row(), 0);
         // Diagnostics can already extend one-past-the-end per Ropey's semantics. If
         // they do, though, then they'll end at the start of a line. We need to

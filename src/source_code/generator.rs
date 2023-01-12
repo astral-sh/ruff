@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
     Operator, Stmt, StmtKind,
 };
 
-use crate::source_code_style::{Indentation, LineEnding, Quote, SourceCodeStyleDetector};
+use crate::source_code::stylist::{Indentation, LineEnding, Quote, Stylist};
 use crate::vendor::{bytes, str};
 
 mod precedence {
@@ -30,7 +30,7 @@ mod precedence {
     pub const EXPR: u8 = BOR;
 }
 
-pub struct SourceCodeGenerator<'a> {
+pub struct Generator<'a> {
     /// The indentation style to use.
     indent: &'a Indentation,
     /// The quote style to use for string literals.
@@ -43,8 +43,8 @@ pub struct SourceCodeGenerator<'a> {
     initial: bool,
 }
 
-impl<'a> From<&'a SourceCodeStyleDetector<'a>> for SourceCodeGenerator<'a> {
-    fn from(stylist: &'a SourceCodeStyleDetector<'a>) -> Self {
+impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
+    fn from(stylist: &'a Stylist<'a>) -> Self {
         Self {
             indent: stylist.indentation(),
             quote: stylist.quote(),
@@ -57,9 +57,9 @@ impl<'a> From<&'a SourceCodeStyleDetector<'a>> for SourceCodeGenerator<'a> {
     }
 }
 
-impl<'a> SourceCodeGenerator<'a> {
+impl<'a> Generator<'a> {
     pub fn new(indent: &'a Indentation, quote: &'a Quote, line_ending: &'a LineEnding) -> Self {
-        SourceCodeGenerator {
+        Generator {
             // Style preferences.
             indent,
             quote,
@@ -962,7 +962,7 @@ impl<'a> SourceCodeGenerator<'a> {
     }
 
     fn unparse_formatted<U>(&mut self, val: &Expr<U>, conversion: usize, spec: Option<&Expr<U>>) {
-        let mut generator = SourceCodeGenerator::new(self.indent, self.quote, self.line_ending);
+        let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::TEST + 1);
         let brace = if generator.buffer.starts_with('{') {
             // put a space to avoid escaping the bracket
@@ -1016,7 +1016,7 @@ impl<'a> SourceCodeGenerator<'a> {
             self.unparse_fstring_body(values, is_spec);
         } else {
             self.p("f");
-            let mut generator = SourceCodeGenerator::new(self.indent, self.quote, self.line_ending);
+            let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
             generator.unparse_fstring_body(values, is_spec);
             let body = &generator.buffer;
             self.p(&format!("{}", str::repr(body, self.quote.into())));
@@ -1045,8 +1045,8 @@ mod tests {
 
     use rustpython_parser::parser;
 
-    use crate::source_code_generator::SourceCodeGenerator;
-    use crate::source_code_style::{Indentation, LineEnding, Quote};
+    use crate::source_code::stylist::{Indentation, LineEnding, Quote};
+    use crate::source_code::Generator;
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
@@ -1054,7 +1054,7 @@ mod tests {
         let line_ending = LineEnding::default();
         let program = parser::parse_program(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
-        let mut generator = SourceCodeGenerator::new(&indentation, &quote, &line_ending);
+        let mut generator = Generator::new(&indentation, &quote, &line_ending);
         generator.unparse_stmt(stmt);
         generator.generate()
     }
@@ -1067,7 +1067,7 @@ mod tests {
     ) -> String {
         let program = parser::parse_program(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
-        let mut generator = SourceCodeGenerator::new(indentation, quote, line_ending);
+        let mut generator = Generator::new(indentation, quote, line_ending);
         generator.unparse_stmt(stmt);
         generator.generate()
     }

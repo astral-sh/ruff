@@ -9,7 +9,7 @@ use rustpython_ast::{
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
 use crate::isort::helpers;
-use crate::source_code_locator::SourceCodeLocator;
+use crate::source_code::Locator;
 
 #[derive(Debug)]
 pub enum Trailer {
@@ -26,7 +26,7 @@ pub struct Block<'a> {
 }
 
 pub struct ImportTracker<'a> {
-    locator: &'a SourceCodeLocator<'a>,
+    locator: &'a Locator<'a>,
     directives: &'a IsortDirectives,
     pyi: bool,
     blocks: Vec<Block<'a>>,
@@ -35,11 +35,7 @@ pub struct ImportTracker<'a> {
 }
 
 impl<'a> ImportTracker<'a> {
-    pub fn new(
-        locator: &'a SourceCodeLocator<'a>,
-        directives: &'a IsortDirectives,
-        path: &'a Path,
-    ) -> Self {
+    pub fn new(locator: &'a Locator<'a>, directives: &'a IsortDirectives, path: &'a Path) -> Self {
         Self {
             locator,
             directives,

@@ -1,6 +1,6 @@
 ---
 source: src/flake8_comprehensions/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     UnnecessaryGeneratorList: ~

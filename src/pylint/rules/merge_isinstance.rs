@@ -4,7 +4,8 @@ use rustpython_ast::{Boolop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::{violations, Diagnostic};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// PLR1701
 pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values: &[Expr]) {

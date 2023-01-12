@@ -46,6 +46,7 @@ imports, and more.
 
 Ruff is extremely actively developed and used in major open-source projects like:
 
+- [pandas](https://github.com/pandas-dev/pandas)
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
@@ -180,7 +181,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.218'
+  rev: 'v0.0.219'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -343,21 +344,21 @@ Options:
           Disable cache reads
       --isolated
           Ignore all configuration files
-      --select <SELECT>
+      --select <RULE_CODE>
           Comma-separated list of rule codes to enable (or ALL, to enable all rules)
-      --extend-select <EXTEND_SELECT>
+      --extend-select <RULE_CODE>
           Like --select, but adds additional rule codes on top of the selected ones
-      --ignore <IGNORE>
+      --ignore <RULE_CODE>
           Comma-separated list of rule codes to disable
-      --extend-ignore <EXTEND_IGNORE>
+      --extend-ignore <RULE_CODE>
           Like --ignore, but adds additional rule codes on top of the ignored ones
-      --exclude <EXCLUDE>
+      --exclude <FILE_PATTERN>
           List of paths, used to omit files and/or directories from analysis
-      --extend-exclude <EXTEND_EXCLUDE>
+      --extend-exclude <FILE_PATTERN>
           Like --exclude, but adds additional files and directories on top of those already excluded
-      --fixable <FIXABLE>
+      --fixable <RULE_CODE>
           List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
-      --unfixable <UNFIXABLE>
+      --unfixable <RULE_CODE>
           List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
@@ -597,6 +598,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file | 🛠 |
+| W505 | DocLineTooLong | Doc line too long (89 > 88 characters) |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' | 🛠 |
 
 ### mccabe (C90)
@@ -781,6 +783,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 | S506 | UnsafeYAMLLoad | Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | SnmpInsecureVersion | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
 | S509 | SnmpWeakCryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
+| S701 | Jinja2AutoescapeFalse | By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities. |  |
 
 ### flake8-blind-except (BLE)
 
@@ -920,8 +923,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT001 | IncorrectFixtureParenthesesStyle | Use `@pytest.fixture()` over `@pytest.fixture` | 🛠 |
 | PT002 | FixturePositionalArgs | Configuration for fixture `...` specified via positional args, use kwargs |  |
 | PT003 | ExtraneousScopeFunction | `scope='function'` is implied in `@pytest.fixture()` |  |
-| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore | 🛠 |
-| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore | 🛠 |
+| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore |  |
+| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
 | PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
@@ -949,10 +952,10 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| Q000 | BadQuotesInlineString | Single quotes found but double quotes preferred |  |
-| Q001 | BadQuotesMultilineString | Single quote multiline found but double quotes preferred |  |
-| Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred |  |
-| Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes |  |
+| Q000 | BadQuotesInlineString | Single quotes found but double quotes preferred | 🛠 |
+| Q001 | BadQuotesMultilineString | Single quote multiline found but double quotes preferred | 🛠 |
+| Q002 | BadQuotesDocstring | Single quote docstring found but double quotes preferred | 🛠 |
+| Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
 ### flake8-return (RET)
 
@@ -975,6 +978,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
 | SIM103 | ReturnBoolConditionDirectly | Return the condition `...` directly | 🛠 |
@@ -998,6 +1002,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
 | SIM300 | YodaConditions | Yoda conditions are discouraged, use `left == right` instead | 🛠 |
+| SIM401 | DictGetWithDefault | Use `var = dict.get(key, "default")` instead of an `if` block | 🛠 |
 
 ### flake8-tidy-imports (TID)
 
@@ -1822,6 +1827,8 @@ Exclusions are based on globs, and can be either:
   `directory`). Note that these paths are relative to the project root
   (e.g., the directory containing your `pyproject.toml`).
 
+For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+
 Note that you'll typically want to use
 [`extend-exclude`](#extend-exclude) to modify the excluded paths.
 
@@ -1868,6 +1875,18 @@ line-length = 100
 
 A list of file patterns to omit from linting, in addition to those
 specified by `exclude`.
+
+Exclusions are based on globs, and can be either:
+
+- Single-path patterns, like `.mypy_cache` (to exclude any directory
+  named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+  `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+- Relative patterns, like `directory/foo.py` (to exclude that specific
+  file) or `directory/*.py` (to exclude any Python files in
+  `directory`). Note that these paths are relative to the project root
+  (e.g., the directory containing your `pyproject.toml`).
+
+For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
 
 **Default value**: `[]`
 
@@ -3003,6 +3022,30 @@ order-by-type = true
 
 ---
 
+#### [`relative-imports-order`](#relative-imports-order)
+
+Whether to place "closer" imports (fewer `.` characters, most local)
+before "further" imports (more `.` characters, least local), or vice
+versa.
+
+The default ("furthest-to-closest") is equivalent to isort's
+`reverse-relative` default (`reverse-relative = false`); setting
+this to "closest-to-furthest" is equivalent to isort's `reverse-relative
+= true`.
+
+**Default value**: `furthest-to-closest`
+
+**Type**: `RelatveImportsOrder`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+relative-imports-order = "closest-to-furthest"
+```
+
+---
+
 #### [`required-imports`](#required-imports)
 
 Add the specified import line to all files.
@@ -3015,7 +3058,7 @@ Add the specified import line to all files.
 
 ```toml
 [tool.ruff.isort]
-add-import = ["from __future__ import annotations"]
+required-imports = ["from __future__ import annotations"]
 ```
 
 ---
@@ -3155,6 +3198,24 @@ and "XXX"]).
 ```toml
 [tool.ruff.pycodestyle]
 ignore-overlong-task-comments = true
+```
+
+---
+
+#### [`max-doc-length`](#max-doc-length)
+
+The maximum line length to allow for line-length violations within
+documentation (`W505`), including standalone comments.
+
+**Default value**: `None`
+
+**Type**: `usize`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pycodestyle]
+max-doc-length = 88
 ```
 
 ---

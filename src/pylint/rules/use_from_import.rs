@@ -2,7 +2,8 @@ use rustpython_ast::Alias;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::{violations, Diagnostic};
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// PLR0402
 pub fn use_from_import(checker: &mut Checker, alias: &Alias) {

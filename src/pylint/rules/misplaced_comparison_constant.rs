@@ -1,9 +1,10 @@
 use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
-use crate::{violations, Diagnostic};
+use crate::fix::Fix;
+use crate::registry::Diagnostic;
+use crate::violations;
 
 /// PLC2201
 pub fn misplaced_comparison_constant(

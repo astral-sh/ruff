@@ -11,7 +11,6 @@ use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::FxHashSet;
 
-use crate::cli::Overrides;
 use crate::fs;
 use crate::settings::configuration::Configuration;
 use crate::settings::pyproject::settings_toml;
@@ -113,6 +112,15 @@ impl Resolver {
     }
 }
 
+pub trait ConfigProcessor: Copy + Send + Sync {
+    fn process_config(&self, config: &mut Configuration);
+}
+
+struct NoOpProcessor;
+impl ConfigProcessor for &NoOpProcessor {
+    fn process_config(&self, _config: &mut Configuration) {}
+}
+
 /// Recursively resolve a `Configuration` from a `pyproject.toml` file at the
 /// specified `Path`.
 // TODO(charlie): This whole system could do with some caching. Right now, if a
@@ -122,7 +130,7 @@ impl Resolver {
 pub fn resolve_configuration(
     pyproject: &Path,
     relativity: &Relativity,
-    overrides: Option<&Overrides>,
+    processor: impl ConfigProcessor,
 ) -> Result<Configuration> {
     let mut seen = FxHashSet::default();
     let mut stack = vec![];
@@ -158,9 +166,7 @@ pub fn resolve_configuration(
     while let Some(extend) = stack.pop() {
         configuration = configuration.combine(extend);
     }
-    if let Some(overrides) = overrides {
-        configuration.apply(overrides.clone());
-    }
+    processor.process_config(&mut configuration);
     Ok(configuration)
 }
 
@@ -169,21 +175,28 @@ pub fn resolve_configuration(
 pub fn resolve_scoped_settings(
     pyproject: &Path,
     relativity: &Relativity,
-    overrides: Option<&Overrides>,
+    processor: impl ConfigProcessor,
 ) -> Result<(PathBuf, Settings)> {
     let project_root = relativity.resolve(pyproject);
-    let configuration = resolve_configuration(pyproject, relativity, overrides)?;
+    let configuration = resolve_configuration(pyproject, relativity, processor)?;
     let settings = Settings::from_configuration(configuration, &project_root)?;
     Ok((project_root, settings))
 }
 
 /// Extract the `Settings` from a given `pyproject.toml`.
-pub fn resolve_settings(
+pub fn resolve_settings(pyproject: &Path, relativity: &Relativity) -> Result<Settings> {
+    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, &NoOpProcessor)?;
+    Ok(settings)
+}
+
+/// Extract the `Settings` from a given `pyproject.toml` and process the
+/// configuration with the given [`ConfigProcessor`].
+pub fn resolve_settings_with_processor(
     pyproject: &Path,
     relativity: &Relativity,
-    overrides: Option<&Overrides>,
+    processor: impl ConfigProcessor,
 ) -> Result<Settings> {
-    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, overrides)?;
+    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, processor)?;
     Ok(settings)
 }
 
@@ -212,19 +225,21 @@ pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_strategy: &PyprojectDiscovery,
     file_strategy: &FileDiscovery,
-    overrides: &Overrides,
+    processor: impl ConfigProcessor,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).collect();
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
-    for path in &paths {
-        for ancestor in path.ancestors() {
-            if let Some(pyproject) = settings_toml(ancestor)? {
-                let (root, settings) =
-                    resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
-                resolver.add(root, settings);
+    if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+        for path in &paths {
+            for ancestor in path.ancestors() {
+                if let Some(pyproject) = settings_toml(ancestor)? {
+                    let (root, settings) =
+                        resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
+                    resolver.add(root, settings);
+                }
             }
         }
     }
@@ -259,29 +274,31 @@ pub fn python_files_in_path(
         Box::new(|result| {
             // Search for the `pyproject.toml` file in this directory, before we visit any
             // of its contents.
-            if let Ok(entry) = &result {
-                if entry
-                    .file_type()
-                    .map_or(false, |file_type| file_type.is_dir())
-                {
-                    match settings_toml(entry.path()) {
-                        Ok(Some(pyproject)) => match resolve_scoped_settings(
-                            &pyproject,
-                            &Relativity::Parent,
-                            Some(overrides),
-                        ) {
-                            Ok((root, settings)) => {
-                                resolver.write().unwrap().add(root, settings);
-                            }
+            if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+                if let Ok(entry) = &result {
+                    if entry
+                        .file_type()
+                        .map_or(false, |file_type| file_type.is_dir())
+                    {
+                        match settings_toml(entry.path()) {
+                            Ok(Some(pyproject)) => match resolve_scoped_settings(
+                                &pyproject,
+                                &Relativity::Parent,
+                                processor,
+                            ) {
+                                Ok((root, settings)) => {
+                                    resolver.write().unwrap().add(root, settings);
+                                }
+                                Err(err) => {
+                                    *error.lock().unwrap() = Err(err);
+                                    return WalkState::Quit;
+                                }
+                            },
+                            Ok(None) => {}
                             Err(err) => {
                                 *error.lock().unwrap() = Err(err);
                                 return WalkState::Quit;
                             }
-                        },
-                        Ok(None) => {}
-                        Err(err) => {
-                            *error.lock().unwrap() = Err(err);
-                            return WalkState::Quit;
                         }
                     }
                 }
@@ -342,7 +359,7 @@ pub fn python_file_at_path(
     path: &Path,
     pyproject_strategy: &PyprojectDiscovery,
     file_strategy: &FileDiscovery,
-    overrides: &Overrides,
+    processor: impl ConfigProcessor,
 ) -> Result<bool> {
     if !file_strategy.force_exclude {
         return Ok(true);
@@ -353,11 +370,13 @@ pub fn python_file_at_path(
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
-    for ancestor in path.ancestors() {
-        if let Some(pyproject) = settings_toml(ancestor)? {
-            let (root, settings) =
-                resolve_scoped_settings(&pyproject, &Relativity::Parent, Some(overrides))?;
-            resolver.add(root, settings);
+    if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+        for ancestor in path.ancestors() {
+            if let Some(pyproject) = settings_toml(ancestor)? {
+                let (root, settings) =
+                    resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
+                resolver.add(root, settings);
+            }
         }
     }
 

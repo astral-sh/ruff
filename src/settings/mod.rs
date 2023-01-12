@@ -29,11 +29,12 @@ use crate::{
 };
 
 pub mod configuration;
-pub mod flags;
+pub(crate) mod flags;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
 pub mod types;
+
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
@@ -458,7 +459,7 @@ mod tests {
             }]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
@@ -478,7 +479,7 @@ mod tests {
             }]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([RuleCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
@@ -504,7 +505,7 @@ mod tests {
             ]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(

@@ -1,5 +1,5 @@
 mod helpers;
-pub mod rules;
+pub(crate) mod rules;
 pub mod settings;
 
 #[cfg(test)]
@@ -9,9 +9,10 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::flake8_bandit;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::{flake8_bandit, Settings};
+    use crate::settings::Settings;
 
     #[test_case(RuleCode::S101, Path::new("S101.py"); "S101")]
     #[test_case(RuleCode::S102, Path::new("S102.py"); "S102")]
@@ -27,6 +28,7 @@ mod tests {
     #[test_case(RuleCode::S506, Path::new("S506.py"); "S506")]
     #[test_case(RuleCode::S508, Path::new("S508.py"); "S508")]
     #[test_case(RuleCode::S509, Path::new("S509.py"); "S509")]
+    #[test_case(RuleCode::S701, Path::new("S701.py"); "S701")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

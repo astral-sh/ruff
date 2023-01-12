@@ -1,7 +1,7 @@
-pub mod fixes;
-pub mod rules;
+mod fixes;
+pub(crate) mod rules;
 pub mod settings;
-pub mod types;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod tests {
@@ -44,6 +44,7 @@ mod tests {
     #[test_case(RuleCode::UP024, Path::new("UP024_0.py"); "UP024_0")]
     #[test_case(RuleCode::UP024, Path::new("UP024_1.py"); "UP024_1")]
     #[test_case(RuleCode::UP024, Path::new("UP024_2.py"); "UP024_2")]
+    #[test_case(RuleCode::UP024, Path::new("UP024_3.py"); "UP024_3")]
     #[test_case(RuleCode::UP025, Path::new("UP025.py"); "UP025")]
     #[test_case(RuleCode::UP026, Path::new("UP026.py"); "UP026")]
     #[test_case(RuleCode::UP027, Path::new("UP027.py"); "UP027")]

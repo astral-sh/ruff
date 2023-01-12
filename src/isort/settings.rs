@@ -6,6 +6,23 @@ use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub enum RelatveImportsOrder {
+    /// Place "closer" imports (fewer `.` characters, most local) before
+    /// "further" imports (more `.` characters, least local).
+    ClosestToFurthest,
+    /// Place "further" imports (more `.` characters, least local) imports
+    /// before "closer" imports (fewer `.` characters, most local).
+    FurthestToClosest,
+}
+
+impl Default for RelatveImportsOrder {
+    fn default() -> Self {
+        Self::FurthestToClosest
+    }
+}
+
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
@@ -130,10 +147,26 @@ pub struct Options {
     /// known to Ruff in advance.
     pub extra_standard_library: Option<Vec<String>>,
     #[option(
+        default = r#"furthest-to-closest"#,
+        value_type = "RelatveImportsOrder",
+        example = r#"
+            relative-imports-order = "closest-to-furthest"
+        "#
+    )]
+    /// Whether to place "closer" imports (fewer `.` characters, most local)
+    /// before "further" imports (more `.` characters, least local), or vice
+    /// versa.
+    ///
+    /// The default ("furthest-to-closest") is equivalent to isort's
+    /// `reverse-relative` default (`reverse-relative = false`); setting
+    /// this to "closest-to-furthest" is equivalent to isort's `reverse-relative
+    /// = true`.
+    pub relative_imports_order: Option<RelatveImportsOrder>,
+    #[option(
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
-            add-import = ["from __future__ import annotations"]
+            required-imports = ["from __future__ import annotations"]
         "#
     )]
     /// Add the specified import line to all files.
@@ -152,6 +185,7 @@ pub struct Settings {
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
     pub order_by_type: bool,
+    pub relative_imports_order: RelatveImportsOrder,
     pub single_line_exclusions: BTreeSet<String>,
     pub split_on_trailing_comma: bool,
 }
@@ -168,6 +202,7 @@ impl Default for Settings {
             known_first_party: BTreeSet::new(),
             known_third_party: BTreeSet::new(),
             order_by_type: true,
+            relative_imports_order: RelatveImportsOrder::default(),
             single_line_exclusions: BTreeSet::new(),
             split_on_trailing_comma: true,
         }
@@ -188,6 +223,7 @@ impl From<Options> for Settings {
             known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
             known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
             order_by_type: options.order_by_type.unwrap_or(true),
+            relative_imports_order: options.relative_imports_order.unwrap_or_default(),
             single_line_exclusions: BTreeSet::from_iter(
                 options.single_line_exclusions.unwrap_or_default(),
             ),
@@ -208,6 +244,7 @@ impl From<Settings> for Options {
             known_first_party: Some(settings.known_first_party.into_iter().collect()),
             known_third_party: Some(settings.known_third_party.into_iter().collect()),
             order_by_type: Some(settings.order_by_type),
+            relative_imports_order: Some(settings.relative_imports_order),
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
             split_on_trailing_comma: Some(settings.split_on_trailing_comma),
         }

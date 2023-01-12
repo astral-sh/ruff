@@ -1,11 +1,13 @@
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
+use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    contains_call_path, create_expr, create_stmt, unparse_expr, unparse_stmt,
+    any_over_expr, contains_call_path, create_expr, create_stmt, has_comments, unparse_expr,
+    unparse_stmt,
 };
 use crate::ast::types::Range;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
@@ -201,14 +203,140 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
-    let content = unparse_stmt(&ternary, checker.style);
+    let contents = unparse_stmt(&ternary, checker.style);
+
+    // Don't flag if the resulting expression would exceed the maximum line length.
+    if stmt.location.column() + contents.len() > checker.settings.line_length {
+        return;
+    }
+
+    // Don't flag if the statement expression contains any comments.
+    if has_comments(stmt, checker.locator) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
-        violations::UseTernaryOperator(content.clone()),
+        violations::UseTernaryOperator(contents.clone()),
         Range::from_located(stmt),
     );
     if checker.patch(&RuleCode::SIM108) {
         diagnostic.amend(Fix::replacement(
-            content,
+            contents,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
+    expr1.eq(expr2)
+}
+
+/// SIM401
+pub fn use_dict_get_with_default(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &Vec<Stmt>,
+    orelse: &Vec<Stmt>,
+) {
+    if body.len() != 1 || orelse.len() != 1 {
+        return;
+    }
+    let StmtKind::Assign { targets: body_var, value: body_val, ..} = &body[0].node else {
+        return;
+    };
+    if body_var.len() != 1 {
+        return;
+    };
+    let StmtKind::Assign { targets: orelse_var, value: orelse_val, .. } = &orelse[0].node else {
+        return;
+    };
+    if orelse_var.len() != 1 {
+        return;
+    };
+    let ExprKind::Compare { left: test_key, ops , comparators: test_dict } = &test.node else {
+        return;
+    };
+    if test_dict.len() != 1 {
+        return;
+    }
+    let (expected_var, expected_val, default_var, default_val) = match ops[..] {
+        [Cmpop::In] => (&body_var[0], body_val, &orelse_var[0], orelse_val),
+        [Cmpop::NotIn] => (&orelse_var[0], orelse_val, &body_var[0], body_val),
+        _ => {
+            return;
+        }
+    };
+    let test_dict = &test_dict[0];
+    let ExprKind::Subscript { value: expected_subscript, slice: expected_slice, .. }  =  &expected_val.node else {
+        return;
+    };
+
+    // Check that the dictionary key, target variables, and dictionary name are all
+    // equivalent.
+    if !compare_expr(&expected_slice.into(), &test_key.into())
+        || !compare_expr(&expected_var.into(), &default_var.into())
+        || !compare_expr(&test_dict.into(), &expected_subscript.into())
+    {
+        return;
+    }
+
+    // Check that the default value is not "complex".
+    if any_over_expr(default_val, &|expr| {
+        matches!(
+            expr.node,
+            ExprKind::Call { .. }
+                | ExprKind::Await { .. }
+                | ExprKind::GeneratorExp { .. }
+                | ExprKind::ListComp { .. }
+                | ExprKind::SetComp { .. }
+                | ExprKind::DictComp { .. }
+                | ExprKind::Yield { .. }
+                | ExprKind::YieldFrom { .. }
+        )
+    }) {
+        return;
+    }
+
+    let contents = unparse_stmt(
+        &create_stmt(StmtKind::Assign {
+            targets: vec![create_expr(expected_var.node.clone())],
+            value: Box::new(create_expr(ExprKind::Call {
+                func: Box::new(create_expr(ExprKind::Attribute {
+                    value: expected_subscript.clone(),
+                    attr: "get".to_string(),
+                    ctx: ExprContext::Load,
+                })),
+                args: vec![
+                    create_expr(test_key.node.clone()),
+                    create_expr(default_val.node.clone()),
+                ],
+                keywords: vec![],
+            })),
+            type_comment: None,
+        }),
+        checker.style,
+    );
+
+    // Don't flag if the resulting expression would exceed the maximum line length.
+    if stmt.location.column() + contents.len() > checker.settings.line_length {
+        return;
+    }
+
+    // Don't flag if the statement expression contains any comments.
+    if has_comments(stmt, checker.locator) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        violations::DictGetWithDefault(contents.clone()),
+        Range::from_located(stmt),
+    );
+    if checker.patch(&RuleCode::SIM401) {
+        diagnostic.amend(Fix::replacement(
+            contents,
             stmt.location,
             stmt.end_location.unwrap(),
         ));

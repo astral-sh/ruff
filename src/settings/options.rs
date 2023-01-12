@@ -87,6 +87,8 @@ pub struct Options {
     ///   `directory`). Note that these paths are relative to the project root
     ///   (e.g., the directory containing your `pyproject.toml`).
     ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    ///
     /// Note that you'll typically want to use
     /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
     pub exclude: Option<Vec<String>>,
@@ -118,6 +120,18 @@ pub struct Options {
     )]
     /// A list of file patterns to omit from linting, in addition to those
     /// specified by `exclude`.
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub extend_exclude: Option<Vec<String>>,
     #[option(
         default = "[]",

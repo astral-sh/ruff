@@ -315,6 +315,20 @@ impl AlwaysAutofixableViolation for InvalidEscapeSequence {
     }
 }
 
+define_violation!(
+    pub struct DocLineTooLong(pub usize, pub usize);
+);
+impl Violation for DocLineTooLong {
+    fn message(&self) -> String {
+        let DocLineTooLong(length, limit) = self;
+        format!("Doc line too long ({length} > {limit} characters)")
+    }
+
+    fn placeholder() -> Self {
+        DocLineTooLong(89, 88)
+    }
+}
+
 // pyflakes
 
 define_violation!(
@@ -2320,12 +2334,20 @@ impl AlwaysAutofixableViolation for PPrintFound {
 define_violation!(
     pub struct BadQuotesInlineString(pub Quote);
 );
-impl Violation for BadQuotesInlineString {
+impl AlwaysAutofixableViolation for BadQuotesInlineString {
     fn message(&self) -> String {
         let BadQuotesInlineString(quote) = self;
         match quote {
             Quote::Single => "Double quotes found but single quotes preferred".to_string(),
             Quote::Double => "Single quotes found but double quotes preferred".to_string(),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesInlineString(quote) = self;
+        match quote {
+            Quote::Single => "Replace double quotes with single quotes".to_string(),
+            Quote::Double => "Replace single quotes with double quotes".to_string(),
         }
     }
 
@@ -2337,12 +2359,20 @@ impl Violation for BadQuotesInlineString {
 define_violation!(
     pub struct BadQuotesMultilineString(pub Quote);
 );
-impl Violation for BadQuotesMultilineString {
+impl AlwaysAutofixableViolation for BadQuotesMultilineString {
     fn message(&self) -> String {
         let BadQuotesMultilineString(quote) = self;
         match quote {
             Quote::Single => "Double quote multiline found but single quotes preferred".to_string(),
             Quote::Double => "Single quote multiline found but double quotes preferred".to_string(),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesMultilineString(quote) = self;
+        match quote {
+            Quote::Single => "Replace double multiline quotes with single quotes".to_string(),
+            Quote::Double => "Replace single multiline quotes with double quotes".to_string(),
         }
     }
 
@@ -2354,12 +2384,20 @@ impl Violation for BadQuotesMultilineString {
 define_violation!(
     pub struct BadQuotesDocstring(pub Quote);
 );
-impl Violation for BadQuotesDocstring {
+impl AlwaysAutofixableViolation for BadQuotesDocstring {
     fn message(&self) -> String {
         let BadQuotesDocstring(quote) = self;
         match quote {
             Quote::Single => "Double quote docstring found but single quotes preferred".to_string(),
             Quote::Double => "Single quote docstring found but double quotes preferred".to_string(),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesDocstring(quote) = self;
+        match quote {
+            Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
+            Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
         }
     }
 
@@ -2371,8 +2409,12 @@ impl Violation for BadQuotesDocstring {
 define_violation!(
     pub struct AvoidQuoteEscape;
 );
-impl Violation for AvoidQuoteEscape {
+impl AlwaysAutofixableViolation for AvoidQuoteEscape {
     fn message(&self) -> String {
+        "Change outer quotes to avoid escaping inner quotes".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
         "Change outer quotes to avoid escaping inner quotes".to_string()
     }
 
@@ -2677,6 +2719,20 @@ impl Violation for SysVersionSlice1Referenced {
 }
 
 // flake8-simplify
+
+define_violation!(
+    pub struct OpenFileWithContextHandler;
+);
+impl Violation for OpenFileWithContextHandler {
+    fn message(&self) -> String {
+        "Use context handler for opening files".to_string()
+    }
+
+    fn placeholder() -> Self {
+        OpenFileWithContextHandler
+    }
+}
+
 define_violation!(
     pub struct UseCapitalEnvironmentVariables(pub String, pub String);
 );
@@ -2779,13 +2835,13 @@ define_violation!(
 );
 impl AlwaysAutofixableViolation for UseTernaryOperator {
     fn message(&self) -> String {
-        let UseTernaryOperator(new_code) = self;
-        format!("Use ternary operator `{new_code}` instead of if-else-block")
+        let UseTernaryOperator(contents) = self;
+        format!("Use ternary operator `{contents}` instead of if-else-block")
     }
 
     fn autofix_title(&self) -> String {
-        let UseTernaryOperator(new_code) = self;
-        format!("Replace if-else-block with `{new_code}`")
+        let UseTernaryOperator(contents) = self;
+        format!("Replace if-else-block with `{contents}`")
     }
 
     fn placeholder() -> Self {
@@ -3093,6 +3149,24 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
     }
 }
 
+define_violation!(
+    pub struct DictGetWithDefault(pub String);
+);
+impl AlwaysAutofixableViolation for DictGetWithDefault {
+    fn message(&self) -> String {
+        let DictGetWithDefault(contents) = self;
+        format!("Use `{contents}` instead of an `if` block")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DictGetWithDefault(contents) = self;
+        format!("Replace with `{contents}`")
+    }
+
+    fn placeholder() -> Self {
+        DictGetWithDefault("var = dict.get(key, \"default\")".to_string())
+    }
+}
 // pyupgrade
 
 define_violation!(
@@ -4678,6 +4752,28 @@ impl AlwaysAutofixableViolation for CommentedOutCode {
 // flake8-bandit
 
 define_violation!(
+    pub struct Jinja2AutoescapeFalse(pub bool);
+);
+impl Violation for Jinja2AutoescapeFalse {
+    fn message(&self) -> String {
+        let Jinja2AutoescapeFalse(value) = self;
+        match value {
+            true => "Using jinja2 templates with `autoescape=False` is dangerous and can lead to \
+                     XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+                .to_string(),
+            false => "By default, jinja2 sets `autoescape` to `False`. Consider using \
+                      `autoescape=True` or the `select_autoescape` function to mitigate XSS \
+                      vulnerabilities."
+                .to_string(),
+        }
+    }
+
+    fn placeholder() -> Self {
+        Jinja2AutoescapeFalse(false)
+    }
+}
+
+define_violation!(
     pub struct AssertUsed;
 );
 impl Violation for AssertUsed {
@@ -5458,14 +5554,10 @@ impl Violation for ExtraneousScopeFunction {
 define_violation!(
     pub struct MissingFixtureNameUnderscore(pub String);
 );
-impl AlwaysAutofixableViolation for MissingFixtureNameUnderscore {
+impl Violation for MissingFixtureNameUnderscore {
     fn message(&self) -> String {
         let MissingFixtureNameUnderscore(function) = self;
         format!("Fixture `{function}` does not return anything, add leading underscore")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add leading underscore".to_string()
     }
 
     fn placeholder() -> Self {
@@ -5476,14 +5568,10 @@ impl AlwaysAutofixableViolation for MissingFixtureNameUnderscore {
 define_violation!(
     pub struct IncorrectFixtureNameUnderscore(pub String);
 );
-impl AlwaysAutofixableViolation for IncorrectFixtureNameUnderscore {
+impl Violation for IncorrectFixtureNameUnderscore {
     fn message(&self) -> String {
         let IncorrectFixtureNameUnderscore(function) = self;
         format!("Fixture `{function}` returns a value, remove leading underscore")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove leading underscore".to_string()
     }
 
     fn placeholder() -> Self {

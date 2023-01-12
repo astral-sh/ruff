@@ -11,61 +11,100 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::autofix::Fix;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::Settings;
-use crate::source_code_generator::SourceCodeGenerator;
-use crate::source_code_locator::SourceCodeLocator;
-use crate::source_code_style::SourceCodeStyleDetector;
+use crate::source_code::{Generator, Locator, Stylist};
 use crate::violations;
 
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
 
-/// E501
-pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
-    let line_length = line.chars().count();
-
-    if line_length <= settings.line_length {
-        return None;
+fn is_overlong(
+    line: &str,
+    line_length: usize,
+    limit: usize,
+    ignore_overlong_task_comments: bool,
+    task_tags: &[String],
+) -> bool {
+    if line_length <= limit {
+        return false;
     }
 
     let mut chunks = line.split_whitespace();
     let (Some(first), Some(second)) = (chunks.next(), chunks.next()) else {
         // Single word / no printable chars - no way to make the line shorter
-        return None;
+        return false;
     };
 
     if first == "#" {
-        if settings.pycodestyle.ignore_overlong_task_comments {
+        if ignore_overlong_task_comments {
             let second = second.trim_end_matches(':');
-            if settings.task_tags.iter().any(|tag| tag == second) {
-                return None;
+            if task_tags.iter().any(|tag| tag == second) {
+                return false;
             }
         }
 
         // Do not enforce the line length for commented lines that end with a URL
         // or contain only a single word.
         if chunks.last().map_or(true, |c| URL_REGEX.is_match(c)) {
-            return None;
+            return false;
         }
     }
 
-    Some(Diagnostic::new(
-        violations::LineTooLong(line_length, settings.line_length),
-        Range::new(
-            Location::new(lineno + 1, settings.line_length),
-            Location::new(lineno + 1, line_length),
-        ),
-    ))
+    true
 }
 
-fn compare(
-    left: &Expr,
-    ops: &[Cmpop],
-    comparators: &[Expr],
-    stylist: &SourceCodeStyleDetector,
-) -> String {
+/// E501
+pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
+    let line_length = line.chars().count();
+    let limit = settings.line_length;
+    if is_overlong(
+        line,
+        line_length,
+        limit,
+        settings.pycodestyle.ignore_overlong_task_comments,
+        &settings.task_tags,
+    ) {
+        Some(Diagnostic::new(
+            violations::LineTooLong(line_length, limit),
+            Range::new(
+                Location::new(lineno + 1, limit),
+                Location::new(lineno + 1, line_length),
+            ),
+        ))
+    } else {
+        None
+    }
+}
+
+/// W505
+pub fn doc_line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
+    let Some(limit) = settings.pycodestyle.max_doc_length else {
+        return None;
+    };
+
+    let line_length = line.chars().count();
+    if is_overlong(
+        line,
+        line_length,
+        limit,
+        settings.pycodestyle.ignore_overlong_task_comments,
+        &settings.task_tags,
+    ) {
+        Some(Diagnostic::new(
+            violations::DocLineTooLong(line_length, limit),
+            Range::new(
+                Location::new(lineno + 1, limit),
+                Location::new(lineno + 1, line_length),
+            ),
+        ))
+    } else {
+        None
+    }
+}
+
+fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr], stylist: &Stylist) -> String {
     unparse_expr(
         &create_expr(ExprKind::Compare {
             left: Box::new(left.clone()),
@@ -367,7 +406,7 @@ pub fn do_not_use_bare_except(
     type_: Option<&Expr>,
     body: &[Stmt],
     handler: &Excepthandler,
-    locator: &SourceCodeLocator,
+    locator: &Locator,
 ) -> Option<Diagnostic> {
     if type_.is_none()
         && !body
@@ -383,12 +422,7 @@ pub fn do_not_use_bare_except(
     }
 }
 
-fn function(
-    name: &str,
-    args: &Arguments,
-    body: &Expr,
-    stylist: &SourceCodeStyleDetector,
-) -> String {
+fn function(name: &str, args: &Arguments, body: &Expr, stylist: &Stylist) -> String {
     let body = Stmt::new(
         Location::default(),
         Location::default(),
@@ -408,7 +442,7 @@ fn function(
             type_comment: None,
         },
     );
-    let mut generator: SourceCodeGenerator = stylist.into();
+    let mut generator: Generator = stylist.into();
     generator.unparse_stmt(&func);
     generator.generate()
 }
@@ -539,7 +573,7 @@ fn extract_quote(text: &str) -> &str {
 
 /// W605
 pub fn invalid_escape_sequence(
-    locator: &SourceCodeLocator,
+    locator: &Locator,
     start: Location,
     end: Location,
     autofix: bool,

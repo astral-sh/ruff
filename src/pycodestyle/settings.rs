@@ -10,6 +10,16 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields, rename_all = "kebab-case", rename = "Pycodestyle")]
 pub struct Options {
     #[option(
+        default = "None",
+        value_type = "usize",
+        example = r#"
+            max-doc-length = 88
+        "#
+    )]
+    /// The maximum line length to allow for line-length violations within
+    /// documentation (`W505`), including standalone comments.
+    pub max_doc_length: Option<usize>,
+    #[option(
         default = "false",
         value_type = "bool",
         example = r#"
@@ -24,12 +34,14 @@ pub struct Options {
 
 #[derive(Debug, Default, Hash)]
 pub struct Settings {
+    pub max_doc_length: Option<usize>,
     pub ignore_overlong_task_comments: bool,
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
+            max_doc_length: options.max_doc_length,
             ignore_overlong_task_comments: options
                 .ignore_overlong_task_comments
                 .unwrap_or_default(),
@@ -40,6 +52,7 @@ impl From<Options> for Settings {
 impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
+            max_doc_length: settings.max_doc_length,
             ignore_overlong_task_comments: Some(settings.ignore_overlong_task_comments),
         }
     }

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.218"
+version = "0.0.219"
 description = "An extremely fast Python linter, written in Rust."
 authors = [
   { name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" },
@@ -35,6 +35,7 @@ urls = { repository = "https://github.com/charliermarsh/ruff" }
 
 [tool.maturin]
 bindings = "bin"
+python-source = "python"
 strip = true
 
 [tool.setuptools]

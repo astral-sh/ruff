@@ -1,4 +1,4 @@
-pub mod rules;
+pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {

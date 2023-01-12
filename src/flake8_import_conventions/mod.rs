@@ -1,17 +1,17 @@
-pub mod rules;
+pub(crate) mod rules;
 pub mod settings;
 
 #[cfg(test)]
 mod tests {
-
     use std::path::Path;
 
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
+    use crate::flake8_import_conventions;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
-    use crate::{flake8_import_conventions, Settings};
+    use crate::settings::Settings;
 
     #[test]
     fn defaults() -> Result<()> {

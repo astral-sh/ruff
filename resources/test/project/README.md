@@ -17,7 +17,7 @@ resources/test/project/examples/docs/docs/file.py:8:5: F841 Local variable `x` i
 resources/test/project/project/file.py:1:8: F401 `os` imported but unused
 resources/test/project/project/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
 Found 7 error(s).
-6 potentially fixable with the --fix option.
+7 potentially fixable with the --fix option.
 ```
 
 Running from the project directory itself should exhibit the same behavior:
@@ -32,7 +32,7 @@ examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never
 project/file.py:1:8: F401 `os` imported but unused
 project/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
 Found 7 error(s).
-6 potentially fixable with the --fix option.
+7 potentially fixable with the --fix option.
 ```
 
 Running from the sub-package directory should exhibit the same behavior, but omit the top-level
@@ -43,7 +43,7 @@ files:
 docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 Found 2 error(s).
-1 potentially fixable with the --fix option.
+2 potentially fixable with the --fix option.
 ```
 
 `--config` should force Ruff to use the specified `pyproject.toml` for all files, and resolve
@@ -74,7 +74,7 @@ docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 excluded/script.py:5:5: F841 Local variable `x` is assigned to but never used
 Found 4 error(s).
-1 potentially fixable with the --fix option.
+4 potentially fixable with the --fix option.
 ```
 
 Passing an excluded directory directly should report errors in the contained files:
