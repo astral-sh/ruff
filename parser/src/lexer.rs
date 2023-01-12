@@ -1075,10 +1075,13 @@ where
                 self.next_char();
                 let tok_end = self.get_pos();
 
-                // Depending on the nesting level, we emit newline or not:
+                // Depending on the nesting level, we emit a logical or
+                // non-logical newline:
                 if self.nesting == 0 {
                     self.at_begin_of_line = true;
                     self.emit((tok_start, Tok::Newline, tok_end));
+                } else {
+                    self.emit((tok_start, Tok::NonLogicalNewline, tok_end));
                 }
             }
             ' ' | '\t' | '\x0C' => {
@@ -1464,7 +1467,16 @@ mod tests {
         $(
             #[test]
             fn $name() {
-                let source = format!("x = [{}    1,2{}]{}", $eol, $eol, $eol);
+                let source = r"x = [
+
+    1,2
+,(3,
+4,
+), {
+5,
+6,\
+7}]
+".replace("\n", $eol);
                 let tokens = lex_source(&source);
                 assert_eq!(
                     tokens,
@@ -1474,9 +1486,32 @@ mod tests {
                         },
                         Tok::Equal,
                         Tok::Lsqb,
+                        Tok::NonLogicalNewline,
+                        Tok::NonLogicalNewline,
                         Tok::Int { value: BigInt::from(1) },
                         Tok::Comma,
                         Tok::Int { value: BigInt::from(2) },
+                        Tok::NonLogicalNewline,
+                        Tok::Comma,
+                        Tok::Lpar,
+                        Tok::Int { value: BigInt::from(3) },
+                        Tok::Comma,
+                        Tok::NonLogicalNewline,
+                        Tok::Int { value: BigInt::from(4) },
+                        Tok::Comma,
+                        Tok::NonLogicalNewline,
+                        Tok::Rpar,
+                        Tok::Comma,
+                        Tok::Lbrace,
+                        Tok::NonLogicalNewline,
+                        Tok::Int { value: BigInt::from(5) },
+                        Tok::Comma,
+                        Tok::NonLogicalNewline,
+                        Tok::Int { value: BigInt::from(6) },
+                        Tok::Comma,
+                        // Continuation here - no NonLogicalNewline.
+                        Tok::Int { value: BigInt::from(7) },
+                        Tok::Rbrace,
                         Tok::Rsqb,
                         Tok::Newline,
                     ]
@@ -1490,6 +1525,50 @@ mod tests {
         test_newline_in_brackets_windows_eol: WINDOWS_EOL,
         test_newline_in_brackets_mac_eol: MAC_EOL,
         test_newline_in_brackets_unix_eol: UNIX_EOL,
+    }
+
+    #[test]
+    fn test_non_logical_newline_in_string_continuation() {
+        let source = r"(
+    'a'
+    'b'
+
+    'c' \
+    'd'
+)";
+        let tokens = lex_source(source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::Lpar,
+                Tok::NonLogicalNewline,
+                stok("a"),
+                Tok::NonLogicalNewline,
+                stok("b"),
+                Tok::NonLogicalNewline,
+                Tok::NonLogicalNewline,
+                stok("c"),
+                stok("d"),
+                Tok::NonLogicalNewline,
+                Tok::Rpar,
+                Tok::Newline,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_logical_newline_line_comment() {
+        let source = "#Hello\n#World";
+        let tokens = lex_source(source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::Comment("#Hello".to_owned()),
+                // tokenize.py does put an NL here...
+                Tok::Comment("#World".to_owned()),
+                // ... and here, but doesn't seem very useful.
+            ]
+        );
     }
 
     #[test]

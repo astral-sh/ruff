@@ -25,6 +25,7 @@ pub enum Tok {
         triple_quoted: bool,
     },
     Newline,
+    NonLogicalNewline,
     Indent,
     Dedent,
     StartModule,
@@ -136,6 +137,7 @@ impl fmt::Display for Tok {
                 write!(f, "{kind}{quotes}{value}{quotes}")
             }
             Newline => f.write_str("Newline"),
+            NonLogicalNewline => f.write_str("NonLogicalNewline"),
             Indent => f.write_str("Indent"),
             Dedent => f.write_str("Dedent"),
             StartModule => f.write_str("StartProgram"),
