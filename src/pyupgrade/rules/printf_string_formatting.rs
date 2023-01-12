@@ -48,7 +48,10 @@ struct PercentFormat {
 
 impl Default for PercentFormat {
     fn default() -> Self {
-        Self {item: "\"".to_string(), parts: None}
+        Self {
+            item: "\"".to_string(),
+            parts: None,
+        }
     }
 }
 
@@ -207,7 +210,141 @@ mod test {
     #[test]
     fn test_parse_percent_format_word_in_paren() {
         let sample = "\"%(hi)s\"";
-        let sube1 = PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string());
+        let sube1 =
+            PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_empty_paren() {
+        let sample = "\"%()s\"";
+        let sube1 = PercentFormatPart::new(Some("".to_string()), None, None, None, "s".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_hashtag() {
+        let sample = "\"%#o\"";
+        let sube1 =
+            PercentFormatPart::new(None, Some("#".to_string()), None, None, "o".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_hashtag_and_symbols() {
+        let sample = "\"% #0-+d\"";
+        let sube1 =
+            PercentFormatPart::new(None, Some(" #0-+".to_string()), None, None, "d".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_numbers_letters() {
+        let sample = "\"%5d\"";
+        let sube1 =
+            PercentFormatPart::new(None, None, Some("5".to_string()), None, "d".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_star_d() {
+        let sample = "\"%*d\"";
+        let sube1 =
+            PercentFormatPart::new(None, None, Some("*".to_string()), None, "d".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_dot_letter() {
+        let sample = "\"%.f\"";
+        let sube1 =
+            PercentFormatPart::new(None, None, None, Some(".".to_string()), "f".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_dot_number_letter() {
+        let sample = "\"%.5f\"";
+        let sube1 =
+            PercentFormatPart::new(None, None, None, Some(".5".to_string()), "f".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_dot_star_letter() {
+        let sample = "\"%.*f\"";
+        let sube1 =
+            PercentFormatPart::new(None, None, None, Some(".*".to_string()), "f".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_two_letter() {
+        let sample = "\"%ld\"";
+        let sube1 = PercentFormatPart::new(None, None, None, None, "d".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_everything() {
+        let sample = "\"%(complete)#4.4f\"";
+        let sube1 = PercentFormatPart::new(
+            Some("complete".to_string()),
+            Some("#".to_string()),
+            Some("4".to_string()),
+            Some(".4".to_string()),
+            "f".to_string(),
+        );
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
         let e2 = PercentFormat::default();
         let expected = vec![e1, e2];
