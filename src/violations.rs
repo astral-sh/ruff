@@ -2677,6 +2677,20 @@ impl Violation for SysVersionSlice1Referenced {
 }
 
 // flake8-simplify
+
+define_violation!(
+    pub struct OpenFileWithContextHandler;
+);
+impl Violation for OpenFileWithContextHandler {
+    fn message(&self) -> String {
+        "Use context handler for opening files".to_string()
+    }
+
+    fn placeholder() -> Self {
+        OpenFileWithContextHandler
+    }
+}
+
 define_violation!(
     pub struct UseCapitalEnvironmentVariables(pub String, pub String);
 );

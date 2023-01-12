@@ -2321,6 +2321,11 @@ where
                             args, keywords,
                         ));
                 }
+
+                // flake8-simplify
+                if self.settings.enabled.contains(&RuleCode::SIM115) {
+                    flake8_simplify::rules::open_file_with_context_handler(self, func);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self.settings.enabled.contains(&RuleCode::F601)
