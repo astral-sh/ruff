@@ -19,6 +19,7 @@ use crate::checkers::lines::check_lines;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
+use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::registry::{Diagnostic, LintSource, RuleCode};
@@ -70,6 +71,14 @@ pub(crate) fn check_path(
     // Aggregate all diagnostics.
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
+    // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
+    // (for docstrings), which demands special-casing at this level.
+    let use_doc_lines = settings.enabled.contains(&RuleCode::W505);
+    let mut doc_lines = vec![];
+    if use_doc_lines {
+        doc_lines.extend(doc_lines_from_tokens(&tokens));
+    }
+
     // Run the token-based rules.
     if settings
         .enabled
@@ -89,7 +98,7 @@ pub(crate) fn check_path(
             .enabled
             .iter()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
-    if use_ast || use_imports {
+    if use_ast || use_imports || use_doc_lines {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 if use_ast {
@@ -116,6 +125,9 @@ pub(crate) fn check_path(
                         package,
                     ));
                 }
+                if use_doc_lines {
+                    doc_lines.extend(doc_lines_from_ast(&python_ast));
+                }
             }
             Err(parse_error) => {
                 if settings.enabled.contains(&RuleCode::E999) {
@@ -128,6 +140,12 @@ pub(crate) fn check_path(
         }
     }
 
+    // Deduplicate and reorder any doc lines.
+    if use_doc_lines {
+        doc_lines.sort_unstable();
+        doc_lines.dedup();
+    }
+
     // Run the lines-based rules.
     if settings
         .enabled
@@ -137,6 +155,7 @@ pub(crate) fn check_path(
         diagnostics.extend(check_lines(
             contents,
             &directives.commented_lines,
+            &doc_lines,
             settings,
             autofix,
         ));

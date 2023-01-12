@@ -315,6 +315,20 @@ impl AlwaysAutofixableViolation for InvalidEscapeSequence {
     }
 }
 
+define_violation!(
+    pub struct DocLineTooLong(pub usize, pub usize);
+);
+impl Violation for DocLineTooLong {
+    fn message(&self) -> String {
+        let DocLineTooLong(length, limit) = self;
+        format!("Doc line too long ({length} > {limit} characters)")
+    }
+
+    fn placeholder() -> Self {
+        DocLineTooLong(89, 88)
+    }
+}
+
 // pyflakes
 
 define_violation!(

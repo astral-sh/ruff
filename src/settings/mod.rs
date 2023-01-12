@@ -458,7 +458,7 @@ mod tests {
             }]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
@@ -478,7 +478,7 @@ mod tests {
             }]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([RuleCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(
@@ -504,7 +504,7 @@ mod tests {
             ]
             .into_iter(),
         );
-        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W605]);
+        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes(

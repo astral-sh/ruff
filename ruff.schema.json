@@ -945,6 +945,15 @@
             "boolean",
             "null"
           ]
+        },
+        "max-doc-length": {
+          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -1616,6 +1625,9 @@
         "W2",
         "W29",
         "W292",
+        "W5",
+        "W50",
+        "W505",
         "W6",
         "W60",
         "W605",

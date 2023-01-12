@@ -132,6 +132,7 @@ define_rule_mapping!(
     E999 => violations::SyntaxError,
     // pycodestyle warnings
     W292 => violations::NoNewLineAtEndOfFile,
+    W505 => violations::DocLineTooLong,
     W605 => violations::InvalidEscapeSequence,
     // pyflakes
     F401 => violations::UnusedImport,
@@ -786,6 +787,7 @@ impl RuleCode {
             RuleCode::RUF100 => &LintSource::NoQA,
             RuleCode::E501
             | RuleCode::W292
+            | RuleCode::W505
             | RuleCode::UP009
             | RuleCode::PGH003
             | RuleCode::PGH004 => &LintSource::Lines,
