@@ -232,12 +232,14 @@ pub fn python_files_in_path(
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
-    for path in &paths {
-        for ancestor in path.ancestors() {
-            if let Some(pyproject) = settings_toml(ancestor)? {
-                let (root, settings) =
-                    resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
-                resolver.add(root, settings);
+    if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+        for path in &paths {
+            for ancestor in path.ancestors() {
+                if let Some(pyproject) = settings_toml(ancestor)? {
+                    let (root, settings) =
+                        resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
+                    resolver.add(root, settings);
+                }
             }
         }
     }
@@ -272,29 +274,31 @@ pub fn python_files_in_path(
         Box::new(|result| {
             // Search for the `pyproject.toml` file in this directory, before we visit any
             // of its contents.
-            if let Ok(entry) = &result {
-                if entry
-                    .file_type()
-                    .map_or(false, |file_type| file_type.is_dir())
-                {
-                    match settings_toml(entry.path()) {
-                        Ok(Some(pyproject)) => match resolve_scoped_settings(
-                            &pyproject,
-                            &Relativity::Parent,
-                            processor,
-                        ) {
-                            Ok((root, settings)) => {
-                                resolver.write().unwrap().add(root, settings);
-                            }
+            if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+                if let Ok(entry) = &result {
+                    if entry
+                        .file_type()
+                        .map_or(false, |file_type| file_type.is_dir())
+                    {
+                        match settings_toml(entry.path()) {
+                            Ok(Some(pyproject)) => match resolve_scoped_settings(
+                                &pyproject,
+                                &Relativity::Parent,
+                                processor,
+                            ) {
+                                Ok((root, settings)) => {
+                                    resolver.write().unwrap().add(root, settings);
+                                }
+                                Err(err) => {
+                                    *error.lock().unwrap() = Err(err);
+                                    return WalkState::Quit;
+                                }
+                            },
+                            Ok(None) => {}
                             Err(err) => {
                                 *error.lock().unwrap() = Err(err);
                                 return WalkState::Quit;
                             }
-                        },
-                        Ok(None) => {}
-                        Err(err) => {
-                            *error.lock().unwrap() = Err(err);
-                            return WalkState::Quit;
                         }
                     }
                 }
@@ -366,11 +370,13 @@ pub fn python_file_at_path(
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
-    for ancestor in path.ancestors() {
-        if let Some(pyproject) = settings_toml(ancestor)? {
-            let (root, settings) =
-                resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
-            resolver.add(root, settings);
+    if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+        for ancestor in path.ancestors() {
+            if let Some(pyproject) = settings_toml(ancestor)? {
+                let (root, settings) =
+                    resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
+                resolver.add(root, settings);
+            }
         }
     }
 
