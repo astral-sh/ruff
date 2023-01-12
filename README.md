@@ -597,6 +597,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file | 🛠 |
+| W505 | DocLineTooLong | Doc line too long (89 > 88 characters) |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' | 🛠 |
 
 ### mccabe (C90)
@@ -3157,6 +3158,24 @@ and "XXX"]).
 ```toml
 [tool.ruff.pycodestyle]
 ignore-overlong-task-comments = true
+```
+
+---
+
+#### [`max-doc-length`](#max-doc-length)
+
+The maximum line length to allow for line-length violations within
+documentation (`W505`), including standalone comments.
+
+**Default value**: `None`
+
+**Type**: `usize`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pycodestyle]
+max-doc-length = 88
 ```
 
 ---

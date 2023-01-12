@@ -22,42 +22,88 @@ use crate::violations;
 
 static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwrap());
 
-/// E501
-pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
-    let line_length = line.chars().count();
-
-    if line_length <= settings.line_length {
-        return None;
+fn is_overlong(
+    line: &str,
+    line_length: usize,
+    limit: usize,
+    ignore_overlong_task_comments: bool,
+    task_tags: &[String],
+) -> bool {
+    if line_length <= limit {
+        return false;
     }
 
     let mut chunks = line.split_whitespace();
     let (Some(first), Some(second)) = (chunks.next(), chunks.next()) else {
         // Single word / no printable chars - no way to make the line shorter
-        return None;
+        return false;
     };
 
     if first == "#" {
-        if settings.pycodestyle.ignore_overlong_task_comments {
+        if ignore_overlong_task_comments {
             let second = second.trim_end_matches(':');
-            if settings.task_tags.iter().any(|tag| tag == second) {
-                return None;
+            if task_tags.iter().any(|tag| tag == second) {
+                return false;
             }
         }
 
         // Do not enforce the line length for commented lines that end with a URL
         // or contain only a single word.
         if chunks.last().map_or(true, |c| URL_REGEX.is_match(c)) {
-            return None;
+            return false;
         }
     }
 
-    Some(Diagnostic::new(
-        violations::LineTooLong(line_length, settings.line_length),
-        Range::new(
-            Location::new(lineno + 1, settings.line_length),
-            Location::new(lineno + 1, line_length),
-        ),
-    ))
+    true
+}
+
+/// E501
+pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
+    let line_length = line.chars().count();
+    let limit = settings.line_length;
+    if is_overlong(
+        line,
+        line_length,
+        limit,
+        settings.pycodestyle.ignore_overlong_task_comments,
+        &settings.task_tags,
+    ) {
+        Some(Diagnostic::new(
+            violations::LineTooLong(line_length, limit),
+            Range::new(
+                Location::new(lineno + 1, limit),
+                Location::new(lineno + 1, line_length),
+            ),
+        ))
+    } else {
+        None
+    }
+}
+
+/// W505
+pub fn doc_line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
+    let Some(limit) = settings.pycodestyle.max_doc_length else {
+        return None;
+    };
+
+    let line_length = line.chars().count();
+    if is_overlong(
+        line,
+        line_length,
+        limit,
+        settings.pycodestyle.ignore_overlong_task_comments,
+        &settings.task_tags,
+    ) {
+        Some(Diagnostic::new(
+            violations::DocLineTooLong(line_length, limit),
+            Range::new(
+                Location::new(lineno + 1, limit),
+                Location::new(lineno + 1, line_length),
+            ),
+        ))
+    } else {
+        None
+    }
 }
 
 fn compare(
