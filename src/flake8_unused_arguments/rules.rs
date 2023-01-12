@@ -118,11 +118,10 @@ pub fn unused_arguments(
             ..
         }) => {
             match function_type::classify(
+                checker,
                 parent,
                 name,
                 decorator_list,
-                &checker.from_imports,
-                &checker.import_aliases,
                 &checker.settings.pep8_naming.classmethod_decorators,
                 &checker.settings.pep8_naming.staticmethod_decorators,
             ) {

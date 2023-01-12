@@ -14,9 +14,7 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 
-use crate::ast::helpers::{
-    binding_range, collect_call_paths, dealias_call_path, extract_handler_names, match_call_path,
-};
+use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -63,13 +61,10 @@ pub struct Checker<'a> {
     // Computed diagnostics.
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Function and class definition tracking (e.g., for docstring enforcement).
-    definitions: Vec<(Definition<'a>, Visibility)>,
+    definitions: Vec<(Definition<'a>, Visibility, DeferralContext<'a>)>,
     // Edit tracking.
     // TODO(charlie): Instead of exposing deletions, wrap in a public API.
     pub(crate) deletions: FxHashSet<RefEquality<'a, Stmt>>,
-    // Import tracking.
-    pub(crate) from_imports: FxHashMap<&'a str, FxHashSet<&'a str>>,
-    pub(crate) import_aliases: FxHashMap<&'a str, &'a str>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
     pub(crate) parents: Vec<RefEquality<'a, Stmt>>,
@@ -123,8 +118,6 @@ impl<'a> Checker<'a> {
             diagnostics: vec![],
             definitions: vec![],
             deletions: FxHashSet::default(),
-            from_imports: FxHashMap::default(),
-            import_aliases: FxHashMap::default(),
             parents: vec![],
             depths: FxHashMap::default(),
             child_to_parent: FxHashMap::default(),
@@ -167,28 +160,28 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
-        let call_path = dealias_call_path(collect_call_paths(expr), &self.import_aliases);
-        self.match_typing_call_path(&call_path, target)
+        self.resolve_call_path(expr).map_or(false, |call_path| {
+            self.match_typing_call_path(&call_path, target)
+        })
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &[&str], target: &str) -> bool {
-        if match_call_path(call_path, "typing", target, &self.from_imports) {
+        if call_path == ["typing", target] {
             return true;
         }
 
         if typing::TYPING_EXTENSIONS.contains(target) {
-            if match_call_path(call_path, "typing_extensions", target, &self.from_imports) {
+            if call_path == ["typing_extensions", target] {
                 return true;
             }
         }
 
-        if self
-            .settings
-            .typing_modules
-            .iter()
-            .any(|module| match_call_path(call_path, module, target, &self.from_imports))
-        {
+        if self.settings.typing_modules.iter().any(|module| {
+            let mut module = module.split('.').collect::<Vec<_>>();
+            module.push(target);
+            call_path == module.as_slice()
+        }) {
             return true;
         }
 
@@ -207,6 +200,35 @@ impl<'a> Checker<'a> {
         self.find_binding(member).map_or(false, |binding| {
             matches!(binding.kind, BindingKind::Builtin)
         })
+    }
+
+    pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<Vec<&'a str>>
+    where
+        'b: 'a,
+    {
+        let call_path = collect_call_path(value);
+        if let Some(head) = call_path.first() {
+            if let Some(binding) = self.find_binding(head) {
+                if let BindingKind::Importation(.., name)
+                | BindingKind::SubmoduleImportation(name, ..)
+                | BindingKind::FromImportation(.., name) = &binding.kind
+                {
+                    // Ignore relative imports.
+                    if name.starts_with('.') {
+                        return None;
+                    }
+                    let mut source_path: Vec<&str> = name.split('.').collect();
+                    source_path.extend(call_path.iter().skip(1));
+                    return Some(source_path);
+                } else if let BindingKind::Builtin = &binding.kind {
+                    let mut source_path: Vec<&str> = Vec::with_capacity(call_path.len() + 1);
+                    source_path.push("");
+                    source_path.extend(call_path);
+                    return Some(source_path);
+                }
+            }
+        }
+        None
     }
 
     /// Return `true` if a `RuleCode` is disabled by a `noqa` directive.
@@ -415,13 +437,11 @@ where
                 if self.settings.enabled.contains(&RuleCode::N804) {
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_class_method(
+                            self,
                             self.current_scope(),
                             name,
                             decorator_list,
                             args,
-                            &self.from_imports,
-                            &self.import_aliases,
-                            &self.settings.pep8_naming,
                         )
                     {
                         self.diagnostics.push(diagnostic);
@@ -431,13 +451,11 @@ where
                 if self.settings.enabled.contains(&RuleCode::N805) {
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_method(
+                            self,
                             self.current_scope(),
                             name,
                             decorator_list,
                             args,
-                            &self.from_imports,
-                            &self.import_aliases,
-                            &self.settings.pep8_naming,
                         )
                     {
                         self.diagnostics.push(diagnostic);
@@ -788,12 +806,6 @@ where
                     }
 
                     if let Some(asname) = &alias.node.asname {
-                        for alias in names {
-                            if let Some(asname) = &alias.node.asname {
-                                self.import_aliases.insert(asname, &alias.node.name);
-                            }
-                        }
-
                         let name = alias.node.name.split('.').last().unwrap();
                         if self.settings.enabled.contains(&RuleCode::N811) {
                             if let Some(diagnostic) =
@@ -890,25 +902,6 @@ where
                 module,
                 level,
             } => {
-                // Track `import from` statements, to ensure that we can correctly attribute
-                // references like `from typing import Union`.
-                if self.settings.enabled.contains(&RuleCode::UP023) {
-                    pyupgrade::rules::replace_c_element_tree(self, stmt);
-                }
-                if level.map(|level| level == 0).unwrap_or(true) {
-                    if let Some(module) = module {
-                        self.from_imports
-                            .entry(module)
-                            .or_insert_with(FxHashSet::default)
-                            .extend(names.iter().map(|alias| alias.node.name.as_str()));
-                    }
-                    for alias in names {
-                        if let Some(asname) = &alias.node.asname {
-                            self.import_aliases.insert(asname, &alias.node.name);
-                        }
-                    }
-                }
-
                 if self.settings.enabled.contains(&RuleCode::E402) {
                     if self.seen_import_boundary && stmt.location.column() == 0 {
                         self.diagnostics.push(Diagnostic::new(
@@ -925,6 +918,9 @@ where
                 }
                 if self.settings.enabled.contains(&RuleCode::UP026) {
                     pyupgrade::rules::rewrite_mock_import(self, stmt);
+                }
+                if self.settings.enabled.contains(&RuleCode::UP023) {
+                    pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
                 if self.settings.enabled.contains(&RuleCode::UP029) {
                     if let Some(module) = module.as_deref() {
@@ -1057,10 +1053,11 @@ where
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `full_name` would be "foo.bar".
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
-                        let full_name = match module {
-                            None => alias.node.name.to_string(),
-                            Some(parent) => format!("{parent}.{}", alias.node.name),
-                        };
+                        let full_name = helpers::format_import_from_member(
+                            level.as_ref(),
+                            module.as_deref(),
+                            &alias.node.name,
+                        );
                         let range = Range::from_located(alias);
                         self.add_binding(
                             name,
@@ -1453,8 +1450,11 @@ where
                     pyupgrade::rules::rewrite_yield_from(self, stmt);
                 }
                 let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Function);
-                self.definitions
-                    .push((definition, scope.visibility.clone()));
+                self.definitions.push((
+                    definition,
+                    scope.visibility.clone(),
+                    (self.scope_stack.clone(), self.parents.clone()),
+                ));
                 self.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
@@ -1511,8 +1511,11 @@ where
                     &Documentable::Class,
                 );
                 let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Class);
-                self.definitions
-                    .push((definition, scope.visibility.clone()));
+                self.definitions.push((
+                    definition,
+                    scope.visibility.clone(),
+                    (self.scope_stack.clone(), self.parents.clone()),
+                ));
                 self.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
@@ -1708,13 +1711,9 @@ where
                                     && !self.settings.pyupgrade.keep_runtime_typing
                                     && self.annotations_future_enabled
                                     && self.in_annotation))
-                            && typing::is_pep585_builtin(
-                                expr,
-                                &self.from_imports,
-                                &self.import_aliases,
-                            )
+                            && typing::is_pep585_builtin(self, expr)
                         {
-                            pyupgrade::rules::use_pep585_annotation(self, expr, id);
+                            pyupgrade::rules::use_pep585_annotation(self, expr);
                         }
 
                         self.handle_node_load(expr);
@@ -1752,9 +1751,9 @@ where
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled
                             && self.in_annotation))
-                    && typing::is_pep585_builtin(expr, &self.from_imports, &self.import_aliases)
+                    && typing::is_pep585_builtin(self, expr)
                 {
-                    pyupgrade::rules::use_pep585_annotation(self, expr, attr);
+                    pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::UP016) {
@@ -1822,12 +1821,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::TID251) {
-                    flake8_tidy_imports::rules::banned_attribute_access(
-                        self,
-                        &dealias_call_path(collect_call_paths(expr), &self.import_aliases),
-                        expr,
-                        &self.settings.flake8_tidy_imports.banned_api,
-                    );
+                    flake8_tidy_imports::rules::banned_attribute_access(self, expr);
                 }
             }
             ExprKind::Call {
@@ -1976,96 +1970,36 @@ where
                     }
                 }
                 if self.settings.enabled.contains(&RuleCode::S103) {
-                    if let Some(diagnostic) = flake8_bandit::rules::bad_file_permissions(
-                        func,
-                        args,
-                        keywords,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::bad_file_permissions(self, func, args, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::S501) {
-                    if let Some(diagnostic) = flake8_bandit::rules::request_with_no_cert_validation(
-                        func,
-                        args,
-                        keywords,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::request_with_no_cert_validation(
+                        self, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::S506) {
-                    if let Some(diagnostic) = flake8_bandit::rules::unsafe_yaml_load(
-                        func,
-                        args,
-                        keywords,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::unsafe_yaml_load(self, func, args, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::S508) {
-                    if let Some(diagnostic) = flake8_bandit::rules::snmp_insecure_version(
-                        func,
-                        args,
-                        keywords,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::snmp_insecure_version(self, func, args, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::S509) {
-                    if let Some(diagnostic) = flake8_bandit::rules::snmp_weak_cryptography(
-                        func,
-                        args,
-                        keywords,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::snmp_weak_cryptography(self, func, args, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::S701) {
-                    if let Some(diagnostic) = flake8_bandit::rules::jinja2_autoescape_false(
-                        func,
-                        args,
-                        keywords,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::jinja2_autoescape_false(self, func, args, keywords);
                 }
                 if self.settings.enabled.contains(&RuleCode::S106) {
                     self.diagnostics
                         .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));
                 }
                 if self.settings.enabled.contains(&RuleCode::S324) {
-                    if let Some(diagnostic) = flake8_bandit::rules::hashlib_insecure_hash_functions(
-                        func,
-                        args,
-                        keywords,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::hashlib_insecure_hash_functions(
+                        self, func, args, keywords,
+                    );
                 }
                 if self.settings.enabled.contains(&RuleCode::S113) {
-                    if let Some(diagnostic) = flake8_bandit::rules::request_without_timeout(
-                        func,
-                        args,
-                        keywords,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::request_without_timeout(self, func, args, keywords);
                 }
 
                 // flake8-comprehensions
@@ -2157,14 +2091,7 @@ where
 
                 // flake8-debugger
                 if self.settings.enabled.contains(&RuleCode::T100) {
-                    if let Some(diagnostic) = flake8_debugger::rules::debugger_call(
-                        expr,
-                        func,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_debugger::rules::debugger_call(self, expr, func);
                 }
 
                 // pandas-vet
@@ -2747,15 +2674,19 @@ where
                 args,
                 keywords,
             } => {
-                let call_path = dealias_call_path(collect_call_paths(func), &self.import_aliases);
-                if self.match_typing_call_path(&call_path, "ForwardRef") {
+                let call_path = self.resolve_call_path(func);
+                if call_path.as_ref().map_or(false, |call_path| {
+                    self.match_typing_call_path(call_path, "ForwardRef")
+                }) {
                     self.visit_expr(func);
                     for expr in args {
                         self.in_type_definition = true;
                         self.visit_expr(expr);
                         self.in_type_definition = prev_in_type_definition;
                     }
-                } else if self.match_typing_call_path(&call_path, "cast") {
+                } else if call_path.as_ref().map_or(false, |call_path| {
+                    self.match_typing_call_path(call_path, "cast")
+                }) {
                     self.visit_expr(func);
                     if !args.is_empty() {
                         self.in_type_definition = true;
@@ -2765,14 +2696,18 @@ where
                     for expr in args.iter().skip(1) {
                         self.visit_expr(expr);
                     }
-                } else if self.match_typing_call_path(&call_path, "NewType") {
+                } else if call_path.as_ref().map_or(false, |call_path| {
+                    self.match_typing_call_path(call_path, "NewType")
+                }) {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.in_type_definition = true;
                         self.visit_expr(expr);
                         self.in_type_definition = prev_in_type_definition;
                     }
-                } else if self.match_typing_call_path(&call_path, "TypeVar") {
+                } else if call_path.as_ref().map_or(false, |call_path| {
+                    self.match_typing_call_path(call_path, "TypeVar")
+                }) {
                     self.visit_expr(func);
                     for expr in args.iter().skip(1) {
                         self.in_type_definition = true;
@@ -2793,7 +2728,9 @@ where
                             }
                         }
                     }
-                } else if self.match_typing_call_path(&call_path, "NamedTuple") {
+                } else if call_path.as_ref().map_or(false, |call_path| {
+                    self.match_typing_call_path(call_path, "NamedTuple")
+                }) {
                     self.visit_expr(func);
 
                     // Ex) NamedTuple("a", [("a", int)])
@@ -2829,7 +2766,9 @@ where
                         self.visit_expr(value);
                         self.in_type_definition = prev_in_type_definition;
                     }
-                } else if self.match_typing_call_path(&call_path, "TypedDict") {
+                } else if call_path.as_ref().map_or(false, |call_path| {
+                    self.match_typing_call_path(call_path, "TypedDict")
+                }) {
                     self.visit_expr(func);
 
                     // Ex) TypedDict("a", {"a": int})
@@ -2855,12 +2794,11 @@ where
                         self.visit_expr(value);
                         self.in_type_definition = prev_in_type_definition;
                     }
-                } else if ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
-                    .iter()
-                    .any(|target| {
-                        match_call_path(&call_path, "mypy_extensions", target, &self.from_imports)
-                    })
-                {
+                } else if call_path.as_ref().map_or(false, |call_path| {
+                    ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
+                        .iter()
+                        .any(|target| *call_path == ["mypy_extensions", target])
+                }) {
                     self.visit_expr(func);
 
                     // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
@@ -2894,13 +2832,7 @@ where
                     self.in_subscript = true;
                     visitor::walk_expr(self, expr);
                 } else {
-                    match typing::match_annotated_subscript(
-                        value,
-                        &self.from_imports,
-                        &self.import_aliases,
-                        self.settings.typing_modules.iter().map(String::as_str),
-                        |member| self.is_builtin(member),
-                    ) {
+                    match typing::match_annotated_subscript(self, value) {
                         Some(subscript) => {
                             match subscript {
                                 // Ex) Optional[int]
@@ -3697,6 +3629,7 @@ impl<'a> Checker<'a> {
                 docstring,
             },
             self.visible_scope.visibility.clone(),
+            (self.scope_stack.clone(), self.parents.clone()),
         ));
         docstring.is_some()
     }
@@ -4150,7 +4083,10 @@ impl<'a> Checker<'a> {
 
         let mut overloaded_name: Option<String> = None;
         self.definitions.reverse();
-        while let Some((definition, visibility)) = self.definitions.pop() {
+        while let Some((definition, visibility, (scopes, parents))) = self.definitions.pop() {
+            self.scope_stack = scopes.clone();
+            self.parents = parents.clone();
+
             // flake8-annotations
             if enforce_annotations {
                 // TODO(charlie): This should be even stricter, in that an overload
@@ -4363,13 +4299,13 @@ pub fn check_ast(
     let mut allocator = vec![];
     checker.check_deferred_string_type_definitions(&mut allocator);
 
+    // Check docstrings.
+    checker.check_definitions();
+
     // Reset the scope to module-level, and check all consumed scopes.
     checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];
     checker.pop_scope();
     checker.check_dead_scopes();
-
-    // Check docstrings.
-    checker.check_definitions();
 
     checker.diagnostics
 }

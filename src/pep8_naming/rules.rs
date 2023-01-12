@@ -1,4 +1,3 @@
-use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Arg, Arguments, Expr, ExprKind, Stmt};
 
 use crate::ast::function_type;
@@ -6,7 +5,6 @@ use crate::ast::helpers::identifier_range;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::pep8_naming::helpers;
-use crate::pep8_naming::settings::Settings;
 use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
@@ -53,23 +51,20 @@ pub fn invalid_argument_name(name: &str, arg: &Arg) -> Option<Diagnostic> {
 
 /// N804
 pub fn invalid_first_argument_name_for_class_method(
+    checker: &Checker,
     scope: &Scope,
     name: &str,
     decorator_list: &[Expr],
     args: &Arguments,
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-    import_aliases: &FxHashMap<&str, &str>,
-    settings: &Settings,
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
+            checker,
             scope,
             name,
             decorator_list,
-            from_imports,
-            import_aliases,
-            &settings.classmethod_decorators,
-            &settings.staticmethod_decorators,
+            &checker.settings.pep8_naming.classmethod_decorators,
+            &checker.settings.pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::ClassMethod
     ) {
@@ -95,23 +90,20 @@ pub fn invalid_first_argument_name_for_class_method(
 
 /// N805
 pub fn invalid_first_argument_name_for_method(
+    checker: &Checker,
     scope: &Scope,
     name: &str,
     decorator_list: &[Expr],
     args: &Arguments,
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-    import_aliases: &FxHashMap<&str, &str>,
-    settings: &Settings,
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
+            checker,
             scope,
             name,
             decorator_list,
-            from_imports,
-            import_aliases,
-            &settings.classmethod_decorators,
-            &settings.staticmethod_decorators,
+            &checker.settings.pep8_naming.classmethod_decorators,
+            &checker.settings.pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::Method
     ) {
@@ -134,9 +126,7 @@ pub fn non_lowercase_variable_in_function(
     stmt: &Stmt,
     name: &str,
 ) {
-    if name.to_lowercase() != name
-        && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
-    {
+    if name.to_lowercase() != name && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
             violations::NonLowercaseVariableInFunction(name.to_string()),
             Range::from_located(expr),
@@ -243,9 +233,7 @@ pub fn mixed_case_variable_in_class_scope(
     stmt: &Stmt,
     name: &str,
 ) {
-    if helpers::is_mixed_case(name)
-        && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
-    {
+    if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
             violations::MixedCaseVariableInClassScope(name.to_string()),
             Range::from_located(expr),
@@ -260,9 +248,7 @@ pub fn mixed_case_variable_in_global_scope(
     stmt: &Stmt,
     name: &str,
 ) {
-    if helpers::is_mixed_case(name)
-        && !helpers::is_namedtuple_assignment(stmt, &checker.from_imports)
-    {
+    if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
             violations::MixedCaseVariableInGlobalScope(name.to_string()),
             Range::from_located(expr),

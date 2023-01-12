@@ -1,8 +1,6 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::{
-    collect_call_paths, dealias_call_path, has_non_none_keyword, is_const_none, match_call_path,
-};
+use crate::ast::helpers::{has_non_none_keyword, is_const_none};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
@@ -15,8 +13,10 @@ pub fn call_datetime_without_tzinfo(
     keywords: &[Keyword],
     location: Range,
 ) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if !match_call_path(&call_path, "datetime", "datetime", &checker.from_imports) {
+    if !checker
+        .resolve_call_path(func)
+        .map_or(false, |call_path| call_path == ["datetime", "datetime"])
+    {
         return;
     }
 
@@ -40,13 +40,9 @@ pub fn call_datetime_without_tzinfo(
 
 /// DTZ002
 pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if match_call_path(
-        &call_path,
-        "datetime.datetime",
-        "today",
-        &checker.from_imports,
-    ) {
+    if checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path == ["datetime", "datetime", "today"]
+    }) {
         checker
             .diagnostics
             .push(Diagnostic::new(violations::CallDatetimeToday, location));
@@ -55,13 +51,9 @@ pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) 
 
 /// DTZ003
 pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if match_call_path(
-        &call_path,
-        "datetime.datetime",
-        "utcnow",
-        &checker.from_imports,
-    ) {
+    if checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path == ["datetime", "datetime", "utcnow"]
+    }) {
         checker
             .diagnostics
             .push(Diagnostic::new(violations::CallDatetimeUtcnow, location));
@@ -70,13 +62,9 @@ pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range)
 
 /// DTZ004
 pub fn call_datetime_utcfromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if match_call_path(
-        &call_path,
-        "datetime.datetime",
-        "utcfromtimestamp",
-        &checker.from_imports,
-    ) {
+    if checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path == ["datetime", "datetime", "utcfromtimestamp"]
+    }) {
         checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeUtcfromtimestamp,
             location,
@@ -92,13 +80,9 @@ pub fn call_datetime_now_without_tzinfo(
     keywords: &[Keyword],
     location: Range,
 ) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if !match_call_path(
-        &call_path,
-        "datetime.datetime",
-        "now",
-        &checker.from_imports,
-    ) {
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path == ["datetime", "datetime", "now"]
+    }) {
         return;
     }
 
@@ -137,13 +121,9 @@ pub fn call_datetime_fromtimestamp(
     keywords: &[Keyword],
     location: Range,
 ) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if !match_call_path(
-        &call_path,
-        "datetime.datetime",
-        "fromtimestamp",
-        &checker.from_imports,
-    ) {
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path == ["datetime", "datetime", "fromtimestamp"]
+    }) {
         return;
     }
 
@@ -181,13 +161,9 @@ pub fn call_datetime_strptime_without_zone(
     args: &[Expr],
     location: Range,
 ) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if !match_call_path(
-        &call_path,
-        "datetime.datetime",
-        "strptime",
-        &checker.from_imports,
-    ) {
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path == ["datetime", "datetime", "strptime"]
+    }) {
         return;
     }
 
@@ -234,8 +210,9 @@ pub fn call_datetime_strptime_without_zone(
 
 /// DTZ011
 pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if match_call_path(&call_path, "datetime.date", "today", &checker.from_imports) {
+    if checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path == ["datetime", "date", "today"]
+    }) {
         checker
             .diagnostics
             .push(Diagnostic::new(violations::CallDateToday, location));
@@ -244,13 +221,9 @@ pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
 
 /// DTZ012
 pub fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
-    let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-    if match_call_path(
-        &call_path,
-        "datetime.date",
-        "fromtimestamp",
-        &checker.from_imports,
-    ) {
+    if checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path == ["datetime", "date", "fromtimestamp"]
+    }) {
         checker
             .diagnostics
             .push(Diagnostic::new(violations::CallDateFromtimestamp, location));

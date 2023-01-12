@@ -1,8 +1,6 @@
-use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Constant, ExprKind, KeywordData};
 use rustpython_parser::ast::Expr;
 
-use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -11,10 +9,9 @@ use crate::settings::types::PythonVersion;
 use crate::violations;
 
 fn rule(
+    checker: &Checker,
     decorator_list: &[Expr],
     target_version: PythonVersion,
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-    import_aliases: &FxHashMap<&str, &str>,
 ) -> Option<Diagnostic> {
     for expr in decorator_list.iter() {
         let ExprKind::Call {
@@ -27,13 +24,9 @@ fn rule(
         };
 
         if !(args.is_empty()
-            && helpers::match_module_member(
-                func,
-                "functools",
-                "lru_cache",
-                from_imports,
-                import_aliases,
-            ))
+            && checker
+                .resolve_call_path(func)
+                .map_or(false, |call_path| call_path == ["functools", "lru_cache"]))
         {
             continue;
         }
@@ -74,10 +67,9 @@ fn rule(
 /// UP011
 pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Expr]) {
     let Some(mut diagnostic) = rule(
+        checker,
         decorator_list,
         checker.settings.target_version,
-        &checker.from_imports,
-        &checker.import_aliases,
     ) else {
         return;
     };

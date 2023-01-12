@@ -1,6 +1,6 @@
 ---
 source: src/pyupgrade/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     OSErrorAlias: EnvironmentError
@@ -205,5 +205,22 @@ expression: checks
     end_location:
       row: 65
       column: 23
+  parent: ~
+- kind:
+    OSErrorAlias: mmap.error
+  location:
+    row: 87
+    column: 7
+  end_location:
+    row: 87
+    column: 19
+  fix:
+    content: OSError
+    location:
+      row: 87
+      column: 7
+    end_location:
+      row: 87
+      column: 19
   parent: ~
 

@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::debug;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use crate::ast::helpers::{create_expr, create_stmt, match_module_member, unparse_stmt};
+use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -29,13 +29,10 @@ fn match_named_tuple_assign<'a>(
     } = &value.node else {
         return None;
     };
-    if !match_module_member(
-        func,
-        "typing",
-        "NamedTuple",
-        &checker.from_imports,
-        &checker.import_aliases,
-    ) {
+    if !checker
+        .resolve_call_path(func)
+        .map_or(false, |call_path| call_path == ["typing", "NamedTuple"])
+    {
         return None;
     }
     Some((typename, args, keywords, func))

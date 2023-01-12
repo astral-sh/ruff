@@ -3554,19 +3554,27 @@ impl AlwaysAutofixableViolation for RemoveSixCompat {
 }
 
 define_violation!(
-    pub struct DatetimeTimezoneUTC;
+    pub struct DatetimeTimezoneUTC {
+        pub straight_import: bool,
+    }
 );
-impl AlwaysAutofixableViolation for DatetimeTimezoneUTC {
+impl Violation for DatetimeTimezoneUTC {
     fn message(&self) -> String {
         "Use `datetime.UTC` alias".to_string()
     }
 
-    fn autofix_title(&self) -> String {
-        "Convert to `datetime.UTC` alias".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        if self.straight_import {
+            Some(|_| "Convert to `datetime.UTC` alias".to_string())
+        } else {
+            None
+        }
     }
 
     fn placeholder() -> Self {
-        DatetimeTimezoneUTC
+        DatetimeTimezoneUTC {
+            straight_import: true,
+        }
     }
 }
 

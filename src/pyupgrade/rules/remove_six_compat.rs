@@ -1,6 +1,6 @@
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, StmtKind};
 
-use crate::ast::helpers::{collect_call_paths, create_expr, create_stmt, dealias_call_path};
+use crate::ast::helpers::{create_expr, create_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -364,8 +364,10 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
         return None;
     }
     let [arg] = &args[..] else { return None; };
-    let call_path = dealias_call_path(collect_call_paths(arg), &checker.import_aliases);
-    if !is_module_member(&call_path, "six") {
+    if !checker
+        .resolve_call_path(arg)
+        .map_or(false, |call_path| is_module_member(&call_path, "six"))
+    {
         return None;
     }
     let ExprKind::Call { func, args, .. } = &arg.node else {return None;};
@@ -409,8 +411,10 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    let call_path = dealias_call_path(collect_call_paths(expr), &checker.import_aliases);
-    if is_module_member(&call_path, "six") {
+    if checker
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| is_module_member(&call_path, "six"))
+    {
         let patch = checker.patch(&RuleCode::UP016);
         let diagnostic = match &expr.node {
             ExprKind::Call {

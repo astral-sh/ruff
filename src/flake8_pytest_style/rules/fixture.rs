@@ -4,7 +4,7 @@ use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
     is_pytest_yield_fixture, keyword_is_literal,
 };
-use crate::ast::helpers::{collect_arg_names, collect_call_paths};
+use crate::ast::helpers::{collect_arg_names, collect_call_path};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -50,7 +50,7 @@ where
                 }
             }
             ExprKind::Call { func, .. } => {
-                if collect_call_paths(func) == vec!["request", "addfinalizer"] {
+                if collect_call_path(func) == vec!["request", "addfinalizer"] {
                     self.addfinalizer_call = Some(expr);
                 };
                 visitor::walk_expr(self, expr);

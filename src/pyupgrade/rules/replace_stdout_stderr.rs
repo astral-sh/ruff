@@ -1,6 +1,6 @@
 use rustpython_ast::{Expr, Keyword};
 
-use crate::ast::helpers::{find_keyword, match_module_member};
+use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
@@ -43,13 +43,10 @@ fn extract_middle(contents: &str) -> Option<MiddleContent> {
 
 /// UP022
 pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
-    if match_module_member(
-        expr,
-        "subprocess",
-        "run",
-        &checker.from_imports,
-        &checker.import_aliases,
-    ) {
+    if checker
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| call_path == ["subprocess", "run"])
+    {
         // Find `stdout` and `stderr` kwargs.
         let Some(stdout) = find_keyword(kwargs, "stdout") else {
             return;
@@ -59,19 +56,13 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
         };
 
         // Verify that they're both set to `subprocess.PIPE`.
-        if !match_module_member(
-            &stdout.node.value,
-            "subprocess",
-            "PIPE",
-            &checker.from_imports,
-            &checker.import_aliases,
-        ) || !match_module_member(
-            &stderr.node.value,
-            "subprocess",
-            "PIPE",
-            &checker.from_imports,
-            &checker.import_aliases,
-        ) {
+        if !checker
+            .resolve_call_path(&stdout.node.value)
+            .map_or(false, |call_path| call_path == ["subprocess", "PIPE"])
+            || !checker
+                .resolve_call_path(&stderr.node.value)
+                .map_or(false, |call_path| call_path == ["subprocess", "PIPE"])
+        {
             return;
         }
 

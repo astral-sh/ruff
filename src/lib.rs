@@ -12,6 +12,8 @@
 )]
 #![forbid(unsafe_code)]
 
+extern crate core;
+
 mod ast;
 mod autofix;
 mod cache;
