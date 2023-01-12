@@ -3022,6 +3022,30 @@ order-by-type = true
 
 ---
 
+#### [`relative-imports-order`](#relative-imports-order)
+
+Whether to place "closer" imports (fewer `.` characters, most local)
+before "further" imports (more `.` characters, least local), or vice
+versa.
+
+The default ("furthest-to-closest") is equivalent to isort's
+`reverse-relative` default (`reverse-relative = false`); setting
+this to "closest-to-furthest" is equivalent to isort's `reverse-relative
+= true`.
+
+**Default value**: `furthest-to-closest`
+
+**Type**: `RelatveImportsOrder`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+relative-imports-order = "closest-to-furthest"
+```
+
+---
+
 #### [`required-imports`](#required-imports)
 
 Add the specified import line to all files.

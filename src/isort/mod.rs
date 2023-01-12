@@ -11,6 +11,7 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::isort::categorize::{categorize, ImportType};
 use crate::isort::comments::Comment;
 use crate::isort::helpers::trailing_comma;
+use crate::isort::settings::RelatveImportsOrder;
 use crate::isort::sorting::{cmp_either_import, cmp_import_from, cmp_members, cmp_modules};
 use crate::isort::track::{Block, Trailer};
 use crate::isort::types::EitherImport::{Import, ImportFrom};
@@ -382,7 +383,11 @@ fn categorize_imports<'a>(
     block_by_type
 }
 
-fn order_imports(block: ImportBlock, order_by_type: bool) -> OrderedImportBlock {
+fn order_imports(
+    block: ImportBlock,
+    order_by_type: bool,
+    relative_imports_order: RelatveImportsOrder,
+) -> OrderedImportBlock {
     let mut ordered = OrderedImportBlock::default();
 
     // Sort `StmtKind::Import`.
@@ -468,16 +473,16 @@ fn order_imports(block: ImportBlock, order_by_type: bool) -> OrderedImportBlock 
             })
             .sorted_by(
                 |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
-                    cmp_import_from(import_from1, import_from2).then_with(|| {
-                        match (aliases1.first(), aliases2.first()) {
+                    cmp_import_from(import_from1, import_from2, relative_imports_order).then_with(
+                        || match (aliases1.first(), aliases2.first()) {
                             (None, None) => Ordering::Equal,
                             (None, Some(_)) => Ordering::Less,
                             (Some(_), None) => Ordering::Greater,
                             (Some((alias1, _)), Some((alias2, _))) => {
                                 cmp_members(alias1, alias2, order_by_type)
                             }
-                        }
-                    })
+                        },
+                    )
                 },
             ),
     );
@@ -540,16 +545,17 @@ pub fn format_imports(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
+    combine_as_imports: bool,
+    extra_standard_library: &BTreeSet<String>,
+    force_single_line: bool,
+    force_sort_within_sections: bool,
+    force_wrap_aliases: bool,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
-    extra_standard_library: &BTreeSet<String>,
-    combine_as_imports: bool,
-    force_wrap_aliases: bool,
-    split_on_trailing_comma: bool,
-    force_single_line: bool,
-    single_line_exclusions: &BTreeSet<String>,
     order_by_type: bool,
-    force_sort_within_sections: bool,
+    relative_imports_order: RelatveImportsOrder,
+    single_line_exclusions: &BTreeSet<String>,
+    split_on_trailing_comma: bool,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -572,7 +578,7 @@ pub fn format_imports(
     // Generate replacement source code.
     let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
-        let mut imports = order_imports(import_block, order_by_type);
+        let mut imports = order_imports(import_block, order_by_type, relative_imports_order);
 
         if force_single_line {
             imports = force_single_line_imports(imports, single_line_exclusions);
@@ -586,7 +592,9 @@ pub fn format_imports(
                 .chain(imports.import_from.into_iter().map(ImportFrom))
                 .collect::<Vec<EitherImport>>();
             if force_sort_within_sections {
-                imports.sort_by(cmp_either_import);
+                imports.sort_by(|import1, import2| {
+                    cmp_either_import(import1, import2, relative_imports_order)
+                });
             };
             imports
         };
@@ -647,6 +655,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::isort;
+    use crate::isort::settings::RelatveImportsOrder;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
     use crate::settings::Settings;
@@ -678,6 +687,7 @@ mod tests {
     #[test_case(Path::new("preserve_import_star.py"))]
     #[test_case(Path::new("preserve_indentation.py"))]
     #[test_case(Path::new("reorder_within_section.py"))]
+    #[test_case(Path::new("relative_imports_order.py"))]
     #[test_case(Path::new("separate_first_party_imports.py"))]
     #[test_case(Path::new("separate_future_imports.py"))]
     #[test_case(Path::new("separate_local_folder_imports.py"))]
@@ -918,6 +928,26 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 ..Settings::for_rule(RuleCode::I002)
+            },
+        )?;
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("relative_imports_order.py"))]
+    fn closest_to_furthest(path: &Path) -> Result<()> {
+        let snapshot = format!("closest_to_furthest_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    relative_imports_order: RelatveImportsOrder::ClosestToFurther,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(RuleCode::I001)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);

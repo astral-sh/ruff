@@ -820,6 +820,17 @@
             "null"
           ]
         },
+        "relative-imports-order": {
+          "description": "Whether to place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local), or vice versa.\n\nThe default (\"furthest-to-closest\") is equivalent to isort's `reverse-relative` default (`reverse-relative = false`); setting this to \"closest-to-furthest\" is equivalent to isort's `reverse-relative = true`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RelatveImportsOrder"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "required-imports": {
           "description": "Add the specified import line to all files.",
           "type": [
@@ -1003,6 +1014,24 @@
           "type": "string",
           "enum": [
             "double"
+          ]
+        }
+      ]
+    },
+    "RelatveImportsOrder": {
+      "oneOf": [
+        {
+          "description": "Place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local).",
+          "type": "string",
+          "enum": [
+            "closest-to-further"
+          ]
+        },
+        {
+          "description": "Place \"further\" imports (more `.` characters, least local) imports before \"closer\" imports (fewer `.` characters, most local).",
+          "type": "string",
+          "enum": [
+            "furthest-to-closest"
           ]
         }
       ]
