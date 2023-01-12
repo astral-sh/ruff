@@ -25,10 +25,10 @@ expression: diagnostics
 - kind:
     BadQuotesDocstring: single
   location:
-    row: 25
+    row: 27
     column: 4
   end_location:
-    row: 25
+    row: 27
     column: 27
   fix: ~
   parent: ~
