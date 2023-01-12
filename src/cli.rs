@@ -61,33 +61,33 @@ pub struct Cli {
     pub isolated: bool,
     /// Comma-separated list of rule codes to enable (or ALL, to enable all
     /// rules).
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
     pub select: Option<Vec<RuleCodePrefix>>,
     /// Like --select, but adds additional rule codes on top of the selected
     /// ones.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
     pub extend_select: Option<Vec<RuleCodePrefix>>,
     /// Comma-separated list of rule codes to disable.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
     pub ignore: Option<Vec<RuleCodePrefix>>,
     /// Like --ignore, but adds additional rule codes on top of the ignored
     /// ones.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
     pub extend_ignore: Option<Vec<RuleCodePrefix>>,
     /// List of paths, used to omit files and/or directories from analysis.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', value_name = "FILE_PATTERN")]
     pub exclude: Option<Vec<FilePattern>>,
     /// Like --exclude, but adds additional files and directories on top of
     /// those already excluded.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', value_name = "FILE_PATTERN")]
     pub extend_exclude: Option<Vec<FilePattern>>,
     /// List of rule codes to treat as eligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
     pub fixable: Option<Vec<RuleCodePrefix>>,
     /// List of rule codes to treat as ineligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
     pub unfixable: Option<Vec<RuleCodePrefix>>,
     /// List of mappings from file pattern to code to exclude
     #[arg(long, value_delimiter = ',')]

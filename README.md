@@ -343,21 +343,21 @@ Options:
           Disable cache reads
       --isolated
           Ignore all configuration files
-      --select <SELECT>
+      --select <RULE_CODE>
           Comma-separated list of rule codes to enable (or ALL, to enable all rules)
-      --extend-select <EXTEND_SELECT>
+      --extend-select <RULE_CODE>
           Like --select, but adds additional rule codes on top of the selected ones
-      --ignore <IGNORE>
+      --ignore <RULE_CODE>
           Comma-separated list of rule codes to disable
-      --extend-ignore <EXTEND_IGNORE>
+      --extend-ignore <RULE_CODE>
           Like --ignore, but adds additional rule codes on top of the ignored ones
-      --exclude <EXCLUDE>
+      --exclude <FILE_PATTERN>
           List of paths, used to omit files and/or directories from analysis
-      --extend-exclude <EXTEND_EXCLUDE>
+      --extend-exclude <FILE_PATTERN>
           Like --exclude, but adds additional files and directories on top of those already excluded
-      --fixable <FIXABLE>
+      --fixable <RULE_CODE>
           List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
-      --unfixable <UNFIXABLE>
+      --unfixable <RULE_CODE>
           List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
@@ -1825,6 +1825,8 @@ Exclusions are based on globs, and can be either:
   `directory`). Note that these paths are relative to the project root
   (e.g., the directory containing your `pyproject.toml`).
 
+For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+
 Note that you'll typically want to use
 [`extend-exclude`](#extend-exclude) to modify the excluded paths.
 
@@ -1871,6 +1873,18 @@ line-length = 100
 
 A list of file patterns to omit from linting, in addition to those
 specified by `exclude`.
+
+Exclusions are based on globs, and can be either:
+
+- Single-path patterns, like `.mypy_cache` (to exclude any directory
+  named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+  `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+- Relative patterns, like `directory/foo.py` (to exclude that specific
+  file) or `directory/*.py` (to exclude any Python files in
+  `directory`). Note that these paths are relative to the project root
+  (e.g., the directory containing your `pyproject.toml`).
+
+For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
 
 **Default value**: `[]`
 
