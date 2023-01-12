@@ -10,8 +10,8 @@ use rustpython_parser::ast::Location;
 use serde::Serialize;
 use serde_json::json;
 
+use crate::diagnostics::Diagnostics;
 use crate::fs::relativize_path;
-use crate::linter::Diagnostics;
 use crate::logging::LogLevel;
 use crate::message::Message;
 use crate::registry::RuleCode;

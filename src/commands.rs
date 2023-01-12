@@ -17,8 +17,9 @@ use walkdir::WalkDir;
 
 use crate::cache::CACHE_DIR_NAME;
 use crate::cli::Overrides;
+use crate::diagnostics::{lint_path, lint_stdin, Diagnostics};
 use crate::iterators::par_iter;
-use crate::linter::{add_noqa_to_path, lint_path, lint_stdin, Diagnostics};
+use crate::linter::add_noqa_to_path;
 use crate::logging::LogLevel;
 use crate::message::Message;
 use crate::registry::RuleCode;

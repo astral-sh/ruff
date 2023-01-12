@@ -18,6 +18,7 @@ mod cache;
 mod checkers;
 pub mod cli;
 mod cst;
+mod diagnostics;
 mod directives;
 mod doc_lines;
 mod docstrings;
