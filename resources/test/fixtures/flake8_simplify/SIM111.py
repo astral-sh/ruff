@@ -1,8 +1,16 @@
 def f():
-    for x in iterable:  # SIM110
+    # SIM110
+    for x in iterable:
         if check(x):
             return True
     return False
+
+
+def f():
+    for x in iterable:
+        if check(x):
+            return True
+    return True
 
 
 def f():
@@ -13,14 +21,16 @@ def f():
 
 
 def f():
-    for x in iterable:  # SIM111
+    # SIM111
+    for x in iterable:
         if check(x):
             return False
     return True
 
 
 def f():
-    for x in iterable:  # SIM 111
+    # SIM111
+    for x in iterable:
         if not x.is_empty():
             return False
     return True
@@ -29,5 +39,41 @@ def f():
 def f():
     for x in iterable:
         if check(x):
+            return False
+    return False
+
+
+def f():
+    for x in iterable:
+        if check(x):
             return "foo"
     return "bar"
+
+
+def f():
+    for x in iterable:
+        if check(x):
+            return True
+        elif x.is_empty():
+            return True
+    return False
+
+
+def f():
+    for x in iterable:
+        if check(x):
+            return True
+        else:
+            return True
+    return False
+
+
+def f():
+    for x in iterable:
+        if check(x):
+            return True
+        elif x.is_empty():
+            return True
+    else:
+        return True
+    return False
