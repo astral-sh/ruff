@@ -430,6 +430,13 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
     arg_names
 }
 
+/// Returns `true` if a statement or expression includes at least one comment.
+pub fn has_comments<T>(located: &Located<T>, locator: &SourceCodeLocator) -> bool {
+    lexer::make_tokenizer(&locator.slice_source_code_range(&Range::from_located(located)))
+        .flatten()
+        .any(|(_, tok, _)| matches!(tok, Tok::Comment(..)))
+}
+
 /// Returns `true` if a call is an argumented `super` invocation.
 pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
     if let ExprKind::Name { id, .. } = &func.node {
