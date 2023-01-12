@@ -79,3 +79,9 @@ if key in a_dict:
 else:
     var2 = value2
     var = "default"
+
+# OK (complex default value)
+if key in a_dict:
+    var = a_dict[key]
+else:
+    var = foo()
