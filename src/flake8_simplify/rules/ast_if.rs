@@ -2,7 +2,7 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKin
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    contains_call_path, create_expr, create_stmt, unparse_expr, unparse_stmt,
+    contains_call_path, create_expr, create_stmt, has_comments, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::autofix::Fix;
@@ -202,14 +202,27 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
-    let content = unparse_stmt(&ternary, checker.style);
+    let contents = unparse_stmt(&ternary, checker.style);
+
+    // Don't flag for simplified ternaries if the resulting expression would exceed
+    // the maximum line length.
+    if stmt.location.column() + contents.len() > checker.settings.line_length {
+        return;
+    }
+
+    // Don't flag for simplified ternaries if the if-expression contains any
+    // comments.
+    if has_comments(stmt, checker.locator) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
-        violations::UseTernaryOperator(content.clone()),
+        violations::UseTernaryOperator(contents.clone()),
         Range::from_located(stmt),
     );
     if checker.patch(&RuleCode::SIM108) {
         diagnostic.amend(Fix::replacement(
-            content,
+            contents,
             stmt.location,
             stmt.end_location.unwrap(),
         ));

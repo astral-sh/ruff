@@ -1,5 +1,3 @@
-#![allow(clippy::len_zero, clippy::needless_pass_by_value)]
-
 use itertools::Itertools;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
@@ -13,8 +11,11 @@ use crate::violations;
 const ERROR_NAMES: &[&str] = &["EnvironmentError", "IOError", "WindowsError"];
 const ERROR_MODULES: &[&str] = &["mmap", "select", "socket"];
 
-fn get_correct_name(original: &str) -> String {
-    if ERROR_NAMES.contains(&original) {
+fn corrected_name(checker: &Checker, original: &str) -> String {
+    if ERROR_NAMES.contains(&original)
+        && checker.is_builtin(original)
+        && checker.is_builtin("OSError")
+    {
         "OSError".to_string()
     } else {
         original.to_string()
@@ -64,7 +65,7 @@ fn handle_name_or_attribute(
             replacements.extend(temp_replacements);
             before_replace.extend(temp_before_replace);
             if replacements.is_empty() {
-                let new_name = get_correct_name(id);
+                let new_name = corrected_name(checker, id);
                 replacements.push(new_name);
                 before_replace.push(id.to_string());
             }
@@ -102,7 +103,7 @@ fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKin
             for elt in elts {
                 match &elt.node {
                     ExprKind::Name { id, .. } => {
-                        let new_name = get_correct_name(id);
+                        let new_name = corrected_name(checker, id);
                         replacements.push(new_name);
                     }
                     ExprKind::Attribute { .. } => {
@@ -138,7 +139,7 @@ fn handle_making_changes(
     before_replace: &[String],
     replacements: &[String],
 ) {
-    if before_replace != replacements && replacements.len() > 0 {
+    if before_replace != replacements && !replacements.is_empty() {
         let range = Range::new(target.location, target.end_location.unwrap());
         let contents = checker.locator.slice_source_code_range(&range);
         // Pyyupgrade does not want imports changed if a module only is
@@ -171,8 +172,6 @@ fn handle_making_changes(
     }
 }
 
-// This is a hacky way to handle the different variable types we get since
-// raise and try are very different. Would love input on a cleaner way
 pub trait OSErrorAliasChecker {
     fn check_error(&self, checker: &mut Checker)
     where
@@ -181,7 +180,6 @@ pub trait OSErrorAliasChecker {
 
 impl OSErrorAliasChecker for &Vec<Excepthandler> {
     fn check_error(&self, checker: &mut Checker) {
-        // Each separate except block is a separate error and fix
         for handler in self.iter() {
             handle_except_block(checker, handler);
         }
@@ -233,6 +231,6 @@ impl OSErrorAliasChecker for &Expr {
 }
 
 /// UP024
-pub fn os_error_alias<U: OSErrorAliasChecker>(checker: &mut Checker, handlers: U) {
+pub fn os_error_alias<U: OSErrorAliasChecker>(checker: &mut Checker, handlers: &U) {
     handlers.check_error(checker);
 }

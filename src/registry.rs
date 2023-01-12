@@ -294,6 +294,7 @@ define_rule_mapping!(
     YTT302 => violations::SysVersionCmpStr10,
     YTT303 => violations::SysVersionSlice1Referenced,
     // flake8-simplify
+    SIM115 => violations::OpenFileWithContextHandler,
     SIM101 => violations::DuplicateIsinstanceCall,
     SIM102 => violations::NestedIfStatements,
     SIM103 => violations::ReturnBoolConditionDirectly,
