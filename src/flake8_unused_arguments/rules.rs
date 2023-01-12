@@ -153,6 +153,10 @@ pub fn unused_arguments(
                         .enabled
                         .contains(Argumentable::Method.rule_code())
                         && !helpers::is_empty(body)
+                        && (!visibility::is_magic(name)
+                            || visibility::is_init(name)
+                            || visibility::is_new(name)
+                            || visibility::is_call(name))
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
                         && !visibility::is_overload(checker, decorator_list)
@@ -178,6 +182,10 @@ pub fn unused_arguments(
                         .enabled
                         .contains(Argumentable::ClassMethod.rule_code())
                         && !helpers::is_empty(body)
+                        && (!visibility::is_magic(name)
+                            || visibility::is_init(name)
+                            || visibility::is_new(name)
+                            || visibility::is_call(name))
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
                         && !visibility::is_overload(checker, decorator_list)
@@ -203,6 +211,10 @@ pub fn unused_arguments(
                         .enabled
                         .contains(Argumentable::StaticMethod.rule_code())
                         && !helpers::is_empty(body)
+                        && (!visibility::is_magic(name)
+                            || visibility::is_init(name)
+                            || visibility::is_new(name)
+                            || visibility::is_call(name))
                         && !visibility::is_abstract(checker, decorator_list)
                         && !visibility::is_override(checker, decorator_list)
                         && !visibility::is_overload(checker, decorator_list)
