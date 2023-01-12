@@ -133,7 +133,7 @@ pub struct Options {
         default = r#"[]"#,
         value_type = "Vec<String>",
         example = r#"
-            add-import = ["from __future__ import annotations"]
+            required-imports = ["from __future__ import annotations"]
         "#
     )]
     /// Add the specified import line to all files.

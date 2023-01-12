@@ -3034,7 +3034,7 @@ Add the specified import line to all files.
 
 ```toml
 [tool.ruff.isort]
-add-import = ["from __future__ import annotations"]
+required-imports = ["from __future__ import annotations"]
 ```
 
 ---
