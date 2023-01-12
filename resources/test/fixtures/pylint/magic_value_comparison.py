@@ -9,6 +9,13 @@ if 10 > user_input: # [magic-value-comparison]
 if 10 == 100: # [comparison-of-constants] R0133
     pass
 
+if 1 == 3: # [comparison-of-constants] R0133
+    pass
+
+x = 0
+if 4 == 3 == x: # [comparison-of-constants] R0133
+    pass
+
 time_delta = 7224
 ONE_HOUR = 3600
 

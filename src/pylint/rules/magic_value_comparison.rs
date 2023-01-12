@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -21,34 +22,30 @@ fn is_magic_value(constant: &Constant) -> bool {
 }
 
 /// PLR2004
-pub fn magic_value_comparison(
-    checker: &mut Checker,
-    expr: &Expr,
-    left: &Expr,
-    comparators: &[Expr],
-) {
-    let mut diagnostics = vec![];
+pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
+    for (left, right) in std::iter::once(left)
+        .chain(comparators.iter())
+        .tuple_windows()
+    {
+        // If both of the comparators are constant, skip rule for the whole expression.
+        // R0133: comparison-of-constants
+        if matches!(left.node, ExprKind::Constant { .. })
+            && matches!(right.node, ExprKind::Constant { .. })
+        {
+            return;
+        }
+    }
 
-    for comparison_expr in comparators.iter().chain([left]) {
+    for comparison_expr in std::iter::once(left).chain(comparators.iter()) {
         if let ExprKind::Constant { value, .. } = &comparison_expr.node {
             if is_magic_value(value) {
                 let diagnostic = Diagnostic::new(
                     violations::MagicValueComparison(value.to_string()),
-                    Range::from_located(expr),
+                    Range::from_located(comparison_expr),
                 );
 
-                diagnostics.push(diagnostic);
+                checker.diagnostics.push(diagnostic);
             }
         }
-    }
-
-    // If all of the comparators (`+ 1` includes `left`) are constant skip rule.
-    // R0133: comparison-of-constants
-    if comparators.len() + 1 == diagnostics.len() {
-        return;
-    }
-
-    for d in diagnostics {
-        checker.diagnostics.push(d);
     }
 }

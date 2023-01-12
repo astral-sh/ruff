@@ -2584,7 +2584,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::PLR2004) {
-                    pylint::rules::magic_value_comparison(self, expr, left, comparators);
+                    pylint::rules::magic_value_comparison(self, left, comparators);
                 }
 
                 if self.settings.enabled.contains(&RuleCode::SIM118) {

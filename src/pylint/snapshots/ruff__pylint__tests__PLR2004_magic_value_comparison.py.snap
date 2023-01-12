@@ -9,46 +9,46 @@ expression: diagnostics
     column: 3
   end_location:
     row: 6
-    column: 18
+    column: 5
   fix: ~
   parent: ~
 - kind:
     MagicValueComparison: "2"
   location:
-    row: 29
-    column: 3
+    row: 36
+    column: 11
   end_location:
-    row: 29
+    row: 36
     column: 12
   fix: ~
   parent: ~
 - kind:
     MagicValueComparison: "'Hunter2'"
   location:
-    row: 44
-    column: 3
+    row: 51
+    column: 21
   end_location:
-    row: 44
+    row: 51
     column: 30
   fix: ~
   parent: ~
 - kind:
     MagicValueComparison: "3.141592653589793"
   location:
-    row: 50
-    column: 3
+    row: 57
+    column: 20
   end_location:
-    row: 50
+    row: 57
     column: 40
   fix: ~
   parent: ~
 - kind:
     MagicValueComparison: "b'something'"
   location:
-    row: 59
-    column: 3
+    row: 66
+    column: 17
   end_location:
-    row: 59
+    row: 66
     column: 29
   fix: ~
   parent: ~
