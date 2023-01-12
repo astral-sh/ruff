@@ -2324,14 +2324,7 @@ where
 
                 // flake8-simplify
                 if self.settings.enabled.contains(&RuleCode::SIM115) {
-                    if let Some(diagnostic) = flake8_simplify::rules::open_file_with_context_handler(
-                        func,
-                        &self.parents,
-                        &self.from_imports,
-                        &self.import_aliases,
-                    ) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_simplify::rules::open_file_with_context_handler(self, func);
                 }
             }
             ExprKind::Dict { keys, values } => {
