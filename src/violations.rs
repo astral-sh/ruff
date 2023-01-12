@@ -4705,6 +4705,29 @@ impl AlwaysAutofixableViolation for CommentedOutCode {
 // flake8-bandit
 
 define_violation!(
+    pub struct Jinja2AutoescapeFalse(pub bool);
+);
+impl Violation for Jinja2AutoescapeFalse {
+    fn message(&self) -> String {
+        let Jinja2AutoescapeFalse(value) = self;
+        match value {
+            true => "Using jinja2 templates with `autoescape=False` is dangerous and can lead to \
+                     XSS. Ensure `autoescape=True` or use the `select_autoescape` function to \
+                     mitigate XSS vulnerabilities."
+                .to_string(),
+            false => "By default, jinja2 sets autoescape to False. Consider using \
+                      `autoescape=True` or use the `select_autoescape` function to mitigate XSS \
+                      vulnerabilities"
+                .to_string(),
+        }
+    }
+
+    fn placeholder() -> Self {
+        Jinja2AutoescapeFalse(false)
+    }
+}
+
+define_violation!(
     pub struct AssertUsed;
 );
 impl Violation for AssertUsed {
