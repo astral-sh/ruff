@@ -1310,8 +1310,15 @@ where
                 if self.settings.enabled.contains(&RuleCode::PLW0120) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
-                if self.settings.enabled.contains(&RuleCode::SIM118) {
-                    flake8_simplify::rules::key_in_dict_for(self, target, iter);
+                if matches!(stmt.node, StmtKind::For { .. }) {
+                    if self.settings.enabled.contains(&RuleCode::SIM110)
+                        || self.settings.enabled.contains(&RuleCode::SIM111)
+                    {
+                        flake8_simplify::rules::convert_for_loop_to_any_all(self, stmt, None);
+                    }
+                    if self.settings.enabled.contains(&RuleCode::SIM118) {
+                        flake8_simplify::rules::key_in_dict_for(self, target, iter);
+                    }
                 }
             }
             StmtKind::Try {
@@ -3168,7 +3175,7 @@ where
                 if matches!(stmt.node, StmtKind::For { .. })
                     && matches!(sibling.node, StmtKind::Return { .. })
                 {
-                    flake8_simplify::rules::convert_loop_to_any_all(self, stmt, sibling);
+                    flake8_simplify::rules::convert_for_loop_to_any_all(self, stmt, Some(sibling));
                 }
             }
         }
