@@ -1,22 +1,22 @@
 ---
 source: src/flake8_simplify/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     ConvertLoopToAny: return any(check(x) for x in iterable)
   location:
-    row: 2
+    row: 3
     column: 4
   end_location:
-    row: 4
+    row: 5
     column: 23
   fix:
     content: return any(check(x) for x in iterable)
     location:
-      row: 2
+      row: 3
       column: 4
     end_location:
-      row: 5
+      row: 6
       column: 16
   parent: ~
 

@@ -25,6 +25,7 @@ fn return_values<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Loop<'a>> {
         body,
         target,
         iter,
+        orelse,
         ..
     } = &stmt.node else {
         return None;
@@ -35,14 +36,21 @@ fn return_values<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Loop<'a>> {
     if body.len() != 1 {
         return None;
     }
+    // TODO(charlie): If we have `else: return True` or `else: return False`, we
+    // should still be able to simplify.
+    if !orelse.is_empty() {
+        return None;
+    }
     let StmtKind::If {
         body: nested_body,
-        test: nested_test,
-        ..
+        test: nested_test, orelse: nested_orelse,
     } = &body[0].node else {
         return None;
     };
     if nested_body.len() != 1 {
+        return None;
+    }
+    if !nested_orelse.is_empty() {
         return None;
     }
     let StmtKind::Return { value } = &nested_body[0].node else {
