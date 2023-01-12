@@ -1,3 +1,4 @@
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
