@@ -2023,6 +2023,17 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.settings.enabled.contains(&RuleCode::S701) {
+                    if let Some(diagnostic) = flake8_bandit::rules::jinja2_autoescape_false(
+                        func,
+                        args,
+                        keywords,
+                        &self.from_imports,
+                        &self.import_aliases,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.enabled.contains(&RuleCode::S106) {
                     self.diagnostics
                         .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));
