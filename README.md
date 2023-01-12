@@ -46,6 +46,7 @@ imports, and more.
 
 Ruff is extremely actively developed and used in major open-source projects like:
 
+- [pandas](https://github.com/pandas-dev/pandas)
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
