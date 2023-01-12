@@ -13,7 +13,7 @@ static WIDTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\*|\d*)").unwrap());
 static PRECISION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\.(?:\*|\d*))?").unwrap());
 static LENGTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[hlL]?").unwrap());
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct PercentFormatPart {
     key: Option<String>,
     conversion_flag: Option<String>,
@@ -40,7 +40,7 @@ impl PercentFormatPart {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct PercentFormat {
     item: String,
     parts: Option<PercentFormatPart>,
@@ -93,7 +93,9 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                     formats.push(fmt_full);
                     return formats;
                 }
-                Some(item) => item,
+                // Since we cut off the part of the string before `i` in the beginning, we need to
+                // add it back to get the proper index
+                Some(item) => item + i,
             };
             string_end = i;
             i += 1;
@@ -174,6 +176,31 @@ mod test {
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
         let e2 = PercentFormat::default();
         let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_double_s() {
+        let sample = "\"%s\"";
+        let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e2 = PercentFormat::default();
+        let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_double_two() {
+        let sample = "\"%s two! %s\"";
+        let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
+        let e1 = PercentFormat::new(" two! ".to_string(), Some(sube1.clone()));
+        let e2 = PercentFormat::new("\"".to_string(), Some(sube1));
+        let e3 = PercentFormat::default();
+        let expected = vec![e2, e1, e3];
 
         let received = parse_percent_format(sample);
         assert_eq!(received, expected);
