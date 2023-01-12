@@ -5,31 +5,51 @@ expression: diagnostics
 - kind:
     MagicValueComparison: "10"
   location:
-    row: 5
+    row: 6
     column: 3
   end_location:
-    row: 5
+    row: 6
     column: 18
   fix: ~
   parent: ~
 - kind:
-    MagicValueComparison: "100"
+    MagicValueComparison: "2"
   location:
-    row: 8
+    row: 29
     column: 3
   end_location:
-    row: 8
+    row: 29
     column: 12
   fix: ~
   parent: ~
 - kind:
-    MagicValueComparison: "10"
+    MagicValueComparison: "'Hunter2'"
   location:
-    row: 8
+    row: 44
     column: 3
   end_location:
-    row: 8
-    column: 12
+    row: 44
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    MagicValueComparison: "3.141592653589793"
+  location:
+    row: 50
+    column: 3
+  end_location:
+    row: 50
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    MagicValueComparison: "b'something'"
+  location:
+    row: 59
+    column: 3
+  end_location:
+    row: 59
+    column: 29
   fix: ~
   parent: ~
 
