@@ -696,6 +696,7 @@ impl<'a> SimpleCallArgs<'a> {
     }
 
     /// Get the number of positional and keyword arguments used.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.args.len() + self.kwargs.len()
     }

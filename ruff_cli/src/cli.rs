@@ -2,18 +2,21 @@ use std::path::{Path, PathBuf};
 
 use clap::{command, Parser};
 use regex::Regex;
-use rustc_hash::FxHashMap;
-
-use crate::logging::LogLevel;
-use crate::registry::{RuleCode, RuleCodePrefix};
-use crate::resolver::ConfigProcessor;
-use crate::settings::types::{
+use ruff::logging::LogLevel;
+use ruff::registry::{RuleCode, RuleCodePrefix};
+use ruff::resolver::ConfigProcessor;
+use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
-use crate::{fs, mccabe};
+use ruff::{fs, mccabe};
+use rustc_hash::FxHashMap;
 
 #[derive(Debug, Parser)]
-#[command(author, about = "Ruff: An extremely fast Python linter.")]
+#[command(
+    author,
+    name = "ruff",
+    about = "Ruff: An extremely fast Python linter."
+)]
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Cli {
@@ -346,7 +349,7 @@ pub struct Overrides {
 }
 
 impl ConfigProcessor for &Overrides {
-    fn process_config(&self, config: &mut crate::settings::configuration::Configuration) {
+    fn process_config(&self, config: &mut ruff::settings::configuration::Configuration) {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());
         }

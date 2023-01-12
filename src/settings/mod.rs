@@ -29,7 +29,7 @@ use crate::{
 };
 
 pub mod configuration;
-pub(crate) mod flags;
+pub mod flags;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;

@@ -26,7 +26,7 @@ const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn check_path(
+pub fn check_path(
     path: &Path,
     package: Option<&Path>,
     contents: &str,

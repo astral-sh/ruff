@@ -5,7 +5,7 @@ use rustpython_parser::mode::Mode;
 use rustpython_parser::{lexer, parser};
 
 /// Collect tokens up to and including the first error.
-pub(crate) fn tokenize(contents: &str) -> Vec<LexResult> {
+pub fn tokenize(contents: &str) -> Vec<LexResult> {
     let mut tokens: Vec<LexResult> = vec![];
     for tok in lexer::make_tokenizer(contents) {
         let is_err = tok.is_err();

@@ -7,12 +7,13 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
+use ruff::linter::{lint_fix, lint_only};
+use ruff::message::Message;
+use ruff::settings::{flags, Settings};
+use ruff::{fix, fs};
 use similar::TextDiff;
 
-use crate::linter::{lint_fix, lint_only};
-use crate::message::Message;
-use crate::settings::{flags, Settings};
-use crate::{cache, fix, fs};
+use crate::cache;
 
 #[derive(Debug, Default)]
 pub struct Diagnostics {

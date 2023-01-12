@@ -1,5 +1,8 @@
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=0.14.10,<0.15"]
+# We depend on >=0.14.10 because we specify name in
+# [package.metadata.maturin] in ruff_cli/Cargo.toml.
+
 build-backend = "maturin"
 
 [project]
@@ -35,6 +38,7 @@ urls = { repository = "https://github.com/charliermarsh/ruff" }
 
 [tool.maturin]
 bindings = "bin"
+manifest-path = "ruff_cli/Cargo.toml"
 python-source = "python"
 strip = true
 

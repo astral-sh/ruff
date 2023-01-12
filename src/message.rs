@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use rustpython_parser::ast::Location;
+pub use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
