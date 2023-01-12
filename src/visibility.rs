@@ -82,27 +82,23 @@ pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
 }
 
 /// Returns `true` if a function is a "magic method".
-pub fn is_magic(stmt: &Stmt) -> bool {
-    match &stmt.node {
-        StmtKind::FunctionDef { name, .. } | StmtKind::AsyncFunctionDef { name, .. } => {
-            name.starts_with("__")
-                && name.ends_with("__")
-                && name != "__init__"
-                && name != "__call__"
-                && name != "__new__"
-        }
-        _ => panic!("Found non-FunctionDef in is_magic"),
-    }
+pub fn is_magic(name: &str) -> bool {
+    name.starts_with("__") && name.ends_with("__")
 }
 
 /// Returns `true` if a function is an `__init__`.
-pub fn is_init(stmt: &Stmt) -> bool {
-    match &stmt.node {
-        StmtKind::FunctionDef { name, .. } | StmtKind::AsyncFunctionDef { name, .. } => {
-            name == "__init__"
-        }
-        _ => panic!("Found non-FunctionDef in is_init"),
-    }
+pub fn is_init(name: &str) -> bool {
+    name == "__init__"
+}
+
+/// Returns `true` if a function is an `__new__`.
+pub fn is_new(name: &str) -> bool {
+    name == "__new__"
+}
+
+/// Returns `true` if a function is an `__call__`.
+pub fn is_call(name: &str) -> bool {
+    name == "__call__"
 }
 
 /// Returns `true` if a module name indicates public visibility.

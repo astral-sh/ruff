@@ -181,3 +181,17 @@ def f(a: int, b: int) -> str:
 
 def f(a, b):
     return f"{a}{b}"
+
+
+###
+# Unused arguments on magic methods.
+###
+class C:
+    def __init__(self, x) -> None:
+        print("Hello, world!")
+
+    def __str__(self) -> str:
+        return "Hello, world!"
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        print("Hello, world!")

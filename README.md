@@ -180,7 +180,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.217'
+  rev: 'v0.0.218'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -920,8 +920,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT001 | IncorrectFixtureParenthesesStyle | Use `@pytest.fixture()` over `@pytest.fixture` | 🛠 |
 | PT002 | FixturePositionalArgs | Configuration for fixture `...` specified via positional args, use kwargs |  |
 | PT003 | ExtraneousScopeFunction | `scope='function'` is implied in `@pytest.fixture()` |  |
-| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore | 🛠 |
-| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore | 🛠 |
+| PT004 | MissingFixtureNameUnderscore | Fixture `...` does not return anything, add leading underscore |  |
+| PT005 | IncorrectFixtureNameUnderscore | Fixture `...` returns a value, remove leading underscore |  |
 | PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple` | 🛠 |
 | PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple` |  |
 | PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
@@ -975,6 +975,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
 | SIM103 | ReturnBoolConditionDirectly | Return the condition `...` directly | 🛠 |
@@ -998,6 +999,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
 | SIM300 | YodaConditions | Yoda conditions are discouraged, use `left == right` instead | 🛠 |
+| SIM401 | DictGetWithDefault | Use `var = dict.get(key, "default")` instead of an `if` block | 🛠 |
 
 ### flake8-tidy-imports (TID)
 
@@ -2340,7 +2342,7 @@ unfixable = ["F401"]
 Enable or disable automatic update checks (overridden by the
 `--update-check` and `--no-update-check` command-line flags).
 
-**Default value**: `true`
+**Default value**: `false`
 
 **Type**: `bool`
 
@@ -2348,7 +2350,7 @@ Enable or disable automatic update checks (overridden by the
 
 ```toml
 [tool.ruff]
-update-check = false
+update-check = true
 ```
 
 ---
