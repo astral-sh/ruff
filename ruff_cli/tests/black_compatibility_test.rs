@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::{fs, process, str};
 
 use anyhow::{anyhow, Context, Result};
-use assert_cmd::{crate_name, Command};
+use assert_cmd::Command;
 use itertools::Itertools;
 use log::info;
 use ruff::logging::{set_up_logging, LogLevel};
@@ -23,6 +23,8 @@ struct Blackd {
     server: process::Child,
     client: ureq::Agent,
 }
+
+const BIN_NAME: &str = "ruff";
 
 impl Blackd {
     pub fn new() -> Result<Self> {
@@ -104,7 +106,7 @@ fn run_test(path: &Path, blackd: &Blackd, ruff_args: &[&str]) -> Result<()> {
     let input = fs::read(path)?;
 
     // Step 1: Run `ruff` on the input.
-    let step_1 = &Command::cargo_bin(crate_name!())?
+    let step_1 = &Command::cargo_bin(BIN_NAME)?
         .args(ruff_args)
         .write_stdin(input)
         .assert()
@@ -121,7 +123,7 @@ fn run_test(path: &Path, blackd: &Blackd, ruff_args: &[&str]) -> Result<()> {
     let step_2_output = blackd.check(&step_1_output)?;
 
     // Step 3: Re-run `ruff` on the input.
-    let step_3 = &Command::cargo_bin(crate_name!())?
+    let step_3 = &Command::cargo_bin(BIN_NAME)?
         .args(ruff_args)
         .write_stdin(step_2_output.clone())
         .assert();

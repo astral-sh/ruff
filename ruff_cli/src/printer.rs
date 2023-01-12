@@ -6,17 +6,16 @@ use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, Sou
 use anyhow::Result;
 use colored::Colorize;
 use itertools::iterate;
-use rustpython_parser::ast::Location;
+use ruff::fs::relativize_path;
+use ruff::logging::LogLevel;
+use ruff::message::{Location, Message};
+use ruff::registry::RuleCode;
+use ruff::settings::types::SerializationFormat;
+use ruff::{fix, notify_user};
 use serde::Serialize;
 use serde_json::json;
 
 use crate::diagnostics::Diagnostics;
-use crate::fs::relativize_path;
-use crate::logging::LogLevel;
-use crate::message::Message;
-use crate::registry::RuleCode;
-use crate::settings::types::SerializationFormat;
-use crate::{fix, notify_user};
 
 /// Enum to control whether lint violations are shown to the user.
 pub enum Violations {
@@ -282,9 +281,9 @@ impl<'a> Printer<'a> {
         Ok(())
     }
 
-    pub fn write_continuously(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub fn write_continuously(&self, diagnostics: &Diagnostics) {
         if matches!(self.log_level, LogLevel::Silent) {
-            return Ok(());
+            return;
         }
 
         if self.log_level >= &LogLevel::Default {
@@ -302,10 +301,9 @@ impl<'a> Printer<'a> {
                 print_message(message);
             }
         }
-
-        Ok(())
     }
 
+    #[allow(clippy::unused_self)]
     pub fn clear_screen(&self) -> Result<()> {
         #[cfg(not(target_family = "wasm"))]
         clearscreen::clear()?;

@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::{Args, CommandFactory};
-use ruff::cli::Cli as MainCli;
+use ruff_cli::Cli as MainCli;
 
 use crate::utils::replace_readme_section;
 

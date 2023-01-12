@@ -11,22 +11,22 @@ use log::{debug, error};
 use path_absolutize::path_dedot;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use rustpython_ast::Location;
+use ruff::cache::CACHE_DIR_NAME;
+use ruff::linter::add_noqa_to_path;
+use ruff::logging::LogLevel;
+use ruff::message::{Location, Message};
+use ruff::registry::RuleCode;
+use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
+use ruff::settings::flags;
+use ruff::settings::types::SerializationFormat;
+use ruff::{fix, fs, packaging, resolver, violations};
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::cache::CACHE_DIR_NAME;
 use crate::cli::Overrides;
 use crate::diagnostics::{lint_path, lint_stdin, Diagnostics};
 use crate::iterators::par_iter;
-use crate::linter::add_noqa_to_path;
-use crate::logging::LogLevel;
-use crate::message::Message;
-use crate::registry::RuleCode;
-use crate::resolver::{FileDiscovery, PyprojectDiscovery};
-use crate::settings::flags;
-use crate::settings::types::SerializationFormat;
-use crate::{cache, fix, fs, packaging, resolver, violations, warn_user_once};
+use crate::{cache, warn_user_once};
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -288,7 +288,7 @@ struct Explanation<'a> {
 }
 
 /// Explain a `RuleCode` to the user.
-pub fn explain(code: &RuleCode, format: &SerializationFormat) -> Result<()> {
+pub fn explain(code: &RuleCode, format: SerializationFormat) -> Result<()> {
     match format {
         SerializationFormat::Text | SerializationFormat::Grouped => {
             println!(

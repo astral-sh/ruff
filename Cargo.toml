@@ -2,7 +2,9 @@
 members = [
   "flake8_to_ruff",
   "ruff_dev",
+  "ruff_cli",
 ]
+default-members = [".", "ruff_cli"]
 
 [package]
 name = "ruff"
@@ -22,20 +24,14 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
-annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { version = "1.0.66" }
-atty = { version = "0.2.14" }
-bincode = { version = "1.3.3" }
 bitflags = { version = "1.3.2" }
-cachedir = { version = "0.3.0" }
 cfg-if = { version = "1.0.0" }
 chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
 clap = { version = "4.0.1", features = ["derive", "env"] }
-clap_complete_command = { version = "0.4.0" }
 colored = { version = "2.0.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
-filetime = { version = "0.2.17" }
 glob = { version = "0.3.0" }
 globset = { version = "0.4.9" }
 ignore = { version = "0.4.18" }
@@ -44,12 +40,10 @@ libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a87
 log = { version = "0.4.17" }
 natord = { version = "1.0.9" }
 nohash-hasher = { version = "0.2.0" }
-notify = { version = "5.0.0" }
 num-bigint = { version = "0.4.3" }
 num-traits = "0.2.15"
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
-quick-junit = { version = "0.3.2" }
 regex = { version = "1.6.0" }
 ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
 ruff_macros = { version = "0.0.220", path = "ruff_macros" }
@@ -60,20 +54,12 @@ rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPyth
 schemars = { version = "0.8.11" }
 semver = { version = "1.0.16" }
 serde = { version = "1.0.147", features = ["derive"] }
-serde_json = { version = "1.0.87" }
 shellexpand = { version = "3.0.0" }
-similar = { version = "2.2.1" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
 toml_edit = { version = "0.17.1", features = ["easy"] }
-walkdir = { version = "2.3.2" }
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-clearscreen = { version = "2.0.0" }
-rayon = { version = "1.5.3" }
-update-informer = { version = "0.6.0", default-features = false, features = ["pypi"], optional = true }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support
@@ -88,16 +74,10 @@ wasm-bindgen = { version = "0.2.83" }
 [dev-dependencies]
 insta = { version = "1.19.1", features = ["yaml"] }
 test-case = { version = "2.2.2" }
-ureq = { version = "2.5.0", features = [] }
 wasm-bindgen-test = { version = "0.3.33" }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
-assert_cmd = { version = "2.0.4" }
 criterion = { version = "0.4.0" }
-
-[features]
-default = ["update-informer"]
-update-informer = ["dep:update-informer"]
 
 [profile.release]
 panic = "abort"
