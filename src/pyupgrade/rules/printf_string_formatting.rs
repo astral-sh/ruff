@@ -242,7 +242,11 @@ fn percent_to_format(string: &str) -> String {
     final_string
 }
 
-fn fix_percent_format_tuple(left: &Expr, right: &Expr) {}
+fn fix_percent_format_tuple(left: &Expr, right: &Expr, left_string: &str) {
+   println!("{}", left_string); 
+   let cleaned_string = percent_to_format(left_string);
+   println!("{}", cleaned_string); 
+}
 
 fn fix_percent_format_dict(left: &Expr, right: &Expr) {}
 
@@ -320,7 +324,7 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         }// all dict substitutions must be named
         match &right.node {
             ExprKind::Tuple { .. } => {
-                fix_percent_format_tuple(left, right);
+                fix_percent_format_tuple(left, right, &left_string);
             }
             ExprKind::Dict { .. } => {
                 fix_percent_format_dict(left, right);
