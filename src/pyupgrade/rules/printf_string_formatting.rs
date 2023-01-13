@@ -7,7 +7,6 @@ use rustpython_ast::{Expr, ExprKind};
 
 // Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
 // Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
-// TODO: do not forget--keep-percent-format as a way to ignore this rule
 
 static MAPPING_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\(([^()]*)\)").unwrap());
 static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").unwrap());
@@ -165,17 +164,20 @@ fn simplify_conversion_flag(flag: &str) -> String {
 
 /// Returns true if any of conversion_flag, width, precision, and conversion are a non-empty string
 fn any_percent_format(pf: &PercentFormatPart) -> bool {
+    let mut cf_bool = false;
+    let mut w_bool = false;
+    let mut precision_bool = false;
+    let conversion_bool = !pf.conversion.is_empty();
     if let Some(conversion_flag) = &pf.conversion_flag {
-        if let Some(width) = &pf.width {
-            if let Some(precision) = &pf.precision {
-                return !conversion_flag.is_empty()
-                    || !width.is_empty()
-                    || !precision.is_empty()
-                    || !pf.conversion.is_empty();
-            }
-        }
+        cf_bool = !conversion_flag.is_empty();
     }
-    false
+    if let Some(width) = &pf.width {
+        w_bool = !width.is_empty();
+    }
+    if let Some(precision) = &pf.precision {
+        precision_bool = !precision.is_empty();
+    }
+    cf_bool || w_bool || precision_bool || conversion_bool
 }
 
 fn handle_part(part: &PercentFormat) -> String {
@@ -204,7 +206,9 @@ fn handle_part(part: &PercentFormat) -> String {
     } else {
         converter = "".to_string();
     }
+    println!("BEFORE THE HIT: {:?}", fmt);
     if any_percent_format(&fmt) {
+        println!("I WAS HIT: {:?}", fmt);
         parts.push(":".to_string());
     }
     if let Some(conversion_flag) = &fmt.conversion_flag {
@@ -259,14 +263,19 @@ fn fix_percent_format_dict(checker: &mut Checker, left: &Expr, right: &Expr) {}
 
 /// Returns true if any of conversion_flag, width, and precision are a non-empty string
 fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
+    let mut cf_bool = false;
+    let mut w_bool = false;
+    let mut precision_bool = false;
     if let Some(conversion_flag) = &pf.conversion_flag {
-        if let Some(width) = &pf.width {
-            if let Some(precision) = &pf.precision {
-                return !conversion_flag.is_empty() || !width.is_empty() || !precision.is_empty();
-            }
-        }
+        cf_bool = !conversion_flag.is_empty();
     }
-    false
+    if let Some(width) = &pf.width {
+        w_bool = !width.is_empty();
+    }
+    if let Some(precision) = &pf.precision {
+        precision_bool = !precision.is_empty();
+    }
+    cf_bool || w_bool || precision_bool
 }
 
 /// UP031
