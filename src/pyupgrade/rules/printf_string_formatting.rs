@@ -1,8 +1,9 @@
+use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::pyupgrade::helpers::curly_escape;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::Expr;
+use rustpython_ast::{Expr, ExprKind};
 
 // Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
 // Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
@@ -241,6 +242,21 @@ fn percent_to_format(string: &str) -> String {
     final_string
 }
 
+fn fix_percent_format_tuple(left: &Expr, right: &Expr) {}
+
+fn fix_percent_format_dict(left: &Expr, right: &Expr) {}
+
+/// Returns true if any of conversion_flag, width, and precision are a non-empty string
+fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
+    if let Some(conversion_flag) = &pf.conversion_flag {
+        if let Some(width) = &pf.width {
+            if let Some(precision) = &pf.precision {
+                return !conversion_flag.is_empty() || !width.is_empty() || !precision.is_empty();
+            }
+        }
+    }
+    false
+}
 
 /// UP031
 pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr) {
@@ -248,7 +264,72 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
     println!("==========");
     println!("{:?}", right);
     //This is just to get rid of the 10,000 lint errors
-    let answer = parse_percent_format("test");
+    let left_range = Range::new(left.location, left.end_location.unwrap());
+    let left_string = checker.locator.slice_source_code_range(&left_range);
+    let parsed = parse_percent_format(&left_string);
+    for item in parsed {
+        let fmt = match item.parts {
+            None => continue,
+            Some(item) => item,
+        };
+        // timid: these require out-of-order parameter consumption
+        if fmt.width == Some("*".to_string()) || fmt.precision == Some("*".to_string()) {
+            break;
+        }
+        // these conversions require modification of parameters
+        if vec!["d", "i", "u", "c"].contains(&&fmt.conversion[..]) {
+            break;
+        }
+        // timid: py2: %#o formats different from {:#o} (--py3?)
+        if fmt
+            .conversion_flag
+            .clone()
+            .unwrap_or_default()
+            .contains("#")
+            && fmt.conversion == "o"
+        {
+            break;
+        }
+        // no equivalent in format
+        if let Some(key) = &fmt.key {
+            if key.is_empty() {
+                break;
+            }
+        }
+        // timid: py2: conversion is subject to modifiers (--py3?)
+        let nontrivial_fmt = get_nontrivial_fmt(&fmt);
+        if fmt.conversion == "%".to_string() && nontrivial_fmt {
+            break;
+        }
+        // no equivalent in format
+        if vec!["a", "r"].contains(&&fmt.conversion[..]) && nontrivial_fmt {
+            break;
+        }
+        // %s with None and width is not supported
+        if let Some(width) = &fmt.width {
+            if !width.is_empty() && fmt.conversion == "s".to_string() {
+                break;
+            }
+        }
+        if let ExprKind::Dict { .. } = &right.node {
+            // Technically a value of "" would also count as `not key`, BUT we already have a check
+            // above for this
+            if fmt.key.is_none() {
+                break;
+            }
+        }// all dict substitutions must be named
+        match &right.node {
+            ExprKind::Tuple { .. } => {
+                fix_percent_format_tuple(left, right);
+            }
+            ExprKind::Dict { .. } => {
+                fix_percent_format_dict(left, right);
+            }
+            _ => {}
+        }
+
+
+    }
 }
 
 //Pyupgrade has a bunch of tests specific to `parse_percent_format`, I figured it wouldn't hurt to
