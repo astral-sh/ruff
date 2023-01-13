@@ -258,8 +258,28 @@ pub fn fix_unnecessary_list_comprehension_dict(
     ))
 }
 
-fn drop_trailing_comma<'a>(elements: &[Element<'a>]) -> Vec<Element<'a>> {
-    let mut elements = elements.to_vec();
+/// Drop a trailing comma from a list of tuple elements.
+fn drop_trailing_comma<'a>(
+    tuple: &Tuple<'a>,
+) -> Result<(
+    Vec<Element<'a>>,
+    ParenthesizableWhitespace<'a>,
+    ParenthesizableWhitespace<'a>,
+)> {
+    let whitespace_after = tuple
+        .lpar
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
+        .whitespace_after
+        .clone();
+    let whitespace_before = tuple
+        .rpar
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
+        .whitespace_before
+        .clone();
+
+    let mut elements = tuple.elements.clone();
     if elements.len() == 1 {
         if let Some(Element::Simple {
             value,
@@ -267,13 +287,18 @@ fn drop_trailing_comma<'a>(elements: &[Element<'a>]) -> Vec<Element<'a>> {
             ..
         }) = elements.last()
         {
-            elements[0] = Element::Simple {
-                value: value.clone(),
-                comma: None,
-            };
+            if whitespace_before == ParenthesizableWhitespace::default()
+                && whitespace_after == ParenthesizableWhitespace::default()
+            {
+                elements[0] = Element::Simple {
+                    value: value.clone(),
+                    comma: None,
+                };
+            }
         }
     }
-    elements
+
+    Ok((elements, whitespace_after, whitespace_before))
 }
 
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
@@ -285,9 +310,13 @@ pub fn fix_unnecessary_literal_set(locator: &Locator, expr: &rustpython_ast::Exp
     let mut call = match_call(body)?;
     let arg = match_arg(call)?;
 
-    let elements = match &arg.value {
-        Expression::Tuple(inner) => drop_trailing_comma(&inner.elements),
-        Expression::List(inner) => inner.elements.clone(),
+    let (elements, whitespace_after, whitespace_before) = match &arg.value {
+        Expression::Tuple(inner) => drop_trailing_comma(inner)?,
+        Expression::List(inner) => (
+            inner.elements.clone(),
+            inner.lbracket.whitespace_after.clone(),
+            inner.rbracket.whitespace_before.clone(),
+        ),
         _ => {
             bail!("Expected Expression::Tuple | Expression::List");
         }
@@ -298,12 +327,8 @@ pub fn fix_unnecessary_literal_set(locator: &Locator, expr: &rustpython_ast::Exp
     } else {
         body.value = Expression::Set(Box::new(Set {
             elements,
-            lbrace: LeftCurlyBrace {
-                whitespace_after: call.whitespace_before_args.clone(),
-            },
-            rbrace: RightCurlyBrace {
-                whitespace_before: arg.whitespace_after_arg.clone(),
-            },
+            lbrace: LeftCurlyBrace { whitespace_after },
+            rbrace: RightCurlyBrace { whitespace_before },
             lpar: vec![],
             rpar: vec![],
         }));
