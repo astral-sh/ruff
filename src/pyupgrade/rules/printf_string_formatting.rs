@@ -183,16 +183,22 @@ fn any_percent_format(pf: &PercentFormatPart) -> bool {
 fn handle_part(part: &PercentFormat) -> String {
     let mut string = part.item.clone();
     string = curly_escape(&string);
+    println!("\nSTART: {}", string);
+    println!("PART: {:?}", part);
     let mut fmt = match part.parts.clone() {
         None => return string,
         Some(item) => item,
     };
 
+    println!("CHECKPOINT 0");
     if fmt.conversion == "%".to_string() {
         string.push('%');
+        println!("THE STRING: {}", string);
         return string;
     }
+    println!("CHECKPOINT 1");
     let mut parts = vec![string, "{".to_string()];
+    println!("PARTS 1: {:?}", parts);
     if fmt.conversion == "s".to_string() {
         fmt.conversion = "".to_string();
     }
@@ -428,7 +434,7 @@ mod test {
     }
 
     #[test_case("%s", "{}"; "simple string")]
-    #[test_case("%%s", "%{}"; "two percents")]
+    #[test_case("%%%s", "%{}"; "three percents")]
     #[test_case("%(foo)s", "{foo}"; "word in string")]
     #[test_case("%2f", "{:2f}"; "formatting in string")]
     #[test_case("%r", "{!r}"; "format an r")]
