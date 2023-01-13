@@ -2590,6 +2590,10 @@ where
                     );
                 }
 
+                if self.settings.enabled.contains(&RuleCode::PLR0133) {
+                    pylint::rules::constant_comparison(self, left, ops, comparators);
+                }
+
                 if self.settings.enabled.contains(&RuleCode::PLR2004) {
                     pylint::rules::magic_value_comparison(self, left, comparators);
                 }

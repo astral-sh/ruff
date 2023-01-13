@@ -17,6 +17,7 @@ mod tests {
     #[test_case(RuleCode::PLE0117, Path::new("nonlocal_without_binding.py"); "PLE0117")]
     #[test_case(RuleCode::PLE0118, Path::new("used_prior_global_declaration.py"); "PLE0118")]
     #[test_case(RuleCode::PLE1142, Path::new("await_outside_async.py"); "PLE1142")]
+    #[test_case(RuleCode::PLR0133, Path::new("constant_comparison.py"); "PLR0133")]
     #[test_case(RuleCode::PLR0206, Path::new("property_with_parameters.py"); "PLR0206")]
     #[test_case(RuleCode::PLR0402, Path::new("import_aliasing.py"); "PLR0402")]
     #[test_case(RuleCode::PLR1701, Path::new("consider_merging_isinstance.py"); "PLR1701")]
