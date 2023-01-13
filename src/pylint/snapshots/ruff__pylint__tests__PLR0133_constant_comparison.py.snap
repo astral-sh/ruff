@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     ConstantComparison:
-      - "100"
-      - "100"
-      - Eq
+      left_constant: "100"
+      op: Eq
+      right_constant: "100"
   location:
     row: 3
     column: 3
@@ -17,9 +17,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "1"
-      - "3"
-      - Eq
+      left_constant: "1"
+      op: Eq
+      right_constant: "3"
   location:
     row: 6
     column: 3
@@ -30,9 +30,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "1"
-      - "3"
-      - NotEq
+      left_constant: "1"
+      op: NotEq
+      right_constant: "3"
   location:
     row: 9
     column: 3
@@ -43,9 +43,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "4"
-      - "3"
-      - Eq
+      left_constant: "4"
+      op: Eq
+      right_constant: "3"
   location:
     row: 13
     column: 3
@@ -56,9 +56,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "1"
-      - "0"
-      - Gt
+      left_constant: "1"
+      op: Gt
+      right_constant: "0"
   location:
     row: 23
     column: 3
@@ -69,9 +69,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "1"
-      - "0"
-      - GtE
+      left_constant: "1"
+      op: GtE
+      right_constant: "0"
   location:
     row: 29
     column: 3
@@ -82,9 +82,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "1"
-      - "0"
-      - Lt
+      left_constant: "1"
+      op: Lt
+      right_constant: "0"
   location:
     row: 35
     column: 3
@@ -95,9 +95,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "1"
-      - "0"
-      - LtE
+      left_constant: "1"
+      op: LtE
+      right_constant: "0"
   location:
     row: 41
     column: 3
@@ -108,9 +108,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "'hello'"
-      - "''"
-      - Eq
+      left_constant: "'hello'"
+      op: Eq
+      right_constant: "''"
   location:
     row: 51
     column: 3
@@ -121,9 +121,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantComparison:
-      - "True"
-      - "False"
-      - Eq
+      left_constant: "True"
+      op: Eq
+      right_constant: "False"
   location:
     row: 58
     column: 3

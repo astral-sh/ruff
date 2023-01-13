@@ -1207,20 +1207,32 @@ impl fmt::Display for ViolationsCmpop {
 }
 
 define_violation!(
-    pub struct ConstantComparison(pub String, pub String, pub ViolationsCmpop);
+    pub struct ConstantComparison {
+        pub left_constant: String,
+        pub op: ViolationsCmpop,
+        pub right_constant: String,
+    }
 );
 impl Violation for ConstantComparison {
     fn message(&self) -> String {
-        let ConstantComparison(left, right, comparison) = self;
+        let ConstantComparison {
+            left_constant,
+            op,
+            right_constant,
+        } = self;
 
         format!(
-            "Two constants compared in a comparison, consider replacing `{left} {comparison} \
-             {right}`"
+            "Two constants compared in a comparison, consider replacing `{left_constant} {op} \
+             {right_constant}`"
         )
     }
 
     fn placeholder() -> Self {
-        ConstantComparison("0".to_string(), "0".to_string(), ViolationsCmpop::Eq)
+        ConstantComparison {
+            left_constant: "0".to_string(),
+            op: ViolationsCmpop::Eq,
+            right_constant: "0".to_string(),
+        }
     }
 }
 

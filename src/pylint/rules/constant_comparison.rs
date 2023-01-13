@@ -20,19 +20,21 @@ pub fn constant_comparison(
     {
         if let (
             ExprKind::Constant {
-                value: left_value, ..
+                value: left_constant,
+                ..
             },
             ExprKind::Constant {
-                value: right_value, ..
+                value: right_constant,
+                ..
             },
         ) = (&left.node, &right.node)
         {
             let diagnostic = Diagnostic::new(
-                violations::ConstantComparison(
-                    left_value.to_string(),
-                    right_value.to_string(),
-                    op.into(),
-                ),
+                violations::ConstantComparison {
+                    left_constant: left_constant.to_string(),
+                    op: op.into(),
+                    right_constant: right_constant.to_string(),
+                },
                 Range::from_located(left),
             );
 
