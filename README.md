@@ -2877,6 +2877,24 @@ ignore-variadic-names = true
 
 ### `isort`
 
+#### [`classes`](#classes)
+
+An override list of tokens to always recognize as a Class for
+`order-by-type` regardless of casing.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+classes = ["SVC"]
+```
+
+---
+
 #### [`combine-as-imports`](#combine-as-imports)
 
 Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
