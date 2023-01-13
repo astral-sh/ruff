@@ -1,6 +1,6 @@
 ---
 source: src/flake8_comprehensions/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     UnnecessaryLiteralSet: list
@@ -69,5 +69,22 @@ expression: checks
     end_location:
       row: 4
       column: 12
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet: tuple
+  location:
+    row: 6
+    column: 5
+  end_location:
+    row: 6
+    column: 14
+  fix:
+    content: "{1}"
+    location:
+      row: 6
+      column: 5
+    end_location:
+      row: 6
+      column: 14
   parent: ~
 
