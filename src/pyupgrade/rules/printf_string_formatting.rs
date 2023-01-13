@@ -350,8 +350,7 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         }
     }
 }
-//Pyupgrade has a bunch of tests specific to `parse_percent_format`, I figured it wouldn't hurt to
-//add them
+// Since this one is pretty complicated, I added all of the unit tests pyupgrade has
 #[cfg(test)]
 mod test {
     use super::*;
