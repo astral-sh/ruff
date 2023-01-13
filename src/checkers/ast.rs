@@ -2590,6 +2590,10 @@ where
                     );
                 }
 
+                if self.settings.enabled.contains(&RuleCode::PLR2004) {
+                    pylint::rules::magic_value_comparison(self, left, comparators);
+                }
+
                 if self.settings.enabled.contains(&RuleCode::SIM118) {
                     flake8_simplify::rules::key_in_dict_compare(self, expr, left, ops, comparators);
                 }

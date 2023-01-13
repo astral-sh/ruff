@@ -189,6 +189,7 @@ define_rule_mapping!(
     PLR0402 => violations::ConsiderUsingFromImport,
     PLR1701 => violations::ConsiderMergingIsinstance,
     PLR1722 => violations::UseSysExit,
+    PLR2004 => violations::MagicValueComparison,
     PLW0120 => violations::UselessElseOnLoop,
     PLW0602 => violations::GlobalVariableNotAssigned,
     // flake8-builtins
