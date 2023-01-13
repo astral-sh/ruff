@@ -242,13 +242,20 @@ fn percent_to_format(string: &str) -> String {
     final_string
 }
 
-fn fix_percent_format_tuple(left: &Expr, right: &Expr, left_string: &str) {
-   println!("{}", left_string); 
-   let cleaned_string = percent_to_format(left_string);
-   println!("{}", cleaned_string); 
+fn fix_percent_format_tuple(checker: &mut Checker, left: &Expr, right: &Expr, left_string: &str) {
+    // Pyupgrade explicitly checks for ' % (' before running, but I am not sure the value of this
+    // (pyupgrade itself says it is overly timid). The one edge case I considered was a multi line
+    // format statement, but worst-case scenario we go over the limit and black fixes it. Let me
+    // know if you want this check implemented
+    let right_range = Range::new(right.location, right.end_location.unwrap());
+    let right_string = checker.locator.slice_source_code_range(&right_range);
+    let mut cleaned_string = percent_to_format(left_string);
+    cleaned_string.push_str(".format");
+    cleaned_string.push_str(&right_string);
+    println!("{}", cleaned_string);
 }
 
-fn fix_percent_format_dict(left: &Expr, right: &Expr) {}
+fn fix_percent_format_dict(checker: &mut Checker, left: &Expr, right: &Expr) {}
 
 /// Returns true if any of conversion_flag, width, and precision are a non-empty string
 fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
@@ -264,13 +271,12 @@ fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
 
 /// UP031
 pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr) {
-    println!("{:?}", left);
-    println!("==========");
-    println!("{:?}", right);
     //This is just to get rid of the 10,000 lint errors
     let left_range = Range::new(left.location, left.end_location.unwrap());
     let left_string = checker.locator.slice_source_code_range(&left_range);
     let parsed = parse_percent_format(&left_string);
+    // Rust does not have a for else statement so we have to do this
+    let mut no_breaks = true;
     for item in parsed {
         let fmt = match item.parts {
             None => continue,
@@ -278,10 +284,12 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         };
         // timid: these require out-of-order parameter consumption
         if fmt.width == Some("*".to_string()) || fmt.precision == Some("*".to_string()) {
+            no_breaks = false;
             break;
         }
         // these conversions require modification of parameters
         if vec!["d", "i", "u", "c"].contains(&&fmt.conversion[..]) {
+            no_breaks = false;
             break;
         }
         // timid: py2: %#o formats different from {:#o} (--py3?)
@@ -292,85 +300,68 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
             .contains("#")
             && fmt.conversion == "o"
         {
+            no_breaks = false;
             break;
         }
         // no equivalent in format
         if let Some(key) = &fmt.key {
             if key.is_empty() {
+                no_breaks = false;
                 break;
             }
         }
         // timid: py2: conversion is subject to modifiers (--py3?)
         let nontrivial_fmt = get_nontrivial_fmt(&fmt);
         if fmt.conversion == "%".to_string() && nontrivial_fmt {
+            no_breaks = false;
             break;
         }
         // no equivalent in format
         if vec!["a", "r"].contains(&&fmt.conversion[..]) && nontrivial_fmt {
+            no_breaks = false;
             break;
         }
         // %s with None and width is not supported
         if let Some(width) = &fmt.width {
             if !width.is_empty() && fmt.conversion == "s".to_string() {
+                no_breaks = false;
                 break;
             }
         }
+        // all dict substitutions must be named
         if let ExprKind::Dict { .. } = &right.node {
             // Technically a value of "" would also count as `not key`, BUT we already have a check
             // above for this
             if fmt.key.is_none() {
+                no_breaks = false;
                 break;
             }
-        }// all dict substitutions must be named
+        }
+    }
+    if no_breaks {
         match &right.node {
             ExprKind::Tuple { .. } => {
-                fix_percent_format_tuple(left, right, &left_string);
+                fix_percent_format_tuple(checker, left, right, &left_string);
             }
             ExprKind::Dict { .. } => {
-                fix_percent_format_dict(left, right);
+                fix_percent_format_dict(checker, left, right);
             }
             _ => {}
         }
-
-
     }
 }
-
 //Pyupgrade has a bunch of tests specific to `parse_percent_format`, I figured it wouldn't hurt to
 //add them
 #[cfg(test)]
 mod test {
     use super::*;
+    use test_case::test_case;
 
     #[test]
     fn test_parse_percent_format_none() {
         let sample = "\"\"";
         let e1 = PercentFormat::new("\"\"".to_string(), None);
         let expected = vec![e1];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_double_percent() {
-        let sample = "\"%%\"";
-        let sube1 = PercentFormatPart::new(None, None, None, None, "%".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_double_s() {
-        let sample = "\"%s\"";
-        let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
         assert_eq!(received, expected);
@@ -389,127 +380,20 @@ mod test {
         assert_eq!(received, expected);
     }
 
-    #[test]
-    fn test_parse_percent_format_word_in_paren() {
-        let sample = "\"%(hi)s\"";
-        let sube1 =
-            PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_empty_paren() {
-        let sample = "\"%()s\"";
-        let sube1 = PercentFormatPart::new(Some("".to_string()), None, None, None, "s".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_hashtag() {
-        let sample = "\"%#o\"";
-        let sube1 =
-            PercentFormatPart::new(None, Some("#".to_string()), None, None, "o".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_hashtag_and_symbols() {
-        let sample = "\"% #0-+d\"";
-        let sube1 =
-            PercentFormatPart::new(None, Some(" #0-+".to_string()), None, None, "d".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_numbers_letters() {
-        let sample = "\"%5d\"";
-        let sube1 =
-            PercentFormatPart::new(None, None, Some("5".to_string()), None, "d".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_star_d() {
-        let sample = "\"%*d\"";
-        let sube1 =
-            PercentFormatPart::new(None, None, Some("*".to_string()), None, "d".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_dot_letter() {
-        let sample = "\"%.f\"";
-        let sube1 =
-            PercentFormatPart::new(None, None, None, Some(".".to_string()), "f".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_dot_number_letter() {
-        let sample = "\"%.5f\"";
-        let sube1 =
-            PercentFormatPart::new(None, None, None, Some(".5".to_string()), "f".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_dot_star_letter() {
-        let sample = "\"%.*f\"";
-        let sube1 =
-            PercentFormatPart::new(None, None, None, Some(".*".to_string()), "f".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::new("\"".to_string(), None);
-        let expected = vec![e1, e2];
-
-        let received = parse_percent_format(sample);
-        assert_eq!(received, expected);
-    }
-
-    #[test]
-    fn test_parse_percent_format_two_letter() {
-        let sample = "\"%ld\"";
-        let sube1 = PercentFormatPart::new(None, None, None, None, "d".to_string());
-        let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
+    #[test_case("\"%ld\"",PercentFormatPart::new(None, None, None, None, "d".to_string()); "two letter")]
+    #[test_case( "\"%.*f\"",PercentFormatPart::new(None, None, None, Some(".*".to_string()), "f".to_string()); "dot star letter")]
+    #[test_case( "\"%.5f\"",PercentFormatPart::new(None, None, None, Some(".5".to_string()), "f".to_string()); "dot number letter")]
+    #[test_case( "\"%.f\"",PercentFormatPart::new(None, None, None, Some(".".to_string()), "f".to_string()); "dot letter")]
+    #[test_case( "\"%*d\"",PercentFormatPart::new(None, None, Some("*".to_string()), None, "d".to_string()); "star d")]
+    #[test_case( "\"%5d\"",PercentFormatPart::new(None, None, Some("5".to_string()), None, "d".to_string()); "number letter")]
+    #[test_case( "\"% #0-+d\"",PercentFormatPart::new(None, Some(" #0-+".to_string()), None, None, "d".to_string()); "hastag and symbols")]
+    #[test_case( "\"%#o\"",PercentFormatPart::new(None, Some("#".to_string()), None, None, "o".to_string()); "format hashtag")]
+    #[test_case( "\"%()s\"",PercentFormatPart::new(Some("".to_string()), None, None, None, "s".to_string()); "empty paren")]
+    #[test_case( "\"%(hi)s\"",PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string()); "word in paren")]
+    #[test_case( "\"%s\"",PercentFormatPart::new(None, None, None, None, "s".to_string()); "format s")]
+    #[test_case( "\"%%\"",PercentFormatPart::new(None, None, None, None, "%".to_string()); "format double percentage")]
+    fn test_parse_percent_format(sample: &str, expected: PercentFormatPart) {
+        let e1 = PercentFormat::new("\"".to_string(), Some(expected));
         let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
@@ -532,6 +416,27 @@ mod test {
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test_case("%s", "{}"; "simple string")]
+    #[test_case("%%s", "%{}"; "two percents")]
+    #[test_case("%(foo)s", "{foo}"; "word in string")]
+    #[test_case("%2f", "{:2f}"; "formatting in string")]
+    #[test_case("%r", "{!r}"; "format an r")]
+    #[test_case("%a", "{!a}"; "format an a")]
+    fn test_percent_to_format(sample: &str, expected: &str) {
+        let received = percent_to_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test_case("", ""; "preserve blanks")]
+    #[test_case(" ", " "; "preserve one space")]
+    #[test_case("  ", " "; "two spaces to one")]
+    #[test_case("#0- +", "#<+"; "complex format")]
+    #[test_case("-", "<"; "simple format")]
+    fn test_simplify_conversion_flag(sample: &str, expected: &str) {
+        let received = simplify_conversion_flag(sample);
         assert_eq!(received, expected);
     }
 }
