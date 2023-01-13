@@ -3565,11 +3565,11 @@ define_violation!(
 );
 impl AlwaysAutofixableViolation for PrintfStringFormatting {
     fn message(&self) -> String {
-        "Use builtin `open`".to_string()
+        "Use format specifiers instead of percent format".to_string()
     }
 
     fn autofix_title(&self) -> String {
-        "Replace with builtin `open`".to_string()
+        "Replace with format specifiers".to_string()
     }
 
     fn placeholder() -> Self {

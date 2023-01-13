@@ -1,6 +1,9 @@
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::pyupgrade::helpers::curly_escape;
+use crate::registry::Diagnostic;
+use crate::violations;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_ast::{Expr, ExprKind};
@@ -244,7 +247,7 @@ fn percent_to_format(string: &str) -> String {
     final_string
 }
 
-fn fix_percent_format_tuple(checker: &mut Checker, left: &Expr, right: &Expr, left_string: &str) {
+fn fix_percent_format_tuple(checker: &mut Checker, right: &Expr, left_string: &str) -> String {
     // Pyupgrade explicitly checks for ' % (' before running, but I am not sure the value of this
     // (pyupgrade itself says it is overly timid). The one edge case I considered was a multi line
     // format statement, but worst-case scenario we go over the limit and black fixes it. Let me
@@ -254,9 +257,13 @@ fn fix_percent_format_tuple(checker: &mut Checker, left: &Expr, right: &Expr, le
     let mut cleaned_string = percent_to_format(left_string);
     cleaned_string.push_str(".format");
     cleaned_string.push_str(&right_string);
+    cleaned_string
+
 }
 
-fn fix_percent_format_dict(checker: &mut Checker, left: &Expr, right: &Expr) {}
+fn fix_percent_format_dict(checker: &mut Checker, left: &Expr, right: &Expr) -> String {
+    String::new()
+}
 
 /// Returns true if any of conversion_flag, width, and precision are a non-empty string
 fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
@@ -277,7 +284,6 @@ fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
 
 /// UP031
 pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr) {
-    //This is just to get rid of the 10,000 lint errors
     let left_range = Range::new(left.location, left.end_location.unwrap());
     let left_string = checker.locator.slice_source_code_range(&left_range);
     let parsed = parse_percent_format(&left_string);
@@ -345,14 +351,31 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         }
     }
     if no_breaks {
+        let mut new_string = String::new();
         match &right.node {
             ExprKind::Tuple { .. } => {
-                fix_percent_format_tuple(checker, left, right, &left_string);
+                new_string = fix_percent_format_tuple(checker, right, &left_string);
             }
             ExprKind::Dict { .. } => {
-                fix_percent_format_dict(checker, left, right);
+                new_string = fix_percent_format_dict(checker, left, right);
             }
             _ => {}
+        }
+        if !new_string.is_empty() {
+            let replace_range = Range::new(left.location, right.end_location.unwrap());
+            let old_string = checker.locator.slice_source_code_range(&replace_range);
+            println!("{} => {}", old_string, new_string);
+            if new_string != old_string {
+                let mut diagnostic = Diagnostic::new(violations::PrintfStringFormatting, replace_range);
+                if checker.patch(diagnostic.kind.code()) {
+                    diagnostic.amend(Fix::replacement(
+                        new_string,
+                        replace_range.location,
+                        replace_range.end_location,
+                    ));
+                }
+                checker.diagnostics.push(diagnostic);
+            }
         }
     }
 }
