@@ -187,6 +187,7 @@ define_rule_mapping!(
     PLE1142 => violations::AwaitOutsideAsync,
     PLR0206 => violations::PropertyWithParameters,
     PLR0402 => violations::ConsiderUsingFromImport,
+    PLR0133 => violations::ConstantComparison,
     PLR1701 => violations::ConsiderMergingIsinstance,
     PLR1722 => violations::UseSysExit,
     PLR2004 => violations::MagicValueComparison,

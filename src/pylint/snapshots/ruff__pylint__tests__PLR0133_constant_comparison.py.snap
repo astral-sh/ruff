@@ -1,0 +1,135 @@
+---
+source: src/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    ConstantComparison:
+      - "100"
+      - "100"
+      - Eq
+  location:
+    row: 3
+    column: 3
+  end_location:
+    row: 3
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "1"
+      - "3"
+      - Eq
+  location:
+    row: 6
+    column: 3
+  end_location:
+    row: 6
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "1"
+      - "3"
+      - NotEq
+  location:
+    row: 9
+    column: 3
+  end_location:
+    row: 9
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "4"
+      - "3"
+      - Eq
+  location:
+    row: 13
+    column: 3
+  end_location:
+    row: 13
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "1"
+      - "0"
+      - Gt
+  location:
+    row: 23
+    column: 3
+  end_location:
+    row: 23
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "1"
+      - "0"
+      - GtE
+  location:
+    row: 29
+    column: 3
+  end_location:
+    row: 29
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "1"
+      - "0"
+      - Lt
+  location:
+    row: 35
+    column: 3
+  end_location:
+    row: 35
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "1"
+      - "0"
+      - LtE
+  location:
+    row: 41
+    column: 3
+  end_location:
+    row: 41
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "'hello'"
+      - "''"
+      - Eq
+  location:
+    row: 51
+    column: 3
+  end_location:
+    row: 51
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    ConstantComparison:
+      - "True"
+      - "False"
+      - Eq
+  location:
+    row: 58
+    column: 3
+  end_location:
+    row: 58
+    column: 7
+  fix: ~
+  parent: ~
+

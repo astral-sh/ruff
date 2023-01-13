@@ -1094,6 +1094,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
 | PLR0402 | ConsiderUsingFromImport | Use `from ... import ...` in lieu of alias |  |
+| PLR0133 | ConstantComparison | Two constants compared in a comparison, consider replacing `0 == 0` |  |
 | PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
 | PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
 | PLR2004 | MagicValueComparison | Magic number used in comparison, consider replacing magic with a constant variable |  |

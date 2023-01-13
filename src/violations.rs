@@ -1157,6 +1157,73 @@ impl Violation for ConsiderUsingFromImport {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ViolationsCmpop {
+    Eq,
+    NotEq,
+    Lt,
+    LtE,
+    Gt,
+    GtE,
+    Is,
+    IsNot,
+    In,
+    NotIn,
+}
+
+impl From<&Cmpop> for ViolationsCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Eq => Self::Eq,
+            Cmpop::NotEq => Self::NotEq,
+            Cmpop::Lt => Self::Lt,
+            Cmpop::LtE => Self::LtE,
+            Cmpop::Gt => Self::Gt,
+            Cmpop::GtE => Self::GtE,
+            Cmpop::Is => Self::Is,
+            Cmpop::IsNot => Self::IsNot,
+            Cmpop::In => Self::In,
+            Cmpop::NotIn => Self::NotIn,
+        }
+    }
+}
+
+impl fmt::Display for ViolationsCmpop {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let representation = match self {
+            Self::Eq => "==",
+            Self::NotEq => "!=",
+            Self::Lt => "<",
+            Self::LtE => "<=",
+            Self::Gt => ">",
+            Self::GtE => ">=",
+            Self::Is => "is",
+            Self::IsNot => "is not",
+            Self::In => "in",
+            Self::NotIn => "not in",
+        };
+        write!(f, "{representation}")
+    }
+}
+
+define_violation!(
+    pub struct ConstantComparison(pub String, pub String, pub ViolationsCmpop);
+);
+impl Violation for ConstantComparison {
+    fn message(&self) -> String {
+        let ConstantComparison(left, right, comparison) = self;
+
+        format!(
+            "Two constants compared in a comparison, consider replacing `{left} {comparison} \
+             {right}`"
+        )
+    }
+
+    fn placeholder() -> Self {
+        ConstantComparison("0".to_string(), "0".to_string(), ViolationsCmpop::Eq)
+    }
+}
+
 define_violation!(
     pub struct ConsiderMergingIsinstance(pub String, pub Vec<String>);
 );
