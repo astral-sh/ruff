@@ -1419,7 +1419,7 @@ Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flak
 
 There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
 
-- Ruff doesn't implement the "opinionated" lint rules from `flake8-bugbear`.
+- Ruff doesn't implement all the "opinionated" lint rules from `flake8-bugbear`.
 - Depending on your project structure, Ruff and `isort` can differ in their detection of first-party
   code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
   code is nested in a `src` directory.)
