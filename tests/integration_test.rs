@@ -4,6 +4,7 @@ use std::str;
 
 use anyhow::Result;
 use assert_cmd::{crate_name, Command};
+use path_absolutize::path_dedot;
 
 #[test]
 fn test_stdin_success() -> Result<()> {
@@ -57,34 +58,37 @@ fn test_stdin_json() -> Result<()> {
         .failure();
     assert_eq!(
         str::from_utf8(&output.get_output().stdout)?,
-        r#"[
-  {
+        format!(
+            r#"[
+  {{
     "code": "F401",
     "message": "`os` imported but unused",
-    "fix": {
+    "fix": {{
       "content": "",
       "message": "Remove unused import: `os`",
-      "location": {
+      "location": {{
         "row": 1,
         "column": 0
-      },
-      "end_location": {
+      }},
+      "end_location": {{
         "row": 2,
         "column": 0
-      }
-    },
-    "location": {
+      }}
+    }},
+    "location": {{
       "row": 1,
       "column": 8
-    },
-    "end_location": {
+    }},
+    "end_location": {{
       "row": 1,
       "column": 10
-    },
-    "filename": "F401.py"
-  }
+    }},
+    "filename": "{}/F401.py"
+  }}
 ]
-"#
+"#,
+            path_dedot::CWD.to_str().unwrap()
+        )
     );
     Ok(())
 }

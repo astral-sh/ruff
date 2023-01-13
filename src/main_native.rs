@@ -14,7 +14,7 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
 #[cfg(feature = "update-informer")]
 use ::ruff::updates;
-use ::ruff::{commands, fix, warn_user_once};
+use ::ruff::{commands, fix, fs, warn_user_once};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
@@ -244,7 +244,7 @@ pub(crate) fn inner_main() -> Result<ExitCode> {
         // Generate lint violations.
         let diagnostics = if is_stdin {
             commands::run_stdin(
-                cli.stdin_filename.as_deref(),
+                cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_strategy,
                 &file_strategy,
                 &overrides,
