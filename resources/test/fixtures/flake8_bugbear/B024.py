@@ -1,15 +1,16 @@
 """
 Should emit:
-B024 - on lines 17, 34, 52, 58, 69, 74, 79, 84, 89
+B024 - on lines 18, 71, 82, 87, 92, 141
 """
 
 import abc
 import abc as notabc
 from abc import ABC, ABCMeta
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 from abc import abstractmethod as abstract
 from abc import abstractmethod as abstractaoeuaoeuaoeu
 from abc import abstractmethod as notabstract
+from abc import abstractproperty as notabstract_property
 
 import foo
 
@@ -49,8 +50,20 @@ class Base_6(ABC):
         foo()
 
 
-class Base_7(ABC):  # error
+class Base_7(ABC):
     @notabstract
+    def method(self):
+        foo()
+
+
+class Base_8(ABC):
+    @notabstract_property
+    def method(self):
+        foo()
+
+
+class Base_9(ABC):
+    @abstractproperty
     def method(self):
         foo()
 
