@@ -52,6 +52,20 @@ fn is_abstractmethod(
     match_module_member(expr, "abc", "abstractmethod", from_imports, import_aliases)
 }
 
+fn is_abstractproperty(
+    expr: &Expr,
+    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
+    import_aliases: &FxHashMap<&str, &str>,
+) -> bool {
+    match_module_member(
+        expr,
+        "abc",
+        "abstractproperty",
+        from_imports,
+        import_aliases,
+    )
+}
+
 fn is_overload(
     expr: &Expr,
     from_imports: &FxHashMap<&str, FxHashSet<&str>>,
@@ -102,9 +116,10 @@ pub fn abstract_base_class(
             continue;
         };
 
-        let has_abstract_decorator = decorator_list
-            .iter()
-            .any(|d| is_abstractmethod(d, &checker.from_imports, &checker.import_aliases));
+        let has_abstract_decorator = decorator_list.iter().any(|d| {
+            is_abstractmethod(d, &checker.from_imports, &checker.import_aliases)
+                || is_abstractproperty(d, &checker.from_imports, &checker.import_aliases)
+        });
 
         has_abstract_method |= has_abstract_decorator;
 
