@@ -1,5 +1,6 @@
 /// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 use crate::isort::settings::RelatveImportsOrder;
 use crate::isort::types::EitherImport::{Import, ImportFrom};
@@ -13,8 +14,11 @@ pub enum Prefix {
     Variables,
 }
 
-fn prefix(name: &str) -> Prefix {
-    if name.len() > 1 && string::is_upper(name) {
+fn prefix(name: &str, classes: &BTreeSet<String>) -> Prefix {
+    if classes.contains(name) {
+        // Ex) `CLASS`
+        Prefix::Classes
+    } else if name.len() > 1 && string::is_upper(name) {
         // Ex) `CONSTANT`
         Prefix::Constants
     } else if name.chars().next().map_or(false, char::is_uppercase) {
@@ -39,10 +43,15 @@ pub fn cmp_modules(alias1: &AliasData, alias2: &AliasData) -> Ordering {
 }
 
 /// Compare two member imports within `StmtKind::ImportFrom` blocks.
-pub fn cmp_members(alias1: &AliasData, alias2: &AliasData, order_by_type: bool) -> Ordering {
+pub fn cmp_members(
+    alias1: &AliasData,
+    alias2: &AliasData,
+    order_by_type: bool,
+    classes: &BTreeSet<String>,
+) -> Ordering {
     if order_by_type {
-        prefix(alias1.name)
-            .cmp(&prefix(alias2.name))
+        prefix(alias1.name, classes)
+            .cmp(&prefix(alias2.name, classes))
             .then_with(|| cmp_modules(alias1, alias2))
     } else {
         cmp_modules(alias1, alias2)

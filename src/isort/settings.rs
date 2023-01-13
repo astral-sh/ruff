@@ -171,6 +171,16 @@ pub struct Options {
     )]
     /// Add the specified import line to all files.
     pub required_imports: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"
+            classes = ["SVC"]
+        "#
+    )]
+    /// An override list of tokens to always recognize as a Class for
+    /// `order-by-type` regardless of casing.
+    pub classes: Option<Vec<String>>,
 }
 
 #[derive(Debug, Hash)]
@@ -188,6 +198,7 @@ pub struct Settings {
     pub relative_imports_order: RelatveImportsOrder,
     pub single_line_exclusions: BTreeSet<String>,
     pub split_on_trailing_comma: bool,
+    pub classes: BTreeSet<String>,
 }
 
 impl Default for Settings {
@@ -205,6 +216,7 @@ impl Default for Settings {
             relative_imports_order: RelatveImportsOrder::default(),
             single_line_exclusions: BTreeSet::new(),
             split_on_trailing_comma: true,
+            classes: BTreeSet::new(),
         }
     }
 }
@@ -228,6 +240,7 @@ impl From<Options> for Settings {
                 options.single_line_exclusions.unwrap_or_default(),
             ),
             split_on_trailing_comma: options.split_on_trailing_comma.unwrap_or(true),
+            classes: BTreeSet::from_iter(options.classes.unwrap_or_default()),
         }
     }
 }
@@ -247,6 +260,7 @@ impl From<Settings> for Options {
             relative_imports_order: Some(settings.relative_imports_order),
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
             split_on_trailing_comma: Some(settings.split_on_trailing_comma),
+            classes: Some(settings.classes.into_iter().collect()),
         }
     }
 }

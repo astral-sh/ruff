@@ -755,6 +755,16 @@
     "IsortOptions": {
       "type": "object",
       "properties": {
+        "classes": {
+          "description": "An override list of tokens to always recognize as a Class for `order-by-type` regardless of casing.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "combine-as-imports": {
           "description": "Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports) option.",
           "type": [

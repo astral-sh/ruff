@@ -383,11 +383,12 @@ fn categorize_imports<'a>(
     block_by_type
 }
 
-fn order_imports(
-    block: ImportBlock,
+fn order_imports<'a>(
+    block: ImportBlock<'a>,
     order_by_type: bool,
     relative_imports_order: RelatveImportsOrder,
-) -> OrderedImportBlock {
+    classes: &'a BTreeSet<String>,
+) -> OrderedImportBlock<'a> {
     let mut ordered = OrderedImportBlock::default();
 
     // Sort `StmtKind::Import`.
@@ -466,7 +467,7 @@ fn order_imports(
                     aliases
                         .into_iter()
                         .sorted_by(|(alias1, _), (alias2, _)| {
-                            cmp_members(alias1, alias2, order_by_type)
+                            cmp_members(alias1, alias2, order_by_type, classes)
                         })
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
@@ -479,7 +480,7 @@ fn order_imports(
                             (None, Some(_)) => Ordering::Less,
                             (Some(_), None) => Ordering::Greater,
                             (Some((alias1, _)), Some((alias2, _))) => {
-                                cmp_members(alias1, alias2, order_by_type)
+                                cmp_members(alias1, alias2, order_by_type, classes)
                             }
                         },
                     )
@@ -556,6 +557,7 @@ pub fn format_imports(
     relative_imports_order: RelatveImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
     split_on_trailing_comma: bool,
+    classes: &BTreeSet<String>,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -578,7 +580,8 @@ pub fn format_imports(
     // Generate replacement source code.
     let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
-        let mut imports = order_imports(import_block, order_by_type, relative_imports_order);
+        let mut imports =
+            order_imports(import_block, order_by_type, relative_imports_order, classes);
 
         if force_single_line {
             imports = force_single_line_imports(imports, single_line_exclusions);
@@ -698,6 +701,7 @@ mod tests {
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
+    #[test_case(Path::new("order_by_type_with_custom_classes.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -807,6 +811,36 @@ mod tests {
             &Settings {
                 isort: isort::settings::Settings {
                     order_by_type: false,
+                    ..isort::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(RuleCode::I001)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("order_by_type_with_custom_classes.py"))]
+    fn order_by_type_with_custom_classes(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "order_by_type_with_custom_classes_{}",
+            path.to_string_lossy()
+        );
+        let mut diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: isort::settings::Settings {
+                    order_by_type: true,
+                    classes: BTreeSet::from([
+                        "SVC".to_string(),
+                        "SELU".to_string(),
+                        "N_CLASS".to_string(),
+                        "CLASS".to_string(),
+                    ]),
                     ..isort::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
