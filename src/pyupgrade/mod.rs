@@ -2,6 +2,7 @@ mod fixes;
 pub(crate) mod rules;
 pub mod settings;
 pub(crate) mod types;
+mod helpers;
 
 #[cfg(test)]
 mod tests {

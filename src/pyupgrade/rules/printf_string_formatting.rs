@@ -1,11 +1,12 @@
 use crate::checkers::ast::Checker;
+use crate::pyupgrade::helpers::curly_escape;
 use once_cell::sync::Lazy;
-use regex::{Match, Regex};
+use regex::Regex;
 use rustpython_ast::Expr;
-use std::default::Default;
 
 // Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
 // Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
+// TODO: do not forget--keep-percent-format as a way to ignore this rule
 
 static MAPPING_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\(([^()]*)\)").unwrap());
 static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").unwrap());
@@ -44,15 +45,6 @@ impl PercentFormatPart {
 struct PercentFormat {
     item: String,
     parts: Option<PercentFormatPart>,
-}
-
-impl Default for PercentFormat {
-    fn default() -> Self {
-        Self {
-            item: "\"".to_string(),
-            parts: None,
-        }
-    }
 }
 
 impl PercentFormat {
@@ -145,6 +137,111 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     formats
 }
 
+/// Removes the first instance of a given element from a vector
+fn remove(vec: &mut Vec<char>, item: char) {
+    let index = vec.iter().position(|&x| x == item).unwrap();
+    vec.remove(index);
+}
+
+fn simplify_conversion_flag(flag: &str) -> String {
+    let mut parts: Vec<char> = vec![];
+    for mut character in flag.chars() {
+        if parts.contains(&character) {
+            continue;
+        }
+        if character == '-' {
+            character = '<';
+        }
+        parts.push(character);
+        if character == '<' && parts.contains(&'0') {
+            remove(&mut parts, '0');
+        } else if character == '+' && parts.contains(&' ') {
+            remove(&mut parts, ' ');
+        }
+    }
+    String::from_iter(parts)
+}
+
+/// Returns true if any of conversion_flag, width, precision, and conversion are a non-empty string
+fn any_percent_format(pf: &PercentFormatPart) -> bool {
+    if let Some(conversion_flag) = &pf.conversion_flag {
+        if let Some(width) = &pf.width {
+            if let Some(precision) = &pf.precision {
+                return !conversion_flag.is_empty()
+                    || !width.is_empty()
+                    || !precision.is_empty()
+                    || !pf.conversion.is_empty();
+            }
+        }
+    }
+    false
+}
+
+fn handle_part(part: &PercentFormat) -> String {
+    let mut string = part.item.clone();
+    string = curly_escape(&string);
+    let mut fmt = match part.parts.clone() {
+        None => return string,
+        Some(item) => item,
+    };
+
+    if fmt.conversion == "%".to_string() {
+        string.push('%');
+        return string;
+    }
+    let mut parts = vec![string, "{".to_string()];
+    if fmt.conversion == "s".to_string() {
+        fmt.conversion = "".to_string();
+    }
+    if let Some(key_item) = &fmt.key {
+        parts.push(key_item.to_string());
+    }
+    let converter: String;
+    if fmt.conversion == "r".to_string() || fmt.conversion == "a".to_string() {
+        converter = format!("!{}", fmt.conversion);
+        fmt.conversion = "".to_string();
+    } else {
+        converter = "".to_string();
+    }
+    if any_percent_format(&fmt) {
+        parts.push(":".to_string());
+    }
+    if let Some(conversion_flag) = &fmt.conversion_flag {
+        if !conversion_flag.is_empty() {
+            let simplified = simplify_conversion_flag(&conversion_flag);
+            parts.push(simplified);
+        }
+    }
+    if let Some(width) = &fmt.width {
+        if !width.is_empty() {
+            parts.push(width.to_string());
+        }
+    }
+
+    if let Some(precision) = &fmt.precision {
+        if !precision.is_empty() {
+            parts.push(precision.to_string());
+        }
+    }
+    if !fmt.conversion.is_empty() {
+        parts.push(fmt.conversion.clone());
+    }
+    for character in converter.chars() {
+        parts.push(character.to_string())
+    }
+    parts.push("}".to_string());
+    String::from_iter(parts)
+}
+
+fn percent_to_format(string: &str) -> String {
+    let mut final_string = String::new();
+    for part in parse_percent_format(string) {
+        final_string.push_str(&handle_part(&part));
+    }
+    final_string
+}
+
+
 /// UP031
 pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr) {
     println!("{:?}", left);
@@ -175,7 +272,7 @@ mod test {
         let sample = "\"%%\"";
         let sube1 = PercentFormatPart::new(None, None, None, None, "%".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -187,7 +284,7 @@ mod test {
         let sample = "\"%s\"";
         let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -200,7 +297,7 @@ mod test {
         let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
         let e1 = PercentFormat::new(" two! ".to_string(), Some(sube1.clone()));
         let e2 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e3 = PercentFormat::default();
+        let e3 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e2, e1, e3];
 
         let received = parse_percent_format(sample);
@@ -213,7 +310,7 @@ mod test {
         let sube1 =
             PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -225,7 +322,7 @@ mod test {
         let sample = "\"%()s\"";
         let sube1 = PercentFormatPart::new(Some("".to_string()), None, None, None, "s".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -238,7 +335,7 @@ mod test {
         let sube1 =
             PercentFormatPart::new(None, Some("#".to_string()), None, None, "o".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -251,7 +348,7 @@ mod test {
         let sube1 =
             PercentFormatPart::new(None, Some(" #0-+".to_string()), None, None, "d".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -264,7 +361,7 @@ mod test {
         let sube1 =
             PercentFormatPart::new(None, None, Some("5".to_string()), None, "d".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -277,7 +374,7 @@ mod test {
         let sube1 =
             PercentFormatPart::new(None, None, Some("*".to_string()), None, "d".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -290,7 +387,7 @@ mod test {
         let sube1 =
             PercentFormatPart::new(None, None, None, Some(".".to_string()), "f".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -303,7 +400,7 @@ mod test {
         let sube1 =
             PercentFormatPart::new(None, None, None, Some(".5".to_string()), "f".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -316,7 +413,7 @@ mod test {
         let sube1 =
             PercentFormatPart::new(None, None, None, Some(".*".to_string()), "f".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -328,7 +425,7 @@ mod test {
         let sample = "\"%ld\"";
         let sube1 = PercentFormatPart::new(None, None, None, None, "d".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
@@ -346,7 +443,7 @@ mod test {
             "f".to_string(),
         );
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1));
-        let e2 = PercentFormat::default();
+        let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
         let received = parse_percent_format(sample);
