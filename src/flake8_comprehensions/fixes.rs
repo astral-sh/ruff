@@ -258,6 +258,24 @@ pub fn fix_unnecessary_list_comprehension_dict(
     ))
 }
 
+fn drop_trailing_comma<'a>(elements: &[Element<'a>]) -> Vec<Element<'a>> {
+    let mut elements = elements.to_vec();
+    if elements.len() == 1 {
+        if let Some(Element::Simple {
+            value,
+            comma: Some(..),
+            ..
+        }) = elements.last()
+        {
+            elements[0] = Element::Simple {
+                value: value.clone(),
+                comma: None,
+            };
+        }
+    }
+    elements
+}
+
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
 pub fn fix_unnecessary_literal_set(locator: &Locator, expr: &rustpython_ast::Expr) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
@@ -268,8 +286,8 @@ pub fn fix_unnecessary_literal_set(locator: &Locator, expr: &rustpython_ast::Exp
     let arg = match_arg(call)?;
 
     let elements = match &arg.value {
-        Expression::Tuple(inner) => &inner.elements,
-        Expression::List(inner) => &inner.elements,
+        Expression::Tuple(inner) => drop_trailing_comma(&inner.elements),
+        Expression::List(inner) => inner.elements.clone(),
         _ => {
             bail!("Expected Expression::Tuple | Expression::List");
         }
@@ -279,7 +297,7 @@ pub fn fix_unnecessary_literal_set(locator: &Locator, expr: &rustpython_ast::Exp
         call.args = vec![];
     } else {
         body.value = Expression::Set(Box::new(Set {
-            elements: elements.clone(),
+            elements,
             lbrace: LeftCurlyBrace {
                 whitespace_after: call.whitespace_before_args.clone(),
             },
