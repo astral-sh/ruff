@@ -6,7 +6,7 @@ use libcst_native::{
 use log::error;
 use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers::collect_call_paths;
+use crate::ast::helpers::collect_call_path;
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
@@ -199,7 +199,7 @@ fn format_import_from(
 /// UP026
 pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
-        if collect_call_paths(value) == ["mock", "mock"] {
+        if collect_call_path(value) == ["mock", "mock"] {
             let mut diagnostic = Diagnostic::new(
                 violations::RewriteMockImport(MockReference::Attribute),
                 Range::from_located(value),

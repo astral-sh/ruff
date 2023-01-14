@@ -1,10 +1,11 @@
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
-use crate::ast::helpers::{compose_call_path, match_module_member, SimpleCallArgs};
+use crate::ast::helpers::{compose_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
 
@@ -86,18 +87,20 @@ fn get_int_value(expr: &Expr) -> Option<u16> {
 
 /// S103
 pub fn bad_file_permissions(
+    checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-    import_aliases: &FxHashMap<&str, &str>,
-) -> Option<Diagnostic> {
-    if match_module_member(func, "os", "chmod", from_imports, import_aliases) {
+) {
+    if checker
+        .resolve_call_path(func)
+        .map_or(false, |call_path| call_path == ["os", "chmod"])
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(mode_arg) = call_args.get_argument("mode", Some(1)) {
             if let Some(int_value) = get_int_value(mode_arg) {
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
-                    return Some(Diagnostic::new(
+                    checker.diagnostics.push(Diagnostic::new(
                         violations::BadFilePermissions(int_value),
                         Range::from_located(mode_arg),
                     ));
@@ -105,5 +108,4 @@ pub fn bad_file_permissions(
             }
         }
     }
-    None
 }

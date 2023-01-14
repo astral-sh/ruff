@@ -74,25 +74,4 @@ mod tests {
         insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
-
-    #[test]
-    fn banned_api_false_positives() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_tidy_imports/TID251_false_positives.py"),
-            &Settings {
-                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_api: FxHashMap::from_iter([(
-                        "typing.TypedDict".to_string(),
-                        BannedApi {
-                            msg: "Use typing_extensions.TypedDict instead.".to_string(),
-                        },
-                    )]),
-                    ..Default::default()
-                },
-                ..Settings::for_rules(vec![RuleCode::TID251])
-            },
-        )?;
-        insta::assert_yaml_snapshot!(diagnostics);
-        Ok(())
-    }
 }

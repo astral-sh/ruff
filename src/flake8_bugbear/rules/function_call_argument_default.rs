@@ -1,9 +1,6 @@
-use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
-use crate::ast::helpers::{
-    collect_call_paths, compose_call_path, dealias_call_path, match_call_path, to_module_and_member,
-};
+use crate::ast::helpers::{compose_call_path, to_call_path};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -12,34 +9,29 @@ use crate::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violations;
 
-const IMMUTABLE_FUNCS: [(&str, &str); 7] = [
-    ("", "tuple"),
-    ("", "frozenset"),
-    ("operator", "attrgetter"),
-    ("operator", "itemgetter"),
-    ("operator", "methodcaller"),
-    ("types", "MappingProxyType"),
-    ("re", "compile"),
+const IMMUTABLE_FUNCS: &[&[&str]] = &[
+    &["", "tuple"],
+    &["", "frozenset"],
+    &["operator", "attrgetter"],
+    &["operator", "itemgetter"],
+    &["operator", "methodcaller"],
+    &["types", "MappingProxyType"],
+    &["re", "compile"],
 ];
 
-fn is_immutable_func(
-    expr: &Expr,
-    extend_immutable_calls: &[(&str, &str)],
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-    import_aliases: &FxHashMap<&str, &str>,
-) -> bool {
-    let call_path = dealias_call_path(collect_call_paths(expr), import_aliases);
-    IMMUTABLE_FUNCS
-        .iter()
-        .chain(extend_immutable_calls)
-        .any(|(module, member)| match_call_path(&call_path, module, member, from_imports))
+fn is_immutable_func(checker: &Checker, expr: &Expr, extend_immutable_calls: &[Vec<&str>]) -> bool {
+    checker.resolve_call_path(expr).map_or(false, |call_path| {
+        IMMUTABLE_FUNCS.iter().any(|target| call_path == *target)
+            || extend_immutable_calls
+                .iter()
+                .any(|target| call_path == *target)
+    })
 }
 
 struct ArgumentDefaultVisitor<'a> {
+    checker: &'a Checker<'a>,
     diagnostics: Vec<(DiagnosticKind, Range)>,
-    extend_immutable_calls: &'a [(&'a str, &'a str)],
-    from_imports: &'a FxHashMap<&'a str, FxHashSet<&'a str>>,
-    import_aliases: &'a FxHashMap<&'a str, &'a str>,
+    extend_immutable_calls: Vec<Vec<&'a str>>,
 }
 
 impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor<'b>
@@ -49,13 +41,8 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
             ExprKind::Call { func, args, .. } => {
-                if !is_mutable_func(func, self.from_imports, self.import_aliases)
-                    && !is_immutable_func(
-                        func,
-                        self.extend_immutable_calls,
-                        self.from_imports,
-                        self.import_aliases,
-                    )
+                if !is_mutable_func(self.checker, func)
+                    && !is_immutable_func(self.checker, func, &self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((
@@ -97,27 +84,29 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
 /// B008
 pub fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Map immutable calls to (module, member) format.
-    let extend_immutable_cells: Vec<(&str, &str)> = checker
+    let extend_immutable_calls: Vec<Vec<&str>> = checker
         .settings
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|target| to_module_and_member(target))
+        .map(|target| to_call_path(target))
         .collect();
-    let mut visitor = ArgumentDefaultVisitor {
-        diagnostics: vec![],
-        extend_immutable_calls: &extend_immutable_cells,
-        from_imports: &checker.from_imports,
-        import_aliases: &checker.import_aliases,
+    let diagnostics = {
+        let mut visitor = ArgumentDefaultVisitor {
+            checker,
+            diagnostics: vec![],
+            extend_immutable_calls,
+        };
+        for expr in arguments
+            .defaults
+            .iter()
+            .chain(arguments.kw_defaults.iter())
+        {
+            visitor.visit_expr(expr);
+        }
+        visitor.diagnostics
     };
-    for expr in arguments
-        .defaults
-        .iter()
-        .chain(arguments.kw_defaults.iter())
-    {
-        visitor.visit_expr(expr);
-    }
-    for (check, range) in visitor.diagnostics {
+    for (check, range) in diagnostics {
         checker.diagnostics.push(Diagnostic::new(check, range));
     }
 }

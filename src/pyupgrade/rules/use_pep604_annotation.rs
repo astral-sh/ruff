@@ -1,6 +1,5 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 
-use crate::ast::helpers::{collect_call_paths, dealias_call_path};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -62,8 +61,10 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         return;
     }
 
-    let call_path = dealias_call_path(collect_call_paths(value), &checker.import_aliases);
-    if checker.match_typing_call_path(&call_path, "Optional") {
+    let call_path = checker.resolve_call_path(value);
+    if call_path.as_ref().map_or(false, |call_path| {
+        checker.match_typing_call_path(call_path, "Optional")
+    }) {
         let mut diagnostic =
             Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch(diagnostic.kind.code()) {
@@ -76,7 +77,9 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             ));
         }
         checker.diagnostics.push(diagnostic);
-    } else if checker.match_typing_call_path(&call_path, "Union") {
+    } else if call_path.as_ref().map_or(false, |call_path| {
+        checker.match_typing_call_path(call_path, "Union")
+    }) {
         let mut diagnostic =
             Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
         if checker.patch(diagnostic.kind.code()) {

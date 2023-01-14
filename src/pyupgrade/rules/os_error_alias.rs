@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
-use crate::ast::helpers::{compose_call_path, match_module_member};
+use crate::ast::helpers::compose_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -37,17 +37,13 @@ fn get_before_replace(elts: &[Expr]) -> Vec<String> {
 fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
     let mut replacements: Vec<String> = vec![];
     let mut before_replace: Vec<String> = vec![];
-    for module in ERROR_MODULES.iter() {
-        if match_module_member(
-            expr,
-            module,
-            "error",
-            &checker.from_imports,
-            &checker.import_aliases,
-        ) {
-            replacements.push("OSError".to_string());
-            before_replace.push(format!("{module}.error"));
-            break;
+    if let Some(call_path) = checker.resolve_call_path(expr) {
+        for module in ERROR_MODULES.iter() {
+            if call_path == [module, "error"] {
+                replacements.push("OSError".to_string());
+                before_replace.push(format!("{module}.error"));
+                break;
+            }
         }
     }
     (replacements, before_replace)
@@ -140,17 +136,6 @@ fn handle_making_changes(
     replacements: &[String],
 ) {
     if before_replace != replacements && !replacements.is_empty() {
-        let range = Range::new(target.location, target.end_location.unwrap());
-        let contents = checker.locator.slice_source_code_range(&range);
-        // Pyyupgrade does not want imports changed if a module only is
-        // surrounded by parentheses. For example: `except mmap.error:`
-        // would be changed, but: `(mmap).error:` would not. One issue with
-        // this implementation is that any valid changes will also be
-        // ignored. Let me know if you want me to go with a more
-        // complicated solution that avoids this.
-        if contents.contains(").") {
-            return;
-        }
         let mut final_str: String;
         if replacements.len() == 1 {
             final_str = replacements.get(0).unwrap().to_string();
@@ -159,13 +144,15 @@ fn handle_making_changes(
             final_str.insert(0, '(');
             final_str.push(')');
         }
-        let mut diagnostic =
-            Diagnostic::new(violations::OSErrorAlias(compose_call_path(target)), range);
+        let mut diagnostic = Diagnostic::new(
+            violations::OSErrorAlias(compose_call_path(target)),
+            Range::from_located(target),
+        );
         if checker.patch(diagnostic.kind.code()) {
             diagnostic.amend(Fix::replacement(
                 final_str,
-                range.location,
-                range.end_location,
+                target.location,
+                target.end_location.unwrap(),
             ));
         }
         checker.diagnostics.push(diagnostic);

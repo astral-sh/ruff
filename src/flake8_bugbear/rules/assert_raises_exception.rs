@@ -1,6 +1,5 @@
 use rustpython_ast::{ExprKind, Stmt, Withitem};
 
-use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
@@ -24,13 +23,10 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
     if !matches!(&func.node, ExprKind::Attribute { attr, .. } if attr == "assertRaises") {
         return;
     }
-    if !match_module_member(
-        args.first().unwrap(),
-        "",
-        "Exception",
-        &checker.from_imports,
-        &checker.import_aliases,
-    ) {
+    if !checker
+        .resolve_call_path(args.first().unwrap())
+        .map_or(false, |call_path| call_path == ["", "Exception"])
+    {
         return;
     }
 

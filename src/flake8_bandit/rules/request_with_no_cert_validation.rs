@@ -1,9 +1,9 @@
-use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Expr, ExprKind, Keyword};
 use rustpython_parser::ast::Constant;
 
-use crate::ast::helpers::{collect_call_paths, dealias_call_path, match_call_path, SimpleCallArgs};
+use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
 
@@ -24,47 +24,46 @@ const HTTPX_METHODS: [&str; 11] = [
 
 /// S501
 pub fn request_with_no_cert_validation(
+    checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-    import_aliases: &FxHashMap<&str, &str>,
-) -> Option<Diagnostic> {
-    let call_path = dealias_call_path(collect_call_paths(func), import_aliases);
-    let call_args = SimpleCallArgs::new(args, keywords);
-
-    for func_name in &REQUESTS_HTTP_VERBS {
-        if match_call_path(&call_path, "requests", func_name, from_imports) {
-            if let Some(verify_arg) = call_args.get_argument("verify", None) {
-                if let ExprKind::Constant {
-                    value: Constant::Bool(false),
-                    ..
-                } = &verify_arg.node
-                {
-                    return Some(Diagnostic::new(
-                        violations::RequestWithNoCertValidation("requests".to_string()),
-                        Range::from_located(verify_arg),
-                    ));
+) {
+    if let Some(call_path) = checker.resolve_call_path(func) {
+        let call_args = SimpleCallArgs::new(args, keywords);
+        for func_name in &REQUESTS_HTTP_VERBS {
+            if call_path == ["requests", func_name] {
+                if let Some(verify_arg) = call_args.get_argument("verify", None) {
+                    if let ExprKind::Constant {
+                        value: Constant::Bool(false),
+                        ..
+                    } = &verify_arg.node
+                    {
+                        checker.diagnostics.push(Diagnostic::new(
+                            violations::RequestWithNoCertValidation("requests".to_string()),
+                            Range::from_located(verify_arg),
+                        ));
+                    }
                 }
+                return;
+            }
+        }
+        for func_name in &HTTPX_METHODS {
+            if call_path == ["httpx", func_name] {
+                if let Some(verify_arg) = call_args.get_argument("verify", None) {
+                    if let ExprKind::Constant {
+                        value: Constant::Bool(false),
+                        ..
+                    } = &verify_arg.node
+                    {
+                        checker.diagnostics.push(Diagnostic::new(
+                            violations::RequestWithNoCertValidation("httpx".to_string()),
+                            Range::from_located(verify_arg),
+                        ));
+                    }
+                }
+                return;
             }
         }
     }
-
-    for func_name in &HTTPX_METHODS {
-        if match_call_path(&call_path, "httpx", func_name, from_imports) {
-            if let Some(verify_arg) = call_args.get_argument("verify", None) {
-                if let ExprKind::Constant {
-                    value: Constant::Bool(false),
-                    ..
-                } = &verify_arg.node
-                {
-                    return Some(Diagnostic::new(
-                        violations::RequestWithNoCertValidation("httpx".to_string()),
-                        Range::from_located(verify_arg),
-                    ));
-                }
-            }
-        }
-    }
-    None
 }

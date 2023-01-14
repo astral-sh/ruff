@@ -1,22 +1,16 @@
-use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem};
 
 use super::helpers::is_empty_or_null_string;
-use crate::ast::helpers::{
-    collect_call_paths, dealias_call_path, match_call_path, match_module_member,
-    to_module_and_member,
-};
+use crate::ast::helpers::{format_call_path, to_call_path};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
-fn is_pytest_raises(
-    func: &Expr,
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-    import_aliases: &FxHashMap<&str, &str>,
-) -> bool {
-    match_module_member(func, "pytest", "raises", from_imports, import_aliases)
+fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
+    checker
+        .resolve_call_path(func)
+        .map_or(false, |call_path| call_path == ["pytest", "raises"])
 }
 
 fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -30,7 +24,7 @@ fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_raises(func, &checker.from_imports, &checker.import_aliases) {
+    if is_pytest_raises(checker, func) {
         if checker.settings.enabled.contains(&RuleCode::PT010) {
             if args.is_empty() && keywords.is_empty() {
                 checker.diagnostics.push(Diagnostic::new(
@@ -62,9 +56,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
     let mut is_too_complex = false;
 
     let raises_called = items.iter().any(|item| match &item.context_expr.node {
-        ExprKind::Call { func, .. } => {
-            is_pytest_raises(func, &checker.from_imports, &checker.import_aliases)
-        }
+        ExprKind::Call { func, .. } => is_pytest_raises(checker, func),
         _ => false,
     });
 
@@ -101,26 +93,24 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
 
 /// PT011
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
-    let call_path = dealias_call_path(collect_call_paths(exception), &checker.import_aliases);
-
-    let is_broad_exception = checker
-        .settings
-        .flake8_pytest_style
-        .raises_require_match_for
-        .iter()
-        .chain(
-            &checker
-                .settings
-                .flake8_pytest_style
-                .raises_extend_require_match_for,
-        )
-        .map(|target| to_module_and_member(target))
-        .any(|(module, member)| match_call_path(&call_path, module, member, &checker.from_imports));
-
-    if is_broad_exception {
-        checker.diagnostics.push(Diagnostic::new(
-            violations::RaisesTooBroad(call_path.join(".")),
-            Range::from_located(exception),
-        ));
+    if let Some(call_path) = checker.resolve_call_path(exception) {
+        let is_broad_exception = checker
+            .settings
+            .flake8_pytest_style
+            .raises_require_match_for
+            .iter()
+            .chain(
+                &checker
+                    .settings
+                    .flake8_pytest_style
+                    .raises_extend_require_match_for,
+            )
+            .any(|target| call_path == to_call_path(target));
+        if is_broad_exception {
+            checker.diagnostics.push(Diagnostic::new(
+                violations::RaisesTooBroad(format_call_path(&call_path)),
+                Range::from_located(exception),
+            ));
+        }
     }
 }

@@ -1,6 +1,5 @@
 use rustpython_ast::Expr;
 
-use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -9,13 +8,10 @@ use crate::violations;
 
 /// UP019
 pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
-    if match_module_member(
-        expr,
-        "typing",
-        "Text",
-        &checker.from_imports,
-        &checker.import_aliases,
-    ) {
+    if checker
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| call_path == ["typing", "Text"])
+    {
         let mut diagnostic =
             Diagnostic::new(violations::TypingTextStrAlias, Range::from_located(expr));
         if checker.patch(diagnostic.kind.code()) {

@@ -1,20 +1,15 @@
 use num_bigint::BigInt;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
-use crate::ast::helpers::match_module_member;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
 fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
-    match_module_member(
-        expr,
-        "sys",
-        target,
-        &checker.from_imports,
-        &checker.import_aliases,
-    )
+    checker
+        .resolve_call_path(expr)
+        .map_or(false, |path| path == ["sys", target])
 }
 
 /// YTT101, YTT102, YTT301, YTT303
@@ -187,13 +182,10 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
 
 /// YTT202
 pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
-    if match_module_member(
-        expr,
-        "six",
-        "PY3",
-        &checker.from_imports,
-        &checker.import_aliases,
-    ) {
+    if checker
+        .resolve_call_path(expr)
+        .map_or(false, |path| path == ["six", "PY3"])
+    {
         checker.diagnostics.push(Diagnostic::new(
             violations::SixPY3Referenced,
             Range::from_located(expr),

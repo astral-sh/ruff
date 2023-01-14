@@ -1,6 +1,6 @@
 ---
 source: src/flake8_debugger/mod.rs
-expression: checks
+expression: diagnostics
 ---
 - kind:
     Debugger:
@@ -70,7 +70,7 @@ expression: checks
   parent: ~
 - kind:
     Debugger:
-      Call: breakpoint
+      Call: builtins.breakpoint
   location:
     row: 11
     column: 0
@@ -81,7 +81,7 @@ expression: checks
   parent: ~
 - kind:
     Debugger:
-      Call: set_trace
+      Call: pdb.set_trace
   location:
     row: 12
     column: 0
@@ -92,7 +92,7 @@ expression: checks
   parent: ~
 - kind:
     Debugger:
-      Call: set_trace
+      Call: celery.contrib.rdb.set_trace
   location:
     row: 13
     column: 0

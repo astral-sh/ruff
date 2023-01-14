@@ -1,6 +1,6 @@
 use rustpython_ast::{Constant, Expr, ExprKind};
 
-use crate::ast::helpers::{create_expr, match_module_member, unparse_expr};
+use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -16,21 +16,9 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     }
 
     // check `os.environ.get('foo')` and `os.getenv('foo')``
-    let is_os_environ_get = match_module_member(
-        expr,
-        "os.environ",
-        "get",
-        &checker.from_imports,
-        &checker.import_aliases,
-    );
-    let is_os_getenv = match_module_member(
-        expr,
-        "os",
-        "getenv",
-        &checker.from_imports,
-        &checker.import_aliases,
-    );
-    if !(is_os_environ_get || is_os_getenv) {
+    if !checker.resolve_call_path(expr).map_or(false, |call_path| {
+        call_path == ["os", "environ", "get"] || call_path == ["os", "getenv"]
+    }) {
         return;
     }
 

@@ -145,4 +145,22 @@ mod tests {
         insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn allow_nested_overload() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_annotations/allow_nested_overload.py"),
+            &Settings {
+                ..Settings::for_rules(vec![
+                    RuleCode::ANN201,
+                    RuleCode::ANN202,
+                    RuleCode::ANN204,
+                    RuleCode::ANN205,
+                    RuleCode::ANN206,
+                ])
+            },
+        )?;
+        insta::assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
 }

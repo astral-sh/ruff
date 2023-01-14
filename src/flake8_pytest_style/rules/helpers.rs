@@ -1,7 +1,7 @@
 use num_traits::identities::Zero;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::{collect_call_paths, compose_call_path, match_module_member};
+use crate::ast::helpers::collect_call_path;
 use crate::checkers::ast::Checker;
 
 const ITERABLE_INITIALIZERS: &[&str] = &["dict", "frozenset", "list", "tuple", "set"];
@@ -14,55 +14,40 @@ pub fn get_mark_decorators(decorators: &[Expr]) -> Vec<&Expr> {
 }
 
 pub fn get_mark_name(decorator: &Expr) -> &str {
-    collect_call_paths(decorator).last().unwrap()
+    collect_call_path(decorator).last().unwrap()
 }
 
 pub fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
-    match_module_member(
-        call,
-        "pytest",
-        "fail",
-        &checker.from_imports,
-        &checker.import_aliases,
-    )
+    checker
+        .resolve_call_path(call)
+        .map_or(false, |call_path| call_path == ["pytest", "fail"])
 }
 
 pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
-    match_module_member(
-        decorator,
-        "pytest",
-        "fixture",
-        &checker.from_imports,
-        &checker.import_aliases,
-    )
+    checker
+        .resolve_call_path(decorator)
+        .map_or(false, |call_path| call_path == ["pytest", "fixture"])
 }
 
 pub fn is_pytest_mark(decorator: &Expr) -> bool {
-    if let Some(qualname) = compose_call_path(decorator) {
-        qualname.starts_with("pytest.mark.")
+    let segments = collect_call_path(decorator);
+    if segments.len() > 2 {
+        segments[0] == "pytest" && segments[1] == "mark"
     } else {
         false
     }
 }
 
 pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
-    match_module_member(
-        decorator,
-        "pytest",
-        "yield_fixture",
-        &checker.from_imports,
-        &checker.import_aliases,
-    )
+    checker
+        .resolve_call_path(decorator)
+        .map_or(false, |call_path| call_path == ["pytest", "yield_fixture"])
 }
 
 pub fn is_abstractmethod_decorator(decorator: &Expr, checker: &Checker) -> bool {
-    match_module_member(
-        decorator,
-        "abc",
-        "abstractmethod",
-        &checker.from_imports,
-        &checker.import_aliases,
-    )
+    checker
+        .resolve_call_path(decorator)
+        .map_or(false, |call_path| call_path == ["abc", "abstractmethod"])
 }
 
 /// Check if the expression is a constant that evaluates to false.
@@ -108,13 +93,11 @@ pub fn is_falsy_constant(expr: &Expr) -> bool {
 }
 
 pub fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
-    match_module_member(
-        decorator,
-        "pytest.mark",
-        "parametrize",
-        &checker.from_imports,
-        &checker.import_aliases,
-    )
+    checker
+        .resolve_call_path(decorator)
+        .map_or(false, |call_path| {
+            call_path == ["pytest", "mark", "parametrize"]
+        })
 }
 
 pub fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {

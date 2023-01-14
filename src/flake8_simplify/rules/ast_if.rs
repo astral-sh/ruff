@@ -149,25 +149,13 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(
-        test,
-        "sys",
-        "version_info",
-        &checker.import_aliases,
-        &checker.from_imports,
-    ) {
+    if contains_call_path(checker, test, &["sys", "version_info"]) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(
-        test,
-        "sys",
-        "platform",
-        &checker.import_aliases,
-        &checker.from_imports,
-    ) {
+    if contains_call_path(checker, test, &["sys", "platform"]) {
         return;
     }
 

@@ -210,14 +210,17 @@ pub fn remove_unused_imports<'a>(
         Some(SmallStatement::Import(import_body)) => (&mut import_body.names, None),
         Some(SmallStatement::ImportFrom(import_body)) => {
             if let ImportNames::Aliases(names) = &mut import_body.names {
-                (names, import_body.module.as_ref())
+                (
+                    names,
+                    Some((&import_body.relative, import_body.module.as_ref())),
+                )
             } else if let ImportNames::Star(..) = &import_body.names {
                 // Special-case: if the import is a `from ... import *`, then we delete the
                 // entire statement.
                 let mut found_star = false;
                 for unused_import in unused_imports {
                     let full_name = match import_body.module.as_ref() {
-                        Some(module_name) => format!("{}.*", compose_module_path(module_name),),
+                        Some(module_name) => format!("{}.*", compose_module_path(module_name)),
                         None => "*".to_string(),
                     };
                     if unused_import == full_name {
@@ -246,11 +249,25 @@ pub fn remove_unused_imports<'a>(
     for unused_import in unused_imports {
         let alias_index = aliases.iter().position(|alias| {
             let full_name = match import_module {
-                Some(module_name) => format!(
-                    "{}.{}",
-                    compose_module_path(module_name),
-                    compose_module_path(&alias.name)
-                ),
+                Some((relative, module)) => {
+                    let module = module.map(compose_module_path);
+                    let member = compose_module_path(&alias.name);
+                    let mut full_name = String::with_capacity(
+                        relative.len()
+                            + module.as_ref().map_or(0, std::string::String::len)
+                            + member.len()
+                            + 1,
+                    );
+                    for _ in 0..relative.len() {
+                        full_name.push('.');
+                    }
+                    if let Some(module) = module {
+                        full_name.push_str(&module);
+                        full_name.push('.');
+                    }
+                    full_name.push_str(&member);
+                    full_name
+                }
                 None => compose_module_path(&alias.name),
             };
             full_name == unused_import

@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_ast::{Expr, Keyword, Stmt, StmtKind};
 
-use crate::ast::helpers::{collect_call_paths, dealias_call_path, is_const_none, match_call_path};
+use crate::ast::helpers::is_const_none;
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
@@ -11,8 +11,11 @@ use crate::violations;
 /// T201, T203
 pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
     let mut diagnostic = {
-        let call_path = dealias_call_path(collect_call_paths(func), &checker.import_aliases);
-        if match_call_path(&call_path, "", "print", &checker.from_imports) {
+        let call_path = checker.resolve_call_path(func);
+        if call_path
+            .as_ref()
+            .map_or(false, |call_path| *call_path == ["", "print"])
+        {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = keywords
@@ -20,16 +23,21 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                 .find(|keyword| keyword.node.arg.as_ref().map_or(false, |arg| arg == "file"))
             {
                 if !is_const_none(&keyword.node.value) {
-                    let call_path = collect_call_paths(&keyword.node.value);
-                    if !(match_call_path(&call_path, "sys", "stdout", &checker.from_imports)
-                        || match_call_path(&call_path, "sys", "stderr", &checker.from_imports))
+                    if checker
+                        .resolve_call_path(&keyword.node.value)
+                        .map_or(true, |call_path| {
+                            call_path != ["sys", "stdout"] && call_path != ["sys", "stderr"]
+                        })
                     {
                         return;
                     }
                 }
             }
             Diagnostic::new(violations::PrintFound, Range::from_located(func))
-        } else if match_call_path(&call_path, "pprint", "pprint", &checker.from_imports) {
+        } else if call_path
+            .as_ref()
+            .map_or(false, |call_path| *call_path == ["pprint", "pprint"])
+        {
             Diagnostic::new(violations::PPrintFound, Range::from_located(func))
         } else {
             return;

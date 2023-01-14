@@ -1,8 +1,7 @@
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Stmt, StmtKind};
 
-use crate::ast::helpers::{collect_call_paths, match_call_path};
+use crate::checkers::ast::Checker;
 use crate::python::string::{is_lower, is_upper};
 
 pub fn is_camelcase(name: &str) -> bool {
@@ -23,19 +22,13 @@ pub fn is_acronym(name: &str, asname: &str) -> bool {
     name.chars().filter(|c| c.is_uppercase()).join("") == asname
 }
 
-pub fn is_namedtuple_assignment(
-    stmt: &Stmt,
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-) -> bool {
+pub fn is_namedtuple_assignment(checker: &Checker, stmt: &Stmt) -> bool {
     let StmtKind::Assign { value, .. } = &stmt.node else {
         return false;
     };
-    match_call_path(
-        &collect_call_paths(value),
-        "collections",
-        "namedtuple",
-        from_imports,
-    )
+    checker.resolve_call_path(value).map_or(false, |call_path| {
+        call_path == ["collections", "namedtuple"]
+    })
 }
 
 #[cfg(test)]
