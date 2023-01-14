@@ -1,8 +1,8 @@
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::registry::Diagnostic;
+use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violations;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -412,22 +412,25 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         }
         _ => {}
     }
-    if !new_string.is_empty() {
-        let replace_range = Range::new(left.location, right.end_location.unwrap());
-        let old_string = checker.locator.slice_source_code_range(&replace_range);
-        if new_string != old_string {
-            let mut diagnostic =
-                Diagnostic::new(violations::PrintfStringFormatting, replace_range);
-            if checker.patch(diagnostic.kind.code()) {
-                diagnostic.amend(Fix::replacement(
-                    new_string,
-                    replace_range.location,
-                    replace_range.end_location,
-                ));
-            }
-            checker.diagnostics.push(diagnostic);
-        }
+    // We should not replace if the string we get back is empty
+    if new_string.is_empty() {
+        return;
     }
+    let replace_range = Range::new(left.location, right.end_location.unwrap());
+    let old_string = checker.locator.slice_source_code_range(&replace_range);
+    // If there is no change, then bail
+    if new_string == old_string {
+        return;
+    }
+    let mut diagnostic = Diagnostic::new(violations::PrintfStringFormatting, replace_range);
+    if checker.patch(diagnostic.kind.code()) {
+        diagnostic.amend(Fix::replacement(
+            new_string,
+            replace_range.location,
+            replace_range.end_location,
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }
 // Since this one is pretty complicated, I added all of the unit tests pyupgrade has
 #[cfg(test)]
