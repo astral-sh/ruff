@@ -1,0 +1,25 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    PublicInit: ~
+  location:
+    row: 60
+    column: 8
+  end_location:
+    row: 60
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PublicInit: ~
+  location:
+    row: 534
+    column: 8
+  end_location:
+    row: 534
+    column: 16
+  fix: ~
+  parent: ~
+

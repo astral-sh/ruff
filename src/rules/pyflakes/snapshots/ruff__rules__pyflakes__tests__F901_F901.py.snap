@@ -1,0 +1,39 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    RaiseNotImplemented: ~
+  location:
+    row: 2
+    column: 10
+  end_location:
+    row: 2
+    column: 24
+  fix:
+    content: NotImplementedError
+    location:
+      row: 2
+      column: 10
+    end_location:
+      row: 2
+      column: 24
+  parent: ~
+- kind:
+    RaiseNotImplemented: ~
+  location:
+    row: 6
+    column: 10
+  end_location:
+    row: 6
+    column: 24
+  fix:
+    content: NotImplementedError
+    location:
+      row: 6
+      column: 10
+    end_location:
+      row: 6
+      column: 24
+  parent: ~
+

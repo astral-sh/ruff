@@ -1,0 +1,245 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    UselessExpression: ~
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 13
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 15
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 18
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 20
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 27
+    column: 4
+  end_location:
+    row: 27
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 39
+    column: 4
+  end_location:
+    row: 39
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 40
+    column: 4
+  end_location:
+    row: 40
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 41
+    column: 4
+  end_location:
+    row: 41
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 42
+    column: 4
+  end_location:
+    row: 42
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 43
+    column: 4
+  end_location:
+    row: 43
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 44
+    column: 4
+  end_location:
+    row: 44
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 45
+    column: 4
+  end_location:
+    row: 45
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 46
+    column: 4
+  end_location:
+    row: 46
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 47
+    column: 4
+  end_location:
+    row: 47
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 48
+    column: 4
+  end_location:
+    row: 48
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 52
+    column: 4
+  end_location:
+    row: 52
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UselessExpression: ~
+  location:
+    row: 55
+    column: 4
+  end_location:
+    row: 55
+    column: 5
+  fix: ~
+  parent: ~
+

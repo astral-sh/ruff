@@ -1,0 +1,77 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    LineTooLong:
+      - 149
+      - 88
+  location:
+    row: 1
+    column: 88
+  end_location:
+    row: 1
+    column: 149
+  fix: ~
+  parent: ~
+- kind:
+    LineTooLong:
+      - 148
+      - 88
+  location:
+    row: 2
+    column: 88
+  end_location:
+    row: 2
+    column: 148
+  fix: ~
+  parent: ~
+- kind:
+    LineTooLong:
+      - 155
+      - 88
+  location:
+    row: 3
+    column: 88
+  end_location:
+    row: 3
+    column: 155
+  fix: ~
+  parent: ~
+- kind:
+    LineTooLong:
+      - 150
+      - 88
+  location:
+    row: 4
+    column: 88
+  end_location:
+    row: 4
+    column: 150
+  fix: ~
+  parent: ~
+- kind:
+    LineTooLong:
+      - 149
+      - 88
+  location:
+    row: 5
+    column: 88
+  end_location:
+    row: 5
+    column: 149
+  fix: ~
+  parent: ~
+- kind:
+    LineTooLong:
+      - 156
+      - 88
+  location:
+    row: 6
+    column: 88
+  end_location:
+    row: 6
+    column: 156
+  fix: ~
+  parent: ~
+

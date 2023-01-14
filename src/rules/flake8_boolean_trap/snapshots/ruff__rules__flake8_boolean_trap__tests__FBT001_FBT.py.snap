@@ -1,0 +1,85 @@
+---
+source: src/rules/flake8_boolean_trap/mod.rs
+expression: diagnostics
+---
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 10
+    column: 4
+  end_location:
+    row: 10
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 41
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 15
+    column: 42
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 18
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 45
+  fix: ~
+  parent: ~
+

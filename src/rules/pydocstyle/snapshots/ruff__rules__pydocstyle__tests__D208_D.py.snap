@@ -1,0 +1,56 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoOverIndentation: ~
+  location:
+    row: 252
+    column: 0
+  end_location:
+    row: 252
+    column: 0
+  fix:
+    content: "    "
+    location:
+      row: 252
+      column: 0
+    end_location:
+      row: 252
+      column: 7
+  parent: ~
+- kind:
+    NoOverIndentation: ~
+  location:
+    row: 264
+    column: 0
+  end_location:
+    row: 264
+    column: 0
+  fix:
+    content: "    "
+    location:
+      row: 264
+      column: 0
+    end_location:
+      row: 264
+      column: 8
+  parent: ~
+- kind:
+    NoOverIndentation: ~
+  location:
+    row: 272
+    column: 0
+  end_location:
+    row: 272
+    column: 0
+  fix:
+    content: "    "
+    location:
+      row: 272
+      column: 0
+    end_location:
+      row: 272
+      column: 8
+  parent: ~
+

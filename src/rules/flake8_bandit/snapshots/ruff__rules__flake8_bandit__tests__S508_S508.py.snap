@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    SnmpInsecureVersion: ~
+  location:
+    row: 3
+    column: 32
+  end_location:
+    row: 3
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    SnmpInsecureVersion: ~
+  location:
+    row: 4
+    column: 32
+  end_location:
+    row: 4
+    column: 33
+  fix: ~
+  parent: ~
+

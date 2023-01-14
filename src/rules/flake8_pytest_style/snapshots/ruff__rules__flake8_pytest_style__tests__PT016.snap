@@ -1,0 +1,55 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    FailWithoutMessage: ~
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 13
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    FailWithoutMessage: ~
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    FailWithoutMessage: ~
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 15
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    FailWithoutMessage: ~
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    FailWithoutMessage: ~
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 15
+  fix: ~
+  parent: ~
+

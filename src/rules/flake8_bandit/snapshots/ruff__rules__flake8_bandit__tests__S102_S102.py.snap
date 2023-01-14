@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    ExecUsed: ~
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    ExecUsed: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 13
+  fix: ~
+  parent: ~
+

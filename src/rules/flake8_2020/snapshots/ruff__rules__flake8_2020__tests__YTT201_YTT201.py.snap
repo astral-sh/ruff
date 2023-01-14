@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_2020/mod.rs
+expression: diagnostics
+---
+- kind:
+    SysVersionInfo0Eq3Referenced: ~
+  location:
+    row: 7
+    column: 6
+  end_location:
+    row: 7
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    SysVersionInfo0Eq3Referenced: ~
+  location:
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    SysVersionInfo0Eq3Referenced: ~
+  location:
+    row: 9
+    column: 6
+  end_location:
+    row: 9
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    SysVersionInfo0Eq3Referenced: ~
+  location:
+    row: 10
+    column: 6
+  end_location:
+    row: 10
+    column: 21
+  fix: ~
+  parent: ~
+

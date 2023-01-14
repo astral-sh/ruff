@@ -1,0 +1,35 @@
+---
+source: src/rules/flake8_boolean_trap/mod.rs
+expression: diagnostics
+---
+- kind:
+    BooleanPositionalValueInFunctionCall: ~
+  location:
+    row: 42
+    column: 10
+  end_location:
+    row: 42
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalValueInFunctionCall: ~
+  location:
+    row: 57
+    column: 10
+  end_location:
+    row: 57
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalValueInFunctionCall: ~
+  location:
+    row: 57
+    column: 16
+  end_location:
+    row: 57
+    column: 21
+  fix: ~
+  parent: ~
+

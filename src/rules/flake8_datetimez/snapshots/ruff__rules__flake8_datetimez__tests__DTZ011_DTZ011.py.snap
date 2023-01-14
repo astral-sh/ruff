@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_datetimez/mod.rs
+expression: diagnostics
+---
+- kind:
+    CallDateToday: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    CallDateToday: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 12
+  fix: ~
+  parent: ~
+

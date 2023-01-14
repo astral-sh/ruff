@@ -1,0 +1,35 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    AmbiguousClassName: l
+  location:
+    row: 1
+    column: 6
+  end_location:
+    row: 1
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    AmbiguousClassName: I
+  location:
+    row: 5
+    column: 6
+  end_location:
+    row: 5
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    AmbiguousClassName: O
+  location:
+    row: 9
+    column: 6
+  end_location:
+    row: 9
+    column: 7
+  fix: ~
+  parent: ~
+

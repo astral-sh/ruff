@@ -1,0 +1,73 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedLoopControlVariable: i
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 5
+  fix:
+    content: _i
+    location:
+      row: 6
+      column: 4
+    end_location:
+      row: 6
+      column: 5
+  parent: ~
+- kind:
+    UnusedLoopControlVariable: k
+  location:
+    row: 18
+    column: 12
+  end_location:
+    row: 18
+    column: 13
+  fix:
+    content: _k
+    location:
+      row: 18
+      column: 12
+    end_location:
+      row: 18
+      column: 13
+  parent: ~
+- kind:
+    UnusedLoopControlVariable: i
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 30
+    column: 5
+  fix:
+    content: _i
+    location:
+      row: 30
+      column: 4
+    end_location:
+      row: 30
+      column: 5
+  parent: ~
+- kind:
+    UnusedLoopControlVariable: k
+  location:
+    row: 30
+    column: 12
+  end_location:
+    row: 30
+    column: 13
+  fix:
+    content: _k
+    location:
+      row: 30
+      column: 12
+    end_location:
+      row: 30
+      column: 13
+  parent: ~
+

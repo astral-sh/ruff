@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    FixtureFinalizerCallback: ~
+  location:
+    row: 49
+    column: 4
+  end_location:
+    row: 49
+    column: 42
+  fix: ~
+  parent: ~
+- kind:
+    FixtureFinalizerCallback: ~
+  location:
+    row: 56
+    column: 4
+  end_location:
+    row: 56
+    column: 42
+  fix: ~
+  parent: ~
+

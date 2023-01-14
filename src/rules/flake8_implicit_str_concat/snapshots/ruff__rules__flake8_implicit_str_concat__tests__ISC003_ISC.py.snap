@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_implicit_str_concat/mod.rs
+expression: diagnostics
+---
+- kind:
+    ExplicitStringConcatenation: ~
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    ExplicitStringConcatenation: ~
+  location:
+    row: 9
+    column: 2
+  end_location:
+    row: 10
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    ExplicitStringConcatenation: ~
+  location:
+    row: 14
+    column: 2
+  end_location:
+    row: 15
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    ExplicitStringConcatenation: ~
+  location:
+    row: 19
+    column: 2
+  end_location:
+    row: 20
+    column: 8
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,35 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    PercentFormatMixedPositionalAndNamed: ~
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    PercentFormatMixedPositionalAndNamed: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    PercentFormatMixedPositionalAndNamed: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 27
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,6 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+[]
+

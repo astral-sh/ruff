@@ -1,0 +1,35 @@
+---
+source: src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    KeywordArgumentBeforeStarArgument: kw
+  location:
+    row: 13
+    column: 2
+  end_location:
+    row: 13
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    KeywordArgumentBeforeStarArgument: kw
+  location:
+    row: 14
+    column: 2
+  end_location:
+    row: 14
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    KeywordArgumentBeforeStarArgument: kw
+  location:
+    row: 15
+    column: 6
+  end_location:
+    row: 15
+    column: 10
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    HardcodedBindAllInterfaces: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedBindAllInterfaces: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedBindAllInterfaces: ~
+  location:
+    row: 14
+    column: 5
+  end_location:
+    row: 14
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedBindAllInterfaces: ~
+  location:
+    row: 18
+    column: 8
+  end_location:
+    row: 18
+    column: 17
+  fix: ~
+  parent: ~
+

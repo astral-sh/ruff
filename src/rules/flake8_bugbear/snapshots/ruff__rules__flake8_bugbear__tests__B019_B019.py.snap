@@ -1,0 +1,85 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    CachedInstanceMethod: ~
+  location:
+    row: 78
+    column: 5
+  end_location:
+    row: 78
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    CachedInstanceMethod: ~
+  location:
+    row: 82
+    column: 5
+  end_location:
+    row: 82
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    CachedInstanceMethod: ~
+  location:
+    row: 86
+    column: 5
+  end_location:
+    row: 86
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    CachedInstanceMethod: ~
+  location:
+    row: 90
+    column: 5
+  end_location:
+    row: 90
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    CachedInstanceMethod: ~
+  location:
+    row: 94
+    column: 5
+  end_location:
+    row: 94
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    CachedInstanceMethod: ~
+  location:
+    row: 98
+    column: 5
+  end_location:
+    row: 98
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    CachedInstanceMethod: ~
+  location:
+    row: 102
+    column: 5
+  end_location:
+    row: 102
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    CachedInstanceMethod: ~
+  location:
+    row: 106
+    column: 5
+  end_location:
+    row: 106
+    column: 16
+  fix: ~
+  parent: ~
+

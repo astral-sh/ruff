@@ -1,0 +1,155 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    TypeComparison: ~
+  location:
+    row: 2
+    column: 3
+  end_location:
+    row: 2
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 5
+    column: 3
+  end_location:
+    row: 5
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 10
+    column: 3
+  end_location:
+    row: 10
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 15
+    column: 3
+  end_location:
+    row: 15
+    column: 34
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 18
+    column: 7
+  end_location:
+    row: 18
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 20
+    column: 7
+  end_location:
+    row: 20
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 22
+    column: 7
+  end_location:
+    row: 22
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 24
+    column: 7
+  end_location:
+    row: 24
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 26
+    column: 7
+  end_location:
+    row: 26
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 28
+    column: 7
+  end_location:
+    row: 28
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 30
+    column: 7
+  end_location:
+    row: 30
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 32
+    column: 7
+  end_location:
+    row: 32
+    column: 34
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 34
+    column: 7
+  end_location:
+    row: 38
+    column: 1
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 40
+    column: 7
+  end_location:
+    row: 40
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    TypeComparison: ~
+  location:
+    row: 42
+    column: 7
+  end_location:
+    row: 42
+    column: 30
+  fix: ~
+  parent: ~
+

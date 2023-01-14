@@ -1,6 +1,0 @@
----
-source: src/pyflakes/mod.rs
-expression: diagnostics
----
-[]
-

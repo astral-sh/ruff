@@ -1,0 +1,25 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    AwaitOutsideAsync: ~
+  location:
+    row: 12
+    column: 10
+  end_location:
+    row: 12
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    AwaitOutsideAsync: ~
+  location:
+    row: 25
+    column: 8
+  end_location:
+    row: 25
+    column: 30
+  fix: ~
+  parent: ~
+

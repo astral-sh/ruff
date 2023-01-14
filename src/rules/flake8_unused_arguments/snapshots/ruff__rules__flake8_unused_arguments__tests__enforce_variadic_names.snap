@@ -1,0 +1,125 @@
+---
+source: src/rules/flake8_unused_arguments/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedFunctionArgument: a
+  location:
+    row: 1
+    column: 6
+  end_location:
+    row: 1
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument: b
+  location:
+    row: 1
+    column: 9
+  end_location:
+    row: 1
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument: a
+  location:
+    row: 5
+    column: 6
+  end_location:
+    row: 5
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument: b
+  location:
+    row: 5
+    column: 9
+  end_location:
+    row: 5
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument: args
+  location:
+    row: 5
+    column: 13
+  end_location:
+    row: 5
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument: kwargs
+  location:
+    row: 5
+    column: 21
+  end_location:
+    row: 5
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument: a
+  location:
+    row: 10
+    column: 16
+  end_location:
+    row: 10
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument: b
+  location:
+    row: 10
+    column: 19
+  end_location:
+    row: 10
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument: a
+  location:
+    row: 13
+    column: 16
+  end_location:
+    row: 13
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument: b
+  location:
+    row: 13
+    column: 19
+  end_location:
+    row: 13
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument: args
+  location:
+    row: 13
+    column: 23
+  end_location:
+    row: 13
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument: kwargs
+  location:
+    row: 13
+    column: 31
+  end_location:
+    row: 13
+    column: 37
+  fix: ~
+  parent: ~
+

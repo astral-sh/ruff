@@ -1,0 +1,25 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    NonLowercaseVariableInFunction: Camel
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    NonLowercaseVariableInFunction: CONSTANT
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 12
+  fix: ~
+  parent: ~
+

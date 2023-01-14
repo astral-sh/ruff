@@ -1,0 +1,107 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 19
+  fix:
+    content: foo.bar
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 18
+      column: 19
+  parent: ~
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 23
+  fix:
+    content: foo._123abc
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 23
+  parent: ~
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 20
+    column: 0
+  end_location:
+    row: 20
+    column: 22
+  fix:
+    content: foo.abc123
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 20
+      column: 22
+  parent: ~
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 23
+  fix:
+    content: foo.abc123
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 21
+      column: 23
+  parent: ~
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 22
+    column: 14
+  end_location:
+    row: 22
+    column: 31
+  fix:
+    content: x.bar
+    location:
+      row: 22
+      column: 14
+    end_location:
+      row: 22
+      column: 31
+  parent: ~
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 23
+    column: 3
+  end_location:
+    row: 23
+    column: 20
+  fix:
+    content: x.bar
+    location:
+      row: 23
+      column: 3
+    end_location:
+      row: 23
+      column: 20
+  parent: ~
+
