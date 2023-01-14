@@ -622,6 +622,19 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &Locator) -> bool {
     false
 }
 
+/// Return the `Range` of the first `Tok::Colon` token in a `Range`.
+pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
+    let contents = locator.slice_source_code_range(&range);
+    let range = lexer::make_tokenizer_located(&contents, range.location)
+        .flatten()
+        .find(|(_, kind, _)| matches!(kind, Tok::Colon))
+        .map(|(location, _, end_location)| Range {
+            location,
+            end_location,
+        });
+    range
+}
+
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
 pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
@@ -708,7 +721,9 @@ mod tests {
     use rustpython_ast::Location;
     use rustpython_parser::parser;
 
-    use crate::ast::helpers::{else_range, identifier_range, match_trailing_content};
+    use crate::ast::helpers::{
+        else_range, first_colon_range, identifier_range, match_trailing_content,
+    };
     use crate::ast::types::Range;
     use crate::source_code::Locator;
 
@@ -838,5 +853,20 @@ else:
         assert_eq!(range.end_location.row(), 3);
         assert_eq!(range.end_location.column(), 4);
         Ok(())
+    }
+
+    #[test]
+    fn test_first_colon_range() {
+        let contents = "with a: pass";
+        let locator = Locator::new(contents);
+        let range = first_colon_range(
+            Range::new(Location::new(1, 0), Location::new(1, contents.len())),
+            &locator,
+        )
+        .unwrap();
+        assert_eq!(range.location.row(), 1);
+        assert_eq!(range.location.column(), 6);
+        assert_eq!(range.end_location.row(), 1);
+        assert_eq!(range.end_location.column(), 7);
     }
 }
