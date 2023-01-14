@@ -622,7 +622,7 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &Locator) -> bool {
     false
 }
 
-// Return the `Range` of the first `Tok::Colon` token in a `Range`.
+/// Return the `Range` of the first `Tok::Colon` token in a `Range`.
 pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
     let contents = locator.slice_source_code_range(&range);
     let range = lexer::make_tokenizer_located(&contents, range.location)
