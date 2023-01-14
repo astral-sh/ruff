@@ -35,8 +35,7 @@ pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt, parent: Opti
                 last_item
                     .optional_vars
                     .as_ref()
-                    .map(|v| v.end_location)
-                    .unwrap_or(last_item.context_expr.end_location)
+                    .map_or(last_item.context_expr.end_location, |v| v.end_location)
                     .unwrap(),
                 body.first()
                     .expect("Expected body to be non-empty")
@@ -46,9 +45,10 @@ pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt, parent: Opti
         );
         checker.diagnostics.push(Diagnostic::new(
             violations::MultipleWithStatements,
-            colon
-                .map(|colon| Range::new(stmt.location, colon.end_location))
-                .unwrap_or_else(|| Range::from_located(stmt)),
+            colon.map_or_else(
+                || Range::from_located(stmt),
+                |colon| Range::new(stmt.location, colon.end_location),
+            ),
         ));
     }
 }
