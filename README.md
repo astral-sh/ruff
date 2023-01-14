@@ -1261,10 +1261,12 @@ extension for `coc.nvim`.
 <br>
 
 
+'''
 let g:ale_linters = { "python": ["ruff"] }
 let g:ale_fixers = {
 \       "python": ["black", "ruff"],
 \}
+'''
 
 </details>
 
