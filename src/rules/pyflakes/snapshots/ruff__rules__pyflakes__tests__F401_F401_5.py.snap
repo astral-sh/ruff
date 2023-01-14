@@ -1,0 +1,85 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedImport:
+      - a.b.c
+      - false
+      - false
+  location:
+    row: 2
+    column: 16
+  end_location:
+    row: 2
+    column: 17
+  fix:
+    content: ""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 3
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      - d.e.f
+      - false
+      - false
+  location:
+    row: 3
+    column: 16
+  end_location:
+    row: 3
+    column: 22
+  fix:
+    content: ""
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 4
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      - h.i
+      - false
+      - false
+  location:
+    row: 4
+    column: 7
+  end_location:
+    row: 4
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 5
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      - j.k
+      - false
+      - false
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 6
+      column: 0
+  parent: ~
+

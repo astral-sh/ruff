@@ -5,7 +5,6 @@ use std::path::Path;
 
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
-use crate::ast::helpers::match_module_member;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Documentable;
 
@@ -31,26 +30,18 @@ pub struct VisibleScope {
 /// Returns `true` if a function is a "static method".
 pub fn is_staticmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        match_module_member(
-            expr,
-            "",
-            "staticmethod",
-            &checker.from_imports,
-            &checker.import_aliases,
-        )
+        checker
+            .resolve_call_path(expr)
+            .map_or(false, |call_path| call_path == ["", "staticmethod"])
     })
 }
 
 /// Returns `true` if a function is a "class method".
 pub fn is_classmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        match_module_member(
-            expr,
-            "",
-            "classmethod",
-            &checker.from_imports,
-            &checker.import_aliases,
-        )
+        checker
+            .resolve_call_path(expr)
+            .map_or(false, |call_path| call_path == ["", "classmethod"])
     })
 }
 
@@ -71,13 +62,9 @@ pub fn is_override(checker: &Checker, decorator_list: &[Expr]) -> bool {
 /// Returns `true` if a function definition is an `@abstractmethod`.
 pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        match_module_member(
-            expr,
-            "abc",
-            "abstractmethod",
-            &checker.from_imports,
-            &checker.import_aliases,
-        )
+        checker.resolve_call_path(expr).map_or(false, |call_path| {
+            call_path == ["abc", "abstractmethod"] || call_path == ["abc", "abstractproperty"]
+        })
     })
 }
 

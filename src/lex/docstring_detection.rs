@@ -43,7 +43,10 @@ impl StateMachine {
     }
 
     pub fn consume(&mut self, tok: &Tok) -> bool {
-        if matches!(tok, Tok::Newline | Tok::Indent | Tok::Dedent) {
+        if matches!(
+            tok,
+            Tok::NonLogicalNewline | Tok::Newline | Tok::Indent | Tok::Dedent | Tok::Comment(..)
+        ) {
             return false;
         }
 

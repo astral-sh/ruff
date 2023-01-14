@@ -1,11 +1,12 @@
 """
 Should emit:
-B027 - on lines 12, 15, 18, 22, 30
+B027 - on lines 13, 16, 19, 23
 """
 import abc
 from abc import ABC
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 from abc import abstractmethod as notabstract
+from abc import abstractproperty as notabstract_property
 
 
 class AbstractClass(ABC):
@@ -40,6 +41,18 @@ class AbstractClass(ABC):
 
     @abc.abstractmethod
     def abstract_3(self):
+        ...
+
+    @abc.abstractproperty
+    def abstract_4(self):
+        ...
+
+    @abstractproperty
+    def abstract_5(self):
+        ...
+
+    @notabstract_property
+    def abstract_6(self):
         ...
 
     def body_1(self):

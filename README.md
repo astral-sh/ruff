@@ -48,18 +48,21 @@ Ruff is extremely actively developed and used in major open-source projects like
 
 - [pandas](https://github.com/pandas-dev/pandas)
 - [FastAPI](https://github.com/tiangolo/fastapi)
+- [Apache Airflow](https://github.com/apache/airflow)
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
+- [Dagster](https://github.com/dagster-io/dagster)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
-- [Synapse](https://github.com/matrix-org/synapse)
+- [Synapse (Matrix)](https://github.com/matrix-org/synapse)
 - [Saleor](https://github.com/saleor/saleor)
 - [Polars](https://github.com/pola-rs/polars)
 - [Ibis](https://github.com/ibis-project/ibis)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
-- [`pyca/cryptography`](https://github.com/pyca/cryptography)
+- [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -140,8 +143,6 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 pip install ruff
 ```
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
-
 For **macOS Homebrew** and **Linuxbrew** users, Ruff is also available as [`ruff`](https://formulae.brew.sh/formula/ruff) on Homebrew:
 
 ```shell
@@ -159,6 +160,8 @@ For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.o
 ```shell
 pacman -S ruff
 ```
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
 
 ### Usage
 
@@ -181,7 +184,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.219'
+  rev: 'v0.0.221'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -580,6 +583,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 
 For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI.
 
+#### Error (E)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E401 | MultipleImportsOnOneLine | Multiple imports on one line |  |
@@ -597,6 +601,10 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
+
+#### Warning (W)
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file | 🛠 |
 | W505 | DocLineTooLong | Doc line too long (89 > 88 characters) |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' | 🛠 |
@@ -978,7 +986,6 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
 | SIM103 | ReturnBoolConditionDirectly | Return the condition `...` directly | 🛠 |
@@ -989,6 +996,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM110 | ConvertLoopToAny | Use `return any(x for x in y)` instead of `for` loop | 🛠 |
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
 | SIM112 | UseCapitalEnvironmentVariables | Use capitalized environment variable `...` instead of `...` | 🛠 |
+| SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
 | SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
@@ -1083,18 +1091,33 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 
 For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
+#### Convention (PLC)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PLC0414 | UselessImportAlias | Import alias does not rename original package | 🛠 |
 | PLC2201 | MisplacedComparisonConstant | Comparison should be ... | 🛠 |
 | PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
+
+#### Error (PLE)
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
 | PLE0117 | NonlocalWithoutBinding | Nonlocal name `...` found without binding |  |
 | PLE0118 | UsedPriorGlobalDeclaration | Name `...` is used prior to global declaration on line 1 |  |
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
+
+#### Refactor (PLR)
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PLR0133 | ConstantComparison | Two constants compared in a comparison, consider replacing `0 == 0` |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
 | PLR0402 | ConsiderUsingFromImport | Use `from ... import ...` in lieu of alias |  |
 | PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
 | PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
+| PLR2004 | MagicValueComparison | Magic number used in comparison, consider replacing magic with a constant variable |  |
+
+#### Warning (PLW)
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 | PLW0602 | GlobalVariableNotAssigned | Using global for `...` but no assignment is done |  |
 
@@ -1252,6 +1275,18 @@ officially supported LSP server for Ruff.
 
 However, Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
 extension for `coc.nvim`.
+
+<details>
+<summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for (Neo)Vim.</summary>
+
+```vim
+let g:ale_linters = { "python": ["ruff"] }
+let g:ale_fixers = {
+\       "python": ["black", "ruff"],
+\}
+```
+
+</details>
 
 <details>
 <summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
@@ -1417,7 +1452,7 @@ Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flak
 
 There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
 
-- Ruff doesn't implement the "opinionated" lint rules from `flake8-bugbear`.
+- Ruff doesn't implement all the "opinionated" lint rules from `flake8-bugbear`.
 - Depending on your project structure, Ruff and `isort` can differ in their detection of first-party
   code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
   code is nested in a `src` directory.)
@@ -1907,6 +1942,12 @@ extend-exclude = ["tests", "src/bad.py"]
 A list of rule codes or prefixes to ignore, in addition to those
 specified by `ignore`.
 
+Note that `extend-ignore` is applied after resolving rules from
+`ignore`/`select` and a less specific rule in `extend-ignore`
+would overwrite a more specific rule in `select`. It is
+recommended to only use `extend-ignore` when extending a
+`pyproject.toml` file via `extend`.
+
 **Default value**: `[]`
 
 **Type**: `Vec<RuleCodePrefix>`
@@ -1925,6 +1966,12 @@ extend-ignore = ["F841"]
 
 A list of rule codes or prefixes to enable, in addition to those
 specified by `select`.
+
+Note that `extend-select` is applied after resolving rules from
+`ignore`/`select` and a less specific rule in `extend-select`
+would overwrite a more specific rule in `ignore`. It is
+recommended to only use `extend-select` when extending a
+`pyproject.toml` file via `extend`.
 
 **Default value**: `[]`
 
@@ -2123,6 +2170,25 @@ The line length to use when enforcing long-lines violations (like
 [tool.ruff]
 # Allow lines to be as long as 120 characters.
 line-length = 120
+```
+
+---
+
+#### [`namespace-packages`](#namespace-packages)
+
+Mark the specified directories as namespace packages. For the purpose of
+module resolution, Ruff will treat those directories as if they
+contained an `__init__.py` file.
+
+**Default value**: `[]`
+
+**Type**: `Vec<PathBuf>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+namespace-packages = ["airflow/providers"]
 ```
 
 ---
@@ -2862,6 +2928,24 @@ ignore-variadic-names = true
 ---
 
 ### `isort`
+
+#### [`classes`](#classes)
+
+An override list of tokens to always recognize as a Class for
+`order-by-type` regardless of casing.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+classes = ["SVC"]
+```
+
+---
 
 #### [`combine-as-imports`](#combine-as-imports)
 

@@ -1,11 +1,7 @@
 [package]
 name = "ruff_dev"
-version = "0.0.219"
+version = "0.0.221"
 edition = "2021"
-
-[lib]
-name = "ruff_dev"
-doctest = false
 
 [dependencies]
 anyhow = { version = "1.0.66" }
@@ -14,9 +10,10 @@ itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
 once_cell = { version = "1.16.0" }
 ruff = { path = ".." }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "d532160333ffeb6dbeca2c2728c2391cd1e53b7f" }
+ruff_cli = { path = "../ruff_cli" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "acbc517b55406c76da83d7b2711941d8d3f65b87" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "acbc517b55406c76da83d7b2711941d8d3f65b87" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "acbc517b55406c76da83d7b2711941d8d3f65b87" }
 schemars = { version = "0.8.11" }
 serde_json = {version="1.0.91"}
 strum = { version = "0.24.1", features = ["strum_macros"] }

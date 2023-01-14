@@ -5,13 +5,13 @@ use rustpython_ast::Cmpop;
 use serde::{Deserialize, Serialize};
 
 use crate::define_violation;
-use crate::flake8_debugger::types::DebuggerUsingType;
-use crate::flake8_pytest_style::types::{
+use crate::rules::flake8_debugger::types::DebuggerUsingType;
+use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
-use crate::flake8_quotes::settings::Quote;
-use crate::flake8_tidy_imports::settings::Strictness;
-use crate::pyupgrade::types::Primitive;
+use crate::rules::flake8_quotes::settings::Quote;
+use crate::rules::flake8_tidy_imports::settings::Strictness;
+use crate::rules::pyupgrade::types::Primitive;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 // pycodestyle errors
@@ -1157,6 +1157,85 @@ impl Violation for ConsiderUsingFromImport {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ViolationsCmpop {
+    Eq,
+    NotEq,
+    Lt,
+    LtE,
+    Gt,
+    GtE,
+    Is,
+    IsNot,
+    In,
+    NotIn,
+}
+
+impl From<&Cmpop> for ViolationsCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Eq => Self::Eq,
+            Cmpop::NotEq => Self::NotEq,
+            Cmpop::Lt => Self::Lt,
+            Cmpop::LtE => Self::LtE,
+            Cmpop::Gt => Self::Gt,
+            Cmpop::GtE => Self::GtE,
+            Cmpop::Is => Self::Is,
+            Cmpop::IsNot => Self::IsNot,
+            Cmpop::In => Self::In,
+            Cmpop::NotIn => Self::NotIn,
+        }
+    }
+}
+
+impl fmt::Display for ViolationsCmpop {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let representation = match self {
+            Self::Eq => "==",
+            Self::NotEq => "!=",
+            Self::Lt => "<",
+            Self::LtE => "<=",
+            Self::Gt => ">",
+            Self::GtE => ">=",
+            Self::Is => "is",
+            Self::IsNot => "is not",
+            Self::In => "in",
+            Self::NotIn => "not in",
+        };
+        write!(f, "{representation}")
+    }
+}
+
+define_violation!(
+    pub struct ConstantComparison {
+        pub left_constant: String,
+        pub op: ViolationsCmpop,
+        pub right_constant: String,
+    }
+);
+impl Violation for ConstantComparison {
+    fn message(&self) -> String {
+        let ConstantComparison {
+            left_constant,
+            op,
+            right_constant,
+        } = self;
+
+        format!(
+            "Two constants compared in a comparison, consider replacing `{left_constant} {op} \
+             {right_constant}`"
+        )
+    }
+
+    fn placeholder() -> Self {
+        ConstantComparison {
+            left_constant: "0".to_string(),
+            op: ViolationsCmpop::Eq,
+            right_constant: "0".to_string(),
+        }
+    }
+}
+
 define_violation!(
     pub struct ConsiderMergingIsinstance(pub String, pub Vec<String>);
 );
@@ -1188,6 +1267,22 @@ impl AlwaysAutofixableViolation for UseSysExit {
 
     fn placeholder() -> Self {
         UseSysExit("exit".to_string())
+    }
+}
+
+define_violation!(
+    pub struct MagicValueComparison(pub String);
+);
+impl Violation for MagicValueComparison {
+    fn message(&self) -> String {
+        let MagicValueComparison(value) = self;
+        format!(
+            "Magic number used in comparison, consider replacing {value} with a constant variable"
+        )
+    }
+
+    fn placeholder() -> Self {
+        MagicValueComparison("magic".to_string())
     }
 }
 
@@ -3459,19 +3554,27 @@ impl AlwaysAutofixableViolation for RemoveSixCompat {
 }
 
 define_violation!(
-    pub struct DatetimeTimezoneUTC;
+    pub struct DatetimeTimezoneUTC {
+        pub straight_import: bool,
+    }
 );
-impl AlwaysAutofixableViolation for DatetimeTimezoneUTC {
+impl Violation for DatetimeTimezoneUTC {
     fn message(&self) -> String {
         "Use `datetime.UTC` alias".to_string()
     }
 
-    fn autofix_title(&self) -> String {
-        "Convert to `datetime.UTC` alias".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        if self.straight_import {
+            Some(|_| "Convert to `datetime.UTC` alias".to_string())
+        } else {
+            None
+        }
     }
 
     fn placeholder() -> Self {
-        DatetimeTimezoneUTC
+        DatetimeTimezoneUTC {
+            straight_import: true,
+        }
     }
 }
 

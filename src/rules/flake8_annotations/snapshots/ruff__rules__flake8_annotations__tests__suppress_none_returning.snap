@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_annotations/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingReturnTypePublicFunction: foo
+  location:
+    row: 45
+    column: 4
+  end_location:
+    row: 45
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypePublicFunction: foo
+  location:
+    row: 50
+    column: 4
+  end_location:
+    row: 50
+    column: 7
+  fix: ~
+  parent: ~
+

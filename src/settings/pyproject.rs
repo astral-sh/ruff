@@ -129,17 +129,17 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::flake8_quotes::settings::Quote;
-    use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
     use crate::registry::RuleCodePrefix;
+    use crate::rules::flake8_quotes::settings::Quote;
+    use crate::rules::flake8_tidy_imports::settings::{BannedApi, Strictness};
+    use crate::rules::{
+        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
+        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
+    };
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
-    use crate::{
-        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
-        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
-    };
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -181,6 +181,7 @@ mod tests {
                     ignore: None,
                     ignore_init_module_imports: None,
                     line_length: None,
+                    namespace_packages: None,
                     per_file_ignores: None,
                     required_version: None,
                     respect_gitignore: None,
@@ -239,6 +240,7 @@ line-length = 79
                     ignore: None,
                     ignore_init_module_imports: None,
                     line_length: Some(79),
+                    namespace_packages: None,
                     per_file_ignores: None,
                     respect_gitignore: None,
                     required_version: None,
@@ -299,6 +301,7 @@ exclude = ["foo.py"]
                     ignore: None,
                     ignore_init_module_imports: None,
                     line_length: None,
+                    namespace_packages: None,
                     per_file_ignores: None,
                     required_version: None,
                     respect_gitignore: None,
@@ -358,6 +361,7 @@ select = ["E501"]
                     ignore: None,
                     ignore_init_module_imports: None,
                     line_length: None,
+                    namespace_packages: None,
                     per_file_ignores: None,
                     required_version: None,
                     respect_gitignore: None,
@@ -418,6 +422,7 @@ ignore = ["E501"]
                     ignore: Some(vec![RuleCodePrefix::E501]),
                     ignore_init_module_imports: None,
                     line_length: None,
+                    namespace_packages: None,
                     per_file_ignores: None,
                     required_version: None,
                     respect_gitignore: None,
@@ -515,6 +520,7 @@ other-attribute = 1
                 fixable: None,
                 format: None,
                 force_exclude: None,
+                namespace_packages: None,
                 unfixable: None,
                 typing_modules: None,
                 task_tags: None,

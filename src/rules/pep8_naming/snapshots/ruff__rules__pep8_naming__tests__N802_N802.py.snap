@@ -1,0 +1,55 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    InvalidFunctionName: Bad
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFunctionName: _Bad
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFunctionName: BAD
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFunctionName: BAD_FUNC
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFunctionName: testTest
+  location:
+    row: 40
+    column: 8
+  end_location:
+    row: 40
+    column: 16
+  fix: ~
+  parent: ~
+

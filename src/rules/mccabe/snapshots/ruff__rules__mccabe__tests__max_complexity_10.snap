@@ -1,0 +1,6 @@
+---
+source: src/rules/mccabe/mod.rs
+expression: diagnostics
+---
+[]
+

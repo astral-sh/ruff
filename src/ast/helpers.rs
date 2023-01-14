@@ -12,6 +12,7 @@ use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
 
 use crate::ast::types::{Binding, BindingKind, Range};
+use crate::checkers::ast::Checker;
 use crate::source_code::{Generator, Locator, Stylist};
 
 /// Create an `Expr` with default location from an `ExprKind`.
@@ -54,150 +55,42 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
     }
 }
 
-/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-pub fn compose_call_path(expr: &Expr) -> Option<String> {
-    let segments = collect_call_paths(expr);
-    if segments.is_empty() {
-        None
-    } else {
-        Some(segments.join("."))
-    }
-}
-
 /// Convert an `Expr` to its call path segments (like ["typing", "List"]).
-pub fn collect_call_paths(expr: &Expr) -> Vec<&str> {
+pub fn collect_call_path(expr: &Expr) -> Vec<&str> {
     let mut segments = vec![];
     collect_call_path_inner(expr, &mut segments);
     segments
 }
 
-/// Rewrite any import aliases on a call path.
-pub fn dealias_call_path<'a>(
-    call_path: Vec<&'a str>,
-    import_aliases: &FxHashMap<&str, &'a str>,
-) -> Vec<&'a str> {
-    if let Some(head) = call_path.first() {
-        if let Some(origin) = import_aliases.get(head) {
-            let tail = &call_path[1..];
-            let mut call_path: Vec<&str> = vec![];
-            call_path.extend(origin.split('.'));
-            call_path.extend(tail);
-            call_path
-        } else {
-            call_path
-        }
+/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
+pub fn compose_call_path(expr: &Expr) -> Option<String> {
+    let call_path = collect_call_path(expr);
+    if call_path.is_empty() {
+        None
     } else {
-        call_path
+        Some(format_call_path(&call_path))
     }
 }
 
-/// Return `true` if the `Expr` is a reference to `${module}.${target}`.
-///
-/// Useful for, e.g., ensuring that a `Union` reference represents
-/// `typing.Union`.
-pub fn match_module_member(
-    expr: &Expr,
-    module: &str,
-    member: &str,
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-    import_aliases: &FxHashMap<&str, &str>,
-) -> bool {
-    match_call_path(
-        &dealias_call_path(collect_call_paths(expr), import_aliases),
-        module,
-        member,
-        from_imports,
-    )
-}
-
-/// Return `true` if the `call_path` is a reference to `${module}.${target}`.
-///
-/// Optimized version of `match_module_member` for pre-computed call paths.
-pub fn match_call_path(
-    call_path: &[&str],
-    module: &str,
-    member: &str,
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-) -> bool {
-    // If we have no segments, we can't ever match.
-    let num_segments = call_path.len();
-    if num_segments == 0 {
-        return false;
-    }
-
-    // If the last segment doesn't match the member, we can't ever match.
-    if call_path[num_segments - 1] != member {
-        return false;
-    }
-
-    // We now only need the module path, so throw out the member name.
-    let call_path = &call_path[..num_segments - 1];
-    let num_segments = call_path.len();
-
-    // Case (1): It's a builtin (like `list`).
-    // Case (2a): We imported from the parent (`from typing.re import Match`,
-    // `Match`).
-    // Case (2b): We imported star from the parent (`from typing.re import *`,
-    // `Match`).
-    if num_segments == 0 {
-        module.is_empty()
-            || from_imports.get(module).map_or(false, |imports| {
-                imports.contains(member) || imports.contains("*")
-            })
+/// Format a call path for display.
+pub fn format_call_path(call_path: &[&str]) -> String {
+    if call_path
+        .first()
+        .expect("Unable to format empty call path")
+        .is_empty()
+    {
+        call_path[1..].join(".")
     } else {
-        let components: Vec<&str> = module.split('.').collect();
-
-        // Case (3a): it's a fully qualified call path (`import typing`,
-        // `typing.re.Match`). Case (3b): it's a fully qualified call path (`import
-        // typing.re`, `typing.re.Match`).
-        if components == call_path {
-            return true;
-        }
-
-        // Case (4): We imported from the grandparent (`from typing import re`,
-        // `re.Match`)
-        let num_matches = (0..components.len())
-            .take(num_segments)
-            .take_while(|i| components[components.len() - 1 - i] == call_path[num_segments - 1 - i])
-            .count();
-        if num_matches > 0 {
-            let cut = components.len() - num_matches;
-            // TODO(charlie): Rewrite to avoid this allocation.
-            let module = components[..cut].join(".");
-            let member = components[cut];
-            if from_imports
-                .get(&module.as_str())
-                .map_or(false, |imports| imports.contains(member))
-            {
-                return true;
-            }
-        }
-
-        false
+        call_path.join(".")
     }
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-pub fn contains_call_path(
-    expr: &Expr,
-    module: &str,
-    member: &str,
-    import_aliases: &FxHashMap<&str, &str>,
-    from_imports: &FxHashMap<&str, FxHashSet<&str>>,
-) -> bool {
+pub fn contains_call_path(checker: &Checker, expr: &Expr, target: &[&str]) -> bool {
     any_over_expr(expr, &|expr| {
-        let call_path = collect_call_paths(expr);
-        if !call_path.is_empty() {
-            if match_call_path(
-                &dealias_call_path(call_path, import_aliases),
-                module,
-                member,
-                from_imports,
-            ) {
-                return true;
-            }
-        }
-        false
+        checker
+            .resolve_call_path(expr)
+            .map_or(false, |call_path| call_path == target)
     })
 }
 
@@ -389,13 +282,13 @@ pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<Vec<&str>> {
                 if let Some(type_) = type_ {
                     if let ExprKind::Tuple { elts, .. } = &type_.node {
                         for type_ in elts {
-                            let call_path = collect_call_paths(type_);
+                            let call_path = collect_call_path(type_);
                             if !call_path.is_empty() {
                                 handler_names.push(call_path);
                             }
                         }
                     } else {
-                        let call_path = collect_call_paths(type_);
+                        let call_path = collect_call_path(type_);
                         if !call_path.is_empty() {
                             handler_names.push(call_path);
                         }
@@ -458,12 +351,37 @@ pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String
     module_name
 }
 
+/// Format the member reference name for a relative import.
+pub fn format_import_from_member(
+    level: Option<&usize>,
+    module: Option<&str>,
+    member: &str,
+) -> String {
+    let mut full_name = String::with_capacity(
+        level.map_or(0, |level| *level)
+            + module.as_ref().map_or(0, |module| module.len())
+            + 1
+            + member.len(),
+    );
+    if let Some(level) = level {
+        for _ in 0..*level {
+            full_name.push('.');
+        }
+    }
+    if let Some(module) = module {
+        full_name.push_str(module);
+        full_name.push('.');
+    }
+    full_name.push_str(member);
+    full_name
+}
+
 /// Split a target string (like `typing.List`) into (`typing`, `List`).
-pub fn to_module_and_member(target: &str) -> (&str, &str) {
-    if let Some(index) = target.rfind('.') {
-        (&target[..index], &target[index + 1..])
+pub fn to_call_path(target: &str) -> Vec<&str> {
+    if target.contains('.') {
+        target.split('.').collect()
     } else {
-        ("", target)
+        vec!["", target]
     }
 }
 
@@ -704,6 +622,19 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &Locator) -> bool {
     false
 }
 
+/// Return the `Range` of the first `Tok::Colon` token in a `Range`.
+pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
+    let contents = locator.slice_source_code_range(&range);
+    let range = lexer::make_tokenizer_located(&contents, range.location)
+        .flatten()
+        .find(|(_, kind, _)| matches!(kind, Tok::Colon))
+        .map(|(location, _, end_location)| Range {
+            location,
+            end_location,
+        });
+    range
+}
+
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
 pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
@@ -778,6 +709,7 @@ impl<'a> SimpleCallArgs<'a> {
     }
 
     /// Get the number of positional and keyword arguments used.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.args.len() + self.kwargs.len()
     }
@@ -786,158 +718,14 @@ impl<'a> SimpleCallArgs<'a> {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustc_hash::{FxHashMap, FxHashSet};
     use rustpython_ast::Location;
     use rustpython_parser::parser;
 
     use crate::ast::helpers::{
-        else_range, identifier_range, match_module_member, match_trailing_content,
+        else_range, first_colon_range, identifier_range, match_trailing_content,
     };
     use crate::ast::types::Range;
     use crate::source_code::Locator;
-
-    #[test]
-    fn builtin() -> Result<()> {
-        let expr = parser::parse_expression("list", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "",
-            "list",
-            &FxHashMap::default(),
-            &FxHashMap::default(),
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn fully_qualified() -> Result<()> {
-        let expr = parser::parse_expression("typing.re.Match", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::default(),
-            &FxHashMap::default(),
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn unimported() -> Result<()> {
-        let expr = parser::parse_expression("Match", "<filename>")?;
-        assert!(!match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::default(),
-            &FxHashMap::default(),
-        ));
-        let expr = parser::parse_expression("re.Match", "<filename>")?;
-        assert!(!match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::default(),
-            &FxHashMap::default(),
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn from_star() -> Result<()> {
-        let expr = parser::parse_expression("Match", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::from_iter([("typing.re", FxHashSet::from_iter(["*"]))]),
-            &FxHashMap::default()
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn from_parent() -> Result<()> {
-        let expr = parser::parse_expression("Match", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::from_iter([("typing.re", FxHashSet::from_iter(["Match"]))]),
-            &FxHashMap::default()
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn from_grandparent() -> Result<()> {
-        let expr = parser::parse_expression("re.Match", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::from_iter([("typing", FxHashSet::from_iter(["re"]))]),
-            &FxHashMap::default()
-        ));
-
-        let expr = parser::parse_expression("match.Match", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re.match",
-            "Match",
-            &FxHashMap::from_iter([("typing.re", FxHashSet::from_iter(["match"]))]),
-            &FxHashMap::default()
-        ));
-
-        let expr = parser::parse_expression("re.match.Match", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re.match",
-            "Match",
-            &FxHashMap::from_iter([("typing", FxHashSet::from_iter(["re"]))]),
-            &FxHashMap::default()
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn from_alias() -> Result<()> {
-        let expr = parser::parse_expression("IMatch", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::from_iter([("typing.re", FxHashSet::from_iter(["Match"]))]),
-            &FxHashMap::from_iter([("IMatch", "Match")]),
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn from_aliased_parent() -> Result<()> {
-        let expr = parser::parse_expression("t.Match", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::default(),
-            &FxHashMap::from_iter([("t", "typing.re")]),
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn from_aliased_grandparent() -> Result<()> {
-        let expr = parser::parse_expression("t.re.Match", "<filename>")?;
-        assert!(match_module_member(
-            &expr,
-            "typing.re",
-            "Match",
-            &FxHashMap::default(),
-            &FxHashMap::from_iter([("t", "typing")]),
-        ));
-        Ok(())
-    }
 
     #[test]
     fn trailing_content() -> Result<()> {
@@ -1065,5 +853,20 @@ else:
         assert_eq!(range.end_location.row(), 3);
         assert_eq!(range.end_location.column(), 4);
         Ok(())
+    }
+
+    #[test]
+    fn test_first_colon_range() {
+        let contents = "with a: pass";
+        let locator = Locator::new(contents);
+        let range = first_colon_range(
+            Range::new(Location::new(1, 0), Location::new(1, contents.len())),
+            &locator,
+        )
+        .unwrap();
+        assert_eq!(range.location.row(), 1);
+        assert_eq!(range.location.column(), 6);
+        assert_eq!(range.end_location.row(), 1);
+        assert_eq!(range.end_location.column(), 7);
     }
 }

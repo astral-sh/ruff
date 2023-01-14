@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_datetimez/mod.rs
+expression: diagnostics
+---
+- kind:
+    CallDatetimeUtcnow: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeUtcnow: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 17
+  fix: ~
+  parent: ~
+

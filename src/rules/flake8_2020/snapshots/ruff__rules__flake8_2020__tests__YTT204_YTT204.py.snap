@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_2020/mod.rs
+expression: diagnostics
+---
+- kind:
+    SysVersionInfoMinorCmpInt: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    SysVersionInfoMinorCmpInt: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 18
+  fix: ~
+  parent: ~
+

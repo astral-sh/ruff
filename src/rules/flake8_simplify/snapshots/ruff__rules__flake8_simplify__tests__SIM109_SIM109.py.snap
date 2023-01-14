@@ -1,0 +1,26 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    CompareWithTuple:
+      - a
+      - - b
+        - c
+      - a == b or a == c
+  location:
+    row: 2
+    column: 3
+  end_location:
+    row: 2
+    column: 19
+  fix:
+    content: "a in (b, c)"
+    location:
+      row: 2
+      column: 3
+    end_location:
+      row: 2
+      column: 19
+  parent: ~
+

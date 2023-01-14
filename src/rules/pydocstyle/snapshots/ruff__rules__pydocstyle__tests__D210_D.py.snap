@@ -1,0 +1,66 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoSurroundingWhitespace: ~
+  location:
+    row: 288
+    column: 4
+  end_location:
+    row: 288
+    column: 33
+  fix:
+    content: Whitespace at the end.
+    location:
+      row: 288
+      column: 7
+    end_location:
+      row: 288
+      column: 30
+  parent: ~
+- kind:
+    NoSurroundingWhitespace: ~
+  location:
+    row: 293
+    column: 4
+  end_location:
+    row: 293
+    column: 37
+  fix:
+    content: Whitespace at everywhere.
+    location:
+      row: 293
+      column: 7
+    end_location:
+      row: 293
+      column: 34
+  parent: ~
+- kind:
+    NoSurroundingWhitespace: ~
+  location:
+    row: 299
+    column: 4
+  end_location:
+    row: 302
+    column: 7
+  fix:
+    content: Whitespace at the beginning.
+    location:
+      row: 299
+      column: 7
+    end_location:
+      row: 299
+      column: 36
+  parent: ~
+- kind:
+    NoSurroundingWhitespace: ~
+  location:
+    row: 581
+    column: 4
+  end_location:
+    row: 581
+    column: 51
+  fix: ~
+  parent: ~
+

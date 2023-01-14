@@ -1,0 +1,56 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    DatetimeTimezoneUTC:
+      straight_import: false
+  location:
+    row: 7
+    column: 6
+  end_location:
+    row: 7
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    DatetimeTimezoneUTC:
+      straight_import: false
+  location:
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DatetimeTimezoneUTC:
+      straight_import: true
+  location:
+    row: 10
+    column: 6
+  end_location:
+    row: 10
+    column: 27
+  fix:
+    content: datetime.UTC
+    location:
+      row: 10
+      column: 6
+    end_location:
+      row: 10
+      column: 27
+  parent: ~
+- kind:
+    DatetimeTimezoneUTC:
+      straight_import: false
+  location:
+    row: 11
+    column: 6
+  end_location:
+    row: 11
+    column: 21
+  fix: ~
+  parent: ~
+

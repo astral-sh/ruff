@@ -1,0 +1,6 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+[]
+

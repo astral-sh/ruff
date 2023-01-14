@@ -1,0 +1,39 @@
+---
+source: src/rules/flake8_print/mod.rs
+expression: diagnostics
+---
+- kind:
+    PPrintFound: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 6
+  fix:
+    content: ""
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 4
+      column: 0
+  parent: ~
+- kind:
+    PPrintFound: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 13
+  fix:
+    content: ""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 8
+      column: 0
+  parent: ~
+

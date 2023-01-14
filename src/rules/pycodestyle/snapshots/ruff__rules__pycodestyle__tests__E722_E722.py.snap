@@ -1,0 +1,35 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    DoNotUseBareExcept: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    DoNotUseBareExcept: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    DoNotUseBareExcept: ~
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 6
+  fix: ~
+  parent: ~
+

@@ -6,12 +6,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::registry::RuleCodePrefix;
-use crate::settings::types::{PythonVersion, SerializationFormat, Version};
-use crate::{
+use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
     mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
+use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
@@ -143,6 +143,12 @@ pub struct Options {
     )]
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
+    ///
+    /// Note that `extend-ignore` is applied after resolving rules from
+    /// `ignore`/`select` and a less specific rule in `extend-ignore`
+    /// would overwrite a more specific rule in `select`. It is
+    /// recommended to only use `extend-ignore` when extending a
+    /// `pyproject.toml` file via `extend`.
     pub extend_ignore: Option<Vec<RuleCodePrefix>>,
     #[option(
         default = "[]",
@@ -154,6 +160,12 @@ pub struct Options {
     )]
     /// A list of rule codes or prefixes to enable, in addition to those
     /// specified by `select`.
+    ///
+    /// Note that `extend-select` is applied after resolving rules from
+    /// `ignore`/`select` and a less specific rule in `extend-select`
+    /// would overwrite a more specific rule in `ignore`. It is
+    /// recommended to only use `extend-select` when extending a
+    /// `pyproject.toml` file via `extend`.
     pub extend_select: Option<Vec<RuleCodePrefix>>,
     #[option(
         default = "[]",
@@ -340,6 +352,17 @@ pub struct Options {
     /// packages in that directory. User home directory and environment
     /// variables will also be expanded.
     pub src: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Vec<PathBuf>",
+        example = r#"
+            namespace-packages = ["airflow/providers"]
+        "#
+    )]
+    /// Mark the specified directories as namespace packages. For the purpose of
+    /// module resolution, Ruff will treat those directories as if they
+    /// contained an `__init__.py` file.
+    pub namespace_packages: Option<Vec<String>>,
     #[option(
         default = r#""py310""#,
         value_type = "PythonVersion",

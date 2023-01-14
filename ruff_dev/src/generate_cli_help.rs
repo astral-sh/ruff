@@ -1,8 +1,7 @@
 //! Generate CLI help.
 
 use anyhow::Result;
-use clap::{Args, CommandFactory};
-use ruff::cli::Cli as MainCli;
+use clap::Args;
 
 use crate::utils::replace_readme_section;
 
@@ -21,8 +20,7 @@ fn trim_lines(s: &str) -> String {
 }
 
 pub fn main(cli: &Cli) -> Result<()> {
-    let mut cmd = MainCli::command();
-    let output = trim_lines(cmd.render_help().to_string().trim());
+    let output = trim_lines(ruff_cli::help().trim());
 
     if cli.dry_run {
         print!("{output}");

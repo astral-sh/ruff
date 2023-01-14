@@ -1,0 +1,53 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    DocLineTooLong:
+      - 57
+      - 50
+  location:
+    row: 2
+    column: 50
+  end_location:
+    row: 2
+    column: 57
+  fix: ~
+  parent: ~
+- kind:
+    DocLineTooLong:
+      - 56
+      - 50
+  location:
+    row: 6
+    column: 50
+  end_location:
+    row: 6
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    DocLineTooLong:
+      - 56
+      - 50
+  location:
+    row: 10
+    column: 50
+  end_location:
+    row: 10
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    DocLineTooLong:
+      - 61
+      - 50
+  location:
+    row: 15
+    column: 50
+  end_location:
+    row: 15
+    column: 61
+  fix: ~
+  parent: ~
+

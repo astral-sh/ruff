@@ -1,6 +1,0 @@
----
-source: src/flake8_quotes/mod.rs
-expression: checks
----
-[]
-

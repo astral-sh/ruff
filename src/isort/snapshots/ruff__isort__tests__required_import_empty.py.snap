@@ -1,6 +1,0 @@
----
-source: src/isort/mod.rs
-expression: diagnostics
----
-[]
-

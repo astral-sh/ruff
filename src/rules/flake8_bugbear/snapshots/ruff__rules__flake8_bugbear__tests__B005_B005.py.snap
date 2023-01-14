@@ -1,0 +1,65 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    StripWithMultiCharacters: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    StripWithMultiCharacters: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    StripWithMultiCharacters: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    StripWithMultiCharacters: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    StripWithMultiCharacters: ~
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    StripWithMultiCharacters: ~
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 18
+  fix: ~
+  parent: ~
+

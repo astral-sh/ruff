@@ -1,0 +1,62 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    YodaConditions:
+      - "\"yoda\""
+      - compare
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 17
+  fix:
+    content: "compare == \"yoda\""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 17
+  parent: ~
+- kind:
+    YodaConditions:
+      - "'yoda'"
+      - compare
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 17
+  fix:
+    content: "compare == 'yoda'"
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 17
+  parent: ~
+- kind:
+    YodaConditions:
+      - "42"
+      - age
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 9
+  fix:
+    content: age == 42
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 9
+  parent: ~
+

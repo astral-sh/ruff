@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    UselessContextlibSuppress: ~
+  location:
+    row: 9
+    column: 5
+  end_location:
+    row: 9
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    UselessContextlibSuppress: ~
+  location:
+    row: 12
+    column: 5
+  end_location:
+    row: 12
+    column: 15
+  fix: ~
+  parent: ~
+

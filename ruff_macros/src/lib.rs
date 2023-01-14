@@ -1,3 +1,4 @@
+//! This crate implements internal macros for the `ruff` library.
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,

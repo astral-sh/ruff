@@ -1,0 +1,22 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    UsePEP604Annotation: ~
+  location:
+    row: 40
+    column: 3
+  end_location:
+    row: 40
+    column: 16
+  fix:
+    content: int | None
+    location:
+      row: 40
+      column: 3
+    end_location:
+      row: 40
+      column: 16
+  parent: ~
+

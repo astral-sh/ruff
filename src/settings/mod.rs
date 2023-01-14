@@ -18,18 +18,19 @@ use rustc_hash::FxHashSet;
 
 use crate::cache::cache_dir;
 use crate::registry::{RuleCode, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::rules::{
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+};
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
-use crate::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade, warn_user_once,
-};
+use crate::warn_user_once;
 
 pub mod configuration;
-pub(crate) mod flags;
+pub mod flags;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
@@ -55,6 +56,7 @@ pub struct Settings {
     pub format: SerializationFormat,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
+    pub namespace_packages: Vec<PathBuf>,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<RuleCode>)>,
     pub required_version: Option<Version>,
     pub respect_gitignore: bool,
@@ -169,6 +171,7 @@ impl Settings {
             force_exclude: config.force_exclude.unwrap_or(false),
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
             line_length: config.line_length.unwrap_or(88),
+            namespace_packages: config.namespace_packages.unwrap_or_default(),
             per_file_ignores: resolve_per_file_ignores(
                 config.per_file_ignores.unwrap_or_default(),
             )?,
@@ -235,6 +238,7 @@ impl Settings {
             format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
+            namespace_packages: vec![],
             per_file_ignores: vec![],
             required_version: None,
             respect_gitignore: true,
@@ -279,6 +283,7 @@ impl Settings {
             format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
+            namespace_packages: vec![],
             per_file_ignores: vec![],
             required_version: None,
             respect_gitignore: true,

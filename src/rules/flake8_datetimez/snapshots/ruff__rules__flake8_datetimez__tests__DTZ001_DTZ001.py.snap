@@ -1,0 +1,55 @@
+---
+source: src/rules/flake8_datetimez/mod.rs
+expression: diagnostics
+---
+- kind:
+    CallDatetimeWithoutTzinfo: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeWithoutTzinfo: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeWithoutTzinfo: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeWithoutTzinfo: ~
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 42
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeWithoutTzinfo: ~
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 29
+  fix: ~
+  parent: ~
+

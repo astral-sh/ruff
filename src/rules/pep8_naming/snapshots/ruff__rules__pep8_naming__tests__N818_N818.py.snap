@@ -1,0 +1,25 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    ErrorSuffixOnExceptionName: C
+  location:
+    row: 9
+    column: 6
+  end_location:
+    row: 9
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    ErrorSuffixOnExceptionName: E
+  location:
+    row: 17
+    column: 6
+  end_location:
+    row: 17
+    column: 7
+  fix: ~
+  parent: ~
+

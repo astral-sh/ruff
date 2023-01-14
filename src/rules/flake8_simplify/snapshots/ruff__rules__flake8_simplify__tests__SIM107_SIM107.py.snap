@@ -1,0 +1,15 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    ReturnInTryExceptFinally: ~
+  location:
+    row: 9
+    column: 8
+  end_location:
+    row: 9
+    column: 18
+  fix: ~
+  parent: ~
+

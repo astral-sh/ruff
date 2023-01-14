@@ -67,7 +67,7 @@
       }
     },
     "extend-ignore": {
-      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
+      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.\n\nNote that `extend-ignore` is applied after resolving rules from `ignore`/`select` and a less specific rule in `extend-ignore` would overwrite a more specific rule in `select`. It is recommended to only use `extend-ignore` when extending a `pyproject.toml` file via `extend`.",
       "type": [
         "array",
         "null"
@@ -77,7 +77,7 @@
       }
     },
     "extend-select": {
-      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.\n\nNote that `extend-select` is applied after resolving rules from `ignore`/`select` and a less specific rule in `extend-select` would overwrite a more specific rule in `ignore`. It is recommended to only use `extend-select` when extending a `pyproject.toml` file via `extend`.",
       "type": [
         "array",
         "null"
@@ -284,6 +284,16 @@
           "type": "null"
         }
       ]
+    },
+    "namespace-packages": {
+      "description": "Mark the specified directories as namespace packages. For the purpose of module resolution, Ruff will treat those directories as if they contained an `__init__.py` file.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
     },
     "pep8-naming": {
       "description": "Options for the `pep8-naming` plugin.",
@@ -755,6 +765,16 @@
     "IsortOptions": {
       "type": "object",
       "properties": {
+        "classes": {
+          "description": "An override list of tokens to always recognize as a Class for `order-by-type` regardless of casing.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "combine-as-imports": {
           "description": "Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports) option.",
           "type": [
@@ -1433,6 +1453,9 @@
         "PLE1142",
         "PLR",
         "PLR0",
+        "PLR01",
+        "PLR013",
+        "PLR0133",
         "PLR02",
         "PLR020",
         "PLR0206",
@@ -1445,6 +1468,10 @@
         "PLR1701",
         "PLR172",
         "PLR1722",
+        "PLR2",
+        "PLR20",
+        "PLR200",
+        "PLR2004",
         "PLW",
         "PLW0",
         "PLW01",

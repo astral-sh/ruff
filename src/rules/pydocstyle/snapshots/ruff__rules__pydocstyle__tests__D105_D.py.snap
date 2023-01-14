@@ -1,0 +1,15 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    MagicMethod: ~
+  location:
+    row: 64
+    column: 8
+  end_location:
+    row: 64
+    column: 15
+  fix: ~
+  parent: ~
+

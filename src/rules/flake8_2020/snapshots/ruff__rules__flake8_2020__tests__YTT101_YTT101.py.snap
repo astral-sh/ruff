@@ -1,0 +1,35 @@
+---
+source: src/rules/flake8_2020/mod.rs
+expression: diagnostics
+---
+- kind:
+    SysVersionSlice3Referenced: ~
+  location:
+    row: 6
+    column: 6
+  end_location:
+    row: 6
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    SysVersionSlice3Referenced: ~
+  location:
+    row: 7
+    column: 6
+  end_location:
+    row: 7
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    SysVersionSlice3Referenced: ~
+  location:
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 7
+  fix: ~
+  parent: ~
+

@@ -12,16 +12,17 @@ use regex::Regex;
 use shellexpand;
 use shellexpand::LookupError;
 
+use crate::fs;
 use crate::registry::RuleCodePrefix;
+use crate::rules::{
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+};
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
-};
-use crate::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, fs, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 #[derive(Debug, Default)]
@@ -44,6 +45,7 @@ pub struct Configuration {
     pub ignore: Option<Vec<RuleCodePrefix>>,
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
+    pub namespace_packages: Option<Vec<PathBuf>>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
@@ -135,6 +137,10 @@ impl Configuration {
             ignore: options.ignore,
             ignore_init_module_imports: options.ignore_init_module_imports,
             line_length: options.line_length,
+            namespace_packages: options
+                .namespace_packages
+                .map(|namespace_package| resolve_src(&namespace_package, project_root))
+                .transpose()?,
             per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
                     .into_iter()
@@ -211,6 +217,7 @@ impl Configuration {
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
             line_length: self.line_length.or(config.line_length),
+            namespace_packages: self.namespace_packages.or(config.namespace_packages),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
             required_version: self.required_version.or(config.required_version),
             respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),

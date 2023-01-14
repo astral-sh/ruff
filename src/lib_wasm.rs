@@ -5,19 +5,20 @@ use rustpython_parser::lexer::LexResult;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
+use crate::directives;
 use crate::linter::check_path;
 use crate::registry::{RuleCode, RuleCodePrefix};
+use crate::rules::{
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+};
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Locator, Stylist};
-use crate::{
-    directives, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
-};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -105,14 +106,15 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         force_exclude: None,
         format: None,
         ignore_init_module_imports: None,
+        namespace_packages: None,
         per_file_ignores: None,
         required_version: None,
         respect_gitignore: None,
         show_source: None,
         src: None,
-        unfixable: None,
-        typing_modules: None,
         task_tags: None,
+        typing_modules: None,
+        unfixable: None,
         update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),

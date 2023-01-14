@@ -1,0 +1,22 @@
+---
+source: src/rules/isort/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnsortedImports: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 6
+    column: 0
+  fix:
+    content: "from collections import (\n    AsyncIterable,\n    Awaitable,\n    ChainMap,\n    Collection,\n    MutableMapping,\n    MutableSequence,\n)\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 6
+      column: 0
+  parent: ~
+

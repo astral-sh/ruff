@@ -1,3 +1,6 @@
+//! This crate implements an internal CLI for developers of Ruff.
+//!
+//! Within the ruff repository you can run it with `cargo dev`.
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
@@ -12,12 +15,19 @@
 )]
 #![forbid(unsafe_code)]
 
+mod generate_all;
+mod generate_cli_help;
+mod generate_json_schema;
+mod generate_options;
+mod generate_rules_table;
+mod print_ast;
+mod print_cst;
+mod print_tokens;
+mod round_trip;
+mod utils;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use ruff_dev::{
-    generate_all, generate_cli_help, generate_json_schema, generate_options, generate_rules_table,
-    print_ast, print_cst, print_tokens, round_trip,
-};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

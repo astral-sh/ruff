@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnreliableCallableCheck: ~
+  location:
+    row: 3
+    column: 7
+  end_location:
+    row: 3
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    UnreliableCallableCheck: ~
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 36
+  fix: ~
+  parent: ~
+

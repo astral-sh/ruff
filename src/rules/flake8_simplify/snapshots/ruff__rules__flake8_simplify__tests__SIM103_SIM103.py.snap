@@ -1,0 +1,22 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    ReturnBoolConditionDirectly: a
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 5
+    column: 20
+  fix:
+    content: return a
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 5
+      column: 20
+  parent: ~
+
