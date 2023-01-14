@@ -1,3 +1,9 @@
+//! This is the library for the [Ruff] Python linter.
+//!
+//! **The API is currently completely unstable**
+//! and subject to change drastically.
+//!
+//! [Ruff]: https://github.com/charliermarsh/ruff
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
