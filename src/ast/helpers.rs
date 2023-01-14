@@ -622,6 +622,19 @@ pub fn preceded_by_continuation(stmt: &Stmt, locator: &Locator) -> bool {
     false
 }
 
+// Return the `Range` of the first `Tok::Colon` token in a `Range`.
+pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
+    let contents = locator.slice_source_code_range(&range);
+    let range = lexer::make_tokenizer_located(&contents, range.location)
+        .flatten()
+        .find(|(_, kind, _)| matches!(kind, Tok::Colon))
+        .map(|(location, _, end_location)| Range {
+            location,
+            end_location,
+        });
+    range
+}
+
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
 pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {

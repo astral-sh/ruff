@@ -1,5 +1,6 @@
 use rustpython_ast::{Stmt, StmtKind};
 
+use crate::ast::helpers::first_colon_range;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
@@ -25,9 +26,29 @@ pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt, parent: Opti
         }
     }
     if let Some(with_stmt) = find_nested_with(stmt) {
+        let StmtKind::With { items, body, .. } = &with_stmt.node else {
+            return
+        };
+        let last_item = items.last().expect("Expected items to be non-empty");
+        let colon = first_colon_range(
+            Range::new(
+                last_item
+                    .optional_vars
+                    .as_ref()
+                    .map(|v| v.end_location)
+                    .unwrap_or(last_item.context_expr.end_location)
+                    .unwrap(),
+                body.first()
+                    .expect("Expected body to be non-empty")
+                    .location,
+            ),
+            checker.locator,
+        );
         checker.diagnostics.push(Diagnostic::new(
             violations::MultipleWithStatements,
-            Range::new(stmt.location, with_stmt.end_location.unwrap()),
+            colon
+                .map(|colon| Range::new(stmt.location, colon.end_location))
+                .unwrap_or_else(|| Range::from_located(stmt)),
         ));
     }
 }
