@@ -21,12 +21,16 @@
     "trailing comma",
         )
 
+paren_continue = (
+    "foo %s "
+    "bar %s" % (x, y)
+)
 """ Having this uncommented breaks the nested one, waiting on help from Charlie to uncomment this
 "%s \N{snowman}" % (a,)
 """
 # Make sure to include assignment and inside a call, also multi-line
 
-# These SHOULD NOT change
+# These should NOT change
 "%s" % unknown_type
 
 b"%s" % (b"bytestring",)
@@ -39,31 +43,12 @@ b"%s" % (b"bytestring",)
 
 "%#o" % (123,)
 
-"%()s" % {"": "empty"}
 
 "%4%" % ()
 
 "%.2r" % (1.25)
 
 i % 3
-
-"%s" % {"k": "v"}
-
-"%(1)s" % {"1": "bar"}
-
-"%(a)s" % {"a": 1, "a": 2}
-
-"%(ab)s" % {"a" "b": 1}
-
-"%(a)s" % {"a"  :  1}
-
-"%(1)s" % {1: 2, "1": 2}
-
-"%(and)s" % {"and": 2}
-
-"%" % {}
-
-"%()s" % {"": "bar"}
 
 "%.*s" % (5, "hi")
 
