@@ -1257,7 +1257,7 @@ However, Ruff is also available as part of the [coc-pyright](https://github.com/
 extension for `coc.nvim`.
 
 <details>
-<summary>Ruff works with <a href="https://github.com/dense-analysis/ale"><code>ale</code></a>.</summary>
+<summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for (Neo)Vim.</summary>
 <br>
 
 ```
