@@ -2,13 +2,14 @@ use std::path::{Path, PathBuf};
 
 use clap::{command, Parser};
 use regex::Regex;
+use ruff::fs;
 use ruff::logging::LogLevel;
 use ruff::registry::{RuleCode, RuleCodePrefix};
 use ruff::resolver::ConfigProcessor;
+use ruff::rules::mccabe;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
-use ruff::{fs, mccabe};
 use rustc_hash::FxHashMap;
 
 #[derive(Debug, Parser)]

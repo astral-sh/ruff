@@ -5,13 +5,13 @@ use rustpython_ast::Cmpop;
 use serde::{Deserialize, Serialize};
 
 use crate::define_violation;
-use crate::flake8_debugger::types::DebuggerUsingType;
-use crate::flake8_pytest_style::types::{
+use crate::rules::flake8_debugger::types::DebuggerUsingType;
+use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
-use crate::flake8_quotes::settings::Quote;
-use crate::flake8_tidy_imports::settings::Strictness;
-use crate::pyupgrade::types::Primitive;
+use crate::rules::flake8_quotes::settings::Quote;
+use crate::rules::flake8_tidy_imports::settings::Strictness;
+use crate::rules::pyupgrade::types::Primitive;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 // pycodestyle errors

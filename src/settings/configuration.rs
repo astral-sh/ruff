@@ -12,16 +12,17 @@ use regex::Regex;
 use shellexpand;
 use shellexpand::LookupError;
 
+use crate::fs;
 use crate::registry::RuleCodePrefix;
+use crate::rules::{
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+};
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
-};
-use crate::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, fs, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 
 #[derive(Debug, Default)]

@@ -129,17 +129,17 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::flake8_quotes::settings::Quote;
-    use crate::flake8_tidy_imports::settings::{BannedApi, Strictness};
     use crate::registry::RuleCodePrefix;
+    use crate::rules::flake8_quotes::settings::Quote;
+    use crate::rules::flake8_tidy_imports::settings::{BannedApi, Strictness};
+    use crate::rules::{
+        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
+        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
+    };
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
-    use crate::{
-        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
-        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
-    };
 
     #[test]
     fn deserialize() -> Result<()> {

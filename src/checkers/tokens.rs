@@ -4,10 +4,10 @@ use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, RuleCode};
-use crate::ruff::rules::Context;
+use crate::rules::ruff::rules::Context;
+use crate::rules::{eradicate, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
-use crate::{eradicate, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff};
 
 pub fn check_tokens(
     locator: &Locator,

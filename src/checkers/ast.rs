@@ -29,20 +29,20 @@ use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::python::typing::SubscriptKind;
 use crate::registry::{Diagnostic, RuleCode};
+use crate::rules::{
+    flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
+    flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
+    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pie, flake8_print,
+    flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports,
+    flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
+    pygrep_hooks, pylint, pyupgrade, ruff,
+};
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Locator, Stylist};
 use crate::violations::DeferralKeyword;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
-use crate::{
-    autofix, docstrings, flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except,
-    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
-    flake8_debugger, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
-    flake8_tidy_imports, flake8_unused_arguments, mccabe, noqa, pandas_vet, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, violations,
-    visibility,
-};
+use crate::{autofix, docstrings, noqa, violations, visibility};
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
