@@ -331,13 +331,8 @@ fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
     cf_bool || w_bool || precision_bool
 }
 
-/// UP031
-pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr) {
-    let left_range = Range::new(left.location, left.end_location.unwrap());
-    let left_string = checker.locator.slice_source_code_range(&left_range);
-    let parsed = parse_percent_format(&left_string);
-    // Rust does not have a for else statement so we have to do this
-    let mut no_breaks = true;
+/// Checks the string for a number of issues that mean we should not convert things
+fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
     for item in parsed {
         let fmt = match item.parts {
             None => continue,
@@ -345,13 +340,11 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         };
         // timid: these require out-of-order parameter consumption
         if fmt.width == Some("*".to_string()) || fmt.precision == Some(".*".to_string()) {
-            no_breaks = false;
-            break;
+            return false;
         }
         // these conversions require modification of parameters
         if vec!["d", "i", "u", "c"].contains(&&fmt.conversion[..]) {
-            no_breaks = false;
-            break;
+            return false;
         }
         // timid: py2: %#o formats different from {:#o} (--py3?)
         if fmt
@@ -361,32 +354,27 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
             .contains("#")
             && fmt.conversion == "o"
         {
-            no_breaks = false;
-            break;
+            return false;
         }
         // no equivalent in format
         if let Some(key) = &fmt.key {
             if key.is_empty() {
-                no_breaks = false;
-                break;
+                return false;
             }
         }
         // timid: py2: conversion is subject to modifiers (--py3?)
         let nontrivial_fmt = get_nontrivial_fmt(&fmt);
         if fmt.conversion == "%".to_string() && nontrivial_fmt {
-            no_breaks = false;
-            break;
+            return false;
         }
         // no equivalent in format
         if vec!["a", "r"].contains(&&fmt.conversion[..]) && nontrivial_fmt {
-            no_breaks = false;
-            break;
+            return false;
         }
         // %s with None and width is not supported
         if let Some(width) = &fmt.width {
             if !width.is_empty() && fmt.conversion == "s".to_string() {
-                no_breaks = false;
-                break;
+                return false;
             }
         }
         // all dict substitutions must be named
@@ -394,12 +382,21 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
             // Technically a value of "" would also count as `not key`, (which is what the python
             // code uses) BUT we already have a check above for this
             if fmt.key.is_none() {
-                no_breaks = false;
-                break;
+                return false;
             }
         }
     }
-    if no_breaks {
+    true
+}
+
+/// UP031
+pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr) {
+    let left_range = Range::new(left.location, left.end_location.unwrap());
+    let left_string = checker.locator.slice_source_code_range(&left_range);
+    let parsed = parse_percent_format(&left_string);
+    // Rust does not have a for else statement so we have to do this
+    let is_valid = check_statement(parsed, right);
+    if is_valid {
         let mut new_string = String::new();
         match &right.node {
             ExprKind::Tuple { .. } => {
