@@ -31,7 +31,8 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.4.0
       - uses: jetli/wasm-bindgen-action@v0.2.0
       - name: "Run wasm-pack"
-        run: wasm-pack build --target web --out-dir playground/src/pkg
+        run: ln -s . ruff  # HACK because `wasm-pack build` doesn't support our crate structure (see https://github.com/rustwasm/wasm-pack/issues/1211)
+        run: wasm-pack build --target web --out-dir playground/src/pkg -p ruff
       - name: "Install Node dependencies"
         run: npm ci
         working-directory: playground
