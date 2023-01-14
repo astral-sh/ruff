@@ -5,6 +5,7 @@
 
 "%s" % ("simple",)
 
+# Breaks based on other things in the file
 "%s" % ("%s" % ("nested",),)
 
 "%s%% percent" % (15,)

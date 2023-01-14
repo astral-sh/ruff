@@ -330,7 +330,7 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
             Some(item) => item,
         };
         // timid: these require out-of-order parameter consumption
-        if fmt.width == Some("*".to_string()) || fmt.precision == Some("*".to_string()) {
+        if fmt.width == Some("*".to_string()) || fmt.precision == Some(".*".to_string()) {
             no_breaks = false;
             break;
         }
@@ -369,6 +369,7 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
             break;
         }
         // %s with None and width is not supported
+        println!("{:?}", fmt);
         if let Some(width) = &fmt.width {
             if !width.is_empty() && fmt.conversion == "s".to_string() {
                 no_breaks = false;
