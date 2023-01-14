@@ -19,14 +19,14 @@ use ruff::registry::RuleCode;
 use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
-use ruff::{fix, fs, packaging, resolver, violations};
+use ruff::{fix, fs, packaging, resolver, violations, warn_user_once};
 use serde::Serialize;
 use walkdir::WalkDir;
 
+use crate::cache;
 use crate::cli::Overrides;
 use crate::diagnostics::{lint_path, lint_stdin, Diagnostics};
 use crate::iterators::par_iter;
-use crate::{cache, warn_user_once};
 
 /// Run the linter over a collection of files.
 pub fn run(

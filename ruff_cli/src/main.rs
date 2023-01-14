@@ -18,7 +18,6 @@ use ::ruff::resolver::{
 use ::ruff::settings::configuration::Configuration;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::{pyproject, Settings};
-#[cfg(feature = "update-informer")]
 use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
