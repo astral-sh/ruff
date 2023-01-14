@@ -1,4 +1,4 @@
-use rustpython_ast::{Stmt, StmtKind, Withitem};
+use rustpython_ast::{Located, Stmt, StmtKind, Withitem};
 
 use crate::ast::helpers::first_colon_range;
 use crate::ast::types::Range;
@@ -7,12 +7,7 @@ use crate::registry::Diagnostic;
 use crate::violations;
 
 fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
-    if body.len() != 1 {
-        return None;
-    }
-    let StmtKind::With { items, body, .. } = &body[0].node else {
-        return None
-    };
+    let [Located { node: StmtKind::With { items, body, .. }, ..}] = body else { return None };
     find_last_with(body).or(Some((items, body)))
 }
 
