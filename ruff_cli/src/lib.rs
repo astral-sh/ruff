@@ -2,5 +2,9 @@
 
 mod cli;
 
-// used by ruff_dev::generate_cli_help
-pub use cli::Cli;
+use clap::CommandFactory;
+
+/// Returns the output of `ruff --help`.
+pub fn help() -> String {
+    cli::Cli::command().render_help().to_string()
+}
