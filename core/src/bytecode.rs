@@ -1,7 +1,6 @@
 //! Implement python as a virtual machine with bytecodes. This module
 //! implements bytecode structure.
 
-use crate::marshal::MarshalError;
 use crate::{marshal, Location};
 use bitflags::bitflags;
 use itertools::Itertools;
@@ -44,6 +43,19 @@ pub trait ConstantBag: Sized + Copy {
     fn make_tuple(&self, elements: impl Iterator<Item = Self::Constant>) -> Self::Constant;
     fn make_code(&self, code: CodeObject<Self::Constant>) -> Self::Constant;
     fn make_name(&self, name: &str) -> <Self::Constant as Constant>::Name;
+}
+
+pub trait AsBag {
+    type Bag: ConstantBag;
+    #[allow(clippy::wrong_self_convention)]
+    fn as_bag(self) -> Self::Bag;
+}
+
+impl<Bag: ConstantBag> AsBag for Bag {
+    type Bag = Self;
+    fn as_bag(self) -> Self {
+        self
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -1077,27 +1089,6 @@ impl<C: Constant> CodeObject<C> {
     }
 }
 
-impl CodeObject<ConstantData> {
-    /// Load a code object from bytes
-    pub fn from_bytes(data: &[u8]) -> Result<Self, MarshalError> {
-        use lz4_flex::block::DecompressError;
-        let raw_bincode = lz4_flex::decompress_size_prepended(data).map_err(|e| match e {
-            DecompressError::OutputTooSmall { .. } | DecompressError::ExpectedAnotherByte => {
-                MarshalError::Eof
-            }
-            _ => MarshalError::InvalidBytecode,
-        })?;
-        marshal::deserialize_code(&mut &raw_bincode[..], BasicBag)
-    }
-
-    /// Serialize this bytecode to bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        marshal::serialize_code(&mut data, self);
-        lz4_flex::compress_prepend_size(&data)
-    }
-}
-
 impl<C: Constant> fmt::Display for CodeObject<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.display_inner(f, false, 1)?;
@@ -1483,32 +1474,81 @@ impl<C: Constant> fmt::Debug for CodeObject<C> {
     }
 }
 
-/// A frozen module. Holds a code object and whether it is part of a package
-#[derive(Debug)]
-pub struct FrozenModule {
-    pub code: CodeObject<ConstantData>,
-    pub package: bool,
-}
-
 pub mod frozen_lib {
     use super::*;
-    use marshal::{Read, Write};
+    use marshal::{Read, ReadBorrowed, Write};
 
-    /// Decode a library to a iterable of frozen modules
-    pub fn decode_lib(bytes: &[u8]) -> FrozenModulesIter {
-        let data = lz4_flex::decompress_size_prepended(bytes).unwrap();
-        let mut data = marshal::Cursor { data, position: 0 };
-        let remaining = data.read_u32().unwrap();
-        FrozenModulesIter { remaining, data }
+    /// A frozen module. Holds a frozen code object and whether it is part of a package
+    #[derive(Copy, Clone)]
+    pub struct FrozenModule<B = &'static [u8]> {
+        pub code: FrozenCodeObject<B>,
+        pub package: bool,
     }
 
-    pub struct FrozenModulesIter {
+    #[derive(Copy, Clone)]
+    pub struct FrozenCodeObject<B> {
+        pub bytes: B,
+    }
+
+    impl<B: AsRef<[u8]>> FrozenCodeObject<B> {
+        /// Decode a frozen codeobject
+        #[inline]
+        pub fn decode<Bag: AsBag>(
+            &self,
+            bag: Bag,
+        ) -> CodeObject<<Bag::Bag as ConstantBag>::Constant> {
+            Self::_decode(self.bytes.as_ref(), bag.as_bag())
+        }
+        fn _decode<Bag: ConstantBag>(data: &[u8], bag: Bag) -> CodeObject<Bag::Constant> {
+            let decompressed = lz4_flex::decompress_size_prepended(data)
+                .expect("deserialize frozen CodeObject failed");
+            marshal::deserialize_code(&mut &decompressed[..], bag)
+                .expect("deserializing frozen CodeObject failed")
+        }
+    }
+
+    impl FrozenCodeObject<Vec<u8>> {
+        pub fn encode<C: Constant>(code: &CodeObject<C>) -> Self {
+            let mut data = Vec::new();
+            marshal::serialize_code(&mut data, code);
+            let bytes = lz4_flex::compress_prepend_size(&data);
+            FrozenCodeObject { bytes }
+        }
+    }
+
+    #[repr(transparent)]
+    pub struct FrozenLib<B: ?Sized = [u8]> {
+        pub bytes: B,
+    }
+
+    impl<B: AsRef<[u8]> + ?Sized> FrozenLib<B> {
+        pub const fn from_ref(b: &B) -> &FrozenLib<B> {
+            unsafe { &*(b as *const B as *const FrozenLib<B>) }
+        }
+
+        /// Decode a library to a iterable of frozen modules
+        pub fn decode(&self) -> FrozenModulesIter<'_> {
+            let mut data = self.bytes.as_ref();
+            let remaining = data.read_u32().unwrap();
+            FrozenModulesIter { remaining, data }
+        }
+    }
+
+    impl<'a, B: AsRef<[u8]> + ?Sized> IntoIterator for &'a FrozenLib<B> {
+        type Item = (&'a str, FrozenModule<&'a [u8]>);
+        type IntoIter = FrozenModulesIter<'a>;
+        fn into_iter(self) -> Self::IntoIter {
+            self.decode()
+        }
+    }
+
+    pub struct FrozenModulesIter<'a> {
         remaining: u32,
-        data: marshal::Cursor<Vec<u8>>,
+        data: &'a [u8],
     }
 
-    impl Iterator for FrozenModulesIter {
-        type Item = (String, FrozenModule);
+    impl<'a> Iterator for FrozenModulesIter<'a> {
+        type Item = (&'a str, FrozenModule<&'a [u8]>);
 
         fn next(&mut self) -> Option<Self::Item> {
             if self.remaining > 0 {
@@ -1524,31 +1564,37 @@ pub mod frozen_lib {
             (self.remaining as usize, Some(self.remaining as usize))
         }
     }
-    impl ExactSizeIterator for FrozenModulesIter {}
+    impl ExactSizeIterator for FrozenModulesIter<'_> {}
 
-    fn read_entry(rdr: &mut impl Read) -> Result<(String, FrozenModule), marshal::MarshalError> {
+    fn read_entry<'a>(
+        rdr: &mut &'a [u8],
+    ) -> Result<(&'a str, FrozenModule<&'a [u8]>), marshal::MarshalError> {
         let len = rdr.read_u32()?;
-        let name = rdr.read_str(len)?.to_owned();
-        let code = marshal::deserialize_code(rdr, BasicBag)?;
+        let name = rdr.read_str_borrow(len)?;
+        let len = rdr.read_u32()?;
+        let code_slice = rdr.read_slice_borrow(len)?;
+        let code = FrozenCodeObject { bytes: code_slice };
         let package = rdr.read_u8()? != 0;
         Ok((name, FrozenModule { code, package }))
     }
 
-    /// Encode the given iterator of frozen modules into a compressed vector of bytes
-    pub fn encode_lib<'a, I>(lib: I) -> Vec<u8>
-    where
-        I: IntoIterator<Item = (&'a str, &'a FrozenModule)>,
-        I::IntoIter: ExactSizeIterator + Clone,
-    {
-        let iter = lib.into_iter();
-        let mut data = Vec::new();
-        write_lib(&mut data, iter);
-        lz4_flex::compress_prepend_size(&data)
+    impl FrozenLib<Vec<u8>> {
+        /// Encode the given iterator of frozen modules into a compressed vector of bytes
+        pub fn encode<'a, I, B: AsRef<[u8]>>(lib: I) -> FrozenLib<Vec<u8>>
+        where
+            I: IntoIterator<Item = (&'a str, FrozenModule<B>)>,
+            I::IntoIter: ExactSizeIterator + Clone,
+        {
+            let iter = lib.into_iter();
+            let mut bytes = Vec::new();
+            write_lib(&mut bytes, iter);
+            Self { bytes }
+        }
     }
 
-    fn write_lib<'a>(
-        buf: &mut impl Write,
-        lib: impl ExactSizeIterator<Item = (&'a str, &'a FrozenModule)>,
+    fn write_lib<'a, B: AsRef<[u8]>>(
+        buf: &mut Vec<u8>,
+        lib: impl ExactSizeIterator<Item = (&'a str, FrozenModule<B>)>,
     ) {
         marshal::write_len(buf, lib.len());
         for (name, module) in lib {
@@ -1556,10 +1602,9 @@ pub mod frozen_lib {
         }
     }
 
-    fn write_entry(buf: &mut impl Write, name: &str, module: &FrozenModule) {
-        marshal::write_len(buf, name.len());
-        buf.write_slice(name.as_bytes());
-        marshal::serialize_code(buf, &module.code);
+    fn write_entry(buf: &mut Vec<u8>, name: &str, module: FrozenModule<impl AsRef<[u8]>>) {
+        marshal::write_vec(buf, name.as_bytes());
+        marshal::write_vec(buf, module.code.bytes.as_ref());
         buf.write_u8(module.package as u8);
     }
 }

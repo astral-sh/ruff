@@ -130,8 +130,21 @@ pub trait Read {
     }
 }
 
+pub(crate) trait ReadBorrowed<'a>: Read {
+    fn read_slice_borrow(&mut self, n: u32) -> Result<&'a [u8]>;
+    fn read_str_borrow(&mut self, len: u32) -> Result<&'a str> {
+        Ok(std::str::from_utf8(self.read_slice_borrow(len)?)?)
+    }
+}
+
 impl Read for &[u8] {
     fn read_slice(&mut self, n: u32) -> Result<&[u8]> {
+        self.read_slice_borrow(n)
+    }
+}
+
+impl<'a> ReadBorrowed<'a> for &'a [u8] {
+    fn read_slice_borrow(&mut self, n: u32) -> Result<&'a [u8]> {
         let data = self.get(..n as usize).ok_or(MarshalError::Eof)?;
         *self = &self[n as usize..];
         Ok(data)
@@ -474,6 +487,11 @@ pub(crate) fn write_len<W: Write>(buf: &mut W, len: usize) {
     buf.write_u32(len);
 }
 
+pub(crate) fn write_vec<W: Write>(buf: &mut W, slice: &[u8]) {
+    write_len(buf, slice.len());
+    buf.write_slice(slice);
+}
+
 pub fn serialize_value<W: Write, D: Dumpable>(
     buf: &mut W,
     constant: DumpableValue<'_, D>,
@@ -501,13 +519,11 @@ pub fn serialize_value<W: Write, D: Dumpable>(
         }
         DumpableValue::Str(s) => {
             buf.write_u8(Type::Unicode as u8);
-            write_len(buf, s.len());
-            buf.write_slice(s.as_bytes());
+            write_vec(buf, s.as_bytes());
         }
         DumpableValue::Bytes(b) => {
             buf.write_u8(Type::Bytes as u8);
-            write_len(buf, b.len());
-            buf.write_slice(b);
+            write_vec(buf, b);
         }
         DumpableValue::Code(c) => {
             buf.write_u8(Type::Code as u8);
@@ -580,14 +596,12 @@ pub fn serialize_code<W: Write, C: Constant>(buf: &mut W, code: &CodeObject<C>) 
     buf.write_u32(code.arg_count);
     buf.write_u32(code.kwonlyarg_count);
 
-    write_len(buf, code.source_path.as_ref().len());
-    buf.write_slice(code.source_path.as_ref().as_bytes());
+    write_vec(buf, code.source_path.as_ref().as_bytes());
 
     buf.write_u32(code.first_line_number);
     buf.write_u32(code.max_stackdepth);
 
-    write_len(buf, code.obj_name.as_ref().len());
-    buf.write_slice(code.obj_name.as_ref().as_bytes());
+    write_vec(buf, code.obj_name.as_ref().as_bytes());
 
     let cell2arg = code.cell2arg.as_deref().unwrap_or(&[]);
     write_len(buf, cell2arg.len());
@@ -603,8 +617,7 @@ pub fn serialize_code<W: Write, C: Constant>(buf: &mut W, code: &CodeObject<C>) 
     let mut write_names = |names: &[C::Name]| {
         write_len(buf, names.len());
         for name in names {
-            write_len(buf, name.as_ref().len());
-            buf.write_slice(name.as_ref().as_bytes());
+            write_vec(buf, name.as_ref().as_bytes());
         }
     };
 
