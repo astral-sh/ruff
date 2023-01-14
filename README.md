@@ -51,16 +51,18 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Apache Airflow](https://github.com/apache/airflow)
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
+- [Dagster](https://github.com/dagster-io/dagster)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
-- [Synapse](https://github.com/matrix-org/synapse)
+- [Synapse (Matrix)](https://github.com/matrix-org/synapse)
 - [Saleor](https://github.com/saleor/saleor)
 - [Polars](https://github.com/pola-rs/polars)
 - [Ibis](https://github.com/ibis-project/ibis)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
-- [`pyca/cryptography`](https://github.com/pyca/cryptography)
+- [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
