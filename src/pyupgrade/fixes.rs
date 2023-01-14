@@ -59,6 +59,10 @@ pub fn remove_class_def_base(
         let mut seen_comma = false;
         for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt_at).flatten() {
             if seen_comma {
+                if matches!(tok, Tok::NonLogicalNewline) {
+                    // Also delete any non-logical newlines after the comma.
+                    continue;
+                }
                 if matches!(tok, Tok::Newline) {
                     fix_end = Some(end);
                 } else {
