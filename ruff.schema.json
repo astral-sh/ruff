@@ -285,6 +285,16 @@
         }
       ]
     },
+    "namespace-packages": {
+      "description": "Mark the specified directories as namespace packages. For the purpose of module resolution, Ruff will treat those directories as if they contained an `__init__.py` file.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "pep8-naming": {
       "description": "Options for the `pep8-naming` plugin.",
       "anyOf": [

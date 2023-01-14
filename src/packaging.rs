@@ -1,8 +1,10 @@
 //! Detect Python package roots and file associations.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rustc_hash::FxHashMap;
+
+use crate::resolver::{PyprojectDiscovery, Resolver};
 
 // If we have a Python package layout like:
 // - root/
@@ -27,15 +29,21 @@ use rustc_hash::FxHashMap;
 
 /// Return `true` if the directory at the given `Path` appears to be a Python
 /// package.
-pub fn is_package(path: &Path) -> bool {
+pub fn is_package(path: &Path, namespace_packages: &[PathBuf]) -> bool {
     path.join("__init__.py").is_file()
+        || namespace_packages
+            .iter()
+            .any(|namespace_package| namespace_package == path)
 }
 
 /// Return the package root for the given Python file.
-pub fn detect_package_root(path: &Path) -> Option<&Path> {
+pub fn detect_package_root<'a>(
+    path: &'a Path,
+    namespace_packages: &'a [PathBuf],
+) -> Option<&'a Path> {
     let mut current = None;
     for parent in path.ancestors() {
-        if !is_package(parent) {
+        if !is_package(parent, namespace_packages) {
             return current;
         }
         current = Some(parent);
@@ -46,21 +54,23 @@ pub fn detect_package_root(path: &Path) -> Option<&Path> {
 /// A wrapper around `is_package` to cache filesystem lookups.
 fn is_package_with_cache<'a>(
     path: &'a Path,
+    namespace_packages: &'a [PathBuf],
     package_cache: &mut FxHashMap<&'a Path, bool>,
 ) -> bool {
     *package_cache
         .entry(path)
-        .or_insert_with(|| is_package(path))
+        .or_insert_with(|| is_package(path, namespace_packages))
 }
 
 /// A wrapper around `detect_package_root` to cache filesystem lookups.
 fn detect_package_root_with_cache<'a>(
     path: &'a Path,
+    namespace_packages: &'a [PathBuf],
     package_cache: &mut FxHashMap<&'a Path, bool>,
 ) -> Option<&'a Path> {
     let mut current = None;
     for parent in path.ancestors() {
-        if !is_package_with_cache(parent, package_cache) {
+        if !is_package_with_cache(parent, namespace_packages, package_cache) {
             return current;
         }
         current = Some(parent);
@@ -69,7 +79,11 @@ fn detect_package_root_with_cache<'a>(
 }
 
 /// Return a mapping from Python file to its package root.
-pub fn detect_package_roots<'a>(files: &[&'a Path]) -> FxHashMap<&'a Path, Option<&'a Path>> {
+pub fn detect_package_roots<'a>(
+    files: &[&'a Path],
+    resolver: &'a Resolver,
+    pyproject_strategy: &'a PyprojectDiscovery,
+) -> FxHashMap<&'a Path, Option<&'a Path>> {
     // Pre-populate the module cache, since the list of files could (but isn't
     // required to) contain some `__init__.py` files.
     let mut package_cache: FxHashMap<&Path, bool> = FxHashMap::default();
@@ -84,13 +98,16 @@ pub fn detect_package_roots<'a>(files: &[&'a Path]) -> FxHashMap<&'a Path, Optio
     // Search for the package root for each file.
     let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
     for file in files {
+        let namespace_packages = &resolver
+            .resolve(file, pyproject_strategy)
+            .namespace_packages;
         if let Some(package) = file.parent() {
             if package_roots.contains_key(package) {
                 continue;
             }
             package_roots.insert(
                 package,
-                detect_package_root_with_cache(package, &mut package_cache),
+                detect_package_root_with_cache(package, namespace_packages, &mut package_cache),
             );
         }
     }
@@ -111,6 +128,7 @@ mod tests {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .join("resources/test/package/src/package")
                     .as_path(),
+                &[],
             ),
             Some(
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -124,6 +142,7 @@ mod tests {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .join("resources/test/project/python_modules/core/core")
                     .as_path(),
+                &[],
             ),
             Some(
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -137,6 +156,7 @@ mod tests {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .join("resources/test/project/examples/docs/docs/concepts")
                     .as_path(),
+                &[],
             ),
             Some(
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -150,6 +170,7 @@ mod tests {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .join("setup.py")
                     .as_path(),
+                &[],
             ),
             None,
         );
