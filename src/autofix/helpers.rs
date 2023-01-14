@@ -12,7 +12,7 @@ use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;
 use crate::fix::Fix;
-use crate::source_code::Locator;
+use crate::source_code::{Indexer, Locator};
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -156,6 +156,7 @@ pub fn delete_stmt(
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
     locator: &Locator,
+    indexer: &Indexer,
 ) -> Result<Fix> {
     if parent
         .map(|parent| is_lone_child(stmt, parent, deleted))
@@ -175,7 +176,7 @@ pub fn delete_stmt(
             Fix::deletion(stmt.location, next)
         } else if helpers::match_leading_content(stmt, locator) {
             Fix::deletion(stmt.location, stmt.end_location.unwrap())
-        } else if helpers::preceded_by_continuation(stmt, locator) {
+        } else if helpers::preceded_by_continuation(stmt, indexer) {
             if is_end_of_file(stmt, locator) && stmt.location.column() == 0 {
                 // Special-case: a file can't end in a continuation.
                 Fix::replacement("\n".to_string(), stmt.location, stmt.end_location.unwrap())
@@ -198,6 +199,7 @@ pub fn remove_unused_imports<'a>(
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
     locator: &Locator,
+    indexer: &Indexer,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text)?;
@@ -235,7 +237,7 @@ pub fn remove_unused_imports<'a>(
                 if !found_star {
                     bail!("Expected \'*\' for unused import");
                 }
-                return delete_stmt(stmt, parent, deleted, locator);
+                return delete_stmt(stmt, parent, deleted, locator, indexer);
             } else {
                 bail!("Expected: ImportNames::Aliases | ImportNames::Star");
             }
@@ -296,7 +298,7 @@ pub fn remove_unused_imports<'a>(
     }
 
     if aliases.is_empty() {
-        delete_stmt(stmt, parent, deleted, locator)
+        delete_stmt(stmt, parent, deleted, locator, indexer)
     } else {
         let mut state = CodegenState::default();
         tree.codegen(&mut state);

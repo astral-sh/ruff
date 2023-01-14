@@ -39,7 +39,7 @@ use crate::rules::{
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violations::DeferralKeyword;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{autofix, docstrings, noqa, violations, visibility};
@@ -57,7 +57,8 @@ pub struct Checker<'a> {
     pub(crate) settings: &'a Settings,
     pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
     pub(crate) locator: &'a Locator<'a>,
-    pub(crate) style: &'a Stylist<'a>,
+    pub(crate) stylist: &'a Stylist<'a>,
+    pub(crate) indexer: &'a Indexer,
     // Computed diagnostics.
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Function and class definition tracking (e.g., for docstring enforcement).
@@ -106,6 +107,7 @@ impl<'a> Checker<'a> {
         path: &'a Path,
         locator: &'a Locator,
         style: &'a Stylist,
+        indexer: &'a Indexer,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -114,7 +116,8 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             locator,
-            style,
+            stylist: style,
+            indexer,
             diagnostics: vec![],
             definitions: vec![],
             deletions: FxHashSet::default(),
@@ -4001,6 +4004,7 @@ impl<'a> Checker<'a> {
                             parent,
                             &deleted,
                             self.locator,
+                            self.indexer,
                         ) {
                             Ok(fix) => {
                                 if fix.content.is_empty() || fix.content == "pass" {
@@ -4296,6 +4300,7 @@ pub fn check_ast(
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,
+    indexer: &Indexer,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -4310,6 +4315,7 @@ pub fn check_ast(
         path,
         locator,
         stylist,
+        indexer,
     );
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();

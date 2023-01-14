@@ -126,7 +126,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
                 diagnostic.amend(Fix::replacement(
-                    unparse_expr(&bool_op, checker.style),
+                    unparse_expr(&bool_op, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
@@ -169,13 +169,13 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
         let str_values = values
             .iter()
-            .map(|value| unparse_expr(value, checker.style))
+            .map(|value| unparse_expr(value, checker.stylist))
             .collect();
         let mut diagnostic = Diagnostic::new(
             violations::CompareWithTuple(
                 value.to_string(),
                 str_values,
-                unparse_expr(expr, checker.style),
+                unparse_expr(expr, checker.stylist),
             ),
             Range::from_located(expr),
         );
@@ -193,7 +193,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                 })],
             });
             diagnostic.amend(Fix::replacement(
-                unparse_expr(&in_expr, checker.style),
+                unparse_expr(&in_expr, checker.stylist),
                 expr.location,
                 expr.end_location.unwrap(),
             ));

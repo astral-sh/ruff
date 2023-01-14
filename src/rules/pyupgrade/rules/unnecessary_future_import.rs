@@ -82,6 +82,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             defined_in.map(std::convert::Into::into),
             &deleted,
             checker.locator,
+            checker.indexer,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {

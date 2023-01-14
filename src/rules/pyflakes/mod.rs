@@ -17,7 +17,7 @@ mod tests {
     use crate::linter::{check_path, test_path};
     use crate::registry::{RuleCode, RuleCodePrefix};
     use crate::settings::flags;
-    use crate::source_code::{Locator, Stylist};
+    use crate::source_code::{Indexer, Locator, Stylist};
     use crate::{directives, rustpython_helpers, settings};
 
     #[test_case(RuleCode::F401, Path::new("F401_0.py"); "F401_0")]
@@ -213,6 +213,7 @@ mod tests {
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_contents(&contents, &locator);
+        let indexer: Indexer = tokens.as_slice().into();
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
         let mut diagnostics = check_path(
@@ -222,6 +223,7 @@ mod tests {
             tokens,
             &locator,
             &stylist,
+            &indexer,
             &directives,
             &settings,
             flags::Autofix::Enabled,

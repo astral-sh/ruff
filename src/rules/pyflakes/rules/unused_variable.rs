@@ -70,7 +70,8 @@ fn remove_unused_variable(
                     .map(std::convert::Into::into)
                     .collect();
                 let locator = checker.locator;
-                match delete_stmt(stmt, parent, &deleted, locator) {
+                let indexer = checker.indexer;
+                match delete_stmt(stmt, parent, &deleted, locator, indexer) {
                     Ok(fix) => Some((DeletionKind::Whole, fix)),
                     Err(err) => {
                         error!("Failed to delete unused variable: {}", err);
@@ -108,7 +109,8 @@ fn remove_unused_variable(
                     .map(std::convert::Into::into)
                     .collect();
                 let locator = checker.locator;
-                match delete_stmt(stmt, parent, &deleted, locator) {
+                let indexer = checker.indexer;
+                match delete_stmt(stmt, parent, &deleted, locator, indexer) {
                     Ok(fix) => Some((DeletionKind::Whole, fix)),
                     Err(err) => {
                         error!("Failed to delete unused variable: {}", err);

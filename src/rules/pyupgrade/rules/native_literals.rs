@@ -35,13 +35,13 @@ pub fn native_literals(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
                         content.push('b');
-                        content.push(checker.style.quote().into());
-                        content.push(checker.style.quote().into());
+                        content.push(checker.stylist.quote().into());
+                        content.push(checker.stylist.quote().into());
                         content
                     } else {
                         let mut content = String::with_capacity(2);
-                        content.push(checker.style.quote().into());
-                        content.push(checker.style.quote().into());
+                        content.push(checker.stylist.quote().into());
+                        content.push(checker.stylist.quote().into());
                         content
                     },
                     expr.location,

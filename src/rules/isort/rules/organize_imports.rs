@@ -13,7 +13,7 @@ use crate::ast::whitespace::leading_space;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violations;
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -31,6 +31,7 @@ fn extract_indentation_range(body: &[&Stmt]) -> Range {
 pub fn organize_imports(
     block: &Block,
     locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
     stylist: &Stylist,
     autofix: flags::Autofix,
@@ -43,7 +44,7 @@ pub fn organize_imports(
 
     // Special-cases: there's leading or trailing content in the import block. These
     // are too hard to get right, and relatively rare, so flag but don't fix.
-    if preceded_by_multi_statement_line(block.imports.first().unwrap(), locator)
+    if preceded_by_multi_statement_line(block.imports.first().unwrap(), locator, indexer)
         || followed_by_multi_statement_line(block.imports.last().unwrap(), locator)
     {
         return Some(Diagnostic::new(violations::UnsortedImports, range));

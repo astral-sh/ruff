@@ -91,7 +91,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     if !(is_one_line_return_bool(body) && is_one_line_return_bool(orelse)) {
         return;
     }
-    let condition = unparse_expr(test, checker.style);
+    let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
@@ -101,7 +101,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
             value: Some(test.clone()),
         });
         diagnostic.amend(Fix::replacement(
-            unparse_stmt(&return_stmt, checker.style),
+            unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
             stmt.end_location.unwrap(),
         ));
@@ -191,7 +191,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
-    let contents = unparse_stmt(&ternary, checker.style);
+    let contents = unparse_stmt(&ternary, checker.stylist);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if stmt.location.column() + contents.len() > checker.settings.line_length {
@@ -305,7 +305,7 @@ pub fn use_dict_get_with_default(
             })),
             type_comment: None,
         }),
-        checker.style,
+        checker.stylist,
     );
 
     // Don't flag if the resulting expression would exceed the maximum line length.

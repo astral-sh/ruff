@@ -10,12 +10,13 @@ use crate::registry::{Diagnostic, RuleCode};
 use crate::rules::isort;
 use crate::rules::isort::track::{Block, ImportTracker};
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_imports(
     python_ast: &Suite,
     locator: &Locator,
+    indexer: &Indexer,
     directives: &IsortDirectives,
     settings: &Settings,
     stylist: &Stylist,
@@ -39,7 +40,7 @@ pub fn check_imports(
         for block in &blocks {
             if !block.imports.is_empty() {
                 if let Some(diagnostic) = isort::rules::organize_imports(
-                    block, locator, settings, stylist, autofix, package,
+                    block, locator, indexer, settings, stylist, autofix, package,
                 ) {
                     diagnostics.push(diagnostic);
                 }

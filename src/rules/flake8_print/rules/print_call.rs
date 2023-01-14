@@ -62,6 +62,7 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                 defined_in.map(std::convert::Into::into),
                 &deleted,
                 checker.locator,
+                checker.indexer,
             ) {
                 Ok(fix) => {
                     if fix.content.is_empty() || fix.content == "pass" {

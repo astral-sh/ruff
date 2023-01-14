@@ -1,0 +1,26 @@
+---
+source: src/rules/isort/mod.rs
+assertion_line: 715
+expression: diagnostics
+---
+- kind:
+    UnsortedImports: ~
+  location:
+    row: 1
+    column: 7
+  end_location:
+    row: 2
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UnsortedImports: ~
+  location:
+    row: 5
+    column: 11
+  end_location:
+    row: 6
+    column: 13
+  fix: ~
+  parent: ~
+

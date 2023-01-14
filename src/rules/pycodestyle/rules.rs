@@ -284,7 +284,7 @@ pub fn literal_comparisons(
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .cloned()
             .collect::<Vec<_>>();
-        let content = compare(left, &ops, comparators, checker.style);
+        let content = compare(left, &ops, comparators, checker.stylist);
         for diagnostic in &mut diagnostics {
             diagnostic.amend(Fix::replacement(
                 content.to_string(),
@@ -325,7 +325,7 @@ pub fn not_tests(
                             );
                             if checker.patch(diagnostic.kind.code()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
-                                    compare(left, &[Cmpop::NotIn], comparators, checker.style),
+                                    compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
@@ -341,7 +341,7 @@ pub fn not_tests(
                             );
                             if checker.patch(diagnostic.kind.code()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
-                                    compare(left, &[Cmpop::IsNot], comparators, checker.style),
+                                    compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
@@ -465,7 +465,10 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                     ));
                     let indentation = &leading_space(&first_line);
                     let mut indented = String::new();
-                    for (idx, line) in function(id, args, body, checker.style).lines().enumerate() {
+                    for (idx, line) in function(id, args, body, checker.stylist)
+                        .lines()
+                        .enumerate()
+                    {
                         if idx == 0 {
                             indented.push_str(line);
                         } else {
