@@ -6,14 +6,14 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
 
-fn find_nested_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
+fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
     if body.len() != 1 {
         return None;
     }
     let StmtKind::With { items, body, .. } = &body[0].node else {
         return None
     };
-    find_nested_with(body).or(Some((items, body)))
+    find_last_with(body).or(Some((items, body)))
 }
 
 /// SIM117
@@ -30,7 +30,7 @@ pub fn multiple_with_statements(
             }
         }
     }
-    if let Some((items, body)) = find_nested_with(body) {
+    if let Some((items, body)) = find_last_with(body) {
         let last_item = items.last().expect("Expected items to be non-empty");
         let colon = first_colon_range(
             Range::new(
