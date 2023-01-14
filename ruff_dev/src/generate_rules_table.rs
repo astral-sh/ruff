@@ -20,7 +20,7 @@ pub struct Cli {
     pub(crate) dry_run: bool,
 }
 
-fn generate_table(table_out: &mut String, prefix: RuleCodePrefix) {
+fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
@@ -71,12 +71,12 @@ pub fn main(cli: &Cli) -> Result<()> {
         }
 
         match prefixes {
-            Prefixes::Single(prefix) => generate_table(&mut table_out, prefix),
+            Prefixes::Single(prefix) => generate_table(&mut table_out, &prefix),
             Prefixes::Multiple(entries) => {
                 for (prefix, category) in entries {
                     table_out.push_str(&format!("#### {category} ({})", prefix.as_ref()));
                     table_out.push('\n');
-                    generate_table(&mut table_out, prefix);
+                    generate_table(&mut table_out, &prefix);
                 }
             }
         }
