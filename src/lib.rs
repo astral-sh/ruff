@@ -20,12 +20,12 @@
 
 extern crate core;
 
-pub mod ast;
-pub mod autofix;
+mod ast;
+mod autofix;
 pub mod cache;
 mod checkers;
 mod cst;
-pub mod directives;
+mod directives;
 mod doc_lines;
 mod docstrings;
 pub mod fix;
@@ -40,7 +40,7 @@ mod python;
 pub mod registry;
 pub mod resolver;
 mod rules;
-pub mod rustpython_helpers;
+mod rustpython_helpers;
 pub mod settings;
 pub mod source_code;
 mod vendor;
