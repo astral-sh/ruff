@@ -1,0 +1,22 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    AvoidQuoteEscape: ~
+  location:
+    row: 1
+    column: 25
+  end_location:
+    row: 1
+    column: 47
+  fix:
+    content: "'This is a \"string\"'"
+    location:
+      row: 1
+      column: 25
+    end_location:
+      row: 1
+      column: 47
+  parent: ~
+

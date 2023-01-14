@@ -1,0 +1,25 @@
+---
+source: src/rules/pygrep_hooks/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoEval: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    NoEval: ~
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 8
+  fix: ~
+  parent: ~
+

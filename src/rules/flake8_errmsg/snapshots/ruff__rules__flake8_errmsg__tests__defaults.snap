@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_errmsg/mod.rs
+expression: diagnostics
+---
+- kind:
+    RawStringInException: ~
+  location:
+    row: 5
+    column: 23
+  end_location:
+    row: 5
+    column: 53
+  fix: ~
+  parent: ~
+- kind:
+    RawStringInException: ~
+  location:
+    row: 9
+    column: 23
+  end_location:
+    row: 9
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    FStringInException: ~
+  location:
+    row: 14
+    column: 23
+  end_location:
+    row: 14
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    DotFormatInException: ~
+  location:
+    row: 18
+    column: 23
+  end_location:
+    row: 18
+    column: 81
+  fix: ~
+  parent: ~
+

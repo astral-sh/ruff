@@ -1,0 +1,192 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 6
+      column: 4
+    end_location:
+      row: 6
+      column: 5
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 7
+      column: 5
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 10
+  fix:
+    content: ""
+    location:
+      row: 9
+      column: 4
+    end_location:
+      row: 9
+      column: 5
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 13
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 13
+      column: 4
+    end_location:
+      row: 13
+      column: 5
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 14
+      column: 4
+    end_location:
+      row: 14
+      column: 5
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 9
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 5
+    end_location:
+      row: 16
+      column: 6
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 9
+  fix:
+    content: ""
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 17
+      column: 5
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 7
+  fix:
+    content: ""
+    location:
+      row: 19
+      column: 4
+    end_location:
+      row: 19
+      column: 5
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 25
+    column: 12
+  end_location:
+    row: 25
+    column: 16
+  fix:
+    content: ""
+    location:
+      row: 25
+      column: 12
+    end_location:
+      row: 25
+      column: 13
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 34
+    column: 6
+  end_location:
+    row: 34
+    column: 13
+  fix:
+    content: ""
+    location:
+      row: 34
+      column: 6
+    end_location:
+      row: 34
+      column: 7
+  parent: ~
+- kind:
+    FStringMissingPlaceholders: ~
+  location:
+    row: 35
+    column: 3
+  end_location:
+    row: 35
+    column: 6
+  fix:
+    content: ""
+    location:
+      row: 35
+      column: 3
+    end_location:
+      row: 35
+      column: 4
+  parent: ~
+

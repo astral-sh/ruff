@@ -1,0 +1,49 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NotIsTest: ~
+  location:
+    row: 2
+    column: 7
+  end_location:
+    row: 2
+    column: 13
+  fix:
+    content: X is not Y
+    location:
+      row: 2
+      column: 3
+    end_location:
+      row: 2
+      column: 13
+  parent: ~
+- kind:
+    NotIsTest: ~
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 15
+  fix:
+    content: X.B is not Y
+    location:
+      row: 5
+      column: 3
+    end_location:
+      row: 5
+      column: 15
+  parent: ~
+- kind:
+    NotIsTest: ~
+  location:
+    row: 8
+    column: 7
+  end_location:
+    row: 8
+    column: 22
+  fix: ~
+  parent: ~
+

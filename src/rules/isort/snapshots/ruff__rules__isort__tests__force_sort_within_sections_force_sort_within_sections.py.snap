@@ -1,0 +1,22 @@
+---
+source: src/rules/isort/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnsortedImports: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 12
+    column: 0
+  fix:
+    content: "import a  # import\nfrom a import a1  # import_from\nimport b as b1  # import_as\nfrom c import *  # import_from_star\nimport c.d\n\nfrom ...grandparent import fn3\nfrom ..parent import *\nfrom . import my\nfrom .my import fn\nfrom .my.nested import fn2\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 12
+      column: 0
+  parent: ~
+

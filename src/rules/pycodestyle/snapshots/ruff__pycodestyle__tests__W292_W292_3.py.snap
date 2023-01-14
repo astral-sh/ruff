@@ -1,6 +1,0 @@
----
-source: src/pycodestyle/mod.rs
-expression: checks
----
-[]
-

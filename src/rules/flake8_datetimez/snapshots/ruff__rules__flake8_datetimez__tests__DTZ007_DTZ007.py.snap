@@ -1,0 +1,55 @@
+---
+source: src/rules/flake8_datetimez/mod.rs
+expression: diagnostics
+---
+- kind:
+    CallDatetimeStrptimeWithoutZone: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 53
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeStrptimeWithoutZone: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeStrptimeWithoutZone: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeStrptimeWithoutZone: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    CallDatetimeStrptimeWithoutZone: ~
+  location:
+    row: 35
+    column: 0
+  end_location:
+    row: 35
+    column: 43
+  fix: ~
+  parent: ~
+

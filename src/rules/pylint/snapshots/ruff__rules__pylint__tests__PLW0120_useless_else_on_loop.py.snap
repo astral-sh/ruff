@@ -1,0 +1,75 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    UselessElseOnLoop: ~
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UselessElseOnLoop: ~
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 18
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UselessElseOnLoop: ~
+  location:
+    row: 30
+    column: 0
+  end_location:
+    row: 30
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    UselessElseOnLoop: ~
+  location:
+    row: 37
+    column: 0
+  end_location:
+    row: 37
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    UselessElseOnLoop: ~
+  location:
+    row: 42
+    column: 0
+  end_location:
+    row: 42
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    UselessElseOnLoop: ~
+  location:
+    row: 88
+    column: 4
+  end_location:
+    row: 88
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UselessElseOnLoop: ~
+  location:
+    row: 98
+    column: 8
+  end_location:
+    row: 98
+    column: 12
+  fix: ~
+  parent: ~
+

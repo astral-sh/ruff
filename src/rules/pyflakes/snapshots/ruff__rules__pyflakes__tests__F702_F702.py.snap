@@ -1,0 +1,45 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    ContinueOutsideLoop: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    ContinueOutsideLoop: ~
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    ContinueOutsideLoop: ~
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 20
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    ContinueOutsideLoop: ~
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 23
+    column: 8
+  fix: ~
+  parent: ~
+

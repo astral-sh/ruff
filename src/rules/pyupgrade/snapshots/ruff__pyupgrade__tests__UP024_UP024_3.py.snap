@@ -1,6 +1,0 @@
----
-source: src/pyupgrade/mod.rs
-expression: diagnostics
----
-[]
-

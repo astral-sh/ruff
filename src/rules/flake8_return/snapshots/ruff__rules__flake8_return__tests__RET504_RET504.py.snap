@@ -1,0 +1,55 @@
+---
+source: src/rules/flake8_return/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryAssign: ~
+  location:
+    row: 6
+    column: 11
+  end_location:
+    row: 6
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryAssign: ~
+  location:
+    row: 13
+    column: 11
+  end_location:
+    row: 13
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryAssign: ~
+  location:
+    row: 19
+    column: 15
+  end_location:
+    row: 19
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryAssign: ~
+  location:
+    row: 31
+    column: 11
+  end_location:
+    row: 31
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryAssign: ~
+  location:
+    row: 39
+    column: 11
+  end_location:
+    row: 39
+    column: 20
+  fix: ~
+  parent: ~
+

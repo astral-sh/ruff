@@ -1,0 +1,175 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 2
+    column: 10
+  end_location:
+    row: 2
+    column: 14
+  fix:
+    content: res is None
+    location:
+      row: 2
+      column: 3
+    end_location:
+      row: 2
+      column: 14
+  parent: ~
+- kind:
+    NoneComparison: NotEq
+  location:
+    row: 5
+    column: 10
+  end_location:
+    row: 5
+    column: 14
+  fix:
+    content: res is not None
+    location:
+      row: 5
+      column: 3
+    end_location:
+      row: 5
+      column: 14
+  parent: ~
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 8
+    column: 3
+  end_location:
+    row: 8
+    column: 7
+  fix:
+    content: None is res
+    location:
+      row: 8
+      column: 3
+    end_location:
+      row: 8
+      column: 14
+  parent: ~
+- kind:
+    NoneComparison: NotEq
+  location:
+    row: 11
+    column: 3
+  end_location:
+    row: 11
+    column: 7
+  fix:
+    content: None is not res
+    location:
+      row: 11
+      column: 3
+    end_location:
+      row: 11
+      column: 14
+  parent: ~
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 14
+    column: 13
+  end_location:
+    row: 14
+    column: 17
+  fix:
+    content: "res[1] is None"
+    location:
+      row: 14
+      column: 3
+    end_location:
+      row: 14
+      column: 17
+  parent: ~
+- kind:
+    NoneComparison: NotEq
+  location:
+    row: 17
+    column: 13
+  end_location:
+    row: 17
+    column: 17
+  fix:
+    content: "res[1] is not None"
+    location:
+      row: 17
+      column: 3
+    end_location:
+      row: 17
+      column: 17
+  parent: ~
+- kind:
+    NoneComparison: NotEq
+  location:
+    row: 20
+    column: 3
+  end_location:
+    row: 20
+    column: 7
+  fix:
+    content: "None is not res[1]"
+    location:
+      row: 20
+      column: 3
+    end_location:
+      row: 20
+      column: 17
+  parent: ~
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 23
+    column: 3
+  end_location:
+    row: 23
+    column: 7
+  fix:
+    content: "None is res[1]"
+    location:
+      row: 23
+      column: 3
+    end_location:
+      row: 23
+      column: 17
+  parent: ~
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 26
+    column: 8
+  end_location:
+    row: 26
+    column: 12
+  fix:
+    content: x is None is not None
+    location:
+      row: 26
+      column: 3
+    end_location:
+      row: 26
+      column: 20
+  parent: ~
+- kind:
+    NoneComparison: NotEq
+  location:
+    row: 26
+    column: 16
+  end_location:
+    row: 26
+    column: 20
+  fix:
+    content: x is None is not None
+    location:
+      row: 26
+      column: 3
+    end_location:
+      row: 26
+      column: 20
+  parent: ~
+

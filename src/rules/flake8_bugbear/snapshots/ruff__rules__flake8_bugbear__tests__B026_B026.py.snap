@@ -1,0 +1,75 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
+  location:
+    row: 16
+    column: 15
+  end_location:
+    row: 16
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
+  location:
+    row: 17
+    column: 15
+  end_location:
+    row: 17
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
+  location:
+    row: 18
+    column: 26
+  end_location:
+    row: 18
+    column: 34
+  fix: ~
+  parent: ~
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
+  location:
+    row: 19
+    column: 37
+  end_location:
+    row: 19
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
+  location:
+    row: 20
+    column: 15
+  end_location:
+    row: 20
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
+  location:
+    row: 20
+    column: 25
+  end_location:
+    row: 20
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    StarArgUnpackingAfterKeywordArg: ~
+  location:
+    row: 21
+    column: 25
+  end_location:
+    row: 21
+    column: 33
+  fix: ~
+  parent: ~
+

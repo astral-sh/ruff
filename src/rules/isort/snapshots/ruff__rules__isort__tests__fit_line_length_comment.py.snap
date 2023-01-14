@@ -1,0 +1,22 @@
+---
+source: src/rules/isort/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnsortedImports: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 5
+    column: 0
+  fix:
+    content: "import a\n\n# Don't take this comment into account when determining whether the next import can fit on one line.\nfrom b import c\nfrom d import (\n    e,  # Do take this comment into account when determining whether the next import can fit on one line.\n)\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 5
+      column: 0
+  parent: ~
+

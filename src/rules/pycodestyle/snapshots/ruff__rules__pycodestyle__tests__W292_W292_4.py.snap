@@ -1,0 +1,22 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoNewLineAtEndOfFile: ~
+  location:
+    row: 1
+    column: 1
+  end_location:
+    row: 1
+    column: 1
+  fix:
+    content: "\n"
+    location:
+      row: 1
+      column: 1
+    end_location:
+      row: 1
+      column: 1
+  parent: ~
+

@@ -1,0 +1,39 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    OneBlankLineAfterClass: 0
+  location:
+    row: 181
+    column: 4
+  end_location:
+    row: 181
+    column: 24
+  fix:
+    content: "\n"
+    location:
+      row: 182
+      column: 0
+    end_location:
+      row: 182
+      column: 0
+  parent: ~
+- kind:
+    OneBlankLineAfterClass: 0
+  location:
+    row: 192
+    column: 4
+  end_location:
+    row: 192
+    column: 45
+  fix:
+    content: "\n"
+    location:
+      row: 193
+      column: 0
+    end_location:
+      row: 193
+      column: 0
+  parent: ~
+

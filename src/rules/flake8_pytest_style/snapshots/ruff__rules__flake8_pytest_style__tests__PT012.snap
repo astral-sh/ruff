@@ -1,0 +1,85 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    RaisesWithMultipleStatements: ~
+  location:
+    row: 28
+    column: 4
+  end_location:
+    row: 30
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    RaisesWithMultipleStatements: ~
+  location:
+    row: 34
+    column: 4
+  end_location:
+    row: 36
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    RaisesWithMultipleStatements: ~
+  location:
+    row: 38
+    column: 4
+  end_location:
+    row: 40
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    RaisesWithMultipleStatements: ~
+  location:
+    row: 42
+    column: 4
+  end_location:
+    row: 44
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    RaisesWithMultipleStatements: ~
+  location:
+    row: 46
+    column: 4
+  end_location:
+    row: 48
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    RaisesWithMultipleStatements: ~
+  location:
+    row: 50
+    column: 4
+  end_location:
+    row: 52
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    RaisesWithMultipleStatements: ~
+  location:
+    row: 54
+    column: 4
+  end_location:
+    row: 56
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    RaisesWithMultipleStatements: ~
+  location:
+    row: 60
+    column: 4
+  end_location:
+    row: 64
+    column: 17
+  fix: ~
+  parent: ~
+

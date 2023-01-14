@@ -1,0 +1,35 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    ModuleImportNotAtTopOfFile: ~
+  location:
+    row: 55
+    column: 0
+  end_location:
+    row: 55
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    ModuleImportNotAtTopOfFile: ~
+  location:
+    row: 57
+    column: 0
+  end_location:
+    row: 57
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    ModuleImportNotAtTopOfFile: ~
+  location:
+    row: 61
+    column: 0
+  end_location:
+    row: 61
+    column: 10
+  fix: ~
+  parent: ~
+

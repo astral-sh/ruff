@@ -1,0 +1,6 @@
+---
+source: src/rules/ruff/mod.rs
+expression: diagnostics
+---
+[]
+

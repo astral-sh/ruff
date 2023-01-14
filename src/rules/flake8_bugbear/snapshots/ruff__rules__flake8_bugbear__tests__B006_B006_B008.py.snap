@@ -1,0 +1,145 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 60
+    column: 24
+  end_location:
+    row: 60
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 64
+    column: 29
+  end_location:
+    row: 64
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 68
+    column: 19
+  end_location:
+    row: 68
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 72
+    column: 19
+  end_location:
+    row: 72
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 76
+    column: 31
+  end_location:
+    row: 76
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 80
+    column: 25
+  end_location:
+    row: 80
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 85
+    column: 45
+  end_location:
+    row: 85
+    column: 69
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 89
+    column: 45
+  end_location:
+    row: 89
+    column: 72
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 93
+    column: 44
+  end_location:
+    row: 93
+    column: 68
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 97
+    column: 32
+  end_location:
+    row: 97
+    column: 34
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 170
+    column: 19
+  end_location:
+    row: 170
+    column: 48
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 203
+    column: 26
+  end_location:
+    row: 203
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 204
+    column: 34
+  end_location:
+    row: 204
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    MutableArgumentDefault: ~
+  location:
+    row: 205
+    column: 61
+  end_location:
+    row: 205
+    column: 66
+  fix: ~
+  parent: ~
+

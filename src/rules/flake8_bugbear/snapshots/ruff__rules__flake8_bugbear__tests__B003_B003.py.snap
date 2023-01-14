@@ -1,0 +1,15 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    AssignmentToOsEnviron: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 10
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,35 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    SkipDocstring: ~
+  location:
+    row: 34
+    column: 8
+  end_location:
+    row: 34
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    SkipDocstring: ~
+  location:
+    row: 90
+    column: 8
+  end_location:
+    row: 90
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    SkipDocstring: ~
+  location:
+    row: 110
+    column: 4
+  end_location:
+    row: 110
+    column: 19
+  fix: ~
+  parent: ~
+

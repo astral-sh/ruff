@@ -1,0 +1,35 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    DefaultExceptNotLast: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    DefaultExceptNotLast: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    DefaultExceptNotLast: ~
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 6
+  fix: ~
+  parent: ~
+

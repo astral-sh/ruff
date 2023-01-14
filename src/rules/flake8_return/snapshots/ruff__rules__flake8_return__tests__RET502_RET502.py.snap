@@ -1,0 +1,22 @@
+---
+source: src/rules/flake8_return/mod.rs
+expression: diagnostics
+---
+- kind:
+    ImplicitReturnValue: ~
+  location:
+    row: 3
+    column: 8
+  end_location:
+    row: 3
+    column: 14
+  fix:
+    content: return None
+    location:
+      row: 3
+      column: 8
+    end_location:
+      row: 3
+      column: 14
+  parent: ~
+

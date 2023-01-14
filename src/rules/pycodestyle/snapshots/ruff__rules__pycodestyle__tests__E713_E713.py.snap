@@ -1,0 +1,90 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NotInTest: ~
+  location:
+    row: 2
+    column: 7
+  end_location:
+    row: 2
+    column: 13
+  fix:
+    content: X not in Y
+    location:
+      row: 2
+      column: 3
+    end_location:
+      row: 2
+      column: 13
+  parent: ~
+- kind:
+    NotInTest: ~
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 15
+  fix:
+    content: X.B not in Y
+    location:
+      row: 5
+      column: 3
+    end_location:
+      row: 5
+      column: 15
+  parent: ~
+- kind:
+    NotInTest: ~
+  location:
+    row: 8
+    column: 7
+  end_location:
+    row: 8
+    column: 13
+  fix:
+    content: X not in Y
+    location:
+      row: 8
+      column: 3
+    end_location:
+      row: 8
+      column: 13
+  parent: ~
+- kind:
+    NotInTest: ~
+  location:
+    row: 11
+    column: 22
+  end_location:
+    row: 11
+    column: 28
+  fix:
+    content: Y not in Z
+    location:
+      row: 11
+      column: 18
+    end_location:
+      row: 11
+      column: 28
+  parent: ~
+- kind:
+    NotInTest: ~
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 14
+  fix:
+    content: X not in Y
+    location:
+      row: 14
+      column: 3
+    end_location:
+      row: 14
+      column: 15
+  parent: ~
+

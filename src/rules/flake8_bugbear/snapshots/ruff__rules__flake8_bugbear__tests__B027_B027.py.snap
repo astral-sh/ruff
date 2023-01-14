@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    EmptyMethodWithoutAbstractDecorator: AbstractClass
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 14
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    EmptyMethodWithoutAbstractDecorator: AbstractClass
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 17
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    EmptyMethodWithoutAbstractDecorator: AbstractClass
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 21
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    EmptyMethodWithoutAbstractDecorator: AbstractClass
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 28
+    column: 12
+  fix: ~
+  parent: ~
+

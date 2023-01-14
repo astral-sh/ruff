@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnaryPrefixIncrement: ~
+  location:
+    row: 15
+    column: 8
+  end_location:
+    row: 15
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UnaryPrefixIncrement: ~
+  location:
+    row: 20
+    column: 11
+  end_location:
+    row: 20
+    column: 14
+  fix: ~
+  parent: ~
+

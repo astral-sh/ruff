@@ -1,0 +1,22 @@
+---
+source: src/rules/flake8_return/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryReturnNone: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 15
+  fix:
+    content: return
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 15
+  parent: ~
+

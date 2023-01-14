@@ -1,0 +1,15 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    PercentFormatExpectedSequence: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 20
+  fix: ~
+  parent: ~
+

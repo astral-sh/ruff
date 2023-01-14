@@ -1,0 +1,243 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 355
+    column: 4
+  end_location:
+    row: 355
+    column: 17
+  fix:
+    content: "."
+    location:
+      row: 355
+      column: 14
+    end_location:
+      row: 355
+      column: 14
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 406
+    column: 24
+  end_location:
+    row: 406
+    column: 39
+  fix:
+    content: "."
+    location:
+      row: 406
+      column: 36
+    end_location:
+      row: 406
+      column: 36
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 410
+    column: 4
+  end_location:
+    row: 410
+    column: 24
+  fix:
+    content: "."
+    location:
+      row: 410
+      column: 21
+    end_location:
+      row: 410
+      column: 21
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 416
+    column: 4
+  end_location:
+    row: 416
+    column: 24
+  fix:
+    content: "."
+    location:
+      row: 416
+      column: 21
+    end_location:
+      row: 416
+      column: 21
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 422
+    column: 34
+  end_location:
+    row: 422
+    column: 49
+  fix:
+    content: "."
+    location:
+      row: 422
+      column: 46
+    end_location:
+      row: 422
+      column: 46
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 429
+    column: 48
+  end_location:
+    row: 429
+    column: 63
+  fix:
+    content: "."
+    location:
+      row: 429
+      column: 60
+    end_location:
+      row: 429
+      column: 60
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 470
+    column: 4
+  end_location:
+    row: 470
+    column: 24
+  fix:
+    content: "."
+    location:
+      row: 470
+      column: 21
+    end_location:
+      row: 470
+      column: 21
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 475
+    column: 4
+  end_location:
+    row: 475
+    column: 24
+  fix:
+    content: "."
+    location:
+      row: 475
+      column: 21
+    end_location:
+      row: 475
+      column: 21
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 480
+    column: 4
+  end_location:
+    row: 480
+    column: 24
+  fix:
+    content: "."
+    location:
+      row: 480
+      column: 21
+    end_location:
+      row: 480
+      column: 21
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 487
+    column: 4
+  end_location:
+    row: 487
+    column: 24
+  fix:
+    content: "."
+    location:
+      row: 487
+      column: 21
+    end_location:
+      row: 487
+      column: 21
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 509
+    column: 4
+  end_location:
+    row: 509
+    column: 34
+  fix:
+    content: "."
+    location:
+      row: 509
+      column: 31
+    end_location:
+      row: 509
+      column: 31
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 514
+    column: 4
+  end_location:
+    row: 514
+    column: 33
+  fix:
+    content: "."
+    location:
+      row: 514
+      column: 30
+    end_location:
+      row: 514
+      column: 30
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 520
+    column: 4
+  end_location:
+    row: 520
+    column: 32
+  fix:
+    content: "."
+    location:
+      row: 520
+      column: 29
+    end_location:
+      row: 520
+      column: 29
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
+    row: 581
+    column: 4
+  end_location:
+    row: 581
+    column: 51
+  fix:
+    content: "."
+    location:
+      row: 581
+      column: 47
+    end_location:
+      row: 581
+      column: 47
+  parent: ~
+

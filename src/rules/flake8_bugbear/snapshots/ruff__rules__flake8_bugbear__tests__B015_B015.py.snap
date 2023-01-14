@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    UselessComparison: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    UselessComparison: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UselessComparison: ~
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    UselessComparison: ~
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 10
+  fix: ~
+  parent: ~
+

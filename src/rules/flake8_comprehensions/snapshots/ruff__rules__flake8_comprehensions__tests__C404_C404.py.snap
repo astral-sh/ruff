@@ -1,0 +1,22 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryListComprehensionDict: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 32
+  fix:
+    content: "{i: i for i in range(3)}"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 32
+  parent: ~
+

@@ -1,0 +1,35 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    InvalidFirstArgumentNameForClassMethod: ~
+  location:
+    row: 30
+    column: 26
+  end_location:
+    row: 30
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFirstArgumentNameForClassMethod: ~
+  location:
+    row: 38
+    column: 55
+  end_location:
+    row: 38
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFirstArgumentNameForClassMethod: ~
+  location:
+    row: 43
+    column: 19
+  end_location:
+    row: 43
+    column: 23
+  fix: ~
+  parent: ~
+

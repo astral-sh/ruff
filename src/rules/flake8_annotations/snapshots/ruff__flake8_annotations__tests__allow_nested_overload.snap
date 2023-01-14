@@ -1,6 +1,0 @@
----
-source: src/flake8_annotations/mod.rs
-expression: diagnostics
----
-[]
-

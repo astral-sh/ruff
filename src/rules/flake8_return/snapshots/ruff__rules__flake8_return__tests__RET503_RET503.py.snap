@@ -1,0 +1,76 @@
+---
+source: src/rules/flake8_return/mod.rs
+expression: diagnostics
+---
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 8
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 15
+  fix:
+    content: "        return None\n"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 23
+    column: 11
+  fix:
+    content: "    return None\n"
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 29
+    column: 8
+  end_location:
+    row: 30
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 39
+    column: 8
+  end_location:
+    row: 39
+    column: 15
+  fix:
+    content: "        return None\n"
+    location:
+      row: 40
+      column: 0
+    end_location:
+      row: 40
+      column: 0
+  parent: ~
+

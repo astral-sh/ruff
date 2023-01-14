@@ -1,0 +1,6 @@
+---
+source: src/rules/pygrep_hooks/mod.rs
+expression: diagnostics
+---
+[]
+

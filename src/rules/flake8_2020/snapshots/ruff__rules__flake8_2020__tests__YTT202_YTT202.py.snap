@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_2020/mod.rs
+expression: diagnostics
+---
+- kind:
+    SixPY3Referenced: ~
+  location:
+    row: 4
+    column: 3
+  end_location:
+    row: 4
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    SixPY3Referenced: ~
+  location:
+    row: 6
+    column: 3
+  end_location:
+    row: 6
+    column: 6
+  fix: ~
+  parent: ~
+

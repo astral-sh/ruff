@@ -1,0 +1,75 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    CompositeAssertion: ~
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 39
+  fix: ~
+  parent: ~
+- kind:
+    CompositeAssertion: ~
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 13
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    CompositeAssertion: ~
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 43
+  fix: ~
+  parent: ~
+- kind:
+    CompositeAssertion: ~
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 15
+    column: 60
+  fix: ~
+  parent: ~
+- kind:
+    CompositeAssertion: ~
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    CompositeAssertion: ~
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 63
+  fix: ~
+  parent: ~
+- kind:
+    CompositeAssertion: ~
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 18
+    column: 64
+  fix: ~
+  parent: ~
+

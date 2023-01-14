@@ -1,0 +1,25 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    DunderFunctionName: ~
+  location:
+    row: 1
+    column: 4
+  end_location:
+    row: 1
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    DunderFunctionName: ~
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 15
+  fix: ~
+  parent: ~
+

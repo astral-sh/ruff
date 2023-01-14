@@ -1,0 +1,65 @@
+---
+source: src/rules/pygrep_hooks/mod.rs
+expression: diagnostics
+---
+- kind:
+    BlanketNOQA: ~
+  location:
+    row: 1
+    column: 7
+  end_location:
+    row: 1
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    BlanketNOQA: ~
+  location:
+    row: 2
+    column: 7
+  end_location:
+    row: 2
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    BlanketNOQA: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    BlanketNOQA: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    BlanketNOQA: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    BlanketNOQA: ~
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 8
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,35 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    OrTrue: ~
+  location:
+    row: 1
+    column: 8
+  end_location:
+    row: 1
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    OrTrue: ~
+  location:
+    row: 4
+    column: 15
+  end_location:
+    row: 4
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    OrTrue: ~
+  location:
+    row: 7
+    column: 14
+  end_location:
+    row: 7
+    column: 18
+  fix: ~
+  parent: ~
+

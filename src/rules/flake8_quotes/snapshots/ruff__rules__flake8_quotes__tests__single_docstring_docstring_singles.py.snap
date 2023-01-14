@@ -1,0 +1,107 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadQuotesMultilineString: double
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 7
+    column: 3
+  fix:
+    content: "\"\"\"\nthis is not a docstring\n\"\"\""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 7
+      column: 3
+  parent: ~
+- kind:
+    BadQuotesMultilineString: double
+  location:
+    row: 11
+    column: 20
+  end_location:
+    row: 13
+    column: 3
+  fix:
+    content: "\"\"\"\n    class params \\t not a docstring\n\"\"\""
+    location:
+      row: 11
+      column: 20
+    end_location:
+      row: 13
+      column: 3
+  parent: ~
+- kind:
+    BadQuotesMultilineString: double
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 20
+    column: 7
+  fix:
+    content: "\"\"\"\n    this is not a docstring\n    \"\"\""
+    location:
+      row: 18
+      column: 4
+    end_location:
+      row: 20
+      column: 7
+  parent: ~
+- kind:
+    BadQuotesMultilineString: double
+  location:
+    row: 23
+    column: 20
+  end_location:
+    row: 24
+    column: 37
+  fix:
+    content: "\"\"\"\n        definitely not a docstring\"\"\""
+    location:
+      row: 23
+      column: 20
+    end_location:
+      row: 24
+      column: 37
+  parent: ~
+- kind:
+    BadQuotesMultilineString: double
+  location:
+    row: 32
+    column: 8
+  end_location:
+    row: 34
+    column: 11
+  fix:
+    content: "\"\"\"\n        this is not a docstring\n        \"\"\""
+    location:
+      row: 32
+      column: 8
+    end_location:
+      row: 34
+      column: 11
+  parent: ~
+- kind:
+    BadQuotesMultilineString: double
+  location:
+    row: 37
+    column: 12
+  end_location:
+    row: 39
+    column: 15
+  fix:
+    content: "\"\"\"\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            \"\"\""
+    location:
+      row: 37
+      column: 12
+    end_location:
+      row: 39
+      column: 15
+  parent: ~
+
