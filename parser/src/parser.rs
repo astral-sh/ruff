@@ -93,14 +93,7 @@ pub fn parse_located(
     location: Location,
 ) -> Result<ast::Mod, ParseError> {
     let lxr = lexer::make_tokenizer_located(source, location);
-    let marker_token = (Default::default(), mode.to_marker(), Default::default());
-    let tokenizer = iter::once(Ok(marker_token))
-        .chain(lxr)
-        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-
-    python::TopParser::new()
-        .parse(tokenizer)
-        .map_err(|e| crate::error::parse_error_from_lalrpop(e, source_path))
+    parse_tokens(lxr, mode, source_path)
 }
 
 // Parse a given token iterator.
@@ -112,7 +105,7 @@ pub fn parse_tokens(
     let marker_token = (Default::default(), mode.to_marker(), Default::default());
     let tokenizer = iter::once(Ok(marker_token))
         .chain(lxr)
-        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment(_)));
+        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
 
     python::TopParser::new()
         .parse(tokenizer)
