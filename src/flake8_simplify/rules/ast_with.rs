@@ -1,4 +1,4 @@
-use rustpython_ast::{Stmt, StmtKind};
+use rustpython_ast::{Stmt, StmtKind, Withitem};
 
 use crate::ast::helpers::first_colon_range;
 use crate::ast::types::Range;
@@ -6,18 +6,23 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violations;
 
-fn find_nested_with(stmt: &Stmt) -> Option<&Stmt> {
-    let StmtKind::With { body, .. } = &stmt.node else {
-        return None
-    };
-    if body.len() != 1 || !matches!(body[0].node, StmtKind::With { .. }) {
+fn find_nested_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
+    if body.len() != 1 {
         return None;
     }
-    find_nested_with(&body[0]).or_else(|| Some(&body[0]))
+    let StmtKind::With { items, body, .. } = &body[0].node else {
+        return None
+    };
+    find_nested_with(body).or_else(|| Some((items, body)))
 }
 
 /// SIM117
-pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
+pub fn multiple_with_statements(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    body: &[Stmt],
+    parent: Option<&Stmt>,
+) {
     if let Some(parent) = parent {
         if let StmtKind::With { body, .. } = &parent.node {
             if body.len() == 1 {
@@ -25,10 +30,7 @@ pub fn multiple_with_statements(checker: &mut Checker, stmt: &Stmt, parent: Opti
             }
         }
     }
-    if let Some(with_stmt) = find_nested_with(stmt) {
-        let StmtKind::With { items, body, .. } = &with_stmt.node else {
-            return
-        };
+    if let Some((items, body)) = find_nested_with(body) {
         let last_item = items.last().expect("Expected items to be non-empty");
         let colon = first_colon_range(
             Range::new(

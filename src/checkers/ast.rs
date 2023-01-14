@@ -1273,6 +1273,7 @@ where
                     flake8_simplify::rules::multiple_with_statements(
                         self,
                         stmt,
+                        body,
                         self.current_stmt_parent().map(|parent| parent.0),
                     );
                 }
