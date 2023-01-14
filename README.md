@@ -1257,6 +1257,18 @@ However, Ruff is also available as part of the [coc-pyright](https://github.com/
 extension for `coc.nvim`.
 
 <details>
+<summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for (Neo)Vim.</summary>
+
+```vim
+let g:ale_linters = { "python": ["ruff"] }
+let g:ale_fixers = {
+\       "python": ["black", "ruff"],
+\}
+```
+
+</details>
+
+<details>
 <summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
 <br>
 
