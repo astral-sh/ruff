@@ -180,7 +180,7 @@ fn test_ruff_black_compatibility() -> Result<()> {
         // problem. Ruff would add a `# noqa: W292`  after the first run, black introduces a
         // newline, and ruff removes the `# noqa: W292` again.
         .filter(|origin| *origin != RuleOrigin::Ruff)
-        .map(|origin| origin.codes().iter().map(AsRef::as_ref).join(","))
+        .map(|origin| origin.prefixes().as_list(","))
         .join(",");
     let ruff_args = [
         "-",

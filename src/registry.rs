@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use ruff_macros::RuleCodePrefix;
 use rustc_hash::FxHashMap;
@@ -568,6 +569,23 @@ impl fmt::Display for Platform {
     }
 }
 
+pub enum Prefixes {
+    Single(RuleCodePrefix),
+    Multiple(Vec<(RuleCodePrefix, &'static str)>),
+}
+
+impl Prefixes {
+    pub fn as_list(&self, separator: &str) -> String {
+        match self {
+            Prefixes::Single(prefix) => prefix.as_ref().to_string(),
+            Prefixes::Multiple(entries) => entries
+                .iter()
+                .map(|(prefix, _)| prefix.as_ref())
+                .join(separator),
+        }
+    }
+}
+
 impl RuleOrigin {
     pub fn title(&self) -> &'static str {
         match self {
@@ -607,46 +625,49 @@ impl RuleOrigin {
         }
     }
 
-    pub fn codes(&self) -> Vec<RuleCodePrefix> {
+    pub fn prefixes(&self) -> Prefixes {
         match self {
-            RuleOrigin::Eradicate => vec![RuleCodePrefix::ERA],
-            RuleOrigin::Flake82020 => vec![RuleCodePrefix::YTT],
-            RuleOrigin::Flake8Annotations => vec![RuleCodePrefix::ANN],
-            RuleOrigin::Flake8Bandit => vec![RuleCodePrefix::S],
-            RuleOrigin::Flake8BlindExcept => vec![RuleCodePrefix::BLE],
-            RuleOrigin::Flake8BooleanTrap => vec![RuleCodePrefix::FBT],
-            RuleOrigin::Flake8Bugbear => vec![RuleCodePrefix::B],
-            RuleOrigin::Flake8Builtins => vec![RuleCodePrefix::A],
-            RuleOrigin::Flake8Comprehensions => vec![RuleCodePrefix::C4],
-            RuleOrigin::Flake8Datetimez => vec![RuleCodePrefix::DTZ],
-            RuleOrigin::Flake8Debugger => vec![RuleCodePrefix::T10],
-            RuleOrigin::Flake8ErrMsg => vec![RuleCodePrefix::EM],
-            RuleOrigin::Flake8ImplicitStrConcat => vec![RuleCodePrefix::ISC],
-            RuleOrigin::Flake8ImportConventions => vec![RuleCodePrefix::ICN],
-            RuleOrigin::Flake8Print => vec![RuleCodePrefix::T20],
-            RuleOrigin::Flake8PytestStyle => vec![RuleCodePrefix::PT],
-            RuleOrigin::Flake8Quotes => vec![RuleCodePrefix::Q],
-            RuleOrigin::Flake8Return => vec![RuleCodePrefix::RET],
-            RuleOrigin::Flake8Simplify => vec![RuleCodePrefix::SIM],
-            RuleOrigin::Flake8TidyImports => vec![RuleCodePrefix::TID],
-            RuleOrigin::Flake8UnusedArguments => vec![RuleCodePrefix::ARG],
-            RuleOrigin::Isort => vec![RuleCodePrefix::I],
-            RuleOrigin::McCabe => vec![RuleCodePrefix::C90],
-            RuleOrigin::PEP8Naming => vec![RuleCodePrefix::N],
-            RuleOrigin::PandasVet => vec![RuleCodePrefix::PD],
-            RuleOrigin::Pycodestyle => vec![RuleCodePrefix::E, RuleCodePrefix::W],
-            RuleOrigin::Pydocstyle => vec![RuleCodePrefix::D],
-            RuleOrigin::Pyflakes => vec![RuleCodePrefix::F],
-            RuleOrigin::PygrepHooks => vec![RuleCodePrefix::PGH],
-            RuleOrigin::Pylint => vec![
-                RuleCodePrefix::PLC,
-                RuleCodePrefix::PLE,
-                RuleCodePrefix::PLR,
-                RuleCodePrefix::PLW,
-            ],
-            RuleOrigin::Pyupgrade => vec![RuleCodePrefix::UP],
-            RuleOrigin::Flake8Pie => vec![RuleCodePrefix::PIE],
-            RuleOrigin::Ruff => vec![RuleCodePrefix::RUF],
+            RuleOrigin::Eradicate => Prefixes::Single(RuleCodePrefix::ERA),
+            RuleOrigin::Flake82020 => Prefixes::Single(RuleCodePrefix::YTT),
+            RuleOrigin::Flake8Annotations => Prefixes::Single(RuleCodePrefix::ANN),
+            RuleOrigin::Flake8Bandit => Prefixes::Single(RuleCodePrefix::S),
+            RuleOrigin::Flake8BlindExcept => Prefixes::Single(RuleCodePrefix::BLE),
+            RuleOrigin::Flake8BooleanTrap => Prefixes::Single(RuleCodePrefix::FBT),
+            RuleOrigin::Flake8Bugbear => Prefixes::Single(RuleCodePrefix::B),
+            RuleOrigin::Flake8Builtins => Prefixes::Single(RuleCodePrefix::A),
+            RuleOrigin::Flake8Comprehensions => Prefixes::Single(RuleCodePrefix::C4),
+            RuleOrigin::Flake8Datetimez => Prefixes::Single(RuleCodePrefix::DTZ),
+            RuleOrigin::Flake8Debugger => Prefixes::Single(RuleCodePrefix::T10),
+            RuleOrigin::Flake8ErrMsg => Prefixes::Single(RuleCodePrefix::EM),
+            RuleOrigin::Flake8ImplicitStrConcat => Prefixes::Single(RuleCodePrefix::ISC),
+            RuleOrigin::Flake8ImportConventions => Prefixes::Single(RuleCodePrefix::ICN),
+            RuleOrigin::Flake8Print => Prefixes::Single(RuleCodePrefix::T20),
+            RuleOrigin::Flake8PytestStyle => Prefixes::Single(RuleCodePrefix::PT),
+            RuleOrigin::Flake8Quotes => Prefixes::Single(RuleCodePrefix::Q),
+            RuleOrigin::Flake8Return => Prefixes::Single(RuleCodePrefix::RET),
+            RuleOrigin::Flake8Simplify => Prefixes::Single(RuleCodePrefix::SIM),
+            RuleOrigin::Flake8TidyImports => Prefixes::Single(RuleCodePrefix::TID),
+            RuleOrigin::Flake8UnusedArguments => Prefixes::Single(RuleCodePrefix::ARG),
+            RuleOrigin::Isort => Prefixes::Single(RuleCodePrefix::I),
+            RuleOrigin::McCabe => Prefixes::Single(RuleCodePrefix::C90),
+            RuleOrigin::PEP8Naming => Prefixes::Single(RuleCodePrefix::N),
+            RuleOrigin::PandasVet => Prefixes::Single(RuleCodePrefix::PD),
+            RuleOrigin::Pycodestyle => Prefixes::Multiple(vec![
+                (RuleCodePrefix::E, "Error"),
+                (RuleCodePrefix::W, "Warning"),
+            ]),
+            RuleOrigin::Pydocstyle => Prefixes::Single(RuleCodePrefix::D),
+            RuleOrigin::Pyflakes => Prefixes::Single(RuleCodePrefix::F),
+            RuleOrigin::PygrepHooks => Prefixes::Single(RuleCodePrefix::PGH),
+            RuleOrigin::Pylint => Prefixes::Multiple(vec![
+                (RuleCodePrefix::PLC, "Convention"),
+                (RuleCodePrefix::PLE, "Error"),
+                (RuleCodePrefix::PLR, "Refactor"),
+                (RuleCodePrefix::PLW, "Warning"),
+            ]),
+            RuleOrigin::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
+            RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
+            RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
         }
     }
 

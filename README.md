@@ -581,6 +581,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 
 For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI.
 
+#### Error (E)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E401 | MultipleImportsOnOneLine | Multiple imports on one line |  |
@@ -598,6 +599,10 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 | E743 | AmbiguousFunctionName | Ambiguous function name: `...` |  |
 | E902 | IOError | IOError: `...` |  |
 | E999 | SyntaxError | SyntaxError: `...` |  |
+
+#### Warning (W)
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
 | W292 | NoNewLineAtEndOfFile | No newline at end of file | 🛠 |
 | W505 | DocLineTooLong | Doc line too long (89 > 88 characters) |  |
 | W605 | InvalidEscapeSequence | Invalid escape sequence: '\c' | 🛠 |
@@ -979,7 +984,6 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
 | SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
 | SIM103 | ReturnBoolConditionDirectly | Return the condition `...` directly | 🛠 |
@@ -990,6 +994,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM110 | ConvertLoopToAny | Use `return any(x for x in y)` instead of `for` loop | 🛠 |
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
 | SIM112 | UseCapitalEnvironmentVariables | Use capitalized environment variable `...` instead of `...` | 🛠 |
+| SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
 | SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
@@ -1084,20 +1089,33 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 
 For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 
+#### Convention (PLC)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PLC0414 | UselessImportAlias | Import alias does not rename original package | 🛠 |
 | PLC2201 | MisplacedComparisonConstant | Comparison should be ... | 🛠 |
 | PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
+
+#### Error (PLE)
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
 | PLE0117 | NonlocalWithoutBinding | Nonlocal name `...` found without binding |  |
 | PLE0118 | UsedPriorGlobalDeclaration | Name `...` is used prior to global declaration on line 1 |  |
 | PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
+
+#### Refactor (PLR)
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PLR0133 | ConstantComparison | Two constants compared in a comparison, consider replacing `0 == 0` |  |
 | PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
 | PLR0402 | ConsiderUsingFromImport | Use `from ... import ...` in lieu of alias |  |
-| PLR0133 | ConstantComparison | Two constants compared in a comparison, consider replacing `0 == 0` |  |
 | PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
 | PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
 | PLR2004 | MagicValueComparison | Magic number used in comparison, consider replacing magic with a constant variable |  |
+
+#### Warning (PLW)
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
 | PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 | PLW0602 | GlobalVariableNotAssigned | Using global for `...` but no assignment is done |  |
 

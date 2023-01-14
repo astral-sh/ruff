@@ -2,8 +2,7 @@
 
 use anyhow::Result;
 use clap::Args;
-use itertools::Itertools;
-use ruff::registry::{RuleCode, RuleOrigin};
+use ruff::registry::{Prefixes, RuleCodePrefix, RuleOrigin};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -21,12 +20,33 @@ pub struct Cli {
     pub(crate) dry_run: bool,
 }
 
+fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
+    table_out.push_str("| Code | Name | Message | Fix |");
+    table_out.push('\n');
+    table_out.push_str("| ---- | ---- | ------- | --- |");
+    table_out.push('\n');
+    for rule_code in prefix.codes() {
+        let kind = rule_code.kind();
+        let fix_token = if kind.fixable() { "🛠" } else { "" };
+        table_out.push_str(&format!(
+            "| {} | {} | {} | {} |",
+            kind.code().as_ref(),
+            kind.as_ref(),
+            kind.summary().replace('|', r"\|"),
+            fix_token
+        ));
+        table_out.push('\n');
+    }
+    table_out.push('\n');
+}
+
 pub fn main(cli: &Cli) -> Result<()> {
     // Generate the table string.
     let mut table_out = String::new();
     let mut toc_out = String::new();
     for origin in RuleOrigin::iter() {
-        let codes_csv: String = origin.codes().iter().map(AsRef::as_ref).join(", ");
+        let prefixes = origin.prefixes();
+        let codes_csv: String = prefixes.as_list(", ");
         table_out.push_str(&format!("### {} ({codes_csv})", origin.title()));
         table_out.push('\n');
         table_out.push('\n');
@@ -50,26 +70,16 @@ pub fn main(cli: &Cli) -> Result<()> {
             table_out.push('\n');
         }
 
-        table_out.push_str("| Code | Name | Message | Fix |");
-        table_out.push('\n');
-        table_out.push_str("| ---- | ---- | ------- | --- |");
-        table_out.push('\n');
-
-        for rule_code in RuleCode::iter() {
-            if rule_code.origin() == origin {
-                let kind = rule_code.kind();
-                let fix_token = if kind.fixable() { "🛠" } else { "" };
-                table_out.push_str(&format!(
-                    "| {} | {} | {} | {} |",
-                    kind.code().as_ref(),
-                    kind.as_ref(),
-                    kind.summary().replace('|', r"\|"),
-                    fix_token
-                ));
-                table_out.push('\n');
+        match prefixes {
+            Prefixes::Single(prefix) => generate_table(&mut table_out, &prefix),
+            Prefixes::Multiple(entries) => {
+                for (prefix, category) in entries {
+                    table_out.push_str(&format!("#### {category} ({})", prefix.as_ref()));
+                    table_out.push('\n');
+                    generate_table(&mut table_out, &prefix);
+                }
             }
         }
-        table_out.push('\n');
     }
 
     if cli.dry_run {
