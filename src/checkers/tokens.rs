@@ -105,7 +105,7 @@ pub fn check_tokens(
     // ISC001, ISC002
     if enforce_implicit_string_concatenation {
         diagnostics.extend(
-            flake8_implicit_str_concat::rules::implicit(tokens, locator)
+            flake8_implicit_str_concat::rules::implicit(tokens)
                 .into_iter()
                 .filter(|diagnostic| settings.enabled.contains(diagnostic.kind.code())),
         );

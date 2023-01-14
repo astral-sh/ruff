@@ -1365,6 +1365,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_enum"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf5395665662ef45796a4ff5486c5d41d29e0c09640af4c5f17fd94ee2c119c9"
+dependencies = [
+ "num_enum_derive",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b0498641e53dd6ac1a4f22547548caa6864cc4933784319cd1775271c5a46ce"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1619,6 +1640,17 @@ checksum = "54ff541861505aabf6ea722d2131ee980b8276e10a1297b94e896dd8b621850d"
 dependencies = [
  "predicates-core",
  "termtree",
+]
+
+[[package]]
+name = "proc-macro-crate"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eda0fc3b0fb7c975631757e14d9049da17374063edb6ebbcbc54d880d4fe94e9"
+dependencies = [
+ "once_cell",
+ "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -2027,8 +2059,8 @@ dependencies = [
 
 [[package]]
 name = "rustpython-ast"
-version = "0.1.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=d532160333ffeb6dbeca2c2728c2391cd1e53b7f#d532160333ffeb6dbeca2c2728c2391cd1e53b7f"
+version = "0.2.0"
+source = "git+https://github.com/RustPython/RustPython.git?rev=acbc517b55406c76da83d7b2711941d8d3f65b87#acbc517b55406c76da83d7b2711941d8d3f65b87"
 dependencies = [
  "num-bigint",
  "rustpython-common",
@@ -2037,8 +2069,8 @@ dependencies = [
 
 [[package]]
 name = "rustpython-common"
-version = "0.0.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=d532160333ffeb6dbeca2c2728c2391cd1e53b7f#d532160333ffeb6dbeca2c2728c2391cd1e53b7f"
+version = "0.2.0"
+source = "git+https://github.com/RustPython/RustPython.git?rev=acbc517b55406c76da83d7b2711941d8d3f65b87#acbc517b55406c76da83d7b2711941d8d3f65b87"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2062,8 +2094,8 @@ dependencies = [
 
 [[package]]
 name = "rustpython-compiler-core"
-version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=d532160333ffeb6dbeca2c2728c2391cd1e53b7f#d532160333ffeb6dbeca2c2728c2391cd1e53b7f"
+version = "0.2.0"
+source = "git+https://github.com/RustPython/RustPython.git?rev=acbc517b55406c76da83d7b2711941d8d3f65b87#acbc517b55406c76da83d7b2711941d8d3f65b87"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2072,15 +2104,15 @@ dependencies = [
  "lz4_flex",
  "num-bigint",
  "num-complex",
+ "num_enum",
  "serde",
- "static_assertions",
  "thiserror",
 ]
 
 [[package]]
 name = "rustpython-parser"
-version = "0.1.2"
-source = "git+https://github.com/RustPython/RustPython.git?rev=d532160333ffeb6dbeca2c2728c2391cd1e53b7f#d532160333ffeb6dbeca2c2728c2391cd1e53b7f"
+version = "0.2.0"
+source = "git+https://github.com/RustPython/RustPython.git?rev=acbc517b55406c76da83d7b2711941d8d3f65b87#acbc517b55406c76da83d7b2711941d8d3f65b87"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2516,6 +2548,15 @@ dependencies = [
  "joinery",
  "lazy_static",
  "regex",
+]
+
+[[package]]
+name = "toml"
+version = "0.5.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1333c76748e868a4d9d1017b5ab53171dfd095f70c712fdb4653a406547f598f"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
