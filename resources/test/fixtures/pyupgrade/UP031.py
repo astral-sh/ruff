@@ -18,9 +18,8 @@
 "brace {} %s" % (1,)
 
 "%s" % (
-    "trailing comma"
+    "trailing comma",
         )
 
 "%s \N{snowman}" % (a,)
-
 # Make sure to include assignment and inside a call, also multi-line

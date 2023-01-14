@@ -141,7 +141,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
 }
 
 /// Removes the first instance of a given element from a vector
-fn remove(vec: &mut Vec<char>, item: char) {
+fn remove<T: std::cmp::PartialEq + std::marker::Copy>(vec: &mut Vec<T>, item: T) {
     let index = vec.iter().position(|&x| x == item).unwrap();
     vec.remove(index);
 }
@@ -247,18 +247,53 @@ fn percent_to_format(string: &str) -> String {
     final_string
 }
 
+/// If the tuple has one argument it removes the comma, otherwise it returns the tuple as is
+fn clean_right_tuple(checker: &Checker, right: &Expr) -> String {
+    // FOR REVIEWER: Let me know if you want this redone in libcst, the reason I didnt is because
+    // it starts as a Tuple, but ends as a Call
+    let right_range = Range::new(right.location, right.end_location.unwrap());
+    let mut base_string = checker
+        .locator
+        .slice_source_code_range(&right_range)
+        .to_string();
+    // let is_multi_line = base_string.contains('\n');
+    if let ExprKind::Tuple { elts, .. } = &right.node {
+        if elts.len() == 1 {
+            /*
+            let mut string = String::from('(');
+            if is_multi_line {
+                string.push('\n');
+                let indent = leading_space()
+                string.push_str(indent);
+            }
+            let sub_range = Range::from_located(elts.get(0).unwrap());
+            let sub_str = checker.locator.slice_source_code_range(&sub_range).to_string();
+            string.push_str(&sub_str);
+            if is_multi_line {
+                string.push('\n');
+            }
+            string.push(')');
+            return string
+            */
+            // FOR REVIEWER: This replaces ALL commas when there is only one item, I couldn't think
+            // of any instanced where this would cause an issue, but let me know if you can and I
+            // will fix
+            base_string = base_string.replace(',', "");
+        }
+    }
+    base_string
+}
+
 fn fix_percent_format_tuple(checker: &mut Checker, right: &Expr, left_string: &str) -> String {
     // Pyupgrade explicitly checks for ' % (' before running, but I am not sure the value of this
     // (pyupgrade itself says it is overly timid). The one edge case I considered was a multi line
     // format statement, but worst-case scenario we go over the limit and black fixes it. Let me
     // know if you want this check implemented
-    let right_range = Range::new(right.location, right.end_location.unwrap());
-    let right_string = checker.locator.slice_source_code_range(&right_range);
+    let right_string = clean_right_tuple(checker, right);
     let mut cleaned_string = percent_to_format(left_string);
     cleaned_string.push_str(".format");
     cleaned_string.push_str(&right_string);
     cleaned_string
-
 }
 
 fn fix_percent_format_dict(checker: &mut Checker, left: &Expr, right: &Expr) -> String {
@@ -342,8 +377,8 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         }
         // all dict substitutions must be named
         if let ExprKind::Dict { .. } = &right.node {
-            // Technically a value of "" would also count as `not key`, BUT we already have a check
-            // above for this
+            // Technically a value of "" would also count as `not key`, (which is what the python
+            // code uses) BUT we already have a check above for this
             if fmt.key.is_none() {
                 no_breaks = false;
                 break;
@@ -364,9 +399,9 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         if !new_string.is_empty() {
             let replace_range = Range::new(left.location, right.end_location.unwrap());
             let old_string = checker.locator.slice_source_code_range(&replace_range);
-            println!("{} => {}", old_string, new_string);
             if new_string != old_string {
-                let mut diagnostic = Diagnostic::new(violations::PrintfStringFormatting, replace_range);
+                let mut diagnostic =
+                    Diagnostic::new(violations::PrintfStringFormatting, replace_range);
                 if checker.patch(diagnostic.kind.code()) {
                     diagnostic.amend(Fix::replacement(
                         new_string,
