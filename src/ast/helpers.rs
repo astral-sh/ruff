@@ -721,7 +721,9 @@ mod tests {
     use rustpython_ast::Location;
     use rustpython_parser::parser;
 
-    use crate::ast::helpers::{else_range, identifier_range, match_trailing_content};
+    use crate::ast::helpers::{
+        else_range, first_colon_range, identifier_range, match_trailing_content,
+    };
     use crate::ast::types::Range;
     use crate::source_code::Locator;
 
@@ -850,6 +852,22 @@ else:
         assert_eq!(range.location.column(), 0);
         assert_eq!(range.end_location.row(), 3);
         assert_eq!(range.end_location.column(), 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_first_colon_range() -> Result<()> {
+        let contents = "with a: pass";
+        let locator = Locator::new(contents);
+        let range = first_colon_range(
+            Range::new(Location::new(1, 0), Location::new(1, contents.len())),
+            &locator,
+        )
+        .unwrap();
+        assert_eq!(range.location.row(), 1);
+        assert_eq!(range.location.column(), 6);
+        assert_eq!(range.end_location.row(), 1);
+        assert_eq!(range.end_location.column(), 7);
         Ok(())
     }
 }
