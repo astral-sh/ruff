@@ -2,24 +2,24 @@ use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
 use colored::Colorize;
-use ruff::registry::RuleCodePrefix;
-use ruff::rules::flake8_pytest_style::types::{
+
+use super::black::Black;
+use super::plugin::Plugin;
+use super::{parser, plugin};
+use crate::registry::RuleCodePrefix;
+use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
-use ruff::rules::flake8_quotes::settings::Quote;
-use ruff::rules::flake8_tidy_imports::settings::Strictness;
-use ruff::rules::pydocstyle::settings::Convention;
-use ruff::rules::{
+use crate::rules::flake8_quotes::settings::Quote;
+use crate::rules::flake8_tidy_imports::settings::Strictness;
+use crate::rules::pydocstyle::settings::Convention;
+use crate::rules::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
     flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
 };
-use ruff::settings::options::Options;
-use ruff::settings::pyproject::Pyproject;
-use ruff::warn_user;
-
-use crate::black::Black;
-use crate::plugin::Plugin;
-use crate::{parser, plugin};
+use crate::settings::options::Options;
+use crate::settings::pyproject::Pyproject;
+use crate::warn_user;
 
 #[allow(clippy::unnecessary_wraps)]
 pub fn convert(
@@ -390,14 +390,14 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
-    use ruff::registry::RuleCodePrefix;
-    use ruff::rules::pydocstyle::settings::Convention;
-    use ruff::rules::{flake8_quotes, pydocstyle};
-    use ruff::settings::options::Options;
-    use ruff::settings::pyproject::Pyproject;
 
-    use crate::converter::convert;
-    use crate::plugin::Plugin;
+    use super::super::plugin::Plugin;
+    use super::convert;
+    use crate::registry::RuleCodePrefix;
+    use crate::rules::pydocstyle::settings::Convention;
+    use crate::rules::{flake8_quotes, pydocstyle};
+    use crate::settings::options::Options;
+    use crate::settings::pyproject::Pyproject;
 
     #[test]
     fn it_converts_empty() -> Result<()> {

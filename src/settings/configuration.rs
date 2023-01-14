@@ -251,6 +251,12 @@ impl Configuration {
             pyupgrade: self.pyupgrade.or(config.pyupgrade),
         }
     }
+
+    pub fn set_max_complexity(&mut self, max_complexity: Option<usize>) {
+        let mut mccabe = self.mccabe.take().unwrap_or_default();
+        mccabe.max_complexity = max_complexity;
+        self.mccabe = Some(mccabe);
+    }
 }
 
 /// Given a list of source paths, which could include glob patterns, resolve the

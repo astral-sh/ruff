@@ -6,7 +6,6 @@ use ruff::fs;
 use ruff::logging::LogLevel;
 use ruff::registry::{RuleCode, RuleCodePrefix};
 use ruff::resolver::ConfigProcessor;
-use ruff::rules::mccabe;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
@@ -385,9 +384,7 @@ impl ConfigProcessor for &Overrides {
             config.line_length = Some(*line_length);
         }
         if let Some(max_complexity) = &self.max_complexity {
-            config.mccabe = Some(mccabe::settings::Options {
-                max_complexity: Some(*max_complexity),
-            });
+            config.set_max_complexity(Some(*max_complexity));
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
