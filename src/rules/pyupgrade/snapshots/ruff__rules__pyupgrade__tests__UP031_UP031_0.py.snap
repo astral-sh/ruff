@@ -223,4 +223,21 @@ expression: diagnostics
       row: 29
       column: 22
   parent: ~
+- kind:
+    PrintfStringFormatting: ~
+  location:
+    row: 31
+    column: 15
+  end_location:
+    row: 34
+    column: 10
+  fix:
+    content: "(\n    \"foo {} \"\n    \"bar {}\"\n).format(x, y)"
+    location:
+      row: 31
+      column: 15
+    end_location:
+      row: 34
+      column: 10
+  parent: ~
 

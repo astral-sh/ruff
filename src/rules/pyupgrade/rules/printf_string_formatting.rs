@@ -17,6 +17,7 @@ static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").un
 static WIDTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\*|\d*)").unwrap());
 static PRECISION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\.(?:\*|\d*))?").unwrap());
 static LENGTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[hlL]?").unwrap());
+static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % \(").unwrap());
 
 #[derive(Debug, PartialEq, Clone)]
 struct PercentFormatPart {
@@ -282,6 +283,7 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
             */
             // FOR REVIEWER: This replaces only the last comma. I could not think of an edge case
             // where this causes issues, but if you can let me know and I will fix
+
             // We check for is_multi_line beign false, because we do not replace the comma on multi
             // line statement
             if !is_multi_line {
@@ -390,11 +392,20 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
 }
 
 /// UP031
-pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr) {
-    println!("{:?}\n", left);
-    println!("{:?}\n", right);
-    let left_range = Range::new(left.location, left.end_location.unwrap());
-    let left_string = checker.locator.slice_source_code_range(&left_range);
+pub fn printf_string_formatting(checker: &mut Checker, expr: &Expr, left: &Expr, right: &Expr) {
+    let expr_range = Range::new(expr.location, expr.end_location.unwrap());
+    let expr_string = checker.locator.slice_source_code_range(&expr_range);
+
+    let mut the_split = MODULO_CALL.split(&expr_string);
+    // Pyupgrade does this test in the functions that change, but I am relying on this logic for
+    // something else, so I will use it here, pyupgrade notes this is an overly timid check
+    let left_string = match the_split.nth(0) {
+        None => return,
+        Some(item) => item,
+    };
+    if  the_split.count() < 1 {
+        return;
+    }
     let parsed = parse_percent_format(&left_string);
     // Rust does not have a for else statement so we have to do this
     let is_valid = check_statement(parsed, right);
@@ -416,7 +427,7 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
     if new_string.is_empty() {
         return;
     }
-    let replace_range = Range::new(left.location, right.end_location.unwrap());
+    let replace_range = Range::new(expr.location, expr.end_location.unwrap());
     let old_string = checker.locator.slice_source_code_range(&replace_range);
     // If there is no change, then bail
     if new_string == old_string {

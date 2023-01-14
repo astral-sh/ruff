@@ -28,12 +28,10 @@ paren_continue = (
 
 print("foo %s " % (x,))
 
-"""
 paren_string = (
     "foo %s "
     "bar %s"
 ) % (x, y)
-"""
 
 # This will stay commented out until my regex in helpers is fixed
 # "%s \N{snowman}" % (a,)
