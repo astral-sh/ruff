@@ -4,10 +4,11 @@ use anyhow::{bail, Result};
 use colored::Colorize;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff::registry::{RuleCodePrefix, PREFIX_REDIRECTS};
-use ruff::settings::types::PatternPrefixPair;
-use ruff::warn_user;
 use rustc_hash::FxHashMap;
+
+use crate::registry::{RuleCodePrefix, PREFIX_REDIRECTS};
+use crate::settings::types::PatternPrefixPair;
+use crate::warn_user;
 
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
@@ -203,10 +204,10 @@ pub fn collect_per_file_ignores(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff::registry::RuleCodePrefix;
-    use ruff::settings::types::PatternPrefixPair;
 
-    use crate::parser::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
+    use super::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
+    use crate::registry::RuleCodePrefix;
+    use crate::settings::types::PatternPrefixPair;
 
     #[test]
     fn it_parses_prefix_codes() {

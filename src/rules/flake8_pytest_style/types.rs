@@ -4,6 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum ParametrizeNameType {
     #[serde(rename = "csv")]
     CSV,
