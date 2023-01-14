@@ -262,6 +262,8 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
     // let is_multi_line = base_string.contains('\n');
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
+            // FOR REVIEWER, if we dedice we like the just removing the last comma then delete the
+            // commented out code below
             /*
             let mut string = String::from('(');
             if is_multi_line {
