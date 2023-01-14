@@ -19,8 +19,8 @@ fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
 /// SIM117
 pub fn multiple_with_statements(
     checker: &mut Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
+    with_stmt: &Stmt,
+    with_body: &[Stmt],
     parent: Option<&Stmt>,
 ) {
     if let Some(parent) = parent {
@@ -30,7 +30,7 @@ pub fn multiple_with_statements(
             }
         }
     }
-    if let Some((items, body)) = find_last_with(body) {
+    if let Some((items, body)) = find_last_with(with_body) {
         let last_item = items.last().expect("Expected items to be non-empty");
         let colon = first_colon_range(
             Range::new(
@@ -48,8 +48,8 @@ pub fn multiple_with_statements(
         checker.diagnostics.push(Diagnostic::new(
             violations::MultipleWithStatements,
             colon.map_or_else(
-                || Range::from_located(stmt),
-                |colon| Range::new(stmt.location, colon.end_location),
+                || Range::from_located(with_stmt),
+                |colon| Range::new(with_stmt.location, colon.end_location),
             ),
         ));
     }
