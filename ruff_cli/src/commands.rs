@@ -19,7 +19,7 @@ use ruff::registry::RuleCode;
 use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
-use ruff::{fix, fs, packaging, resolver, violations, warn_user_once};
+use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError};
 use serde::Serialize;
 use walkdir::WalkDir;
 
@@ -116,7 +116,7 @@ pub fn run(
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.enabled.contains(&RuleCode::E902) {
                         Diagnostics::new(vec![Message {
-                            kind: violations::IOError(message).into(),
+                            kind: IOError(message).into(),
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,

@@ -45,10 +45,11 @@ pub mod settings;
 pub mod source_code;
 mod vendor;
 mod violation;
-pub mod violations;
+mod violations;
 mod visibility;
 
 use cfg_if::cfg_if;
+pub use violations::IOError;
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
