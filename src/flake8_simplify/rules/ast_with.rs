@@ -21,9 +21,9 @@ pub fn multiple_with_statements(
     checker: &mut Checker,
     with_stmt: &Stmt,
     with_body: &[Stmt],
-    parent: Option<&Stmt>,
+    with_parent: Option<&Stmt>,
 ) {
-    if let Some(parent) = parent {
+    if let Some(parent) = with_parent {
         if let StmtKind::With { body, .. } = &parent.node {
             if body.len() == 1 {
                 return;
