@@ -95,7 +95,7 @@ pub fn cmp_import_from(
     })
 }
 
-/// Compare two `EitherImport` enums which may be `Import` or `ImportFrom`
+/// Compare two [`EitherImport`] enums which may be [`Import`] or [`ImportFrom`]
 /// structs.
 pub fn cmp_either_import(
     a: &EitherImport,

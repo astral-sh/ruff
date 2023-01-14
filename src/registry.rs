@@ -1,4 +1,4 @@
-//! Registry of `RuleCode` to `DiagnosticKind` mappings.
+//! Registry of [`RuleCode`] to [`DiagnosticKind`] mappings.
 
 use std::fmt;
 

@@ -10,7 +10,7 @@ use crate::fix::Fix;
 use crate::python::string::strip_quotes_and_prefixes;
 use crate::source_code::Locator;
 
-/// Generate a `Fix` to remove unused keys from format dict.
+/// Generate a [`Fix`] to remove unused keys from format dict.
 pub fn remove_unused_format_arguments_from_dict(
     unused_arguments: &[&str],
     stmt: &Expr,
@@ -56,7 +56,7 @@ pub fn remove_unused_format_arguments_from_dict(
     ))
 }
 
-/// Generate a `Fix` to remove unused keyword arguments from format call.
+/// Generate a [`Fix`] to remove unused keyword arguments from format call.
 pub fn remove_unused_keyword_arguments_from_format_call(
     unused_arguments: &[&str],
     location: Range,
@@ -100,7 +100,7 @@ pub fn remove_unused_keyword_arguments_from_format_call(
     ))
 }
 
-/// Generate a `Fix` to remove the binding from an exception handler.
+/// Generate a [`Fix`] to remove the binding from an exception handler.
 pub fn remove_exception_handler_assignment(
     excepthandler: &Excepthandler,
     locator: &Locator,

@@ -197,7 +197,7 @@ where
 
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
-/// Return `true` if the `Stmt` is an assignment to a dunder (like `__all__`).
+/// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
 pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type
     // annotation. This is what pycodestyle (as of 2.9.1) does.
@@ -219,7 +219,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     }
 }
 
-/// Return `true` if the `Expr` is a singleton (`None`, `True`, `False`, or
+/// Return `true` if the [`Expr`] is a singleton (`None`, `True`, `False`, or
 /// `...`).
 pub fn is_singleton(expr: &Expr) -> bool {
     matches!(
@@ -231,7 +231,7 @@ pub fn is_singleton(expr: &Expr) -> bool {
     )
 }
 
-/// Return `true` if the `Expr` is a constant or tuple of constants.
+/// Return `true` if the [`Expr`] is a constant or tuple of constants.
 pub fn is_constant(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::Constant { .. } => true,
@@ -240,13 +240,13 @@ pub fn is_constant(expr: &Expr) -> bool {
     }
 }
 
-/// Return `true` if the `Expr` is a non-singleton constant.
+/// Return `true` if the [`Expr`] is a non-singleton constant.
 pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Return the `Keyword` with the given name, if it's present in the list of
-/// `Keyword` arguments.
+/// Return the [`Keyword`] with the given name, if it's present in the list of
+/// [`Keyword`] arguments.
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
         let KeywordData { arg, .. } = &keyword.node;
@@ -254,7 +254,7 @@ pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&
     })
 }
 
-/// Return `true` if an `Expr` is `None`.
+/// Return `true` if an [`Expr`] is `None`.
 pub fn is_const_none(expr: &Expr) -> bool {
     matches!(
         &expr.node,
