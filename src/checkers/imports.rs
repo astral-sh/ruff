@@ -6,9 +6,9 @@ use rustpython_parser::ast::Suite;
 
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
-use crate::isort;
-use crate::isort::track::{Block, ImportTracker};
 use crate::registry::{Diagnostic, RuleCode};
+use crate::rules::isort;
+use crate::rules::isort::track::{Block, ImportTracker};
 use crate::settings::{flags, Settings};
 use crate::source_code::{Locator, Stylist};
 

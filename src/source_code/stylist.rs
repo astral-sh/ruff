@@ -9,7 +9,7 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
-use crate::pydocstyle::helpers::leading_quote;
+use crate::rules::pydocstyle::helpers::leading_quote;
 use crate::source_code::Locator;
 use crate::vendor;
 

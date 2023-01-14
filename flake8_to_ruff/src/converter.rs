@@ -2,19 +2,20 @@ use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
 use colored::Colorize;
-use ruff::flake8_pytest_style::types::{
+use ruff::registry::RuleCodePrefix;
+use ruff::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
-use ruff::flake8_quotes::settings::Quote;
-use ruff::flake8_tidy_imports::settings::Strictness;
-use ruff::pydocstyle::settings::Convention;
-use ruff::registry::RuleCodePrefix;
+use ruff::rules::flake8_quotes::settings::Quote;
+use ruff::rules::flake8_tidy_imports::settings::Strictness;
+use ruff::rules::pydocstyle::settings::Convention;
+use ruff::rules::{
+    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
+    flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
+};
 use ruff::settings::options::Options;
 use ruff::settings::pyproject::Pyproject;
-use ruff::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, mccabe, pep8_naming, pydocstyle, warn_user,
-};
+use ruff::warn_user;
 
 use crate::black::Black;
 use crate::plugin::Plugin;
@@ -389,11 +390,11 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
-    use ruff::pydocstyle::settings::Convention;
     use ruff::registry::RuleCodePrefix;
+    use ruff::rules::pydocstyle::settings::Convention;
+    use ruff::rules::{flake8_quotes, pydocstyle};
     use ruff::settings::options::Options;
     use ruff::settings::pyproject::Pyproject;
-    use ruff::{flake8_quotes, pydocstyle};
 
     use crate::converter::convert;
     use crate::plugin::Plugin;

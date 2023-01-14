@@ -1,9 +1,11 @@
 //! Lint rules based on checking raw physical lines.
 
-use crate::pycodestyle::rules::{doc_line_too_long, line_too_long, no_newline_at_end_of_file};
-use crate::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
-use crate::pyupgrade::rules::unnecessary_coding_comment;
 use crate::registry::{Diagnostic, RuleCode};
+use crate::rules::pycodestyle::rules::{
+    doc_line_too_long, line_too_long, no_newline_at_end_of_file,
+};
+use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
+use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
 
 pub fn check_lines(
