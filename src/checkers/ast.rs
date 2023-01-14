@@ -1270,7 +1270,11 @@ where
                     flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
                 }
                 if self.settings.enabled.contains(&RuleCode::SIM117) {
-                    flake8_simplify::rules::multiple_with_statements(self, stmt);
+                    flake8_simplify::rules::multiple_with_statements(
+                        self,
+                        stmt,
+                        self.current_stmt_parent().map(|parent| parent.0),
+                    );
                 }
             }
             StmtKind::While { body, orelse, .. } => {
