@@ -13,7 +13,7 @@ fn find_nested_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
     let StmtKind::With { items, body, .. } = &body[0].node else {
         return None
     };
-    find_nested_with(body).or_else(|| Some((items, body)))
+    find_nested_with(body).or(Some((items, body)))
 }
 
 /// SIM117

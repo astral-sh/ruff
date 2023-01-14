@@ -856,7 +856,7 @@ else:
     }
 
     #[test]
-    fn test_first_colon_range() -> Result<()> {
+    fn test_first_colon_range() {
         let contents = "with a: pass";
         let locator = Locator::new(contents);
         let range = first_colon_range(
@@ -868,6 +868,5 @@ else:
         assert_eq!(range.location.column(), 6);
         assert_eq!(range.end_location.row(), 1);
         assert_eq!(range.end_location.column(), 7);
-        Ok(())
     }
 }
