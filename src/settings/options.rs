@@ -353,6 +353,17 @@ pub struct Options {
     /// variables will also be expanded.
     pub src: Option<Vec<String>>,
     #[option(
+        default = r#"[]"#,
+        value_type = "Vec<PathBuf>",
+        example = r#"
+            namespace-packages = ["airflow/providers"]
+        "#
+    )]
+    /// Mark the specified directories as namespace packages. For the purpose of
+    /// module resolution, Ruff will treat those directories as if they
+    /// contained an `__init__.py` file.
+    pub namespace_packages: Option<Vec<String>>,
+    #[option(
         default = r#""py310""#,
         value_type = "PythonVersion",
         example = r#"

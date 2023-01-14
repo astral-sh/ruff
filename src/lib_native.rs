@@ -51,7 +51,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
     // Generate diagnostics.
     let diagnostics = check_path(
         path,
-        packaging::detect_package_root(path),
+        packaging::detect_package_root(path, &settings.namespace_packages),
         contents,
         tokens,
         &locator,

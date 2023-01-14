@@ -83,6 +83,8 @@ pub fn run(
             .flatten()
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
+        &resolver,
+        pyproject_strategy,
     );
 
     let start = Instant::now();
@@ -169,7 +171,7 @@ pub fn run_stdin(
     };
     let package_root = filename
         .and_then(Path::parent)
-        .and_then(packaging::detect_package_root);
+        .and_then(|path| packaging::detect_package_root(path, &settings.namespace_packages));
     let stdin = read_from_stdin()?;
     let mut diagnostics = lint_stdin(filename, package_root, &stdin, settings, autofix)?;
     diagnostics.messages.sort_unstable();

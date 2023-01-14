@@ -2154,6 +2154,25 @@ line-length = 120
 
 ---
 
+#### [`namespace-packages`](#namespace-packages)
+
+Mark the specified directories as namespace packages. For the purpose of
+module resolution, Ruff will treat those directories as if they
+contained an `__init__.py` file.
+
+**Default value**: `[]`
+
+**Type**: `Vec<PathBuf>`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+namespace-packages = ["airflow/providers"]
+```
+
+---
+
 #### [`per-file-ignores`](#per-file-ignores)
 
 A list of mappings from file pattern to rule codes or prefixes to
