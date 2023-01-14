@@ -1,3 +1,7 @@
+//! This library only exists to enable the Ruff internal tooling (`ruff_dev`)
+//! to automatically update the `ruff --help` output in the `README.md`.
+//!
+//! For the actual Ruff library, see [`ruff`].
 #![allow(clippy::must_use_candidate, dead_code)]
 
 mod cli;

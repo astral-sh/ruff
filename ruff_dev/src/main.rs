@@ -1,3 +1,6 @@
+//! This crate implements an internal CLI for developers of Ruff.
+//!
+//! Within the ruff repository you can run it with `cargo dev`.
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,

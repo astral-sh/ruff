@@ -1,4 +1,4 @@
-//! Utility to generate Ruff's pyproject.toml section from a Flake8 INI file.
+//! Utility to generate Ruff's `pyproject.toml` section from a Flake8 INI file.
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
