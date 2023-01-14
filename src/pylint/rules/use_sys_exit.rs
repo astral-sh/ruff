@@ -31,28 +31,44 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
                 // e.g. module=sys object=exit
                 // `import sys`         -> `sys.exit`
                 // `import sys as sys2` -> `sys2.exit`
-                BindingKind::Importation(name, full_name) if full_name == module => {
-                    Some(format!("{name}.{member}"))
+                BindingKind::Importation(name, full_name) => {
+                    if full_name == &module {
+                        Some(format!("{name}.{member}"))
+                    } else {
+                        None
+                    }
                 }
                 // e.g. module=os.path object=join
                 // `from os.path import join`          -> `join`
                 // `from os.path import join as join2` -> `join2`
-                BindingKind::FromImportation(name, full_name)
-                    if full_name == &format!("{module}.{member}") =>
-                {
-                    Some(name.to_string())
+                BindingKind::FromImportation(name, full_name) => {
+                    let mut parts = full_name.split('.');
+                    if parts.next() == Some(module)
+                        && parts.next() == Some(member)
+                        && parts.next().is_none()
+                    {
+                        Some((*name).to_string())
+                    } else {
+                        None
+                    }
                 }
                 // e.g. module=os.path object=join
                 // `from os.path import *` -> `join`
-                BindingKind::StarImportation(_, name)
-                    if name.as_ref().map(|name| name == module).unwrap_or_default() =>
-                {
-                    Some(member.to_string())
+                BindingKind::StarImportation(_, name) => {
+                    if name.as_ref().map(|name| name == module).unwrap_or_default() {
+                        Some(member.to_string())
+                    } else {
+                        None
+                    }
                 }
                 // e.g. module=os.path object=join
                 // `import os.path ` -> `os.path.join`
-                BindingKind::SubmoduleImportation(_, full_name) if full_name == module => {
-                    Some(format!("{full_name}.{member}"))
+                BindingKind::SubmoduleImportation(_, full_name) => {
+                    if full_name == &module {
+                        Some(format!("{full_name}.{member}"))
+                    } else {
+                        None
+                    }
                 }
                 // Non-imports.
                 _ => None,

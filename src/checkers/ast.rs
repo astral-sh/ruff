@@ -209,22 +209,41 @@ impl<'a> Checker<'a> {
         let call_path = collect_call_path(value);
         if let Some(head) = call_path.first() {
             if let Some(binding) = self.find_binding(head) {
-                if let BindingKind::Importation(.., name)
-                | BindingKind::SubmoduleImportation(name, ..)
-                | BindingKind::FromImportation(.., name) = &binding.kind
-                {
-                    // Ignore relative imports.
-                    if name.starts_with('.') {
-                        return None;
+                match &binding.kind {
+                    BindingKind::Importation(.., name) => {
+                        // Ignore relative imports.
+                        if name.starts_with('.') {
+                            return None;
+                        }
+                        let mut source_path: Vec<&str> = name.split('.').collect();
+                        source_path.extend(call_path.iter().skip(1));
+                        return Some(source_path);
                     }
-                    let mut source_path: Vec<&str> = name.split('.').collect();
-                    source_path.extend(call_path.iter().skip(1));
-                    return Some(source_path);
-                } else if let BindingKind::Builtin = &binding.kind {
-                    let mut source_path: Vec<&str> = Vec::with_capacity(call_path.len() + 1);
-                    source_path.push("");
-                    source_path.extend(call_path);
-                    return Some(source_path);
+                    BindingKind::SubmoduleImportation(name, ..) => {
+                        // Ignore relative imports.
+                        if name.starts_with('.') {
+                            return None;
+                        }
+                        let mut source_path: Vec<&str> = name.split('.').collect();
+                        source_path.extend(call_path.iter().skip(1));
+                        return Some(source_path);
+                    }
+                    BindingKind::FromImportation(.., name) => {
+                        // Ignore relative imports.
+                        if name.starts_with('.') {
+                            return None;
+                        }
+                        let mut source_path: Vec<&str> = name.split('.').collect();
+                        source_path.extend(call_path.iter().skip(1));
+                        return Some(source_path);
+                    }
+                    BindingKind::Builtin => {
+                        let mut source_path: Vec<&str> = Vec::with_capacity(call_path.len() + 1);
+                        source_path.push("");
+                        source_path.extend(call_path);
+                        return Some(source_path);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -724,10 +743,7 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::SubmoduleImportation(
-                                    name.to_string(),
-                                    full_name.to_string(),
-                                ),
+                                kind: BindingKind::SubmoduleImportation(name, full_name),
                                 used: None,
                                 range: Range::from_located(alias),
                                 source: Some(self.current_stmt().clone()),
@@ -746,10 +762,7 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::Importation(
-                                    name.to_string(),
-                                    full_name.to_string(),
-                                ),
+                                kind: BindingKind::Importation(name, full_name),
                                 // Treat explicit re-export as usage (e.g., `import applications
                                 // as applications`).
                                 used: if alias
@@ -1062,7 +1075,7 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::FromImportation(name.to_string(), full_name),
+                                kind: BindingKind::FromImportation(name, full_name),
                                 // Treat explicit re-export as usage (e.g., `from .applications
                                 // import FastAPI as FastAPI`).
                                 used: if alias
@@ -2118,7 +2131,7 @@ where
                                             if let BindingKind::Importation(.., module) =
                                                 &binding.kind
                                             {
-                                                module != "pandas"
+                                                module != &"pandas"
                                             } else {
                                                 matches!(
                                                     binding.kind,
@@ -3359,23 +3372,37 @@ impl<'a> Checker<'a> {
                     //   import pyarrow as pa
                     //   import pyarrow.csv
                     //   print(pa.csv.read_csv("test.csv"))
-                    if let BindingKind::Importation(name, full_name)
-                    | BindingKind::FromImportation(name, full_name)
-                    | BindingKind::SubmoduleImportation(name, full_name) =
-                        &self.bindings[*index].kind
-                    {
-                        let has_alias = full_name
-                            .split('.')
-                            .last()
-                            .map(|segment| segment != name)
-                            .unwrap_or_default();
-                        if has_alias {
-                            // Mark the sub-importation as used.
-                            if let Some(index) = scope.values.get(full_name.as_str()) {
-                                self.bindings[*index].used =
-                                    Some((scope_id, Range::from_located(expr)));
+                    match &self.bindings[*index].kind {
+                        BindingKind::Importation(name, full_name)
+                        | BindingKind::SubmoduleImportation(name, full_name) => {
+                            let has_alias = full_name
+                                .split('.')
+                                .last()
+                                .map(|segment| &segment != name)
+                                .unwrap_or_default();
+                            if has_alias {
+                                // Mark the sub-importation as used.
+                                if let Some(index) = scope.values.get(full_name) {
+                                    self.bindings[*index].used =
+                                        Some((scope_id, Range::from_located(expr)));
+                                }
                             }
                         }
+                        BindingKind::FromImportation(name, full_name) => {
+                            let has_alias = full_name
+                                .split('.')
+                                .last()
+                                .map(|segment| &segment != name)
+                                .unwrap_or_default();
+                            if has_alias {
+                                // Mark the sub-importation as used.
+                                if let Some(index) = scope.values.get(full_name.as_str()) {
+                                    self.bindings[*index].used =
+                                        Some((scope_id, Range::from_located(expr)));
+                                }
+                            }
+                        }
+                        _ => {}
                     }
 
                     return;
@@ -3901,9 +3928,12 @@ impl<'a> Checker<'a> {
                 {
                     let binding = &self.bindings[*index];
 
-                    let (BindingKind::Importation(_, full_name)
-                    | BindingKind::SubmoduleImportation(_, full_name)
-                    | BindingKind::FromImportation(_, full_name)) = &binding.kind else { continue; };
+                    let full_name = match &binding.kind {
+                        BindingKind::Importation(.., full_name) => full_name,
+                        BindingKind::FromImportation(.., full_name) => full_name.as_str(),
+                        BindingKind::SubmoduleImportation(.., full_name) => full_name,
+                        _ => continue,
+                    };
 
                     // Skip used exports from `__all__`
                     if binding.used.is_some()

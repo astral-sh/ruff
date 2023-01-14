@@ -104,7 +104,7 @@ impl<'a> Scope<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub enum BindingKind {
+pub enum BindingKind<'a> {
     Annotation,
     Argument,
     Assignment,
@@ -118,14 +118,14 @@ pub enum BindingKind {
     Export(Vec<String>),
     FutureImportation,
     StarImportation(Option<usize>, Option<String>),
-    Importation(String, String),
-    FromImportation(String, String),
-    SubmoduleImportation(String, String),
+    Importation(&'a str, &'a str),
+    FromImportation(&'a str, String),
+    SubmoduleImportation(&'a str, &'a str),
 }
 
 #[derive(Clone, Debug)]
 pub struct Binding<'a> {
-    pub kind: BindingKind,
+    pub kind: BindingKind<'a>,
     pub range: Range,
     /// The statement in which the `Binding` was defined.
     pub source: Option<RefEquality<'a, Stmt>>,
@@ -168,19 +168,26 @@ impl<'a> Binding<'a> {
 
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Importation(_, full_name) | BindingKind::FromImportation(_, full_name) => {
-                if let BindingKind::SubmoduleImportation(_, existing_full_name) = &existing.kind {
-                    return full_name == existing_full_name;
+            BindingKind::Importation(.., full_name) => {
+                if let BindingKind::SubmoduleImportation(.., existing) = &existing.kind {
+                    return full_name == existing;
                 }
             }
-            BindingKind::SubmoduleImportation(_, full_name) => {
-                if let BindingKind::Importation(_, existing_full_name)
-                | BindingKind::FromImportation(_, existing_full_name)
-                | BindingKind::SubmoduleImportation(_, existing_full_name) = &existing.kind
-                {
-                    return full_name == existing_full_name;
+            BindingKind::FromImportation(.., full_name) => {
+                if let BindingKind::SubmoduleImportation(.., existing) = &existing.kind {
+                    return full_name == existing;
                 }
             }
+            BindingKind::SubmoduleImportation(.., full_name) => match &existing.kind {
+                BindingKind::Importation(.., existing)
+                | BindingKind::SubmoduleImportation(.., existing) => {
+                    return full_name == existing;
+                }
+                BindingKind::FromImportation(.., existing) => {
+                    return full_name == existing;
+                }
+                _ => {}
+            },
             BindingKind::Annotation => {
                 return false;
             }
