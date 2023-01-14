@@ -13,14 +13,18 @@
 )]
 #![forbid(unsafe_code)]
 
+mod black;
+mod converter;
+mod parser;
+mod plugin;
+
 use std::path::PathBuf;
 
 use anyhow::Result;
+use black::parse_black_options;
 use clap::Parser;
 use configparser::ini::Ini;
-use flake8_to_ruff::black::parse_black_options;
-use flake8_to_ruff::converter;
-use flake8_to_ruff::plugin::Plugin;
+use plugin::Plugin;
 
 #[derive(Parser)]
 #[command(

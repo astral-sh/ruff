@@ -20,6 +20,7 @@ use crate::black::Black;
 use crate::plugin::Plugin;
 use crate::{parser, plugin};
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
     black: Option<&Black>,
