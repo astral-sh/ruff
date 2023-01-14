@@ -3,10 +3,6 @@ name = "ruff_dev"
 version = "0.0.221"
 edition = "2021"
 
-[lib]
-name = "ruff_dev"
-doctest = false
-
 [dependencies]
 anyhow = { version = "1.0.66" }
 clap = { version = "4.0.1", features = ["derive"] }
