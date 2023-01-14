@@ -7,7 +7,7 @@ use crate::violations;
 use once_cell::sync::Lazy;
 use regex::Regex;
 // use rustpython_ast::{Expr, ExprKind};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{Expr, ExprKind};
 
 // Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
 // Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
@@ -391,37 +391,41 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
 
 /// UP031
 pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr) {
+    println!("{:?}\n", left);
+    println!("{:?}\n", right);
     let left_range = Range::new(left.location, left.end_location.unwrap());
     let left_string = checker.locator.slice_source_code_range(&left_range);
     let parsed = parse_percent_format(&left_string);
     // Rust does not have a for else statement so we have to do this
     let is_valid = check_statement(parsed, right);
-    if is_valid {
-        let mut new_string = String::new();
-        match &right.node {
-            ExprKind::Tuple { .. } => {
-                new_string = fix_percent_format_tuple(checker, right, &left_string);
-            }
-            ExprKind::Dict { .. } => {
-                new_string = fix_percent_format_dict(checker, left, right);
-            }
-            _ => {}
+    // If the statement is not valid, then bail
+    if !is_valid {
+        return;
+    }
+    let mut new_string = String::new();
+    match &right.node {
+        ExprKind::Tuple { .. } => {
+            new_string = fix_percent_format_tuple(checker, right, &left_string);
         }
-        if !new_string.is_empty() {
-            let replace_range = Range::new(left.location, right.end_location.unwrap());
-            let old_string = checker.locator.slice_source_code_range(&replace_range);
-            if new_string != old_string {
-                let mut diagnostic =
-                    Diagnostic::new(violations::PrintfStringFormatting, replace_range);
-                if checker.patch(diagnostic.kind.code()) {
-                    diagnostic.amend(Fix::replacement(
-                        new_string,
-                        replace_range.location,
-                        replace_range.end_location,
-                    ));
-                }
-                checker.diagnostics.push(diagnostic);
+        ExprKind::Dict { .. } => {
+            new_string = fix_percent_format_dict(checker, left, right);
+        }
+        _ => {}
+    }
+    if !new_string.is_empty() {
+        let replace_range = Range::new(left.location, right.end_location.unwrap());
+        let old_string = checker.locator.slice_source_code_range(&replace_range);
+        if new_string != old_string {
+            let mut diagnostic =
+                Diagnostic::new(violations::PrintfStringFormatting, replace_range);
+            if checker.patch(diagnostic.kind.code()) {
+                diagnostic.amend(Fix::replacement(
+                    new_string,
+                    replace_range.location,
+                    replace_range.end_location,
+                ));
             }
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
