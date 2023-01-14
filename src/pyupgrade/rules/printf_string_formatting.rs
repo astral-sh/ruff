@@ -6,7 +6,8 @@ use crate::registry::Diagnostic;
 use crate::violations;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_ast::{Expr, ExprKind};
+// use rustpython_ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
 
 // Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
 // Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
@@ -140,10 +141,12 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     formats
 }
 
-/// Removes the first instance of a given element from a vector
+/// Removes the first instance of a given element from a vector, if the item is not in the vector,
+/// nothing happens
 fn remove<T: std::cmp::PartialEq + std::marker::Copy>(vec: &mut Vec<T>, item: T) {
-    let index = vec.iter().position(|&x| x == item).unwrap();
-    vec.remove(index);
+    if let Some(index) = vec.iter().position(|&x| x == item) {
+        vec.remove(index);
+    }
 }
 
 fn simplify_conversion_flag(flag: &str) -> String {
@@ -248,7 +251,7 @@ fn percent_to_format(string: &str) -> String {
 }
 
 /// If the tuple has one argument it removes the comma, otherwise it returns the tuple as is
-fn clean_right_tuple(checker: &Checker, right: &Expr) -> String {
+fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
     // FOR REVIEWER: Let me know if you want this redone in libcst, the reason I didnt is because
     // it starts as a Tuple, but ends as a Call
     let right_range = Range::new(right.location, right.end_location.unwrap());
@@ -275,10 +278,15 @@ fn clean_right_tuple(checker: &Checker, right: &Expr) -> String {
             string.push(')');
             return string
             */
-            // FOR REVIEWER: This replaces ALL commas when there is only one item, I couldn't think
-            // of any instanced where this would cause an issue, but let me know if you can and I
-            // will fix
-            base_string = base_string.replace(',', "");
+            // FOR REVIEWER: This replaces only the last comma. I could not think of an edge case
+            // where this causes issues, but if you can let me know and I will fix
+            for (i, character) in base_string.chars().rev().enumerate() {
+                if character == ',' {
+                    let correct_index = base_string.len() - i - 1;
+                    base_string.remove(correct_index);
+                    break;
+                }
+            }
         }
     }
     base_string
@@ -289,9 +297,9 @@ fn fix_percent_format_tuple(checker: &mut Checker, right: &Expr, left_string: &s
     // (pyupgrade itself says it is overly timid). The one edge case I considered was a multi line
     // format statement, but worst-case scenario we go over the limit and black fixes it. Let me
     // know if you want this check implemented
-    let right_string = clean_right_tuple(checker, right);
     let mut cleaned_string = percent_to_format(left_string);
     cleaned_string.push_str(".format");
+    let right_string = clean_right_tuple(checker, right);
     cleaned_string.push_str(&right_string);
     cleaned_string
 }
@@ -369,7 +377,6 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
             break;
         }
         // %s with None and width is not supported
-        println!("{:?}", fmt);
         if let Some(width) = &fmt.width {
             if !width.is_empty() && fmt.conversion == "s".to_string() {
                 no_breaks = false;
@@ -400,10 +407,13 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         if !new_string.is_empty() {
             let replace_range = Range::new(left.location, right.end_location.unwrap());
             let old_string = checker.locator.slice_source_code_range(&replace_range);
+            println!("{} => {}", old_string, new_string);
             if new_string != old_string {
+                println!("We in the if");
                 let mut diagnostic =
                     Diagnostic::new(violations::PrintfStringFormatting, replace_range);
                 if checker.patch(diagnostic.kind.code()) {
+                    println!("We in the final");
                     diagnostic.amend(Fix::replacement(
                         new_string,
                         replace_range.location,

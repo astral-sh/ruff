@@ -5,7 +5,7 @@
 
 "%s" % ("simple",)
 
-# Breaks based on other things in the file
+# By itself this works fine, but when with certain other ones it breaks
 "%s" % ("%s" % ("nested",),)
 
 "%s%% percent" % (15,)
@@ -26,9 +26,7 @@ paren_continue = (
     "foo %s "
     "bar %s" % (x, y)
 )
-""" Having this uncommented breaks the nested one, waiting on help from Charlie to uncomment this
 "%s \N{snowman}" % (a,)
-"""
 # Make sure to include assignment and inside a call, also multi-line
 
 # These should NOT change
