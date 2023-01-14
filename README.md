@@ -385,8 +385,6 @@ Options:
           The minimum Python version that should be supported
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated rules and automatic formatting
-      --max-complexity <MAX_COMPLEXITY>
-          Maximum McCabe complexity allowed for a given function
       --add-noqa
           Enable automatic additions of `noqa` directives to failing lines
       --clean
