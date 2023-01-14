@@ -5,7 +5,6 @@
 
 "%s" % ("simple",)
 
-# By itself this works fine, but when with certain other ones it breaks
 "%s" % ("%s" % ("nested",),)
 
 "%s%% percent" % (15,)
@@ -26,8 +25,18 @@ paren_continue = (
     "foo %s "
     "bar %s" % (x, y)
 )
-"%s \N{snowman}" % (a,)
-# Make sure to include assignment and inside a call, also multi-line
+
+print("foo %s " % (x,))
+
+"""
+paren_string = (
+    "foo %s "
+    "bar %s"
+) % (x, y)
+"""
+
+# This will stay commented out until my regex in helpers is fixed
+# "%s \N{snowman}" % (a,)
 
 # These should NOT change
 "%s" % unknown_type

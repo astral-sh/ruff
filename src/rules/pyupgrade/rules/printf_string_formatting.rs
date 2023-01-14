@@ -1,7 +1,7 @@
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::pyupgrade::helpers::curly_escape;
+use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::registry::Diagnostic;
 use crate::violations;
 use once_cell::sync::Lazy;
@@ -259,7 +259,7 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
         .locator
         .slice_source_code_range(&right_range)
         .to_string();
-    // let is_multi_line = base_string.contains('\n');
+    let is_multi_line = base_string.contains('\n');
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
             // FOR REVIEWER, if we dedice we like the just removing the last comma then delete the
@@ -282,11 +282,15 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
             */
             // FOR REVIEWER: This replaces only the last comma. I could not think of an edge case
             // where this causes issues, but if you can let me know and I will fix
-            for (i, character) in base_string.chars().rev().enumerate() {
-                if character == ',' {
-                    let correct_index = base_string.len() - i - 1;
-                    base_string.remove(correct_index);
-                    break;
+            // We check for is_multi_line beign false, because we do not replace the comma on multi
+            // line statement
+            if !is_multi_line {
+                for (i, character) in base_string.chars().rev().enumerate() {
+                    if character == ',' {
+                        let correct_index = base_string.len() - i - 1;
+                        base_string.remove(correct_index);
+                        break;
+                    }
                 }
             }
         }
@@ -409,13 +413,10 @@ pub fn printf_string_formatting(checker: &mut Checker, left: &Expr, right: &Expr
         if !new_string.is_empty() {
             let replace_range = Range::new(left.location, right.end_location.unwrap());
             let old_string = checker.locator.slice_source_code_range(&replace_range);
-            println!("{} => {}", old_string, new_string);
             if new_string != old_string {
-                println!("We in the if");
                 let mut diagnostic =
                     Diagnostic::new(violations::PrintfStringFormatting, replace_range);
                 if checker.patch(diagnostic.kind.code()) {
-                    println!("We in the final");
                     diagnostic.amend(Fix::replacement(
                         new_string,
                         replace_range.location,
