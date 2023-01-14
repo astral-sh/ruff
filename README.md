@@ -141,8 +141,6 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 pip install ruff
 ```
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
-
 For **macOS Homebrew** and **Linuxbrew** users, Ruff is also available as [`ruff`](https://formulae.brew.sh/formula/ruff) on Homebrew:
 
 ```shell
@@ -160,6 +158,8 @@ For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.o
 ```shell
 pacman -S ruff
 ```
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
 
 ### Usage
 
