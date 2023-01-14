@@ -1260,7 +1260,7 @@ extension for `coc.nvim`.
 <summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for (Neo)Vim.</summary>
 <br>
 
-```
+```vim
 let g:ale_linters = { "python": ["ruff"] }
 let g:ale_fixers = {
 \       "python": ["black", "ruff"],
