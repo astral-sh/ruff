@@ -3,6 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::helpers::result_exists;
 use super::visitor::{ReturnVisitor, Stack};
+use crate::ast::helpers::elif_else_range;
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::whitespace::indentation;
@@ -228,7 +229,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             if checker.settings.enabled.contains(&RuleCode::RET505) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseReturn(branch),
-                    Range::from_located(stmt),
+                    elif_else_range(stmt, checker.locator)
+                        .unwrap_or_else(|| Range::from_located(stmt)),
                 ));
             }
             return true;
@@ -237,7 +239,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             if checker.settings.enabled.contains(&RuleCode::RET508) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseBreak(branch),
-                    Range::from_located(stmt),
+                    elif_else_range(stmt, checker.locator)
+                        .unwrap_or_else(|| Range::from_located(stmt)),
                 ));
             }
             return true;
@@ -246,7 +249,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             if checker.settings.enabled.contains(&RuleCode::RET506) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseRaise(branch),
-                    Range::from_located(stmt),
+                    elif_else_range(stmt, checker.locator)
+                        .unwrap_or_else(|| Range::from_located(stmt)),
                 ));
             }
             return true;
@@ -255,7 +259,8 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             if checker.settings.enabled.contains(&RuleCode::RET507) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseContinue(branch),
-                    Range::from_located(stmt),
+                    elif_else_range(stmt, checker.locator)
+                        .unwrap_or_else(|| Range::from_located(stmt)),
                 ));
             }
             return true;
