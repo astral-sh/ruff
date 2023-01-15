@@ -1,5 +1,20 @@
 # Breaking Changes
 
+## 0.0.222
+
+### `--max-complexity` has been removed from the CLI ([#1877](https://github.com/charliermarsh/ruff/pull/1877))
+
+The McCabe plugin's `--max-complexity` setting has been removed from the CLI, for consistency with
+the treatment of other, similar settings.
+
+To set the maximum complexity, use the `max-complexity` property in your `pyproject.toml` file,
+like so:
+
+```toml
+[tool.ruff.mccabe]
+max-complexity = 10
+```
+
 ## 0.0.181
 
 ### Files excluded by `.gitignore` are now ignored ([#1234](https://github.com/charliermarsh/ruff/pull/1234))
