@@ -80,6 +80,9 @@ jobs:
           cargo insta test --all --delete-unreferenced-snapshots
           git diff --exit-code
       - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
+      # Check for broken links in the documentation.
+      # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
+      - run: RUSTDOCFLAGS="-D warnings" cargo doc --all --no-deps
 
 # TODO(charlie): Re-enable the `wasm-pack` tests.
 # See: https://github.com/charliermarsh/ruff/issues/1425
