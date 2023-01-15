@@ -19,20 +19,17 @@ pub fn check_tokens(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_ambiguous_unicode_character = settings.enabled.contains(&RuleCode::RUF001)
-        || settings.enabled.contains(&RuleCode::RUF002)
-        || settings.enabled.contains(&RuleCode::RUF003);
-    let enforce_quotes = settings.enabled.contains(&RuleCode::Q000)
-        || settings.enabled.contains(&RuleCode::Q001)
-        || settings.enabled.contains(&RuleCode::Q002)
-        || settings.enabled.contains(&RuleCode::Q003);
-    let enforce_commented_out_code = settings.enabled.contains(&RuleCode::ERA001);
-    let enforce_invalid_escape_sequence = settings.enabled.contains(&RuleCode::W605);
-    let enforce_implicit_string_concatenation = settings.enabled.contains(&RuleCode::ISC001)
-        || settings.enabled.contains(&RuleCode::ISC002);
-    let enforce_trailing_comma = settings.enabled.contains(&RuleCode::COM812)
-        || settings.enabled.contains(&RuleCode::COM818)
-        || settings.enabled.contains(&RuleCode::COM819);
+    let enforce_ambiguous_unicode_character =
+        settings.enabled.RUF001 || settings.enabled.RUF002 || settings.enabled.RUF003;
+    let enforce_quotes = settings.enabled.Q000
+        || settings.enabled.Q001
+        || settings.enabled.Q002
+        || settings.enabled.Q003;
+    let enforce_commented_out_code = settings.enabled.ERA001;
+    let enforce_invalid_escape_sequence = settings.enabled.W605;
+    let enforce_implicit_string_concatenation = settings.enabled.ISC001 || settings.enabled.ISC002;
+    let enforce_trailing_comma =
+        settings.enabled.COM812 || settings.enabled.COM818 || settings.enabled.COM819;
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {

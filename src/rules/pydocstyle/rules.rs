@@ -34,7 +34,7 @@ pub fn not_missing(
 
     match definition.kind {
         DefinitionKind::Module => {
-            if checker.settings.enabled.contains(&RuleCode::D100) {
+            if checker.settings.enabled.D100 {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::PublicModule,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
@@ -43,7 +43,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Package => {
-            if checker.settings.enabled.contains(&RuleCode::D104) {
+            if checker.settings.enabled.D104 {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::PublicPackage,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
@@ -52,7 +52,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Class(stmt) => {
-            if checker.settings.enabled.contains(&RuleCode::D101) {
+            if checker.settings.enabled.D101 {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::PublicClass,
                     identifier_range(stmt, checker.locator),
@@ -61,7 +61,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::NestedClass(stmt) => {
-            if checker.settings.enabled.contains(&RuleCode::D106) {
+            if checker.settings.enabled.D106 {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::PublicNestedClass,
                     identifier_range(stmt, checker.locator),
@@ -73,7 +73,7 @@ pub fn not_missing(
             if is_overload(checker, cast::decorator_list(stmt)) {
                 true
             } else {
-                if checker.settings.enabled.contains(&RuleCode::D103) {
+                if checker.settings.enabled.D103 {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::PublicFunction,
                         identifier_range(stmt, checker.locator),
@@ -88,7 +88,7 @@ pub fn not_missing(
             {
                 true
             } else if is_init(cast::name(stmt)) {
-                if checker.settings.enabled.contains(&RuleCode::D107) {
+                if checker.settings.enabled.D107 {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::PublicInit,
                         identifier_range(stmt, checker.locator),
@@ -96,7 +96,7 @@ pub fn not_missing(
                 }
                 true
             } else if is_new(cast::name(stmt)) || is_call(cast::name(stmt)) {
-                if checker.settings.enabled.contains(&RuleCode::D102) {
+                if checker.settings.enabled.D102 {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::PublicMethod,
                         identifier_range(stmt, checker.locator),
@@ -104,7 +104,7 @@ pub fn not_missing(
                 }
                 true
             } else if is_magic(cast::name(stmt)) {
-                if checker.settings.enabled.contains(&RuleCode::D105) {
+                if checker.settings.enabled.D105 {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::MagicMethod,
                         identifier_range(stmt, checker.locator),
@@ -112,7 +112,7 @@ pub fn not_missing(
                 }
                 true
             } else {
-                if checker.settings.enabled.contains(&RuleCode::D102) {
+                if checker.settings.enabled.D102 {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::PublicMethod,
                         identifier_range(stmt, checker.locator),
@@ -163,7 +163,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
         return;
     };
 
-    if checker.settings.enabled.contains(&RuleCode::D201) {
+    if checker.settings.enabled.D201 {
         let (before, ..) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
             &Range::from_located(docstring.expr),
@@ -191,7 +191,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D202) {
+    if checker.settings.enabled.D202 {
         let (_, _, after) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
             &Range::from_located(docstring.expr),
@@ -242,9 +242,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         return;
     };
 
-    if checker.settings.enabled.contains(&RuleCode::D203)
-        || checker.settings.enabled.contains(&RuleCode::D211)
-    {
+    if checker.settings.enabled.D203 || checker.settings.enabled.D211 {
         let (before, ..) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
             &Range::from_located(docstring.expr),
@@ -256,7 +254,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             .skip(1)
             .take_while(|line| line.trim().is_empty())
             .count();
-        if checker.settings.enabled.contains(&RuleCode::D211) {
+        if checker.settings.enabled.D211 {
             if blank_lines_before != 0 {
                 let mut diagnostic = Diagnostic::new(
                     violations::NoBlankLineBeforeClass(blank_lines_before),
@@ -272,7 +270,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        if checker.settings.enabled.contains(&RuleCode::D203) {
+        if checker.settings.enabled.D203 {
             if blank_lines_before != 1 {
                 let mut diagnostic = Diagnostic::new(
                     violations::OneBlankLineBeforeClass(blank_lines_before),
@@ -291,7 +289,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D204) {
+    if checker.settings.enabled.D204 {
         let (_, _, after) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
             &Range::from_located(docstring.expr),
@@ -409,7 +407,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         // yet.
         has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-        if checker.settings.enabled.contains(&RuleCode::D207) {
+        if checker.settings.enabled.D207 {
             // We report under-indentation on every line. This isn't great, but enables
             // autofix.
             if (i == lines.len() - 1 || !is_blank)
@@ -448,7 +446,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D206) {
+    if checker.settings.enabled.D206 {
         if has_seen_tab {
             checker.diagnostics.push(Diagnostic::new(
                 violations::IndentWithSpaces,
@@ -457,7 +455,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D208) {
+    if checker.settings.enabled.D208 {
         // If every line (except the last) is over-indented...
         if is_over_indented {
             for i in over_indented_lines {
@@ -605,14 +603,14 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
         return;
     };
     if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
-        if checker.settings.enabled.contains(&RuleCode::D212) {
+        if checker.settings.enabled.D212 {
             checker.diagnostics.push(Diagnostic::new(
                 violations::MultiLineSummaryFirstLine,
                 Range::from_located(docstring.expr),
             ));
         }
     } else {
-        if checker.settings.enabled.contains(&RuleCode::D213) {
+        if checker.settings.enabled.D213 {
             checker.diagnostics.push(Diagnostic::new(
                 violations::MultiLineSummarySecondLine,
                 Range::from_located(docstring.expr),
@@ -907,7 +905,7 @@ pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
         return true;
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D419) {
+    if checker.settings.enabled.D419 {
         checker.diagnostics.push(Diagnostic::new(
             violations::NonEmpty,
             Range::from_located(docstring.expr),
@@ -970,7 +968,7 @@ fn blanks_and_section_underline(
 
     // Nothing but blank lines after the section header.
     if blank_lines_after_header == context.following_lines.len() {
-        if checker.settings.enabled.contains(&RuleCode::D407) {
+        if checker.settings.enabled.D407 {
             let mut diagnostic = Diagnostic::new(
                 violations::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
@@ -992,7 +990,7 @@ fn blanks_and_section_underline(
             }
             checker.diagnostics.push(diagnostic);
         }
-        if checker.settings.enabled.contains(&RuleCode::D414) {
+        if checker.settings.enabled.D414 {
             checker.diagnostics.push(Diagnostic::new(
                 violations::NonEmptySection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
@@ -1008,7 +1006,7 @@ fn blanks_and_section_underline(
 
     if dash_line_found {
         if blank_lines_after_header > 0 {
-            if checker.settings.enabled.contains(&RuleCode::D408) {
+            if checker.settings.enabled.D408 {
                 let mut diagnostic = Diagnostic::new(
                     violations::SectionUnderlineAfterName(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
@@ -1040,7 +1038,7 @@ fn blanks_and_section_underline(
             .count()
             != context.section_name.len()
         {
-            if checker.settings.enabled.contains(&RuleCode::D409) {
+            if checker.settings.enabled.D409 {
                 let mut diagnostic = Diagnostic::new(
                     violations::SectionUnderlineMatchesSectionLength(
                         context.section_name.to_string(),
@@ -1077,7 +1075,7 @@ fn blanks_and_section_underline(
             }
         }
 
-        if checker.settings.enabled.contains(&RuleCode::D215) {
+        if checker.settings.enabled.D215 {
             let leading_space = whitespace::leading_space(non_empty_line);
             if leading_space.len() > docstring.indentation.len() {
                 let mut diagnostic = Diagnostic::new(
@@ -1119,14 +1117,14 @@ fn blanks_and_section_underline(
                     .take_while(|line| line.trim().is_empty())
                     .count();
                 if blank_lines_after_dashes == rest_of_lines.len() {
-                    if checker.settings.enabled.contains(&RuleCode::D414) {
+                    if checker.settings.enabled.D414 {
                         checker.diagnostics.push(Diagnostic::new(
                             violations::NonEmptySection(context.section_name.to_string()),
                             Range::from_located(docstring.expr),
                         ));
                     }
                 } else {
-                    if checker.settings.enabled.contains(&RuleCode::D412) {
+                    if checker.settings.enabled.D412 {
                         let mut diagnostic = Diagnostic::new(
                             violations::NoBlankLinesBetweenHeaderAndContent(
                                 context.section_name.to_string(),
@@ -1158,7 +1156,7 @@ fn blanks_and_section_underline(
                 }
             }
         } else {
-            if checker.settings.enabled.contains(&RuleCode::D414) {
+            if checker.settings.enabled.D414 {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::NonEmptySection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
@@ -1166,7 +1164,7 @@ fn blanks_and_section_underline(
             }
         }
     } else {
-        if checker.settings.enabled.contains(&RuleCode::D407) {
+        if checker.settings.enabled.D407 {
             let mut diagnostic = Diagnostic::new(
                 violations::DashedUnderlineAfterSection(context.section_name.to_string()),
                 Range::from_located(docstring.expr),
@@ -1189,7 +1187,7 @@ fn blanks_and_section_underline(
             checker.diagnostics.push(diagnostic);
         }
         if blank_lines_after_header > 0 {
-            if checker.settings.enabled.contains(&RuleCode::D412) {
+            if checker.settings.enabled.D412 {
                 let mut diagnostic = Diagnostic::new(
                     violations::NoBlankLinesBetweenHeaderAndContent(
                         context.section_name.to_string(),
@@ -1224,7 +1222,7 @@ fn common_section(
     context: &SectionContext,
     style: &SectionStyle,
 ) {
-    if checker.settings.enabled.contains(&RuleCode::D405) {
+    if checker.settings.enabled.D405 {
         if !style.section_names().contains(&context.section_name) {
             let capitalized_section_name = titlecase::titlecase(context.section_name);
             if style
@@ -1260,7 +1258,7 @@ fn common_section(
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D214) {
+    if checker.settings.enabled.D214 {
         let leading_space = whitespace::leading_space(context.line);
         if leading_space.len() > docstring.indentation.len() {
             let mut diagnostic = Diagnostic::new(
@@ -1288,7 +1286,7 @@ fn common_section(
         .map_or(true, |line| !line.trim().is_empty())
     {
         if context.is_last_section {
-            if checker.settings.enabled.contains(&RuleCode::D413) {
+            if checker.settings.enabled.D413 {
                 let mut diagnostic = Diagnostic::new(
                     violations::BlankLineAfterLastSection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
@@ -1309,7 +1307,7 @@ fn common_section(
                 checker.diagnostics.push(diagnostic);
             }
         } else {
-            if checker.settings.enabled.contains(&RuleCode::D410) {
+            if checker.settings.enabled.D410 {
                 let mut diagnostic = Diagnostic::new(
                     violations::BlankLineAfterSection(context.section_name.to_string()),
                     Range::from_located(docstring.expr),
@@ -1332,7 +1330,7 @@ fn common_section(
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D411) {
+    if checker.settings.enabled.D411 {
         if !context.previous_line.is_empty() {
             let mut diagnostic = Diagnostic::new(
                 violations::BlankLineBeforeSection(context.section_name.to_string()),
@@ -1516,7 +1514,7 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
 fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     common_section(checker, docstring, context, &SectionStyle::Numpy);
 
-    if checker.settings.enabled.contains(&RuleCode::D406) {
+    if checker.settings.enabled.D406 {
         let suffix = context
             .line
             .trim()
@@ -1551,7 +1549,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D417) {
+    if checker.settings.enabled.D417 {
         let capitalized_section_name = titlecase::titlecase(context.section_name);
         if capitalized_section_name == "Parameters" {
             parameters_section(checker, docstring, context);
@@ -1562,7 +1560,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
 fn google_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     common_section(checker, docstring, context, &SectionStyle::Google);
 
-    if checker.settings.enabled.contains(&RuleCode::D416) {
+    if checker.settings.enabled.D416 {
         let suffix = context
             .line
             .trim()
@@ -1598,7 +1596,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::D417) {
+    if checker.settings.enabled.D417 {
         let capitalized_section_name = titlecase::titlecase(context.section_name);
         if capitalized_section_name == "Args" || capitalized_section_name == "Arguments" {
             args_section(checker, docstring, context);

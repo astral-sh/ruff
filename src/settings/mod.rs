@@ -18,7 +18,9 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::cache::cache_dir;
-use crate::registry::{RuleCode, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::registry::{
+    EnabledRules, RuleCode, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES,
+};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
@@ -80,7 +82,7 @@ pub struct Settings {
     pub allowed_confusables: FxHashSet<char>,
     pub builtins: Vec<String>,
     pub dummy_variable_rgx: Regex,
-    pub enabled: FxHashSet<RuleCode>,
+    pub enabled: EnabledRules,
     pub exclude: GlobSet,
     pub extend_exclude: GlobSet,
     pub external: FxHashSet<String>,
@@ -184,7 +186,8 @@ impl Settings {
                         Right(iter::empty())
                     },
                 ),
-            )),
+            ))
+            .into(),
             exclude: resolve_globset(config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()))?,
             extend_exclude: resolve_globset(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()),
@@ -253,7 +256,7 @@ impl Settings {
             allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FxHashSet::from_iter([rule_code.clone()]),
+            enabled: FxHashSet::from_iter([rule_code.clone()]).into(),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
@@ -294,7 +297,7 @@ impl Settings {
             allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FxHashSet::from_iter(rule_codes.clone()),
+            enabled: FxHashSet::from_iter(rule_codes.clone()).into(),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),

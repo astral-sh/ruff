@@ -24,7 +24,7 @@ pub fn check_noqa(
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut ignored = vec![];
 
-    let enforce_noqa = settings.enabled.contains(&RuleCode::RUF100);
+    let enforce_noqa = settings.enabled.RUF100;
 
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {

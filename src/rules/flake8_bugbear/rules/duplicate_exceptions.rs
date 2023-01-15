@@ -6,7 +6,7 @@ use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::Diagnostic;
 use crate::source_code::Generator;
 use crate::violations;
 
@@ -41,7 +41,7 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::B014) {
+    if checker.settings.enabled.B014 {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut diagnostic = Diagnostic::new(
@@ -105,7 +105,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
         }
     }
 
-    if checker.settings.enabled.contains(&RuleCode::B025) {
+    if checker.settings.enabled.B025 {
         for (name, exprs) in duplicates {
             for expr in exprs {
                 checker.diagnostics.push(Diagnostic::new(

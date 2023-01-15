@@ -2,7 +2,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::Diagnostic;
 use crate::violations;
 use crate::visibility::{is_abstract, is_overload};
 
@@ -76,7 +76,7 @@ pub fn abstract_base_class(
         let has_abstract_decorator = is_abstract(checker, decorator_list);
         has_abstract_method |= has_abstract_decorator;
 
-        if !checker.settings.enabled.contains(&RuleCode::B027) {
+        if !checker.settings.enabled.B027 {
             continue;
         }
 
@@ -87,7 +87,7 @@ pub fn abstract_base_class(
             ));
         }
     }
-    if checker.settings.enabled.contains(&RuleCode::B024) {
+    if checker.settings.enabled.B024 {
         if !has_abstract_method {
             checker.diagnostics.push(Diagnostic::new(
                 violations::AbstractBaseClassWithoutAbstractMethod(name.to_string()),

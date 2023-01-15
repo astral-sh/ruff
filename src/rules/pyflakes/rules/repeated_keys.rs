@@ -37,7 +37,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
             if let Some(seen_values) = seen.get_mut(&key) {
                 match key {
                     DictionaryKey::Constant(..) => {
-                        if checker.settings.enabled.contains(&RuleCode::F601) {
+                        if checker.settings.enabled.F601 {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
@@ -61,7 +61,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                         }
                     }
                     DictionaryKey::Variable(key) => {
-                        if checker.settings.enabled.contains(&RuleCode::F602) {
+                        if checker.settings.enabled.F602 {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(

@@ -4,7 +4,7 @@ use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 fn pytest_mark_parentheses(
@@ -84,8 +84,8 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
 }
 
 pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
-    let enforce_parentheses = checker.settings.enabled.contains(&RuleCode::PT023);
-    let enforce_useless_usefixtures = checker.settings.enabled.contains(&RuleCode::PT026);
+    let enforce_parentheses = checker.settings.enabled.PT023;
+    let enforce_useless_usefixtures = checker.settings.enabled.PT026;
 
     for mark in get_mark_decorators(decorators) {
         if enforce_parentheses {

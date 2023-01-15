@@ -13,6 +13,8 @@ pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
     let mut diagkind_fixable_match_arms = quote!();
     let mut diagkind_commit_match_arms = quote!();
     let mut from_impls_for_diagkind = quote!();
+    let mut enabledrules_fields = quote!();
+    let mut enabledrules_from_attrs = quote!();
 
     for (code, path, name) in mapping.entries {
         rulecode_variants.extend(quote! {#code,});
@@ -37,6 +39,8 @@ pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
                 }
             }
         });
+        enabledrules_fields.extend(quote! {pub #code: bool,});
+        enabledrules_from_attrs.extend(quote! {#code: map.contains(&RuleCode::#code),});
     }
 
     quote! {
@@ -97,6 +101,30 @@ pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
         }
 
         #from_impls_for_diagkind
+
+        #[derive(Debug)]
+        #[allow(non_snake_case)]
+        pub struct EnabledRules {
+            map: rustc_hash::FxHashSet<RuleCode>,
+            #enabledrules_fields
+        }
+
+        impl std::ops::Deref for EnabledRules {
+            type Target = rustc_hash::FxHashSet<RuleCode>;
+
+            fn deref(&self) -> &Self::Target {
+                &self.map
+            }
+        }
+
+        impl From<rustc_hash::FxHashSet<RuleCode>> for EnabledRules {
+            fn from(map: rustc_hash::FxHashSet<RuleCode>) -> Self {
+                Self {
+                    #enabledrules_from_attrs
+                    map,
+                }
+            }
+        }
     }
 }
 

@@ -6,7 +6,7 @@ use rustpython_parser::ast::Suite;
 
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::Diagnostic;
 use crate::rules::isort;
 use crate::rules::isort::track::{Block, ImportTracker};
 use crate::settings::{flags, Settings};
@@ -36,7 +36,7 @@ pub fn check_imports(
 
     // Enforce import rules.
     let mut diagnostics = vec![];
-    if settings.enabled.contains(&RuleCode::I001) {
+    if settings.enabled.I001 {
         for block in &blocks {
             if !block.imports.is_empty() {
                 if let Some(diagnostic) = isort::rules::organize_imports(
@@ -47,7 +47,7 @@ pub fn check_imports(
             }
         }
     }
-    if settings.enabled.contains(&RuleCode::I002) {
+    if settings.enabled.I002 {
         diagnostics.extend(isort::rules::add_required_imports(
             &blocks, python_ast, locator, settings, autofix,
         ));

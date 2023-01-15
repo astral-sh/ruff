@@ -17,12 +17,12 @@ pub fn check_lines(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_blanket_noqa = settings.enabled.contains(&RuleCode::PGH004);
-    let enforce_blanket_type_ignore = settings.enabled.contains(&RuleCode::PGH003);
-    let enforce_doc_line_too_long = settings.enabled.contains(&RuleCode::W505);
-    let enforce_line_too_long = settings.enabled.contains(&RuleCode::E501);
-    let enforce_no_newline_at_end_of_file = settings.enabled.contains(&RuleCode::W292);
-    let enforce_unnecessary_coding_comment = settings.enabled.contains(&RuleCode::UP009);
+    let enforce_blanket_noqa = settings.enabled.PGH004;
+    let enforce_blanket_type_ignore = settings.enabled.PGH003;
+    let enforce_doc_line_too_long = settings.enabled.W505;
+    let enforce_line_too_long = settings.enabled.E501;
+    let enforce_no_newline_at_end_of_file = settings.enabled.W292;
+    let enforce_unnecessary_coding_comment = settings.enabled.UP009;
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
