@@ -7,6 +7,7 @@
 "%(foo)s \N{snowman}" % {"foo": 1}
 """
 
+# Make sure to test assignement, call. and multi-line
 # These should NOT change
 "%()s" % {"": "empty"}
 

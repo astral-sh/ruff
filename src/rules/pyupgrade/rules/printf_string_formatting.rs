@@ -6,8 +6,7 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violations;
 use once_cell::sync::Lazy;
 use regex::Regex;
-// use rustpython_ast::{Expr, ExprKind};
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, ExprKind, Constant};
 
 // Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
 // Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
@@ -17,7 +16,7 @@ static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").un
 static WIDTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\*|\d*)").unwrap());
 static PRECISION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\.(?:\*|\d*))?").unwrap());
 static LENGTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[hlL]?").unwrap());
-static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % \(").unwrap());
+static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % (\(|\{)").unwrap());
 
 #[derive(Debug, PartialEq, Clone)]
 struct PercentFormatPart {
@@ -300,11 +299,41 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
     base_string
 }
 
+
+fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
+    let whole_range = Range::new(right.location, right.end_location.unwrap());
+    let whole_string = checker.locator.slice_source_code_range(&whole_range);
+    let is_multi_line = whole_string.contains('\n');
+    let mut new_string = String::new();
+    if let ExprKind::Dict{ keys, values } = &right.node {
+        let mut new_vals: Vec<String> = vec![];
+        for (key, value) in keys.iter().zip(values.iter()) {
+            // FOR REVIEWER: My interpretation of this rule is that we only convert if the key is a
+            // string constant
+            if let ExprKind::Constant{ value: Constant::Str(key_string), .. } = &key.node {
+                let mut new_string = String::new();
+                let value_range = Range::new(value.location, value.end_location.unwrap());
+                let value_string = checker.locator.slice_source_code_range(&value_range);
+                new_string.push_str(key_string);
+                new_string.push('=');
+                new_string.push_str(&value_string);
+                new_vals.push(new_string);
+            }
+        }
+        // If we couldn't parse out key values return an empty string so that we don't attempt a
+        // fix
+        if new_vals.is_empty() {
+            return new_string;
+        }
+        new_string.push('(');
+        new_string.push_str(&new_vals.join(", "));
+        new_string.push(')');
+        println!("{:?}", new_string);
+    }
+    new_string
+}
+
 fn fix_percent_format_tuple(checker: &mut Checker, right: &Expr, left_string: &str) -> String {
-    // Pyupgrade explicitly checks for ' % (' before running, but I am not sure the value of this
-    // (pyupgrade itself says it is overly timid). The one edge case I considered was a multi line
-    // format statement, but worst-case scenario we go over the limit and black fixes it. Let me
-    // know if you want this check implemented
     let mut cleaned_string = percent_to_format(left_string);
     cleaned_string.push_str(".format");
     let right_string = clean_right_tuple(checker, right);
@@ -312,8 +341,18 @@ fn fix_percent_format_tuple(checker: &mut Checker, right: &Expr, left_string: &s
     cleaned_string
 }
 
-fn fix_percent_format_dict(checker: &mut Checker, left: &Expr, right: &Expr) -> String {
-    String::new()
+fn fix_percent_format_dict(checker: &mut Checker, right: &Expr, left_string: &str) -> String {
+    let mut cleaned_string = percent_to_format(left_string);
+    cleaned_string.push_str(".format");
+    let right_string = clean_right_dict(checker, right);
+    // If we could not properly parse the dictionary we should return an emtpy string so the
+    // program knows not to fix this
+    if right_string.is_empty() {
+        return right_string;
+    }
+    cleaned_string.push_str(&right_string);
+    println!("Cleaned: {}\n", cleaned_string);
+    cleaned_string
 }
 
 /// Returns true if any of conversion_flag, width, and precision are a non-empty string
@@ -419,7 +458,7 @@ pub fn printf_string_formatting(checker: &mut Checker, expr: &Expr, left: &Expr,
             new_string = fix_percent_format_tuple(checker, right, &left_string);
         }
         ExprKind::Dict { .. } => {
-            new_string = fix_percent_format_dict(checker, left, right);
+            new_string = fix_percent_format_dict(checker, right, &left_string);
         }
         _ => {}
     }
