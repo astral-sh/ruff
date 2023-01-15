@@ -6030,11 +6030,17 @@ impl AlwaysAutofixableViolation for PreferListBuiltin {
 // Ruff
 
 define_violation!(
-    pub struct AmbiguousUnicodeCharacterString(pub char, pub char);
+    pub struct AmbiguousUnicodeCharacterString {
+        pub confusable: char,
+        pub representant: char,
+    }
 );
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterString(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterString {
+            confusable,
+            representant,
+        } = self;
         format!(
             "String contains ambiguous unicode character '{confusable}' (did you mean \
              '{representant}'?)"
@@ -6042,21 +6048,33 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
     }
 
     fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterString(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterString {
+            confusable,
+            representant,
+        } = self;
         format!("Replace '{confusable}' with '{representant}'")
     }
 
     fn placeholder() -> Self {
-        AmbiguousUnicodeCharacterString('𝐁', 'B')
+        AmbiguousUnicodeCharacterString {
+            confusable: '𝐁',
+            representant: 'B',
+        }
     }
 }
 
 define_violation!(
-    pub struct AmbiguousUnicodeCharacterDocstring(pub char, pub char);
+    pub struct AmbiguousUnicodeCharacterDocstring {
+        pub confusable: char,
+        pub representant: char,
+    }
 );
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterDocstring(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterDocstring {
+            confusable,
+            representant,
+        } = self;
         format!(
             "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
              '{representant}'?)"
@@ -6064,21 +6082,33 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
     }
 
     fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterDocstring(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterDocstring {
+            confusable,
+            representant,
+        } = self;
         format!("Replace '{confusable}' with '{representant}'")
     }
 
     fn placeholder() -> Self {
-        AmbiguousUnicodeCharacterDocstring('𝐁', 'B')
+        AmbiguousUnicodeCharacterDocstring {
+            confusable: '𝐁',
+            representant: 'B',
+        }
     }
 }
 
 define_violation!(
-    pub struct AmbiguousUnicodeCharacterComment(pub char, pub char);
+    pub struct AmbiguousUnicodeCharacterComment {
+        pub confusable: char,
+        pub representant: char,
+    }
 );
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterComment(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterComment {
+            confusable,
+            representant,
+        } = self;
         format!(
             "Comment contains ambiguous unicode character '{confusable}' (did you mean \
              '{representant}'?)"
@@ -6086,12 +6116,18 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
     }
 
     fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterComment(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterComment {
+            confusable,
+            representant,
+        } = self;
         format!("Replace '{confusable}' with '{representant}'")
     }
 
     fn placeholder() -> Self {
-        AmbiguousUnicodeCharacterComment('𝐁', 'B')
+        AmbiguousUnicodeCharacterComment {
+            confusable: '𝐁',
+            representant: 'B',
+        }
     }
 }
 
