@@ -6011,6 +6011,23 @@ impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
 }
 
 define_violation!(
+    pub struct NoUnnecessarySpread;
+);
+impl AlwaysAutofixableViolation for NoUnnecessarySpread {
+    fn message(&self) -> String {
+        format!("Unnecessary spread `**`")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Remove unnecessary spread `**`")
+    }
+
+    fn placeholder() -> Self {
+        NoUnnecessarySpread
+    }
+}
+
+define_violation!(
     pub struct PreferListBuiltin;
 );
 impl AlwaysAutofixableViolation for PreferListBuiltin {

@@ -2300,6 +2300,10 @@ where
                 {
                     pyflakes::rules::repeated_keys(self, keys, values);
                 }
+
+                if self.settings.enabled.contains(&RuleCode::PIE800) {
+                    flake8_pie::rules::no_unnecessary_spread(self, keys, values);
+                }
             }
             ExprKind::Yield { .. } => {
                 if self.settings.enabled.contains(&RuleCode::F704) {

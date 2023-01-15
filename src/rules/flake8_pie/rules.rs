@@ -1,5 +1,8 @@
+use itertools::EitherOrBoth;
+use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashSet;
+use rustpython_ast::Located;
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::{Range, RefEquality};
@@ -102,6 +105,36 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                 }
             }
             checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
+/// PIE800
+pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
+    for item in keys.iter().zip_longest(values.iter()) {
+        match item {
+            EitherOrBoth::Both(_, _) => {}
+            EitherOrBoth::Left(_) => {}
+            EitherOrBoth::Right(value) => {
+                if let Located {
+                    node: ExprKind::Dict { .. },
+                    ..
+                } = value
+                {
+                    let mut diagnostic = Diagnostic::new(
+                        violations::NoUnnecessarySpread,
+                        Range::from_located(value),
+                    );
+                    // if checker.patch(&RuleCode::PIE807) {
+                    //     diagnostic.amend(Fix::replacement(
+                    //         "pooooooooooooooooo".to_string(),
+                    //         value.location,
+                    //         value.end_location.unwrap(),
+                    //     ));
+                    // }
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
         }
     }
 }

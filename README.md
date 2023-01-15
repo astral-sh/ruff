@@ -1129,6 +1129,7 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
 | ---- | ---- | ------- | --- |
 | PIE790 | NoUnnecessaryPass | Unnecessary `pass` statement | 🛠 |
 | PIE794 | DupeClassFieldDefinitions | Class field `...` is defined multiple times | 🛠 |
+| PIE800 | NoUnnecessarySpread | Unnecessary spread `**` | 🛠 |
 | PIE807 | PreferListBuiltin | Prefer `list()` over useless lambda | 🛠 |
 
 ### Ruff-specific rules (RUF)
