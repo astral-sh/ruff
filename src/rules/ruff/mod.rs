@@ -31,7 +31,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff/confusables.py"),
             &settings::Settings {
-                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']).into(),
                 ..settings::Settings::for_rules(vec![
                     RuleCode::RUF001,
                     RuleCode::RUF002,

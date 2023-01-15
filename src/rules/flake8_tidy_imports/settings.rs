@@ -1,12 +1,13 @@
 //! Settings for the `flake8-tidy-imports` plugin.
 
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
-use itertools::Itertools;
 use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::settings::hashable::HashableHashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -59,17 +60,17 @@ pub struct Options {
     pub banned_api: Option<FxHashMap<String, BannedApi>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Settings {
     pub ban_relative_imports: Strictness,
-    pub banned_api: FxHashMap<String, BannedApi>,
+    pub banned_api: HashableHashMap<String, BannedApi>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             ban_relative_imports: Strictness::Parents,
-            banned_api: FxHashMap::default(),
+            banned_api: HashableHashMap::default(),
         }
     }
 }
@@ -78,7 +79,7 @@ impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
             ban_relative_imports: options.ban_relative_imports.unwrap_or(Strictness::Parents),
-            banned_api: options.banned_api.unwrap_or_default(),
+            banned_api: options.banned_api.unwrap_or_default().into(),
         }
     }
 }
@@ -87,17 +88,7 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             ban_relative_imports: Some(settings.ban_relative_imports),
-            banned_api: Some(settings.banned_api),
-        }
-    }
-}
-
-impl Hash for Settings {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.ban_relative_imports.hash(state);
-        for key in self.banned_api.keys().sorted() {
-            key.hash(state);
-            self.banned_api[key].hash(state);
+            banned_api: Some(settings.banned_api.into()),
         }
     }
 }

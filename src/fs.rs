@@ -4,11 +4,11 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use globset::GlobMatcher;
 use path_absolutize::{path_dedot, Absolutize};
 use rustc_hash::FxHashSet;
 
 use crate::registry::RuleCode;
+use crate::settings::hashable::{HashableGlobMatcher, HashableHashSet};
 
 /// Extract the absolute path and basename (as strings) from a Path.
 pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -26,7 +26,11 @@ pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
 /// Create a set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path<'a>(
     path: &Path,
-    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, FxHashSet<RuleCode>)],
+    pattern_code_pairs: &'a [(
+        HashableGlobMatcher,
+        HashableGlobMatcher,
+        HashableHashSet<RuleCode>,
+    )],
 ) -> Result<FxHashSet<&'a RuleCode>> {
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
@@ -34,7 +38,7 @@ pub(crate) fn ignores_from_path<'a>(
         .filter(|(absolute, basename, _)| {
             basename.is_match(file_basename) || absolute.is_match(file_path)
         })
-        .flat_map(|(_, _, codes)| codes)
+        .flat_map(|(_, _, codes)| codes.iter())
         .collect())
 }
 

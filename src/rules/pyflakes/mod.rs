@@ -121,7 +121,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pyflakes/F841_0.py"),
             &settings::Settings {
-                dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
+                dummy_variable_rgx: Regex::new(r"^z$").unwrap().into(),
                 ..settings::Settings::for_rule(RuleCode::F841)
             },
         )?;
