@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_tidy_imports/mod.rs
+source: src/rules/flake8_tidy_imports/relative_imports.rs
 expression: diagnostics
 ---
 - kind:

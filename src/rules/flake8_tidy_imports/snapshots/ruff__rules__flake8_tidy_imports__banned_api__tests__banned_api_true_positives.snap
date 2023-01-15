@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_tidy_imports/mod.rs
+source: src/rules/flake8_tidy_imports/banned_api.rs
 expression: diagnostics
 ---
 - kind:
