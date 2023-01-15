@@ -5,6 +5,7 @@ use crate::registry::Diagnostic;
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violations;
 use once_cell::sync::Lazy;
+use crate::ast::whitespace::indentation;
 use regex::Regex;
 use rustpython_parser::ast::{Expr, ExprKind, Constant};
 
@@ -307,11 +308,15 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
     let mut new_string = String::new();
     if let ExprKind::Dict{ keys, values } = &right.node {
         let mut new_vals: Vec<String> = vec![];
+        let mut indent = String::new();
         for (key, value) in keys.iter().zip(values.iter()) {
-            // FOR REVIEWER: My interpretation of this rule is that we only convert if the key is a
-            // string constant
+            // The original unit tests of pyupgrade reveal that we should not rewrite non-string
+            // keys
             if let ExprKind::Constant{ value: Constant::Str(key_string), .. } = &key.node {
                 let mut new_string = String::new();
+                if is_multi_line && indent.is_empty() {
+                    indent = indentation(checker, key).to_string();
+                }
                 let value_range = Range::new(value.location, value.end_location.unwrap());
                 let value_string = checker.locator.slice_source_code_range(&value_range);
                 new_string.push_str(key_string);
@@ -326,9 +331,24 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
             return new_string;
         }
         new_string.push('(');
-        new_string.push_str(&new_vals.join(", "));
+        if is_multi_line {
+            for item in &new_vals {
+                new_string.push('\n');
+                new_string.push_str(&indent);
+                new_string.push_str(&item);
+                // This implementation adds a trailing comma always, let me know if you want a more
+                // in-depth solution
+                new_string.push(',');
+            }
+            // For the ending parenthese we want to go back one indent
+            new_string.push('\n');
+            if indent.len() > 3 {
+                new_string.push_str(&indent[3..]);
+            }
+        } else {
+            new_string.push_str(&new_vals.join(", "));
+        }
         new_string.push(')');
-        println!("{:?}", new_string);
     }
     new_string
 }
@@ -351,7 +371,7 @@ fn fix_percent_format_dict(checker: &mut Checker, right: &Expr, left_string: &st
         return right_string;
     }
     cleaned_string.push_str(&right_string);
-    println!("Cleaned: {}\n", cleaned_string);
+    println!("{}\n", cleaned_string);
     cleaned_string
 }
 

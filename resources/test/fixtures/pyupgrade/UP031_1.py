@@ -3,6 +3,8 @@
 
 "%(to_list)s" % {"to_list": []}
 
+"%(k)s" % {"k": "v", "i": 1, "j": []}
+
 """ Waiting for Charlie to review my regex before uncommenting this
 "%(foo)s \N{snowman}" % {"foo": 1}
 """
