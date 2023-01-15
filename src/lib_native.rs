@@ -17,10 +17,10 @@ use crate::{directives, packaging, resolver};
 fn resolve(path: &Path) -> Result<Settings> {
     if let Some(pyproject) = pyproject::find_settings_toml(path)? {
         // First priority: `pyproject.toml` in the current `Path`.
-        resolver::resolve_settings(&pyproject, &Relativity::Parent)
+        Ok(resolver::resolve_settings(&pyproject, &Relativity::Parent)?.lib)
     } else if let Some(pyproject) = pyproject::find_user_settings_toml() {
         // Second priority: user-specific `pyproject.toml`.
-        resolver::resolve_settings(&pyproject, &Relativity::Cwd)
+        Ok(resolver::resolve_settings(&pyproject, &Relativity::Cwd)?.lib)
     } else {
         // Fallback: default settings.
         Settings::from_configuration(Configuration::default(), &path_dedot::CWD)

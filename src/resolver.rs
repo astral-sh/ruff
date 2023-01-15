@@ -14,7 +14,7 @@ use rustc_hash::FxHashSet;
 use crate::fs;
 use crate::settings::configuration::Configuration;
 use crate::settings::pyproject::settings_toml;
-use crate::settings::{pyproject, Settings};
+use crate::settings::{pyproject, AllSettings, Settings};
 
 /// The strategy used to discover Python files in the filesystem..
 #[derive(Debug)]
@@ -29,10 +29,10 @@ pub struct FileDiscovery {
 pub enum PyprojectDiscovery {
     /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
     /// provided on the command-line).
-    Fixed(Settings),
+    Fixed(AllSettings),
     /// Use the closest `pyproject.toml` file in the filesystem hierarchy, or
     /// the default settings.
-    Hierarchical(Settings),
+    Hierarchical(AllSettings),
 }
 
 /// The strategy for resolving file paths in a `pyproject.toml`.
@@ -58,17 +58,21 @@ impl Relativity {
 
 #[derive(Default)]
 pub struct Resolver {
-    settings: BTreeMap<PathBuf, Settings>,
+    settings: BTreeMap<PathBuf, AllSettings>,
 }
 
 impl Resolver {
     /// Add a resolved `Settings` under a given `PathBuf` scope.
-    pub fn add(&mut self, path: PathBuf, settings: Settings) {
+    pub fn add(&mut self, path: PathBuf, settings: AllSettings) {
         self.settings.insert(path, settings);
     }
 
-    /// Return the appropriate `Settings` for a given `Path`.
-    pub fn resolve<'a>(&'a self, path: &Path, strategy: &'a PyprojectDiscovery) -> &'a Settings {
+    /// Return the appropriate `AllSettings` for a given `Path`.
+    pub fn resolve_all<'a>(
+        &'a self,
+        path: &Path,
+        strategy: &'a PyprojectDiscovery,
+    ) -> &'a AllSettings {
         match strategy {
             PyprojectDiscovery::Fixed(settings) => settings,
             PyprojectDiscovery::Hierarchical(default) => self
@@ -86,8 +90,12 @@ impl Resolver {
         }
     }
 
+    pub fn resolve<'a>(&'a self, path: &Path, strategy: &'a PyprojectDiscovery) -> &'a Settings {
+        &self.resolve_all(path, strategy).lib
+    }
+
     /// Return an iterator over the resolved `Settings` in this `Resolver`.
-    pub fn iter(&self) -> impl Iterator<Item = &Settings> {
+    pub fn iter(&self) -> impl Iterator<Item = &AllSettings> {
         self.settings.values()
     }
 
@@ -100,11 +108,11 @@ impl Resolver {
         // `Settings` for each path, but that's more expensive.
         match &strategy {
             PyprojectDiscovery::Fixed(settings) => {
-                settings.validate()?;
+                settings.lib.validate()?;
             }
             PyprojectDiscovery::Hierarchical(default) => {
                 for settings in std::iter::once(default).chain(self.iter()) {
-                    settings.validate()?;
+                    settings.lib.validate()?;
                 }
             }
         }
@@ -176,15 +184,15 @@ pub fn resolve_scoped_settings(
     pyproject: &Path,
     relativity: &Relativity,
     processor: impl ConfigProcessor,
-) -> Result<(PathBuf, Settings)> {
+) -> Result<(PathBuf, AllSettings)> {
     let project_root = relativity.resolve(pyproject);
     let configuration = resolve_configuration(pyproject, relativity, processor)?;
-    let settings = Settings::from_configuration(configuration, &project_root)?;
+    let settings = AllSettings::from_configuration(configuration, &project_root)?;
     Ok((project_root, settings))
 }
 
 /// Extract the `Settings` from a given `pyproject.toml`.
-pub fn resolve_settings(pyproject: &Path, relativity: &Relativity) -> Result<Settings> {
+pub fn resolve_settings(pyproject: &Path, relativity: &Relativity) -> Result<AllSettings> {
     let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, &NoOpProcessor)?;
     Ok(settings)
 }
@@ -195,7 +203,7 @@ pub fn resolve_settings_with_processor(
     pyproject: &Path,
     relativity: &Relativity,
     processor: impl ConfigProcessor,
-) -> Result<Settings> {
+) -> Result<AllSettings> {
     let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, processor)?;
     Ok(settings)
 }
