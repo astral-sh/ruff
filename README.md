@@ -123,7 +123,7 @@ of [Conda](https://docs.conda.io/en/latest/):
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
    1. [flake8-pie (PIE)](#flake8-pie-pie)
-   1. [flake8-commas (COM)](#flake8-commas-c8)
+   1. [flake8-commas (COM)](#flake8-commas-com)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
