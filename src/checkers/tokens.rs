@@ -30,9 +30,9 @@ pub fn check_tokens(
     let enforce_invalid_escape_sequence = settings.enabled.contains(&RuleCode::W605);
     let enforce_implicit_string_concatenation = settings.enabled.contains(&RuleCode::ISC001)
         || settings.enabled.contains(&RuleCode::ISC002);
-    let enforce_trailing_comma = settings.enabled.contains(&RuleCode::C812)
-        || settings.enabled.contains(&RuleCode::C818)
-        || settings.enabled.contains(&RuleCode::C819);
+    let enforce_trailing_comma = settings.enabled.contains(&RuleCode::COM812)
+        || settings.enabled.contains(&RuleCode::COM818)
+        || settings.enabled.contains(&RuleCode::COM819);
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {
@@ -116,7 +116,7 @@ pub fn check_tokens(
         );
     }
 
-    // C812, C818, C819
+    // COM812, COM818, COM819
     if enforce_trailing_comma {
         diagnostics.extend(
             flake8_commas::rules::trailing_commas(tokens, locator)

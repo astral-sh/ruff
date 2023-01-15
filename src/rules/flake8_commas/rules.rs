@@ -107,7 +107,7 @@ impl Context {
     }
 }
 
-/// C812, C818, C819
+/// COM812, COM818, COM819
 #[allow(clippy::if_same_then_else, clippy::needless_bool)]
 pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];

@@ -412,9 +412,9 @@ ruff_macros::define_rule_mapping!(
     PIE794 => violations::DupeClassFieldDefinitions,
     PIE807 => violations::PreferListBuiltin,
     // flake8-commas
-    C812 => violations::TrailingCommaMissing,
-    C818 => violations::TrailingCommaOnBareTupleProhibited,
-    C819 => violations::TrailingCommaProhibited,
+    COM812 => violations::TrailingCommaMissing,
+    COM818 => violations::TrailingCommaOnBareTupleProhibited,
+    COM819 => violations::TrailingCommaProhibited,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -574,7 +574,7 @@ impl RuleOrigin {
             ]),
             RuleOrigin::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
             RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
-            RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::C8),
+            RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
             RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
         }
     }
@@ -734,9 +734,9 @@ impl RuleCode {
             | RuleCode::Q002
             | RuleCode::Q003
             | RuleCode::W605
-            | RuleCode::C812
-            | RuleCode::C818
-            | RuleCode::C819
+            | RuleCode::COM812
+            | RuleCode::COM818
+            | RuleCode::COM819
             | RuleCode::RUF001
             | RuleCode::RUF002
             | RuleCode::RUF003 => &LintSource::Tokens,
