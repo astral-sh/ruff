@@ -18,8 +18,7 @@ pub enum Convention {
 }
 
 impl Convention {
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn codes(&self) -> &'static [RuleCodePrefix] {
+    pub fn codes(self) -> &'static [RuleCodePrefix] {
         match self {
             Convention::Google => &[
                 // All errors except D203, D204, D213, D215, D400, D401, D404, D406, D407, D408,

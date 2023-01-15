@@ -21,7 +21,6 @@ use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
 use crate::warn_user;
 
-#[allow(clippy::unnecessary_wraps)]
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
     black: Option<&Black>,
@@ -272,7 +271,7 @@ pub fn convert(
                     match value.trim() {
                         "csv" => {
                             flake8_pytest_style.parametrize_names_type =
-                                Some(ParametrizeNameType::CSV);
+                                Some(ParametrizeNameType::Csv);
                         }
                         "tuple" => {
                             flake8_pytest_style.parametrize_names_type =

@@ -303,8 +303,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    #[allow(clippy::unused_self)]
-    pub fn clear_screen(&self) -> Result<()> {
+    pub fn clear_screen() -> Result<()> {
         #[cfg(not(target_family = "wasm"))]
         clearscreen::clear()?;
         Ok(())

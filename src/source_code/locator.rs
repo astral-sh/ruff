@@ -25,15 +25,13 @@ impl<'a> Locator<'a> {
         self.rope.get_or_init(|| Rope::from_str(self.contents))
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn slice_source_code_at(&self, location: &Location) -> Cow<'_, str> {
+    pub fn slice_source_code_at(&self, location: Location) -> Cow<'_, str> {
         let rope = self.get_or_init_rope();
         let offset = rope.line_to_char(location.row() - 1) + location.column();
         Cow::from(rope.slice(offset..))
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn slice_source_code_until(&self, location: &Location) -> Cow<'_, str> {
+    pub fn slice_source_code_until(&self, location: Location) -> Cow<'_, str> {
         let rope = self.get_or_init_rope();
         let offset = rope.line_to_char(location.row() - 1) + location.column();
         Cow::from(rope.slice(..offset))

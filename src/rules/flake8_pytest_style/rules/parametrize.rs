@@ -139,7 +139,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {}
+                    types::ParametrizeNameType::Csv => {}
                 }
             }
         }
@@ -173,7 +173,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {
+                    types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
@@ -222,7 +222,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {
+                    types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
@@ -279,7 +279,7 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     let mut diagnostic = Diagnostic::new(
-        violations::ParametrizeNamesWrongType(types::ParametrizeNameType::CSV),
+        violations::ParametrizeNamesWrongType(types::ParametrizeNameType::Csv),
         Range::from_located(expr),
     );
 

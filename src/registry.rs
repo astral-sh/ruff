@@ -694,14 +694,13 @@ impl RuleOrigin {
     }
 }
 
-#[allow(clippy::upper_case_acronyms)]
 pub enum LintSource {
-    AST,
-    FileSystem,
+    Ast,
+    Io,
     Lines,
     Tokens,
     Imports,
-    NoQA,
+    NoQa,
 }
 
 impl RuleCode {
@@ -709,7 +708,7 @@ impl RuleCode {
     /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            RuleCode::RUF100 => &LintSource::NoQA,
+            RuleCode::RUF100 => &LintSource::NoQa,
             RuleCode::E501
             | RuleCode::W292
             | RuleCode::W505
@@ -727,9 +726,9 @@ impl RuleCode {
             | RuleCode::RUF001
             | RuleCode::RUF002
             | RuleCode::RUF003 => &LintSource::Tokens,
-            RuleCode::E902 => &LintSource::FileSystem,
+            RuleCode::E902 => &LintSource::Io,
             RuleCode::I001 | RuleCode::I002 => &LintSource::Imports,
-            _ => &LintSource::AST,
+            _ => &LintSource::Ast,
         }
     }
 }
