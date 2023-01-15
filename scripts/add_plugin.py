@@ -10,8 +10,9 @@ Example usage:
 
 import argparse
 import os
+from pathlib import Path
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def dir_name(plugin: str) -> str:
@@ -25,15 +26,16 @@ def pascal_case(plugin: str) -> str:
 def main(*, plugin: str, url: str) -> None:
     # Create the test fixture folder.
     os.makedirs(
-        os.path.join(ROOT_DIR, f"resources/test/fixtures/{dir_name(plugin)}"),
+        ROOT_DIR / "resources/test/fixtures" / dir_name(plugin),
         exist_ok=True,
     )
 
     # Create the Rust module.
-    os.makedirs(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}"), exist_ok=True)
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/rules.rs"), "w+") as fp:
+    rust_module = ROOT_DIR / "src/rules" / dir_name(plugin)
+    os.makedirs(rust_module, exist_ok=True)
+    with open(rust_module / "rules.rs", "w+") as fp:
         fp.write("use crate::checkers::ast::Checker;\n")
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(plugin)}/mod.rs"), "w+") as fp:
+    with open(rust_module / "mod.rs", "w+") as fp:
         fp.write("pub(crate) mod rules;\n")
         fp.write("\n")
         fp.write(
@@ -65,15 +67,14 @@ mod tests {
             % dir_name(plugin)
         )
 
-    # Add the plugin to `lib.rs`.
-    with open(os.path.join(ROOT_DIR, "src/lib.rs"), "a") as fp:
-        fp.write(f"mod {dir_name(plugin)};")
+    # Add the plugin to `rules/mod.rs`.
+    with open(ROOT_DIR / "src/rules/mod.rs", "a") as fp:
+        fp.write(f"pub mod {dir_name(plugin)};")
 
     # Add the relevant sections to `src/registry.rs`.
-    with open(os.path.join(ROOT_DIR, "src/registry.rs")) as fp:
-        content = fp.read()
+    content = (ROOT_DIR / "src/registry.rs").read_text()
 
-    with open(os.path.join(ROOT_DIR, "src/registry.rs"), "w") as fp:
+    with open(ROOT_DIR / "src/registry.rs", "w") as fp:
         for line in content.splitlines():
             if line.strip() == "// Ruff":
                 indent = line.split("// Ruff")[0]
@@ -108,10 +109,9 @@ mod tests {
             fp.write("\n")
 
     # Add the relevant section to `src/violations.rs`.
-    with open(os.path.join(ROOT_DIR, "src/violations.rs")) as fp:
-        content = fp.read()
+    content = (ROOT_DIR / "src/violations.rs").read_text()
 
-    with open(os.path.join(ROOT_DIR, "src/violations.rs"), "w") as fp:
+    with open(ROOT_DIR / "src/violations.rs", "w") as fp:
         for line in content.splitlines():
             if line.strip() == "// Ruff":
                 indent = line.split("// Ruff")[0]
