@@ -10,7 +10,7 @@ Located {
     end_location: Some(
         Location {
             row: 1,
-            column: 15,
+            column: 25,
         },
     ),
     custom: (),
@@ -31,13 +31,34 @@ Located {
                     custom: (),
                     node: Constant {
                         value: Str(
-                            "k",
+                            "a",
                         ),
                         kind: None,
                     },
                 },
             ),
             None,
+            Some(
+                Located {
+                    location: Location {
+                        row: 1,
+                        column: 16,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 19,
+                        },
+                    ),
+                    custom: (),
+                    node: Constant {
+                        value: Str(
+                            "d",
+                        ),
+                        kind: None,
+                    },
+                },
+            ),
         ],
         values: [
             Located {
@@ -54,7 +75,7 @@ Located {
                 custom: (),
                 node: Constant {
                     value: Str(
-                        "v",
+                        "b",
                     ),
                     kind: None,
                 },
@@ -72,8 +93,27 @@ Located {
                 ),
                 custom: (),
                 node: Name {
-                    id: "d",
+                    id: "c",
                     ctx: Load,
+                },
+            },
+            Located {
+                location: Location {
+                    row: 1,
+                    column: 21,
+                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 24,
+                    },
+                ),
+                custom: (),
+                node: Constant {
+                    value: Str(
+                        "e",
+                    ),
+                    kind: None,
                 },
             },
         ],
