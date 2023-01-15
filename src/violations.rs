@@ -3837,6 +3837,23 @@ impl AlwaysAutofixableViolation for FormatLiterals {
     }
 }
 
+define_violation!(
+    pub struct FString;
+);
+impl AlwaysAutofixableViolation for FString {
+    fn message(&self) -> String {
+        "Use f-strings instead of positional format fields".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Convert strings with positional format fields to strings".to_string()
+    }
+
+    fn placeholder() -> Self {
+        Self
+    }
+}
+
 // pydocstyle
 
 define_violation!(

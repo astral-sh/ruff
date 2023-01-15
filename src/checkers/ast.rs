@@ -1909,6 +1909,10 @@ where
                                         if self.settings.enabled.contains(&RuleCode::UP030) {
                                             pyupgrade::rules::format_literals(self, &summary, expr);
                                         }
+
+                                        if self.settings.enabled.contains(&RuleCode::UP032) {
+                                            pyupgrade::rules::f_strings(self, &summary, expr);
+                                        }
                                     }
                                 }
                             }
