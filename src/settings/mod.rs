@@ -40,21 +40,52 @@ pub mod types;
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
+pub struct AllSettings {
+    pub cli: CliSettings,
+    pub lib: Settings,
+}
+
+impl AllSettings {
+    pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
+        Ok(Self {
+            cli: CliSettings {
+                cache_dir: config
+                    .cache_dir
+                    .clone()
+                    .unwrap_or_else(|| cache_dir(project_root)),
+                fix: config.fix.unwrap_or(false),
+                fix_only: config.fix_only.unwrap_or(false),
+                format: config.format.unwrap_or_default(),
+                update_check: config.update_check.unwrap_or_default(),
+            },
+            lib: Settings::from_configuration(config, project_root)?,
+        })
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+/// Settings that are not used by this library and
+/// only here so that `ruff_cli` can use them.
+pub struct CliSettings {
+    pub cache_dir: PathBuf,
+    pub fix: bool,
+    pub fix_only: bool,
+    pub format: SerializationFormat,
+    pub update_check: bool,
+}
+
+#[derive(Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub allowed_confusables: FxHashSet<char>,
     pub builtins: Vec<String>,
-    pub cache_dir: PathBuf,
     pub dummy_variable_rgx: Regex,
     pub enabled: FxHashSet<RuleCode>,
     pub exclude: GlobSet,
     pub extend_exclude: GlobSet,
     pub external: FxHashSet<String>,
-    pub fix: bool,
-    pub fix_only: bool,
     pub fixable: FxHashSet<RuleCode>,
     pub force_exclude: bool,
-    pub format: SerializationFormat,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub namespace_packages: Vec<PathBuf>,
@@ -66,7 +97,6 @@ pub struct Settings {
     pub target_version: PythonVersion,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
-    pub update_check: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bandit: flake8_bandit::settings::Settings,
@@ -120,7 +150,6 @@ impl Settings {
                 .map(FxHashSet::from_iter)
                 .unwrap_or_default(),
             builtins: config.builtins.unwrap_or_default(),
-            cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
                 .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
@@ -159,8 +188,6 @@ impl Settings {
             exclude: resolve_globset(config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()))?,
             extend_exclude: resolve_globset(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()),
-            fix: config.fix.unwrap_or(false),
-            fix_only: config.fix_only.unwrap_or(false),
             fixable: resolve_codes(
                 [RuleCodeSpec {
                     select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
@@ -168,7 +195,6 @@ impl Settings {
                 }]
                 .into_iter(),
             ),
-            format: config.format.unwrap_or_default(),
             force_exclude: config.force_exclude.unwrap_or(false),
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
             line_length: config.line_length.unwrap_or(88),
@@ -187,7 +213,6 @@ impl Settings {
                 vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()]
             }),
             typing_modules: config.typing_modules.unwrap_or_default(),
-            update_check: config.update_check.unwrap_or_default(),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
@@ -227,17 +252,13 @@ impl Settings {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
-            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter([rule_code.clone()]),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
-            fix: false,
-            fix_only: false,
             fixable: FxHashSet::from_iter([rule_code]),
             force_exclude: false,
-            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             namespace_packages: vec![],
@@ -249,7 +270,6 @@ impl Settings {
             target_version: PythonVersion::Py310,
             task_tags: vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()],
             typing_modules: vec![],
-            update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
@@ -273,17 +293,13 @@ impl Settings {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
-            cache_dir: cache_dir(path_dedot::CWD.as_path()),
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
             enabled: FxHashSet::from_iter(rule_codes.clone()),
             exclude: GlobSet::empty(),
             extend_exclude: GlobSet::empty(),
             external: FxHashSet::default(),
-            fix: false,
-            fix_only: false,
             fixable: FxHashSet::from_iter(rule_codes),
             force_exclude: false,
-            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             namespace_packages: vec![],
@@ -295,7 +311,6 @@ impl Settings {
             target_version: PythonVersion::Py310,
             task_tags: vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()],
             typing_modules: vec![],
-            update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
