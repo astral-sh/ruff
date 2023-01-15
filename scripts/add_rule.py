@@ -11,8 +11,9 @@ Example usage:
 
 import argparse
 import os
+from pathlib import Path
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def dir_name(origin: str) -> str:
@@ -32,16 +33,16 @@ def snake_case(name: str) -> str:
 def main(*, name: str, code: str, origin: str) -> None:
     # Create a test fixture.
     with open(
-        os.path.join(ROOT_DIR, f"resources/test/fixtures/{dir_name(origin)}/{code}.py"),
+        ROOT_DIR / "resources/test/fixtures" / dir_name(origin) / f"{code}.py",
         "a",
     ):
         pass
 
     # Add the relevant `#testcase` macro.
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(origin)}/mod.rs")) as fp:
-        content = fp.read()
+    mod_rs = ROOT_DIR / "src/rules" / dir_name(origin) / "mod.rs"
+    content = mod_rs.read_text()
 
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(origin)}/mod.rs"), "w") as fp:
+    with open(mod_rs, "w") as fp:
         for line in content.splitlines():
             if line.strip() == "fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {":
                 indent = line.split("fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {")[0]
@@ -52,7 +53,7 @@ def main(*, name: str, code: str, origin: str) -> None:
             fp.write("\n")
 
     # Add the relevant rule function.
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(origin)}/rules.rs"), "a") as fp:
+    with open(ROOT_DIR / "src/rules" / dir_name(origin) / "rules.rs", "a") as fp:
         fp.write(
             f"""
 /// {code}
@@ -62,10 +63,9 @@ pub fn {snake_case(name)}(checker: &mut Checker) {{}}
         fp.write("\n")
 
     # Add the relevant struct to `src/violations.rs`.
-    with open(os.path.join(ROOT_DIR, "src/violations.rs")) as fp:
-        content = fp.read()
+    content = (ROOT_DIR / "src/violations.rs").read_text()
 
-    with open(os.path.join(ROOT_DIR, "src/violations.rs"), "w") as fp:
+    with open(ROOT_DIR / "src/violations.rs", "w") as fp:
         for line in content.splitlines():
             fp.write(line)
             fp.write("\n")
@@ -90,12 +90,11 @@ impl Violation for %s {
                 fp.write("\n")
 
     # Add the relevant code-to-violation pair to `src/registry.rs`.
-    with open(os.path.join(ROOT_DIR, "src/registry.rs")) as fp:
-        content = fp.read()
+    content = (ROOT_DIR / "src/registry.rs").read_text()
 
     seen_macro = False
     has_written = False
-    with open(os.path.join(ROOT_DIR, "src/registry.rs"), "w") as fp:
+    with open(ROOT_DIR / "src/registry.rs", "w") as fp:
         for line in content.splitlines():
             fp.write(line)
             fp.write("\n")
