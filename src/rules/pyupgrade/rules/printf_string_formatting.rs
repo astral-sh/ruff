@@ -306,7 +306,7 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
 /// Converts a dictionary to a function call while preserving as much styling as
 /// possible. This function also looks for areas that might cause issues, and
 /// returns an empty string if it finds one
-fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
+fn clean_right_dict(checker: &mut Checker, right: &Expr) -> Option<String> {
     let whole_range = Range::new(right.location, right.end_location.unwrap());
     let whole_string = checker.locator.slice_source_code_range(&whole_range);
     let is_multi_line = whole_string.contains('\n');
@@ -325,16 +325,16 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
             {
                 // If the dictionary key is not a valid python variable name, then do not fix
                 if !PYTHON_NAME.is_match(key_string) {
-                    return new_string;
+                    return None;
                 }
                 // We should not rewrite if the key is a python keyword
                 if is_keyword(key_string) {
-                    return new_string;
+                    return None;
                 }
                 // If there are multiple entries of the same key, we need to return because we
                 // cannot handle this ambiguity
                 if already_seen.contains(key_string) {
-                    return new_string;
+                    return None;
                 }
                 already_seen.push(key_string.clone());
                 let mut new_string = String::new();
@@ -350,13 +350,13 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
             } else {
                 // If there are any non-string keys, we should be timid and not modify the
                 // string
-                return new_string;
+                return None;
             }
         }
         // If we couldn't parse out key values return an empty string so that we don't
         // attempt a fix
         if new_vals.is_empty() {
-            return new_string;
+            return None;
         }
         new_string.push('(');
         if is_multi_line {
@@ -378,7 +378,7 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
         }
         new_string.push(')');
     }
-    new_string
+    Some(new_string)
 }
 
 fn fix_percent_format_tuple(checker: &mut Checker, right: &Expr, left_string: &str) -> String {
@@ -389,17 +389,26 @@ fn fix_percent_format_tuple(checker: &mut Checker, right: &Expr, left_string: &s
     cleaned_string
 }
 
-fn fix_percent_format_dict(checker: &mut Checker, right: &Expr, left_string: &str) -> String {
+fn fix_percent_format_dict(
+    checker: &mut Checker,
+    right: &Expr,
+    left_string: &str,
+) -> Option<String> {
     let mut cleaned_string = percent_to_format(left_string);
     cleaned_string.push_str(".format");
-    let right_string = clean_right_dict(checker, right);
-    // If we could not properly parse the dictionary we should return an empty
-    // string so the program knows not to fix this
-    if right_string.is_empty() {
-        return right_string;
-    }
+    let right_string = match clean_right_dict(checker, right) {
+        // If we could not properly parse the dictionary we should None so the program knows not to
+        // fix this
+        None => return None,
+        Some(string) => {
+            if string.is_empty() {
+                return None;
+            }
+            string
+        }
+    };
     cleaned_string.push_str(&right_string);
-    cleaned_string
+    Some(cleaned_string)
 }
 
 /// Returns true if any of `conversion_flag`, `width`, and `precision` are a
@@ -508,7 +517,10 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
             new_string = fix_percent_format_tuple(checker, right, left_string);
         }
         ExprKind::Dict { .. } => {
-            new_string = fix_percent_format_dict(checker, right, left_string);
+            new_string = match fix_percent_format_dict(checker, right, left_string) {
+                None => return,
+                Some(string) => string,
+            };
         }
         _ => {}
     }
