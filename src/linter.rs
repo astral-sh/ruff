@@ -138,7 +138,7 @@ pub fn check_path(
     }
 
     // Enforce `noqa` directives.
-    if matches!(noqa, flags::Noqa::Enabled)
+    if (matches!(noqa, flags::Noqa::Enabled) && !diagnostics.is_empty())
         || settings
             .enabled
             .iter()
