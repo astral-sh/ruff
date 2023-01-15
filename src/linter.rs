@@ -66,7 +66,7 @@ pub fn check_path(
     let use_ast = settings
         .enabled
         .iter()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::AST));
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Ast));
     let use_imports = !directives.isort.skip_file
         && settings
             .enabled
@@ -142,7 +142,7 @@ pub fn check_path(
         || settings
             .enabled
             .iter()
-            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQA))
+            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQa))
     {
         check_noqa(
             &mut diagnostics,

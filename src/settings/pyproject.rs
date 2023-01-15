@@ -550,7 +550,7 @@ other-attribute = 1
                 flake8_pytest_style: Some(flake8_pytest_style::settings::Options {
                     fixture_parentheses: Some(false),
                     parametrize_names_type: Some(
-                        flake8_pytest_style::types::ParametrizeNameType::CSV
+                        flake8_pytest_style::types::ParametrizeNameType::Csv
                     ),
                     parametrize_values_type: Some(
                         flake8_pytest_style::types::ParametrizeValuesType::Tuple,

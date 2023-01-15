@@ -200,7 +200,7 @@ pub fn main() -> Result<ExitCode> {
         }
 
         // Perform an initial run instantly.
-        printer.clear_screen()?;
+        Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
         let messages = commands::run(
@@ -230,7 +230,7 @@ pub fn main() -> Result<ExitCode> {
                             .unwrap_or_default()
                     });
                     if py_changed {
-                        printer.clear_screen()?;
+                        Printer::clear_screen()?;
                         printer.write_to_user("File change detected...\n");
 
                         let messages = commands::run(

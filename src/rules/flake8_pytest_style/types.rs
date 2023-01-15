@@ -4,10 +4,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[allow(clippy::upper_case_acronyms)]
 pub enum ParametrizeNameType {
     #[serde(rename = "csv")]
-    CSV,
+    Csv,
     #[serde(rename = "tuple")]
     Tuple,
     #[serde(rename = "list")]
@@ -23,7 +22,7 @@ impl Default for ParametrizeNameType {
 impl Display for ParametrizeNameType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CSV => write!(f, "csv"),
+            Self::Csv => write!(f, "csv"),
             Self::Tuple => write!(f, "tuple"),
             Self::List => write!(f, "list"),
         }
