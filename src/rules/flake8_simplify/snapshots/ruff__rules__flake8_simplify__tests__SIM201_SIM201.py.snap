@@ -8,7 +8,7 @@ expression: diagnostics
       - b
   location:
     row: 1
-    column: 7
+    column: 3
   end_location:
     row: 1
     column: 13
@@ -27,7 +27,7 @@ expression: diagnostics
       - b + c
   location:
     row: 4
-    column: 7
+    column: 3
   end_location:
     row: 4
     column: 19
@@ -46,7 +46,7 @@ expression: diagnostics
       - c
   location:
     row: 7
-    column: 7
+    column: 3
   end_location:
     row: 7
     column: 19
