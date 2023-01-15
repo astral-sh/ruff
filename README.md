@@ -1111,7 +1111,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | PLR0402 | ConsiderUsingFromImport | Use `from ... import ...` in lieu of alias |  |
 | PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance(..., (...))` |  |
 | PLR1722 | UseSysExit | Use `sys.exit()` instead of `exit` | 🛠 |
-| PLR2004 | MagicValueComparison | Magic number used in comparison, consider replacing magic with a constant variable |  |
+| PLR2004 | MagicValueComparison | Magic value used in comparison, consider replacing magic with a constant variable |  |
 
 #### Warning (PLW)
 | Code | Name | Message | Fix |
