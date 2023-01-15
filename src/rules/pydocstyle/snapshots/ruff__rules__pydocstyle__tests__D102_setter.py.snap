@@ -1,0 +1,15 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    PublicMethod: ~
+  location:
+    row: 16
+    column: 8
+  end_location:
+    row: 16
+    column: 11
+  fix: ~
+  parent: ~
+
