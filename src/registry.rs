@@ -411,6 +411,10 @@ ruff_macros::define_rule_mapping!(
     PIE790 => violations::NoUnnecessaryPass,
     PIE794 => violations::DupeClassFieldDefinitions,
     PIE807 => violations::PreferListBuiltin,
+    // flake8-commas
+    COM812 => violations::TrailingCommaMissing,
+    COM818 => violations::TrailingCommaOnBareTupleProhibited,
+    COM819 => violations::TrailingCommaProhibited,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -453,6 +457,7 @@ pub enum RuleOrigin {
     PygrepHooks,
     Pylint,
     Flake8Pie,
+    Flake8Commas,
     Ruff,
 }
 
@@ -522,6 +527,7 @@ impl RuleOrigin {
             RuleOrigin::Pylint => "Pylint",
             RuleOrigin::Pyupgrade => "pyupgrade",
             RuleOrigin::Flake8Pie => "flake8-pie",
+            RuleOrigin::Flake8Commas => "flake8-commas",
             RuleOrigin::Ruff => "Ruff-specific rules",
         }
     }
@@ -568,6 +574,7 @@ impl RuleOrigin {
             ]),
             RuleOrigin::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
             RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
+            RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
             RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
         }
     }
@@ -689,6 +696,10 @@ impl RuleOrigin {
                 "https://pypi.org/project/flake8-pie/0.16.0/",
                 &Platform::PyPI,
             )),
+            RuleOrigin::Flake8Commas => Some((
+                "https://pypi.org/project/flake8-commas/2.1.0/",
+                &Platform::PyPI,
+            )),
             RuleOrigin::Ruff => None,
         }
     }
@@ -723,6 +734,9 @@ impl RuleCode {
             | RuleCode::Q002
             | RuleCode::Q003
             | RuleCode::W605
+            | RuleCode::COM812
+            | RuleCode::COM818
+            | RuleCode::COM819
             | RuleCode::RUF001
             | RuleCode::RUF002
             | RuleCode::RUF003 => &LintSource::Tokens,
