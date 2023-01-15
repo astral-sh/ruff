@@ -99,6 +99,7 @@ pub struct Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         settings: &'a Settings,
         noqa_line_for: &'a IntMap<usize, usize>,

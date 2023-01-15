@@ -601,16 +601,6 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
     }
 }
 
-/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
-/// other statements preceding it.
-pub fn preceded_by_continuation(stmt: &Stmt, indexer: &Indexer) -> bool {
-    println!("{:?}", indexer.continuation_lines());
-    stmt.location.row() > 1
-        && indexer
-            .continuation_lines()
-            .contains(&(stmt.location.row() - 1))
-}
-
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
 pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
     let contents = locator.slice_source_code_range(&range);
@@ -622,6 +612,15 @@ pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
             end_location,
         });
     range
+}
+
+/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
+/// other statements preceding it.
+pub fn preceded_by_continuation(stmt: &Stmt, indexer: &Indexer) -> bool {
+    stmt.location.row() > 1
+        && indexer
+            .continuation_lines()
+            .contains(&(stmt.location.row() - 1))
 }
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with

@@ -130,7 +130,7 @@ pub fn check_path(
     {
         diagnostics.extend(check_lines(
             contents,
-            &indexer.commented_lines(),
+            indexer.commented_lines(),
             &doc_lines,
             settings,
             autofix,
@@ -147,7 +147,7 @@ pub fn check_path(
         check_noqa(
             &mut diagnostics,
             contents,
-            &indexer.commented_lines(),
+            indexer.commented_lines(),
             &directives.noqa_line_for,
             settings,
             autofix,
