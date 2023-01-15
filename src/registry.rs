@@ -509,6 +509,7 @@ define_rule_mapping!(
     // flake8-pie
     PIE790 => violations::NoUnnecessaryPass,
     PIE794 => violations::DupeClassFieldDefinitions,
+    PIE804 => violations::NoUnnecessaryDictKwargs,
     PIE807 => violations::PreferListBuiltin,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,

@@ -1,6 +1,6 @@
 use log::error;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Located, Stmt, StmtKind};
 
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
@@ -102,6 +102,70 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                 }
             }
             checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
+fn is_valid_kwarg_name(key: &Located<ExprKind>) -> bool {
+    if let ExprKind::Constant {
+        value: Constant::Str(key_str),
+        ..
+    } = &key.node
+    {
+        // can't have empty keyword args
+        if key_str.is_empty() {
+            return false;
+        }
+
+        // can't start with digit
+        if key_str
+            .chars()
+            .next()
+            .map(char::is_numeric)
+            .unwrap_or(false)
+        {
+            return false;
+        }
+
+        // only ascii digits, letters, and underscore are allowed in kwargs
+        if key_str
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return true;
+        }
+
+        // TODO: add check for spread to allow: foo(**{**bar, "buzz": 1})
+        // see: https://github.com/RustPython/RustPython/pull/4449
+
+        return false;
+    }
+    return false;
+}
+
+/// PIE804
+pub fn no_unnecessary_dict_kwargs(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    kwargs: &[Keyword],
+) {
+    for kw in kwargs {
+        if let ExprKind::Dict { keys, values } = &kw.node.value.node {
+            if keys.iter().all(is_valid_kwarg_name) {
+                let mut diagnostic = Diagnostic::new(
+                    violations::NoUnnecessaryDictKwargs,
+                    Range::from_located(expr),
+                );
+                // if checker.patch(&RuleCode::PIE804) {
+                //     diagnostic.amend(Fix::replacement(
+                //         "list".to_string(),
+                //         expr.location,
+                //         expr.end_location.unwrap(),
+                //     ));
+                // }
+                checker.diagnostics.push(diagnostic);
+            }
         }
     }
 }

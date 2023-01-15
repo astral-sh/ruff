@@ -1981,6 +1981,11 @@ where
                     flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
                 }
 
+                // flake8-pie
+                if self.settings.enabled.contains(&RuleCode::PIE804) {
+                    flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, func, keywords)
+                }
+
                 // flake8-bandit
                 if self.settings.enabled.contains(&RuleCode::S102) {
                     if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {

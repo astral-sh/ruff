@@ -6011,6 +6011,23 @@ impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
 }
 
 define_violation!(
+    pub struct NoUnnecessaryDictKwargs;
+);
+impl AlwaysAutofixableViolation for NoUnnecessaryDictKwargs {
+    fn message(&self) -> String {
+        "Unnecessary dict kwargs".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Unnecessary dict kwargs".to_string()
+    }
+
+    fn placeholder() -> Self {
+        NoUnnecessaryDictKwargs
+    }
+}
+
+define_violation!(
     pub struct PreferListBuiltin;
 );
 impl AlwaysAutofixableViolation for PreferListBuiltin {
