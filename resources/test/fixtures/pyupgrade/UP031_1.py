@@ -1,6 +1,11 @@
 # These SHOULD change
 "%(k)s" % {"k": "v"}
 
+"%(k)s" % {
+    "k": "v",
+    "i": "j"
+}
+
 "%(to_list)s" % {"to_list": []}
 
 "%(k)s" % {"k": "v", "i": 1, "j": []}
