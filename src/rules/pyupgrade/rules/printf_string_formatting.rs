@@ -170,8 +170,8 @@ fn simplify_conversion_flag(flag: &str) -> String {
     String::from_iter(parts)
 }
 
-/// Returns true if any of `conversion_flag`, `width`, `precision`, and conversion are
-/// a non-empty string
+/// Returns true if any of `conversion_flag`, `width`, `precision`, and
+/// conversion are a non-empty string
 fn any_percent_format(pf: &PercentFormatPart) -> bool {
     let mut cf_bool = false;
     let mut w_bool = false;
@@ -368,7 +368,7 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
                 // more in-depth solution
                 new_string.push(',');
             }
-            // For the ending parenthese we want to go back one indent
+            // For the ending parentheses we want to go back one indent
             new_string.push('\n');
             if indent.len() > 3 {
                 new_string.push_str(&indent[3..]);
@@ -393,7 +393,7 @@ fn fix_percent_format_dict(checker: &mut Checker, right: &Expr, left_string: &st
     let mut cleaned_string = percent_to_format(left_string);
     cleaned_string.push_str(".format");
     let right_string = clean_right_dict(checker, right);
-    // If we could not properly parse the dictionary we should return an emtpy
+    // If we could not properly parse the dictionary we should return an empty
     // string so the program knows not to fix this
     if right_string.is_empty() {
         return right_string;
@@ -402,8 +402,8 @@ fn fix_percent_format_dict(checker: &mut Checker, right: &Expr, left_string: &st
     cleaned_string
 }
 
-/// Returns true if any of `conversion_flag`, `width`, and `precision` are a non-empty
-/// string
+/// Returns true if any of `conversion_flag`, `width`, and `precision` are a
+/// non-empty string
 fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
     let mut cf_bool = false;
     let mut w_bool = false;
