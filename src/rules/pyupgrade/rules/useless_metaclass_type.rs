@@ -45,6 +45,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
             defined_in.map(std::convert::Into::into),
             &deleted,
             checker.locator,
+            checker.indexer,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {

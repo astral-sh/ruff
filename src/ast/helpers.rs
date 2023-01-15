@@ -13,7 +13,7 @@ use rustpython_parser::token::StringKind;
 
 use crate::ast::types::{Binding, BindingKind, Range};
 use crate::checkers::ast::Checker;
-use crate::source_code::{Generator, Locator, Stylist};
+use crate::source_code::{Generator, Indexer, Locator, Stylist};
 
 /// Create an `Expr` with default location from an `ExprKind`.
 pub fn create_expr(node: ExprKind) -> Expr {
@@ -601,27 +601,6 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
     }
 }
 
-/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
-/// other statements preceding it.
-pub fn preceded_by_continuation(stmt: &Stmt, locator: &Locator) -> bool {
-    // Does the previous line end in a continuation? This will have a specific
-    // false-positive, which is that if the previous line ends in a comment, it
-    // will be treated as a continuation. So we should only use this information to
-    // make conservative choices.
-    // TODO(charlie): Come up with a more robust strategy.
-    if stmt.location.row() > 1 {
-        let range = Range::new(
-            Location::new(stmt.location.row() - 1, 0),
-            Location::new(stmt.location.row(), 0),
-        );
-        let line = locator.slice_source_code_range(&range);
-        if line.trim_end().ends_with('\\') {
-            return true;
-        }
-    }
-    false
-}
-
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
 pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
     let contents = locator.slice_source_code_range(&range);
@@ -637,8 +616,17 @@ pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
-pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
-    match_leading_content(stmt, locator) || preceded_by_continuation(stmt, locator)
+pub fn preceded_by_continuation(stmt: &Stmt, indexer: &Indexer) -> bool {
+    stmt.location.row() > 1
+        && indexer
+            .continuation_lines()
+            .contains(&(stmt.location.row() - 1))
+}
+
+/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
+/// other statements preceding it.
+pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator, indexer: &Indexer) -> bool {
+    match_leading_content(stmt, locator) || preceded_by_continuation(stmt, indexer)
 }
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with

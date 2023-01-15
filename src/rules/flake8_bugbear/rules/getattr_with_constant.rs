@@ -48,7 +48,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     let mut diagnostic =
         Diagnostic::new(violations::GetAttrWithConstant, Range::from_located(expr));
     if checker.patch(diagnostic.kind.code()) {
-        let mut generator: Generator = checker.style.into();
+        let mut generator: Generator = checker.stylist.into();
         generator.unparse_expr(&attribute(obj, value), 0);
         diagnostic.amend(Fix::replacement(
             generator.generate(),

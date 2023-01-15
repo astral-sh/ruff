@@ -42,7 +42,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
                                 violations::MultiValueRepeatedKeyLiteral(
-                                    unparse_expr(&keys[i], checker.style),
+                                    unparse_expr(&keys[i], checker.stylist),
                                     is_duplicate_value,
                                 ),
                                 Range::from_located(&keys[i]),

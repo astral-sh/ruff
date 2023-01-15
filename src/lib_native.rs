@@ -10,7 +10,7 @@ use crate::resolver::Relativity;
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::{flags, pyproject, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 use crate::{directives, packaging, resolver};
 
 /// Load the relevant `Settings` for a given `Path`.
@@ -44,6 +44,9 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
     // Detect the current code style (lazily).
     let stylist = Stylist::from_contents(contents, &locator);
 
+    // Extra indices from the code.
+    let indexer: Indexer = tokens.as_slice().into();
+
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
@@ -56,6 +59,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         &settings,
         autofix.into(),

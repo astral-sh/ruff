@@ -398,7 +398,7 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
         },
         arg,
         patch,
-        checker.style,
+        checker.stylist,
     ))
 }
 
@@ -427,7 +427,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
                 keywords,
                 expr,
                 patch,
-                checker.style,
+                checker.stylist,
                 checker.locator,
             ),
             ExprKind::Attribute { attr, .. } => map_name(attr.as_str(), expr, patch),
