@@ -29,7 +29,7 @@ enum TokenType {
 /// Simplified token specialized for the task.
 #[derive(Copy, Clone)]
 struct Token<'tok> {
-    ty: TokenType,
+    type_: TokenType,
     // Underlying token.
     spanned: Option<&'tok Spanned>,
 }
@@ -37,13 +37,13 @@ struct Token<'tok> {
 impl<'tok> Token<'tok> {
     fn irrelevant() -> Token<'static> {
         Token {
-            ty: TokenType::Irrelevant,
+            type_: TokenType::Irrelevant,
             spanned: None,
         }
     }
 
     fn from_spanned(spanned: &'tok Spanned) -> Token<'tok> {
-        let ty = match &spanned.1 {
+        let type_ = match &spanned.1 {
             Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
             Tok::Newline => TokenType::Newline,
             Tok::For => TokenType::For,
@@ -62,7 +62,7 @@ impl<'tok> Token<'tok> {
         };
         Self {
             spanned: Some(spanned),
-            ty,
+            type_,
         }
     }
 }
@@ -90,13 +90,16 @@ enum ContextType {
 /// Comma context - described a comma-delimited "situation".
 #[derive(Copy, Clone)]
 struct Context {
-    ty: ContextType,
+    type_: ContextType,
     num_commas: u32,
 }
 
 impl Context {
-    fn new(ty: ContextType) -> Self {
-        Context { ty, num_commas: 0 }
+    fn new(type_: ContextType) -> Self {
+        Context {
+            type_,
+            num_commas: 0,
+        }
     }
 
     fn inc(&mut self) {
@@ -121,7 +124,8 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
     // Collapse consecutive newlines to the first one -- trailing commas are
     // added before the first newline.
     let tokens = tokens.coalesce(|previous, current| {
-        if previous.ty == TokenType::NonLogicalNewline && current.ty == TokenType::NonLogicalNewline
+        if previous.type_ == TokenType::NonLogicalNewline
+            && current.type_ == TokenType::NonLogicalNewline
         {
             Ok(previous)
         } else {
@@ -134,8 +138,8 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
 
     for (prev_prev, prev, token) in tokens.tuple_windows() {
         // Update the comma context stack.
-        match token.ty {
-            TokenType::OpeningBracket => match (prev.ty, prev_prev.ty) {
+        match token.type_ {
+            TokenType::OpeningBracket => match (prev.type_, prev_prev.type_) {
                 (TokenType::Named, TokenType::Def) => {
                     stack.push(Context::new(ContextType::FunctionParameters));
                 }
@@ -146,7 +150,7 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
                     stack.push(Context::new(ContextType::Tuple));
                 }
             },
-            TokenType::OpeningSquareBracket => match prev.ty {
+            TokenType::OpeningSquareBracket => match prev.type_ {
                 TokenType::ClosingBracket | TokenType::Named => {
                     stack.push(Context::new(ContextType::Subscript));
                 }
@@ -173,8 +177,8 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
         let context = &stack[stack.len() - 1];
 
         // Is it allowed to have a trailing comma before this token?
-        let comma_allowed = token.ty == TokenType::ClosingBracket
-            && match context.ty {
+        let comma_allowed = token.type_ == TokenType::ClosingBracket
+            && match context.type_ {
                 ContextType::No => false,
                 ContextType::FunctionParameters => true,
                 ContextType::CallArguments => true,
@@ -189,16 +193,18 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
             };
 
         // Is prev a prohibited trailing comma?
-        let comma_prohibited = prev.ty == TokenType::Comma && {
+        let comma_prohibited = prev.type_ == TokenType::Comma && {
             // Is `(1,)` or `x[1,]`?
             let is_singleton_tuplish =
-                matches!(context.ty, ContextType::Subscript | ContextType::Tuple)
+                matches!(context.type_, ContextType::Subscript | ContextType::Tuple)
                     && context.num_commas <= 1;
             // There was no non-logical newline, so prohibit (except in `(1,)` or `x[1,]`).
             if comma_allowed && !is_singleton_tuplish {
                 true
             // Lambdas not handled by comma_allowed so handle it specially.
-            } else if context.ty == ContextType::LambdaParameters && token.ty == TokenType::Colon {
+            } else if context.type_ == ContextType::LambdaParameters
+                && token.type_ == TokenType::Colon
+            {
                 true
             } else {
                 false
@@ -219,7 +225,8 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
 
         // Is prev a prohibited trailing comma on a bare tuple?
         // Approximation: any comma followed by a statement-ending newline.
-        let bare_comma_prohibited = prev.ty == TokenType::Comma && token.ty == TokenType::Newline;
+        let bare_comma_prohibited =
+            prev.type_ == TokenType::Comma && token.type_ == TokenType::Newline;
         if bare_comma_prohibited {
             let comma = prev.spanned.unwrap();
             let diagnostic = Diagnostic::new(
@@ -238,9 +245,9 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
         // - Not already present,
         // - Not on an empty (), {}, [].
         let comma_required = comma_allowed
-            && prev.ty == TokenType::NonLogicalNewline
+            && prev.type_ == TokenType::NonLogicalNewline
             && !matches!(
-                prev_prev.ty,
+                prev_prev.type_,
                 TokenType::Comma
                     | TokenType::OpeningBracket
                     | TokenType::OpeningSquareBracket
@@ -261,12 +268,12 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
 
         // Pop the current context if the current token ended it.
         // The top context is never popped (if unbalanced closing brackets).
-        let pop_context = match context.ty {
+        let pop_context = match context.type_ {
             // Lambda terminated by `:`.
-            ContextType::LambdaParameters => token.ty == TokenType::Colon,
+            ContextType::LambdaParameters => token.type_ == TokenType::Colon,
             // All others terminated by a closing bracket.
             // flake8-commas doesn't verify that it matches the opening...
-            _ => token.ty == TokenType::ClosingBracket,
+            _ => token.type_ == TokenType::ClosingBracket,
         };
         if pop_context && stack.len() > 1 {
             stack.pop();
