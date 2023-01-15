@@ -6,14 +6,14 @@ use regex::Regex;
 static NAMED_UNICODE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\\)(?:\\\\)*(\\N\{[^}]+\})").unwrap());
 
-const KEYWORDS: [&'static str; 35] = [
+const KEYWORDS: [&str; 35] = [
     "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue",
     "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import",
     "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while",
     "with", "yield",
 ];
 
-/// Equivalent to the python regex fullmatch: https://docs.python.org/3/library/re.html
+/// Equivalent to the python regex fullmatch: <https://docs.python.org/3/library/re.html>
 fn full_match(regex: &Lazy<Regex>, string: &str) -> bool {
     match regex.find(string) {
         None => false,
@@ -28,7 +28,7 @@ pub fn curly_escape(string: &str) -> String {
         if full_match(&NAMED_UNICODE_RE, part) {
             final_str.push_str(part);
         } else {
-            final_str.push_str(&part.replace("{", "{{").replace("}", "}}"));
+            final_str.push_str(&part.replace('{', "{{").replace('}', "}}"));
         }
     }
     final_str
