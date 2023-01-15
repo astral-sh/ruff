@@ -12,6 +12,7 @@ use globset::{Glob, GlobMatcher, GlobSet};
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+#[cfg(test)]
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
@@ -221,6 +222,7 @@ impl Settings {
         })
     }
 
+    #[cfg(test)]
     pub fn for_rule(rule_code: RuleCode) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
@@ -266,6 +268,7 @@ impl Settings {
         }
     }
 
+    #[cfg(test)]
     pub fn for_rules(rule_codes: Vec<RuleCode>) -> Self {
         Self {
             allowed_confusables: FxHashSet::from_iter([]),
