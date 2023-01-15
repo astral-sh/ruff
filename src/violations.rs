@@ -1277,7 +1277,7 @@ impl Violation for MagicValueComparison {
     fn message(&self) -> String {
         let MagicValueComparison(value) = self;
         format!(
-            "Magic number used in comparison, consider replacing {value} with a constant variable"
+            "Magic value used in comparison, consider replacing {value} with a constant variable"
         )
     }
 
