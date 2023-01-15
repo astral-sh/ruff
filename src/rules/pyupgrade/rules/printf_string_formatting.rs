@@ -1,13 +1,14 @@
+use once_cell::sync::Lazy;
+use regex::Regex;
+use rustpython_parser::ast::{Constant, Expr, ExprKind};
+
 use crate::ast::types::Range;
+use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyupgrade::helpers::{curly_escape, is_keyword};
 use crate::violations;
-use once_cell::sync::Lazy;
-use crate::ast::whitespace::indentation;
-use regex::Regex;
-use rustpython_parser::ast::{Expr, ExprKind, Constant};
 
 // Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
 // Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
@@ -59,7 +60,8 @@ impl PercentFormat {
     }
 }
 
-/// Gets the match from a regex and potentiall updated the value of a given integer
+/// Gets the match from a regex and potentiall updated the value of a given
+/// integer
 fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -> Option<String> {
     let flag_match = regex.find_at(string, *position);
     if let Some(flag_match) = flag_match {
@@ -143,8 +145,8 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     formats
 }
 
-/// Removes the first instance of a given element from a vector, if the item is not in the vector,
-/// nothing happens
+/// Removes the first instance of a given element from a vector, if the item is
+/// not in the vector, nothing happens
 fn remove<T: std::cmp::PartialEq + std::marker::Copy>(vec: &mut Vec<T>, item: T) {
     if let Some(index) = vec.iter().position(|&x| x == item) {
         vec.remove(index);
@@ -170,7 +172,8 @@ fn simplify_conversion_flag(flag: &str) -> String {
     String::from_iter(parts)
 }
 
-/// Returns true if any of conversion_flag, width, precision, and conversion are a non-empty string
+/// Returns true if any of conversion_flag, width, precision, and conversion are
+/// a non-empty string
 fn any_percent_format(pf: &PercentFormatPart) -> bool {
     let mut cf_bool = false;
     let mut w_bool = false;
@@ -252,10 +255,11 @@ fn percent_to_format(string: &str) -> String {
     final_string
 }
 
-/// If the tuple has one argument it removes the comma, otherwise it returns the tuple as is
+/// If the tuple has one argument it removes the comma, otherwise it returns the
+/// tuple as is
 fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
-    // FOR REVIEWER: Let me know if you want this redone in libcst, the reason I didnt is because
-    // it starts as a Tuple, but ends as a Call
+    // FOR REVIEWER: Let me know if you want this redone in libcst, the reason I
+    // didnt is because it starts as a Tuple, but ends as a Call
     let right_range = Range::new(right.location, right.end_location.unwrap());
     let mut base_string = checker
         .locator
@@ -264,29 +268,29 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
     let is_multi_line = base_string.contains('\n');
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
-            // FOR REVIEWER, if we dedice we like the just removing the last comma then delete the
-            // commented out code below
-            /*
-            let mut string = String::from('(');
-            if is_multi_line {
-                string.push('\n');
-                let indent = leading_space()
-                string.push_str(indent);
-            }
-            let sub_range = Range::from_located(elts.get(0).unwrap());
-            let sub_str = checker.locator.slice_source_code_range(&sub_range).to_string();
-            string.push_str(&sub_str);
-            if is_multi_line {
-                string.push('\n');
-            }
-            string.push(')');
-            return string
-            */
-            // FOR REVIEWER: This replaces only the last comma. I could not think of an edge case
-            // where this causes issues, but if you can let me know and I will fix
+            // FOR REVIEWER, if we dedice we like the just removing the last comma then
+            // delete the commented out code below
+            // let mut string = String::from('(');
+            // if is_multi_line {
+            // string.push('\n');
+            // let indent = leading_space()
+            // string.push_str(indent);
+            // }
+            // let sub_range = Range::from_located(elts.get(0).unwrap());
+            // let sub_str =
+            // checker.locator.slice_source_code_range(&sub_range).to_string();
+            // string.push_str(&sub_str);
+            // if is_multi_line {
+            // string.push('\n');
+            // }
+            // string.push(')');
+            // return string
+            // FOR REVIEWER: This replaces only the last comma. I could not think of an edge
+            // case where this causes issues, but if you can let me know and I
+            // will fix
 
-            // We check for is_multi_line beign false, because we do not replace the comma on multi
-            // line statement
+            // We check for is_multi_line beign false, because we do not replace the comma
+            // on multi line statement
             if !is_multi_line {
                 for (i, character) in base_string.chars().rev().enumerate() {
                     if character == ',' {
@@ -301,23 +305,26 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
     base_string
 }
 
-
-/// Converts a dictionary to a function call while preserving as much styling as possible. This
-/// function also looks for areas that might cause issues, and returns an empty string if it finds
-/// one
+/// Converts a dictionary to a function call while preserving as much styling as
+/// possible. This function also looks for areas that might cause issues, and
+/// returns an empty string if it finds one
 fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
     let whole_range = Range::new(right.location, right.end_location.unwrap());
     let whole_string = checker.locator.slice_source_code_range(&whole_range);
     let is_multi_line = whole_string.contains('\n');
     let mut new_string = String::new();
-    if let ExprKind::Dict{ keys, values } = &right.node {
+    if let ExprKind::Dict { keys, values } = &right.node {
         let mut new_vals: Vec<String> = vec![];
         let mut indent = String::new();
         let mut already_seen: Vec<String> = vec![];
         for (key, value) in keys.iter().zip(values.iter()) {
-            // The original unit tests of pyupgrade reveal that we should not rewrite non-string
-            // keys
-            if let ExprKind::Constant{ value: Constant::Str(key_string), .. } = &key.node {
+            // The original unit tests of pyupgrade reveal that we should not rewrite
+            // non-string keys
+            if let ExprKind::Constant {
+                value: Constant::Str(key_string),
+                ..
+            } = &key.node
+            {
                 // If the dictionary key is not a valid python variable name, then do not fix
                 if !PYTHON_NAME.is_match(&key_string) {
                     return new_string;
@@ -344,12 +351,13 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
                 new_string.push_str(&value_string);
                 new_vals.push(new_string);
             } else {
-                // If there are any non-string keys, we should be timid and not modify the string
+                // If there are any non-string keys, we should be timid and not modify the
+                // string
                 return new_string;
             }
         }
-        // If we couldn't parse out key values return an empty string so that we don't attempt a
-        // fix
+        // If we couldn't parse out key values return an empty string so that we don't
+        // attempt a fix
         if new_vals.is_empty() {
             return new_string;
         }
@@ -359,8 +367,8 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
                 new_string.push('\n');
                 new_string.push_str(&indent);
                 new_string.push_str(&item);
-                // This implementation adds a trailing comma always, let me know if you want a more
-                // in-depth solution
+                // This implementation adds a trailing comma always, let me know if you want a
+                // more in-depth solution
                 new_string.push(',');
             }
             // For the ending parenthese we want to go back one indent
@@ -388,18 +396,17 @@ fn fix_percent_format_dict(checker: &mut Checker, right: &Expr, left_string: &st
     let mut cleaned_string = percent_to_format(left_string);
     cleaned_string.push_str(".format");
     let right_string = clean_right_dict(checker, right);
-    // If we could not properly parse the dictionary we should return an emtpy string so the
-    // program knows not to fix this
+    // If we could not properly parse the dictionary we should return an emtpy
+    // string so the program knows not to fix this
     if right_string.is_empty() {
         return right_string;
     }
     cleaned_string.push_str(&right_string);
-    println!("{}", cleaned_string);
-    println!("-----END-----\n");
     cleaned_string
 }
 
-/// Returns true if any of conversion_flag, width, and precision are a non-empty string
+/// Returns true if any of conversion_flag, width, and precision are a non-empty
+/// string
 fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
     let mut cf_bool = false;
     let mut w_bool = false;
@@ -416,7 +423,8 @@ fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
     cf_bool || w_bool || precision_bool
 }
 
-/// Checks the string for a number of issues that mean we should not convert things
+/// Checks the string for a number of issues that mean we should not convert
+/// things
 fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
     for item in parsed {
         let fmt = match item.parts {
@@ -464,8 +472,8 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
         }
         // all dict substitutions must be named
         if let ExprKind::Dict { .. } = &right.node {
-            // Technically a value of "" would also count as `not key`, (which is what the python
-            // code uses) BUT we already have a check above for this
+            // Technically a value of "" would also count as `not key`, (which is what the
+            // python code uses) BUT we already have a check above for this
             if fmt.key.is_none() {
                 return false;
             }
@@ -475,20 +483,19 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
 }
 
 /// UP031
-pub fn printf_string_formatting(checker: &mut Checker, expr: &Expr, left: &Expr, right: &Expr) {
+pub fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
     let expr_range = Range::new(expr.location, expr.end_location.unwrap());
     let expr_string = checker.locator.slice_source_code_range(&expr_range);
-    println!("-----START-----");
-    println!("{}", expr_string);
 
     let mut the_split = MODULO_CALL.split(&expr_string);
-    // Pyupgrade does this test in the functions that change, but I am relying on this logic for
-    // something else, so I will use it here, pyupgrade notes this is an overly timid check
+    // Pyupgrade does this test in the functions that change, but I am relying on
+    // this logic for something else, so I will use it here, pyupgrade notes
+    // this is an overly timid check
     let left_string = match the_split.nth(0) {
         None => return,
         Some(item) => item,
     };
-    if  the_split.count() < 1 {
+    if the_split.count() < 1 {
         return;
     }
     let parsed = parse_percent_format(&left_string);
@@ -528,11 +535,13 @@ pub fn printf_string_formatting(checker: &mut Checker, expr: &Expr, left: &Expr,
     }
     checker.diagnostics.push(diagnostic);
 }
-// Since this one is pretty complicated, I added all of the unit tests pyupgrade has
+// Since this one is pretty complicated, I added all of the unit tests pyupgrade
+// has
 #[cfg(test)]
 mod test {
-    use super::*;
     use test_case::test_case;
+
+    use super::*;
 
     #[test]
     fn test_parse_percent_format_none() {

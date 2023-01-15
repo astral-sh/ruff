@@ -7,6 +7,7 @@ pub(crate) use native_literals::native_literals;
 use once_cell::sync::Lazy;
 pub(crate) use open_alias::open_alias;
 pub(crate) use os_error_alias::os_error_alias;
+pub(crate) use printf_string_formatting::printf_string_formatting;
 pub(crate) use redundant_open_modes::redundant_open_modes;
 use regex::Regex;
 pub(crate) use remove_six_compat::remove_six_compat;
@@ -30,7 +31,6 @@ pub(crate) use use_pep585_annotation::use_pep585_annotation;
 pub(crate) use use_pep604_annotation::use_pep604_annotation;
 pub(crate) use useless_metaclass_type::useless_metaclass_type;
 pub(crate) use useless_object_inheritance::useless_object_inheritance;
-pub(crate) use printf_string_formatting::printf_string_formatting;
 
 use crate::ast::helpers::{self};
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -46,6 +46,7 @@ mod format_literals;
 mod native_literals;
 mod open_alias;
 mod os_error_alias;
+mod printf_string_formatting;
 mod redundant_open_modes;
 mod remove_six_compat;
 mod replace_stdout_stderr;
@@ -66,7 +67,6 @@ mod use_pep585_annotation;
 mod use_pep604_annotation;
 mod useless_metaclass_type;
 mod useless_object_inheritance;
-mod printf_string_formatting;
 
 /// UP008
 pub fn super_args(

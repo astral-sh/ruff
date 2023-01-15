@@ -1,8 +1,8 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-// FOR REVIEWER: I had to rewrite this from the python implementation, so please review carefully
-// original regex was: (?<!\\)(?:\\\\)*(\\N\{[^}]+\})
+// FOR REVIEWER: I had to rewrite this from the python implementation, so please
+// review carefully original regex was: (?<!\\)(?:\\\\)*(\\N\{[^}]+\})
 static NAMED_UNICODE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\\)(?:\\\\)*(\\N\{[^}]+\})").unwrap());
 

@@ -3676,8 +3676,9 @@ impl AlwaysAutofixableViolation for PrintfStringFormatting {
     }
 
     fn placeholder() -> Self {
-        // FOR REVIEWER: Should we switch all of these to self? Is there any way to do this automatically when
-        // defining the trait (im pretty sure the answer is no, but I want to confirm)
+        // FOR REVIEWER: Should we switch all of these to self? Is there any way to do
+        // this automatically when defining the trait (im pretty sure the answer
+        // is no, but I want to confirm)
         Self
     }
 }
