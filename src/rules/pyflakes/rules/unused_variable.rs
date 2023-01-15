@@ -48,8 +48,8 @@ enum DeletionKind {
     Partial,
 }
 
-/// Generate a `Fix` to remove an unused variable assignment, given the
-/// enclosing `Stmt` and the `Range` of the variable binding.
+/// Generate a [`Fix`] to remove an unused variable assignment, given the
+/// enclosing [`Stmt`] and the [`Range`] of the variable binding.
 fn remove_unused_variable(
     stmt: &Stmt,
     range: &Range,

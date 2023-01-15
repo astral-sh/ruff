@@ -36,7 +36,7 @@ pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     trailing_comma
 }
 
-/// Return `true` if a `Stmt` is preceded by a "comment break"
+/// Return `true` if a [`Stmt`] is preceded by a "comment break"
 pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     // Starting from the `Stmt` (`def f(): pass`), we want to detect patterns like
     // this:

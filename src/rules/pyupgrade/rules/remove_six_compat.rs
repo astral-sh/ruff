@@ -8,7 +8,7 @@ use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code::{Generator, Locator, Stylist};
 use crate::violations;
 
-/// Return `true` if the `Expr` is a reference to `${module}.${any}`.
+/// Return `true` if the call path is a reference to `${module}.${any}`.
 fn is_module_member(call_path: &[&str], module: &str) -> bool {
     call_path
         .first()
