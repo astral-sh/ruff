@@ -13,11 +13,10 @@
 )]
 #![forbid(unsafe_code)]
 
-use proc_macro2::Span;
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Ident};
+use syn::{parse_macro_input, DeriveInput};
 
 mod config;
+mod define_rule_mapping;
 mod prefixes;
 mod rule_code_prefix;
 
@@ -40,21 +39,7 @@ pub fn derive_rule_code_prefix(input: proc_macro::TokenStream) -> proc_macro::To
 }
 
 #[proc_macro]
-pub fn origin_by_code(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let ident = parse_macro_input!(item as Ident).to_string();
-    let mut iter = prefixes::PREFIX_TO_ORIGIN.iter();
-    let origin = loop {
-        let (prefix, origin) = iter
-            .next()
-            .unwrap_or_else(|| panic!("code doesn't start with any recognized prefix: {ident}"));
-        if ident.starts_with(prefix) {
-            break origin;
-        }
-    };
-    let prefix = Ident::new(origin, Span::call_site());
-
-    quote! {
-        RuleOrigin::#prefix
-    }
-    .into()
+pub fn define_rule_mapping(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let mapping = parse_macro_input!(item as define_rule_mapping::Mapping);
+    define_rule_mapping::define_rule_mapping(mapping).into()
 }
