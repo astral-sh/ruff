@@ -13,7 +13,7 @@ use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
 use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::violation::Violation;
-use crate::violations;
+use crate::{rules, violations};
 
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
@@ -152,8 +152,8 @@ ruff_macros::define_rule_mapping!(
     // mccabe
     C901 => violations::FunctionIsTooComplex,
     // flake8-tidy-imports
-    TID251 => violations::BannedApi,
-    TID252 => violations::RelativeImports,
+    TID251 => rules::flake8_tidy_imports::banned_api::BannedApi,
+    TID252 => rules::flake8_tidy_imports::relative_imports::RelativeImports,
     // flake8-return
     RET501 => violations::UnnecessaryReturnNone,
     RET502 => violations::ImplicitReturnValue,

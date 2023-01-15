@@ -7,23 +7,9 @@ use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::banned_api::ApiBan;
+use super::relative_imports::Strictness;
 use crate::settings::hashable::HashableHashMap;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum Strictness {
-    /// Ban imports that extend into the parent module or beyond.
-    Parents,
-    /// Ban all relative imports.
-    All,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct ApiBan {
-    /// The message to display when the API is used.
-    pub msg: String,
-}
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
