@@ -1,0 +1,81 @@
+---
+source: compiler/parser/src/parser.rs
+expression: parse_ast
+---
+Located {
+    location: Location {
+        row: 1,
+        column: 0,
+    },
+    end_location: Some(
+        Location {
+            row: 1,
+            column: 15,
+        },
+    ),
+    custom: (),
+    node: Dict {
+        keys: [
+            Some(
+                Located {
+                    location: Location {
+                        row: 1,
+                        column: 1,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 4,
+                        },
+                    ),
+                    custom: (),
+                    node: Constant {
+                        value: Str(
+                            "k",
+                        ),
+                        kind: None,
+                    },
+                },
+            ),
+            None,
+        ],
+        values: [
+            Located {
+                location: Location {
+                    row: 1,
+                    column: 6,
+                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 9,
+                    },
+                ),
+                custom: (),
+                node: Constant {
+                    value: Str(
+                        "v",
+                    ),
+                    kind: None,
+                },
+            },
+            Located {
+                location: Location {
+                    row: 1,
+                    column: 13,
+                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 14,
+                    },
+                ),
+                custom: (),
+                node: Name {
+                    id: "d",
+                    ctx: Load,
+                },
+            },
+        ],
+    },
+}

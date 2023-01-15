@@ -195,7 +195,7 @@ pub enum ExprKind<U = ()> {
         orelse: Box<Expr<U>>,
     },
     Dict {
-        keys: Vec<Expr<U>>,
+        keys: Vec<Option<Expr<U>>>,
         values: Vec<Expr<U>>,
     },
     Set {

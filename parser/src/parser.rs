@@ -309,4 +309,10 @@ with (0 as a, 1 as b,): pass
             assert!(parse_program(source, "<test>").is_err());
         }
     }
+
+    #[test]
+    fn test_dict_containing_spread() {
+        let parse_ast = parse_expression(r#"{"k": "v", **d}"#, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }
