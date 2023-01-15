@@ -1632,20 +1632,20 @@ pub fn ambiguous_unicode_character(
                     let end_location = Location::new(location.row(), location.column() + 1);
                     let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
                         match context {
-                            Context::String => violations::AmbiguousUnicodeCharacterString(
-                                current_char,
+                            Context::String => violations::AmbiguousUnicodeCharacterString {
+                                confusable: current_char,
                                 representant,
-                            )
+                            }
                             .into(),
-                            Context::Docstring => violations::AmbiguousUnicodeCharacterDocstring(
-                                current_char,
+                            Context::Docstring => violations::AmbiguousUnicodeCharacterDocstring {
+                                confusable: current_char,
                                 representant,
-                            )
+                            }
                             .into(),
-                            Context::Comment => violations::AmbiguousUnicodeCharacterComment(
-                                current_char,
+                            Context::Comment => violations::AmbiguousUnicodeCharacterComment {
+                                confusable: current_char,
                                 representant,
-                            )
+                            }
                             .into(),
                         },
                         Range::new(location, end_location),

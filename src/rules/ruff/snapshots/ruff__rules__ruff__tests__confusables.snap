@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     AmbiguousUnicodeCharacterString:
-      - 𝐁
-      - B
+      confusable: 𝐁
+      representant: B
   location:
     row: 1
     column: 5
@@ -23,8 +23,8 @@ expression: diagnostics
   parent: ~
 - kind:
     AmbiguousUnicodeCharacterDocstring:
-      - ）
-      - )
+      confusable: ）
+      representant: )
   location:
     row: 6
     column: 55
@@ -42,8 +42,8 @@ expression: diagnostics
   parent: ~
 - kind:
     AmbiguousUnicodeCharacterComment:
-      - ᜵
-      - /
+      confusable: ᜵
+      representant: /
   location:
     row: 7
     column: 61
