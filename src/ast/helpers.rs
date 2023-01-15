@@ -614,6 +614,36 @@ pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
     range
 }
 
+/// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
+pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
+    let StmtKind::If { body, orelse, .. } = &stmt.node else {
+        return None;
+    };
+
+    let start = body
+        .last()
+        .expect("Expected body to be non-empty")
+        .end_location
+        .unwrap();
+    let end = match &orelse[..] {
+        [Stmt {
+            node: StmtKind::If { test, .. },
+            ..
+        }] => test.location,
+        [stmt, ..] => stmt.location,
+        _ => return None,
+    };
+    let contents = locator.slice_source_code_range(&Range::new(start, end));
+    let range = lexer::make_tokenizer_located(&contents, start)
+        .flatten()
+        .find(|(_, kind, _)| matches!(kind, Tok::Elif | Tok::Else))
+        .map(|(location, _, end_location)| Range {
+            location,
+            end_location,
+        });
+    range
+}
+
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
 pub fn preceded_by_continuation(stmt: &Stmt, indexer: &Indexer) -> bool {
@@ -709,7 +739,7 @@ mod tests {
     use rustpython_parser::parser;
 
     use crate::ast::helpers::{
-        else_range, first_colon_range, identifier_range, match_trailing_content,
+        elif_else_range, else_range, first_colon_range, identifier_range, match_trailing_content,
     };
     use crate::ast::types::Range;
     use crate::source_code::Locator;
@@ -855,5 +885,40 @@ else:
         assert_eq!(range.location.column(), 6);
         assert_eq!(range.end_location.row(), 1);
         assert_eq!(range.end_location.column(), 7);
+    }
+
+    #[test]
+    fn test_elif_else_range() -> Result<()> {
+        let contents = "
+if a:
+    ...
+elif b:
+    ...
+"
+        .trim_start();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = Locator::new(contents);
+        let range = elif_else_range(stmt, &locator).unwrap();
+        assert_eq!(range.location.row(), 3);
+        assert_eq!(range.location.column(), 0);
+        assert_eq!(range.end_location.row(), 3);
+        assert_eq!(range.end_location.column(), 4);
+        let contents = "
+if a:
+    ...
+else:
+    ...
+"
+        .trim_start();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = Locator::new(contents);
+        let range = elif_else_range(stmt, &locator).unwrap();
+        assert_eq!(range.location.row(), 3);
+        assert_eq!(range.location.column(), 0);
+        assert_eq!(range.end_location.row(), 3);
+        assert_eq!(range.end_location.column(), 4);
+        Ok(())
     }
 }
