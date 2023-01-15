@@ -311,7 +311,7 @@ with (0 as a, 1 as b,): pass
     }
 
     #[test]
-    fn test_dict_containing_spread() {
+    fn test_dict_unpacking() {
         let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
