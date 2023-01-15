@@ -2,7 +2,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::rules::pyupgrade::helpers::curly_escape;
+use crate::rules::pyupgrade::helpers::{curly_escape, is_keyword};
 use crate::violations;
 use once_cell::sync::Lazy;
 use crate::ast::whitespace::indentation;
@@ -18,6 +18,7 @@ static WIDTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\*|\d*)").unwrap());
 static PRECISION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\.(?:\*|\d*))?").unwrap());
 static LENGTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[hlL]?").unwrap());
 static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % (\(|\{)").unwrap());
+static PYTHON_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\W0-9]\w*").unwrap());
 
 #[derive(Debug, PartialEq, Clone)]
 struct PercentFormatPart {
@@ -301,6 +302,9 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
 }
 
 
+/// Converts a dictionary to a function call while preserving as much styling as possible. This
+/// function also looks for areas that might cause issues, and returns an empty string if it finds
+/// one
 fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
     let whole_range = Range::new(right.location, right.end_location.unwrap());
     let whole_string = checker.locator.slice_source_code_range(&whole_range);
@@ -309,10 +313,26 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
     if let ExprKind::Dict{ keys, values } = &right.node {
         let mut new_vals: Vec<String> = vec![];
         let mut indent = String::new();
+        let mut already_seen: Vec<String> = vec![];
         for (key, value) in keys.iter().zip(values.iter()) {
             // The original unit tests of pyupgrade reveal that we should not rewrite non-string
             // keys
             if let ExprKind::Constant{ value: Constant::Str(key_string), .. } = &key.node {
+                // If the dictionary key is not a valid python variable name, then do not fix
+                if !PYTHON_NAME.is_match(&key_string) {
+                    return new_string;
+                }
+                // We should not rewrite if the key is a python keyword
+                if is_keyword(&key_string) {
+                    return new_string;
+                }
+                // If there are multiple entries of the same key, we need to return because we
+                // cannot handle this ambiguity
+                if already_seen.contains(key_string) {
+                    return new_string;
+                } else {
+                    already_seen.push(key_string.clone());
+                }
                 let mut new_string = String::new();
                 if is_multi_line && indent.is_empty() {
                     indent = indentation(checker, key).to_string();
@@ -323,6 +343,9 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> String {
                 new_string.push('=');
                 new_string.push_str(&value_string);
                 new_vals.push(new_string);
+            } else {
+                // If there are any non-string keys, we should be timid and not modify the string
+                return new_string;
             }
         }
         // If we couldn't parse out key values return an empty string so that we don't attempt a
@@ -371,7 +394,8 @@ fn fix_percent_format_dict(checker: &mut Checker, right: &Expr, left_string: &st
         return right_string;
     }
     cleaned_string.push_str(&right_string);
-    println!("{}\n", cleaned_string);
+    println!("{}", cleaned_string);
+    println!("-----END-----\n");
     cleaned_string
 }
 
@@ -454,6 +478,8 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
 pub fn printf_string_formatting(checker: &mut Checker, expr: &Expr, left: &Expr, right: &Expr) {
     let expr_range = Range::new(expr.location, expr.end_location.unwrap());
     let expr_string = checker.locator.slice_source_code_range(&expr_range);
+    println!("-----START-----");
+    println!("{}", expr_string);
 
     let mut the_split = MODULO_CALL.split(&expr_string);
     // Pyupgrade does this test in the functions that change, but I am relying on this logic for

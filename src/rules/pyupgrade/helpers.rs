@@ -3,7 +3,15 @@ use regex::Regex;
 
 // FOR REVIEWER: I had to rewrite this from the python implementation, so please review carefully
 // original regex was: (?<!\\)(?:\\\\)*(\\N\{[^}]+\})
-static NAMED_UNICODE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(\\)(?:\\\\)*(\\N\{[^}]+\})").unwrap());
+static NAMED_UNICODE_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(\\)(?:\\\\)*(\\N\{[^}]+\})").unwrap());
+
+const KEYWORDS: [&'static str; 35] = [
+    "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue",
+    "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import",
+    "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while",
+    "with", "yield",
+];
 
 /// Equivalent to the python regex fullmatch: https://docs.python.org/3/library/re.html
 fn full_match(regex: &Lazy<Regex>, string: &str) -> bool {
@@ -24,4 +32,9 @@ pub fn curly_escape(string: &str) -> String {
         }
     }
     final_str
+}
+
+/// Whether or not a given string is a python keyword
+pub fn is_keyword(string: &str) -> bool {
+    KEYWORDS.contains(&string)
 }

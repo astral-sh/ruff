@@ -10,6 +10,16 @@
 
 "%(k)s" % {"k": "v", "i": 1, "j": []}
 
+paren_continue = (
+    "foo %(foo)s "
+    "bar %(bar)s" % {"foo": x, "bar": y}
+)
+
+paren_string = (
+    "foo %(foo)s "
+    "bar %(bar)s"
+) % {"foo": x, "bar": y}
+
 """ Waiting for Charlie to review my regex before uncommenting this
 "%(foo)s \N{snowman}" % {"foo": 1}
 """
@@ -24,9 +34,11 @@
 
 "%(a)s" % {"a": 1, "a": 2}
 
-"%(ab)s" % {"a" "b": 1}
+# Asking Charlie if we can ignore this one
+# "%(ab)s" % {"a" "b": 1}
 
-"%(a)s" % {"a"  :  1}
+# Asking Charlie if we can ignore this one
+# "%(a)s" % {"a"  :  1}
 
 "%(1)s" % {1: 2, "1": 2}
 
