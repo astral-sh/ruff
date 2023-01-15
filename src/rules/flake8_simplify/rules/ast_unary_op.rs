@@ -40,7 +40,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
             unparse_expr(left, checker.style),
             unparse_expr(&comparators[0], checker.style),
         ),
-        Range::from_located(operand),
+        Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
@@ -84,7 +84,7 @@ pub fn negation_with_not_equal_op(
             unparse_expr(left, checker.style),
             unparse_expr(&comparators[0], checker.style),
         ),
-        Range::from_located(operand),
+        Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
@@ -117,7 +117,7 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
 
     let mut diagnostic = Diagnostic::new(
         violations::DoubleNegation(operand.to_string()),
-        Range::from_located(operand),
+        Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
