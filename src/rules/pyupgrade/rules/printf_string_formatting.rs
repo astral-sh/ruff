@@ -480,7 +480,7 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
 }
 
 /// UP031
-pub fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
+pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
     let expr_range = Range::new(expr.location, expr.end_location.unwrap());
     let expr_string = checker.locator.slice_source_code_range(&expr_range);
 
