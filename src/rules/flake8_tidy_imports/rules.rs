@@ -1,10 +1,10 @@
-use rustc_hash::FxHashMap;
 use rustpython_ast::{Alias, Expr, Located, Stmt};
 
 use super::settings::{BannedApi, Strictness};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::settings::hashable::HashableHashMap;
 use crate::violations;
 
 /// TID252
@@ -31,7 +31,7 @@ pub fn banned_relative_import(
 pub fn name_is_banned(
     module: &str,
     name: &Alias,
-    banned_apis: &FxHashMap<String, BannedApi>,
+    banned_apis: &HashableHashMap<String, BannedApi>,
 ) -> Option<Diagnostic> {
     let full_name = format!("{module}.{}", &name.node.name);
     if let Some(ban) = banned_apis.get(&full_name) {
@@ -50,7 +50,7 @@ pub fn name_is_banned(
 pub fn name_or_parent_is_banned<T>(
     located: &Located<T>,
     name: &str,
-    banned_apis: &FxHashMap<String, BannedApi>,
+    banned_apis: &HashableHashMap<String, BannedApi>,
 ) -> Option<Diagnostic> {
     let mut name = name;
     loop {
@@ -75,7 +75,7 @@ pub fn name_or_parent_is_banned<T>(
 /// TID251
 pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
     if let Some(call_path) = checker.resolve_call_path(expr) {
-        for (banned_path, ban) in &checker.settings.flake8_tidy_imports.banned_api {
+        for (banned_path, ban) in checker.settings.flake8_tidy_imports.banned_api.iter() {
             if call_path == banned_path.split('.').collect::<Vec<_>>() {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::BannedApi {

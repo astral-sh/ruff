@@ -64,7 +64,8 @@ mod tests {
                                 msg: "Use typing_extensions.TypedDict instead.".to_string(),
                             },
                         ),
-                    ]),
+                    ])
+                    .into(),
                     ..Default::default()
                 },
                 ..Settings::for_rules(vec![RuleCode::TID251])
