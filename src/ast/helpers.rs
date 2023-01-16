@@ -94,6 +94,45 @@ pub fn contains_call_path(checker: &Checker, expr: &Expr, target: &[&str]) -> bo
     })
 }
 
+/// Return `true` if the `Expr` contains an expression that appears to include a
+/// side-effect (like a function call).
+pub fn contains_effect(checker: &Checker, expr: &Expr) -> bool {
+    any_over_expr(expr, &|expr| {
+        // Accept empty initializers.
+        if let ExprKind::Call {
+            func,
+            args,
+            keywords,
+        } = &expr.node
+        {
+            if args.is_empty() && keywords.is_empty() {
+                if let ExprKind::Name { id, .. } = &func.node {
+                    let is_empty_initializer = (id == "set"
+                        || id == "list"
+                        || id == "tuple"
+                        || id == "dict"
+                        || id == "frozenset")
+                        && checker.is_builtin(id);
+                    return !is_empty_initializer;
+                }
+            }
+        }
+
+        // Otherwise, avoid all complex expressions.
+        matches!(
+            expr.node,
+            ExprKind::Call { .. }
+                | ExprKind::Await { .. }
+                | ExprKind::GeneratorExp { .. }
+                | ExprKind::ListComp { .. }
+                | ExprKind::SetComp { .. }
+                | ExprKind::DictComp { .. }
+                | ExprKind::Yield { .. }
+                | ExprKind::YieldFrom { .. }
+        )
+    })
+}
+
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
 /// returns `true`..
 pub fn any_over_expr<F>(expr: &Expr, func: &F) -> bool
