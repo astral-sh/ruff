@@ -7,17 +7,8 @@ pub mod options;
 pub mod banned_api;
 pub mod relative_imports;
 
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Default)]
 pub struct Settings {
     pub ban_relative_imports: Strictness,
     pub banned_api: HashableHashMap<String, ApiBan>,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            ban_relative_imports: Strictness::Parents,
-            banned_api: HashableHashMap::default(),
-        }
-    }
 }
