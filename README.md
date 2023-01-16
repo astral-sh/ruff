@@ -842,7 +842,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
 | B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
 | B027 | EmptyMethodWithoutAbstractDecorator | `...` is an empty method in an abstract base class, but has no abstract decorator |  |
-| B904 | RaiseWithoutFromInsideExcept | Within an except clause, raise exceptions with raise ... from err or raise ... from None to distinguish them from errors in exception handling |  |
+| B904 | RaiseWithoutFromInsideExcept | Within an except clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |  |
 | B905 | ZipWithoutExplicitStrict | `zip()` without an explicit `strict=` parameter |  |
 
 ### flake8-builtins (A)

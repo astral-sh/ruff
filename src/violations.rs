@@ -1781,8 +1781,8 @@ define_violation!(
 );
 impl Violation for RaiseWithoutFromInsideExcept {
     fn message(&self) -> String {
-        "Within an except clause, raise exceptions with raise ... from err or raise ... from None \
-         to distinguish them from errors in exception handling"
+        "Within an except clause, raise exceptions with `raise ... from err` or `raise ... from \
+         None` to distinguish them from errors in exception handling"
             .to_string()
     }
 
