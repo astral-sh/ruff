@@ -7,6 +7,8 @@ use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
+pub type Settings = Strictness;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Strictness {

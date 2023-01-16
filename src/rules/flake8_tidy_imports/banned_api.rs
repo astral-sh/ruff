@@ -7,7 +7,10 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
+use crate::settings::hashable::HashableHashMap;
 use crate::violation::Violation;
+
+pub type Settings = HashableHashMap<String, ApiBan>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
