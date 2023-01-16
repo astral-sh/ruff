@@ -45,7 +45,7 @@ impl FormatFunction {
         let mut invalid = false;
         if let ExprKind::Call { args, keywords, .. } = &expr.node {
             for arg in args {
-                let arg_range = Range::from_located(&arg);
+                let arg_range = Range::from_located(arg);
                 let arg_string = checker.locator.slice_source_code_range(&arg_range);
                 invalid = contains_invalids(&arg_string);
                 final_args.push(arg_string.to_string());
@@ -54,7 +54,7 @@ impl FormatFunction {
             for keyword in keywords {
                 let KeywordData { arg, value } = &keyword.node;
                 if let Some(key) = arg {
-                    let kwarg_range = Range::from_located(&value);
+                    let kwarg_range = Range::from_located(value);
                     let kwarg_string = checker.locator.slice_source_code_range(&kwarg_range);
                     invalid = contains_invalids(&kwarg_string);
                     final_kwargs.insert(key.to_string(), kwarg_string.to_string());
@@ -74,7 +74,7 @@ impl FormatFunction {
     }
 
     fn consume_arg(&mut self) -> Option<String> {
-        if self.args.len() > 0 {
+        if !self.args.is_empty() {
             Some(self.args.remove(0))
         } else {
             None
@@ -139,7 +139,7 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                 }
                 Some(item) => item,
             };
-            if let Ok(second_part) = extract_caps(&caps, "fmt") {
+            if let Ok(second_part) = extract_caps(caps, "fmt") {
                 format!("{{{}{}}}", kwarg, second_part)
             } else {
                 had_error = true;
@@ -153,7 +153,7 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                 }
                 Some(item) => item,
             };
-            if let Ok(second_part) = extract_caps(&caps, "fmt") {
+            if let Ok(second_part) = extract_caps(caps, "fmt") {
                 format!("{{{}{}}}", arg, second_part)
             } else {
                 had_error = true;
@@ -193,7 +193,7 @@ fn generate_f_string(
 
 /// UP032
 pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) {
-    let expr_range = Range::from_located(&expr);
+    let expr_range = Range::from_located(expr);
     let expr_string = checker.locator.slice_source_code_range(&expr_range);
     // Pyupgrade says we should not try and refactor multi-line statements
     if expr_string.contains('\n') {
