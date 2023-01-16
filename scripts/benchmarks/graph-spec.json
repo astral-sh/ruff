@@ -1,0 +1,209 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {
+    "values": [
+      {
+        "tool": "Ruff",
+        "time": 0.2943,
+        "timeFormat": "0.29s"
+      },
+      {
+        "tool": "Autoflake",
+        "time": 6.175,
+        "timeFormat": "6.18s"
+      },
+      {
+        "tool": "Flake8",
+        "time": 12.26,
+        "timeFormat": "12.26s"
+      },
+      {
+        "tool": "Pyflakes",
+        "time": 15.786,
+        "timeFormat": "15.79s"
+      },
+      {
+        "tool": "Pycodestyle",
+        "time": 46.921,
+        "timeFormat": "46.92s"
+      },
+      {
+        "tool": "Pylint",
+        "time": 62.0,
+        "timeFormat": "> 60s"
+      }
+    ]
+  },
+  "config": {
+    "params": [
+      {
+        "name": "defaultFont",
+        "value": "-apple-system,BlinkMacSystemFont,\"Segoe UI\",Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\""
+      },
+      {
+        "name": "titleColor",
+        "value": "#333333"
+      },
+      {
+        "name": "labelColor",
+        "value": "#333333"
+      }
+    ],
+    "header": {
+      "labelFont": {
+        "expr": "defaultFont"
+      },
+      "titleFont": {
+        "expr": "defaultFont"
+      },
+      "titleFontWeight": 500
+    },
+    "text": {
+      "font": {
+        "expr": "defaultFont"
+      },
+      "color": {
+        "expr": "labelColor"
+      }
+    },
+    "mark": {
+      "font": {
+        "expr": "defaultFont"
+      },
+      "color": {
+        "expr": "labelColor"
+      }
+    },
+    "title": {
+      "font": {
+        "expr": "defaultFont"
+      },
+      "subtitleFont": {
+        "expr": "defaultFont"
+      },
+      "fontWeight": 500
+    },
+    "axis": {
+      "labelColor": {
+        "expr": "labelColor"
+      },
+      "labelFont": {
+        "expr": "defaultFont"
+      },
+      "titleFont": {
+        "expr": "defaultFont"
+      },
+      "titleFontWeight": 500,
+      "titleColor": {
+        "expr": "titleColor"
+      },
+      "titleFontSize": 12
+    },
+    "legend": {
+      "titleFontWeight": 500,
+      "titleColor": {
+        "expr": "titleColor"
+      },
+      "titleFontSize": 12,
+      "labelColor": {
+        "expr": "labelColor"
+      },
+      "labelFont": {
+        "expr": "defaultFont"
+      },
+      "titleFont": {
+        "expr": "defaultFont"
+      }
+    },
+    "view": {
+      "stroke": null
+    },
+    "background": "transparent"
+  },
+  "background": "transparent",
+  "encoding": {
+    "y": {
+      "field": "tool",
+      "type": "nominal",
+      "axis": {
+        "grid": false,
+        "title": null,
+        "labelFontSize": 12,
+        "ticks": false,
+        "labelPadding": 10,
+        "domain": false
+      },
+      "sort": null
+    },
+    "x": {
+      "field": "time",
+      "type": "quantitative",
+      "axis": {
+        "title": null,
+        "labelExpr": "datum.value + 's'",
+        "tickCount": 3,
+        "tickSize": 0,
+        "labelPadding": 6,
+        "labelAlign": "center",
+        "labelFontSize": 12,
+        "tickColor": "rgba(127,127,127,0.25)",
+        "gridColor": "rgba(127,127,127,0.25)",
+        "domain": false
+      }
+    }
+  },
+  "height": 140,
+  "width": "container",
+  "layer": [
+    {
+      "mark": "bar",
+      "encoding": {
+        "size": {
+          "value": 13
+        },
+        "color": {
+          "value": "#E15759"
+        }
+      }
+    },
+    {
+      "transform": [
+        {
+          "filter": "datum.tool !== 'ruff'"
+        }
+      ],
+      "mark": {
+        "type": "text",
+        "align": "left",
+        "baseline": "middle",
+        "dx": 6,
+        "fontSize": 12
+      },
+      "encoding": {
+        "text": {
+          "field": "timeFormat"
+        }
+      }
+    },
+    {
+      "transform": [
+        {
+          "filter": "datum.tool === 'ruff'"
+        }
+      ],
+      "mark": {
+        "type": "text",
+        "align": "left",
+        "baseline": "middle",
+        "dx": 6,
+        "fontSize": 12,
+        "fontWeight": "bold"
+      },
+      "encoding": {
+        "text": {
+          "field": "timeFormat"
+        }
+      }
+    }
+  ]
+}
