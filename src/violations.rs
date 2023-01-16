@@ -5971,15 +5971,16 @@ impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
 }
 
 define_violation!(
-    pub struct PreferUniqueEnums;
+    pub struct PreferUniqueEnums(pub String);
 );
 impl Violation for PreferUniqueEnums {
     fn message(&self) -> String {
-        "Consider using removing dupe values.".to_string()
+        let PreferUniqueEnums(value) = self;
+        format!("Enum contains duplicate value: {value}")
     }
 
     fn placeholder() -> Self {
-        PreferUniqueEnums
+        PreferUniqueEnums("...".to_string())
     }
 }
 

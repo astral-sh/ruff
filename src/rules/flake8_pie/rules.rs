@@ -2,6 +2,8 @@ use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
+use crate::ast::comparable::ComparableExpr;
+use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -131,23 +133,17 @@ where
         return;
     }
 
-    let mut seen_targets: FxHashSet<String> = FxHashSet::default();
+    let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
     for stmt in body {
-        let target = match &stmt.node {
-            StmtKind::Assign { value, .. } => match &value.node {
-                ExprKind::Constant { value, .. } => value.to_string(),
-                _ => {
-                    continue;
-                }
-            },
-            _ => {
-                continue;
-            }
+        let StmtKind::Assign { value, .. } = &stmt.node else {
+            continue;
         };
 
-        if !seen_targets.insert(target) {
-            let diagnostic =
-                Diagnostic::new(violations::PreferUniqueEnums, Range::from_located(stmt));
+        if !seen_targets.insert(ComparableExpr::from(value)) {
+            let diagnostic = Diagnostic::new(
+                violations::PreferUniqueEnums(unparse_expr(value, checker.stylist)),
+                Range::from_located(stmt),
+            );
             checker.diagnostics.push(diagnostic);
         }
     }

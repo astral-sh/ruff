@@ -3,7 +3,7 @@ source: src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PreferUniqueEnums: ~
+    PreferUniqueEnums: "\"B\""
   location:
     row: 4
     column: 4
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums: ~
+    PreferUniqueEnums: "2"
   location:
     row: 10
     column: 4
@@ -23,7 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums: ~
+    PreferUniqueEnums: "\"2\""
   location:
     row: 16
     column: 4
@@ -33,7 +33,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums: ~
+    PreferUniqueEnums: "2.5"
   location:
     row: 21
     column: 4
@@ -43,7 +43,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums: ~
+    PreferUniqueEnums: "False"
   location:
     row: 28
     column: 4
@@ -53,7 +53,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums: ~
+    PreferUniqueEnums: None
   location:
     row: 35
     column: 4
@@ -63,7 +63,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums: ~
+    PreferUniqueEnums: "2"
   location:
     row: 48
     column: 4
