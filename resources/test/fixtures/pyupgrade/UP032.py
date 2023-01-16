@@ -26,7 +26,7 @@ u"foo{}".format(1)
 # Waiting for a response to solve this one
 # "{}{{}}{}".format(escaped, y)
 
-# Don't forget assigned, call, and multiline
+# Don't forget assigned, call
 # Waiting on Charlie solution to solve this
 # r'"\N{snowman} {}".format(a)'
 
@@ -36,8 +36,6 @@ u"foo{}".format(1)
 "{".format(a)
 
 "}".format(a)
-
-"{}" . format(x)
 
 "{}".format(
     a

@@ -16,7 +16,7 @@ use crate::violations;
 static NAME_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<name>[^\W0-9]\w*)?(?P<fmt>.*?)}").unwrap());
 
-static HAS_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"[.*]").unwrap());
+static HAS_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*\]").unwrap());
 
 #[derive(Debug)]
 struct FormatFunction {
@@ -29,7 +29,7 @@ struct FormatFunction {
 /// Whether the given string contains characters that are FORBIDDEN in args and
 /// kwargs
 fn contains_invalids(string: &str) -> bool {
-    let invalids = vec!['*', '\'', '"'];
+    let invalids = vec!["*", "'", "\"", "await"];
     for invalid in invalids {
         if string.contains(invalid) {
             return true;
@@ -95,16 +95,13 @@ impl FormatFunction {
     }
 }
 
-
 fn extract_caps(caps: &Captures, target: &str) -> Result<String, ()> {
     let new_string = match caps.name(target) {
-        None => {
-            return Err(())
-        }
+        None => return Err(()),
         Some(item) => item.as_str(),
     };
     if HAS_BRACKETS.is_match(new_string) {
-        return Err(())
+        return Err(());
     }
     Ok(new_string.to_string())
 }
@@ -252,7 +249,7 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
-            invalid: false
+            invalid: false,
         };
         let checks_out = form_func.check_with_summary(&summary);
         assert!(checks_out);
@@ -275,7 +272,7 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
-            invalid: false
+            invalid: false,
         };
         let checks_out = form_func.check_with_summary(&summary);
         assert!(!checks_out);
@@ -298,7 +295,7 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
-            invalid: false
+            invalid: false,
         };
         let checks_out = form_func.check_with_summary(&summary);
         assert!(!checks_out);
@@ -321,7 +318,7 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
-            invalid: false
+            invalid: false,
         };
         let checks_out = form_func.check_with_summary(&summary);
         assert!(checks_out);
