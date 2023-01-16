@@ -2192,11 +2192,11 @@ impl Violation for BannedApi {
 }
 
 define_violation!(
-    pub struct BannedRelativeImport(pub Strictness);
+    pub struct RelativeImports(pub Strictness);
 );
-impl Violation for BannedRelativeImport {
+impl Violation for RelativeImports {
     fn message(&self) -> String {
-        let BannedRelativeImport(strictness) = self;
+        let RelativeImports(strictness) = self;
         match strictness {
             Strictness::Parents => "Relative imports from parent modules are banned".to_string(),
             Strictness::All => "Relative imports are banned".to_string(),
@@ -2204,7 +2204,7 @@ impl Violation for BannedRelativeImport {
     }
 
     fn placeholder() -> Self {
-        BannedRelativeImport(Strictness::All)
+        RelativeImports(Strictness::All)
     }
 }
 

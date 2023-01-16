@@ -3,7 +3,7 @@ source: src/rules/flake8_tidy_imports/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BannedRelativeImport: all
+    RelativeImports: all
   location:
     row: 1
     column: 0
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedRelativeImport: all
+    RelativeImports: all
   location:
     row: 2
     column: 0
@@ -23,7 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedRelativeImport: all
+    RelativeImports: all
   location:
     row: 4
     column: 0
@@ -33,7 +33,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedRelativeImport: all
+    RelativeImports: all
   location:
     row: 5
     column: 0
@@ -43,7 +43,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedRelativeImport: all
+    RelativeImports: all
   location:
     row: 7
     column: 0
@@ -53,7 +53,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedRelativeImport: all
+    RelativeImports: all
   location:
     row: 8
     column: 0

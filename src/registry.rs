@@ -153,7 +153,7 @@ ruff_macros::define_rule_mapping!(
     C901 => violations::FunctionIsTooComplex,
     // flake8-tidy-imports
     TID251 => violations::BannedApi,
-    TID252 => violations::BannedRelativeImport,
+    TID252 => violations::RelativeImports,
     // flake8-return
     RET501 => violations::UnnecessaryReturnNone,
     RET502 => violations::ImplicitReturnValue,
