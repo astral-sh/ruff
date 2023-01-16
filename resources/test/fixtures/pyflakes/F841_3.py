@@ -44,3 +44,14 @@ def f():
         1 / 0
     except (ValueError, ZeroDivisionError) as x2:
         pass
+
+
+def f(a, b):
+    x = (
+        a
+        if a is not None
+        else b
+    )
+
+    y = \
+        a if a is not None else b
