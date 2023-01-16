@@ -140,7 +140,7 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                 Some(item) => item,
             };
             if let Ok(second_part) = extract_caps(caps, "fmt") {
-                format!("{{{}{}}}", kwarg, second_part)
+                format!("{{{kwarg}{second_part}}}")
             } else {
                 had_error = true;
                 "badstring".to_string()
@@ -154,7 +154,7 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                 Some(item) => item,
             };
             if let Ok(second_part) = extract_caps(caps, "fmt") {
-                format!("{{{}{}}}", arg, second_part)
+                format!("{{{arg}{second_part}}}")
             } else {
                 had_error = true;
                 "badstring".to_string()
@@ -164,7 +164,7 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
     if had_error {
         return None;
     }
-    Some(format!("f\"{}\"", clean_string))
+    Some(format!("f\"{clean_string}\""))
 }
 
 fn generate_f_string(
