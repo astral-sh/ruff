@@ -23,13 +23,15 @@
 
 u"foo{}".format(1)
 
+x = "{a}".format(a=1)
+
+print("foo {} ".format(x))
+
 # Waiting for a response to solve this one
 # "{}{{}}{}".format(escaped, y)
 
-# Don't forget assigned, call
 # Waiting on Charlie solution to solve this
 # r'"\N{snowman} {}".format(a)'
-
 
 # These should NOT change
 
