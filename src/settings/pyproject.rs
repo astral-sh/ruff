@@ -575,7 +575,7 @@ other-attribute = 1
                     docstring_quotes: Some(Quote::Double),
                     avoid_escape: Some(true),
                 }),
-                flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
+                flake8_tidy_imports: Some(flake8_tidy_imports::options::Options {
                     ban_relative_imports: Some(Strictness::Parents),
                     banned_api: Some(FxHashMap::from_iter([
                         (

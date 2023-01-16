@@ -1,7 +1,5 @@
 //! Settings for the `flake8-tidy-imports` plugin.
 
-use std::hash::Hash;
-
 use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
@@ -9,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use super::banned_api::ApiBan;
 use super::relative_imports::Strictness;
-use crate::settings::hashable::HashableHashMap;
+use super::Settings;
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
@@ -44,21 +42,6 @@ pub struct Options {
     /// Note that this rule is only meant to flag accidental uses,
     /// and can be circumvented via `eval` or `importlib`.
     pub banned_api: Option<FxHashMap<String, ApiBan>>,
-}
-
-#[derive(Debug, Hash)]
-pub struct Settings {
-    pub ban_relative_imports: Strictness,
-    pub banned_api: HashableHashMap<String, ApiBan>,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            ban_relative_imports: Strictness::Parents,
-            banned_api: HashableHashMap::default(),
-        }
-    }
 }
 
 impl From<Options> for Settings {

@@ -93,7 +93,7 @@ pub fn convert(
     let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
     let mut flake8_pytest_style = flake8_pytest_style::settings::Options::default();
     let mut flake8_quotes = flake8_quotes::settings::Options::default();
-    let mut flake8_tidy_imports = flake8_tidy_imports::settings::Options::default();
+    let mut flake8_tidy_imports = flake8_tidy_imports::options::Options::default();
     let mut mccabe = mccabe::settings::Options::default();
     let mut pep8_naming = pep8_naming::settings::Options::default();
     let mut pydocstyle = pydocstyle::settings::Options::default();
@@ -354,7 +354,7 @@ pub fn convert(
     if flake8_quotes != flake8_quotes::settings::Options::default() {
         options.flake8_quotes = Some(flake8_quotes);
     }
-    if flake8_tidy_imports != flake8_tidy_imports::settings::Options::default() {
+    if flake8_tidy_imports != flake8_tidy_imports::options::Options::default() {
         options.flake8_tidy_imports = Some(flake8_tidy_imports);
     }
     if mccabe != mccabe::settings::Options::default() {
