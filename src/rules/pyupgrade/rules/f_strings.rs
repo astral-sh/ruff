@@ -18,16 +18,31 @@ static NAME_SPECIFIER: Lazy<Regex> =
 struct FormatFunction {
     args: Vec<String>,
     kwargs: HashMap<String, String>,
+    // Whether or not something invalid was found, if it was return IMMIDEATELY
+    invalid: bool,
+}
+
+/// Whether the given string contains characters that are FORBIDDEN in args and kwargs
+fn contains_invalids(string: &str) -> bool {
+    let invalids = vec!['*', '\'','"'];
+    for invalid in invalids {
+        if string.contains(invalid) {
+            return true;
+        }
+    }
+    false
 }
 
 impl FormatFunction {
     fn from_expr(checker: &mut Checker, expr: &Expr) -> Self {
         let mut final_args: Vec<String> = Vec::new();
         let mut final_kwargs: HashMap<String, String> = HashMap::new();
+        let mut invalid = false;
         if let ExprKind::Call { args, keywords, .. } = &expr.node {
             for arg in args {
                 let arg_range = Range::from_located(&arg);
                 let arg_string = checker.locator.slice_source_code_range(&arg_range);
+                invalid = contains_invalids(&arg_string);
                 final_args.push(arg_string.to_string());
             }
 
@@ -36,6 +51,7 @@ impl FormatFunction {
                 if let Some(key) = arg {
                     let kwarg_range = Range::from_located(&value);
                     let kwarg_string = checker.locator.slice_source_code_range(&kwarg_range);
+                    invalid = contains_invalids(&kwarg_string);
                     final_kwargs.insert(key.to_string(), kwarg_string.to_string());
                 }
             }
@@ -43,6 +59,7 @@ impl FormatFunction {
         Self {
             args: final_args,
             kwargs: final_kwargs,
+            invalid
         }
     }
 
@@ -77,7 +94,13 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
     let mut new_string = String::new();
     if let ExprKind::Call { func, .. } = &expr.node {
         if let ExprKind::Attribute { value, .. }  = &func.node {
-            if let ExprKind::Constant { value, .. } = & value.node {
+            if let ExprKind::Constant { value, kind } = & value.node {
+                // Do NOT refactor byte strings
+                if let Some(kind_str) = kind {
+                    if kind_str == "b" {
+                        return None;
+                    }
+                }
                 if let Constant::Str(string) = value {
                     new_string = string.to_string();
                 }
@@ -133,6 +156,11 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
 
 fn generate_f_string(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) -> Option<String> {
     let mut original_call = FormatFunction::from_expr(checker, expr);
+
+    // If there were any invalid characters we should return immediately
+    if original_call.invalid {
+        return None;
+    }
     // We do not need to make changes if there are no arguments (let me know if you want me to
     // change this to removing the .format() and doing nothing else, but that seems like it could
     // cause issues)
@@ -148,6 +176,12 @@ fn generate_f_string(checker: &mut Checker, summary: &FormatSummary, expr: &Expr
 
 /// UP032
 pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) {
+    let expr_range = Range::from_located(&expr);
+    let expr_string = checker.locator.slice_source_code_range(&expr_range);
+    // Pyupgrade says we should not try and refactor multi-line statements
+    if expr_string.contains('\n') {
+        return;
+    }
     if summary.has_nested_parts {
         return;
     }
