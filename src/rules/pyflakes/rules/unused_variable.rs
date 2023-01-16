@@ -1,11 +1,15 @@
+use itertools::Itertools;
 use log::error;
-use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Expr, ExprKind, Location, Stmt, StmtKind};
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
+use crate::source_code::Locator;
 use crate::violations;
 
 fn is_literal_or_name(expr: &Expr, checker: &Checker) -> bool {
@@ -41,6 +45,22 @@ fn is_literal_or_name(expr: &Expr, checker: &Checker) -> bool {
     }
 
     false
+}
+
+fn match_token_after<F>(stmt: &Stmt, locator: &Locator, f: F) -> Location
+where
+    F: Fn(Tok) -> bool,
+{
+    let contents = locator.slice_source_code_range(&Range::from_located(stmt));
+    for ((_, tok, _), (start, ..)) in lexer::make_tokenizer_located(&contents, stmt.location)
+        .flatten()
+        .tuple_windows()
+    {
+        if f(tok) {
+            return start;
+        }
+    }
+    unreachable!("No token after matched");
 }
 
 enum DeletionKind {
@@ -83,7 +103,10 @@ fn remove_unused_variable(
                 // but preserve the right-hand side.
                 Some((
                     DeletionKind::Partial,
-                    Fix::deletion(stmt.location, value.location),
+                    Fix::deletion(
+                        stmt.location,
+                        match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal),
+                    ),
                 ))
             };
         }
@@ -122,7 +145,10 @@ fn remove_unused_variable(
                 // but preserve the right-hand side.
                 Some((
                     DeletionKind::Partial,
-                    Fix::deletion(stmt.location, value.location),
+                    Fix::deletion(
+                        stmt.location,
+                        match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal),
+                    ),
                 ))
             };
         }
