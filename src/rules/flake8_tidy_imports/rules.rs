@@ -1,6 +1,6 @@
 use rustpython_ast::{Alias, Expr, Located, Stmt};
 
-use super::settings::{BannedApi, Strictness};
+use super::settings::{ApiBan, Strictness};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
@@ -31,10 +31,10 @@ pub fn banned_relative_import(
 pub fn name_is_banned(
     module: &str,
     name: &Alias,
-    banned_apis: &HashableHashMap<String, BannedApi>,
+    api_bans: &HashableHashMap<String, ApiBan>,
 ) -> Option<Diagnostic> {
     let full_name = format!("{module}.{}", &name.node.name);
-    if let Some(ban) = banned_apis.get(&full_name) {
+    if let Some(ban) = api_bans.get(&full_name) {
         return Some(Diagnostic::new(
             violations::BannedApi {
                 name: full_name,
@@ -50,11 +50,11 @@ pub fn name_is_banned(
 pub fn name_or_parent_is_banned<T>(
     located: &Located<T>,
     name: &str,
-    banned_apis: &HashableHashMap<String, BannedApi>,
+    api_bans: &HashableHashMap<String, ApiBan>,
 ) -> Option<Diagnostic> {
     let mut name = name;
     loop {
-        if let Some(ban) = banned_apis.get(name) {
+        if let Some(ban) = api_bans.get(name) {
             return Some(Diagnostic::new(
                 violations::BannedApi {
                     name: name.to_string(),

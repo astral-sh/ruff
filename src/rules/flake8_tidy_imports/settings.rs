@@ -20,7 +20,7 @@ pub enum Strictness {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct BannedApi {
+pub struct ApiBan {
     /// The message to display when the API is used.
     pub msg: String,
 }
@@ -57,13 +57,13 @@ pub struct Options {
     /// Specific modules or module members that may not be imported or accessed.
     /// Note that this rule is only meant to flag accidental uses,
     /// and can be circumvented via `eval` or `importlib`.
-    pub banned_api: Option<FxHashMap<String, BannedApi>>,
+    pub banned_api: Option<FxHashMap<String, ApiBan>>,
 }
 
 #[derive(Debug, Hash)]
 pub struct Settings {
     pub ban_relative_imports: Strictness,
-    pub banned_api: HashableHashMap<String, BannedApi>,
+    pub banned_api: HashableHashMap<String, ApiBan>,
 }
 
 impl Default for Settings {
