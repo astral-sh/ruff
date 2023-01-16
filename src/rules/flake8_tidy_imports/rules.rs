@@ -19,7 +19,7 @@ pub fn banned_relative_import(
     };
     if level? > &strictness_level {
         Some(Diagnostic::new(
-            violations::BannedRelativeImport(strictness.clone()),
+            violations::RelativeImports(strictness.clone()),
             Range::from_located(stmt),
         ))
     } else {

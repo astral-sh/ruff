@@ -1018,7 +1018,7 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | TID251 | BannedApi | `...` is banned: ... |  |
-| TID252 | BannedRelativeImport | Relative imports are banned |  |
+| TID252 | RelativeImports | Relative imports are banned |  |
 
 ### flake8-unused-arguments (ARG)
 
