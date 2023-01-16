@@ -21,22 +21,22 @@ struct FormatFunction {
 }
 
 impl FormatFunction {
-    fn from_expr(expr: &Expr) -> Self {
+    fn from_expr(checker: &mut Checker, expr: &Expr) -> Self {
         let mut final_args: Vec<String> = Vec::new();
         let mut final_kwargs: HashMap<String, String> = HashMap::new();
         if let ExprKind::Call { args, keywords, .. } = &expr.node {
             for arg in args {
-                if let ExprKind::Name { id, .. } = &arg.node {
-                    final_args.push(id.to_string())
-                }
+                let arg_range = Range::from_located(&arg);
+                let arg_string = checker.locator.slice_source_code_range(&arg_range);
+                final_args.push(arg_string.to_string());
             }
 
             for keyword in keywords {
                 let KeywordData { arg, value } = &keyword.node;
-                if let ExprKind::Name { id, .. } = &value.node {
-                    if let Some(key) = arg {
-                        final_kwargs.insert(key.to_string(), id.to_string());
-                    }
+                if let Some(key) = arg {
+                    let kwarg_range = Range::from_located(&value);
+                    let kwarg_string = checker.locator.slice_source_code_range(&kwarg_range);
+                    final_kwargs.insert(key.to_string(), kwarg_string.to_string());
                 }
             }
         }
@@ -131,8 +131,8 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
     Some(format!("f\"{}\"", clean_string))
 }
 
-fn generate_f_string(summary: &FormatSummary, expr: &Expr) -> Option<String> {
-    let mut original_call = FormatFunction::from_expr(expr);
+fn generate_f_string(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) -> Option<String> {
+    let mut original_call = FormatFunction::from_expr(checker, expr);
     // We do not need to make changes if there are no arguments (let me know if you want me to
     // change this to removing the .format() and doing nothing else, but that seems like it could
     // cause issues)
@@ -157,7 +157,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     }
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let contents = match generate_f_string(summary, expr) {
+    let contents = match generate_f_string(checker, summary, expr) {
         None => return,
         Some(items) => items,
     };

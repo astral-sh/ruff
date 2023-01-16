@@ -32,7 +32,7 @@ pub(crate) use useless_metaclass_type::useless_metaclass_type;
 pub(crate) use useless_object_inheritance::useless_object_inheritance;
 pub(crate) use f_strings::f_strings;
 
-use crate::ast::helpers::{self};
+use crate::ast::helpers;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::fix::Fix;
 use crate::registry::Diagnostic;

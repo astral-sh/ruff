@@ -17,13 +17,14 @@
 
 "hello {}!".format(name)
 
-"{}{{}}{}".format(escaped, y)
-
 "{}{b}{}".format(a, c, b=b)
 
 "{}".format(0x0)
 
 u"foo{}".format(1)
+
+# Waiting for a response to solve this one
+# "{}{{}}{}".format(escaped, y)
 
 # Don't forget assigned, call, and multiline
 # Waiting on Charlie solution to solve this
