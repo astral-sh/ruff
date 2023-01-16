@@ -10,6 +10,7 @@ use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
+use super::hashable::HashableHashSet;
 use crate::fs;
 use crate::registry::{RuleCode, RuleCodePrefix};
 
@@ -54,7 +55,7 @@ impl FromStr for PythonVersion {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
     User(String, PathBuf),
@@ -94,16 +95,16 @@ impl FromStr for FilePattern {
 pub struct PerFileIgnore {
     pub basename: String,
     pub absolute: PathBuf,
-    pub codes: FxHashSet<RuleCode>,
+    pub codes: HashableHashSet<RuleCode>,
 }
 
 impl PerFileIgnore {
     pub fn new(basename: String, absolute: PathBuf, prefixes: &[RuleCodePrefix]) -> Self {
-        let codes = prefixes.iter().flat_map(RuleCodePrefix::codes).collect();
+        let codes: FxHashSet<_> = prefixes.iter().flat_map(RuleCodePrefix::codes).collect();
         Self {
             basename,
             absolute,
-            codes,
+            codes: codes.into(),
         }
     }
 }
@@ -150,7 +151,9 @@ impl FromStr for PatternPrefixPair {
     }
 }
 
-#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(
+    Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema, Hash,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum SerializationFormat {
     Text,
@@ -167,7 +170,7 @@ impl Default for SerializationFormat {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(try_from = "String")]
 pub struct Version(String);
 

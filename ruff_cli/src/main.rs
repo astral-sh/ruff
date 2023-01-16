@@ -208,7 +208,7 @@ pub fn main() -> Result<ExitCode> {
             cache.into(),
             fix::FixMode::None,
         )?;
-        printer.write_continuously(&messages);
+        printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
         let (tx, rx) = channel();
@@ -238,7 +238,7 @@ pub fn main() -> Result<ExitCode> {
                             cache.into(),
                             fix::FixMode::None,
                         )?;
-                        printer.write_continuously(&messages);
+                        printer.write_continuously(&messages)?;
                     }
                 }
                 Err(err) => return Err(err.into()),

@@ -804,7 +804,7 @@ where
                     // flake8_tidy_imports
                     if self.settings.enabled.contains(&RuleCode::TID251) {
                         if let Some(diagnostic) =
-                            flake8_tidy_imports::rules::name_or_parent_is_banned(
+                            flake8_tidy_imports::banned_api::name_or_parent_is_banned(
                                 alias,
                                 &alias.node.name,
                                 &self.settings.flake8_tidy_imports.banned_api,
@@ -948,16 +948,18 @@ where
                 if self.settings.enabled.contains(&RuleCode::TID251) {
                     if let Some(module) = module {
                         for name in names {
-                            if let Some(diagnostic) = flake8_tidy_imports::rules::name_is_banned(
-                                module,
-                                name,
-                                &self.settings.flake8_tidy_imports.banned_api,
-                            ) {
+                            if let Some(diagnostic) =
+                                flake8_tidy_imports::banned_api::name_is_banned(
+                                    module,
+                                    name,
+                                    &self.settings.flake8_tidy_imports.banned_api,
+                                )
+                            {
                                 self.diagnostics.push(diagnostic);
                             }
                         }
                         if let Some(diagnostic) =
-                            flake8_tidy_imports::rules::name_or_parent_is_banned(
+                            flake8_tidy_imports::banned_api::name_or_parent_is_banned(
                                 stmt,
                                 module,
                                 &self.settings.flake8_tidy_imports.banned_api,
@@ -1106,11 +1108,13 @@ where
                     }
 
                     if self.settings.enabled.contains(&RuleCode::TID252) {
-                        if let Some(diagnostic) = flake8_tidy_imports::rules::banned_relative_import(
-                            stmt,
-                            level.as_ref(),
-                            &self.settings.flake8_tidy_imports.ban_relative_imports,
-                        ) {
+                        if let Some(diagnostic) =
+                            flake8_tidy_imports::relative_imports::banned_relative_import(
+                                stmt,
+                                level.as_ref(),
+                                &self.settings.flake8_tidy_imports.ban_relative_imports,
+                            )
+                        {
                             self.diagnostics.push(diagnostic);
                         }
                     }
@@ -1279,7 +1283,7 @@ where
                     }
                 }
             }
-            StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
+            StmtKind::With { items, body, .. } => {
                 if self.settings.enabled.contains(&RuleCode::B017) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
@@ -1291,7 +1295,7 @@ where
                         self,
                         stmt,
                         body,
-                        self.current_stmt_parent().map(|parent| parent.0),
+                        self.current_stmt_parent().map(Into::into),
                     );
                 }
             }
@@ -1843,7 +1847,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::TID251) {
-                    flake8_tidy_imports::rules::banned_attribute_access(self, expr);
+                    flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
                 }
             }
             ExprKind::Call {

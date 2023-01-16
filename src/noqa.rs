@@ -9,6 +9,7 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::registry::{Diagnostic, RuleCode, CODE_REDIRECTS};
+use crate::settings::hashable::HashableHashSet;
 use crate::source_code::LineEnding;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -84,7 +85,7 @@ pub fn add_noqa(
     diagnostics: &[Diagnostic],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
-    external: &FxHashSet<String>,
+    external: &HashableHashSet<String>,
     line_ending: &LineEnding,
 ) -> Result<usize> {
     let (count, output) =
@@ -97,7 +98,7 @@ fn add_noqa_inner(
     diagnostics: &[Diagnostic],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
-    external: &FxHashSet<String>,
+    external: &HashableHashSet<String>,
     line_ending: &LineEnding,
 ) -> (usize, String) {
     let mut matches_by_line: FxHashMap<usize, FxHashSet<&RuleCode>> = FxHashMap::default();
@@ -208,12 +209,12 @@ fn add_noqa_inner(
 #[cfg(test)]
 mod tests {
     use nohash_hasher::IntMap;
-    use rustc_hash::FxHashSet;
     use rustpython_parser::ast::Location;
 
     use crate::ast::types::Range;
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::Diagnostic;
+    use crate::settings::hashable::HashableHashSet;
     use crate::source_code::LineEnding;
     use crate::violations;
 
@@ -236,7 +237,7 @@ mod tests {
         let diagnostics = vec![];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
-        let external = FxHashSet::default();
+        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
@@ -253,7 +254,7 @@ mod tests {
         )];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
-        let external = FxHashSet::default();
+        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
@@ -276,7 +277,7 @@ mod tests {
         ];
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = IntMap::default();
-        let external = FxHashSet::default();
+        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
@@ -299,7 +300,7 @@ mod tests {
         ];
         let contents = "x = 1  # noqa";
         let noqa_line_for = IntMap::default();
-        let external = FxHashSet::default();
+        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,

@@ -131,7 +131,8 @@ mod tests {
 
     use crate::registry::RuleCodePrefix;
     use crate::rules::flake8_quotes::settings::Quote;
-    use crate::rules::flake8_tidy_imports::settings::{BannedApi, Strictness};
+    use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
+    use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
     use crate::rules::{
         flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
         flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
@@ -574,18 +575,18 @@ other-attribute = 1
                     docstring_quotes: Some(Quote::Double),
                     avoid_escape: Some(true),
                 }),
-                flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
+                flake8_tidy_imports: Some(flake8_tidy_imports::options::Options {
                     ban_relative_imports: Some(Strictness::Parents),
                     banned_api: Some(FxHashMap::from_iter([
                         (
                             "cgi".to_string(),
-                            BannedApi {
+                            ApiBan {
                                 msg: "The cgi module is deprecated.".to_string()
                             }
                         ),
                         (
                             "typing.TypedDict".to_string(),
-                            BannedApi {
+                            ApiBan {
                                 msg: "Use typing_extensions.TypedDict instead.".to_string()
                             }
                         )

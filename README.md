@@ -10,9 +10,9 @@ An extremely fast Python linter, written in Rust.
 
 <p align="center">
   <picture align="center">
-    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/210156880-a97c2a0d-2c03-4393-8695-36547935a94e.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/210156881-a88fd142-5008-4695-9407-d028cec3eff7.svg">
-    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/210156881-a88fd142-5008-4695-9407-d028cec3eff7.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
+    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
   </picture>
 </p>
 
@@ -74,6 +74,13 @@ of [FastAPI](https://github.com/tiangolo/fastapi):
 > Ruff is so fast that sometimes I add an intentional bug in the code just to confirm it's actually
 > running and checking the code.
 
+[**Nick Schrock**](https://twitter.com/schrockn/status/1612615862904827904), founder of [Elementl](https://www.elementl.com/),
+co-creator of [GraphQL](https://graphql.org/):
+
+> Why is Ruff a gamechanger? Primarily because it is nearly 1000x faster. Literally. Not a typo. On
+> our largest module (dagster itself, 250k LOC) pylint takes about 2.5 minutes, parallelized across 4
+> cores on my M1. Running ruff against our *entire* codebase takes .4 seconds.
+
 [**Bryan Van de Ven**](https://github.com/bokeh/bokeh/pull/12605), co-creator
 of [Bokeh](https://github.com/bokeh/bokeh/), original author
 of [Conda](https://docs.conda.io/en/latest/):
@@ -82,7 +89,13 @@ of [Conda](https://docs.conda.io/en/latest/):
 > ~20s. This is an enormous quality of life improvement for local dev. It's fast enough that I added
 > it as an actual commit hook, which is terrific.
 
-[**Tim Abbott**](https://github.com/charliermarsh/ruff/issues/465#issuecomment-1317400028), lead developer of [Zulip](https://github.com/zulip/zulip):
+[**Timothy Crosley**](https://twitter.com/timothycrosley/status/1606420868514877440),
+creator of [isort](https://github.com/PyCQA/isort):
+
+> Just switched my first project to Ruff. Only one downside so far: it's so fast I couldn't believe it was working till I intentionally introduced some errors.
+
+[**Tim Abbott**](https://github.com/charliermarsh/ruff/issues/465#issuecomment-1317400028), lead
+developer of [Zulip](https://github.com/zulip/zulip):
 
 > This is just ridiculously fast... `ruff` is amazing.
 
@@ -185,7 +198,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.222'
+  rev: 'v0.0.223'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -843,7 +856,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 | B025 | DuplicateTryBlockException | try-except block with duplicate exception `Exception` |  |
 | B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
 | B027 | EmptyMethodWithoutAbstractDecorator | `...` is an empty method in an abstract base class, but has no abstract decorator |  |
-| B904 | RaiseWithoutFromInsideExcept | Within an except clause, raise exceptions with raise ... from err or raise ... from None to distinguish them from errors in exception handling |  |
+| B904 | RaiseWithoutFromInsideExcept | Within an except clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |  |
 | B905 | ZipWithoutExplicitStrict | `zip()` without an explicit `strict=` parameter |  |
 
 ### flake8-builtins (A)
@@ -1019,7 +1032,7 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | TID251 | BannedApi | `...` is banned: ... |  |
-| TID252 | BannedRelativeImport | Relative imports are banned |  |
+| TID252 | RelativeImports | Relative imports are banned |  |
 
 ### flake8-unused-arguments (ARG)
 
@@ -1425,6 +1438,7 @@ natively, including:
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
+- [`flake8-commas`](https://pypi.org/project/flake8-commas/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-datetimez`](https://pypi.org/project/flake8-datetimez/)
 - [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
@@ -1490,6 +1504,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
 - [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
 - [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
+- [`flake8-commas`](https://pypi.org/project/flake8-commas/)
 - [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
 - [`flake8-datetimez`](https://pypi.org/project/flake8-datetimez/)
 - [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
@@ -1641,57 +1656,28 @@ which makes it a good target for benchmarking.
 git clone --branch 3.10 https://github.com/python/cpython.git resources/test/cpython
 ```
 
-Add this `pyproject.toml` to the CPython directory:
-
-```toml
-[tool.ruff]
-line-length = 88
-extend-exclude = [
-    "Lib/lib2to3/tests/data/bom.py",
-    "Lib/lib2to3/tests/data/crlf.py",
-    "Lib/lib2to3/tests/data/different_encoding.py",
-    "Lib/lib2to3/tests/data/false_encoding.py",
-    "Lib/lib2to3/tests/data/py2_test_grammar.py",
-    "Lib/test/bad_coding2.py",
-    "Lib/test/badsyntax_3131.py",
-    "Lib/test/badsyntax_pep3120.py",
-    "Lib/test/encoded_modules/module_iso_8859_1.py",
-    "Lib/test/encoded_modules/module_koi8_r.py",
-    "Lib/test/test_fstring.py",
-    "Lib/test/test_grammar.py",
-    "Lib/test/test_importlib/test_util.py",
-    "Lib/test/test_named_expressions.py",
-    "Lib/test/test_patma.py",
-    "Lib/test/test_source_encoding.py",
-    "Tools/c-analyzer/c_parser/parser/_delim.py",
-    "Tools/i18n/pygettext.py",
-    "Tools/test2to3/maintest.py",
-    "Tools/test2to3/setup.py",
-    "Tools/test2to3/test/test_foo.py",
-    "Tools/test2to3/test2to3/hello.py",
-]
-```
-
-Next, to benchmark the release build:
+To benchmark the release build:
 
 ```shell
-cargo build --release
-
-hyperfine --ignore-failure --warmup 10 --runs 100 \
+cargo build --release && hyperfine --ignore-failure --warmup 10 \
   "./target/release/ruff ./resources/test/cpython/ --no-cache" \
   "./target/release/ruff ./resources/test/cpython/"
 
 Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
-  Time (mean ± σ):     297.4 ms ±   4.9 ms    [User: 2460.0 ms, System: 67.2 ms]
-  Range (min … max):   287.7 ms … 312.1 ms    100 runs
+  Time (mean ± σ):     293.8 ms ±   3.2 ms    [User: 2384.6 ms, System: 90.3 ms]
+  Range (min … max):   289.9 ms … 301.6 ms    10 runs
 
   Warning: Ignoring non-zero exit code.
 
 Benchmark 2: ./target/release/ruff ./resources/test/cpython/
-  Time (mean ± σ):      79.6 ms ±   7.3 ms    [User: 59.7 ms, System: 356.1 ms]
-  Range (min … max):    62.4 ms … 111.2 ms    100 runs
+  Time (mean ± σ):      48.0 ms ±   3.1 ms    [User: 65.2 ms, System: 124.7 ms]
+  Range (min … max):    45.0 ms …  66.7 ms    62 runs
 
   Warning: Ignoring non-zero exit code.
+
+Summary
+  './target/release/ruff ./resources/test/cpython/' ran
+    6.12 ± 0.41 times faster than './target/release/ruff ./resources/test/cpython/ --no-cache'
 ```
 
 To benchmark against the ecosystem's existing tools:
@@ -1699,73 +1685,89 @@ To benchmark against the ecosystem's existing tools:
 ```shell
 hyperfine --ignore-failure --warmup 5 \
   "./target/release/ruff ./resources/test/cpython/ --no-cache" \
-  "pylint --recursive=y resources/test/cpython/" \
   "pyflakes resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
   "pycodestyle resources/test/cpython" \
-  "flake8 resources/test/cpython" \
-  "python -m scripts.run_flake8 resources/test/cpython"
-```
+  "flake8 resources/test/cpython"
 
-In order, these evaluate:
-
-- Ruff
-- Pylint
-- Pyflakes
-- autoflake
-- pycodestyle
-- Flake8
-- Flake8, with a hack to enable multiprocessing on macOS
-
-(You can `poetry install` from `./scripts` to create a working environment for the above.)
-
-```shell
 Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
-  Time (mean ± σ):     297.9 ms ±   7.0 ms    [User: 2436.6 ms, System: 65.9 ms]
-  Range (min … max):   289.9 ms … 314.6 ms    10 runs
+  Time (mean ± σ):     294.3 ms ±   3.3 ms    [User: 2467.5 ms, System: 89.6 ms]
+  Range (min … max):   291.1 ms … 302.8 ms    10 runs
 
   Warning: Ignoring non-zero exit code.
 
-Benchmark 2: pylint --recursive=y resources/test/cpython/
-  Time (mean ± σ):     37.634 s ±  0.225 s    [User: 36.728 s, System: 0.853 s]
-  Range (min … max):   37.201 s … 38.106 s    10 runs
+Benchmark 2: pyflakes resources/test/cpython
+  Time (mean ± σ):     15.786 s ±  0.143 s    [User: 15.560 s, System: 0.214 s]
+  Range (min … max):   15.640 s … 16.157 s    10 runs
 
   Warning: Ignoring non-zero exit code.
 
-Benchmark 3: pyflakes resources/test/cpython
-  Time (mean ± σ):     40.950 s ±  0.449 s    [User: 40.688 s, System: 0.229 s]
-  Range (min … max):   40.348 s … 41.671 s    10 runs
+Benchmark 3: autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython
+  Time (mean ± σ):      6.175 s ±  0.169 s    [User: 54.102 s, System: 1.057 s]
+  Range (min … max):    5.950 s …  6.391 s    10 runs
+
+Benchmark 4: pycodestyle resources/test/cpython
+  Time (mean ± σ):     46.921 s ±  0.508 s    [User: 46.699 s, System: 0.202 s]
+  Range (min … max):   46.171 s … 47.863 s    10 runs
 
   Warning: Ignoring non-zero exit code.
 
-Benchmark 4: autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython
-  Time (mean ± σ):     11.562 s ±  0.160 s    [User: 107.022 s, System: 1.143 s]
-  Range (min … max):   11.417 s … 11.917 s    10 runs
-
-Benchmark 5: pycodestyle resources/test/cpython
-  Time (mean ± σ):     67.428 s ±  0.985 s    [User: 67.199 s, System: 0.203 s]
-  Range (min … max):   65.313 s … 68.496 s    10 runs
+Benchmark 5: flake8 resources/test/cpython
+  Time (mean ± σ):     12.260 s ±  0.321 s    [User: 102.934 s, System: 1.230 s]
+  Range (min … max):   11.848 s … 12.933 s    10 runs
 
   Warning: Ignoring non-zero exit code.
-
-Benchmark 6: flake8 resources/test/cpython
-  Time (mean ± σ):     116.099 s ±  1.178 s    [User: 115.217 s, System: 0.845 s]
-  Range (min … max):   114.180 s … 117.724 s    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 7: python -m scripts.run_flake8 resources/test/cpython
-  Time (mean ± σ):     20.477 s ±  0.349 s    [User: 142.372 s, System: 1.504 s]
-  Range (min … max):   20.107 s … 21.183 s    10 runs
 
 Summary
   './target/release/ruff ./resources/test/cpython/ --no-cache' ran
-   38.81 ± 1.05 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
-   68.74 ± 1.99 times faster than 'python -m scripts.run_flake8 resources/test/cpython'
-  126.33 ± 3.05 times faster than 'pylint --recursive=y resources/test/cpython/'
-  137.46 ± 3.55 times faster than 'pyflakes resources/test/cpython'
-  226.35 ± 6.23 times faster than 'pycodestyle resources/test/cpython'
-  389.73 ± 9.92 times faster than 'flake8 resources/test/cpython'
+   20.98 ± 0.62 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
+   41.66 ± 1.18 times faster than 'flake8 resources/test/cpython'
+   53.64 ± 0.77 times faster than 'pyflakes resources/test/cpython'
+  159.43 ± 2.48 times faster than 'pycodestyle resources/test/cpython'
+```
+
+You can run `poetry install` from `./scripts` to create a working environment for the above. All
+reported benchmarks were computed using the versions specified by `./scripts/pyproject.toml`
+on Python 3.11.
+
+To benchmark Pylint, remove the following files from the CPython repository:
+
+```shell
+rm Lib/test/bad_coding.py \
+  Lib/test/bad_coding2.py \
+  Lib/test/bad_getattr.py \
+  Lib/test/bad_getattr2.py \
+  Lib/test/bad_getattr3.py \
+  Lib/test/badcert.pem \
+  Lib/test/badkey.pem \
+  Lib/test/badsyntax_3131.py \
+  Lib/test/badsyntax_future10.py \
+  Lib/test/badsyntax_future3.py \
+  Lib/test/badsyntax_future4.py \
+  Lib/test/badsyntax_future5.py \
+  Lib/test/badsyntax_future6.py \
+  Lib/test/badsyntax_future7.py \
+  Lib/test/badsyntax_future8.py \
+  Lib/test/badsyntax_future9.py \
+  Lib/test/badsyntax_pep3120.py \
+  Lib/test/test_asyncio/test_runners.py \
+  Lib/test/test_copy.py \
+  Lib/test/test_inspect.py \
+  Lib/test/test_typing.py
+```
+
+Then, from `resources/test/cpython`, run: `time pylint -j 0 -E $(git ls-files '*.py')`. This
+will execute Pylint with maximum parallelism and only report errors.
+
+To benchmark Pyupgrade, run the following from `resources/test/cpython`:
+
+```shell
+hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
+  "find . -type f -name \"*.py\" | xargs -P 0 pyupgrade --py311-plus"
+
+Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
+  Time (mean ± σ):     30.119 s ±  0.195 s    [User: 28.638 s, System: 0.390 s]
+  Range (min … max):   29.813 s … 30.356 s    10 runs
 ```
 
 ## Reference

@@ -17,7 +17,8 @@ mod tests {
 
     #[test_case(RuleCode::D100, Path::new("D.py"); "D100")]
     #[test_case(RuleCode::D101, Path::new("D.py"); "D101")]
-    #[test_case(RuleCode::D102, Path::new("D.py"); "D102")]
+    #[test_case(RuleCode::D102, Path::new("D.py"); "D102_0")]
+    #[test_case(RuleCode::D102, Path::new("setter.py"); "D102_1")]
     #[test_case(RuleCode::D103, Path::new("D.py"); "D103")]
     #[test_case(RuleCode::D104, Path::new("D.py"); "D104")]
     #[test_case(RuleCode::D105, Path::new("D.py"); "D105")]

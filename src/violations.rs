@@ -10,7 +10,6 @@ use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
 use crate::rules::flake8_quotes::settings::Quote;
-use crate::rules::flake8_tidy_imports::settings::Strictness;
 use crate::rules::pyupgrade::types::Primitive;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
@@ -1781,8 +1780,8 @@ define_violation!(
 );
 impl Violation for RaiseWithoutFromInsideExcept {
     fn message(&self) -> String {
-        "Within an except clause, raise exceptions with raise ... from err or raise ... from None \
-         to distinguish them from errors in exception handling"
+        "Within an except clause, raise exceptions with `raise ... from err` or `raise ... from \
+         None` to distinguish them from errors in exception handling"
             .to_string()
     }
 
@@ -2166,45 +2165,6 @@ impl Violation for FunctionIsTooComplex {
 
     fn placeholder() -> Self {
         FunctionIsTooComplex("...".to_string(), 10)
-    }
-}
-
-// flake8-tidy-imports
-
-define_violation!(
-    pub struct BannedApi {
-        pub name: String,
-        pub message: String,
-    }
-);
-impl Violation for BannedApi {
-    fn message(&self) -> String {
-        let BannedApi { name, message } = self;
-        format!("`{name}` is banned: {message}")
-    }
-
-    fn placeholder() -> Self {
-        BannedApi {
-            name: "...".to_string(),
-            message: "...".to_string(),
-        }
-    }
-}
-
-define_violation!(
-    pub struct BannedRelativeImport(pub Strictness);
-);
-impl Violation for BannedRelativeImport {
-    fn message(&self) -> String {
-        let BannedRelativeImport(strictness) = self;
-        match strictness {
-            Strictness::Parents => "Relative imports from parent modules are banned".to_string(),
-            Strictness::All => "Relative imports are banned".to_string(),
-        }
-    }
-
-    fn placeholder() -> Self {
-        BannedRelativeImport(Strictness::All)
     }
 }
 

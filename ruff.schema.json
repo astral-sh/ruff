@@ -448,7 +448,7 @@
   },
   "additionalProperties": false,
   "definitions": {
-    "BannedApi": {
+    "ApiBan": {
       "type": "object",
       "required": [
         "msg"
@@ -743,7 +743,7 @@
             "null"
           ],
           "additionalProperties": {
-            "$ref": "#/definitions/BannedApi"
+            "$ref": "#/definitions/ApiBan"
           }
         }
       },

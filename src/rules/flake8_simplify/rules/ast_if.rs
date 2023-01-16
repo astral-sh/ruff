@@ -2,7 +2,7 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKin
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    any_over_expr, contains_call_path, create_expr, create_stmt, has_comments, unparse_expr,
+    contains_call_path, contains_effect, create_expr, create_stmt, has_comments, unparse_expr,
     unparse_stmt,
 };
 use crate::ast::types::Range;
@@ -272,19 +272,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if any_over_expr(default_val, &|expr| {
-        matches!(
-            expr.node,
-            ExprKind::Call { .. }
-                | ExprKind::Await { .. }
-                | ExprKind::GeneratorExp { .. }
-                | ExprKind::ListComp { .. }
-                | ExprKind::SetComp { .. }
-                | ExprKind::DictComp { .. }
-                | ExprKind::Yield { .. }
-                | ExprKind::YieldFrom { .. }
-        )
-    }) {
+    if contains_effect(checker, default_val) {
         return;
     }
 

@@ -436,7 +436,7 @@ pub struct Options {
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
     #[option_group]
     /// Options for the `flake8-tidy-imports` plugin.
-    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    pub flake8_tidy_imports: Option<flake8_tidy_imports::options::Options>,
     #[option_group]
     /// Options for the `flake8-import-conventions` plugin.
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,

@@ -123,7 +123,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_errmsg: Some(flake8_errmsg::settings::Settings::default().into()),
         flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
         flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
-        flake8_tidy_imports: Some(flake8_tidy_imports::settings::Settings::default().into()),
+        flake8_tidy_imports: Some(flake8_tidy_imports::Settings::default().into()),
         flake8_import_conventions: Some(
             flake8_import_conventions::settings::Settings::default().into(),
         ),
