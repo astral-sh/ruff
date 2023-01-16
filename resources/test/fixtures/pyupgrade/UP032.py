@@ -25,5 +25,6 @@
 
 u"foo{}".format(1)
 
+# Don't forget assigned, call, and multiline
 # Waiting on Charlie solution to solve this
 # r'"\N{snowman} {}".format(a)'
