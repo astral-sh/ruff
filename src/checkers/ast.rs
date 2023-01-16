@@ -1279,7 +1279,7 @@ where
                     }
                 }
             }
-            StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
+            StmtKind::With { items, body, .. } => {
                 if self.settings.enabled.contains(&RuleCode::B017) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
@@ -1291,7 +1291,7 @@ where
                         self,
                         stmt,
                         body,
-                        self.current_stmt_parent().map(|parent| parent.0),
+                        self.current_stmt_parent().map(Into::into),
                     );
                 }
             }
