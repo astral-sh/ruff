@@ -88,16 +88,40 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
     if new_string.is_empty() {
         return None;
     }
+    // You can't return a function from inside a closure, so we just record that there was an error
+    let mut had_error = false;
     let clean_string = NAME_SPECIFIER.replace_all(&new_string, |caps: &Captures| {
         if let Some(name) = caps.name("name") {
-            // I believe we do sufficient checks to make sure this unwrap is safe
-            let kwarg = function.get_kwarg(name.as_str()).unwrap();
-            let second_part = caps.name("fmt").unwrap().as_str();
+            let kwarg = match function.get_kwarg(name.as_str()) {
+                None => {
+                    had_error = true;
+                    return String::new();
+                }
+                Some(item) => item
+            };
+            let second_part = match caps.name("fmt") {
+                None => {
+                    had_error = true;
+                    return String::new();
+                }
+                Some(item) => item.as_str()
+            };
             format!("{{{}{}}}", kwarg, second_part)
         } else {
-            // I believe we do sufficient checks to make sure this unwrap is safe
-            let arg = function.consume_arg().unwrap();
-            let second_part = caps.name("fmt").unwrap().as_str();
+            let arg = match function.consume_arg() {
+                None => {
+                    had_error = true;
+                    return String::new();
+                }
+                Some(item) => item
+            };
+            let second_part = match caps.name("fmt") {
+                None => {
+                    had_error = true;
+                    return String::new();
+                }
+                Some(item) => item.as_str()
+            };
             format!("{{{}{}}}", arg, second_part)
         }
     });
@@ -134,7 +158,6 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
         None => return,
         Some(items) => items,
     };
-    println!("{}", contents);
     let mut diagnostic = Diagnostic::new(violations::FString, Range::from_located(expr));
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
