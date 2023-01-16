@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::io;
+use std::io::{BufWriter, Write};
 use std::path::Path;
 
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
@@ -69,7 +71,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn post_text(&self, diagnostics: &Diagnostics) {
+    fn post_text<T: Write>(&self, stdout: &mut T, diagnostics: &Diagnostics) -> Result<()> {
         if self.log_level >= &LogLevel::Default {
             match self.violations {
                 Violations::Show => {
@@ -77,9 +79,12 @@ impl<'a> Printer<'a> {
                     let remaining = diagnostics.messages.len();
                     let total = fixed + remaining;
                     if fixed > 0 {
-                        println!("Found {total} error(s) ({fixed} fixed, {remaining} remaining).");
+                        writeln!(
+                            stdout,
+                            "Found {total} error(s) ({fixed} fixed, {remaining} remaining)."
+                        )?;
                     } else if remaining > 0 {
-                        println!("Found {remaining} error(s).");
+                        writeln!(stdout, "Found {remaining} error(s).")?;
                     }
 
                     if !matches!(self.autofix, fix::FixMode::Apply) {
@@ -89,7 +94,10 @@ impl<'a> Printer<'a> {
                             .filter(|message| message.kind.fixable())
                             .count();
                         if num_fixable > 0 {
-                            println!("{num_fixable} potentially fixable with the --fix option.");
+                            writeln!(
+                                stdout,
+                                "{num_fixable} potentially fixable with the --fix option."
+                            )?;
                         }
                     }
                 }
@@ -97,14 +105,15 @@ impl<'a> Printer<'a> {
                     let fixed = diagnostics.fixed;
                     if fixed > 0 {
                         if matches!(self.autofix, fix::FixMode::Apply) {
-                            println!("Fixed {fixed} error(s).");
+                            writeln!(stdout, "Fixed {fixed} error(s).")?;
                         } else if matches!(self.autofix, fix::FixMode::Diff) {
-                            println!("Would fix {fixed} error(s).");
+                            writeln!(stdout, "Would fix {fixed} error(s).")?;
                         }
                     }
                 }
             }
         }
+        Ok(())
     }
 
     pub fn write_once(&self, diagnostics: &Diagnostics) -> Result<()> {
@@ -113,18 +122,21 @@ impl<'a> Printer<'a> {
         }
 
         if matches!(self.violations, Violations::Hide) {
+            let mut stdout = BufWriter::new(io::stdout());
             if matches!(
                 self.format,
                 SerializationFormat::Text | SerializationFormat::Grouped
             ) {
-                self.post_text(diagnostics);
+                self.post_text(&mut stdout, diagnostics)?;
             }
             return Ok(());
         }
 
+        let mut stdout = BufWriter::new(io::stdout());
         match self.format {
             SerializationFormat::Json => {
-                println!(
+                writeln!(
+                    stdout,
                     "{}",
                     serde_json::to_string_pretty(
                         &diagnostics
@@ -145,7 +157,7 @@ impl<'a> Printer<'a> {
                             })
                             .collect::<Vec<_>>()
                     )?
-                );
+                )?;
             }
             SerializationFormat::Junit => {
                 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
@@ -180,14 +192,14 @@ impl<'a> Printer<'a> {
                     }
                     report.add_test_suite(test_suite);
                 }
-                println!("{}", report.to_string().unwrap());
+                writeln!(stdout, "{}", report.to_string().unwrap())?;
             }
             SerializationFormat::Text => {
                 for message in &diagnostics.messages {
-                    print_message(message);
+                    print_message(&mut stdout, message)?;
                 }
 
-                self.post_text(diagnostics);
+                self.post_text(&mut stdout, diagnostics)?;
             }
             SerializationFormat::Grouped => {
                 for (filename, messages) in group_messages_by_filename(&diagnostics.messages) {
@@ -209,21 +221,25 @@ impl<'a> Printer<'a> {
                     );
 
                     // Print the filename.
-                    println!("{}:", relativize_path(Path::new(&filename)).underline());
+                    writeln!(
+                        stdout,
+                        "{}:",
+                        relativize_path(Path::new(&filename)).underline()
+                    )?;
 
                     // Print each message.
                     for message in messages {
-                        print_grouped_message(message, row_length, column_length);
+                        print_grouped_message(&mut stdout, message, row_length, column_length)?;
                     }
-                    println!();
+                    writeln!(stdout)?;
                 }
 
-                self.post_text(diagnostics);
+                self.post_text(&mut stdout, diagnostics)?;
             }
             SerializationFormat::Github => {
                 // Generate error workflow command in GitHub Actions format.
                 // See: https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
-                diagnostics.messages.iter().for_each(|message| {
+                for message in &diagnostics.messages {
                     let label = format!(
                         "{}{}{}{}{}{} {} {}",
                         relativize_path(Path::new(&message.filename)),
@@ -235,7 +251,8 @@ impl<'a> Printer<'a> {
                         message.kind.code().as_ref(),
                         message.kind.body(),
                     );
-                    println!(
+                    writeln!(
+                        stdout,
                         "::error title=Ruff \
                          ({}),file={},line={},col={},endLine={},endColumn={}::{}",
                         message.kind.code(),
@@ -245,13 +262,13 @@ impl<'a> Printer<'a> {
                         message.end_location.row(),
                         message.end_location.column(),
                         label,
-                    );
-                });
+                    )?;
+                }
             }
             SerializationFormat::Gitlab => {
                 // Generate JSON with errors in GitLab CI format
                 // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implementing-a-custom-tool
-                println!(
+                writeln!(stdout,
                     "{}",
                     serde_json::to_string_pretty(
                         &diagnostics
@@ -274,16 +291,18 @@ impl<'a> Printer<'a> {
                         )
                         .collect::<Vec<_>>()
                     )?
-                );
+                )?;
             }
         }
+
+        stdout.flush()?;
 
         Ok(())
     }
 
-    pub fn write_continuously(&self, diagnostics: &Diagnostics) {
+    pub fn write_continuously(&self, diagnostics: &Diagnostics) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
-            return;
+            return Ok(());
         }
 
         if self.log_level >= &LogLevel::Default {
@@ -293,14 +312,18 @@ impl<'a> Printer<'a> {
             );
         }
 
+        let mut stdout = BufWriter::new(io::stdout());
         if !diagnostics.messages.is_empty() {
             if self.log_level >= &LogLevel::Default {
-                println!();
+                writeln!(stdout)?;
             }
             for message in &diagnostics.messages {
-                print_message(message);
+                print_message(&mut stdout, message)?;
             }
         }
+        stdout.flush()?;
+
+        Ok(())
     }
 
     pub fn clear_screen() -> Result<()> {
@@ -329,7 +352,7 @@ fn num_digits(n: usize) -> usize {
 }
 
 /// Print a single `Message` with full details.
-fn print_message(message: &Message) {
+fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
     let label = format!(
         "{}{}{}{}{}{} {} {}",
         relativize_path(Path::new(&message.filename)).bold(),
@@ -341,7 +364,7 @@ fn print_message(message: &Message) {
         message.kind.code().as_ref().red().bold(),
         message.kind.body(),
     );
-    println!("{label}");
+    writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
         let commit = message.kind.commit();
         let footer = if commit.is_some() {
@@ -353,7 +376,6 @@ fn print_message(message: &Message) {
         } else {
             vec![]
         };
-
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -383,13 +405,19 @@ fn print_message(message: &Message) {
         // Skip the first line, since we format the `label` ourselves.
         let message = DisplayList::from(snippet).to_string();
         let (_, message) = message.split_once('\n').unwrap();
-        println!("{message}\n");
+        writeln!(stdout, "{message}\n")?;
     }
+    Ok(())
 }
 
 /// Print a grouped `Message`, assumed to be printed in a group with others from
 /// the same file.
-fn print_grouped_message(message: &Message, row_length: usize, column_length: usize) {
+fn print_grouped_message<T: Write>(
+    stdout: &mut T,
+    message: &Message,
+    row_length: usize,
+    column_length: usize,
+) -> Result<()> {
     let label = format!(
         "  {}{}{}{}{}  {}  {}",
         " ".repeat(row_length - num_digits(message.location.row())),
@@ -400,7 +428,7 @@ fn print_grouped_message(message: &Message, row_length: usize, column_length: us
         message.kind.code().as_ref().red().bold(),
         message.kind.body(),
     );
-    println!("{label}");
+    writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
         let commit = message.kind.commit();
         let footer = if commit.is_some() {
@@ -412,7 +440,6 @@ fn print_grouped_message(message: &Message, row_length: usize, column_length: us
         } else {
             vec![]
         };
-
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -443,6 +470,7 @@ fn print_grouped_message(message: &Message, row_length: usize, column_length: us
         let message = DisplayList::from(snippet).to_string();
         let (_, message) = message.split_once('\n').unwrap();
         let message = textwrap::indent(message, "  ");
-        println!("{message}");
+        writeln!(stdout, "{message}")?;
     }
+    Ok(())
 }
