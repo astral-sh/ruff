@@ -128,7 +128,7 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
     if had_error {
         return None
     }
-    Some(clean_string.to_string())
+    Some(format!("f\"{}\"", clean_string))
 }
 
 fn generate_f_string(summary: &FormatSummary, expr: &Expr) -> Option<String> {
