@@ -4,7 +4,7 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::violations;
-use rustpython_ast::{Expr, ExprKind};
+use rustpython_ast::{Expr, ExprKind, KeywordData};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -14,16 +14,29 @@ struct FormatFunction {
 }
 
 impl FormatFunction {
-    fn new(expr: &Expr) -> Result<Self, ()> {
-        println!("expr: {:?}", expr);
-        if let ExprKind::Call{ func, args, keywords } = &expr.node {
-            println!("{:?}", args);
-            println!("{:?}", keywords);
+    fn from_expr(expr: &Expr) -> Self {
+        let mut final_args: Vec<String> = Vec::new();
+        let mut final_kwargs: HashMap<String, String> = HashMap::new();
+        if let ExprKind::Call { args, keywords, .. } = &expr.node {
+            for arg in args {
+                if let ExprKind::Name { id, .. } = &arg.node {
+                    final_args.push(id.to_string())
+                }
+            }
+
+            for keyword in keywords {
+                let KeywordData { arg, value } = &keyword.node;
+                if let ExprKind::Name { id, .. } = &value.node {
+                    if let Some(key) = arg {
+                        final_kwargs.insert(key.to_string(), id.to_string());
+                    }
+                }
+            }
         }
-        Ok(Self {
-            args: vec![],
-            kwargs: HashMap::new(),
-        })
+        Self {
+            args: final_args,
+            kwargs: final_kwargs,
+        }
     }
 
     /// Returns true if args and kwargs are empty
@@ -41,14 +54,18 @@ impl FormatFunction {
 
     /// Returns true if the statement and function call match, and false if not
     fn check_with_summary(&self, summary: &FormatSummary) -> bool {
-        summary.autos.len() == self.args.len() && summary.keywords.len() == self.kwargs.len()
+        let mut self_keys = self.kwargs.clone().into_keys().collect::<Vec<_>>();
+        self_keys.sort();
+        let mut summary_keys = summary.keywords.clone();
+        summary_keys.sort();
+        summary.autos.len() == self.args.len() && self_keys == summary_keys
     }
 }
 
-fn generate_f_string(summary: &FormatSummary, expr: &Expr) -> String {
-    let mut original_call = FormatFunction::new(expr);
+fn generate_f_string(summary: &FormatSummary, expr: &Expr) -> Option<String> {
+    let mut original_call = FormatFunction::from_expr(expr);
     println!("{:?}", original_call);
-    String::new()
+    Some(String::new())
 }
 
 /// UP032
@@ -60,13 +77,14 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     if !summary.indexes.is_empty() {
         return;
     }
-    println!("Checkpoint Charlie");
-    let mut diagnostic = Diagnostic::new(violations::FString, Range::from_located(expr));
-    println!("{:?}", diagnostic.kind.code());
-    println!("{:?}", checker.patch(diagnostic.kind.code()));
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let contents = generate_f_string(summary, expr);
+    let contents = match generate_f_string(summary, expr) {
+        None => return,
+        Some(items) => items,
+    };
+    println!("WE HERE");
+    let mut diagnostic = Diagnostic::new(violations::FString, Range::from_located(expr));
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
             contents,
@@ -75,4 +93,86 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
         ));
     };
     checker.diagnostics.push(diagnostic);
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_with_summary() {
+        let summary = FormatSummary {
+            autos: vec![0, 1],
+            keywords: vec!["c".to_string(), "d".to_string()],
+            has_nested_parts: false,
+            indexes: vec![],
+        };
+        let form_func = FormatFunction {
+            args: vec!["a".to_string(), "b".to_string()],
+            kwargs: [("c".to_string(), "e".to_string()), ("d".to_string(), "f".to_string())]
+                .iter()
+                .cloned()
+                .collect(),
+        };
+    let checks_out = form_func.check_with_summary(&summary);
+    assert!(checks_out);
+    }
+
+    #[test]
+    fn test_check_with_summary_unuequal_args() {
+        let summary = FormatSummary {
+            autos: vec![0, 1],
+            keywords: vec!["c".to_string()],
+            has_nested_parts: false,
+            indexes: vec![],
+        };
+        let form_func = FormatFunction {
+            args: vec!["a".to_string(), "b".to_string()],
+            kwargs: [("c".to_string(), "e".to_string()), ("d".to_string(), "f".to_string())]
+                .iter()
+                .cloned()
+                .collect(),
+        };
+    let checks_out = form_func.check_with_summary(&summary);
+    assert!(!checks_out);
+    }
+
+    #[test]
+    fn test_check_with_summary_different_kwargs() {
+        let summary = FormatSummary {
+            autos: vec![0, 1],
+            keywords: vec!["c".to_string(), "d".to_string()],
+            has_nested_parts: false,
+            indexes: vec![],
+        };
+        let form_func = FormatFunction {
+            args: vec!["a".to_string(), "b".to_string()],
+            kwargs: [("c".to_string(), "e".to_string()), ("e".to_string(), "f".to_string())]
+                .iter()
+                .cloned()
+                .collect(),
+        };
+    let checks_out = form_func.check_with_summary(&summary);
+    assert!(!checks_out);
+    }
+
+    #[test]
+    fn test_check_with_summary_kwargs_same_diff_order() {
+        let summary = FormatSummary {
+            autos: vec![0, 1],
+            keywords: vec!["c".to_string(), "d".to_string()],
+            has_nested_parts: false,
+            indexes: vec![],
+        };
+        let form_func = FormatFunction {
+            args: vec!["a".to_string(), "b".to_string()],
+            kwargs: [("d".to_string(), "e".to_string()), ("c".to_string(), "f".to_string())]
+                .iter()
+                .cloned()
+                .collect(),
+        };
+    let checks_out = form_func.check_with_summary(&summary);
+    assert!(checks_out);
+    }
 }
