@@ -74,10 +74,10 @@ impl FormatFunction {
     }
 
     fn consume_arg(&mut self) -> Option<String> {
-        if !self.args.is_empty() {
-            Some(self.args.remove(0))
-        } else {
+        if self.args.is_empty() {
             None
+        } else {
+            Some(self.args.remove(0))
         }
     }
 
