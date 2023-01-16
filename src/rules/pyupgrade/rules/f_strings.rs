@@ -16,6 +16,8 @@ use crate::violations;
 static NAME_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<name>[^\W0-9]\w*)?(?P<fmt>.*?)}").unwrap());
 
+static HAS_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"[.*]").unwrap());
+
 #[derive(Debug)]
 struct FormatFunction {
     args: Vec<String>,
@@ -93,6 +95,20 @@ impl FormatFunction {
     }
 }
 
+
+fn extract_caps(caps: &Captures, target: &str) -> Result<String, ()> {
+    let new_string = match caps.name(target) {
+        None => {
+            return Err(())
+        }
+        Some(item) => item.as_str(),
+    };
+    if HAS_BRACKETS.is_match(new_string) {
+        return Err(())
+    }
+    Ok(new_string.to_string())
+}
+
 fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<String> {
     let mut new_string = String::new();
     if let ExprKind::Call { func, .. } = &expr.node {
@@ -126,14 +142,12 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                 }
                 Some(item) => item,
             };
-            let second_part = match caps.name("fmt") {
-                None => {
-                    had_error = true;
-                    return String::new();
-                }
-                Some(item) => item.as_str(),
-            };
-            format!("{{{}{}}}", kwarg, second_part)
+            if let Ok(second_part) = extract_caps(&caps, "fmt") {
+                format!("{{{}{}}}", kwarg, second_part)
+            } else {
+                had_error = true;
+                "badstring".to_string()
+            }
         } else {
             let arg = match function.consume_arg() {
                 None => {
@@ -142,14 +156,12 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                 }
                 Some(item) => item,
             };
-            let second_part = match caps.name("fmt") {
-                None => {
-                    had_error = true;
-                    return String::new();
-                }
-                Some(item) => item.as_str(),
-            };
-            format!("{{{}{}}}", arg, second_part)
+            if let Ok(second_part) = extract_caps(&caps, "fmt") {
+                format!("{{{}{}}}", arg, second_part)
+            } else {
+                had_error = true;
+                "badstring".to_string()
+            }
         }
     });
     if had_error {
@@ -184,15 +196,12 @@ fn generate_f_string(
 
 /// UP032
 pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) {
-    println!("Checkpoint 0");
     let expr_range = Range::from_located(&expr);
     let expr_string = checker.locator.slice_source_code_range(&expr_range);
     // Pyupgrade says we should not try and refactor multi-line statements
-    println!("Checkpoint 1");
     if expr_string.contains('\n') {
         return;
     }
-    println!("Checkpoint 2");
     if summary.has_nested_parts {
         return;
     }
@@ -243,6 +252,7 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
+            invalid: false
         };
         let checks_out = form_func.check_with_summary(&summary);
         assert!(checks_out);
@@ -265,6 +275,7 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
+            invalid: false
         };
         let checks_out = form_func.check_with_summary(&summary);
         assert!(!checks_out);
@@ -287,6 +298,7 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
+            invalid: false
         };
         let checks_out = form_func.check_with_summary(&summary);
         assert!(!checks_out);
@@ -309,6 +321,7 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
+            invalid: false
         };
         let checks_out = form_func.check_with_summary(&summary);
         assert!(checks_out);

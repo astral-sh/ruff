@@ -61,7 +61,7 @@ b"{} {}".format(a, b)
 
 "{}{}".format(a)
 
-''"{}".format(a['\\'])''
+''"{}".format(a['\\'])
 
 '{}'.format(a['b'])
 
