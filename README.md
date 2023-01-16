@@ -10,9 +10,9 @@ An extremely fast Python linter, written in Rust.
 
 <p align="center">
   <picture align="center">
-    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/210156880-a97c2a0d-2c03-4393-8695-36547935a94e.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/210156881-a88fd142-5008-4695-9407-d028cec3eff7.svg">
-    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/210156881-a88fd142-5008-4695-9407-d028cec3eff7.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
+    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
   </picture>
 </p>
 
