@@ -122,7 +122,7 @@ impl<'a> Printer<'a> {
         }
 
         if matches!(self.violations, Violations::Hide) {
-            let mut stdout = BufWriter::new(io::stdout());
+            let mut stdout = BufWriter::new(io::stdout().lock());
             if matches!(
                 self.format,
                 SerializationFormat::Text | SerializationFormat::Grouped
@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
             return Ok(());
         }
 
-        let mut stdout = BufWriter::new(io::stdout());
+        let mut stdout = BufWriter::new(io::stdout().lock());
         match self.format {
             SerializationFormat::Json => {
                 writeln!(
@@ -312,7 +312,7 @@ impl<'a> Printer<'a> {
             );
         }
 
-        let mut stdout = BufWriter::new(io::stdout());
+        let mut stdout = BufWriter::new(io::stdout().lock());
         if !diagnostics.messages.is_empty() {
             if self.log_level >= &LogLevel::Default {
                 writeln!(stdout)?;
