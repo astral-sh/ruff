@@ -1,16 +1,18 @@
+use std::collections::HashMap;
+
 use once_cell::sync::Lazy;
-use regex::{Regex, Captures};
+use regex::{Captures, Regex};
+use rustpython_ast::{Constant, Expr, ExprKind, KeywordData};
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::violations;
-use rustpython_ast::{Expr, ExprKind, KeywordData, Constant};
-use std::collections::HashMap;
 
-// Checks for curly brackets. Inside these brackets this checks for an optional valid python name
-// and any format specifiers afterwards
+// Checks for curly brackets. Inside these brackets this checks for an optional
+// valid python name and any format specifiers afterwards
 static NAME_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<name>[^\W0-9]\w*)?(?P<fmt>.*?)}").unwrap());
 
@@ -18,13 +20,14 @@ static NAME_SPECIFIER: Lazy<Regex> =
 struct FormatFunction {
     args: Vec<String>,
     kwargs: HashMap<String, String>,
-    // Whether or not something invalid was found, if it was return IMMIDEATELY
+    // Whether or not something invalid was found, if it was return immediately
     invalid: bool,
 }
 
-/// Whether the given string contains characters that are FORBIDDEN in args and kwargs
+/// Whether the given string contains characters that are FORBIDDEN in args and
+/// kwargs
 fn contains_invalids(string: &str) -> bool {
-    let invalids = vec!['*', '\'','"'];
+    let invalids = vec!['*', '\'', '"'];
     for invalid in invalids {
         if string.contains(invalid) {
             return true;
@@ -59,7 +62,7 @@ impl FormatFunction {
         Self {
             args: final_args,
             kwargs: final_kwargs,
-            invalid
+            invalid,
         }
     }
 
@@ -93,8 +96,8 @@ impl FormatFunction {
 fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<String> {
     let mut new_string = String::new();
     if let ExprKind::Call { func, .. } = &expr.node {
-        if let ExprKind::Attribute { value, .. }  = &func.node {
-            if let ExprKind::Constant { value, kind } = & value.node {
+        if let ExprKind::Attribute { value, .. } = &func.node {
+            if let ExprKind::Constant { value, kind } = &value.node {
                 // Do NOT refactor byte strings
                 if let Some(kind_str) = kind {
                     if kind_str == "b" {
@@ -111,7 +114,8 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
     if new_string.is_empty() {
         return None;
     }
-    // You can't return a function from inside a closure, so we just record that there was an error
+    // You can't return a function from inside a closure, so we just record that
+    // there was an error
     let mut had_error = false;
     let clean_string = NAME_SPECIFIER.replace_all(&new_string, |caps: &Captures| {
         if let Some(name) = caps.name("name") {
@@ -120,14 +124,14 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                     had_error = true;
                     return String::new();
                 }
-                Some(item) => item
+                Some(item) => item,
             };
             let second_part = match caps.name("fmt") {
                 None => {
                     had_error = true;
                     return String::new();
                 }
-                Some(item) => item.as_str()
+                Some(item) => item.as_str(),
             };
             format!("{{{}{}}}", kwarg, second_part)
         } else {
@@ -136,34 +140,38 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                     had_error = true;
                     return String::new();
                 }
-                Some(item) => item
+                Some(item) => item,
             };
             let second_part = match caps.name("fmt") {
                 None => {
                     had_error = true;
                     return String::new();
                 }
-                Some(item) => item.as_str()
+                Some(item) => item.as_str(),
             };
             format!("{{{}{}}}", arg, second_part)
         }
     });
     if had_error {
-        return None
+        return None;
     }
     Some(format!("f\"{}\"", clean_string))
 }
 
-fn generate_f_string(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) -> Option<String> {
+fn generate_f_string(
+    checker: &mut Checker,
+    summary: &FormatSummary,
+    expr: &Expr,
+) -> Option<String> {
     let mut original_call = FormatFunction::from_expr(checker, expr);
 
     // If there were any invalid characters we should return immediately
     if original_call.invalid {
         return None;
     }
-    // We do not need to make changes if there are no arguments (let me know if you want me to
-    // change this to removing the .format() and doing nothing else, but that seems like it could
-    // cause issues)
+    // We do not need to make changes if there are no arguments (let me know if you
+    // want me to change this to removing the .format() and doing nothing else,
+    // but that seems like it could cause issues)
     if original_call.is_empty() {
         return None;
     }
@@ -176,16 +184,20 @@ fn generate_f_string(checker: &mut Checker, summary: &FormatSummary, expr: &Expr
 
 /// UP032
 pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) {
+    println!("Checkpoint 0");
     let expr_range = Range::from_located(&expr);
     let expr_string = checker.locator.slice_source_code_range(&expr_range);
     // Pyupgrade says we should not try and refactor multi-line statements
+    println!("Checkpoint 1");
     if expr_string.contains('\n') {
         return;
     }
+    println!("Checkpoint 2");
     if summary.has_nested_parts {
         return;
     }
-    // UP030 already removes the indexes, so we should not need to worry about the complexity
+    // UP030 already removes the indexes, so we should not need to worry about the
+    // complexity
     if !summary.indexes.is_empty() {
         return;
     }
@@ -195,6 +207,10 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
         None => return,
         Some(items) => items,
     };
+    // Don't refactor if it will make the string longer
+    if contents.len() > expr_string.len() {
+        return;
+    }
     let mut diagnostic = Diagnostic::new(violations::FString, Range::from_located(expr));
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
@@ -205,7 +221,6 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     };
     checker.diagnostics.push(diagnostic);
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -221,13 +236,16 @@ mod tests {
         };
         let form_func = FormatFunction {
             args: vec!["a".to_string(), "b".to_string()],
-            kwargs: [("c".to_string(), "e".to_string()), ("d".to_string(), "f".to_string())]
-                .iter()
-                .cloned()
-                .collect(),
+            kwargs: [
+                ("c".to_string(), "e".to_string()),
+                ("d".to_string(), "f".to_string()),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
         };
-    let checks_out = form_func.check_with_summary(&summary);
-    assert!(checks_out);
+        let checks_out = form_func.check_with_summary(&summary);
+        assert!(checks_out);
     }
 
     #[test]
@@ -240,13 +258,16 @@ mod tests {
         };
         let form_func = FormatFunction {
             args: vec!["a".to_string(), "b".to_string()],
-            kwargs: [("c".to_string(), "e".to_string()), ("d".to_string(), "f".to_string())]
-                .iter()
-                .cloned()
-                .collect(),
+            kwargs: [
+                ("c".to_string(), "e".to_string()),
+                ("d".to_string(), "f".to_string()),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
         };
-    let checks_out = form_func.check_with_summary(&summary);
-    assert!(!checks_out);
+        let checks_out = form_func.check_with_summary(&summary);
+        assert!(!checks_out);
     }
 
     #[test]
@@ -259,13 +280,16 @@ mod tests {
         };
         let form_func = FormatFunction {
             args: vec!["a".to_string(), "b".to_string()],
-            kwargs: [("c".to_string(), "e".to_string()), ("e".to_string(), "f".to_string())]
-                .iter()
-                .cloned()
-                .collect(),
+            kwargs: [
+                ("c".to_string(), "e".to_string()),
+                ("e".to_string(), "f".to_string()),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
         };
-    let checks_out = form_func.check_with_summary(&summary);
-    assert!(!checks_out);
+        let checks_out = form_func.check_with_summary(&summary);
+        assert!(!checks_out);
     }
 
     #[test]
@@ -278,12 +302,15 @@ mod tests {
         };
         let form_func = FormatFunction {
             args: vec!["a".to_string(), "b".to_string()],
-            kwargs: [("d".to_string(), "e".to_string()), ("c".to_string(), "f".to_string())]
-                .iter()
-                .cloned()
-                .collect(),
+            kwargs: [
+                ("d".to_string(), "e".to_string()),
+                ("c".to_string(), "f".to_string()),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
         };
-    let checks_out = form_func.check_with_summary(&summary);
-    assert!(checks_out);
+        let checks_out = form_func.check_with_summary(&summary);
+        assert!(checks_out);
     }
 }
