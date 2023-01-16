@@ -5971,6 +5971,19 @@ impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
 }
 
 define_violation!(
+    pub struct PreferUniqueEnums;
+);
+impl Violation for PreferUniqueEnums {
+    fn message(&self) -> String {
+        "Consider using removing dupe values.".to_string()
+    }
+
+    fn placeholder() -> Self {
+        PreferUniqueEnums
+    }
+}
+
+define_violation!(
     pub struct PreferListBuiltin;
 );
 impl AlwaysAutofixableViolation for PreferListBuiltin {

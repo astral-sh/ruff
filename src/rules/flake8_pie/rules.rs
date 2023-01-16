@@ -106,6 +106,53 @@ pub fn dupe_class_field_definitions<'a, 'b>(
     }
 }
 
+// PIE796
+pub fn prefer_unique_enums<'a, 'b>(checker: &mut Checker<'a>, parent: &'b Stmt, body: &'b [Stmt])
+where
+    'b: 'a,
+{
+    let StmtKind::ClassDef { bases, .. } = &parent.node else {
+        return;
+    };
+
+    let is_enum = bases.iter().any(|stmt| match &stmt.node {
+        ExprKind::Name { id, .. } => id == "Enum",
+        ExprKind::Attribute { value, attr, .. } => {
+            attr.ends_with("Enum")
+                && match &value.node {
+                    ExprKind::Name { id, .. } => id == "enum",
+                    _ => false,
+                }
+        }
+        _ => false,
+    });
+
+    if !is_enum {
+        return;
+    }
+
+    let mut seen_targets: FxHashSet<String> = FxHashSet::default();
+    for stmt in body {
+        let target = match &stmt.node {
+            StmtKind::Assign { value, .. } => match &value.node {
+                ExprKind::Constant { value, .. } => value.to_string(),
+                _ => {
+                    continue;
+                }
+            },
+            _ => {
+                continue;
+            }
+        };
+
+        if !seen_targets.insert(target) {
+            let diagnostic =
+                Diagnostic::new(violations::PreferUniqueEnums, Range::from_located(stmt));
+            checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
 /// PIE807
 pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Lambda { args, body } = &expr.node else {

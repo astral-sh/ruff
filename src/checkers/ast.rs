@@ -701,6 +701,10 @@ where
                     flake8_pie::rules::dupe_class_field_definitions(self, stmt, body);
                 }
 
+                if self.settings.enabled.contains(&RuleCode::PIE796) {
+                    flake8_pie::rules::prefer_unique_enums(self, stmt, body);
+                }
+
                 self.check_builtin_shadowing(name, stmt, false);
 
                 for expr in bases {
