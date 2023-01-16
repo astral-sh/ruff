@@ -1,28 +1,26 @@
 use rustpython_ast::{Constant, ExprKind, KeywordData};
 use rustpython_parser::ast::Expr;
 
+use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{Diagnostic, RuleCode};
 use crate::settings::types::PythonVersion;
 use crate::violations;
 
-fn rule(
-    checker: &Checker,
-    decorator_list: &[Expr],
-    target_version: PythonVersion,
-) -> Option<Diagnostic> {
+/// UP011
+pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Expr]) {
     for expr in decorator_list.iter() {
         let ExprKind::Call {
             func,
             args,
             keywords,
-        } = &expr.node
-        else {
+        } = &expr.node else {
             continue;
         };
 
+        // Look for, e.g., `import functools; @functools.lru_cache`.
         if !(args.is_empty()
             && checker
                 .resolve_call_path(func)
@@ -31,21 +29,29 @@ fn rule(
             continue;
         }
 
-        let range = Range::new(func.end_location.unwrap(), expr.end_location.unwrap());
         // Ex) `functools.lru_cache()`
         if keywords.is_empty() {
-            return Some(Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 violations::UnnecessaryLRUCacheParams,
-                range,
-            ));
+                Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
+            );
+            if checker.patch(&RuleCode::UP011) {
+                diagnostic.amend(Fix::replacement(
+                    unparse_expr(func, checker.stylist),
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
+            }
+            checker.diagnostics.push(diagnostic);
         }
+
         // Ex) `functools.lru_cache(maxsize=None)`
-        if !(target_version >= PythonVersion::Py39 && keywords.len() == 1) {
+        if !(checker.settings.target_version >= PythonVersion::Py39 && keywords.len() == 1) {
             continue;
         }
 
         let KeywordData { arg, value } = &keywords[0].node;
-        if !(arg.as_ref().map(|arg| arg == "maxsize").unwrap_or_default()
+        if !(arg.as_ref().map_or(false, |arg| arg == "maxsize")
             && matches!(
                 value.node,
                 ExprKind::Constant {
@@ -56,25 +62,27 @@ fn rule(
         {
             continue;
         }
-        return Some(Diagnostic::new(
-            violations::UnnecessaryLRUCacheParams,
-            range,
-        ));
-    }
-    None
-}
 
-/// UP011
-pub fn unnecessary_lru_cache_params(checker: &mut Checker, decorator_list: &[Expr]) {
-    let Some(mut diagnostic) = rule(
-        checker,
-        decorator_list,
-        checker.settings.target_version,
-    ) else {
-        return;
-    };
-    if checker.patch(diagnostic.kind.code()) {
-        diagnostic.amend(Fix::deletion(diagnostic.location, diagnostic.end_location));
+        let mut diagnostic = Diagnostic::new(
+            violations::UnnecessaryLRUCacheParams,
+            Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
+        );
+        if checker.patch(&RuleCode::UP011) {
+            if let ExprKind::Attribute { value, ctx, .. } = &func.node {
+                diagnostic.amend(Fix::replacement(
+                    unparse_expr(
+                        &create_expr(ExprKind::Attribute {
+                            value: value.clone(),
+                            attr: "cache".to_string(),
+                            ctx: ctx.clone(),
+                        }),
+                        checker.stylist,
+                    ),
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
+            }
+        }
+        checker.diagnostics.push(diagnostic);
     }
-    checker.diagnostics.push(diagnostic);
 }

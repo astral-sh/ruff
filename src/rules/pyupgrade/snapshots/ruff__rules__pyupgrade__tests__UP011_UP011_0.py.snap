@@ -11,10 +11,10 @@ expression: diagnostics
     row: 5
     column: 12
   fix:
-    content: ""
+    content: lru_cache
     location:
       row: 5
-      column: 10
+      column: 1
     end_location:
       row: 5
       column: 12
@@ -28,10 +28,10 @@ expression: diagnostics
     row: 11
     column: 22
   fix:
-    content: ""
+    content: functools.lru_cache
     location:
       row: 11
-      column: 20
+      column: 1
     end_location:
       row: 11
       column: 22
@@ -44,14 +44,7 @@ expression: diagnostics
   end_location:
     row: 16
     column: 24
-  fix:
-    content: ""
-    location:
-      row: 16
-      column: 10
-    end_location:
-      row: 16
-      column: 24
+  fix: ~
   parent: ~
 - kind:
     UnnecessaryLRUCacheParams: ~
@@ -62,10 +55,10 @@ expression: diagnostics
     row: 21
     column: 34
   fix:
-    content: ""
+    content: functools.cache
     location:
       row: 21
-      column: 20
+      column: 1
     end_location:
       row: 21
       column: 34
@@ -79,10 +72,10 @@ expression: diagnostics
     row: 28
     column: 1
   fix:
-    content: ""
+    content: lru_cache
     location:
       row: 27
-      column: 10
+      column: 1
     end_location:
       row: 28
       column: 1
@@ -96,10 +89,10 @@ expression: diagnostics
     row: 35
     column: 1
   fix:
-    content: ""
+    content: lru_cache
     location:
       row: 33
-      column: 10
+      column: 1
     end_location:
       row: 35
       column: 1
@@ -113,10 +106,10 @@ expression: diagnostics
     row: 42
     column: 19
   fix:
-    content: ""
+    content: functools.cache
     location:
       row: 40
-      column: 20
+      column: 1
     end_location:
       row: 42
       column: 19
@@ -130,10 +123,10 @@ expression: diagnostics
     row: 51
     column: 1
   fix:
-    content: ""
+    content: functools.cache
     location:
       row: 47
-      column: 20
+      column: 1
     end_location:
       row: 51
       column: 1
@@ -147,10 +140,10 @@ expression: diagnostics
     row: 62
     column: 1
   fix:
-    content: ""
+    content: functools.cache
     location:
       row: 56
-      column: 20
+      column: 1
     end_location:
       row: 62
       column: 1
@@ -164,10 +157,10 @@ expression: diagnostics
     row: 72
     column: 1
   fix:
-    content: ""
+    content: functools.cache
     location:
       row: 67
-      column: 20
+      column: 1
     end_location:
       row: 72
       column: 1
