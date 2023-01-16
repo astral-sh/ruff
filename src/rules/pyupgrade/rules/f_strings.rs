@@ -1,11 +1,18 @@
+use once_cell::sync::Lazy;
+use regex::{Regex, Captures};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::violations;
-use rustpython_ast::{Expr, ExprKind, KeywordData};
+use rustpython_ast::{Expr, ExprKind, KeywordData, Constant};
 use std::collections::HashMap;
+
+// Checks for curly brackets. Inside these brackets this checks for an optional valid python name
+// and any format specifiers afterwards
+static NAME_SPECIFIER: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\{(?P<name>[^\W0-9]\w*)?(?P<fmt>.*?)}").unwrap());
 
 #[derive(Debug)]
 struct FormatFunction {
@@ -44,12 +51,16 @@ impl FormatFunction {
         self.args.is_empty() && self.kwargs.is_empty()
     }
 
-    fn add_arg(&mut self, arg: String) {
-        self.args.push(arg);
+    fn consume_arg(&mut self) -> Option<String> {
+        if self.args.len() > 0 {
+            Some(self.args.remove(0))
+        } else {
+            None
+        }
     }
 
-    fn add_kwarg(&mut self, key: String, value: String) {
-        self.kwargs.insert(key, value);
+    fn get_kwarg(&self, key: &str) -> Option<String> {
+        self.kwargs.get(key).cloned()
     }
 
     /// Returns true if the statement and function call match, and false if not
@@ -62,10 +73,50 @@ impl FormatFunction {
     }
 }
 
+fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<String> {
+    let mut new_string = String::new();
+    if let ExprKind::Call { func, .. } = &expr.node {
+        if let ExprKind::Attribute { value, .. }  = &func.node {
+            if let ExprKind::Constant { value, .. } = & value.node {
+                if let Constant::Str(string) = value {
+                    new_string = string.to_string();
+                }
+            }
+        }
+    }
+    // If we didn't get a valid string, return an empty string
+    if new_string.is_empty() {
+        return None;
+    }
+    let clean_string = NAME_SPECIFIER.replace_all(&new_string, |caps: &Captures| {
+        if let Some(name) = caps.name("name") {
+            // I believe we do sufficient checks to make sure this unwrap is safe
+            let kwarg = function.get_kwarg(name.as_str()).unwrap();
+            let second_part = caps.name("fmt").unwrap().as_str();
+            format!("{{{}{}}}", kwarg, second_part)
+        } else {
+            // I believe we do sufficient checks to make sure this unwrap is safe
+            let arg = function.consume_arg().unwrap();
+            let second_part = caps.name("fmt").unwrap().as_str();
+            format!("{{{}{}}}", arg, second_part)
+        }
+    });
+    Some(clean_string.to_string())
+}
+
 fn generate_f_string(summary: &FormatSummary, expr: &Expr) -> Option<String> {
     let mut original_call = FormatFunction::from_expr(expr);
-    println!("{:?}", original_call);
-    Some(String::new())
+    // We do not need to make changes if there are no arguments (let me know if you want me to
+    // change this to removing the .format() and doing nothing else, but that seems like it could
+    // cause issues)
+    if original_call.is_empty() {
+        return None;
+    }
+    // If the actual string and the format function do not match, we cannot operate
+    if !original_call.check_with_summary(summary) {
+        return None;
+    }
+    create_new_string(expr, &mut original_call)
 }
 
 /// UP032
@@ -83,7 +134,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
         None => return,
         Some(items) => items,
     };
-    println!("WE HERE");
+    println!("{}", contents);
     let mut diagnostic = Diagnostic::new(violations::FString, Range::from_located(expr));
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(

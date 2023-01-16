@@ -1,1 +1,1 @@
-'{}{}{}{x}{foo} {bar}'.format(x, y, z, foo=hello, bar=world)
+'{}{}{}{foo} {bar}'.format(x, y, z, foo=hello, bar=world)
