@@ -7,10 +7,11 @@ use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Strictness {
     /// Ban imports that extend into the parent module or beyond.
+    #[default]
     Parents,
     /// Ban all relative imports.
     All,
