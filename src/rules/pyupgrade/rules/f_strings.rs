@@ -125,6 +125,9 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
             format!("{{{}{}}}", arg, second_part)
         }
     });
+    if had_error {
+        return None
+    }
     Some(clean_string.to_string())
 }
 
