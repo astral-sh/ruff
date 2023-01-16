@@ -23,5 +23,7 @@
 
 "{}".format(0x0)
 
+u"foo{}".format(1)
+
 # Waiting on Charlie solution to solve this
 # r'"\N{snowman} {}".format(a)'
