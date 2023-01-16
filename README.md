@@ -1745,6 +1745,17 @@ rm Lib/test/bad_coding.py \
 Then, from `resources/test/cpython`, run: `time pylint -j 0 -E $(git ls-files '*.py')`. This
 will execute Pylint with maximum parallelism and only report errors.
 
+To benchmark Pyupgrade, run the following from `resources/test/cpython`:
+
+```shell
+hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
+  "find . -type f -name \"*.py\" | xargs -P 0 pyupgrade --py311-plus"
+
+Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
+  Time (mean ± σ):     30.119 s ±  0.195 s    [User: 28.638 s, System: 0.390 s]
+  Range (min … max):   29.813 s … 30.356 s    10 runs
+```
+
 ## Reference
 
 ### Options
