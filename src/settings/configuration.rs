@@ -65,7 +65,7 @@ pub struct Configuration {
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
     pub flake8_pytest_style: Option<flake8_pytest_style::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
-    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    pub flake8_tidy_imports: Option<flake8_tidy_imports::options::Options>,
     pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
     pub isort: Option<isort::settings::Options>,
     pub mccabe: Option<mccabe::settings::Options>,
