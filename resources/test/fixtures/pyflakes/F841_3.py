@@ -48,6 +48,17 @@ def f():
 
 def f(a, b):
     x = (
+        a()
+        if a is not None
+        else b
+    )
+
+    y = \
+        a() if a is not None else b
+
+
+def f(a, b):
+    x = (
         a
         if a is not None
         else b
