@@ -8,7 +8,7 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use super::settings::{BannedApi, Strictness};
+    use super::settings::{ApiBan, Strictness};
     use crate::linter::test_path;
     use crate::registry::RuleCode;
     use crate::settings::Settings;
@@ -54,13 +54,13 @@ mod tests {
                     banned_api: FxHashMap::from_iter([
                         (
                             "cgi".to_string(),
-                            BannedApi {
+                            ApiBan {
                                 msg: "The cgi module is deprecated.".to_string(),
                             },
                         ),
                         (
                             "typing.TypedDict".to_string(),
-                            BannedApi {
+                            ApiBan {
                                 msg: "Use typing_extensions.TypedDict instead.".to_string(),
                             },
                         ),
