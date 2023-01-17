@@ -342,13 +342,10 @@ fn build_rule_table(
 ) -> RuleTable {
     let mut rules = RuleTable::empty();
 
-    let fixable = resolve_codes(
-        [RuleCodeSpec {
-            select: &fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
-            ignore: &unfixable.unwrap_or_default(),
-        }]
-        .into_iter(),
-    );
+    let fixable = resolve_codes([RuleCodeSpec {
+        select: &fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
+        ignore: &unfixable.unwrap_or_default(),
+    }]);
 
     for code in validate_enabled(resolve_codes(
         [RuleCodeSpec {
@@ -417,7 +414,7 @@ struct RuleCodeSpec<'a> {
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// rule codes.
-fn resolve_codes<'a>(specs: impl Iterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<RuleCode> {
+fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<RuleCode> {
     let mut codes: FxHashSet<RuleCode> = FxHashSet::default();
     for spec in specs {
         for specificity in [
@@ -464,75 +461,57 @@ mod tests {
 
     #[test]
     fn rule_codes() {
-        let actual = resolve_codes(
-            [RuleCodeSpec {
-                select: &[RuleCodePrefix::W],
-                ignore: &[],
-            }]
-            .into_iter(),
-        );
+        let actual = resolve_codes([RuleCodeSpec {
+            select: &[RuleCodePrefix::W],
+            ignore: &[],
+        }]);
         let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(
-            [RuleCodeSpec {
-                select: &[RuleCodePrefix::W6],
-                ignore: &[],
-            }]
-            .into_iter(),
-        );
+        let actual = resolve_codes([RuleCodeSpec {
+            select: &[RuleCodePrefix::W6],
+            ignore: &[],
+        }]);
         let expected = FxHashSet::from_iter([RuleCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(
-            [RuleCodeSpec {
-                select: &[RuleCodePrefix::W],
-                ignore: &[RuleCodePrefix::W292],
-            }]
-            .into_iter(),
-        );
+        let actual = resolve_codes([RuleCodeSpec {
+            select: &[RuleCodePrefix::W],
+            ignore: &[RuleCodePrefix::W292],
+        }]);
         let expected = FxHashSet::from_iter([RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(
-            [RuleCodeSpec {
-                select: &[RuleCodePrefix::W605],
-                ignore: &[RuleCodePrefix::W605],
-            }]
-            .into_iter(),
-        );
+        let actual = resolve_codes([RuleCodeSpec {
+            select: &[RuleCodePrefix::W605],
+            ignore: &[RuleCodePrefix::W605],
+        }]);
         let expected = FxHashSet::from_iter([]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(
-            [
-                RuleCodeSpec {
-                    select: &[RuleCodePrefix::W],
-                    ignore: &[RuleCodePrefix::W292],
-                },
-                RuleCodeSpec {
-                    select: &[RuleCodePrefix::W292],
-                    ignore: &[],
-                },
-            ]
-            .into_iter(),
-        );
+        let actual = resolve_codes([
+            RuleCodeSpec {
+                select: &[RuleCodePrefix::W],
+                ignore: &[RuleCodePrefix::W292],
+            },
+            RuleCodeSpec {
+                select: &[RuleCodePrefix::W292],
+                ignore: &[],
+            },
+        ]);
         let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W505, RuleCode::W605]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes(
-            [
-                RuleCodeSpec {
-                    select: &[RuleCodePrefix::W],
-                    ignore: &[RuleCodePrefix::W292],
-                },
-                RuleCodeSpec {
-                    select: &[RuleCodePrefix::W292],
-                    ignore: &[RuleCodePrefix::W],
-                },
-            ]
-            .into_iter(),
-        );
+        let actual = resolve_codes([
+            RuleCodeSpec {
+                select: &[RuleCodePrefix::W],
+                ignore: &[RuleCodePrefix::W292],
+            },
+            RuleCodeSpec {
+                select: &[RuleCodePrefix::W292],
+                ignore: &[RuleCodePrefix::W],
+            },
+        ]);
         let expected = FxHashSet::from_iter([RuleCode::W292]);
         assert_eq!(actual, expected);
     }
