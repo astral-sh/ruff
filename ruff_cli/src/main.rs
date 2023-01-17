@@ -98,7 +98,7 @@ pub fn main() -> Result<ExitCode> {
             r#"
 {}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
 
-https://github.com/charliermarsh/ruff/issues/new
+https://github.com/charliermarsh/ruff/issues/new?title=%5BPanic%5D
 
 quoting the executed command, along with the relevant file contents and `pyproject.toml` settings,
 we'd be very appreciative!

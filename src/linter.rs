@@ -345,7 +345,7 @@ pub fn lint_fix(
 
 This likely indicates a bug in `{}`. If you could open an issue at:
 
-{}/issues/new
+{}/issues/new?title=%5BInfinite%20loop%5D
 
 quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be
 very appreciative!
