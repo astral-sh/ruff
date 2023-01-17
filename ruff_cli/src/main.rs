@@ -93,10 +93,18 @@ pub fn main() -> Result<ExitCode> {
     let (cli, overrides) = Cli::parse().partition();
 
     let default_panic_hook = std::panic::take_hook();
-
     std::panic::set_hook(Box::new(move |info| {
-        eprintln!("ruff crashed ... this should not be happening :/\n\
-        Please report it on GitHub: https://github.com/charliermarsh/ruff/issues/new?title=Panic+when+%2E%2E%2E");
+        eprintln!(
+            r#"
+{}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
+
+https://github.com/charliermarsh/ruff/issues/new
+
+quoting the executed command, along with the relevant file contents and `pyproject.toml` settings,
+we'd be very appreciative!
+"#,
+            "error".red().bold(),
+        );
         default_panic_hook(info);
     }));
 
