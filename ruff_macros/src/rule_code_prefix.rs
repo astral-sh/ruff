@@ -3,9 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use once_cell::sync::Lazy;
 use proc_macro2::Span;
 use quote::quote;
-use syn::punctuated::Punctuated;
-use syn::token::Comma;
-use syn::{DataEnum, DeriveInput, Ident, Variant};
+use syn::Ident;
 
 const ALL: &str = "ALL";
 
@@ -86,43 +84,16 @@ pub static PREFIX_REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::n
     ])
 });
 
-pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let DeriveInput { ident, data, .. } = input;
-    let syn::Data::Enum(DataEnum { variants, .. }) = data else {
-        return Err(syn::Error::new(
-            ident.span(),
-            "Can only derive `RuleCodePrefix` from enums.",
-        ));
-    };
-
-    let prefix_ident = Ident::new(&format!("{ident}Prefix"), ident.span());
-    let prefix = expand(&ident, &prefix_ident, &variants);
-    let expanded = quote! {
-        #[derive(PartialEq, Eq, PartialOrd, Ord)]
-        pub enum SuffixLength {
-            None,
-            Zero,
-            One,
-            Two,
-            Three,
-            Four,
-        }
-
-        #prefix
-    };
-    Ok(expanded)
-}
-
-fn expand(
-    ident: &Ident,
+pub fn expand<'a>(
+    rule_type: &Ident,
     prefix_ident: &Ident,
-    variants: &Punctuated<Variant, Comma>,
+    variants: impl Iterator<Item = &'a Ident>,
 ) -> proc_macro2::TokenStream {
     // Build up a map from prefix to matching RuleCodes.
     let mut prefix_to_codes: BTreeMap<Ident, BTreeSet<String>> = BTreeMap::default();
     for variant in variants {
-        let span = variant.ident.span();
-        let code_str = variant.ident.to_string();
+        let span = variant.span();
+        let code_str = variant.to_string();
         let code_prefix_len = code_str
             .chars()
             .take_while(|char| char.is_alphabetic())
@@ -158,7 +129,7 @@ fn expand(
         }
     });
 
-    let prefix_impl = generate_impls(ident, prefix_ident, &prefix_to_codes);
+    let prefix_impl = generate_impls(rule_type, prefix_ident, &prefix_to_codes);
 
     let prefix_redirects = PREFIX_REDIRECTS.iter().map(|(alias, rule_code)| {
         let code = Ident::new(rule_code, Span::call_site());
@@ -168,6 +139,16 @@ fn expand(
     });
 
     quote! {
+        #[derive(PartialEq, Eq, PartialOrd, Ord)]
+        pub enum SuffixLength {
+            None,
+            Zero,
+            One,
+            Two,
+            Three,
+            Four,
+        }
+
         #[derive(
             ::strum_macros::EnumString,
             ::strum_macros::AsRefStr,
@@ -197,7 +178,7 @@ fn expand(
 }
 
 fn generate_impls(
-    ident: &Ident,
+    rule_type: &Ident,
     prefix_ident: &Ident,
     prefix_to_codes: &BTreeMap<Ident, BTreeSet<String>>,
 ) -> proc_macro2::TokenStream {
@@ -205,7 +186,7 @@ fn generate_impls(
         let codes = codes.iter().map(|code| {
             let code = Ident::new(code, Span::call_site());
             quote! {
-                #ident::#code
+                #rule_type::#code
             }
         });
         let prefix_str = prefix.to_string();
@@ -265,7 +246,7 @@ fn generate_impls(
 
     quote! {
         impl #prefix_ident {
-            pub fn codes(&self) -> Vec<#ident> {
+            pub fn codes(&self) -> Vec<#rule_type> {
                 use colored::Colorize;
 
                 #[allow(clippy::match_same_arms)]

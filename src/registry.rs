@@ -2,7 +2,6 @@
 
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use ruff_macros::RuleCodePrefix;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
