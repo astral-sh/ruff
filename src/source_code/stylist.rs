@@ -61,6 +61,15 @@ impl Default for Quote {
     }
 }
 
+impl From<Quote> for char {
+    fn from(val: Quote) -> Self {
+        match val {
+            Quote::Single => '\'',
+            Quote::Double => '"',
+        }
+    }
+}
+
 impl From<&Quote> for vendor::str::Quote {
     fn from(val: &Quote) -> Self {
         match val {

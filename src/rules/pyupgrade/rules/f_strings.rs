@@ -75,17 +75,6 @@ impl<'a> FormatSummaryValues<'a> {
     fn consume_kwarg(&mut self, key: &str) -> Option<String> {
         self.kwargs.remove(key)
     }
-
-    /// Return `true` if the statement and function call match.
-    fn validate(&self, summary: &FormatSummary) -> bool {
-        let mut self_keys = self.kwargs.clone().into_keys().collect::<Vec<_>>();
-        self_keys.sort_unstable();
-
-        let mut summary_keys = summary.keywords.clone();
-        summary_keys.sort();
-
-        summary.autos.len() == self.args.len() && self_keys == summary_keys
-    }
 }
 
 /// Return `true` if the string contains characters that are forbidden in
@@ -135,14 +124,24 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
     let ExprKind::Attribute { value, .. } = &func.node else {
         return None;
     };
-    let ExprKind::Constant { value, .. } = &value.node else {
-        return None;
-    };
-    let Constant::Str(string) = value else {
+    if !matches!(
+        &value.node,
+        ExprKind::Constant {
+            value: Constant::Str(..),
+            ..
+        },
+    ) {
         return None;
     };
 
-    let contents = string.to_string();
+    let contents = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(value));
+    let contents = if contents.starts_with('U') || contents.starts_with('u') {
+        &contents[1..]
+    } else {
+        &contents
+    };
     if contents.is_empty() {
         return None;
     }
@@ -151,9 +150,7 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         return None;
     };
 
-    // You can't return a function from inside a closure, so we just record that
-    // there was an error.
-    let clean_string = replace_all(&NAME_SPECIFIER, &contents, |caps: &Captures| {
+    let converted = replace_all(&NAME_SPECIFIER, contents, |caps: &Captures| {
         if let Some(name) = caps.name("name") {
             let Some(value) = summary.consume_kwarg(name.as_str()) else {
                 return Err(anyhow!("Missing kwarg"));
@@ -173,7 +170,12 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         }
     })
     .ok()?;
-    Some(format!("f\"{clean_string}\""))
+
+    // Construct the format string.
+    let mut contents = String::with_capacity(1 + converted.len());
+    contents.push('f');
+    contents.push_str(&converted);
+    Some(contents)
 }
 
 /// UP032
@@ -185,12 +187,8 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
         return;
     }
 
-    let existing = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(expr));
-
     // Avoid refactoring multi-line strings.
-    if existing.contains('\n') {
+    if expr.location.row() != expr.end_location.unwrap().row() {
         return;
     }
 
@@ -201,6 +199,9 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     };
 
     // Avoid refactors that increase the resulting string length.
+    let existing = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(expr));
     if contents.len() > existing.len() {
         return;
     }
@@ -214,85 +215,4 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
         ));
     };
     checker.diagnostics.push(diagnostic);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_validate() {
-        let summary = FormatSummary {
-            autos: vec![0, 1],
-            keywords: vec!["c".to_string(), "d".to_string()],
-            has_nested_parts: false,
-            indexes: vec![],
-        };
-        let form_func = FormatSummaryValues {
-            args: vec!["a".to_string(), "b".to_string()],
-            kwargs: [("c", "e".to_string()), ("d", "f".to_string())]
-                .iter()
-                .cloned()
-                .collect(),
-        };
-        let checks_out = form_func.validate(&summary);
-        assert!(checks_out);
-    }
-
-    #[test]
-    fn test_validate_unequal_args() {
-        let summary = FormatSummary {
-            autos: vec![0, 1],
-            keywords: vec!["c".to_string()],
-            has_nested_parts: false,
-            indexes: vec![],
-        };
-        let form_func = FormatSummaryValues {
-            args: vec!["a".to_string(), "b".to_string()],
-            kwargs: [("c", "e".to_string()), ("d", "f".to_string())]
-                .iter()
-                .cloned()
-                .collect(),
-        };
-        let checks_out = form_func.validate(&summary);
-        assert!(!checks_out);
-    }
-
-    #[test]
-    fn test_validate_different_kwargs() {
-        let summary = FormatSummary {
-            autos: vec![0, 1],
-            keywords: vec!["c".to_string(), "d".to_string()],
-            has_nested_parts: false,
-            indexes: vec![],
-        };
-        let form_func = FormatSummaryValues {
-            args: vec!["a".to_string(), "b".to_string()],
-            kwargs: [("c", "e".to_string()), ("e", "f".to_string())]
-                .iter()
-                .cloned()
-                .collect(),
-        };
-        let checks_out = form_func.validate(&summary);
-        assert!(!checks_out);
-    }
-
-    #[test]
-    fn test_validate_kwargs_same_diff_order() {
-        let summary = FormatSummary {
-            autos: vec![0, 1],
-            keywords: vec!["c".to_string(), "d".to_string()],
-            has_nested_parts: false,
-            indexes: vec![],
-        };
-        let form_func = FormatSummaryValues {
-            args: vec!["a".to_string(), "b".to_string()],
-            kwargs: [("d", "e".to_string()), ("c", "f".to_string())]
-                .iter()
-                .cloned()
-                .collect(),
-        };
-        let checks_out = form_func.validate(&summary);
-        assert!(checks_out);
-    }
 }

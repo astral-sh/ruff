@@ -21,7 +21,13 @@
 
 "{}".format(0x0)
 
+'{} {}'.format(a, b)
+
+'''{} {}'''.format(a, b)
+
 u"foo{}".format(1)
+
+r"foo{}".format(1)
 
 x = "{a}".format(a=1)
 

@@ -179,48 +179,99 @@ expression: diagnostics
     column: 0
   end_location:
     row: 24
-    column: 18
+    column: 20
   fix:
-    content: "f\"foo{1}\""
+    content: "f'{a} {b}'"
     location:
       row: 24
       column: 0
     end_location:
       row: 24
+      column: 20
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 26
+    column: 24
+  fix:
+    content: "f'''{a} {b}'''"
+    location:
+      row: 26
+      column: 0
+    end_location:
+      row: 26
+      column: 24
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 28
+    column: 0
+  end_location:
+    row: 28
+    column: 18
+  fix:
+    content: "f\"foo{1}\""
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 28
       column: 18
   parent: ~
 - kind:
     FString: ~
   location:
-    row: 26
+    row: 30
+    column: 0
+  end_location:
+    row: 30
+    column: 18
+  fix:
+    content: "fr\"foo{1}\""
+    location:
+      row: 30
+      column: 0
+    end_location:
+      row: 30
+      column: 18
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 32
     column: 4
   end_location:
-    row: 26
+    row: 32
     column: 21
   fix:
     content: "f\"{1}\""
     location:
-      row: 26
+      row: 32
       column: 4
     end_location:
-      row: 26
+      row: 32
       column: 21
   parent: ~
 - kind:
     FString: ~
   location:
-    row: 28
+    row: 34
     column: 6
   end_location:
-    row: 28
+    row: 34
     column: 25
   fix:
     content: "f\"foo {x} \""
     location:
-      row: 28
+      row: 34
       column: 6
     end_location:
-      row: 28
+      row: 34
       column: 25
   parent: ~
 
