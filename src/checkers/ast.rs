@@ -1891,8 +1891,8 @@ where
                                     }
                                     Ok(summary) => {
                                         if self.settings.enabled.contains(&RuleCode::F522) {
-                                            pyflakes::rules::string_dot_format_extra_named_arguments(self,
-                                                                                                     &summary, keywords, location,
+                                            pyflakes::rules::string_dot_format_extra_named_arguments(
+                                                self, &summary, keywords, location,
                                             );
                                         }
 
