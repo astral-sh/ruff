@@ -1,3 +1,4 @@
+//! Rules from [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/).
 pub(crate) mod rules;
 
 #[cfg(test)]

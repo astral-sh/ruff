@@ -1,3 +1,4 @@
+//! Rules from [flake8-annotations](https://pypi.org/project/flake8-annotations/2.9.1/).
 mod fixes;
 pub(crate) mod helpers;
 pub(crate) mod rules;

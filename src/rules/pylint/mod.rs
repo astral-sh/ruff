@@ -1,3 +1,4 @@
+//! Rules from [Pylint](https://pypi.org/project/pylint/2.15.7/).
 pub(crate) mod rules;
 
 #[cfg(test)]

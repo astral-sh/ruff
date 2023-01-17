@@ -1,3 +1,4 @@
+//! Rules from [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/).
 pub(crate) mod rules;
 pub(crate) mod types;
 
