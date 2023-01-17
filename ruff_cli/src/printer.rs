@@ -177,8 +177,10 @@ impl<'a> Printer<'a> {
                             message.location.column(),
                             message.kind.body()
                         ));
-                        let mut case =
-                            TestCase::new(format!("org.ruff.{}", message.kind.rule()), status);
+                        let mut case = TestCase::new(
+                            format!("org.ruff.{}", message.kind.rule().code()),
+                            status,
+                        );
                         let file_path = Path::new(filename);
                         let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
                         let classname = file_path.parent().unwrap().join(file_stem);
@@ -255,7 +257,7 @@ impl<'a> Printer<'a> {
                         stdout,
                         "::error title=Ruff \
                          ({}),file={},line={},col={},endLine={},endColumn={}::{}",
-                        message.kind.rule(),
+                        message.kind.rule().code(),
                         message.filename,
                         message.location.row(),
                         message.location.column(),
@@ -276,7 +278,7 @@ impl<'a> Printer<'a> {
                             .iter()
                             .map(|message| {
                                 json!({
-                                    "description": format!("({}) {}", message.kind.rule(), message.kind.body()),
+                                    "description": format!("({}) {}", message.kind.rule().code(), message.kind.body()),
                                     "severity": "major",
                                     "fingerprint": message.kind.rule(),
                                     "location": {
