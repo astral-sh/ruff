@@ -18,7 +18,7 @@ static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").un
 static WIDTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\*|\d*)").unwrap());
 static PRECISION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\.(?:\*|\d*))?").unwrap());
 static LENGTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[hlL]?").unwrap());
-static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % (\(|\{)").unwrap());
+static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % ([({])").unwrap());
 static PYTHON_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\W0-9]\w*").unwrap());
 
 #[derive(Debug, PartialEq, Clone)]
@@ -60,8 +60,8 @@ impl PercentFormat {
     }
 }
 
-/// Gets the match from a regex and potentiall updated the value of a given
-/// integer
+/// Gets the match from a regex and potentially updates the value of a given
+/// integer.
 fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -> Option<String> {
     let flag_match = regex.find_at(string, *position);
     if let Some(flag_match) = flag_match {
@@ -145,7 +145,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
 
 /// Removes the first instance of a given element from a vector, if the item is
 /// not in the vector, nothing happens
-fn remove<T: std::cmp::PartialEq + std::marker::Copy>(vec: &mut Vec<T>, item: T) {
+fn remove<T: PartialEq + Copy>(vec: &mut Vec<T>, item: T) {
     if let Some(index) = vec.iter().position(|&x| x == item) {
         vec.remove(index);
     }
@@ -258,10 +258,9 @@ fn percent_to_format(string: &str) -> String {
 fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
     // FOR REVIEWER: Let me know if you want this redone in libcst, the reason I
     // didnt is because it starts as a Tuple, but ends as a Call
-    let right_range = Range::new(right.location, right.end_location.unwrap());
     let mut base_string = checker
         .locator
-        .slice_source_code_range(&right_range)
+        .slice_source_code_range(&Range::from_located(right))
         .to_string();
     let is_multi_line = base_string.contains('\n');
     if let ExprKind::Tuple { elts, .. } = &right.node {
@@ -490,20 +489,21 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
 
 /// UP031
 pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
-    let expr_range = Range::new(expr.location, expr.end_location.unwrap());
-    let expr_string = checker.locator.slice_source_code_range(&expr_range);
+    let expr_string = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(expr));
 
-    let mut the_split = MODULO_CALL.split(&expr_string);
+    let mut split = MODULO_CALL.split(&expr_string);
     // Pyupgrade does this test in the functions that change, but I am relying on
     // this logic for something else, so I will use it here, pyupgrade notes
     // this is an overly timid check
-    let left_string = match the_split.next() {
-        None => return,
-        Some(item) => item,
+    let Some(left_string) = split.next() else {
+        return
     };
-    if the_split.count() < 1 {
+    if split.count() < 1 {
         return;
     }
+
     let parsed = parse_percent_format(left_string);
     // Rust does not have a for else statement so we have to do this
     let is_valid = check_statement(parsed, right);
@@ -528,13 +528,17 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     if new_string.is_empty() {
         return;
     }
-    let replace_range = Range::new(expr.location, expr.end_location.unwrap());
-    let old_string = checker.locator.slice_source_code_range(&replace_range);
+    let old_string = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(expr));
     // If there is no change, then bail
     if new_string == old_string {
         return;
     }
-    let mut diagnostic = Diagnostic::new(violations::PrintfStringFormatting, replace_range);
+    let mut diagnostic = Diagnostic::new(
+        violations::PrintfStringFormatting,
+        Range::from_located(expr),
+    );
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
             new_string,
@@ -544,8 +548,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     }
     checker.diagnostics.push(diagnostic);
 }
-// Since this one is pretty complicated, I added all of the unit tests pyupgrade
-// has
+
 #[cfg(test)]
 mod test {
     use test_case::test_case;
