@@ -30,6 +30,7 @@ pub(crate) use use_pep585_annotation::use_pep585_annotation;
 pub(crate) use use_pep604_annotation::use_pep604_annotation;
 pub(crate) use useless_metaclass_type::useless_metaclass_type;
 pub(crate) use useless_object_inheritance::useless_object_inheritance;
+pub(crate) use extraneous_parenthesis::extraneous_parenthesis;
 
 use crate::ast::helpers::{self};
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -65,6 +66,7 @@ mod use_pep585_annotation;
 mod use_pep604_annotation;
 mod useless_metaclass_type;
 mod useless_object_inheritance;
+mod extraneous_parenthesis;
 
 /// UP008
 pub fn super_args(

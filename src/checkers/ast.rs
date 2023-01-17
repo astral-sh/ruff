@@ -1954,6 +1954,9 @@ where
                 if self.settings.enabled.contains(&RuleCode::UP024) {
                     pyupgrade::rules::os_error_alias(self, &expr);
                 }
+                if self.settings.enabled.contains(&RuleCode::UP033) {
+                    pyupgrade::rules::extraneous_parenthesis(self, expr, func, args, keywords);
+                }
 
                 // flake8-print
                 if self.settings.enabled.contains(&RuleCode::T201)
