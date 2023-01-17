@@ -922,6 +922,8 @@ For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-impli
 
 ### flake8-import-conventions (ICN)
 
+For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions) on GitHub.
+
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | ICN001 | ImportAliasIsNotConventional | `...` should be imported as `...` |  |
