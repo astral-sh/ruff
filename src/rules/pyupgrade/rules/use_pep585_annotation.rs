@@ -16,7 +16,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
             violations::UsePEP585Annotation(binding.to_string()),
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 binding.to_lowercase(),
                 expr.location,

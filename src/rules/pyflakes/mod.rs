@@ -233,7 +233,7 @@ mod tests {
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         let actual = diagnostics
             .iter()
-            .map(|diagnostic| diagnostic.kind.code().clone())
+            .map(|diagnostic| diagnostic.kind.rule().clone())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
         Ok(())

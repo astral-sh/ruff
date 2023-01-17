@@ -83,7 +83,7 @@ fn pytest_fixture_parentheses(
         violations::IncorrectFixtureParenthesesStyle(preferred.to_string(), actual.to_string()),
         Range::from_located(decorator),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(fix);
     }
     checker.diagnostics.push(diagnostic);
@@ -180,7 +180,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                             violations::UselessYieldFixture(func_name.to_string()),
                             Range::from_located(stmt),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
                                 "return".to_string(),
                                 stmt.location,
@@ -252,7 +252,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     violations::UnnecessaryAsyncioMarkOnFixture,
                     Range::from_located(mark),
                 );
-                if checker.patch(diagnostic.kind.code()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
                     diagnostic.amend(Fix::deletion(start, end));
@@ -267,7 +267,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     violations::ErroneousUseFixturesOnFixture,
                     Range::from_located(mark),
                 );
-                if checker.patch(diagnostic.kind.code()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
                     diagnostic.amend(Fix::deletion(start, end));

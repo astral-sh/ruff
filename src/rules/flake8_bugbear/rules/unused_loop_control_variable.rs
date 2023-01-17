@@ -66,7 +66,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
             violations::UnusedLoopControlVariable(name.to_string()),
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             // Prefix the variable name with an underscore.
             diagnostic.amend(Fix::replacement(
                 format!("_{name}"),

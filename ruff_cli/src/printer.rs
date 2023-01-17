@@ -143,7 +143,7 @@ impl<'a> Printer<'a> {
                             .messages
                             .iter()
                             .map(|message| ExpandedMessage {
-                                code: message.kind.code(),
+                                code: message.kind.rule(),
                                 message: message.kind.body(),
                                 fix: message.fix.as_ref().map(|fix| ExpandedFix {
                                     content: &fix.content,
@@ -178,7 +178,7 @@ impl<'a> Printer<'a> {
                             message.kind.body()
                         ));
                         let mut case =
-                            TestCase::new(format!("org.ruff.{}", message.kind.code()), status);
+                            TestCase::new(format!("org.ruff.{}", message.kind.rule()), status);
                         let file_path = Path::new(filename);
                         let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
                         let classname = file_path.parent().unwrap().join(file_stem);
@@ -248,14 +248,14 @@ impl<'a> Printer<'a> {
                         ":",
                         message.location.column(),
                         ":",
-                        message.kind.code().as_ref(),
+                        message.kind.rule().as_ref(),
                         message.kind.body(),
                     );
                     writeln!(
                         stdout,
                         "::error title=Ruff \
                          ({}),file={},line={},col={},endLine={},endColumn={}::{}",
-                        message.kind.code(),
+                        message.kind.rule(),
                         message.filename,
                         message.location.row(),
                         message.location.column(),
@@ -276,9 +276,9 @@ impl<'a> Printer<'a> {
                             .iter()
                             .map(|message| {
                                 json!({
-                                    "description": format!("({}) {}", message.kind.code(), message.kind.body()),
+                                    "description": format!("({}) {}", message.kind.rule(), message.kind.body()),
                                     "severity": "major",
-                                    "fingerprint": message.kind.code(),
+                                    "fingerprint": message.kind.rule(),
                                     "location": {
                                         "path": message.filename,
                                         "lines": {
@@ -361,7 +361,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
         ":".cyan(),
         message.location.column(),
         ":".cyan(),
-        message.kind.code().as_ref().red().bold(),
+        message.kind.rule().as_ref().red().bold(),
         message.kind.body(),
     );
     writeln!(stdout, "{label}")?;
@@ -388,7 +388,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
                 source: &source.contents,
                 line_start: message.location.row(),
                 annotations: vec![SourceAnnotation {
-                    label: message.kind.code().as_ref(),
+                    label: message.kind.rule().as_ref(),
                     annotation_type: AnnotationType::Error,
                     range: source.range,
                 }],
@@ -425,7 +425,7 @@ fn print_grouped_message<T: Write>(
         ":".cyan(),
         message.location.column(),
         " ".repeat(column_length - num_digits(message.location.column())),
-        message.kind.code().as_ref().red().bold(),
+        message.kind.rule().as_ref().red().bold(),
         message.kind.body(),
     );
     writeln!(stdout, "{label}")?;
@@ -452,7 +452,7 @@ fn print_grouped_message<T: Write>(
                 source: &source.contents,
                 line_start: message.location.row(),
                 annotations: vec![SourceAnnotation {
-                    label: message.kind.code().as_ref(),
+                    label: message.kind.rule().as_ref(),
                     annotation_type: AnnotationType::Error,
                     range: source.range,
                 }],

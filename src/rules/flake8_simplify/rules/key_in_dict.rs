@@ -38,7 +38,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
         violations::KeyInDict(left_content.to_string(), value_content.to_string()),
         range,
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             value_content.to_string(),
             right.location,

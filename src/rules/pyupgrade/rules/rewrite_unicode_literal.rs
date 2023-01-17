@@ -12,7 +12,7 @@ pub fn rewrite_unicode_literal(checker: &mut Checker, expr: &Expr, kind: Option<
         if const_kind.to_lowercase() == "u" {
             let mut diagnostic =
                 Diagnostic::new(violations::RewriteUnicodeLiteral, Range::from_located(expr));
-            if checker.patch(diagnostic.kind.code()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::deletion(
                     expr.location,
                     Location::new(expr.location.row(), expr.location.column() + 1),

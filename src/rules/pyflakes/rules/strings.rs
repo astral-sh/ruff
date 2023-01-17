@@ -116,7 +116,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         ),
         location,
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match remove_unused_format_arguments_from_dict(&missing, right, checker.locator) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -274,7 +274,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         ),
         location,
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match remove_unused_keyword_arguments_from_format_call(&missing, location, checker.locator)
         {
             Ok(fix) => {

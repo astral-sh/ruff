@@ -170,7 +170,7 @@ pub fn check_path(
         if !ignores.is_empty() {
             return Ok(diagnostics
                 .into_iter()
-                .filter(|diagnostic| !ignores.contains(&diagnostic.kind.code()))
+                .filter(|diagnostic| !ignores.contains(&diagnostic.kind.rule()))
                 .collect());
         }
     }
