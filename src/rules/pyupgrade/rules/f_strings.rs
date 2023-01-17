@@ -132,12 +132,9 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
     let mut had_error = false;
     let clean_string = NAME_SPECIFIER.replace_all(&new_string, |caps: &Captures| {
         if let Some(name) = caps.name("name") {
-            let kwarg = match function.get_kwarg(name.as_str()) {
-                None => {
-                    had_error = true;
-                    return String::new();
-                }
-                Some(item) => item,
+            let Some(kwarg) = function.get_kwarg(name.as_str()) else {
+                had_error = true;
+                return String::new();
             };
             if let Ok(second_part) = extract_caps(caps, "fmt") {
                 format!("{{{kwarg}{second_part}}}")
@@ -146,12 +143,9 @@ fn create_new_string(expr: &Expr, function: &mut FormatFunction) -> Option<Strin
                 "badstring".to_string()
             }
         } else {
-            let arg = match function.consume_arg() {
-                None => {
-                    had_error = true;
-                    return String::new();
-                }
-                Some(item) => item,
+            let Some(arg) = function.consume_arg() else {
+                had_error = true;
+                return String::new();
             };
             if let Ok(second_part) = extract_caps(caps, "fmt") {
                 format!("{{{arg}{second_part}}}")
@@ -209,9 +203,8 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     }
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let contents = match generate_f_string(checker, summary, expr) {
-        None => return,
-        Some(items) => items,
+    let Some(contents) = generate_f_string(checker, summary, expr) else {
+        return;
     };
     // Don't refactor if it will make the string longer
     if contents.len() > expr_string.len() {

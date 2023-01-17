@@ -1867,6 +1867,7 @@ where
                     || self.settings.enabled.contains(&RuleCode::F525)
                     // pyupgrade
                     || self.settings.enabled.contains(&RuleCode::UP030)
+                    || self.settings.enabled.contains(&RuleCode::UP032)
                 {
                     if let ExprKind::Attribute { value, attr, .. } = &func.node {
                         if let ExprKind::Constant {

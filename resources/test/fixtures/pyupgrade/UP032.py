@@ -1,31 +1,31 @@
 # These SHOULD change
-"{} {}".format(a, b)
+f"{a} {b}"
 
 "{1} {0}".format(a, b)
 
-"{x.y}".format(x=z)
+f"{z.y}"
 
-"{.x} {.y}".format(a, b)
+f"{a.x} {b.y}"
 
-"{} {}".format(a.b, c.d)
+f"{a.b} {c.d}"
 
-"{}".format(a())
+f"{a()}"
 
-"{}".format(a.b())
+f"{a.b()}"
 
-"{}".format(a.b().c())
+f"{a.b().c()}"
 
-"hello {}!".format(name)
+f"hello {name}!"
 
-"{}{b}{}".format(a, c, b=b)
+f"{a}{b}{c}"
 
-"{}".format(0x0)
+f"{0x0}"
 
-u"foo{}".format(1)
+f"foo{1}"
 
-x = "{a}".format(a=1)
+x = f"{1}"
 
-print("foo {} ".format(x))
+print(f"foo {x} ")
 
 # Waiting for a response to solve this one
 # "{}{{}}{}".format(escaped, y)
