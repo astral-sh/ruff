@@ -4,10 +4,10 @@ use syn::parse::Parse;
 use syn::{Ident, Path, Token};
 
 pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
-    let mut rulecode_variants = quote!();
+    let mut rule_variants = quote!();
     let mut diagkind_variants = quote!();
-    let mut rulecode_kind_match_arms = quote!();
-    let mut rulecode_origin_match_arms = quote!();
+    let mut rule_kind_match_arms = quote!();
+    let mut rule_origin_match_arms = quote!();
     let mut diagkind_code_match_arms = quote!();
     let mut diagkind_body_match_arms = quote!();
     let mut diagkind_fixable_match_arms = quote!();
@@ -15,13 +15,13 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut from_impls_for_diagkind = quote!();
 
     for (code, path, name) in &mapping.entries {
-        rulecode_variants.extend(quote! {#code,});
+        rule_variants.extend(quote! {#code,});
         diagkind_variants.extend(quote! {#name(#path),});
-        rulecode_kind_match_arms.extend(
+        rule_kind_match_arms.extend(
             quote! {Self::#code => DiagnosticKind::#name(<#path as Violation>::placeholder()),},
         );
         let origin = get_origin(code);
-        rulecode_origin_match_arms.extend(quote! {Self::#code => RuleOrigin::#origin,});
+        rule_origin_match_arms.extend(quote! {Self::#code => RuleOrigin::#origin,});
         diagkind_code_match_arms.extend(quote! {Self::#name(..) => &RuleCode::#code, });
         diagkind_body_match_arms.extend(quote! {Self::#name(x) => Violation::message(x), });
         diagkind_fixable_match_arms
@@ -45,34 +45,36 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
     quote! {
         #[derive(
-            AsRefStr,
+            AsRefStr,    // TODO(martin): Remove
             EnumIter,
-            EnumString,
+            EnumString,  // TODO(martin): Remove
             Debug,
-            Display,
+            Display,     // TODO(martin): Remove
             PartialEq,
             Eq,
             Clone,
-            Serialize,
-            Deserialize,
+            Serialize,   // TODO(martin): Remove
+            Deserialize, // TODO(martin): Remove
             Hash,
             PartialOrd,
             Ord,
         )]
-        pub enum RuleCode { #rulecode_variants }
+        pub enum Rule { #rule_variants }
+
+        pub use Rule as RuleCode; // TODO(martin): Remove
 
         #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
         pub enum DiagnosticKind { #diagkind_variants }
 
 
-        impl RuleCode {
+        impl Rule {
             /// A placeholder representation of the `DiagnosticKind` for the diagnostic.
             pub fn kind(&self) -> DiagnosticKind {
-                match self { #rulecode_kind_match_arms }
+                match self { #rule_kind_match_arms }
             }
 
             pub fn origin(&self) -> RuleOrigin {
-                match self { #rulecode_origin_match_arms }
+                match self { #rule_origin_match_arms }
             }
         }
 
