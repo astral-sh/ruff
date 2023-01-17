@@ -18,18 +18,16 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         rulecode_variants.extend(quote! {#code,});
         diagkind_variants.extend(quote! {#name(#path),});
         rulecode_kind_match_arms.extend(
-            quote! {RuleCode::#code => DiagnosticKind::#name(<#path as Violation>::placeholder()),},
+            quote! {Self::#code => DiagnosticKind::#name(<#path as Violation>::placeholder()),},
         );
         let origin = get_origin(code);
-        rulecode_origin_match_arms.extend(quote! {RuleCode::#code => RuleOrigin::#origin,});
-        diagkind_code_match_arms.extend(quote! {DiagnosticKind::#name(..) => &RuleCode::#code, });
-        diagkind_body_match_arms
-            .extend(quote! {DiagnosticKind::#name(x) => Violation::message(x), });
+        rulecode_origin_match_arms.extend(quote! {Self::#code => RuleOrigin::#origin,});
+        diagkind_code_match_arms.extend(quote! {Self::#name(..) => &RuleCode::#code, });
+        diagkind_body_match_arms.extend(quote! {Self::#name(x) => Violation::message(x), });
         diagkind_fixable_match_arms
-            .extend(quote! {DiagnosticKind::#name(x) => x.autofix_title_formatter().is_some(),});
-        diagkind_commit_match_arms.extend(
-            quote! {DiagnosticKind::#name(x) => x.autofix_title_formatter().map(|f| f(x)), },
-        );
+            .extend(quote! {Self::#name(x) => x.autofix_title_formatter().is_some(),});
+        diagkind_commit_match_arms
+            .extend(quote! {Self::#name(x) => x.autofix_title_formatter().map(|f| f(x)), });
         from_impls_for_diagkind.extend(quote! {
             impl From<#path> for DiagnosticKind {
                 fn from(x: #path) -> Self {
