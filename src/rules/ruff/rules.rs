@@ -1650,9 +1650,9 @@ pub fn ambiguous_unicode_character(
                         },
                         Range::new(location, end_location),
                     );
-                    if settings.enabled.contains(diagnostic.kind.code()) {
+                    if settings.rules.enabled(diagnostic.kind.code()) {
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(diagnostic.kind.code())
+                            && settings.rules.should_fix(diagnostic.kind.code())
                         {
                             diagnostic.amend(Fix::replacement(
                                 representant.to_string(),

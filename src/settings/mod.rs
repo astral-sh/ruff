@@ -16,6 +16,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
+use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
 use crate::registry::{RuleCode, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::rules::{
@@ -35,6 +36,7 @@ pub mod hashable;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
+mod rule_table;
 pub mod types;
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -77,8 +79,7 @@ pub struct CliSettings {
 #[derive(Debug, Hash)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
-    pub enabled: HashableHashSet<RuleCode>,
-    pub fixable: HashableHashSet<RuleCode>,
+    pub rules: RuleTable,
     pub per_file_ignores: Vec<(
         HashableGlobMatcher,
         HashableGlobMatcher,
@@ -154,6 +155,15 @@ static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
 impl Settings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
+            rules: build_rule_table(
+                config.fixable,
+                config.unfixable,
+                config.select,
+                config.ignore,
+                &config.extend_select,
+                &config.extend_ignore,
+                &config.pydocstyle,
+            ),
             allowed_confusables: config
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
@@ -164,53 +174,14 @@ impl Settings {
                 .dummy_variable_rgx
                 .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone())
                 .into(),
-            enabled: validate_enabled(resolve_codes(
-                [RuleCodeSpec {
-                    select: &config
-                        .select
-                        .unwrap_or_else(|| vec![RuleCodePrefix::E, RuleCodePrefix::F]),
-                    ignore: &config.ignore.unwrap_or_default(),
-                }]
-                .into_iter()
-                .chain(
-                    config
-                        .extend_select
-                        .iter()
-                        .zip(config.extend_ignore.iter())
-                        .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
-                )
-                .chain(
-                    // If a docstring convention is specified, force-disable any incompatible error
-                    // codes.
-                    if let Some(convention) = config
-                        .pydocstyle
-                        .as_ref()
-                        .and_then(|pydocstyle| pydocstyle.convention)
-                    {
-                        Left(iter::once(RuleCodeSpec {
-                            select: &[],
-                            ignore: convention.codes(),
-                        }))
-                    } else {
-                        Right(iter::empty())
-                    },
-                ),
-            ))
-            .into(),
             exclude: HashableGlobSet::new(
                 config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
             )?,
             extend_exclude: HashableGlobSet::new(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()).into(),
-            fixable: resolve_codes(
-                [RuleCodeSpec {
-                    select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
-                    ignore: &config.unfixable.unwrap_or_default(),
-                }]
-                .into_iter(),
-            )
-            .into(),
+
             force_exclude: config.force_exclude.unwrap_or(false),
+
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
             line_length: config.line_length.unwrap_or(88),
             namespace_packages: config.namespace_packages.unwrap_or_default(),
@@ -265,16 +236,15 @@ impl Settings {
     #[cfg(test)]
     pub fn for_rule(rule_code: RuleCode) -> Self {
         Self {
+            rules: [rule_code].into(),
             allowed_confusables: FxHashSet::from_iter([]).into(),
             builtins: vec![],
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$")
                 .unwrap()
                 .into(),
-            enabled: FxHashSet::from_iter([rule_code.clone()]).into(),
             exclude: HashableGlobSet::empty(),
             extend_exclude: HashableGlobSet::empty(),
             external: HashableHashSet::default(),
-            fixable: FxHashSet::from_iter([rule_code]).into(),
             force_exclude: false,
             ignore_init_module_imports: false,
             line_length: 88,
@@ -308,16 +278,15 @@ impl Settings {
     #[cfg(test)]
     pub fn for_rules(rule_codes: Vec<RuleCode>) -> Self {
         Self {
+            rules: rule_codes.into(),
             allowed_confusables: HashableHashSet::default(),
             builtins: vec![],
             dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$")
                 .unwrap()
                 .into(),
-            enabled: FxHashSet::from_iter(rule_codes.clone()).into(),
             exclude: HashableGlobSet::empty(),
             extend_exclude: HashableGlobSet::empty(),
             external: HashableHashSet::default(),
-            fixable: FxHashSet::from_iter(rule_codes).into(),
             force_exclude: false,
             ignore_init_module_imports: false,
             line_length: 88,
@@ -360,6 +329,59 @@ impl Settings {
         }
         Ok(())
     }
+}
+
+fn build_rule_table(
+    fixable: Option<Vec<RuleCodePrefix>>,
+    unfixable: Option<Vec<RuleCodePrefix>>,
+    select: Option<Vec<RuleCodePrefix>>,
+    ignore: Option<Vec<RuleCodePrefix>>,
+    extend_select: &[Vec<RuleCodePrefix>],
+    extend_ignore: &[Vec<RuleCodePrefix>],
+    pydocstyle: &Option<pydocstyle::settings::Options>,
+) -> RuleTable {
+    let mut rules = RuleTable::empty();
+
+    let fixable = resolve_codes(
+        [RuleCodeSpec {
+            select: &fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
+            ignore: &unfixable.unwrap_or_default(),
+        }]
+        .into_iter(),
+    );
+
+    for code in validate_enabled(resolve_codes(
+        [RuleCodeSpec {
+            select: &select.unwrap_or_else(|| vec![RuleCodePrefix::E, RuleCodePrefix::F]),
+            ignore: &ignore.unwrap_or_default(),
+        }]
+        .into_iter()
+        .chain(
+            extend_select
+                .iter()
+                .zip(extend_ignore.iter())
+                .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
+        )
+        .chain(
+            // If a docstring convention is specified, force-disable any incompatible error
+            // codes.
+            if let Some(convention) = pydocstyle
+                .as_ref()
+                .and_then(|pydocstyle| pydocstyle.convention)
+            {
+                Left(iter::once(RuleCodeSpec {
+                    select: &[],
+                    ignore: convention.codes(),
+                }))
+            } else {
+                Right(iter::empty())
+            },
+        ),
+    )) {
+        let fix = fixable.contains(&code);
+        rules.enable(code, fix);
+    }
+    rules
 }
 
 /// Given a list of patterns, create a `GlobSet`.

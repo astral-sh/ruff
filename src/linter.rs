@@ -47,7 +47,7 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = settings.enabled.contains(&RuleCode::W505);
+    let use_doc_lines = settings.rules.enabled(&RuleCode::W505);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(&tokens));
@@ -55,8 +55,8 @@ pub fn check_path(
 
     // Run the token-based rules.
     if settings
-        .enabled
-        .iter()
+        .rules
+        .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Tokens))
     {
         diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
@@ -64,13 +64,13 @@ pub fn check_path(
 
     // Run the AST-based rules.
     let use_ast = settings
-        .enabled
-        .iter()
+        .rules
+        .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Ast));
     let use_imports = !directives.isort.skip_file
         && settings
-            .enabled
-            .iter()
+            .rules
+            .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports || use_doc_lines {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
@@ -106,7 +106,7 @@ pub fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.enabled.contains(&RuleCode::E999) {
+                if settings.rules.enabled(&RuleCode::E999) {
                     diagnostics.push(Diagnostic::new(
                         violations::SyntaxError(parse_error.error.to_string()),
                         Range::new(parse_error.location, parse_error.location),
@@ -124,8 +124,8 @@ pub fn check_path(
 
     // Run the lines-based rules.
     if settings
-        .enabled
-        .iter()
+        .rules
+        .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
     {
         diagnostics.extend(check_lines(
@@ -140,8 +140,8 @@ pub fn check_path(
     // Enforce `noqa` directives.
     if (matches!(noqa, flags::Noqa::Enabled) && !diagnostics.is_empty())
         || settings
-            .enabled
-            .iter()
+            .rules
+            .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQa))
     {
         check_noqa(
