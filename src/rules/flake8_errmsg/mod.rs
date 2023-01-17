@@ -1,3 +1,4 @@
+//! Rules from [flake8-errmsg](https://pypi.org/project/flake8-errmsg/0.4.0/).
 pub(crate) mod rules;
 pub mod settings;
 

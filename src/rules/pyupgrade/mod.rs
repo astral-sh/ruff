@@ -1,3 +1,4 @@
+//! Rules from [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/).
 mod fixes;
 pub(crate) mod rules;
 pub mod settings;
