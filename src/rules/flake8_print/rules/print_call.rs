@@ -44,7 +44,7 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
         }
     };
 
-    if !checker.settings.enabled.contains(diagnostic.kind.code()) {
+    if !checker.settings.rules.enabled(diagnostic.kind.code()) {
         return;
     }
 

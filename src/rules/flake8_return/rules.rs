@@ -226,7 +226,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
     };
     for child in body {
         if matches!(child.node, StmtKind::Return { .. }) {
-            if checker.settings.enabled.contains(&RuleCode::RET505) {
+            if checker.settings.rules.enabled(&RuleCode::RET505) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseReturn(branch),
                     elif_else_range(stmt, checker.locator)
@@ -236,7 +236,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Break) {
-            if checker.settings.enabled.contains(&RuleCode::RET508) {
+            if checker.settings.rules.enabled(&RuleCode::RET508) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseBreak(branch),
                     elif_else_range(stmt, checker.locator)
@@ -246,7 +246,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Raise { .. }) {
-            if checker.settings.enabled.contains(&RuleCode::RET506) {
+            if checker.settings.rules.enabled(&RuleCode::RET506) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseRaise(branch),
                     elif_else_range(stmt, checker.locator)
@@ -256,7 +256,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Continue) {
-            if checker.settings.enabled.contains(&RuleCode::RET507) {
+            if checker.settings.rules.enabled(&RuleCode::RET507) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseContinue(branch),
                     elif_else_range(stmt, checker.locator)
@@ -319,10 +319,10 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
         visitor.stack
     };
 
-    if checker.settings.enabled.contains(&RuleCode::RET505)
-        || checker.settings.enabled.contains(&RuleCode::RET506)
-        || checker.settings.enabled.contains(&RuleCode::RET507)
-        || checker.settings.enabled.contains(&RuleCode::RET508)
+    if checker.settings.rules.enabled(&RuleCode::RET505)
+        || checker.settings.rules.enabled(&RuleCode::RET506)
+        || checker.settings.rules.enabled(&RuleCode::RET507)
+        || checker.settings.rules.enabled(&RuleCode::RET508)
     {
         if superfluous_elif(checker, &stack) {
             return;
@@ -338,20 +338,20 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
     }
 
     if !result_exists(&stack.returns) {
-        if checker.settings.enabled.contains(&RuleCode::RET501) {
+        if checker.settings.rules.enabled(&RuleCode::RET501) {
             unnecessary_return_none(checker, &stack);
         }
         return;
     }
 
-    if checker.settings.enabled.contains(&RuleCode::RET502) {
+    if checker.settings.rules.enabled(&RuleCode::RET502) {
         implicit_return_value(checker, &stack);
     }
-    if checker.settings.enabled.contains(&RuleCode::RET503) {
+    if checker.settings.rules.enabled(&RuleCode::RET503) {
         implicit_return(checker, last_stmt);
     }
 
-    if checker.settings.enabled.contains(&RuleCode::RET504) {
+    if checker.settings.rules.enabled(&RuleCode::RET504) {
         for (_, expr) in &stack.returns {
             if let Some(expr) = expr {
                 unnecessary_assign(checker, &stack, expr);

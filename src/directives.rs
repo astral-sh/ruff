@@ -18,8 +18,8 @@ bitflags! {
 impl Flags {
     pub fn from_settings(settings: &Settings) -> Self {
         if settings
-            .enabled
-            .iter()
+            .rules
+            .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports))
         {
             Flags::NOQA | Flags::ISORT

@@ -19,20 +19,20 @@ pub fn check_tokens(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_ambiguous_unicode_character = settings.enabled.contains(&RuleCode::RUF001)
-        || settings.enabled.contains(&RuleCode::RUF002)
-        || settings.enabled.contains(&RuleCode::RUF003);
-    let enforce_quotes = settings.enabled.contains(&RuleCode::Q000)
-        || settings.enabled.contains(&RuleCode::Q001)
-        || settings.enabled.contains(&RuleCode::Q002)
-        || settings.enabled.contains(&RuleCode::Q003);
-    let enforce_commented_out_code = settings.enabled.contains(&RuleCode::ERA001);
-    let enforce_invalid_escape_sequence = settings.enabled.contains(&RuleCode::W605);
-    let enforce_implicit_string_concatenation = settings.enabled.contains(&RuleCode::ISC001)
-        || settings.enabled.contains(&RuleCode::ISC002);
-    let enforce_trailing_comma = settings.enabled.contains(&RuleCode::COM812)
-        || settings.enabled.contains(&RuleCode::COM818)
-        || settings.enabled.contains(&RuleCode::COM819);
+    let enforce_ambiguous_unicode_character = settings.rules.enabled(&RuleCode::RUF001)
+        || settings.rules.enabled(&RuleCode::RUF002)
+        || settings.rules.enabled(&RuleCode::RUF003);
+    let enforce_quotes = settings.rules.enabled(&RuleCode::Q000)
+        || settings.rules.enabled(&RuleCode::Q001)
+        || settings.rules.enabled(&RuleCode::Q002)
+        || settings.rules.enabled(&RuleCode::Q003);
+    let enforce_commented_out_code = settings.rules.enabled(&RuleCode::ERA001);
+    let enforce_invalid_escape_sequence = settings.rules.enabled(&RuleCode::W605);
+    let enforce_implicit_string_concatenation =
+        settings.rules.enabled(&RuleCode::ISC001) || settings.rules.enabled(&RuleCode::ISC002);
+    let enforce_trailing_comma = settings.rules.enabled(&RuleCode::COM812)
+        || settings.rules.enabled(&RuleCode::COM818)
+        || settings.rules.enabled(&RuleCode::COM819);
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {
@@ -75,7 +75,7 @@ pub fn check_tokens(
                     settings,
                     autofix,
                 ) {
-                    if settings.enabled.contains(diagnostic.kind.code()) {
+                    if settings.rules.enabled(diagnostic.kind.code()) {
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -101,7 +101,7 @@ pub fn check_tokens(
                     start,
                     end,
                     matches!(autofix, flags::Autofix::Enabled)
-                        && settings.fixable.contains(&RuleCode::W605),
+                        && settings.rules.should_fix(&RuleCode::W605),
                 ));
             }
         }
@@ -112,7 +112,7 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_implicit_str_concat::rules::implicit(tokens)
                 .into_iter()
-                .filter(|diagnostic| settings.enabled.contains(diagnostic.kind.code())),
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.code())),
         );
     }
 
@@ -121,7 +121,7 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_commas::rules::trailing_commas(tokens, locator)
                 .into_iter()
-                .filter(|diagnostic| settings.enabled.contains(diagnostic.kind.code())),
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.code())),
         );
     }
 
