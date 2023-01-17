@@ -9,8 +9,6 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use globset::Glob;
 use itertools::Either::{Left, Right};
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
@@ -23,13 +21,11 @@ use crate::rules::{
     mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{
-    FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
-};
+use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat, Version};
 use crate::warn_user_once;
 
 pub mod configuration;
-mod defaults;
+pub mod defaults;
 pub mod flags;
 pub mod hashable;
 pub mod options;
@@ -124,33 +120,6 @@ pub struct Settings {
     pub pyupgrade: pyupgrade::settings::Settings,
 }
 
-static DEFAULT_EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
-    vec![
-        FilePattern::Builtin(".bzr"),
-        FilePattern::Builtin(".direnv"),
-        FilePattern::Builtin(".eggs"),
-        FilePattern::Builtin(".git"),
-        FilePattern::Builtin(".hg"),
-        FilePattern::Builtin(".mypy_cache"),
-        FilePattern::Builtin(".nox"),
-        FilePattern::Builtin(".pants.d"),
-        FilePattern::Builtin(".ruff_cache"),
-        FilePattern::Builtin(".svn"),
-        FilePattern::Builtin(".tox"),
-        FilePattern::Builtin(".venv"),
-        FilePattern::Builtin("__pypackages__"),
-        FilePattern::Builtin("_build"),
-        FilePattern::Builtin("buck-out"),
-        FilePattern::Builtin("build"),
-        FilePattern::Builtin("dist"),
-        FilePattern::Builtin("node_modules"),
-        FilePattern::Builtin("venv"),
-    ]
-});
-
-static DEFAULT_DUMMY_VARIABLE_RGX: Lazy<Regex> =
-    Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
-
 impl Settings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
@@ -171,10 +140,10 @@ impl Settings {
             builtins: config.builtins.unwrap_or_default(),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
-                .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone())
+                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone())
                 .into(),
             exclude: HashableGlobSet::new(
-                config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
+                config.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
             )?,
             extend_exclude: HashableGlobSet::new(config.extend_exclude)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()).into(),
@@ -182,7 +151,7 @@ impl Settings {
             force_exclude: config.force_exclude.unwrap_or(false),
 
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
-            line_length: config.line_length.unwrap_or(88),
+            line_length: config.line_length.unwrap_or(defaults::LINE_LENGTH),
             namespace_packages: config.namespace_packages.unwrap_or_default(),
             per_file_ignores: resolve_per_file_ignores(
                 config.per_file_ignores.unwrap_or_default(),
@@ -193,9 +162,12 @@ impl Settings {
             src: config
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
-            target_version: config.target_version.unwrap_or_default(),
+            target_version: config.target_version.unwrap_or(defaults::TARGET_VERSION),
             task_tags: config.task_tags.unwrap_or_else(|| {
-                vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()]
+                defaults::TASK_TAGS
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect()
             }),
             typing_modules: config.typing_modules.unwrap_or_default(),
             // Plugins
@@ -280,7 +252,7 @@ fn build_rule_table(
 
     for code in validate_enabled(resolve_codes(
         [RuleCodeSpec {
-            select: &select.unwrap_or_else(|| vec![RuleCodePrefix::E, RuleCodePrefix::F]),
+            select: &select.unwrap_or_else(|| defaults::PREFIXES.to_vec()),
             ignore: &ignore.unwrap_or_default(),
         }]
         .into_iter()
