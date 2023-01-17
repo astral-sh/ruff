@@ -131,6 +131,15 @@ where
             continue;
         };
 
+        if let ExprKind::Call { func, .. } = &value.node {
+            if checker
+                .resolve_call_path(func)
+                .map_or(false, |call_path| call_path == ["enum", "auto"])
+            {
+                continue;
+            }
+        }
+
         if !seen_targets.insert(ComparableExpr::from(value)) {
             let diagnostic = Diagnostic::new(
                 violations::PreferUniqueEnums {

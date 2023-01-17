@@ -2,7 +2,7 @@ import enum
 from enum import Enum, unique
 
 
-class FakeEnum(enum.Enum):
+class FakeEnum1(enum.Enum):
     A = "A"
     B = "B"
     C = "B"  # PIE796
@@ -58,3 +58,9 @@ class FakeEnum9(enum.Enum):
     A = "A"
     B = "B"
     C = "C"
+
+
+class FakeEnum10(enum.Enum):
+    A = enum.auto()
+    B = enum.auto()
+    C = enum.auto()
