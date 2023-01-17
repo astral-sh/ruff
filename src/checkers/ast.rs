@@ -499,7 +499,12 @@ where
                 if self.settings.rules.enabled(&RuleCode::UP011)
                     && self.settings.target_version >= PythonVersion::Py38
                 {
-                    pyupgrade::rules::unnecessary_lru_cache_params(self, decorator_list);
+                    pyupgrade::rules::lru_cache_without_parameters(self, decorator_list);
+                }
+                if self.settings.rules.enabled(&RuleCode::UP033)
+                    && self.settings.target_version >= PythonVersion::Py39
+                {
+                    pyupgrade::rules::functools_cache(self, decorator_list);
                 }
 
                 if self.settings.rules.enabled(&RuleCode::B018) {

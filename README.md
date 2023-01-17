@@ -705,7 +705,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
 | UP009 | PEP3120UnnecessaryCodingComment | UTF-8 encoding declaration is unnecessary | 🛠 |
 | UP010 | UnnecessaryFutureImport | Unnecessary `__future__` import `...` for target Python version | 🛠 |
-| UP011 | UnnecessaryLRUCacheParams | Unnecessary parameters to `functools.lru_cache` | 🛠 |
+| UP011 | LRUCacheWithoutParameters | Unnecessary parameters to `functools.lru_cache` | 🛠 |
 | UP012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
 | UP013 | ConvertTypedDictFunctionalToClass | Convert `...` from `TypedDict` functional to class syntax | 🛠 |
 | UP014 | ConvertNamedTupleFunctionalToClass | Convert `...` from `NamedTuple` functional to class syntax | 🛠 |
@@ -726,6 +726,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP029 | UnnecessaryBuiltinImport | Unnecessary builtin import: `...` | 🛠 |
 | UP030 | FormatLiterals | Use implicit references for positional format fields | 🛠 |
 | UP032 | FString | Use f-string instead of `format` call | 🛠 |
+| UP033 | FunctoolsCache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 
 ### pep8-naming (N)
 

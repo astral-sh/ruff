@@ -1,0 +1,66 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    FunctoolsCache: ~
+  location:
+    row: 5
+    column: 20
+  end_location:
+    row: 5
+    column: 34
+  fix:
+    content: functools.cache
+    location:
+      row: 5
+      column: 1
+    end_location:
+      row: 5
+      column: 34
+  parent: ~
+- kind:
+    FunctoolsCache: ~
+  location:
+    row: 10
+    column: 10
+  end_location:
+    row: 10
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    FunctoolsCache: ~
+  location:
+    row: 16
+    column: 20
+  end_location:
+    row: 16
+    column: 34
+  fix:
+    content: functools.cache
+    location:
+      row: 16
+      column: 1
+    end_location:
+      row: 16
+      column: 34
+  parent: ~
+- kind:
+    FunctoolsCache: ~
+  location:
+    row: 21
+    column: 20
+  end_location:
+    row: 21
+    column: 34
+  fix:
+    content: functools.cache
+    location:
+      row: 21
+      column: 1
+    end_location:
+      row: 21
+      column: 34
+  parent: ~
+
