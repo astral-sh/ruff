@@ -725,6 +725,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP028 | RewriteYieldFrom | Replace `yield` over `for` loop with `yield from` | 🛠 |
 | UP029 | UnnecessaryBuiltinImport | Unnecessary builtin import: `...` | 🛠 |
 | UP030 | FormatLiterals | Use implicit references for positional format fields | 🛠 |
+| UP032 | FString | Use f-string instead of `format` call | 🛠 |
 
 ### pep8-naming (N)
 

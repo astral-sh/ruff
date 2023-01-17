@@ -1,0 +1,362 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    FString: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 20
+  fix:
+    content: "f\"{a} {b}\""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 20
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 22
+  fix:
+    content: "f\"{b} {a}\""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 22
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 19
+  fix:
+    content: "f\"{z.y}\""
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 19
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 24
+  fix:
+    content: "f\"{a.x} {b.y}\""
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 24
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 24
+  fix:
+    content: "f\"{a.b} {c.d}\""
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 24
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 16
+  fix:
+    content: "f\"{a()}\""
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 16
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 18
+  fix:
+    content: "f\"{a.b()}\""
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 17
+      column: 18
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 22
+  fix:
+    content: "f\"{a.b().c()}\""
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 22
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 24
+  fix:
+    content: "f\"hello {name}!\""
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 21
+      column: 24
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 23
+    column: 27
+  fix:
+    content: "f\"{a}{b}{c}\""
+    location:
+      row: 23
+      column: 0
+    end_location:
+      row: 23
+      column: 27
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 25
+    column: 0
+  end_location:
+    row: 25
+    column: 16
+  fix:
+    content: "f\"{0x0}\""
+    location:
+      row: 25
+      column: 0
+    end_location:
+      row: 25
+      column: 16
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 20
+  fix:
+    content: "f\"{a} {b}\""
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 27
+      column: 20
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 29
+    column: 0
+  end_location:
+    row: 29
+    column: 24
+  fix:
+    content: "f\"\"\"{a} {b}\"\"\""
+    location:
+      row: 29
+      column: 0
+    end_location:
+      row: 29
+      column: 24
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 31
+    column: 17
+  fix:
+    content: "f\"foo{1}\""
+    location:
+      row: 31
+      column: 0
+    end_location:
+      row: 31
+      column: 17
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 33
+    column: 18
+  fix:
+    content: "fr\"foo{1}\""
+    location:
+      row: 33
+      column: 0
+    end_location:
+      row: 33
+      column: 18
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 35
+    column: 4
+  end_location:
+    row: 35
+    column: 21
+  fix:
+    content: "f\"{1}\""
+    location:
+      row: 35
+      column: 4
+    end_location:
+      row: 35
+      column: 21
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 37
+    column: 6
+  end_location:
+    row: 37
+    column: 25
+  fix:
+    content: "f\"foo {x} \""
+    location:
+      row: 37
+      column: 6
+    end_location:
+      row: 37
+      column: 25
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 39
+    column: 0
+  end_location:
+    row: 39
+    column: 20
+  fix:
+    content: "f\"{a[b]}\""
+    location:
+      row: 39
+      column: 0
+    end_location:
+      row: 39
+      column: 20
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 41
+    column: 0
+  end_location:
+    row: 41
+    column: 22
+  fix:
+    content: "f\"{a.a[b]}\""
+    location:
+      row: 41
+      column: 0
+    end_location:
+      row: 41
+      column: 22
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 43
+    column: 0
+  end_location:
+    row: 43
+    column: 29
+  fix:
+    content: "f\"{escaped}{{}}{y}\""
+    location:
+      row: 43
+      column: 0
+    end_location:
+      row: 43
+      column: 29
+  parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 45
+    column: 0
+  end_location:
+    row: 45
+    column: 14
+  fix:
+    content: "f\"{a}\""
+    location:
+      row: 45
+      column: 0
+    end_location:
+      row: 45
+      column: 14
+  parent: ~
+

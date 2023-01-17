@@ -2,6 +2,7 @@ pub(crate) use convert_named_tuple_functional_to_class::convert_named_tuple_func
 pub(crate) use convert_typed_dict_functional_to_class::convert_typed_dict_functional_to_class;
 pub(crate) use datetime_utc_alias::datetime_utc_alias;
 pub(crate) use deprecated_unittest_alias::deprecated_unittest_alias;
+pub(crate) use f_strings::f_strings;
 pub(crate) use format_literals::format_literals;
 pub(crate) use native_literals::native_literals;
 use once_cell::sync::Lazy;
@@ -31,7 +32,7 @@ pub(crate) use use_pep604_annotation::use_pep604_annotation;
 pub(crate) use useless_metaclass_type::useless_metaclass_type;
 pub(crate) use useless_object_inheritance::useless_object_inheritance;
 
-use crate::ast::helpers::{self};
+use crate::ast::helpers;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
@@ -41,6 +42,7 @@ mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
 mod datetime_utc_alias;
 mod deprecated_unittest_alias;
+mod f_strings;
 mod format_literals;
 mod native_literals;
 mod open_alias;
