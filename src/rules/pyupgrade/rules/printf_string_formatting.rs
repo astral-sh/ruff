@@ -247,7 +247,8 @@ fn handle_part(part: &PercentFormat) -> String {
 fn percent_to_format(string: &str) -> String {
     let mut final_string = String::new();
     for part in parse_percent_format(string) {
-        final_string.push_str(&handle_part(&part));
+        let handled = handle_part(&part);
+        final_string.push_str(&handled);
     }
     final_string
 }
@@ -504,6 +505,10 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     }
 
     let parsed = parse_percent_format(left_string);
+    println!("START");
+    for parse in &parsed {
+        println!("{:?}\n", parse);
+    }
     let is_valid = check_statement(parsed, right);
     // If the statement is not valid, then bail
     if !is_valid {
@@ -594,6 +599,32 @@ mod test {
         let e1 = PercentFormat::new("\"".to_string(), Some(expected));
         let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_one_parenthesis_non_formatting() {
+        let sample = "\"Writing merged info for %s slides (%s unrecognized)\"";
+        let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
+        let e1 = PercentFormat::new("Writing merged info for ".to_string(), Some(sube1.clone()));
+        let e2 = PercentFormat::new(" slides (".to_string(), Some(sube1.clone()));
+        let e3 = PercentFormat::new(" unrecognized)".to_string(), None);
+        let expected = vec![e1, e2, e3];
+
+        let received = parse_percent_format(sample);
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_two_parenthesis_non_formatting() {
+        let sample = "\"Expected one image (got %d) per channel (got %d)\"";
+        let sube1 = PercentFormatPart::new(None, None, None, None, "d".to_string());
+        let e1 = PercentFormat::new("Expected one image (got ".to_string(), Some(sube1.clone()));
+        let e2 = PercentFormat::new(") per channel (got ".to_string(), Some(sube1.clone()));
+        let e3 = PercentFormat::new(")".to_string(), None);
+        let expected = vec![e1, e2, e3];
 
         let received = parse_percent_format(sample);
         assert_eq!(received, expected);
