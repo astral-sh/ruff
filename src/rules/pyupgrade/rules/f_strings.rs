@@ -3,11 +3,15 @@ use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Constant, Expr, ExprKind, KeywordData};
+use rustpython_common::format::{
+    FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
+};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
+use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::violations;
 
@@ -64,11 +68,19 @@ impl<'a> FormatSummaryValues<'a> {
         })
     }
 
-    fn consume_arg(&mut self) -> Option<String> {
+    fn consume_next(&mut self) -> Option<String> {
         if self.args.is_empty() {
             None
         } else {
             Some(self.args.remove(0))
+        }
+    }
+
+    fn consume_arg(&mut self, index: usize) -> Option<String> {
+        if self.args.len() > index {
+            Some(self.args.remove(index))
+        } else {
+            None
         }
     }
 
@@ -134,9 +146,16 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         return None;
     };
 
+    let Some(mut summary) = FormatSummaryValues::try_from_expr(checker, expr) else {
+        return None;
+    };
+
     let contents = checker
         .locator
         .slice_source_code_range(&Range::from_located(value));
+
+    // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
+    // with f-strings.
     let contents = if contents.starts_with('U') || contents.starts_with('u') {
         &contents[1..]
     } else {
@@ -146,44 +165,110 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         return None;
     }
 
-    let Some(mut summary) = FormatSummaryValues::try_from_expr(checker, expr) else {
+    // Remove the leading and trailing quotes.
+    let Some(leading_quote) = leading_quote(contents) else {
+        return None;
+    };
+    let Some(trailing_quote) = trailing_quote(contents) else {
+        return None;
+    };
+    let contents = &contents[leading_quote.len()..contents.len() - trailing_quote.len()];
+
+    // Parse the format string.
+    let Ok(format_string) = FormatString::from_str(contents) else {
+        println!("Failed to parse format string: {}", contents);
         return None;
     };
 
-    let converted = replace_all(&NAME_SPECIFIER, contents, |caps: &Captures| {
-        if let Some(name) = caps.name("name") {
-            let Some(value) = summary.consume_kwarg(name.as_str()) else {
-                return Err(anyhow!("Missing kwarg"));
-            };
-            let Ok(format_spec) = extract_format_spec(caps, "fmt") else {
-                return Err(anyhow!("Missing caps"));
-            };
-            Ok(format!("{{{value}{format_spec}}}"))
-        } else {
-            let Some(value) = summary.consume_arg() else {
-                return Err(anyhow!("Missing arg"));
-            };
-            let Ok(format_spec) = extract_format_spec(caps, "fmt") else {
-                return Err(anyhow!("Missing caps"));
-            };
-            Ok(format!("{{{value}{format_spec}}}"))
+    println!("format_string: {:?}", format_string);
+
+    let mut converted = String::with_capacity(contents.len());
+    for part in format_string.format_parts {
+        match part {
+            FormatPart::Field {
+                field_name,
+                preconversion_spec,
+                format_spec,
+            } => {
+                converted.push('{');
+
+                let field = FieldName::parse(&field_name).ok()?;
+                match field.field_type {
+                    FieldType::Auto => {
+                        let Some(arg) = summary.consume_next() else {
+                            return None;
+                        };
+                        converted.push_str(&arg);
+                    }
+                    FieldType::Index(index) => {
+                        let Some(arg) = summary.consume_arg(index) else {
+                            return None;
+                        };
+                        converted.push_str(&arg);
+                    }
+                    FieldType::Keyword(name) => {
+                        let Some(arg) = summary.consume_kwarg(&name) else {
+                            return None;
+                        };
+                        converted.push_str(&arg);
+                    }
+                }
+
+                for part in field.parts {
+                    match part {
+                        FieldNamePart::Attribute(name) => {
+                            converted.push('.');
+                            converted.push_str(&name);
+                        }
+                        FieldNamePart::Index(index) => {
+                            converted.push('[');
+                            converted.push_str(index.to_string().as_str());
+                            converted.push(']');
+                        }
+                        FieldNamePart::StringIndex(index) => {
+                            converted.push('[');
+                            converted.push_str(&index);
+                            converted.push(']');
+                        }
+                    }
+                }
+
+                if let Some(preconversion_spec) = preconversion_spec {
+                    converted.push('!');
+                    converted.push(preconversion_spec);
+                }
+
+                if !format_spec.is_empty() {
+                    converted.push(':');
+                    converted.push_str(&format_spec);
+                }
+
+                converted.push('}');
+            }
+            FormatPart::Literal(value) => {
+                if value.starts_with('{') {
+                    converted.push_str("{{");
+                }
+                converted.push_str(&value);
+                if value.ends_with('}') {
+                    converted.push_str("}}");
+                }
+            }
         }
-    })
-    .ok()?;
+    }
 
     // Construct the format string.
     let mut contents = String::with_capacity(1 + converted.len());
     contents.push('f');
+    contents.push_str(&leading_quote);
     contents.push_str(&converted);
+    contents.push_str(&trailing_quote);
     Some(contents)
 }
 
 /// UP032
 pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) {
     if summary.has_nested_parts {
-        return;
-    }
-    if !summary.indexes.is_empty() {
         return;
     }
 
