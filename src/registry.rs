@@ -232,7 +232,7 @@ ruff_macros::define_rule_mapping!(
     UP008 => violations::SuperCallWithParameters,
     UP009 => violations::PEP3120UnnecessaryCodingComment,
     UP010 => violations::UnnecessaryFutureImport,
-    UP011 => violations::UnnecessaryLRUCacheParams,
+    UP011 => violations::LRUCacheWithoutParameters,
     UP012 => violations::UnnecessaryEncodeUTF8,
     UP013 => violations::ConvertTypedDictFunctionalToClass,
     UP014 => violations::ConvertNamedTupleFunctionalToClass,
@@ -253,6 +253,7 @@ ruff_macros::define_rule_mapping!(
     UP029 => violations::UnnecessaryBuiltinImport,
     UP030 => violations::FormatLiterals,
     UP032 => violations::FString,
+        UP033 => violations::FunctoolsCache,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,
