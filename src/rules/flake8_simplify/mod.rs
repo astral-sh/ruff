@@ -3,7 +3,6 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -39,7 +38,7 @@ mod tests {
     #[test_case(RuleCode::SIM300, Path::new("SIM300.py"); "SIM300")]
     #[test_case(RuleCode::SIM401, Path::new("SIM401.py"); "SIM401")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_simplify")
                 .join(path)

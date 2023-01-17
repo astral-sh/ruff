@@ -15,7 +15,7 @@ use ruff::cache::CACHE_DIR_NAME;
 use ruff::linter::add_noqa_to_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
-use ruff::registry::RuleCode;
+use ruff::registry::Rule;
 use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
@@ -114,7 +114,7 @@ pub fn run(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    if settings.rules.enabled(&RuleCode::E902) {
+                    if settings.rules.enabled(&Rule::E902) {
                         Diagnostics::new(vec![Message {
                             kind: IOError(message).into(),
                             location: Location::default(),
@@ -289,24 +289,24 @@ struct Explanation<'a> {
     summary: &'a str,
 }
 
-/// Explain a `RuleCode` to the user.
-pub fn explain(code: &RuleCode, format: SerializationFormat) -> Result<()> {
+/// Explain a `Rule` to the user.
+pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
     match format {
         SerializationFormat::Text | SerializationFormat::Grouped => {
             println!(
                 "{} ({}): {}",
-                code.as_ref(),
-                code.origin().name(),
-                code.kind().summary()
+                rule.code(),
+                rule.origin().name(),
+                rule.kind().summary()
             );
         }
         SerializationFormat::Json => {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
-                    code: code.as_ref(),
-                    origin: code.origin().name(),
-                    summary: &code.kind().summary(),
+                    code: rule.code(),
+                    origin: rule.origin().name(),
+                    summary: &rule.kind().summary(),
                 })?
             );
         }

@@ -6,7 +6,6 @@ mod types;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -22,7 +21,7 @@ mod tests {
     #[test_case(RuleCode::ARG004, Path::new("ARG.py"); "ARG004")]
     #[test_case(RuleCode::ARG005, Path::new("ARG.py"); "ARG005")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_unused_arguments")
                 .join(path)

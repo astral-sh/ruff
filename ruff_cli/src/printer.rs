@@ -248,7 +248,7 @@ impl<'a> Printer<'a> {
                         ":",
                         message.location.column(),
                         ":",
-                        message.kind.rule().as_ref(),
+                        message.kind.rule().code(),
                         message.kind.body(),
                     );
                     writeln!(
@@ -361,7 +361,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
         ":".cyan(),
         message.location.column(),
         ":".cyan(),
-        message.kind.rule().as_ref().red().bold(),
+        message.kind.rule().code().red().bold(),
         message.kind.body(),
     );
     writeln!(stdout, "{label}")?;
@@ -388,7 +388,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
                 source: &source.contents,
                 line_start: message.location.row(),
                 annotations: vec![SourceAnnotation {
-                    label: message.kind.rule().as_ref(),
+                    label: message.kind.rule().code(),
                     annotation_type: AnnotationType::Error,
                     range: source.range,
                 }],
@@ -425,7 +425,7 @@ fn print_grouped_message<T: Write>(
         ":".cyan(),
         message.location.column(),
         " ".repeat(column_length - num_digits(message.location.column())),
-        message.kind.rule().as_ref().red().bold(),
+        message.kind.rule().code().red().bold(),
         message.kind.body(),
     );
     writeln!(stdout, "{label}")?;
@@ -452,7 +452,7 @@ fn print_grouped_message<T: Write>(
                 source: &source.contents,
                 line_start: message.location.row(),
                 annotations: vec![SourceAnnotation {
-                    label: message.kind.rule().as_ref(),
+                    label: message.kind.rule().code(),
                     annotation_type: AnnotationType::Error,
                     range: source.range,
                 }],

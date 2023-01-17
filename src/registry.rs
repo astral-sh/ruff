@@ -716,26 +716,26 @@ mod tests {
 
     use strum::IntoEnumIterator;
 
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
 
     #[test]
     fn check_code_serialization() {
-        for check_code in RuleCode::iter() {
+        for rule in Rule::iter() {
             assert!(
-                RuleCode::from_str(check_code.as_ref()).is_ok(),
-                "{check_code:?} could not be round-trip serialized."
+                Rule::from_str(rule.code()).is_ok(),
+                "{rule:?} could not be round-trip serialized."
             );
         }
     }
 
     #[test]
     fn fixable_codes() {
-        for check_code in RuleCode::iter() {
-            let kind = check_code.kind();
+        for rule in Rule::iter() {
+            let kind = rule.kind();
             if kind.fixable() {
                 assert!(
                     kind.commit().is_some(),
-                    "{check_code:?} is fixable but has no commit message."
+                    "{rule:?} is fixable but has no commit message."
                 );
             }
         }

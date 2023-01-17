@@ -4,7 +4,6 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -16,7 +15,7 @@ mod tests {
 
     #[test_case(RuleCode::ERA001, Path::new("ERA001.py"); "ERA001")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/eradicate")
                 .join(path)

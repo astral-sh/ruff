@@ -70,10 +70,10 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
 pub fn includes(needle: &RuleCode, haystack: &[&str]) -> bool {
-    let needle: &str = needle.as_ref();
+    let needle: &str = needle.code();
     haystack.iter().any(|candidate| {
         if let Some(candidate) = CODE_REDIRECTS.get(candidate) {
-            needle == candidate.as_ref()
+            needle == candidate.code()
         } else {
             &needle == candidate
         }
@@ -138,7 +138,7 @@ fn add_noqa_inner(
                 output.push_str(line);
                 output.push_str(line_ending);
             }
-            Some(codes) => {
+            Some(rules) => {
                 match extract_noqa_directive(line) {
                     Directive::None => {
                         // Add existing content.
@@ -148,7 +148,7 @@ fn add_noqa_inner(
                         output.push_str("  # noqa: ");
 
                         // Add codes.
-                        let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
+                        let codes: Vec<&str> = rules.iter().map(|r| r.code()).collect();
                         let suffix = codes.join(", ");
                         output.push_str(&suffix);
                         output.push_str(line_ending);
@@ -163,7 +163,7 @@ fn add_noqa_inner(
 
                         // Add codes.
                         let codes: Vec<&str> =
-                            codes.iter().map(AsRef::as_ref).sorted_unstable().collect();
+                            rules.iter().map(|r| r.code()).sorted_unstable().collect();
                         let suffix = codes.join(", ");
                         output.push_str(&suffix);
                         output.push_str(line_ending);
@@ -181,9 +181,9 @@ fn add_noqa_inner(
                         formatted.push_str("  # noqa: ");
 
                         // Add codes.
-                        let codes: Vec<&str> = codes
+                        let codes: Vec<&str> = rules
                             .iter()
-                            .map(AsRef::as_ref)
+                            .map(|r| r.code())
                             .chain(existing.into_iter().filter(|code| external.contains(*code)))
                             .sorted_unstable()
                             .collect();

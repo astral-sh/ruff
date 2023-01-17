@@ -3,7 +3,6 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -18,7 +17,7 @@ mod tests {
     #[test_case(RuleCode::PIE796, Path::new("PIE796.py"); "PIE796")]
     #[test_case(RuleCode::PIE807, Path::new("PIE807.py"); "PIE807")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_pie")
                 .join(path)

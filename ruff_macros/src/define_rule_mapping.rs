@@ -1,13 +1,14 @@
 use proc_macro2::Span;
 use quote::quote;
 use syn::parse::Parse;
-use syn::{Ident, Path, Token};
+use syn::{Ident, LitStr, Path, Token};
 
 pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut rule_variants = quote!();
     let mut diagkind_variants = quote!();
     let mut rule_kind_match_arms = quote!();
     let mut rule_origin_match_arms = quote!();
+    let mut rule_code_match_arms = quote!();
     let mut diagkind_code_match_arms = quote!();
     let mut diagkind_body_match_arms = quote!();
     let mut diagkind_fixable_match_arms = quote!();
@@ -22,6 +23,8 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         );
         let origin = get_origin(code);
         rule_origin_match_arms.extend(quote! {Self::#code => RuleOrigin::#origin,});
+        let code_str = LitStr::new(&code.to_string(), Span::call_site());
+        rule_code_match_arms.extend(quote! {Self::#code => #code_str,});
         diagkind_code_match_arms.extend(quote! {Self::#name(..) => &RuleCode::#code, });
         diagkind_body_match_arms.extend(quote! {Self::#name(x) => Violation::message(x), });
         diagkind_fixable_match_arms
@@ -45,7 +48,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
     quote! {
         #[derive(
-            AsRefStr,    // TODO(martin): Remove
             EnumIter,
             EnumString,  // TODO(martin): Remove
             Debug,
@@ -75,6 +77,10 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
             pub fn origin(&self) -> RuleOrigin {
                 match self { #rule_origin_match_arms }
+            }
+
+            pub fn code(&self) -> &'static str {
+                match self { #rule_code_match_arms }
             }
         }
 

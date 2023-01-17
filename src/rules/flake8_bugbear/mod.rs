@@ -42,7 +42,7 @@ mod tests {
     #[test_case(RuleCode::B904, Path::new("B904.py"); "B904")]
     #[test_case(RuleCode::B905, Path::new("B905.py"); "B905")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_bugbear")
                 .join(path)
