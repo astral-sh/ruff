@@ -20,9 +20,8 @@ paren_string = (
     "bar %(bar)s"
 ) % {"foo": x, "bar": y}
 
-""" Waiting for Charlie to review my regex before uncommenting this
+# Should issue warning but no change
 "%(foo)s \N{snowman}" % {"foo": 1}
-"""
 
 # These should NOT change
 "%()s" % {"": "empty"}

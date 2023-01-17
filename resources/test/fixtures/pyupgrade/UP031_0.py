@@ -33,8 +33,8 @@ paren_string = (
     "bar %s"
 ) % (x, y)
 
-# This will stay commented out until my regex in helpers is fixed
-# "%s \N{snowman}" % (a,)
+# Should issue warning but no change
+"%s \N{snowman}" % (a,)
 
 # These should NOT change
 "%s" % unknown_type

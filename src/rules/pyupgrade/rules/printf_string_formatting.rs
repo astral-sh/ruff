@@ -10,9 +10,6 @@ use crate::registry::Diagnostic;
 use crate::rules::pyupgrade::helpers::{curly_escape, is_keyword};
 use crate::violations;
 
-// Tests: https://github.com/asottile/pyupgrade/blob/main/tests/features/percent_format_test.py
-// Code: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_plugins/percent_format.py#L48
-
 static MAPPING_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\(([^()]*)\)").unwrap());
 static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").unwrap());
 static WIDTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\*|\d*)").unwrap());
@@ -20,6 +17,7 @@ static PRECISION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\.(?:\*|\d*))?")
 static LENGTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[hlL]?").unwrap());
 static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % ([({])").unwrap());
 static PYTHON_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\W0-9]\w*").unwrap());
+static EMOJI_SYNTAX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\N\{.*?\}").unwrap());
 
 #[derive(Debug, PartialEq, Clone)]
 struct PercentFormatPart {
@@ -540,7 +538,9 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         violations::PrintfStringFormatting,
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    // Emoji sytnax is very rare and adds a lot of complexity to the code, so we are only issuing a
+    // warning if it exists, and not fixing the code
+    if checker.patch(diagnostic.kind.code()) && !EMOJI_SYNTAX.is_match(&expr_string) {
         diagnostic.amend(Fix::replacement(
             new_string,
             expr.location,

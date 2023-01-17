@@ -104,4 +104,14 @@ expression: diagnostics
       row: 21
       column: 24
   parent: ~
+- kind:
+    PrintfStringFormatting: ~
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 24
+    column: 34
+  fix: ~
+  parent: ~
 
