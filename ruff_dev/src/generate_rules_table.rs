@@ -59,12 +59,25 @@ pub fn main(cli: &Cli) -> Result<()> {
             codes_csv.to_lowercase().replace(',', "-").replace(' ', "")
         ));
 
-        if let Some((url, platform)) = origin.url() {
+        if let Some(url) = origin.url() {
+            let host = url
+                .trim_start_matches("https://")
+                .split('/')
+                .next()
+                .unwrap();
             table_out.push_str(&format!(
                 "For more, see [{}]({}) on {}.",
                 origin.name(),
                 url,
-                platform
+                match host {
+                    "pypi.org" => "PyPI",
+                    "github.com" => "GitHub",
+                    host => panic!(
+                        "unexpected host in URL of {}, expected pypi.org or github.com but found \
+                         {host}",
+                        origin.name()
+                    ),
+                }
             ));
             table_out.push('\n');
             table_out.push('\n');
