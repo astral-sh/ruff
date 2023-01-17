@@ -630,7 +630,10 @@ impl RuleOrigin {
                 "https://pypi.org/project/flake8-implicit-str-concat/0.3.0/",
                 &Platform::PyPI,
             )),
-            RuleOrigin::Flake8ImportConventions => None,
+            RuleOrigin::Flake8ImportConventions => Some((
+                "https://github.com/joaopalmeiro/flake8-import-conventions",
+                &Platform::GitHub,
+            )),
             RuleOrigin::Flake8Print => Some((
                 "https://pypi.org/project/flake8-print/5.0.0/",
                 &Platform::PyPI,
