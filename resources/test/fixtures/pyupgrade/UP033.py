@@ -15,3 +15,11 @@ print((1,))
 sum((i for i in range(3)), [])
 
 print((x for x in range(3)))
+
+print ((
+    "foo"
+))
+
+print(
+    ("foo")
+)
