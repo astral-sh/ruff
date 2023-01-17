@@ -3,7 +3,6 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -20,7 +19,7 @@ mod tests {
     #[test_case(RuleCode::PGH003, Path::new("PGH003_0.py"); "PGH003_0")]
     #[test_case(RuleCode::PGH004, Path::new("PGH004_0.py"); "PGH004_0")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pygrep-hooks")
                 .join(path)

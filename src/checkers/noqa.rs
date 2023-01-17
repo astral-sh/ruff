@@ -56,13 +56,13 @@ pub fn check_noqa(
                 });
                 match noqa {
                     (Directive::All(..), matches) => {
-                        matches.push(diagnostic.kind.rule().as_ref());
+                        matches.push(diagnostic.kind.rule().code());
                         ignored.push(index);
                         continue;
                     }
                     (Directive::Codes(.., codes), matches) => {
                         if noqa::includes(diagnostic.kind.rule(), codes) {
-                            matches.push(diagnostic.kind.rule().as_ref());
+                            matches.push(diagnostic.kind.rule().code());
                             ignored.push(index);
                             continue;
                         }
@@ -83,12 +83,12 @@ pub fn check_noqa(
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![]));
             match noqa {
                 (Directive::All(..), matches) => {
-                    matches.push(diagnostic.kind.rule().as_ref());
+                    matches.push(diagnostic.kind.rule().code());
                     ignored.push(index);
                 }
                 (Directive::Codes(.., codes), matches) => {
                     if noqa::includes(diagnostic.kind.rule(), codes) {
-                        matches.push(diagnostic.kind.rule().as_ref());
+                        matches.push(diagnostic.kind.rule().code());
                         ignored.push(index);
                     }
                 }
@@ -125,8 +125,8 @@ pub fn check_noqa(
                     let mut valid_codes = vec![];
                     let mut self_ignore = false;
                     for code in codes {
-                        let code = CODE_REDIRECTS.get(code).map_or(code, AsRef::as_ref);
-                        if code == RuleCode::RUF100.as_ref() {
+                        let code = CODE_REDIRECTS.get(code).map_or(code, |r| r.code());
+                        if code == RuleCode::RUF100.code() {
                             self_ignore = true;
                             break;
                         }

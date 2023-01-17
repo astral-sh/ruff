@@ -34,7 +34,7 @@ mod tests {
     #[test_case(RuleCode::PLW0120, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(RuleCode::PLW0602, Path::new("global_variable_not_assigned.py"); "PLW0602")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pylint")
                 .join(path)

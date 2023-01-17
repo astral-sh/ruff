@@ -4,7 +4,6 @@ pub(crate) mod types;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -16,7 +15,7 @@ mod tests {
 
     #[test_case(RuleCode::T100, Path::new("T100.py"); "T100")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_debugger")
                 .join(path)
