@@ -22,7 +22,7 @@ fn pytest_mark_parentheses(
         ),
         Range::from_located(decorator),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(fix);
     }
     checker.diagnostics.push(diagnostic);
@@ -75,7 +75,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
             violations::UseFixturesWithoutParameters,
             Range::from_located(decorator),
         );
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
             diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
         }

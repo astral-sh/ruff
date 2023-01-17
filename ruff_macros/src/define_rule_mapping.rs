@@ -80,8 +80,8 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
 
         impl DiagnosticKind {
-            /// A four-letter shorthand code for the diagnostic.
-            pub fn code(&self) -> &'static RuleCode {
+            /// The rule of the diagnostic.
+            pub fn rule(&self) -> &'static Rule {
                 match self { #diagkind_code_match_arms }
             }
 

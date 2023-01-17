@@ -32,7 +32,7 @@ pub fn explicit_true_false_in_ifexpr(
         violations::IfExprWithTrueFalse(unparse_expr(test, checker.stylist)),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::Call {
@@ -77,7 +77,7 @@ pub fn explicit_false_true_in_ifexpr(
         violations::IfExprWithFalseTrue(unparse_expr(test, checker.stylist)),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::UnaryOp {
@@ -126,7 +126,7 @@ pub fn twisted_arms_in_ifexpr(
         ),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::IfExp {

@@ -56,13 +56,13 @@ pub fn check_noqa(
                 });
                 match noqa {
                     (Directive::All(..), matches) => {
-                        matches.push(diagnostic.kind.code().as_ref());
+                        matches.push(diagnostic.kind.rule().as_ref());
                         ignored.push(index);
                         continue;
                     }
                     (Directive::Codes(.., codes), matches) => {
-                        if noqa::includes(diagnostic.kind.code(), codes) {
-                            matches.push(diagnostic.kind.code().as_ref());
+                        if noqa::includes(diagnostic.kind.rule(), codes) {
+                            matches.push(diagnostic.kind.rule().as_ref());
                             ignored.push(index);
                             continue;
                         }
@@ -83,12 +83,12 @@ pub fn check_noqa(
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![]));
             match noqa {
                 (Directive::All(..), matches) => {
-                    matches.push(diagnostic.kind.code().as_ref());
+                    matches.push(diagnostic.kind.rule().as_ref());
                     ignored.push(index);
                 }
                 (Directive::Codes(.., codes), matches) => {
-                    if noqa::includes(diagnostic.kind.code(), codes) {
-                        matches.push(diagnostic.kind.code().as_ref());
+                    if noqa::includes(diagnostic.kind.rule(), codes) {
+                        matches.push(diagnostic.kind.rule().as_ref());
                         ignored.push(index);
                     }
                 }
@@ -108,7 +108,7 @@ pub fn check_noqa(
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.code())
+                            && settings.rules.should_fix(diagnostic.kind.rule())
                         {
                             diagnostic.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
@@ -172,7 +172,7 @@ pub fn check_noqa(
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.code())
+                            && settings.rules.should_fix(diagnostic.kind.rule())
                         {
                             if valid_codes.is_empty() {
                                 diagnostic.amend(Fix::deletion(

@@ -115,7 +115,7 @@ fn add_noqa_inner(
             // duplication, whereby some parent `noqa` directives become
             // redundant.
             if diagnostic.location.row() == lineno + 1 {
-                codes.insert(diagnostic.kind.code());
+                codes.insert(diagnostic.kind.rule());
             }
         }
 

@@ -330,7 +330,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 violations::MissingReturnTypeSpecialMethod(name.to_string()),
                                 helpers::identifier_range(stmt, checker.locator),
                             );
-                            if checker.patch(diagnostic.kind.code()) {
+                            if checker.patch(diagnostic.kind.rule()) {
                                 match fixes::add_return_none_annotation(checker.locator, stmt) {
                                     Ok(fix) => {
                                         diagnostic.amend(fix);

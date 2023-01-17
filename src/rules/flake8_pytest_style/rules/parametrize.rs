@@ -84,7 +84,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
@@ -114,7 +114,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
@@ -156,7 +156,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
@@ -178,7 +178,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
                                 diagnostic.amend(Fix::replacement(
                                     content,
@@ -205,7 +205,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
@@ -227,7 +227,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
                                 diagnostic.amend(Fix::replacement(
                                     content,
@@ -283,7 +283,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
         Range::from_located(expr),
     );
 
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         let mut generator: Generator = checker.stylist.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
         diagnostic.amend(Fix::replacement(

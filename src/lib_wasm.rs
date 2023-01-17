@@ -182,7 +182,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
         .map(|diagnostic| ExpandedMessage {
-            code: diagnostic.kind.code().clone(),
+            code: diagnostic.kind.rule().clone(),
             message: diagnostic.kind.body(),
             location: diagnostic.location,
             end_location: diagnostic.end_location,

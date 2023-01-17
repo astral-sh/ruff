@@ -30,7 +30,7 @@ fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
         let fix_token = if kind.fixable() { "🛠" } else { "" };
         table_out.push_str(&format!(
             "| {} | {} | {} | {} |",
-            kind.code().as_ref(),
+            kind.rule().as_ref(),
             kind.as_ref(),
             kind.summary().replace('|', r"\|"),
             fix_token

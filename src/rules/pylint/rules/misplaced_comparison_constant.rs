@@ -6,8 +6,8 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violations;
 
-/// SIM300
-pub fn yoda_conditions(
+/// PLC2201
+pub fn misplaced_comparison_constant(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -31,15 +31,6 @@ pub fn yoda_conditions(
         return;
     }
 
-    // Slice exact content to preserve formatting.
-    let constant = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(left));
-    let variable = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(right));
-
-    // Reverse the operation.
     let reversed_op = match op {
         Cmpop::Eq => "==",
         Cmpop::NotEq => "!=",
@@ -49,19 +40,16 @@ pub fn yoda_conditions(
         Cmpop::GtE => "<=",
         _ => unreachable!("Expected comparison operator"),
     };
-
-    let suggestion = format!("{variable} {reversed_op} {constant}");
+    let suggestion = format!("{right} {reversed_op} {left}");
     let mut diagnostic = Diagnostic::new(
-        violations::YodaConditions {
-            suggestion: suggestion.to_string(),
-        },
+        violations::MisplacedComparisonConstant(suggestion.clone()),
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             suggestion,
-            left.location,
-            right.end_location.unwrap(),
+            expr.location,
+            expr.end_location.unwrap(),
         ));
     }
     checker.diagnostics.push(diagnostic);

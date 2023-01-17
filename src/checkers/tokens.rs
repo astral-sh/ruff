@@ -75,7 +75,7 @@ pub fn check_tokens(
                     settings,
                     autofix,
                 ) {
-                    if settings.rules.enabled(diagnostic.kind.code()) {
+                    if settings.rules.enabled(diagnostic.kind.rule()) {
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -112,7 +112,7 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_implicit_str_concat::rules::implicit(tokens)
                 .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.code())),
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
     }
 
@@ -121,7 +121,7 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_commas::rules::trailing_commas(tokens, settings, autofix)
                 .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.code())),
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
     }
 

@@ -54,7 +54,7 @@ fn duplicate_handler_exceptions<'a>(
                 ),
                 Range::from_located(expr),
             );
-            if checker.patch(diagnostic.kind.code()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 let mut generator: Generator = checker.stylist.into();
                 if unique_elts.len() == 1 {
                     generator.unparse_expr(unique_elts[0], 0);
