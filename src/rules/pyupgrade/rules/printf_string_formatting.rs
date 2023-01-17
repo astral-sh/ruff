@@ -77,6 +77,7 @@ fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -
     }
 }
 
+/// Given a string (like
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let mut string_start = 0;
     let mut string_end = 0;
@@ -542,8 +543,8 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
             new_string,
-            replace_range.location,
-            replace_range.end_location,
+            expr.location,
+            expr.end_location.unwrap(),
         ));
     }
     checker.diagnostics.push(diagnostic);
