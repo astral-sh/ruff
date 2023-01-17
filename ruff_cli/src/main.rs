@@ -91,6 +91,15 @@ fn resolve(
 pub fn main() -> Result<ExitCode> {
     // Extract command-line arguments.
     let (cli, overrides) = Cli::parse().partition();
+
+    let default_panic_hook = std::panic::take_hook();
+
+    std::panic::set_hook(Box::new(move |info| {
+        eprintln!("ruff crashed ... this should not be happening :/\n\
+        Please report it on GitHub: https://github.com/charliermarsh/ruff/issues/new?title=Panic+when+%2E%2E%2E");
+        default_panic_hook(info);
+    }));
+
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
 
