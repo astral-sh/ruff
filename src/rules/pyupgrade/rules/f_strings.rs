@@ -1,6 +1,3 @@
-use anyhow::{anyhow, Result};
-use once_cell::sync::Lazy;
-use regex::{Captures, Regex};
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Constant, Expr, ExprKind, KeywordData};
 use rustpython_common::format::{
@@ -14,11 +11,6 @@ use crate::registry::{Diagnostic, RuleCode};
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::violations;
-
-static NAME_SPECIFIER: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\{(?P<name>[^\W0-9]\w*)?(?P<fmt>.*?)}").unwrap());
-
-static HAS_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*]").unwrap());
 
 /// Like [`FormatSummary`], but maps positional and keyword arguments to their
 /// values. For example, given `{a} {b}".format(a=1, b=2)`, `FormatFunction`
@@ -98,36 +90,6 @@ fn contains_invalids(string: &str) -> bool {
         || string.contains("await")
 }
 
-/// Extract the format spec from a regex [`Captures`] object.
-fn extract_format_spec(caps: &Captures, target: &str) -> Result<String> {
-    let Some(match_) = caps.name(target) else {
-        return Err(anyhow!("No match for target: {}", target));
-    };
-    let match_ = match_.as_str();
-    if HAS_BRACKETS.is_match(match_) {
-        return Err(anyhow!("Invalid match for target: {}", target));
-    }
-    Ok(match_.to_string())
-}
-
-// See: https://github.com/rust-lang/regex/issues/648
-fn replace_all(
-    re: &Regex,
-    haystack: &str,
-    mut replacement: impl FnMut(&Captures) -> Result<String>,
-) -> Result<String> {
-    let mut new = String::with_capacity(haystack.len());
-    let mut last_match = 0;
-    for caps in re.captures_iter(haystack) {
-        let m = caps.get(0).unwrap();
-        new.push_str(&haystack[last_match..m.start()]);
-        new.push_str(&replacement(&caps)?);
-        last_match = m.end();
-    }
-    new.push_str(&haystack[last_match..]);
-    Ok(new)
-}
-
 /// Generate an f-string from an [`Expr`].
 fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
     let ExprKind::Call { func, .. } = &expr.node else {
@@ -176,11 +138,9 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
 
     // Parse the format string.
     let Ok(format_string) = FormatString::from_str(contents) else {
-        println!("Failed to parse format string: {}", contents);
+
         return None;
     };
-
-    println!("format_string: {:?}", format_string);
 
     let mut converted = String::with_capacity(contents.len());
     for part in format_string.format_parts {
@@ -247,11 +207,11 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
             }
             FormatPart::Literal(value) => {
                 if value.starts_with('{') {
-                    converted.push_str("{{");
+                    converted.push('{');
                 }
                 converted.push_str(&value);
                 if value.ends_with('}') {
-                    converted.push_str("}}");
+                    converted.push('}');
                 }
             }
         }
@@ -260,9 +220,9 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
     // Construct the format string.
     let mut contents = String::with_capacity(1 + converted.len());
     contents.push('f');
-    contents.push_str(&leading_quote);
+    contents.push_str(leading_quote);
     contents.push_str(&converted);
-    contents.push_str(&trailing_quote);
+    contents.push_str(trailing_quote);
     Some(contents)
 }
 

@@ -31,16 +31,11 @@ pub fn leading_quote(content: &str) -> Option<&str> {
 }
 
 /// Return the trailing quote string for a docstring (e.g., `"""`).
-pub fn trailing_quote(content: &str) -> Option<&str> {
-    for pattern in constants::SINGLE_QUOTE_SUFFIXES
+pub fn trailing_quote(content: &str) -> Option<&&str> {
+    constants::TRIPLE_QUOTE_SUFFIXES
         .iter()
         .chain(constants::SINGLE_QUOTE_SUFFIXES)
-    {
-        if content.ends_with(pattern) {
-            return Some(pattern);
-        }
-    }
-    None
+        .find(|&pattern| content.ends_with(pattern))
 }
 
 /// Return the index of the first logical line in a string.
