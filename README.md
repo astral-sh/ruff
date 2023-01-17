@@ -1141,6 +1141,7 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
 | ---- | ---- | ------- | --- |
 | PIE790 | NoUnnecessaryPass | Unnecessary `pass` statement | 🛠 |
 | PIE794 | DupeClassFieldDefinitions | Class field `...` is defined multiple times | 🛠 |
+| PIE796 | PreferUniqueEnums | Enum contains duplicate value: `...` |  |
 | PIE807 | PreferListBuiltin | Prefer `list()` over useless lambda | 🛠 |
 
 ### flake8-commas (COM)
