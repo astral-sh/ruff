@@ -2,6 +2,8 @@ use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
+use crate::ast::comparable::ComparableExpr;
+use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -101,6 +103,41 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                     }
                 }
             }
+            checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
+/// PIE796
+pub fn prefer_unique_enums<'a, 'b>(checker: &mut Checker<'a>, parent: &'b Stmt, body: &'b [Stmt])
+where
+    'b: 'a,
+{
+    let StmtKind::ClassDef { bases, .. } = &parent.node else {
+        return;
+    };
+
+    if !bases.iter().any(|expr| {
+        checker
+            .resolve_call_path(expr)
+            .map_or(false, |call_path| call_path == ["enum", "Enum"])
+    }) {
+        return;
+    }
+
+    let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
+    for stmt in body {
+        let StmtKind::Assign { value, .. } = &stmt.node else {
+            continue;
+        };
+
+        if !seen_targets.insert(ComparableExpr::from(value)) {
+            let diagnostic = Diagnostic::new(
+                violations::PreferUniqueEnums {
+                    value: unparse_expr(value, checker.stylist),
+                },
+                Range::from_located(stmt),
+            );
             checker.diagnostics.push(diagnostic);
         }
     }

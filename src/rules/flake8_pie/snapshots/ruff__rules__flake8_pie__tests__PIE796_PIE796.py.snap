@@ -1,0 +1,82 @@
+---
+source: src/rules/flake8_pie/mod.rs
+expression: diagnostics
+---
+- kind:
+    PreferUniqueEnums:
+      value: "\"B\""
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    PreferUniqueEnums:
+      value: "2"
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    PreferUniqueEnums:
+      value: "\"2\""
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 20
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    PreferUniqueEnums:
+      value: "2.5"
+  location:
+    row: 26
+    column: 4
+  end_location:
+    row: 26
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    PreferUniqueEnums:
+      value: "False"
+  location:
+    row: 33
+    column: 4
+  end_location:
+    row: 33
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    PreferUniqueEnums:
+      value: None
+  location:
+    row: 40
+    column: 4
+  end_location:
+    row: 40
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    PreferUniqueEnums:
+      value: "2"
+  location:
+    row: 54
+    column: 4
+  end_location:
+    row: 54
+    column: 9
+  fix: ~
+  parent: ~
+

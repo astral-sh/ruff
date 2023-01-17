@@ -1142,6 +1142,7 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
 | ---- | ---- | ------- | --- |
 | PIE790 | NoUnnecessaryPass | Unnecessary `pass` statement | 🛠 |
 | PIE794 | DupeClassFieldDefinitions | Class field `...` is defined multiple times | 🛠 |
+| PIE796 | PreferUniqueEnums | Enum contains duplicate value: `...` |  |
 | PIE807 | PreferListBuiltin | Prefer `list()` over useless lambda | 🛠 |
 
 ### flake8-commas (COM)
@@ -1456,6 +1457,7 @@ natively, including:
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
 - [`isort`](https://pypi.org/project/isort/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
+- [`pandas-vet`](https://pypi.org/project/pandas-vet/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 - [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980))
@@ -1521,6 +1523,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
+- [`pandas-vet`](https://pypi.org/project/pandas-vet/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
 - [`pydocstyle`](https://pypi.org/project/pydocstyle/)
 
