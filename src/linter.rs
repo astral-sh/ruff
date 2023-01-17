@@ -340,16 +340,16 @@ pub fn lint_fix(
             }
 
             eprintln!(
-                "
+                r#"
 {}: Failed to converge after {} iterations.
 
 This likely indicates a bug in `{}`. If you could open an issue at:
 
-{}/issues
+{}/issues/new?title=%5BInfinite%20loop%5D
 
-quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd \
-                 be very appreciative!
-",
+quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be
+very appreciative!
+"#,
                 "warning".yellow().bold(),
                 MAX_ITERATIONS,
                 CARGO_PKG_NAME,

@@ -91,6 +91,23 @@ fn resolve(
 pub fn main() -> Result<ExitCode> {
     // Extract command-line arguments.
     let (cli, overrides) = Cli::parse().partition();
+
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        eprintln!(
+            r#"
+{}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
+
+https://github.com/charliermarsh/ruff/issues/new?title=%5BPanic%5D
+
+quoting the executed command, along with the relevant file contents and `pyproject.toml` settings,
+we'd be very appreciative!
+"#,
+            "error".red().bold(),
+        );
+        default_panic_hook(info);
+    }));
+
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
 
