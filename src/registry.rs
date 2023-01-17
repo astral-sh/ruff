@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
-use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
+use strum_macros::{AsRefStr, EnumIter, EnumString};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;

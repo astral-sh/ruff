@@ -51,7 +51,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             EnumIter,
             EnumString,  // TODO(martin): Remove
             Debug,
-            Display,     // TODO(martin): Remove
             PartialEq,
             Eq,
             Clone,
