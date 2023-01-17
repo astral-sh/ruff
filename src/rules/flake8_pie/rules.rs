@@ -108,7 +108,7 @@ pub fn dupe_class_field_definitions<'a, 'b>(
     }
 }
 
-// PIE796
+/// PIE796
 pub fn prefer_unique_enums<'a, 'b>(checker: &mut Checker<'a>, parent: &'b Stmt, body: &'b [Stmt])
 where
     'b: 'a,
@@ -117,19 +117,11 @@ where
         return;
     };
 
-    let is_enum = bases.iter().any(|stmt| match &stmt.node {
-        ExprKind::Name { id, .. } => id == "Enum",
-        ExprKind::Attribute { value, attr, .. } => {
-            attr.ends_with("Enum")
-                && match &value.node {
-                    ExprKind::Name { id, .. } => id == "enum",
-                    _ => false,
-                }
-        }
-        _ => false,
-    });
-
-    if !is_enum {
+    if !bases.iter().any(|expr| {
+        checker
+            .resolve_call_path(expr)
+            .map_or(false, |call_path| call_path == ["enum", "Enum"])
+    }) {
         return;
     }
 
@@ -141,7 +133,9 @@ where
 
         if !seen_targets.insert(ComparableExpr::from(value)) {
             let diagnostic = Diagnostic::new(
-                violations::PreferUniqueEnums(unparse_expr(value, checker.stylist)),
+                violations::PreferUniqueEnums {
+                    value: unparse_expr(value, checker.stylist),
+                },
                 Range::from_located(stmt),
             );
             checker.diagnostics.push(diagnostic);
