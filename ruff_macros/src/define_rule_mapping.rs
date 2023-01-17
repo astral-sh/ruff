@@ -3,7 +3,7 @@ use quote::quote;
 use syn::parse::Parse;
 use syn::{Ident, Path, Token};
 
-pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
+pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut rulecode_variants = quote!();
     let mut diagkind_variants = quote!();
     let mut rulecode_kind_match_arms = quote!();
@@ -14,13 +14,13 @@ pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
     let mut diagkind_commit_match_arms = quote!();
     let mut from_impls_for_diagkind = quote!();
 
-    for (code, path, name) in mapping.entries {
+    for (code, path, name) in &mapping.entries {
         rulecode_variants.extend(quote! {#code,});
         diagkind_variants.extend(quote! {#name(#path),});
         rulecode_kind_match_arms.extend(
             quote! {RuleCode::#code => DiagnosticKind::#name(<#path as Violation>::placeholder()),},
         );
-        let origin = get_origin(&code);
+        let origin = get_origin(code);
         rulecode_origin_match_arms.extend(quote! {RuleCode::#code => RuleOrigin::#origin,});
         diagkind_code_match_arms.extend(quote! {DiagnosticKind::#name(..) => &RuleCode::#code, });
         diagkind_body_match_arms
@@ -39,10 +39,15 @@ pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
         });
     }
 
+    let rulecodeprefix = super::rule_code_prefix::expand(
+        &Ident::new("RuleCode", Span::call_site()),
+        &Ident::new("RuleCodePrefix", Span::call_site()),
+        mapping.entries.iter().map(|(code, ..)| code),
+    );
+
     quote! {
         #[derive(
             AsRefStr,
-            RuleCodePrefix,
             EnumIter,
             EnumString,
             Debug,
@@ -97,6 +102,8 @@ pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
         }
 
         #from_impls_for_diagkind
+
+        #rulecodeprefix
     }
 }
 
