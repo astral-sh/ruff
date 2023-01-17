@@ -77,28 +77,33 @@ pub struct CliSettings {
 #[derive(Debug, Hash)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
-    pub allowed_confusables: HashableHashSet<char>,
-    pub builtins: Vec<String>,
-    pub dummy_variable_rgx: HashableRegex,
     pub enabled: HashableHashSet<RuleCode>,
-    pub exclude: HashableGlobSet,
-    pub extend_exclude: HashableGlobSet,
-    pub external: HashableHashSet<String>,
     pub fixable: HashableHashSet<RuleCode>,
-    pub force_exclude: bool,
-    pub ignore_init_module_imports: bool,
-    pub line_length: usize,
-    pub namespace_packages: Vec<PathBuf>,
     pub per_file_ignores: Vec<(
         HashableGlobMatcher,
         HashableGlobMatcher,
         HashableHashSet<RuleCode>,
     )>,
-    pub required_version: Option<Version>,
-    pub respect_gitignore: bool,
+
     pub show_source: bool,
-    pub src: Vec<PathBuf>,
     pub target_version: PythonVersion,
+
+    // Resolver settings
+    pub exclude: HashableGlobSet,
+    pub extend_exclude: HashableGlobSet,
+    pub force_exclude: bool,
+    pub respect_gitignore: bool,
+    pub required_version: Option<Version>,
+
+    // Rule-specific settings
+    pub allowed_confusables: HashableHashSet<char>,
+    pub builtins: Vec<String>,
+    pub dummy_variable_rgx: HashableRegex,
+    pub external: HashableHashSet<String>,
+    pub ignore_init_module_imports: bool,
+    pub line_length: usize,
+    pub namespace_packages: Vec<PathBuf>,
+    pub src: Vec<PathBuf>,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
     // Plugins
