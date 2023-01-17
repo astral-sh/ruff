@@ -3,6 +3,8 @@ use rustpython_ast::{Constant, Expr, ExprKind, KeywordData};
 use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -116,6 +118,16 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         .locator
         .slice_source_code_range(&Range::from_located(value));
 
+    // Tokenize: we need to avoid trying to fix implicit string concatenations.
+    if lexer::make_tokenizer(&contents)
+        .flatten()
+        .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
+        .count()
+        > 1
+    {
+        return None;
+    }
+
     // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
     // with f-strings.
     let contents = if contents.starts_with('U') || contents.starts_with('u') {
@@ -138,7 +150,6 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
 
     // Parse the format string.
     let Ok(format_string) = FormatString::from_str(contents) else {
-
         return None;
     };
 

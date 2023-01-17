@@ -1,4 +1,7 @@
-# These SHOULD change
+###
+# Errors
+###
+
 "{} {}".format(a, b)
 
 "{1} {0}".format(a, b)
@@ -37,12 +40,13 @@ print("foo {} ".format(x))
 
 "{a.a[b]}".format(a=a)
 
-
 "{}{{}}{}".format(escaped, y)
 
 "\N{snowman} {}".format(a)
 
-# These should NOT change
+###
+# Non-errors
+###
 
 "{".format(a)
 
@@ -69,6 +73,8 @@ b"{} {}".format(a, b)
 "{}".format(a["b"])
 
 r'"\N{snowman} {}".format(a)'
+
+"{a}" "{b}".format(a=1, b=1)
 
 
 async def c():
