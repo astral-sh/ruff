@@ -495,7 +495,7 @@ impl Prefixes {
 }
 
 impl RuleOrigin {
-    pub fn title(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         match self {
             RuleOrigin::Eradicate => "eradicate",
             RuleOrigin::Flake82020 => "flake8-2020",

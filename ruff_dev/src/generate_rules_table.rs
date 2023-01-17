@@ -47,22 +47,22 @@ pub fn main(cli: &Cli) -> Result<()> {
     for origin in RuleOrigin::iter() {
         let prefixes = origin.prefixes();
         let codes_csv: String = prefixes.as_list(", ");
-        table_out.push_str(&format!("### {} ({codes_csv})", origin.title()));
+        table_out.push_str(&format!("### {} ({codes_csv})", origin.name()));
         table_out.push('\n');
         table_out.push('\n');
 
         toc_out.push_str(&format!(
             "   1. [{} ({})](#{}-{})\n",
-            origin.title(),
+            origin.name(),
             codes_csv,
-            origin.title().to_lowercase().replace(' ', "-"),
+            origin.name().to_lowercase().replace(' ', "-"),
             codes_csv.to_lowercase().replace(',', "-").replace(' ', "")
         ));
 
         if let Some((url, platform)) = origin.url() {
             table_out.push_str(&format!(
                 "For more, see [{}]({}) on {}.",
-                origin.title(),
+                origin.name(),
                 url,
                 platform
             ));
