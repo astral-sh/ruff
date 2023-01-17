@@ -42,17 +42,18 @@ print("foo {} ".format(x))
 
 "{}{{}}{}".format(escaped, y)
 
-"\N{snowman} {}".format(a)
+"{}".format(a)
 
 ###
 # Non-errors
 ###
 
+# False-negative: RustPython doesn't parse the `\N{snowman}`.
+"\N{snowman} {}".format(a)
+
 "{".format(a)
 
 "}".format(a)
-
-"{}".format(a)
 
 "{} {}".format(*a)
 
