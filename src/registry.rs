@@ -255,6 +255,7 @@ ruff_macros::define_rule_mapping!(
     UP029 => violations::UnnecessaryBuiltinImport,
     UP030 => violations::FormatLiterals,
     UP031 => violations::PrintfStringFormatting,
+    UP032 => violations::FString,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,

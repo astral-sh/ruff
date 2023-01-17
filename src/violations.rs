@@ -3817,6 +3817,23 @@ impl AlwaysAutofixableViolation for FormatLiterals {
     }
 }
 
+define_violation!(
+    pub struct FString;
+);
+impl AlwaysAutofixableViolation for FString {
+    fn message(&self) -> String {
+        "Use f-string instead of `format` call".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Convert to f-string".to_string()
+    }
+
+    fn placeholder() -> Self {
+        FString
+    }
+}
+
 // pydocstyle
 
 define_violation!(

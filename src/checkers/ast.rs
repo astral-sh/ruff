@@ -1867,6 +1867,7 @@ where
                     || self.settings.enabled.contains(&RuleCode::F525)
                     // pyupgrade
                     || self.settings.enabled.contains(&RuleCode::UP030)
+                    || self.settings.enabled.contains(&RuleCode::UP032)
                 {
                     if let ExprKind::Attribute { value, attr, .. } = &func.node {
                         if let ExprKind::Constant {
@@ -1890,8 +1891,8 @@ where
                                     }
                                     Ok(summary) => {
                                         if self.settings.enabled.contains(&RuleCode::F522) {
-                                            pyflakes::rules::string_dot_format_extra_named_arguments(self,
-                                                                                                     &summary, keywords, location,
+                                            pyflakes::rules::string_dot_format_extra_named_arguments(
+                                                self, &summary, keywords, location,
                                             );
                                         }
 
@@ -1916,6 +1917,10 @@ where
 
                                         if self.settings.enabled.contains(&RuleCode::UP030) {
                                             pyupgrade::rules::format_literals(self, &summary, expr);
+                                        }
+
+                                        if self.settings.enabled.contains(&RuleCode::UP032) {
+                                            pyupgrade::rules::f_strings(self, &summary, expr);
                                         }
                                     }
                                 }

@@ -726,6 +726,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP029 | UnnecessaryBuiltinImport | Unnecessary builtin import: `...` | 🛠 |
 | UP030 | FormatLiterals | Use implicit references for positional format fields | 🛠 |
 | UP031 | PrintfStringFormatting | Use format specifiers instead of percent format | 🛠 |
+| UP032 | FString | Use f-string instead of `format` call | 🛠 |
 
 ### pep8-naming (N)
 

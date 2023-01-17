@@ -5,10 +5,10 @@ const KEYWORDS: [&str; 35] = [
     "with", "yield",
 ];
 
-/// This function currently does not work with python emoji synatx. For example "\N{dog}" will be
-/// converted to "\N{{dog}}" which is NOT correct and WILL cause issues. Please check for emoji
-/// syntax before using this command, and if it exists, issue a warning instead of attempting to
-/// fix
+/// This function currently does not work with python emoji synatx. For example
+/// "\N{dog}" will be converted to "\N{{dog}}" which is NOT correct and WILL
+/// cause issues. Please check for emoji syntax before using this command, and
+/// if it exists, issue a warning instead of attempting to fix
 pub fn curly_escape(string: &str) -> String {
     string.replace('{', "{{").replace('}', "}}")
 }
