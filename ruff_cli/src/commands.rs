@@ -19,7 +19,7 @@ use ruff::registry::RuleCode;
 use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
-use ruff::{fix, fs, packaging, resolver, violations, warn_user_once};
+use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError};
 use serde::Serialize;
 use walkdir::WalkDir;
 
@@ -56,19 +56,19 @@ pub fn run(
     if matches!(cache, flags::Cache::Enabled) {
         match &pyproject_strategy {
             PyprojectDiscovery::Fixed(settings) => {
-                if let Err(e) = cache::init(&settings.cache_dir) {
+                if let Err(e) = cache::init(&settings.cli.cache_dir) {
                     error!(
                         "Failed to initialize cache at {}: {e:?}",
-                        settings.cache_dir.to_string_lossy()
+                        settings.cli.cache_dir.to_string_lossy()
                     );
                 }
             }
             PyprojectDiscovery::Hierarchical(default) => {
                 for settings in std::iter::once(default).chain(resolver.iter()) {
-                    if let Err(e) = cache::init(&settings.cache_dir) {
+                    if let Err(e) = cache::init(&settings.cli.cache_dir) {
                         error!(
                             "Failed to initialize cache at {}: {e:?}",
-                            settings.cache_dir.to_string_lossy()
+                            settings.cli.cache_dir.to_string_lossy()
                         );
                     }
                 }
@@ -97,7 +97,7 @@ pub fn run(
                         .parent()
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
-                    let settings = resolver.resolve(path, pyproject_strategy);
+                    let settings = resolver.resolve_all(path, pyproject_strategy);
                     lint_path(path, package, settings, cache, autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -116,7 +116,7 @@ pub fn run(
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.enabled.contains(&RuleCode::E902) {
                         Diagnostics::new(vec![Message {
-                            kind: violations::IOError(message).into(),
+                            kind: IOError(message).into(),
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,
@@ -171,9 +171,9 @@ pub fn run_stdin(
     };
     let package_root = filename
         .and_then(Path::parent)
-        .and_then(|path| packaging::detect_package_root(path, &settings.namespace_packages));
+        .and_then(|path| packaging::detect_package_root(path, &settings.lib.namespace_packages));
     let stdin = read_from_stdin()?;
-    let mut diagnostics = lint_stdin(filename, package_root, &stdin, settings, autofix)?;
+    let mut diagnostics = lint_stdin(filename, package_root, &stdin, &settings.lib, autofix)?;
     diagnostics.messages.sort_unstable();
     Ok(diagnostics)
 }

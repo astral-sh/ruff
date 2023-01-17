@@ -39,7 +39,7 @@ use crate::rules::{
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violations::DeferralKeyword;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{autofix, docstrings, noqa, violations, visibility};
@@ -57,7 +57,8 @@ pub struct Checker<'a> {
     pub(crate) settings: &'a Settings,
     pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
     pub(crate) locator: &'a Locator<'a>,
-    pub(crate) style: &'a Stylist<'a>,
+    pub(crate) stylist: &'a Stylist<'a>,
+    pub(crate) indexer: &'a Indexer,
     // Computed diagnostics.
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Function and class definition tracking (e.g., for docstring enforcement).
@@ -98,6 +99,7 @@ pub struct Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         settings: &'a Settings,
         noqa_line_for: &'a IntMap<usize, usize>,
@@ -106,6 +108,7 @@ impl<'a> Checker<'a> {
         path: &'a Path,
         locator: &'a Locator,
         style: &'a Stylist,
+        indexer: &'a Indexer,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -114,7 +117,8 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             locator,
-            style,
+            stylist: style,
+            indexer,
             diagnostics: vec![],
             definitions: vec![],
             deletions: FxHashSet::default(),
@@ -697,6 +701,10 @@ where
                     flake8_pie::rules::dupe_class_field_definitions(self, stmt, body);
                 }
 
+                if self.settings.enabled.contains(&RuleCode::PIE796) {
+                    flake8_pie::rules::prefer_unique_enums(self, stmt, body);
+                }
+
                 self.check_builtin_shadowing(name, stmt, false);
 
                 for expr in bases {
@@ -800,7 +808,7 @@ where
                     // flake8_tidy_imports
                     if self.settings.enabled.contains(&RuleCode::TID251) {
                         if let Some(diagnostic) =
-                            flake8_tidy_imports::rules::name_or_parent_is_banned(
+                            flake8_tidy_imports::banned_api::name_or_parent_is_banned(
                                 alias,
                                 &alias.node.name,
                                 &self.settings.flake8_tidy_imports.banned_api,
@@ -944,16 +952,18 @@ where
                 if self.settings.enabled.contains(&RuleCode::TID251) {
                     if let Some(module) = module {
                         for name in names {
-                            if let Some(diagnostic) = flake8_tidy_imports::rules::name_is_banned(
-                                module,
-                                name,
-                                &self.settings.flake8_tidy_imports.banned_api,
-                            ) {
+                            if let Some(diagnostic) =
+                                flake8_tidy_imports::banned_api::name_is_banned(
+                                    module,
+                                    name,
+                                    &self.settings.flake8_tidy_imports.banned_api,
+                                )
+                            {
                                 self.diagnostics.push(diagnostic);
                             }
                         }
                         if let Some(diagnostic) =
-                            flake8_tidy_imports::rules::name_or_parent_is_banned(
+                            flake8_tidy_imports::banned_api::name_or_parent_is_banned(
                                 stmt,
                                 module,
                                 &self.settings.flake8_tidy_imports.banned_api,
@@ -1102,11 +1112,13 @@ where
                     }
 
                     if self.settings.enabled.contains(&RuleCode::TID252) {
-                        if let Some(diagnostic) = flake8_tidy_imports::rules::banned_relative_import(
-                            stmt,
-                            level.as_ref(),
-                            &self.settings.flake8_tidy_imports.ban_relative_imports,
-                        ) {
+                        if let Some(diagnostic) =
+                            flake8_tidy_imports::relative_imports::banned_relative_import(
+                                stmt,
+                                level.as_ref(),
+                                &self.settings.flake8_tidy_imports.ban_relative_imports,
+                            )
+                        {
                             self.diagnostics.push(diagnostic);
                         }
                     }
@@ -1275,7 +1287,7 @@ where
                     }
                 }
             }
-            StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
+            StmtKind::With { items, body, .. } => {
                 if self.settings.enabled.contains(&RuleCode::B017) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
@@ -1287,7 +1299,7 @@ where
                         self,
                         stmt,
                         body,
-                        self.current_stmt_parent().map(|parent| parent.0),
+                        self.current_stmt_parent().map(Into::into),
                     );
                 }
             }
@@ -1839,7 +1851,7 @@ where
                 }
 
                 if self.settings.enabled.contains(&RuleCode::TID251) {
-                    flake8_tidy_imports::rules::banned_attribute_access(self, expr);
+                    flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
                 }
             }
             ExprKind::Call {
@@ -4004,6 +4016,7 @@ impl<'a> Checker<'a> {
                             parent,
                             &deleted,
                             self.locator,
+                            self.indexer,
                         ) {
                             Ok(fix) => {
                                 if fix.content.is_empty() || fix.content == "pass" {
@@ -4299,6 +4312,7 @@ pub fn check_ast(
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,
+    indexer: &Indexer,
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -4313,6 +4327,7 @@ pub fn check_ast(
         path,
         locator,
         stylist,
+        indexer,
     );
     checker.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();

@@ -5,6 +5,7 @@ use std::path::Path;
 
 use rustpython_ast::{Expr, Stmt, StmtKind};
 
+use crate::ast::helpers::collect_call_path;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Documentable;
 
@@ -148,7 +149,28 @@ fn function_visibility(stmt: &Stmt) -> Visibility {
 
 fn method_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
-        StmtKind::FunctionDef { name, .. } | StmtKind::AsyncFunctionDef { name, .. } => {
+        StmtKind::FunctionDef {
+            name,
+            decorator_list,
+            ..
+        }
+        | StmtKind::AsyncFunctionDef {
+            name,
+            decorator_list,
+            ..
+        } => {
+            // Is this a setter or deleter?
+            if decorator_list.iter().any(|expr| {
+                let call_path = collect_call_path(expr);
+                if call_path.len() > 1 {
+                    call_path[0] == name
+                } else {
+                    false
+                }
+            }) {
+                return Visibility::Private;
+            }
+
             // Is the method non-private?
             if !name.starts_with('_') {
                 return Visibility::Public;

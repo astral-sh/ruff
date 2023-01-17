@@ -17,7 +17,7 @@ use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::registry::{Diagnostic, LintSource, RuleCode};
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 use crate::{directives, fs, rustpython_helpers, violations};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -33,6 +33,7 @@ pub fn check_path(
     tokens: Vec<LexResult>,
     locator: &Locator,
     stylist: &Stylist,
+    indexer: &Indexer,
     directives: &Directives,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -65,7 +66,7 @@ pub fn check_path(
     let use_ast = settings
         .enabled
         .iter()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::AST));
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Ast));
     let use_imports = !directives.isort.skip_file
         && settings
             .enabled
@@ -79,6 +80,7 @@ pub fn check_path(
                         &python_ast,
                         locator,
                         stylist,
+                        indexer,
                         &directives.noqa_line_for,
                         settings,
                         autofix,
@@ -90,6 +92,7 @@ pub fn check_path(
                     diagnostics.extend(check_imports(
                         &python_ast,
                         locator,
+                        indexer,
                         &directives.isort,
                         settings,
                         stylist,
@@ -127,7 +130,7 @@ pub fn check_path(
     {
         diagnostics.extend(check_lines(
             contents,
-            &directives.commented_lines,
+            indexer.commented_lines(),
             &doc_lines,
             settings,
             autofix,
@@ -135,16 +138,16 @@ pub fn check_path(
     }
 
     // Enforce `noqa` directives.
-    if matches!(noqa, flags::Noqa::Enabled)
+    if (matches!(noqa, flags::Noqa::Enabled) && !diagnostics.is_empty())
         || settings
             .enabled
             .iter()
-            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQA))
+            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQa))
     {
         check_noqa(
             &mut diagnostics,
             contents,
-            &directives.commented_lines,
+            indexer.commented_lines(),
             &directives.noqa_line_for,
             settings,
             autofix,
@@ -184,6 +187,9 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     // Detect the current code style (lazily).
     let stylist = Stylist::from_contents(&contents, &locator);
 
+    // Extra indices from the code.
+    let indexer: Indexer = tokens.as_slice().into();
+
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
@@ -196,6 +202,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         settings,
         flags::Autofix::Disabled,
@@ -230,6 +237,9 @@ pub fn lint_only(
     // Detect the current code style (lazily).
     let stylist = Stylist::from_contents(contents, &locator);
 
+    // Extra indices from the code.
+    let indexer: Indexer = tokens.as_slice().into();
+
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
@@ -242,6 +252,7 @@ pub fn lint_only(
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         settings,
         autofix,
@@ -290,6 +301,9 @@ pub fn lint_fix(
         // Detect the current code style (lazily).
         let stylist = Stylist::from_contents(&contents, &locator);
 
+        // Extra indices from the code.
+        let indexer: Indexer = tokens.as_slice().into();
+
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
@@ -302,6 +316,7 @@ pub fn lint_fix(
             tokens,
             &locator,
             &stylist,
+            &indexer,
             &directives,
             settings,
             flags::Autofix::Enabled,
@@ -366,6 +381,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_contents(&contents, &locator);
+    let indexer: Indexer = tokens.as_slice().into();
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
     let mut diagnostics = check_path(
@@ -375,6 +391,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         settings,
         flags::Autofix::Enabled,
@@ -395,6 +412,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
             let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
             let locator = Locator::new(&contents);
             let stylist = Stylist::from_contents(&contents, &locator);
+            let indexer: Indexer = tokens.as_slice().into();
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
             let diagnostics = check_path(
@@ -404,6 +422,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
                 tokens,
                 &locator,
                 &stylist,
+                &indexer,
                 &directives,
                 settings,
                 flags::Autofix::Enabled,

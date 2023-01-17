@@ -1,5 +1,5 @@
-//! An equivalent object hierarchy to the `Expr` hierarchy, but with the ability
-//! to compare expressions for equality (via `Eq` and `Hash`).
+//! An equivalent object hierarchy to the [`Expr`] hierarchy, but with the
+//! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
 
 use num_bigint::BigInt;
 use rustpython_ast::{

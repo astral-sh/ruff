@@ -64,7 +64,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                 Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
             if checker.patch(diagnostic.kind.code()) {
                 diagnostic.amend(Fix::replacement(
-                    assignment(obj, name, value, checker.style),
+                    assignment(obj, name, value, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));

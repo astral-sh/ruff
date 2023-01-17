@@ -2,26 +2,25 @@ use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
 use colored::Colorize;
-use ruff::registry::RuleCodePrefix;
-use ruff::rules::flake8_pytest_style::types::{
+
+use super::black::Black;
+use super::plugin::Plugin;
+use super::{parser, plugin};
+use crate::registry::RuleCodePrefix;
+use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
-use ruff::rules::flake8_quotes::settings::Quote;
-use ruff::rules::flake8_tidy_imports::settings::Strictness;
-use ruff::rules::pydocstyle::settings::Convention;
-use ruff::rules::{
+use crate::rules::flake8_quotes::settings::Quote;
+use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
+use crate::rules::pydocstyle::settings::Convention;
+use crate::rules::{
     flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
     flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
 };
-use ruff::settings::options::Options;
-use ruff::settings::pyproject::Pyproject;
-use ruff::warn_user;
+use crate::settings::options::Options;
+use crate::settings::pyproject::Pyproject;
+use crate::warn_user;
 
-use crate::black::Black;
-use crate::plugin::Plugin;
-use crate::{parser, plugin};
-
-#[allow(clippy::unnecessary_wraps)]
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
     black: Option<&Black>,
@@ -94,7 +93,7 @@ pub fn convert(
     let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
     let mut flake8_pytest_style = flake8_pytest_style::settings::Options::default();
     let mut flake8_quotes = flake8_quotes::settings::Options::default();
-    let mut flake8_tidy_imports = flake8_tidy_imports::settings::Options::default();
+    let mut flake8_tidy_imports = flake8_tidy_imports::options::Options::default();
     let mut mccabe = mccabe::settings::Options::default();
     let mut pep8_naming = pep8_naming::settings::Options::default();
     let mut pydocstyle = pydocstyle::settings::Options::default();
@@ -272,7 +271,7 @@ pub fn convert(
                     match value.trim() {
                         "csv" => {
                             flake8_pytest_style.parametrize_names_type =
-                                Some(ParametrizeNameType::CSV);
+                                Some(ParametrizeNameType::Csv);
                         }
                         "tuple" => {
                             flake8_pytest_style.parametrize_names_type =
@@ -355,7 +354,7 @@ pub fn convert(
     if flake8_quotes != flake8_quotes::settings::Options::default() {
         options.flake8_quotes = Some(flake8_quotes);
     }
-    if flake8_tidy_imports != flake8_tidy_imports::settings::Options::default() {
+    if flake8_tidy_imports != flake8_tidy_imports::options::Options::default() {
         options.flake8_tidy_imports = Some(flake8_tidy_imports);
     }
     if mccabe != mccabe::settings::Options::default() {
@@ -390,14 +389,14 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
-    use ruff::registry::RuleCodePrefix;
-    use ruff::rules::pydocstyle::settings::Convention;
-    use ruff::rules::{flake8_quotes, pydocstyle};
-    use ruff::settings::options::Options;
-    use ruff::settings::pyproject::Pyproject;
 
-    use crate::converter::convert;
-    use crate::plugin::Plugin;
+    use super::super::plugin::Plugin;
+    use super::convert;
+    use crate::registry::RuleCodePrefix;
+    use crate::rules::pydocstyle::settings::Convention;
+    use crate::rules::{flake8_quotes, pydocstyle};
+    use crate::settings::options::Options;
+    use crate::settings::pyproject::Pyproject;
 
     #[test]
     fn it_converts_empty() -> Result<()> {

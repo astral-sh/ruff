@@ -37,10 +37,10 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
 
     let mut diagnostic = Diagnostic::new(
         violations::NegateEqualOp(
-            unparse_expr(left, checker.style),
-            unparse_expr(&comparators[0], checker.style),
+            unparse_expr(left, checker.stylist),
+            unparse_expr(&comparators[0], checker.stylist),
         ),
-        Range::from_located(operand),
+        Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
@@ -50,7 +50,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
                     ops: vec![Cmpop::NotEq],
                     comparators: comparators.clone(),
                 }),
-                checker.style,
+                checker.stylist,
             ),
             expr.location,
             expr.end_location.unwrap(),
@@ -81,10 +81,10 @@ pub fn negation_with_not_equal_op(
 
     let mut diagnostic = Diagnostic::new(
         violations::NegateNotEqualOp(
-            unparse_expr(left, checker.style),
-            unparse_expr(&comparators[0], checker.style),
+            unparse_expr(left, checker.stylist),
+            unparse_expr(&comparators[0], checker.stylist),
         ),
-        Range::from_located(operand),
+        Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
@@ -94,7 +94,7 @@ pub fn negation_with_not_equal_op(
                     ops: vec![Cmpop::Eq],
                     comparators: comparators.clone(),
                 }),
-                checker.style,
+                checker.stylist,
             ),
             expr.location,
             expr.end_location.unwrap(),
@@ -117,11 +117,11 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
 
     let mut diagnostic = Diagnostic::new(
         violations::DoubleNegation(operand.to_string()),
-        Range::from_located(operand),
+        Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.code()) {
         diagnostic.amend(Fix::replacement(
-            unparse_expr(operand, checker.style),
+            unparse_expr(operand, checker.stylist),
             expr.location,
             expr.end_location.unwrap(),
         ));

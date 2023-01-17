@@ -2,7 +2,7 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKin
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    any_over_expr, contains_call_path, create_expr, create_stmt, has_comments, unparse_expr,
+    contains_call_path, contains_effect, create_expr, create_stmt, has_comments, unparse_expr,
     unparse_stmt,
 };
 use crate::ast::types::Range;
@@ -91,7 +91,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     if !(is_one_line_return_bool(body) && is_one_line_return_bool(orelse)) {
         return;
     }
-    let condition = unparse_expr(test, checker.style);
+    let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
@@ -101,7 +101,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
             value: Some(test.clone()),
         });
         diagnostic.amend(Fix::replacement(
-            unparse_stmt(&return_stmt, checker.style),
+            unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
             stmt.end_location.unwrap(),
         ));
@@ -191,7 +191,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
-    let contents = unparse_stmt(&ternary, checker.style);
+    let contents = unparse_stmt(&ternary, checker.stylist);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if stmt.location.column() + contents.len() > checker.settings.line_length {
@@ -272,19 +272,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if any_over_expr(default_val, &|expr| {
-        matches!(
-            expr.node,
-            ExprKind::Call { .. }
-                | ExprKind::Await { .. }
-                | ExprKind::GeneratorExp { .. }
-                | ExprKind::ListComp { .. }
-                | ExprKind::SetComp { .. }
-                | ExprKind::DictComp { .. }
-                | ExprKind::Yield { .. }
-                | ExprKind::YieldFrom { .. }
-        )
-    }) {
+    if contains_effect(checker, default_val) {
         return;
     }
 
@@ -305,7 +293,7 @@ pub fn use_dict_get_with_default(
             })),
             type_comment: None,
         }),
-        checker.style,
+        checker.stylist,
     );
 
     // Don't flag if the resulting expression would exceed the maximum line length.

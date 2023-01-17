@@ -8,7 +8,7 @@ use crate::registry::{Diagnostic, RuleCode};
 use crate::source_code::{Generator, Locator, Stylist};
 use crate::violations;
 
-/// Return `true` if the `Expr` is a reference to `${module}.${any}`.
+/// Return `true` if the call path is a reference to `${module}.${any}`.
 fn is_module_member(call_path: &[&str], module: &str) -> bool {
     call_path
         .first()
@@ -398,7 +398,7 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
         },
         arg,
         patch,
-        checker.style,
+        checker.stylist,
     ))
 }
 
@@ -427,7 +427,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
                 keywords,
                 expr,
                 patch,
-                checker.style,
+                checker.stylist,
                 checker.locator,
             ),
             ExprKind::Attribute { attr, .. } => map_name(attr.as_str(), expr, patch),

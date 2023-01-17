@@ -1,0 +1,77 @@
+[tool.poetry]
+name = "scripts"
+version = "0.1.0"
+description = ""
+authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+autoflake = "^2.0.0"
+flake8 = "^6.0.0"
+pycodestyle = "^2.10.0"
+pyflakes = "^3.0.1"
+pylint = "^2.15.10"
+black = "^22.12.0"
+isort = "^5.11.4"
+flake8-2020 = { version = "*", optional = true }
+flake8-annotations = { version = "*", optional = true }
+flake8-bandit = { version = "*", optional = true }
+flake8-blind-except = { version = "*", optional = true }
+# flake8-boolean-trap = { version = "*", optional = true }
+flake8-bugbear = { version = "*", optional = true }
+flake8-builtins = { version = "*", optional = true }
+flake8-commas = { version = "*", optional = true }
+flake8-comprehensions = { version = "*", optional = true }
+flake8-datetimez = { version = "*", optional = true }
+flake8-debugger = { version = "*", optional = true }
+flake8-docstrings = { version = "*", optional = true }
+# flake8-eradicate = { version = "*", optional = true }
+flake8-errmsg = { version = "*", optional = true }
+flake8-implicit-str-concat = { version = "*", optional = true }
+# flake8-import-conventions = { version = "*", optional = true }
+flake8-isort = { version = "*", optional = true }
+flake8-pie = { version = "*", optional = true }
+flake8-print = { version = "*", optional = true }
+flake8-quotes = { version = "*", optional = true }
+flake8-return = { version = "*", optional = true }
+flake8-simplify = { version = "*", optional = true }
+flake8-super = { version = "*", optional = true }
+flake8-tidy-imports = { version = "*", optional = true }
+pandas-vet = { version = "*", optional = true }
+pep8-naming = { version = "*", optional = true }
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.extras]
+plugins = [
+  "flake8-2020",
+  "flake8-annotations",
+  "flake8-bandit",
+  "flake8-blind-except",
+  # "flake8-boolean-trap",
+  "flake8-bugbear",
+  "flake8-builtins",
+  "flake8-commas",
+  "flake8-comprehensions",
+  "flake8-datetimez",
+  "flake8-debugger",
+  "flake8-docstrings",
+  # "flake8-eradicate",
+  "flake8-errmsg",
+  "flake8-implicit-str-concat",
+  # "flake8-import-conventions",
+  "flake8-isort",
+  "flake8-pie",
+  "flake8-print",
+  "flake8-quotes",
+  "flake8-return",
+  "flake8-simplify",
+  "flake8-super",
+  "flake8-tidy-imports",
+  "pandas-vet",
+  "pep8-naming",
+]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

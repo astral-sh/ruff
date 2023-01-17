@@ -2,20 +2,20 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::hash::{Hash, Hasher};
 use std::iter;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
-use globset::{Glob, GlobMatcher, GlobSet};
+use globset::Glob;
 use itertools::Either::{Left, Right};
-use itertools::Itertools;
 use once_cell::sync::Lazy;
+#[cfg(test)]
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 
+use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use crate::cache::cache_dir;
 use crate::registry::{RuleCode, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::rules::{
@@ -31,6 +31,7 @@ use crate::warn_user_once;
 
 pub mod configuration;
 pub mod flags;
+pub mod hashable;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
@@ -39,25 +40,60 @@ pub mod types;
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
-#[allow(clippy::struct_excessive_bools)]
-pub struct Settings {
-    pub allowed_confusables: FxHashSet<char>,
-    pub builtins: Vec<String>,
+pub struct AllSettings {
+    pub cli: CliSettings,
+    pub lib: Settings,
+}
+
+impl AllSettings {
+    pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
+        Ok(Self {
+            cli: CliSettings {
+                cache_dir: config
+                    .cache_dir
+                    .clone()
+                    .unwrap_or_else(|| cache_dir(project_root)),
+                fix: config.fix.unwrap_or(false),
+                fix_only: config.fix_only.unwrap_or(false),
+                format: config.format.unwrap_or_default(),
+                update_check: config.update_check.unwrap_or_default(),
+            },
+            lib: Settings::from_configuration(config, project_root)?,
+        })
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+/// Settings that are not used by this library and
+/// only here so that `ruff_cli` can use them.
+pub struct CliSettings {
     pub cache_dir: PathBuf,
-    pub dummy_variable_rgx: Regex,
-    pub enabled: FxHashSet<RuleCode>,
-    pub exclude: GlobSet,
-    pub extend_exclude: GlobSet,
-    pub external: FxHashSet<String>,
     pub fix: bool,
     pub fix_only: bool,
-    pub fixable: FxHashSet<RuleCode>,
-    pub force_exclude: bool,
     pub format: SerializationFormat,
+    pub update_check: bool,
+}
+
+#[derive(Debug, Hash)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct Settings {
+    pub allowed_confusables: HashableHashSet<char>,
+    pub builtins: Vec<String>,
+    pub dummy_variable_rgx: HashableRegex,
+    pub enabled: HashableHashSet<RuleCode>,
+    pub exclude: HashableGlobSet,
+    pub extend_exclude: HashableGlobSet,
+    pub external: HashableHashSet<String>,
+    pub fixable: HashableHashSet<RuleCode>,
+    pub force_exclude: bool,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub namespace_packages: Vec<PathBuf>,
-    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<RuleCode>)>,
+    pub per_file_ignores: Vec<(
+        HashableGlobMatcher,
+        HashableGlobMatcher,
+        HashableHashSet<RuleCode>,
+    )>,
     pub required_version: Option<Version>,
     pub respect_gitignore: bool,
     pub show_source: bool,
@@ -65,7 +101,6 @@ pub struct Settings {
     pub target_version: PythonVersion,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
-    pub update_check: bool,
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bandit: flake8_bandit::settings::Settings,
@@ -74,7 +109,7 @@ pub struct Settings {
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
-    pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
+    pub flake8_tidy_imports: flake8_tidy_imports::Settings,
     pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
@@ -117,12 +152,13 @@ impl Settings {
             allowed_confusables: config
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
-                .unwrap_or_default(),
+                .unwrap_or_default()
+                .into(),
             builtins: config.builtins.unwrap_or_default(),
-            cache_dir: config.cache_dir.unwrap_or_else(|| cache_dir(project_root)),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
-                .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone()),
+                .unwrap_or_else(|| DEFAULT_DUMMY_VARIABLE_RGX.clone())
+                .into(),
             enabled: validate_enabled(resolve_codes(
                 [RuleCodeSpec {
                     select: &config
@@ -154,20 +190,21 @@ impl Settings {
                         Right(iter::empty())
                     },
                 ),
-            )),
-            exclude: resolve_globset(config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()))?,
-            extend_exclude: resolve_globset(config.extend_exclude)?,
-            external: FxHashSet::from_iter(config.external.unwrap_or_default()),
-            fix: config.fix.unwrap_or(false),
-            fix_only: config.fix_only.unwrap_or(false),
+            ))
+            .into(),
+            exclude: HashableGlobSet::new(
+                config.exclude.unwrap_or_else(|| DEFAULT_EXCLUDE.clone()),
+            )?,
+            extend_exclude: HashableGlobSet::new(config.extend_exclude)?,
+            external: FxHashSet::from_iter(config.external.unwrap_or_default()).into(),
             fixable: resolve_codes(
                 [RuleCodeSpec {
                     select: &config.fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
                     ignore: &config.unfixable.unwrap_or_default(),
                 }]
                 .into_iter(),
-            ),
-            format: config.format.unwrap_or_default(),
+            )
+            .into(),
             force_exclude: config.force_exclude.unwrap_or(false),
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
             line_length: config.line_length.unwrap_or(88),
@@ -186,7 +223,6 @@ impl Settings {
                 vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()]
             }),
             typing_modules: config.typing_modules.unwrap_or_default(),
-            update_check: config.update_check.unwrap_or_default(),
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
@@ -221,21 +257,20 @@ impl Settings {
         })
     }
 
+    #[cfg(test)]
     pub fn for_rule(rule_code: RuleCode) -> Self {
         Self {
-            allowed_confusables: FxHashSet::from_iter([]),
+            allowed_confusables: FxHashSet::from_iter([]).into(),
             builtins: vec![],
-            cache_dir: cache_dir(path_dedot::CWD.as_path()),
-            dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FxHashSet::from_iter([rule_code.clone()]),
-            exclude: GlobSet::empty(),
-            extend_exclude: GlobSet::empty(),
-            external: FxHashSet::default(),
-            fix: false,
-            fix_only: false,
-            fixable: FxHashSet::from_iter([rule_code]),
+            dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$")
+                .unwrap()
+                .into(),
+            enabled: FxHashSet::from_iter([rule_code.clone()]).into(),
+            exclude: HashableGlobSet::empty(),
+            extend_exclude: HashableGlobSet::empty(),
+            external: HashableHashSet::default(),
+            fixable: FxHashSet::from_iter([rule_code]).into(),
             force_exclude: false,
-            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             namespace_packages: vec![],
@@ -247,7 +282,6 @@ impl Settings {
             target_version: PythonVersion::Py310,
             task_tags: vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()],
             typing_modules: vec![],
-            update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
@@ -255,7 +289,7 @@ impl Settings {
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
-            flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
+            flake8_tidy_imports: flake8_tidy_imports::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
@@ -266,21 +300,20 @@ impl Settings {
         }
     }
 
+    #[cfg(test)]
     pub fn for_rules(rule_codes: Vec<RuleCode>) -> Self {
         Self {
-            allowed_confusables: FxHashSet::from_iter([]),
+            allowed_confusables: HashableHashSet::default(),
             builtins: vec![],
-            cache_dir: cache_dir(path_dedot::CWD.as_path()),
-            dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap(),
-            enabled: FxHashSet::from_iter(rule_codes.clone()),
-            exclude: GlobSet::empty(),
-            extend_exclude: GlobSet::empty(),
-            external: FxHashSet::default(),
-            fix: false,
-            fix_only: false,
-            fixable: FxHashSet::from_iter(rule_codes),
+            dummy_variable_rgx: Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$")
+                .unwrap()
+                .into(),
+            enabled: FxHashSet::from_iter(rule_codes.clone()).into(),
+            exclude: HashableGlobSet::empty(),
+            extend_exclude: HashableGlobSet::empty(),
+            external: HashableHashSet::default(),
+            fixable: FxHashSet::from_iter(rule_codes).into(),
             force_exclude: false,
-            format: SerializationFormat::Text,
             ignore_init_module_imports: false,
             line_length: 88,
             namespace_packages: vec![],
@@ -292,7 +325,6 @@ impl Settings {
             target_version: PythonVersion::Py310,
             task_tags: vec!["TODO".to_string(), "FIXME".to_string(), "XXX".to_string()],
             typing_modules: vec![],
-            update_check: false,
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
@@ -300,7 +332,7 @@ impl Settings {
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
-            flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
+            flake8_tidy_imports: flake8_tidy_imports::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),
@@ -325,68 +357,16 @@ impl Settings {
     }
 }
 
-impl Hash for Settings {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        // Add base properties in alphabetical order.
-        for confusable in &self.allowed_confusables {
-            confusable.hash(state);
-        }
-        self.builtins.hash(state);
-        self.dummy_variable_rgx.as_str().hash(state);
-        for value in self.enabled.iter().sorted() {
-            value.hash(state);
-        }
-        for value in self.external.iter().sorted() {
-            value.hash(state);
-        }
-        for value in self.fixable.iter().sorted() {
-            value.hash(state);
-        }
-        self.ignore_init_module_imports.hash(state);
-        self.line_length.hash(state);
-        for (absolute, basename, codes) in &self.per_file_ignores {
-            absolute.glob().hash(state);
-            basename.glob().hash(state);
-            for value in codes.iter().sorted() {
-                value.hash(state);
-            }
-        }
-        self.show_source.hash(state);
-        self.src.hash(state);
-        self.target_version.hash(state);
-        self.task_tags.hash(state);
-        self.typing_modules.hash(state);
-        // Add plugin properties in alphabetical order.
-        self.flake8_annotations.hash(state);
-        self.flake8_bandit.hash(state);
-        self.flake8_bugbear.hash(state);
-        self.flake8_errmsg.hash(state);
-        self.flake8_import_conventions.hash(state);
-        self.flake8_pytest_style.hash(state);
-        self.flake8_quotes.hash(state);
-        self.flake8_tidy_imports.hash(state);
-        self.flake8_unused_arguments.hash(state);
-        self.isort.hash(state);
-        self.mccabe.hash(state);
-        self.pep8_naming.hash(state);
-        self.pydocstyle.hash(state);
-        self.pyupgrade.hash(state);
-    }
-}
-
-/// Given a list of patterns, create a `GlobSet`.
-pub fn resolve_globset(patterns: Vec<FilePattern>) -> Result<GlobSet> {
-    let mut builder = globset::GlobSetBuilder::new();
-    for pattern in patterns {
-        pattern.add_to(&mut builder)?;
-    }
-    builder.build().map_err(Into::into)
-}
-
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
-) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<RuleCode>)>> {
+) -> Result<
+    Vec<(
+        HashableGlobMatcher,
+        HashableGlobMatcher,
+        HashableHashSet<RuleCode>,
+    )>,
+> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {
@@ -397,7 +377,7 @@ pub fn resolve_per_file_ignores(
             // Construct basename matcher.
             let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-            Ok((absolute, basename, per_file_ignore.codes))
+            Ok((absolute.into(), basename.into(), per_file_ignore.codes))
         })
         .collect()
 }

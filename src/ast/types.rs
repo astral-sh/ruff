@@ -127,7 +127,7 @@ pub enum BindingKind<'a> {
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: Range,
-    /// The statement in which the `Binding` was defined.
+    /// The statement in which the [`Binding`] was defined.
     pub source: Option<RefEquality<'a, Stmt>>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used.

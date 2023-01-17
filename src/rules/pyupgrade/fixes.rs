@@ -17,7 +17,7 @@ pub fn remove_class_def_base(
     bases: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Fix> {
-    let contents = locator.slice_source_code_at(&stmt_at);
+    let contents = locator.slice_source_code_at(stmt_at);
 
     // Case 1: `object` is the only base.
     if bases.len() == 1 && keywords.is_empty() {

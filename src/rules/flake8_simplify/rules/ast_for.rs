@@ -184,7 +184,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     loop_info.test,
                     loop_info.target,
                     loop_info.iter,
-                    checker.style,
+                    checker.stylist,
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
@@ -232,7 +232,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     &test,
                     loop_info.target,
                     loop_info.iter,
-                    checker.style,
+                    checker.stylist,
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.

@@ -13,18 +13,12 @@
 )]
 #![forbid(unsafe_code)]
 
-mod black;
-mod converter;
-mod parser;
-mod plugin;
-
 use std::path::PathBuf;
 
 use anyhow::Result;
-use black::parse_black_options;
 use clap::Parser;
 use configparser::ini::Ini;
-use plugin::Plugin;
+use ruff::flake8_to_ruff;
 
 #[derive(Parser)]
 #[command(
@@ -42,7 +36,7 @@ struct Cli {
     pyproject: Option<PathBuf>,
     /// List of plugins to enable.
     #[arg(long, value_delimiter = ',')]
-    plugin: Option<Vec<Plugin>>,
+    plugin: Option<Vec<flake8_to_ruff::Plugin>>,
 }
 
 fn main() -> Result<()> {
@@ -56,12 +50,12 @@ fn main() -> Result<()> {
     // Read the pyproject.toml file.
     let black = cli
         .pyproject
-        .map(parse_black_options)
+        .map(flake8_to_ruff::parse_black_options)
         .transpose()?
         .flatten();
 
     // Create Ruff's pyproject.toml section.
-    let pyproject = converter::convert(&config, black.as_ref(), cli.plugin)?;
+    let pyproject = flake8_to_ruff::convert(&config, black.as_ref(), cli.plugin)?;
     println!("{}", toml_edit::easy::to_string_pretty(&pyproject)?);
 
     Ok(())

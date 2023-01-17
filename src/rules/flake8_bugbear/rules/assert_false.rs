@@ -48,7 +48,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
 
     let mut diagnostic = Diagnostic::new(violations::DoNotAssertFalse, Range::from_located(test));
     if checker.patch(diagnostic.kind.code()) {
-        let mut generator: Generator = checker.style.into();
+        let mut generator: Generator = checker.stylist.into();
         generator.unparse_stmt(&assertion_error(msg));
         diagnostic.amend(Fix::replacement(
             generator.generate(),

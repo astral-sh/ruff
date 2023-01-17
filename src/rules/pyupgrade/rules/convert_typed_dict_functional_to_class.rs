@@ -210,7 +210,7 @@ pub fn convert_typed_dict_functional_to_class(
                     body,
                     total_keyword,
                     base_class,
-                    checker.style,
+                    checker.stylist,
                 ));
             }
             Err(err) => debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}"),

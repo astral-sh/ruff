@@ -9,7 +9,7 @@ use filetime::FileTime;
 use log::error;
 use path_absolutize::Absolutize;
 use ruff::message::Message;
-use ruff::settings::{flags, Settings};
+use ruff::settings::{flags, AllSettings, Settings};
 use serde::{Deserialize, Serialize};
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -80,10 +80,14 @@ fn read_sync(cache_dir: &Path, key: u64) -> Result<Vec<u8>, std::io::Error> {
 pub fn get<P: AsRef<Path>>(
     path: P,
     metadata: &fs::Metadata,
-    settings: &Settings,
+    settings: &AllSettings,
     autofix: flags::Autofix,
 ) -> Option<Vec<Message>> {
-    let encoded = read_sync(&settings.cache_dir, cache_key(path, settings, autofix)).ok()?;
+    let encoded = read_sync(
+        &settings.cli.cache_dir,
+        cache_key(path, &settings.lib, autofix),
+    )
+    .ok()?;
     let (mtime, messages) = match bincode::deserialize::<CheckResult>(&encoded[..]) {
         Ok(CheckResult {
             metadata: CacheMetadata { mtime },
@@ -104,7 +108,7 @@ pub fn get<P: AsRef<Path>>(
 pub fn set<P: AsRef<Path>>(
     path: P,
     metadata: &fs::Metadata,
-    settings: &Settings,
+    settings: &AllSettings,
     autofix: flags::Autofix,
     messages: &[Message],
 ) {
@@ -115,8 +119,8 @@ pub fn set<P: AsRef<Path>>(
         messages,
     };
     if let Err(e) = write_sync(
-        &settings.cache_dir,
-        cache_key(path, settings, autofix),
+        &settings.cli.cache_dir,
+        cache_key(path, &settings.lib, autofix),
         &bincode::serialize(&check_result).unwrap(),
     ) {
         error!("Failed to write to cache: {e:?}");

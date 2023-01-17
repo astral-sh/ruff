@@ -20,15 +20,16 @@
 
 extern crate core;
 
-pub mod ast;
-pub mod autofix;
+mod ast;
+mod autofix;
 pub mod cache;
 mod checkers;
 mod cst;
-pub mod directives;
+mod directives;
 mod doc_lines;
 mod docstrings;
 pub mod fix;
+pub mod flake8_to_ruff;
 pub mod fs;
 mod lex;
 pub mod linter;
@@ -38,16 +39,17 @@ mod noqa;
 mod python;
 pub mod registry;
 pub mod resolver;
-pub mod rules;
-pub mod rustpython_helpers;
+mod rules;
+mod rustpython_helpers;
 pub mod settings;
 pub mod source_code;
 mod vendor;
 mod violation;
-pub mod violations;
+mod violations;
 mod visibility;
 
 use cfg_if::cfg_if;
+pub use violations::IOError;
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {

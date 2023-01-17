@@ -3,8 +3,9 @@
 use std::path::Path;
 
 use anyhow::Result;
-use ruff::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
+
+use crate::settings::types::PythonVersion;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Black {

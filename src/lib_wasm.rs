@@ -18,7 +18,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -123,7 +123,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_errmsg: Some(flake8_errmsg::settings::Settings::default().into()),
         flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
         flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
-        flake8_tidy_imports: Some(flake8_tidy_imports::settings::Settings::default().into()),
+        flake8_tidy_imports: Some(flake8_tidy_imports::Settings::default().into()),
         flake8_import_conventions: Some(
             flake8_import_conventions::settings::Settings::default().into(),
         ),
@@ -157,6 +157,9 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     // Detect the current code style (lazily).
     let stylist = Stylist::from_contents(contents, &locator);
 
+    // Extra indices from the code.
+    let indexer: Indexer = tokens.as_slice().into();
+
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(&tokens, directives::Flags::empty());
 
@@ -168,6 +171,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         &settings,
         flags::Autofix::Enabled,

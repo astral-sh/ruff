@@ -6,10 +6,10 @@ expression: diagnostics
     DoubleNegation: a
   location:
     row: 1
-    column: 12
+    column: 3
   end_location:
     row: 1
-    column: 13
+    column: 14
   fix:
     content: a
     location:
@@ -23,10 +23,10 @@ expression: diagnostics
     DoubleNegation: a == b
   location:
     row: 4
-    column: 13
+    column: 3
   end_location:
     row: 4
-    column: 19
+    column: 21
   fix:
     content: a == b
     location:

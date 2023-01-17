@@ -36,7 +36,7 @@ pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     trailing_comma
 }
 
-/// Return `true` if a `Stmt` is preceded by a "comment break"
+/// Return `true` if a [`Stmt`] is preceded by a "comment break"
 pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     // Starting from the `Stmt` (`def f(): pass`), we want to detect patterns like
     // this:
@@ -63,11 +63,7 @@ pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     //   # Direct comment.
     //   def f(): pass
     let mut seen_blank = false;
-    for line in locator
-        .slice_source_code_until(&stmt.location)
-        .lines()
-        .rev()
-    {
+    for line in locator.slice_source_code_until(stmt.location).lines().rev() {
         let line = line.trim();
         if seen_blank {
             if line.starts_with('#') {
@@ -113,7 +109,7 @@ pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
     let mut splice = match_docstring_end(body).unwrap_or_default();
 
     // Find the first token that isn't a comment or whitespace.
-    let contents = locator.slice_source_code_at(&splice);
+    let contents = locator.slice_source_code_at(splice);
     for (.., tok, end) in lexer::make_tokenizer(&contents).flatten() {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
             splice = end;

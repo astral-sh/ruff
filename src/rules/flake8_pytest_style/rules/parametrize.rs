@@ -31,7 +31,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         return None;
     }
 
-    let mut generator: Generator = checker.style.into();
+    let mut generator: Generator = checker.stylist.into();
     generator.unparse_expr(
         &create_expr(ExprKind::Constant {
             value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
@@ -85,7 +85,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: Generator = checker.style.into();
+                            let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: names
@@ -115,7 +115,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: Generator = checker.style.into();
+                            let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: names
@@ -139,7 +139,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {}
+                    types::ParametrizeNameType::Csv => {}
                 }
             }
         }
@@ -157,7 +157,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: Generator = checker.style.into();
+                            let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: elts.clone(),
@@ -173,7 +173,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {
+                    types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
@@ -206,7 +206,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: Generator = checker.style.into();
+                            let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: elts.clone(),
@@ -222,7 +222,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {
+                    types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
@@ -279,12 +279,12 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     let mut diagnostic = Diagnostic::new(
-        violations::ParametrizeNamesWrongType(types::ParametrizeNameType::CSV),
+        violations::ParametrizeNamesWrongType(types::ParametrizeNameType::Csv),
         Range::from_located(expr),
     );
 
     if checker.patch(diagnostic.kind.code()) {
-        let mut generator: Generator = checker.style.into();
+        let mut generator: Generator = checker.stylist.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
         diagnostic.amend(Fix::replacement(
             generator.generate(),

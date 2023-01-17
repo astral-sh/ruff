@@ -46,7 +46,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
             kind: kind.clone(),
         });
         diagnostic.amend(Fix::replacement(
-            unparse_expr(&new_env_var, checker.style),
+            unparse_expr(&new_env_var, checker.stylist),
             arg.location,
             arg.end_location.unwrap(),
         ));
@@ -85,7 +85,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             kind: kind.clone(),
         });
         diagnostic.amend(Fix::replacement(
-            unparse_expr(&new_env_var, checker.style),
+            unparse_expr(&new_env_var, checker.stylist),
             slice.location,
             slice.end_location.unwrap(),
         ));

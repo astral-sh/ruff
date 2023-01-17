@@ -7,7 +7,7 @@ const INDENT: &str = "    ";
 // Guess a capacity to use for string allocation.
 const CAPACITY: usize = 200;
 
-/// Add a plain import statement to the `RopeBuilder`.
+/// Add a plain import statement to the [`RopeBuilder`].
 pub fn format_import(
     alias: &AliasData,
     comments: &CommentSet,
@@ -39,7 +39,7 @@ pub fn format_import(
     output
 }
 
-/// Add an import-from statement to the `RopeBuilder`.
+/// Add an import-from statement to the [`RopeBuilder`].
 #[allow(clippy::too_many_arguments)]
 pub fn format_import_from(
     import_from: &ImportFromData,

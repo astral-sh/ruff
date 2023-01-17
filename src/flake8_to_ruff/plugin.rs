@@ -3,7 +3,8 @@ use std::fmt;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use ruff::registry::RuleCodePrefix;
+
+use crate::registry::RuleCodePrefix;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
@@ -298,7 +299,7 @@ pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleCodePrefix> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::plugin::{infer_plugins_from_options, Plugin};
+    use super::{infer_plugins_from_options, Plugin};
 
     #[test]
     fn it_infers_plugins() {

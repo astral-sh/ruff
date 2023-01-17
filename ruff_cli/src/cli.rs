@@ -6,7 +6,6 @@ use ruff::fs;
 use ruff::logging::LogLevel;
 use ruff::registry::{RuleCode, RuleCodePrefix};
 use ruff::resolver::ConfigProcessor;
-use ruff::rules::mccabe;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
@@ -138,9 +137,6 @@ pub struct Cli {
     /// formatting.
     #[arg(long)]
     pub line_length: Option<usize>,
-    /// Maximum McCabe complexity allowed for a given function.
-    #[arg(long)]
-    pub max_complexity: Option<usize>,
     /// Enable automatic additions of `noqa` directives to failing lines.
     #[arg(
         long,
@@ -267,7 +263,6 @@ impl Cli {
                 fixable: self.fixable,
                 ignore: self.ignore,
                 line_length: self.line_length,
-                max_complexity: self.max_complexity,
                 per_file_ignores: self.per_file_ignores,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
@@ -333,7 +328,6 @@ pub struct Overrides {
     pub fixable: Option<Vec<RuleCodePrefix>>,
     pub ignore: Option<Vec<RuleCodePrefix>>,
     pub line_length: Option<usize>,
-    pub max_complexity: Option<usize>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleCodePrefix>>,
@@ -383,11 +377,6 @@ impl ConfigProcessor for &Overrides {
         }
         if let Some(line_length) = &self.line_length {
             config.line_length = Some(*line_length);
-        }
-        if let Some(max_complexity) = &self.max_complexity {
-            config.mccabe = Some(mccabe::settings::Options {
-                max_complexity: Some(*max_complexity),
-            });
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));

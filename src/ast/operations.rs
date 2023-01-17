@@ -96,7 +96,7 @@ impl<'a> Visitor<'a> for GlobalVisitor<'a> {
     }
 }
 
-/// Extract a map from global name to its last-defining `Stmt`.
+/// Extract a map from global name to its last-defining [`Stmt`].
 pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
     let mut visitor = GlobalVisitor::default();
     for stmt in body {
@@ -197,12 +197,12 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
 
 pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
 
-/// Extract all `Cmpop` operators from a source code snippet, with appropriate
+/// Extract all [`Cmpop`] operators from a source code snippet, with appropriate
 /// ranges.
 ///
-/// `RustPython` doesn't include line and column information on `Cmpop` nodes.
+/// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
 /// `CPython` doesn't either. This method iterates over the token stream and
-/// re-identifies `Cmpop` nodes, annotating them with valid ranges.
+/// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
     let mut tok_iter = lexer::make_tokenizer(contents).flatten().peekable();
     let mut ops: Vec<LocatedCmpop> = vec![];

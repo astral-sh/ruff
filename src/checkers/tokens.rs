@@ -5,7 +5,9 @@ use rustpython_parser::lexer::{LexResult, Tok};
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, RuleCode};
 use crate::rules::ruff::rules::Context;
-use crate::rules::{eradicate, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff};
+use crate::rules::{
+    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff,
+};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 
@@ -28,6 +30,9 @@ pub fn check_tokens(
     let enforce_invalid_escape_sequence = settings.enabled.contains(&RuleCode::W605);
     let enforce_implicit_string_concatenation = settings.enabled.contains(&RuleCode::ISC001)
         || settings.enabled.contains(&RuleCode::ISC002);
+    let enforce_trailing_comma = settings.enabled.contains(&RuleCode::COM812)
+        || settings.enabled.contains(&RuleCode::COM818)
+        || settings.enabled.contains(&RuleCode::COM819);
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {
@@ -106,6 +111,15 @@ pub fn check_tokens(
     if enforce_implicit_string_concatenation {
         diagnostics.extend(
             flake8_implicit_str_concat::rules::implicit(tokens)
+                .into_iter()
+                .filter(|diagnostic| settings.enabled.contains(diagnostic.kind.code())),
+        );
+    }
+
+    // COM812, COM818, COM819
+    if enforce_trailing_comma {
+        diagnostics.extend(
+            flake8_commas::rules::trailing_commas(tokens, locator)
                 .into_iter()
                 .filter(|diagnostic| settings.enabled.contains(diagnostic.kind.code())),
         );

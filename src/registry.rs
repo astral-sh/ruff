@@ -1,4 +1,4 @@
-//! Registry of `RuleCode` to `DiagnosticKind` mappings.
+//! Registry of [`RuleCode`] to [`DiagnosticKind`] mappings.
 
 use std::fmt;
 
@@ -13,108 +13,9 @@ use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
 use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::violation::Violation;
-use crate::violations;
+use crate::{rules, violations};
 
-macro_rules! define_rule_mapping {
-    ($($code:ident => $mod:ident::$name:ident,)+) => {
-        #[derive(
-            AsRefStr,
-            RuleCodePrefix,
-            EnumIter,
-            EnumString,
-            Debug,
-            Display,
-            PartialEq,
-            Eq,
-            Clone,
-            Serialize,
-            Deserialize,
-            Hash,
-            PartialOrd,
-            Ord,
-        )]
-        pub enum RuleCode {
-            $(
-                $code,
-            )+
-        }
-
-        #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
-        pub enum DiagnosticKind {
-            $(
-                $name($mod::$name),
-            )+
-        }
-
-        impl RuleCode {
-            /// A placeholder representation of the `DiagnosticKind` for the diagnostic.
-            pub fn kind(&self) -> DiagnosticKind {
-                match self {
-                    $(
-                        RuleCode::$code => DiagnosticKind::$name(<$mod::$name as Violation>::placeholder()),
-                    )+
-                }
-            }
-
-            pub fn origin(&self) -> RuleOrigin {
-                match self {
-                    $(
-                        RuleCode::$code => ruff_macros::origin_by_code!($code),
-                    )+
-                }
-            }
-        }
-
-        impl DiagnosticKind {
-            /// A four-letter shorthand code for the diagnostic.
-            pub fn code(&self) -> &'static RuleCode {
-                match self {
-                    $(
-                        DiagnosticKind::$name(..) => &RuleCode::$code,
-                    )+
-                }
-            }
-
-            /// The body text for the diagnostic.
-            pub fn body(&self) -> String {
-                match self {
-                    $(
-                        DiagnosticKind::$name(x) => Violation::message(x),
-                    )+
-                }
-            }
-
-            /// Whether the diagnostic is (potentially) fixable.
-            pub fn fixable(&self) -> bool {
-                match self {
-                    $(
-                        DiagnosticKind::$name(x) => x.autofix_title_formatter().is_some(),
-                    )+
-                }
-            }
-
-            /// The message used to describe the fix action for a given `DiagnosticKind`.
-            pub fn commit(&self) -> Option<String> {
-                match self {
-                    $(
-                        DiagnosticKind::$name(x) => x.autofix_title_formatter().map(|f| f(x)),
-                    )+
-                }
-            }
-        }
-
-        $(
-            impl From<$mod::$name> for DiagnosticKind {
-                fn from(x: $mod::$name) -> Self {
-                    DiagnosticKind::$name(x)
-                }
-            }
-        )+
-
-    };
-}
-
-define_rule_mapping!(
+ruff_macros::define_rule_mapping!(
     // pycodestyle errors
     E401 => violations::MultipleImportsOnOneLine,
     E402 => violations::ModuleImportNotAtTopOfFile,
@@ -251,8 +152,8 @@ define_rule_mapping!(
     // mccabe
     C901 => violations::FunctionIsTooComplex,
     // flake8-tidy-imports
-    TID251 => violations::BannedApi,
-    TID252 => violations::BannedRelativeImport,
+    TID251 => rules::flake8_tidy_imports::banned_api::BannedApi,
+    TID252 => rules::flake8_tidy_imports::relative_imports::RelativeImports,
     // flake8-return
     RET501 => violations::UnnecessaryReturnNone,
     RET502 => violations::ImplicitReturnValue,
@@ -510,7 +411,12 @@ define_rule_mapping!(
     // flake8-pie
     PIE790 => violations::NoUnnecessaryPass,
     PIE794 => violations::DupeClassFieldDefinitions,
+    PIE796 => violations::PreferUniqueEnums,
     PIE807 => violations::PreferListBuiltin,
+    // flake8-commas
+    COM812 => violations::TrailingCommaMissing,
+    COM818 => violations::TrailingCommaOnBareTupleProhibited,
+    COM819 => violations::TrailingCommaProhibited,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -553,6 +459,7 @@ pub enum RuleOrigin {
     PygrepHooks,
     Pylint,
     Flake8Pie,
+    Flake8Commas,
     Ruff,
 }
 
@@ -622,6 +529,7 @@ impl RuleOrigin {
             RuleOrigin::Pylint => "Pylint",
             RuleOrigin::Pyupgrade => "pyupgrade",
             RuleOrigin::Flake8Pie => "flake8-pie",
+            RuleOrigin::Flake8Commas => "flake8-commas",
             RuleOrigin::Ruff => "Ruff-specific rules",
         }
     }
@@ -668,6 +576,7 @@ impl RuleOrigin {
             ]),
             RuleOrigin::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
             RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
+            RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
             RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
         }
     }
@@ -789,19 +698,22 @@ impl RuleOrigin {
                 "https://pypi.org/project/flake8-pie/0.16.0/",
                 &Platform::PyPI,
             )),
+            RuleOrigin::Flake8Commas => Some((
+                "https://pypi.org/project/flake8-commas/2.1.0/",
+                &Platform::PyPI,
+            )),
             RuleOrigin::Ruff => None,
         }
     }
 }
 
-#[allow(clippy::upper_case_acronyms)]
 pub enum LintSource {
-    AST,
-    FileSystem,
+    Ast,
+    Io,
     Lines,
     Tokens,
     Imports,
-    NoQA,
+    NoQa,
 }
 
 impl RuleCode {
@@ -809,7 +721,7 @@ impl RuleCode {
     /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            RuleCode::RUF100 => &LintSource::NoQA,
+            RuleCode::RUF100 => &LintSource::NoQa,
             RuleCode::E501
             | RuleCode::W292
             | RuleCode::W505
@@ -824,12 +736,15 @@ impl RuleCode {
             | RuleCode::Q002
             | RuleCode::Q003
             | RuleCode::W605
+            | RuleCode::COM812
+            | RuleCode::COM818
+            | RuleCode::COM819
             | RuleCode::RUF001
             | RuleCode::RUF002
             | RuleCode::RUF003 => &LintSource::Tokens,
-            RuleCode::E902 => &LintSource::FileSystem,
+            RuleCode::E902 => &LintSource::Io,
             RuleCode::I001 | RuleCode::I002 => &LintSource::Imports,
-            _ => &LintSource::AST,
+            _ => &LintSource::Ast,
         }
     }
 }

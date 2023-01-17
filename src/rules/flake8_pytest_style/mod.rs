@@ -35,7 +35,7 @@ mod tests {
         RuleCode::PT006,
         Path::new("PT006.py"),
         Settings {
-            parametrize_names_type: types::ParametrizeNameType::CSV,
+            parametrize_names_type: types::ParametrizeNameType::Csv,
             ..Settings::default()
         },
         "PT006_csv";

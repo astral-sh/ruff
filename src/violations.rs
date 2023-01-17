@@ -10,7 +10,6 @@ use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
 use crate::rules::flake8_quotes::settings::Quote;
-use crate::rules::flake8_tidy_imports::settings::Strictness;
 use crate::rules::pyupgrade::types::Primitive;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
@@ -1277,7 +1276,7 @@ impl Violation for MagicValueComparison {
     fn message(&self) -> String {
         let MagicValueComparison(value) = self;
         format!(
-            "Magic number used in comparison, consider replacing {value} with a constant variable"
+            "Magic value used in comparison, consider replacing {value} with a constant variable"
         )
     }
 
@@ -1781,8 +1780,8 @@ define_violation!(
 );
 impl Violation for RaiseWithoutFromInsideExcept {
     fn message(&self) -> String {
-        "Within an except clause, raise exceptions with raise ... from err or raise ... from None \
-         to distinguish them from errors in exception handling"
+        "Within an except clause, raise exceptions with `raise ... from err` or `raise ... from \
+         None` to distinguish them from errors in exception handling"
             .to_string()
     }
 
@@ -2166,45 +2165,6 @@ impl Violation for FunctionIsTooComplex {
 
     fn placeholder() -> Self {
         FunctionIsTooComplex("...".to_string(), 10)
-    }
-}
-
-// flake8-tidy-imports
-
-define_violation!(
-    pub struct BannedApi {
-        pub name: String,
-        pub message: String,
-    }
-);
-impl Violation for BannedApi {
-    fn message(&self) -> String {
-        let BannedApi { name, message } = self;
-        format!("`{name}` is banned: {message}")
-    }
-
-    fn placeholder() -> Self {
-        BannedApi {
-            name: "...".to_string(),
-            message: "...".to_string(),
-        }
-    }
-}
-
-define_violation!(
-    pub struct BannedRelativeImport(pub Strictness);
-);
-impl Violation for BannedRelativeImport {
-    fn message(&self) -> String {
-        let BannedRelativeImport(strictness) = self;
-        match strictness {
-            Strictness::Parents => "Relative imports from parent modules are banned".to_string(),
-            Strictness::All => "Relative imports are banned".to_string(),
-        }
-    }
-
-    fn placeholder() -> Self {
-        BannedRelativeImport(Strictness::All)
     }
 }
 
@@ -6031,6 +5991,24 @@ impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
 }
 
 define_violation!(
+    pub struct PreferUniqueEnums {
+        pub value: String,
+    }
+);
+impl Violation for PreferUniqueEnums {
+    fn message(&self) -> String {
+        let PreferUniqueEnums { value } = self;
+        format!("Enum contains duplicate value: `{value}`")
+    }
+
+    fn placeholder() -> Self {
+        PreferUniqueEnums {
+            value: "...".to_string(),
+        }
+    }
+}
+
+define_violation!(
     pub struct PreferListBuiltin;
 );
 impl AlwaysAutofixableViolation for PreferListBuiltin {
@@ -6047,14 +6025,69 @@ impl AlwaysAutofixableViolation for PreferListBuiltin {
     }
 }
 
+// flake8-commas
+
+define_violation!(
+    pub struct TrailingCommaMissing;
+);
+impl AlwaysAutofixableViolation for TrailingCommaMissing {
+    fn message(&self) -> String {
+        "Trailing comma missing".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add trailing comma".to_string()
+    }
+
+    fn placeholder() -> Self {
+        TrailingCommaMissing
+    }
+}
+
+define_violation!(
+    pub struct TrailingCommaOnBareTupleProhibited;
+);
+impl Violation for TrailingCommaOnBareTupleProhibited {
+    fn message(&self) -> String {
+        "Trailing comma on bare tuple prohibited".to_string()
+    }
+
+    fn placeholder() -> Self {
+        TrailingCommaOnBareTupleProhibited
+    }
+}
+
+define_violation!(
+    pub struct TrailingCommaProhibited;
+);
+impl AlwaysAutofixableViolation for TrailingCommaProhibited {
+    fn message(&self) -> String {
+        "Trailing comma prohibited".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove trailing comma".to_string()
+    }
+
+    fn placeholder() -> Self {
+        TrailingCommaProhibited
+    }
+}
+
 // Ruff
 
 define_violation!(
-    pub struct AmbiguousUnicodeCharacterString(pub char, pub char);
+    pub struct AmbiguousUnicodeCharacterString {
+        pub confusable: char,
+        pub representant: char,
+    }
 );
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterString(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterString {
+            confusable,
+            representant,
+        } = self;
         format!(
             "String contains ambiguous unicode character '{confusable}' (did you mean \
              '{representant}'?)"
@@ -6062,21 +6095,33 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
     }
 
     fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterString(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterString {
+            confusable,
+            representant,
+        } = self;
         format!("Replace '{confusable}' with '{representant}'")
     }
 
     fn placeholder() -> Self {
-        AmbiguousUnicodeCharacterString('𝐁', 'B')
+        AmbiguousUnicodeCharacterString {
+            confusable: '𝐁',
+            representant: 'B',
+        }
     }
 }
 
 define_violation!(
-    pub struct AmbiguousUnicodeCharacterDocstring(pub char, pub char);
+    pub struct AmbiguousUnicodeCharacterDocstring {
+        pub confusable: char,
+        pub representant: char,
+    }
 );
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterDocstring(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterDocstring {
+            confusable,
+            representant,
+        } = self;
         format!(
             "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
              '{representant}'?)"
@@ -6084,21 +6129,33 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
     }
 
     fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterDocstring(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterDocstring {
+            confusable,
+            representant,
+        } = self;
         format!("Replace '{confusable}' with '{representant}'")
     }
 
     fn placeholder() -> Self {
-        AmbiguousUnicodeCharacterDocstring('𝐁', 'B')
+        AmbiguousUnicodeCharacterDocstring {
+            confusable: '𝐁',
+            representant: 'B',
+        }
     }
 }
 
 define_violation!(
-    pub struct AmbiguousUnicodeCharacterComment(pub char, pub char);
+    pub struct AmbiguousUnicodeCharacterComment {
+        pub confusable: char,
+        pub representant: char,
+    }
 );
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterComment(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterComment {
+            confusable,
+            representant,
+        } = self;
         format!(
             "Comment contains ambiguous unicode character '{confusable}' (did you mean \
              '{representant}'?)"
@@ -6106,12 +6163,18 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
     }
 
     fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterComment(confusable, representant) = self;
+        let AmbiguousUnicodeCharacterComment {
+            confusable,
+            representant,
+        } = self;
         format!("Replace '{confusable}' with '{representant}'")
     }
 
     fn placeholder() -> Self {
-        AmbiguousUnicodeCharacterComment('𝐁', 'B')
+        AmbiguousUnicodeCharacterComment {
+            confusable: '𝐁',
+            representant: 'B',
+        }
     }
 }
 
