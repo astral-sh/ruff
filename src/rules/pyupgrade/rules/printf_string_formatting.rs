@@ -504,7 +504,6 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     }
 
     let parsed = parse_percent_format(left_string);
-    // Rust does not have a for else statement so we have to do this
     let is_valid = check_statement(parsed, right);
     // If the statement is not valid, then bail
     if !is_valid {
