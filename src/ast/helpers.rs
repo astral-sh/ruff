@@ -145,12 +145,13 @@ pub fn contains_effect(checker: &Checker, expr: &Expr) -> bool {
         // Otherwise, avoid all complex expressions.
         matches!(
             expr.node,
-            ExprKind::Call { .. }
-                | ExprKind::Await { .. }
+            ExprKind::Await { .. }
+                | ExprKind::Call { .. }
+                | ExprKind::DictComp { .. }
                 | ExprKind::GeneratorExp { .. }
                 | ExprKind::ListComp { .. }
                 | ExprKind::SetComp { .. }
-                | ExprKind::DictComp { .. }
+                | ExprKind::Subscript { .. }
                 | ExprKind::Yield { .. }
                 | ExprKind::YieldFrom { .. }
         )
