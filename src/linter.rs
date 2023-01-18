@@ -63,6 +63,15 @@ pub fn check_path(
         diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
     }
 
+    // Run the filesystem-based rules.
+    if settings
+        .rules
+        .iter_enabled()
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem))
+    {
+        diagnostics.extend(check_file_path(path, settings));
+    }
+
     // Run the AST-based rules.
     let use_ast = settings
         .rules
@@ -73,15 +82,6 @@ pub fn check_path(
             .rules
             .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
-    let use_filesystem = settings
-        .rules
-        .iter_enabled()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem));
-
-    if use_filesystem {
-        diagnostics.extend(check_file_path(path, settings));
-    }
-
     if use_ast || use_imports || use_doc_lines {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
