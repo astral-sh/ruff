@@ -29,7 +29,7 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
             for item in items {
                 if let ExprKind::Call { func, .. } = &item.context_expr.node {
                     if checker.resolve_call_path(func).map_or(false, |call_path| {
-                        call_path == ["contextlib", "AsyncExitStack"]
+                        call_path.as_slice() == ["contextlib", "AsyncExitStack"]
                     }) {
                         return true;
                     }
@@ -59,10 +59,9 @@ fn match_exit_stack(checker: &Checker) -> bool {
         if let StmtKind::With { items, .. } = &parent.node {
             for item in items {
                 if let ExprKind::Call { func, .. } = &item.context_expr.node {
-                    if checker
-                        .resolve_call_path(func)
-                        .map_or(false, |call_path| call_path == ["contextlib", "ExitStack"])
-                    {
+                    if checker.resolve_call_path(func).map_or(false, |call_path| {
+                        call_path.as_slice() == ["contextlib", "ExitStack"]
+                    }) {
                         return true;
                     }
                 }
@@ -76,7 +75,7 @@ fn match_exit_stack(checker: &Checker) -> bool {
 pub fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     if checker
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path == ["", "open"])
+        .map_or(false, |call_path| call_path.as_slice() == ["", "open"])
     {
         if checker.is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`

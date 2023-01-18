@@ -15,11 +15,13 @@ fn is_abc_class(checker: &Checker, bases: &[Expr], keywords: &[Keyword]) -> bool
             .map_or(false, |arg| arg == "metaclass")
             && checker
                 .resolve_call_path(&keyword.node.value)
-                .map_or(false, |call_path| call_path == ["abc", "ABCMeta"])
+                .map_or(false, |call_path| {
+                    call_path.as_slice() == ["abc", "ABCMeta"]
+                })
     }) || bases.iter().any(|base| {
         checker
             .resolve_call_path(base)
-            .map_or(false, |call_path| call_path == ["abc", "ABC"])
+            .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
     })
 }
 

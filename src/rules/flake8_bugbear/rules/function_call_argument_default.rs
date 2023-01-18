@@ -2,7 +2,7 @@ use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
 use super::mutable_argument_default::is_mutable_func;
 use crate::ast::helpers::{compose_call_path, to_call_path};
-use crate::ast::types::Range;
+use crate::ast::types::{CallPath, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
@@ -19,9 +19,11 @@ const IMMUTABLE_FUNCS: &[&[&str]] = &[
     &["re", "compile"],
 ];
 
-fn is_immutable_func(checker: &Checker, expr: &Expr, extend_immutable_calls: &[Vec<&str>]) -> bool {
+fn is_immutable_func(checker: &Checker, expr: &Expr, extend_immutable_calls: &[CallPath]) -> bool {
     checker.resolve_call_path(expr).map_or(false, |call_path| {
-        IMMUTABLE_FUNCS.iter().any(|target| call_path == *target)
+        IMMUTABLE_FUNCS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
             || extend_immutable_calls
                 .iter()
                 .any(|target| call_path == *target)
@@ -31,7 +33,7 @@ fn is_immutable_func(checker: &Checker, expr: &Expr, extend_immutable_calls: &[V
 struct ArgumentDefaultVisitor<'a> {
     checker: &'a Checker<'a>,
     diagnostics: Vec<(DiagnosticKind, Range)>,
-    extend_immutable_calls: Vec<Vec<&'a str>>,
+    extend_immutable_calls: Vec<CallPath<'a>>,
 }
 
 impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor<'b>
@@ -84,7 +86,7 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
 /// B008
 pub fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Map immutable calls to (module, member) format.
-    let extend_immutable_calls: Vec<Vec<&str>> = checker
+    let extend_immutable_calls: Vec<CallPath> = checker
         .settings
         .flake8_bugbear
         .extend_immutable_calls

@@ -120,7 +120,7 @@ where
     if !bases.iter().any(|expr| {
         checker
             .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path == ["enum", "Enum"])
+            .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
     }) {
         return;
     }
@@ -134,7 +134,7 @@ where
         if let ExprKind::Call { func, .. } = &value.node {
             if checker
                 .resolve_call_path(func)
-                .map_or(false, |call_path| call_path == ["enum", "auto"])
+                .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
             {
                 continue;
             }

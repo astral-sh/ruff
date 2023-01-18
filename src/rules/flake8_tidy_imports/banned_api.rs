@@ -3,7 +3,7 @@ use rustpython_ast::{Alias, Expr, Located};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::Range;
+use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
@@ -88,7 +88,7 @@ pub fn name_or_parent_is_banned<T>(
 pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
     if let Some(call_path) = checker.resolve_call_path(expr) {
         for (banned_path, ban) in checker.settings.flake8_tidy_imports.banned_api.iter() {
-            if call_path == banned_path.split('.').collect::<Vec<_>>() {
+            if call_path == banned_path.split('.').collect::<CallPath>() {
                 checker.diagnostics.push(Diagnostic::new(
                     BannedApi {
                         name: banned_path.to_string(),

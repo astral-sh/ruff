@@ -27,7 +27,7 @@ pub fn is_namedtuple_assignment(checker: &Checker, stmt: &Stmt) -> bool {
         return false;
     };
     checker.resolve_call_path(value).map_or(false, |call_path| {
-        call_path == ["collections", "namedtuple"]
+        call_path.as_slice() == ["collections", "namedtuple"]
     })
 }
 

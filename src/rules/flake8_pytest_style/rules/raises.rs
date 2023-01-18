@@ -8,9 +8,9 @@ use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
 fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
-    checker
-        .resolve_call_path(func)
-        .map_or(false, |call_path| call_path == ["pytest", "raises"])
+    checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["pytest", "raises"]
+    })
 }
 
 fn is_non_trivial_with_body(body: &[Stmt]) -> bool {

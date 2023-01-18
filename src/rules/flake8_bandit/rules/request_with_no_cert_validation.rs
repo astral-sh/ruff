@@ -32,7 +32,7 @@ pub fn request_with_no_cert_validation(
     if let Some(call_path) = checker.resolve_call_path(func) {
         let call_args = SimpleCallArgs::new(args, keywords);
         for func_name in &REQUESTS_HTTP_VERBS {
-            if call_path == ["requests", func_name] {
+            if call_path.as_slice() == ["requests", func_name] {
                 if let Some(verify_arg) = call_args.get_argument("verify", None) {
                     if let ExprKind::Constant {
                         value: Constant::Bool(false),
@@ -49,7 +49,7 @@ pub fn request_with_no_cert_validation(
             }
         }
         for func_name in &HTTPX_METHODS {
-            if call_path == ["httpx", func_name] {
+            if call_path.as_slice() == ["httpx", func_name] {
                 if let Some(verify_arg) = call_args.get_argument("verify", None) {
                     if let ExprKind::Constant {
                         value: Constant::Bool(false),

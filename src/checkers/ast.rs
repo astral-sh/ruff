@@ -13,12 +13,16 @@ use rustpython_parser::ast::{
     KeywordData, Operator, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
+use smallvec::{smallvec, SmallVec};
 
-use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
+use crate::ast::helpers::{
+    binding_range, collect_call_path, collect_small_path, extract_handler_names,
+};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingKind, ClassDef, FunctionDef, Lambda, Node, Range, RefEquality, Scope, ScopeKind,
+    Binding, BindingKind, CallPath, ClassDef, FunctionDef, Lambda, Node, Range, RefEquality, Scope,
+    ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
@@ -170,21 +174,21 @@ impl<'a> Checker<'a> {
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
-    pub fn match_typing_call_path(&self, call_path: &[&str], target: &str) -> bool {
-        if call_path == ["typing", target] {
+    pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
+        if call_path.as_slice() == ["typing", target] {
             return true;
         }
 
         if typing::TYPING_EXTENSIONS.contains(target) {
-            if call_path == ["typing_extensions", target] {
+            if call_path.as_slice() == ["typing_extensions", target] {
                 return true;
             }
         }
 
         if self.settings.typing_modules.iter().any(|module| {
-            let mut module = module.split('.').collect::<Vec<_>>();
+            let mut module: CallPath = module.split('.').collect();
             module.push(target);
-            call_path == module.as_slice()
+            *call_path == module
         }) {
             return true;
         }
@@ -206,11 +210,11 @@ impl<'a> Checker<'a> {
         })
     }
 
-    pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<Vec<&'a str>>
+    pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
     where
         'b: 'a,
     {
-        let call_path = collect_call_path(value);
+        let call_path = collect_small_path(value);
         if let Some(head) = call_path.first() {
             if let Some(binding) = self.find_binding(head) {
                 match &binding.kind {
@@ -219,8 +223,8 @@ impl<'a> Checker<'a> {
                         if name.starts_with('.') {
                             return None;
                         }
-                        let mut source_path: Vec<&str> = name.split('.').collect();
-                        source_path.extend(call_path.iter().skip(1));
+                        let mut source_path: CallPath = name.split('.').collect();
+                        source_path.extend(call_path.into_iter().skip(1));
                         return Some(source_path);
                     }
                     BindingKind::SubmoduleImportation(name, ..) => {
@@ -228,8 +232,8 @@ impl<'a> Checker<'a> {
                         if name.starts_with('.') {
                             return None;
                         }
-                        let mut source_path: Vec<&str> = name.split('.').collect();
-                        source_path.extend(call_path.iter().skip(1));
+                        let mut source_path: CallPath = name.split('.').collect();
+                        source_path.extend(call_path.into_iter().skip(1));
                         return Some(source_path);
                     }
                     BindingKind::FromImportation(.., name) => {
@@ -237,12 +241,12 @@ impl<'a> Checker<'a> {
                         if name.starts_with('.') {
                             return None;
                         }
-                        let mut source_path: Vec<&str> = name.split('.').collect();
-                        source_path.extend(call_path.iter().skip(1));
+                        let mut source_path: CallPath = name.split('.').collect();
+                        source_path.extend(call_path.into_iter().skip(1));
                         return Some(source_path);
                     }
                     BindingKind::Builtin => {
-                        let mut source_path: Vec<&str> = Vec::with_capacity(call_path.len() + 1);
+                        let mut source_path: CallPath = smallvec![];
                         source_path.push("");
                         source_path.extend(call_path);
                         return Some(source_path);
@@ -2712,151 +2716,144 @@ where
                 args,
                 keywords,
             } => {
-                let call_path = self.resolve_call_path(func);
-                if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "ForwardRef")
-                }) {
-                    self.visit_expr(func);
-                    for expr in args {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "cast")
-                }) {
-                    self.visit_expr(func);
-                    if !args.is_empty() {
-                        self.in_type_definition = true;
-                        self.visit_expr(&args[0]);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                    for expr in args.iter().skip(1) {
-                        self.visit_expr(expr);
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "NewType")
-                }) {
-                    self.visit_expr(func);
-                    for expr in args.iter().skip(1) {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "TypeVar")
-                }) {
-                    self.visit_expr(func);
-                    for expr in args.iter().skip(1) {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                    for keyword in keywords {
-                        let KeywordData { arg, value } = &keyword.node;
-                        if let Some(id) = arg {
-                            if id == "bound" {
-                                self.in_type_definition = true;
-                                self.visit_expr(value);
-                                self.in_type_definition = prev_in_type_definition;
-                            } else {
-                                self.in_type_definition = false;
-                                self.visit_expr(value);
-                                self.in_type_definition = prev_in_type_definition;
-                            }
+                if let Some(call_path) = self.resolve_call_path(func) {
+                    let call_path = call_path.to_vec();
+                    if self.match_typing_call_path(&call_path, "ForwardRef") {
+                        self.visit_expr(func);
+                        for expr in args {
+                            self.in_type_definition = true;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
                         }
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "NamedTuple")
-                }) {
-                    self.visit_expr(func);
-
-                    // Ex) NamedTuple("a", [("a", int)])
-                    if args.len() > 1 {
-                        match &args[1].node {
-                            ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
-                                for elt in elts {
-                                    match &elt.node {
-                                        ExprKind::List { elts, .. }
-                                        | ExprKind::Tuple { elts, .. } => {
-                                            if elts.len() == 2 {
-                                                self.in_type_definition = false;
-                                                self.visit_expr(&elts[0]);
-                                                self.in_type_definition = prev_in_type_definition;
-
-                                                self.in_type_definition = true;
-                                                self.visit_expr(&elts[1]);
-                                                self.in_type_definition = prev_in_type_definition;
-                                            }
-                                        }
-                                        _ => {}
-                                    }
+                    } else if self.match_typing_call_path(&call_path, "cast") {
+                        self.visit_expr(func);
+                        if !args.is_empty() {
+                            self.in_type_definition = true;
+                            self.visit_expr(&args[0]);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                        for expr in args.iter().skip(1) {
+                            self.visit_expr(expr);
+                        }
+                    } else if self.match_typing_call_path(&call_path, "NewType") {
+                        self.visit_expr(func);
+                        for expr in args.iter().skip(1) {
+                            self.in_type_definition = true;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                    } else if self.match_typing_call_path(&call_path, "TypeVar") {
+                        self.visit_expr(func);
+                        for expr in args.iter().skip(1) {
+                            self.in_type_definition = true;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                        for keyword in keywords {
+                            let KeywordData { arg, value } = &keyword.node;
+                            if let Some(id) = arg {
+                                if id == "bound" {
+                                    self.in_type_definition = true;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
+                                } else {
+                                    self.in_type_definition = false;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
                                 }
                             }
-                            _ => {}
                         }
-                    }
+                    } else if self.match_typing_call_path(&call_path, "NamedTuple") {
+                        self.visit_expr(func);
 
-                    // Ex) NamedTuple("a", a=int)
-                    for keyword in keywords {
-                        let KeywordData { value, .. } = &keyword.node;
-                        self.in_type_definition = true;
-                        self.visit_expr(value);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "TypedDict")
-                }) {
-                    self.visit_expr(func);
+                        // Ex) NamedTuple("a", [("a", int)])
+                        if args.len() > 1 {
+                            match &args[1].node {
+                                ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
+                                    for elt in elts {
+                                        match &elt.node {
+                                            ExprKind::List { elts, .. }
+                                            | ExprKind::Tuple { elts, .. } => {
+                                                if elts.len() == 2 {
+                                                    self.in_type_definition = false;
+                                                    self.visit_expr(&elts[0]);
+                                                    self.in_type_definition =
+                                                        prev_in_type_definition;
 
-                    // Ex) TypedDict("a", {"a": int})
-                    if args.len() > 1 {
-                        if let ExprKind::Dict { keys, values } = &args[1].node {
-                            for key in keys {
-                                self.in_type_definition = false;
-                                self.visit_expr(key);
-                                self.in_type_definition = prev_in_type_definition;
-                            }
-                            for value in values {
-                                self.in_type_definition = true;
-                                self.visit_expr(value);
-                                self.in_type_definition = prev_in_type_definition;
+                                                    self.in_type_definition = true;
+                                                    self.visit_expr(&elts[1]);
+                                                    self.in_type_definition =
+                                                        prev_in_type_definition;
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
-                    }
 
-                    // Ex) TypedDict("a", a=int)
-                    for keyword in keywords {
-                        let KeywordData { value, .. } = &keyword.node;
-                        self.in_type_definition = true;
-                        self.visit_expr(value);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
+                        // Ex) NamedTuple("a", a=int)
+                        for keyword in keywords {
+                            let KeywordData { value, .. } = &keyword.node;
+                            self.in_type_definition = true;
+                            self.visit_expr(value);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                    } else if self.match_typing_call_path(&call_path, "TypedDict") {
+                        self.visit_expr(func);
+
+                        // Ex) TypedDict("a", {"a": int})
+                        if args.len() > 1 {
+                            if let ExprKind::Dict { keys, values } = &args[1].node {
+                                for key in keys {
+                                    self.in_type_definition = false;
+                                    self.visit_expr(key);
+                                    self.in_type_definition = prev_in_type_definition;
+                                }
+                                for value in values {
+                                    self.in_type_definition = true;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
+                                }
+                            }
+                        }
+
+                        // Ex) TypedDict("a", a=int)
+                        for keyword in keywords {
+                            let KeywordData { value, .. } = &keyword.node;
+                            self.in_type_definition = true;
+                            self.visit_expr(value);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                    } else if ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
                         .iter()
-                        .any(|target| *call_path == ["mypy_extensions", target])
-                }) {
-                    self.visit_expr(func);
+                        .any(|target| call_path.as_slice() == ["mypy_extensions", target])
+                    {
+                        self.visit_expr(func);
 
-                    // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
-                    let mut arguments = args.iter().chain(keywords.iter().map(|keyword| {
-                        let KeywordData { value, .. } = &keyword.node;
-                        value
-                    }));
-                    if let Some(expr) = arguments.next() {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                    for expr in arguments {
-                        self.in_type_definition = false;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
+                        // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
+                        let mut arguments = args.iter().chain(keywords.iter().map(|keyword| {
+                            let KeywordData { value, .. } = &keyword.node;
+                            value
+                        }));
+                        if let Some(expr) = arguments.next() {
+                            self.in_type_definition = true;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                        for expr in arguments {
+                            self.in_type_definition = false;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                    } else {
+                        visitor::walk_expr(self, expr);
                     }
                 } else {
                     visitor::walk_expr(self, expr);
-                }
+                };
             }
             ExprKind::Subscript { value, slice, ctx } => {
                 // Only allow annotations in `ExprContext::Load`. If we have, e.g.,

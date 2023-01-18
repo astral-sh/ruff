@@ -28,7 +28,10 @@ const DEBUGGERS: &[&[&str]] = &[
 /// Checks for the presence of a debugger call.
 pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let Some(call_path) = checker.resolve_call_path(func) {
-        if DEBUGGERS.iter().any(|target| call_path == *target) {
+        if DEBUGGERS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
+        {
             checker.diagnostics.push(Diagnostic::new(
                 violations::Debugger(DebuggerUsingType::Call(format_call_path(&call_path))),
                 Range::from_located(expr),

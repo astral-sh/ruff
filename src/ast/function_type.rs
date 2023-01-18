@@ -33,7 +33,7 @@ pub fn classify(
             checker.resolve_call_path(expr).map_or(false, |call_path| {
                 METACLASS_BASES
                     .iter()
-                    .any(|(module, member)| call_path == [*module, *member])
+                    .any(|(module, member)| call_path.as_slice() == [*module, *member])
             })
         })
         || decorator_list.iter().any(|expr| {

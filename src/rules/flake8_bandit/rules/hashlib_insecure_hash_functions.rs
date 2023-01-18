@@ -30,7 +30,7 @@ pub fn hashlib_insecure_hash_functions(
     keywords: &[Keyword],
 ) {
     if let Some(call_path) = checker.resolve_call_path(func) {
-        if call_path == ["hashlib", "new"] {
+        if call_path.as_slice() == ["hashlib", "new"] {
             let call_args = SimpleCallArgs::new(args, keywords);
 
             if !is_used_for_security(&call_args) {
@@ -49,7 +49,7 @@ pub fn hashlib_insecure_hash_functions(
             }
         } else {
             for func_name in &WEAK_HASHES {
-                if call_path == ["hashlib", func_name] {
+                if call_path.as_slice() == ["hashlib", func_name] {
                     let call_args = SimpleCallArgs::new(args, keywords);
 
                     if !is_used_for_security(&call_args) {

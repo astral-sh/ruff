@@ -1946,6 +1946,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "shellexpand",
+ "smallvec",
  "strum",
  "strum_macros",
  "test-case",

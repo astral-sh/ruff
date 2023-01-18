@@ -1,5 +1,6 @@
 use log::error;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use smallvec::smallvec;
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
@@ -174,13 +175,13 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(checker, test, &["sys", "version_info"]) {
+    if contains_call_path(checker, test, smallvec!["sys", "version_info"]) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(checker, test, &["sys", "platform"]) {
+    if contains_call_path(checker, test, smallvec!["sys", "platform"]) {
         return;
     }
 
