@@ -2994,6 +2994,24 @@ combine-as-imports = true
 
 ---
 
+#### [`constants`](#constants)
+
+An override list of tokens to always recognize as a CONSTANT
+for `order-by-type` regardless of casing.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+constants = ["constant"]
+```
+
+---
+
 #### [`extra-standard-library`](#extra-standard-library)
 
 A list of modules to consider standard-library, in addition to those
@@ -3209,6 +3227,24 @@ See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/confi
 ```toml
 [tool.ruff.isort]
 split-on-trailing-comma = false
+```
+
+---
+
+#### [`variables`](#variables)
+
+An override list of tokens to always recognize as a var
+for `order-by-type` regardless of casing.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+variables = ["VAR"]
 ```
 
 ---
