@@ -3,7 +3,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
 
 use crate::ast::helpers;
-use crate::ast::types::Range;
+use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
@@ -25,9 +25,9 @@ fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
-) -> FxHashMap<Vec<&'a str>, &'a Expr> {
-    let mut seen: FxHashMap<Vec<&str>, &Expr> = FxHashMap::default();
-    let mut duplicates: FxHashSet<Vec<&str>> = FxHashSet::default();
+) -> FxHashMap<CallPath<'a>, &'a Expr> {
+    let mut seen: FxHashMap<CallPath, &Expr> = FxHashMap::default();
+    let mut duplicates: FxHashSet<CallPath> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
         let call_path = helpers::collect_call_path(type_);
@@ -75,8 +75,8 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
-    let mut seen: FxHashSet<Vec<&str>> = FxHashSet::default();
-    let mut duplicates: FxHashMap<Vec<&str>, Vec<&Expr>> = FxHashMap::default();
+    let mut seen: FxHashSet<CallPath> = FxHashSet::default();
+    let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
         let ExcepthandlerKind::ExceptHandler { type_: Some(type_), .. } = &handler.node else {
             continue;

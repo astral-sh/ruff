@@ -15,7 +15,7 @@ use rustpython_parser::ast::{
 use rustpython_parser::parser;
 use smallvec::smallvec;
 
-use crate::ast::helpers::{binding_range, collect_small_path, extract_handler_names};
+use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -212,7 +212,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let call_path = collect_small_path(value);
+        let call_path = collect_call_path(value);
         if let Some(head) = call_path.first() {
             if let Some(binding) = self.find_binding(head) {
                 match &binding.kind {
@@ -1591,7 +1591,12 @@ where
                 orelse,
                 finalbody,
             } => {
-                self.except_handlers.push(extract_handler_names(handlers));
+                // TODO(charlie): The use of `smallvec` here leads to a lifetime issue.
+                let handler_names = extract_handler_names(handlers)
+                    .into_iter()
+                    .map(|call_path| call_path.to_vec())
+                    .collect();
+                self.except_handlers.push(handler_names);
                 if self.settings.rules.enabled(&RuleCode::B012) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
@@ -3498,7 +3503,7 @@ impl<'a> Checker<'a> {
                 if let Some(handler_names) = self.except_handlers.last() {
                     if handler_names
                         .iter()
-                        .any(|call_path| call_path.len() == 1 && call_path[0] == "NameError")
+                        .any(|call_path| call_path.as_slice() == ["NameError"])
                     {
                         return;
                     }

@@ -40,7 +40,7 @@ pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
     generator.generate()
 }
 
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
+fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) {
     match &expr.node {
         ExprKind::Call { func, .. } => {
             collect_call_path_inner(func, parts);
@@ -56,33 +56,10 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
     }
 }
 
-/// Convert an `Expr` to its call path segments (like ["typing", "List"]).
-pub fn collect_call_path(expr: &Expr) -> Vec<&str> {
-    let mut segments = vec![];
-    collect_call_path_inner(expr, &mut segments);
-    segments
-}
-
-fn collect_small_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) {
-    match &expr.node {
-        ExprKind::Call { func, .. } => {
-            collect_small_path_inner(func, parts);
-        }
-        ExprKind::Attribute { value, attr, .. } => {
-            collect_small_path_inner(value, parts);
-            parts.push(attr);
-        }
-        ExprKind::Name { id, .. } => {
-            parts.push(id);
-        }
-        _ => {}
-    }
-}
-
-/// Convert an `Expr` to its call path segments (like ["typing", "List"]).
-pub fn collect_small_path(expr: &Expr) -> CallPath {
+/// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
+pub fn collect_call_path(expr: &Expr) -> CallPath {
     let mut segments = smallvec![];
-    collect_small_path_inner(expr, &mut segments);
+    collect_call_path_inner(expr, &mut segments);
     segments
 }
 
@@ -338,7 +315,9 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
 }
 
 /// Extract the names of all handled exceptions.
-pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<Vec<&str>> {
+pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<CallPath> {
+    // TODO(charlie): Use `resolve_call_path` to avoid false positives for
+    // overridden builtins.
     let mut handler_names = vec![];
     for handler in handlers {
         match &handler.node {
