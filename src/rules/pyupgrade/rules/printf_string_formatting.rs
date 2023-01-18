@@ -1,5 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustpython_common::cformat::{CFormatPart, CFormatStrOrBytes, CFormatString, CFormatQuantity};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -9,6 +10,7 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyupgrade::helpers::{curly_escape, is_keyword};
 use crate::violations;
+use std::str::FromStr;
 
 static MAPPING_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\(([^()]*)\)").unwrap());
 static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").unwrap());
@@ -79,10 +81,57 @@ fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let mut formats: Vec<PercentFormat> = vec![];
 
-    /*
-    let Ok(format_string) = CFormatString::from_str(&string[1..string.len() - 1]) else {
-        return;
+    let Ok(format_string) = CFormatString::from_str(&string) else {
+        return formats;
     };
+    let format_vec: Vec<&CFormatPart<String>> =
+        format_string.iter().map(|(_, part)| part).collect();
+    for (i, part) in format_vec.iter().enumerate() {
+        if let CFormatPart::Literal(item) = &part {
+            println!("{:?}", item);
+            let mut current_format = PercentFormat::new(item.to_string(), None);
+            let the_next = match format_vec.get(i + 1) {
+                Some(next) => next,
+                None => {
+                    formats.push(current_format);
+                    continue;
+                }
+            };
+            if let CFormatPart::Spec(c_spec) = &the_next {
+                let clean_width = match &c_spec.min_field_width {
+                    Some(width_item) => match width_item {
+                        CFormatQuantity::Amount(amount) => Some(amount.to_string()),
+                        // FOR REVIEWER: Not sure if below is the correct way to handle
+                        // FromValuesTuple
+                        CFormatQuantity::FromValuesTuple =>  None
+                    }
+                    None => None
+                };
+                let clean_precision = match &c_spec.precision {
+                    Some(width_item) => match width_item {
+                        CFormatQuantity::Amount(amount) => Some(format!(".{amount}")),
+                        // FOR REVIEWER: Not sure if below is the correct way to handle
+                        // FromValuesTuple
+                        CFormatQuantity::FromValuesTuple =>  None
+                    }
+                    None => None
+                };
+                // Charlie, I have no clue how to get this to a string
+                println!("conversion_flag: {:?}", c_spec.flags);
+                let perc_part = PercentFormatPart::new(
+                    c_spec.mapping_key.clone(),
+                    None,
+                    clean_width,
+                    clean_precision,
+                    c_spec.format_char.to_string(),
+                );
+                current_format.parts = Some(perc_part);
+            }
+            formats.push(current_format);
+        }
+    }
+
+    /*
     let mut string_start = 0;
     let mut string_end = 0;
     let mut in_fmt = false;
