@@ -762,6 +762,16 @@
       },
       "additionalProperties": false
     },
+    "ImportType": {
+      "type": "string",
+      "enum": [
+        "future",
+        "standard-library",
+        "third-party",
+        "first-party",
+        "local-folder"
+      ]
+    },
     "IsortOptions": {
       "type": "object",
       "properties": {
@@ -841,6 +851,16 @@
           ],
           "items": {
             "type": "string"
+          }
+        },
+        "no-lines-before": {
+          "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ImportType"
           }
         },
         "order-by-type": {

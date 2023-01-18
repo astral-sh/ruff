@@ -575,6 +575,7 @@ pub fn format_imports(
     classes: &BTreeSet<String>,
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
+    no_lines_before: &BTreeSet<ImportType>,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -596,7 +597,7 @@ pub fn format_imports(
 
     // Generate replacement source code.
     let mut is_first_block = true;
-    for import_block in block_by_type.into_values() {
+    for (import_type, import_block) in block_by_type {
         let mut imports = order_imports(
             import_block,
             order_by_type,
@@ -628,7 +629,7 @@ pub fn format_imports(
         // Add a blank line between every section.
         if is_first_block {
             is_first_block = false;
-        } else {
+        } else if !no_lines_before.contains(&import_type) {
             output.append(stylist.line_ending());
         }
 
@@ -680,6 +681,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use super::categorize::ImportType;
     use super::settings::RelatveImportsOrder;
     use crate::linter::test_path;
     use crate::registry::RuleCode;
@@ -726,6 +728,7 @@ mod tests {
     #[test_case(Path::new("order_by_type_with_custom_classes.py"))]
     #[test_case(Path::new("order_by_type_with_custom_constants.py"))]
     #[test_case(Path::new("order_by_type_with_custom_variables.py"))]
+    #[test_case(Path::new("no_lines_before.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -1070,6 +1073,33 @@ mod tests {
                 ..Settings::for_rule(RuleCode::I001)
             },
         )?;
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_lines_before.py"))]
+    fn no_lines_before(path: &Path) -> Result<()> {
+        let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
+        let mut diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    no_lines_before: BTreeSet::from([
+                        ImportType::Future,
+                        ImportType::StandardLibrary,
+                        ImportType::ThirdParty,
+                        ImportType::FirstParty,
+                        ImportType::LocalFolder,
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(RuleCode::I001)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
