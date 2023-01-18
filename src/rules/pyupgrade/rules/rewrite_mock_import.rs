@@ -227,7 +227,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
                 let content = if checker.patch(&RuleCode::UP026) {
-                    let indent = indentation(checker, stmt);
+                    let indent = indentation(&checker.locator, stmt);
                     match format_import(stmt, &indent, checker.locator, checker.stylist) {
                         Ok(content) => Some(content),
                         Err(e) => {
@@ -273,7 +273,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     Range::from_located(stmt),
                 );
                 if checker.patch(&RuleCode::UP026) {
-                    let indent = indentation(checker, stmt);
+                    let indent = indentation(&checker.locator, stmt);
                     match format_import_from(stmt, &indent, checker.locator, checker.stylist) {
                         Ok(content) => {
                             diagnostic.amend(Fix::replacement(
