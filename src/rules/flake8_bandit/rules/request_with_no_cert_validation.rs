@@ -29,6 +29,11 @@ pub fn request_with_no_cert_validation(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
+    if let Some(target) = checker.resolve_call_path(func).and_then(|call_path| {
+        REQUESTS_HTTP_VERBS
+            .iter()
+            .find(|target| call_path.as_slice() == ["requests", target)
+    }) {}
     if let Some(call_path) = checker.resolve_call_path(func) {
         let call_args = SimpleCallArgs::new(args, keywords);
         for func_name in &REQUESTS_HTTP_VERBS {
