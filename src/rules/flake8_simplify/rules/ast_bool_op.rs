@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use crate::ast::helpers::{create_expr, unparse_expr};
+use crate::ast::helpers::{contains_effect, create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -230,6 +230,10 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
+    if contains_effect(checker, expr) {
+        return;
+    }
+
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
@@ -278,6 +282,10 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
+    if contains_effect(checker, expr) {
+        return;
+    }
+
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
@@ -303,6 +311,9 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
+    if contains_effect(checker, expr) {
+        return;
+    }
     for value in values {
         if let ExprKind::Constant {
             value: Constant::Bool(true),
@@ -327,6 +338,9 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
+    if contains_effect(checker, expr) {
+        return;
+    }
     for value in values {
         if let ExprKind::Constant {
             value: Constant::Bool(false),

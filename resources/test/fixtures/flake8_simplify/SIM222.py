@@ -7,8 +7,12 @@ if (a or b) or True:  # SIM223
 if a or (b or True):  # SIM223
     pass
 
-if a and True:
+if a and True:  # OK
     pass
 
-if True:
+if True:  # OK
     pass
+
+
+def validate(self, value):
+    return json.loads(value) or True  # OK
