@@ -119,7 +119,7 @@ pub fn check_tokens(
     // COM812, COM818, COM819
     if enforce_trailing_comma {
         diagnostics.extend(
-            flake8_commas::rules::trailing_commas(tokens, locator)
+            flake8_commas::rules::trailing_commas(tokens, settings, autofix)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.code())),
         );
