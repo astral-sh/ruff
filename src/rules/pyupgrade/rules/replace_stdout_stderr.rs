@@ -89,7 +89,7 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
                 if middle.multi_line {
                     contents.push(',');
                     contents.push('\n');
-                    contents.push_str(&indentation(checker, first));
+                    contents.push_str(&indentation(&checker.locator, first));
                 } else {
                     contents.push(',');
                     contents.push(' ');

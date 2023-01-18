@@ -108,7 +108,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
                 Diagnostic::new(violations::ImplicitReturn, Range::from_located(last_stmt));
             if checker.patch(&RuleCode::RET503) {
                 let mut content = String::new();
-                content.push_str(&indentation(checker, last_stmt));
+                content.push_str(&indentation(&checker.locator, last_stmt));
                 content.push_str("return None");
                 content.push('\n');
                 diagnostic.amend(Fix::insertion(
