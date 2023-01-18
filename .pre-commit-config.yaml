@@ -8,3 +8,11 @@ repos:
     rev: v0.10.1
     hooks:
       - id: validate-pyproject
+
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --
+        language: rust
+        types: [rust]
