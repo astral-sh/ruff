@@ -507,7 +507,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     let parsed = parse_percent_format(left_string);
     println!("START");
     for parse in &parsed {
-        println!("{:?}\n", parse);
+        println!("{parse:?}\n");
     }
     let is_valid = check_statement(parsed, right);
     // If the statement is not valid, then bail
@@ -542,8 +542,8 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         violations::PrintfStringFormatting,
         Range::from_located(expr),
     );
-    // Emoji sytnax is very rare and adds a lot of complexity to the code, so we are only issuing a
-    // warning if it exists, and not fixing the code
+    // Emoji sytnax is very rare and adds a lot of complexity to the code, so we are
+    // only issuing a warning if it exists, and not fixing the code
     if checker.patch(diagnostic.kind.code()) && !EMOJI_SYNTAX.is_match(&expr_string) {
         diagnostic.amend(Fix::replacement(
             new_string,
@@ -609,7 +609,7 @@ mod test {
         let sample = "\"Writing merged info for %s slides (%s unrecognized)\"";
         let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
         let e1 = PercentFormat::new("Writing merged info for ".to_string(), Some(sube1.clone()));
-        let e2 = PercentFormat::new(" slides (".to_string(), Some(sube1.clone()));
+        let e2 = PercentFormat::new(" slides (".to_string(), Some(sube1));
         let e3 = PercentFormat::new(" unrecognized)".to_string(), None);
         let expected = vec![e1, e2, e3];
 
@@ -622,7 +622,7 @@ mod test {
         let sample = "\"Expected one image (got %d) per channel (got %d)\"";
         let sube1 = PercentFormatPart::new(None, None, None, None, "d".to_string());
         let e1 = PercentFormat::new("Expected one image (got ".to_string(), Some(sube1.clone()));
-        let e2 = PercentFormat::new(") per channel (got ".to_string(), Some(sube1.clone()));
+        let e2 = PercentFormat::new(") per channel (got ".to_string(), Some(sube1));
         let e3 = PercentFormat::new(")".to_string(), None);
         let expected = vec![e1, e2, e3];
 
