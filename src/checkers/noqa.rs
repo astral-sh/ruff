@@ -1,14 +1,12 @@
 //! `NoQA` enforcement and validation.
 
-use std::str::FromStr;
-
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::registry::{Diagnostic, DiagnosticKind, RuleCode, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, DiagnosticKind, Rule, RuleCode, CODE_REDIRECTS};
 use crate::settings::{flags, Settings};
 use crate::violations::UnusedCodes;
 use crate::{noqa, violations};
@@ -134,8 +132,8 @@ pub fn check_noqa(
                         if matches.contains(&code) || settings.external.contains(code) {
                             valid_codes.push(code);
                         } else {
-                            if let Ok(rule_code) = RuleCode::from_str(code) {
-                                if settings.rules.enabled(&rule_code) {
+                            if let Ok(rule) = Rule::from_code(code) {
+                                if settings.rules.enabled(rule) {
                                     unmatched_codes.push(code);
                                 } else {
                                     disabled_codes.push(code);

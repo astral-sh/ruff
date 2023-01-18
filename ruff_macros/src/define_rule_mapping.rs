@@ -9,6 +9,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut rule_kind_match_arms = quote!();
     let mut rule_origin_match_arms = quote!();
     let mut rule_code_match_arms = quote!();
+    let mut rule_from_code_match_arms = quote!();
     let mut diagkind_code_match_arms = quote!();
     let mut diagkind_body_match_arms = quote!();
     let mut diagkind_fixable_match_arms = quote!();
@@ -25,6 +26,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         rule_origin_match_arms.extend(quote! {Self::#code => RuleOrigin::#origin,});
         let code_str = LitStr::new(&code.to_string(), Span::call_site());
         rule_code_match_arms.extend(quote! {Self::#code => #code_str,});
+        rule_from_code_match_arms.extend(quote! {#code_str => Ok(&RuleCode::#code), });
         diagkind_code_match_arms.extend(quote! {Self::#name(..) => &RuleCode::#code, });
         diagkind_body_match_arms.extend(quote! {Self::#name(x) => Violation::message(x), });
         diagkind_fixable_match_arms
@@ -49,7 +51,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     quote! {
         #[derive(
             EnumIter,
-            EnumString,  // TODO(martin): Remove
             Debug,
             PartialEq,
             Eq,
@@ -67,6 +68,11 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
         pub enum DiagnosticKind { #diagkind_variants }
 
+        #[derive(thiserror::Error, Debug)]
+        pub enum FromCodeError {
+            #[error("unknown rule code")]
+            Unknown,
+        }
 
         impl Rule {
             /// A placeholder representation of the `DiagnosticKind` for the diagnostic.
@@ -80,6 +86,13 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
             pub fn code(&self) -> &'static str {
                 match self { #rule_code_match_arms }
+            }
+
+            pub fn from_code(code: &str) -> Result<&'static Self, FromCodeError> {
+                match code {
+                    #rule_from_code_match_arms
+                    _ => Err(FromCodeError::Unknown),
+                }
             }
         }
 
