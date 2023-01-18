@@ -2552,16 +2552,6 @@ where
                     );
                 }
 
-                if self.settings.rules.enabled(&RuleCode::PLC2201) {
-                    pylint::rules::misplaced_comparison_constant(
-                        self,
-                        expr,
-                        left,
-                        ops,
-                        comparators,
-                    );
-                }
-
                 if self.settings.rules.enabled(&RuleCode::PLR0133) {
                     pylint::rules::constant_comparison(self, left, ops, comparators);
                 }

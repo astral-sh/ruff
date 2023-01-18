@@ -80,7 +80,6 @@ ruff_macros::define_rule_mapping!(
     F901 => violations::RaiseNotImplemented,
     // pylint
     PLC0414 => violations::UselessImportAlias,
-    PLC2201 => violations::MisplacedComparisonConstant,
     PLC3002 => violations::UnnecessaryDirectLambdaCall,
     PLE0117 => violations::NonlocalWithoutBinding,
     PLE0118 => violations::UsedPriorGlobalDeclaration,
