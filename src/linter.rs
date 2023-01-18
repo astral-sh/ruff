@@ -77,7 +77,12 @@ pub fn check_path(
         .rules
         .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem));
-    if use_ast || use_imports || use_doc_lines || use_filesystem {
+
+    if use_filesystem {
+        diagnostics.extend(check_file_path(path, settings));
+    }
+
+    if use_ast || use_imports || use_doc_lines {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 if use_ast {
@@ -108,9 +113,6 @@ pub fn check_path(
                 }
                 if use_doc_lines {
                     doc_lines.extend(doc_lines_from_ast(&python_ast));
-                }
-                if use_filesystem {
-                    diagnostics.extend(check_file_path(path, settings));
                 }
             }
             Err(parse_error) => {
