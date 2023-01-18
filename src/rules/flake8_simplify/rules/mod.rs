@@ -25,6 +25,8 @@ mod ast_if;
 mod ast_ifexp;
 mod ast_unary_op;
 mod ast_with;
+mod fix_if;
+mod fix_with;
 mod key_in_dict;
 mod open_file_with_context_handler;
 mod return_in_try_except_finally;

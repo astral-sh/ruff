@@ -1,5 +1,12 @@
 # Breaking Changes
 
+## 0.0.226
+
+### `misplaced-comparison-constant` (`PLC2201`) was deprecated in favor of `SIM300` ([#1980](https://github.com/charliermarsh/ruff/pull/1980))
+
+These two rules contain (nearly) identical logic. To deduplicate the rule set, we've upgraded
+`SIM300` to handle a few more cases, and deprecated `PLC2201` in favor of `SIM300`.
+
 ## 0.0.225
 
 ### `@functools.cache` rewrites have been moved to a standalone rule (`UP033`) ([#1938](https://github.com/charliermarsh/ruff/pull/1938))

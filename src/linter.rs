@@ -7,6 +7,7 @@ use rustpython_parser::lexer::LexResult;
 use crate::ast::types::Range;
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
+use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::lines::check_lines;
 use crate::checkers::noqa::check_noqa;
@@ -60,6 +61,15 @@ pub fn check_path(
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Tokens))
     {
         diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
+    }
+
+    // Run the filesystem-based rules.
+    if settings
+        .rules
+        .iter_enabled()
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem))
+    {
+        diagnostics.extend(check_file_path(path, settings));
     }
 
     // Run the AST-based rules.
@@ -347,8 +357,7 @@ This likely indicates a bug in `{}`. If you could open an issue at:
 
 {}/issues/new?title=%5BInfinite%20loop%5D
 
-quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be
-very appreciative!
+quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
                 "warning".yellow().bold(),
                 MAX_ITERATIONS,

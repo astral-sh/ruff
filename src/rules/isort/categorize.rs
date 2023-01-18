@@ -3,10 +3,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use log::debug;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::python::sys::KNOWN_STANDARD_LIBRARY;
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ImportType {
     Future,
     StandardLibrary,

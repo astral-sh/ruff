@@ -1057,25 +1057,6 @@ impl AlwaysAutofixableViolation for UselessImportAlias {
 }
 
 define_violation!(
-    pub struct MisplacedComparisonConstant(pub String);
-);
-impl AlwaysAutofixableViolation for MisplacedComparisonConstant {
-    fn message(&self) -> String {
-        let MisplacedComparisonConstant(comparison) = self;
-        format!("Comparison should be {comparison}")
-    }
-
-    fn autofix_title(&self) -> String {
-        let MisplacedComparisonConstant(comparison) = self;
-        format!("Replace with {comparison}")
-    }
-
-    fn placeholder() -> Self {
-        MisplacedComparisonConstant("...".to_string())
-    }
-}
-
-define_violation!(
     pub struct UnnecessaryDirectLambdaCall;
 );
 impl Violation for UnnecessaryDirectLambdaCall {
@@ -2829,9 +2810,13 @@ impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
 define_violation!(
     pub struct NestedIfStatements;
 );
-impl Violation for NestedIfStatements {
+impl AlwaysAutofixableViolation for NestedIfStatements {
     fn message(&self) -> String {
         "Use a single `if` statement instead of nested `if` statements".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Combine `if` statements using `and`".to_string()
     }
 
     fn placeholder() -> Self {
@@ -2970,10 +2955,14 @@ impl AlwaysAutofixableViolation for ConvertLoopToAll {
 define_violation!(
     pub struct MultipleWithStatements;
 );
-impl Violation for MultipleWithStatements {
+impl AlwaysAutofixableViolation for MultipleWithStatements {
     fn message(&self) -> String {
         "Use a single `with` statement with multiple contexts instead of nested `with` statements"
             .to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Combine `with` statements".to_string()
     }
 
     fn placeholder() -> Self {
@@ -3126,21 +3115,25 @@ impl AlwaysAutofixableViolation for AndFalse {
 }
 
 define_violation!(
-    pub struct YodaConditions(pub String, pub String);
+    pub struct YodaConditions {
+        pub suggestion: String,
+    }
 );
 impl AlwaysAutofixableViolation for YodaConditions {
     fn message(&self) -> String {
-        let YodaConditions(left, right) = self;
-        format!("Yoda conditions are discouraged, use `{left} == {right}` instead")
+        let YodaConditions { suggestion } = self;
+        format!("Yoda conditions are discouraged, use `{suggestion}` instead")
     }
 
     fn autofix_title(&self) -> String {
-        let YodaConditions(left, right) = self;
-        format!("Replace Yoda condition with `{left} == {right}`")
+        let YodaConditions { suggestion } = self;
+        format!("Replace Yoda condition with `{suggestion}`")
     }
 
     fn placeholder() -> Self {
-        YodaConditions("left".to_string(), "right".to_string())
+        YodaConditions {
+            suggestion: "x == 1".to_string(),
+        }
     }
 }
 
@@ -6105,6 +6098,22 @@ impl AlwaysAutofixableViolation for TrailingCommaProhibited {
 
     fn placeholder() -> Self {
         TrailingCommaProhibited
+    }
+}
+
+// flake8-no-pep420
+
+define_violation!(
+    pub struct ImplicitNamespacePackage(pub String);
+);
+impl Violation for ImplicitNamespacePackage {
+    fn message(&self) -> String {
+        let ImplicitNamespacePackage(filename) = self;
+        format!("File `{filename}` is part of an implicit namespace package. Add an `__init__.py`.")
+    }
+
+    fn placeholder() -> Self {
+        ImplicitNamespacePackage("...".to_string())
     }
 }
 

@@ -8,14 +8,17 @@ use crate::violations;
 
 /// UP006
 pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
-    if let Some(call_path) = checker.resolve_call_path(expr) {
+    if let Some(binding) = checker
+        .resolve_call_path(expr)
+        .and_then(|call_path| call_path.last().copied())
+    {
         let mut diagnostic = Diagnostic::new(
-            violations::UsePEP585Annotation(call_path[call_path.len() - 1].to_string()),
+            violations::UsePEP585Annotation(binding.to_string()),
             Range::from_located(expr),
         );
         if checker.patch(diagnostic.kind.code()) {
             diagnostic.amend(Fix::replacement(
-                call_path[call_path.len() - 1].to_lowercase(),
+                binding.to_lowercase(),
                 expr.location,
                 expr.end_location.unwrap(),
             ));

@@ -5,18 +5,52 @@ expression: diagnostics
 - kind:
     ReturnBoolConditionDirectly: a
   location:
-    row: 2
+    row: 3
     column: 4
   end_location:
-    row: 5
+    row: 6
     column: 20
   fix:
     content: return a
     location:
-      row: 2
+      row: 3
       column: 4
     end_location:
-      row: 5
+      row: 6
       column: 20
+  parent: ~
+- kind:
+    ReturnBoolConditionDirectly: b
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 14
+    column: 19
+  fix:
+    content: return b
+    location:
+      row: 13
+      column: 4
+    end_location:
+      row: 16
+      column: 20
+  parent: ~
+- kind:
+    ReturnBoolConditionDirectly: b
+  location:
+    row: 24
+    column: 8
+  end_location:
+    row: 27
+    column: 24
+  fix:
+    content: return b
+    location:
+      row: 24
+      column: 8
+    end_location:
+      row: 27
+      column: 24
   parent: ~
 

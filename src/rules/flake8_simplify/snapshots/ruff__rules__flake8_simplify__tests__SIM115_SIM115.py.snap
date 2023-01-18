@@ -5,11 +5,21 @@ expression: diagnostics
 - kind:
     OpenFileWithContextHandler: ~
   location:
-    row: 1
+    row: 4
     column: 4
   end_location:
-    row: 1
+    row: 4
     column: 8
+  fix: ~
+  parent: ~
+- kind:
+    OpenFileWithContextHandler: ~
+  location:
+    row: 31
+    column: 8
+  end_location:
+    row: 31
+    column: 12
   fix: ~
   parent: ~
 

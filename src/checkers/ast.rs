@@ -13,12 +13,14 @@ use rustpython_parser::ast::{
     KeywordData, Operator, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
+use smallvec::smallvec;
 
 use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
 use crate::ast::operations::extract_all_names;
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingKind, ClassDef, FunctionDef, Lambda, Node, Range, RefEquality, Scope, ScopeKind,
+    Binding, BindingKind, CallPath, ClassDef, FunctionDef, Lambda, Node, Range, RefEquality, Scope,
+    ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
@@ -27,7 +29,7 @@ use crate::noqa::Directive;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
-use crate::python::typing::SubscriptKind;
+use crate::python::typing::{Callable, SubscriptKind};
 use crate::registry::{Diagnostic, RuleCode};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
@@ -170,21 +172,21 @@ impl<'a> Checker<'a> {
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
-    pub fn match_typing_call_path(&self, call_path: &[&str], target: &str) -> bool {
-        if call_path == ["typing", target] {
+    pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
+        if call_path.as_slice() == ["typing", target] {
             return true;
         }
 
         if typing::TYPING_EXTENSIONS.contains(target) {
-            if call_path == ["typing_extensions", target] {
+            if call_path.as_slice() == ["typing_extensions", target] {
                 return true;
             }
         }
 
         if self.settings.typing_modules.iter().any(|module| {
-            let mut module = module.split('.').collect::<Vec<_>>();
+            let mut module: CallPath = module.split('.').collect();
             module.push(target);
-            call_path == module.as_slice()
+            *call_path == module
         }) {
             return true;
         }
@@ -206,7 +208,7 @@ impl<'a> Checker<'a> {
         })
     }
 
-    pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<Vec<&'a str>>
+    pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
     where
         'b: 'a,
     {
@@ -219,8 +221,8 @@ impl<'a> Checker<'a> {
                         if name.starts_with('.') {
                             return None;
                         }
-                        let mut source_path: Vec<&str> = name.split('.').collect();
-                        source_path.extend(call_path.iter().skip(1));
+                        let mut source_path: CallPath = name.split('.').collect();
+                        source_path.extend(call_path.into_iter().skip(1));
                         return Some(source_path);
                     }
                     BindingKind::SubmoduleImportation(name, ..) => {
@@ -228,8 +230,8 @@ impl<'a> Checker<'a> {
                         if name.starts_with('.') {
                             return None;
                         }
-                        let mut source_path: Vec<&str> = name.split('.').collect();
-                        source_path.extend(call_path.iter().skip(1));
+                        let mut source_path: CallPath = name.split('.').collect();
+                        source_path.extend(call_path.into_iter().skip(1));
                         return Some(source_path);
                     }
                     BindingKind::FromImportation(.., name) => {
@@ -237,12 +239,12 @@ impl<'a> Checker<'a> {
                         if name.starts_with('.') {
                             return None;
                         }
-                        let mut source_path: Vec<&str> = name.split('.').collect();
-                        source_path.extend(call_path.iter().skip(1));
+                        let mut source_path: CallPath = name.split('.').collect();
+                        source_path.extend(call_path.into_iter().skip(1));
                         return Some(source_path);
                     }
                     BindingKind::Builtin => {
-                        let mut source_path: Vec<&str> = Vec::with_capacity(call_path.len() + 1);
+                        let mut source_path: CallPath = smallvec![];
                         source_path.push("");
                         source_path.extend(call_path);
                         return Some(source_path);
@@ -1384,7 +1386,7 @@ where
                 }
                 if self.settings.rules.enabled(&RuleCode::SIM105) {
                     flake8_simplify::rules::use_contextlib_suppress(
-                        self, stmt, handlers, orelse, finalbody,
+                        self, stmt, body, handlers, orelse, finalbody,
                     );
                 }
                 if self.settings.rules.enabled(&RuleCode::SIM107) {
@@ -1589,7 +1591,12 @@ where
                 orelse,
                 finalbody,
             } => {
-                self.except_handlers.push(extract_handler_names(handlers));
+                // TODO(charlie): The use of `smallvec` here leads to a lifetime issue.
+                let handler_names = extract_handler_names(handlers)
+                    .into_iter()
+                    .map(|call_path| call_path.to_vec())
+                    .collect();
+                self.except_handlers.push(handler_names);
                 if self.settings.rules.enabled(&RuleCode::B012) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
@@ -2548,16 +2555,6 @@ where
                     );
                 }
 
-                if self.settings.rules.enabled(&RuleCode::PLC2201) {
-                    pylint::rules::misplaced_comparison_constant(
-                        self,
-                        expr,
-                        left,
-                        ops,
-                        comparators,
-                    );
-                }
-
                 if self.settings.rules.enabled(&RuleCode::PLR0133) {
                     pylint::rules::constant_comparison(self, left, ops, comparators);
                 }
@@ -2715,150 +2712,167 @@ where
                 args,
                 keywords,
             } => {
-                let call_path = self.resolve_call_path(func);
-                if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "ForwardRef")
-                }) {
-                    self.visit_expr(func);
-                    for expr in args {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
+                let callable = self.resolve_call_path(func).and_then(|call_path| {
+                    if self.match_typing_call_path(&call_path, "ForwardRef") {
+                        Some(Callable::ForwardRef)
+                    } else if self.match_typing_call_path(&call_path, "cast") {
+                        Some(Callable::Cast)
+                    } else if self.match_typing_call_path(&call_path, "NewType") {
+                        Some(Callable::NewType)
+                    } else if self.match_typing_call_path(&call_path, "TypeVar") {
+                        Some(Callable::TypeVar)
+                    } else if self.match_typing_call_path(&call_path, "NamedTuple") {
+                        Some(Callable::NamedTuple)
+                    } else if self.match_typing_call_path(&call_path, "TypedDict") {
+                        Some(Callable::TypedDict)
+                    } else if ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
+                        .iter()
+                        .any(|target| call_path.as_slice() == ["mypy_extensions", target])
+                    {
+                        Some(Callable::MypyExtension)
+                    } else {
+                        None
                     }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "cast")
-                }) {
-                    self.visit_expr(func);
-                    if !args.is_empty() {
-                        self.in_type_definition = true;
-                        self.visit_expr(&args[0]);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                    for expr in args.iter().skip(1) {
-                        self.visit_expr(expr);
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "NewType")
-                }) {
-                    self.visit_expr(func);
-                    for expr in args.iter().skip(1) {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "TypeVar")
-                }) {
-                    self.visit_expr(func);
-                    for expr in args.iter().skip(1) {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                    for keyword in keywords {
-                        let KeywordData { arg, value } = &keyword.node;
-                        if let Some(id) = arg {
-                            if id == "bound" {
-                                self.in_type_definition = true;
-                                self.visit_expr(value);
-                                self.in_type_definition = prev_in_type_definition;
-                            } else {
-                                self.in_type_definition = false;
-                                self.visit_expr(value);
-                                self.in_type_definition = prev_in_type_definition;
-                            }
+                });
+                match callable {
+                    Some(Callable::ForwardRef) => {
+                        self.visit_expr(func);
+                        for expr in args {
+                            self.in_type_definition = true;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
                         }
                     }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "NamedTuple")
-                }) {
-                    self.visit_expr(func);
-
-                    // Ex) NamedTuple("a", [("a", int)])
-                    if args.len() > 1 {
-                        match &args[1].node {
-                            ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
-                                for elt in elts {
-                                    match &elt.node {
-                                        ExprKind::List { elts, .. }
-                                        | ExprKind::Tuple { elts, .. } => {
-                                            if elts.len() == 2 {
-                                                self.in_type_definition = false;
-                                                self.visit_expr(&elts[0]);
-                                                self.in_type_definition = prev_in_type_definition;
-
-                                                self.in_type_definition = true;
-                                                self.visit_expr(&elts[1]);
-                                                self.in_type_definition = prev_in_type_definition;
-                                            }
-                                        }
-                                        _ => {}
-                                    }
+                    Some(Callable::Cast) => {
+                        self.visit_expr(func);
+                        if !args.is_empty() {
+                            self.in_type_definition = true;
+                            self.visit_expr(&args[0]);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                        for expr in args.iter().skip(1) {
+                            self.visit_expr(expr);
+                        }
+                    }
+                    Some(Callable::NewType) => {
+                        self.visit_expr(func);
+                        for expr in args.iter().skip(1) {
+                            self.in_type_definition = true;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                    }
+                    Some(Callable::TypeVar) => {
+                        self.visit_expr(func);
+                        for expr in args.iter().skip(1) {
+                            self.in_type_definition = true;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                        for keyword in keywords {
+                            let KeywordData { arg, value } = &keyword.node;
+                            if let Some(id) = arg {
+                                if id == "bound" {
+                                    self.in_type_definition = true;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
+                                } else {
+                                    self.in_type_definition = false;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
                                 }
                             }
-                            _ => {}
                         }
                     }
+                    Some(Callable::NamedTuple) => {
+                        self.visit_expr(func);
 
-                    // Ex) NamedTuple("a", a=int)
-                    for keyword in keywords {
-                        let KeywordData { value, .. } = &keyword.node;
-                        self.in_type_definition = true;
-                        self.visit_expr(value);
-                        self.in_type_definition = prev_in_type_definition;
-                    }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    self.match_typing_call_path(call_path, "TypedDict")
-                }) {
-                    self.visit_expr(func);
+                        // Ex) NamedTuple("a", [("a", int)])
+                        if args.len() > 1 {
+                            match &args[1].node {
+                                ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
+                                    for elt in elts {
+                                        match &elt.node {
+                                            ExprKind::List { elts, .. }
+                                            | ExprKind::Tuple { elts, .. } => {
+                                                if elts.len() == 2 {
+                                                    self.in_type_definition = false;
 
-                    // Ex) TypedDict("a", {"a": int})
-                    if args.len() > 1 {
-                        if let ExprKind::Dict { keys, values } = &args[1].node {
-                            for key in keys {
-                                self.in_type_definition = false;
-                                self.visit_expr(key);
-                                self.in_type_definition = prev_in_type_definition;
-                            }
-                            for value in values {
-                                self.in_type_definition = true;
-                                self.visit_expr(value);
-                                self.in_type_definition = prev_in_type_definition;
+                                                    self.visit_expr(&elts[0]);
+                                                    self.in_type_definition =
+                                                        prev_in_type_definition;
+
+                                                    self.in_type_definition = true;
+                                                    self.visit_expr(&elts[1]);
+                                                    self.in_type_definition =
+                                                        prev_in_type_definition;
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
-                    }
 
-                    // Ex) TypedDict("a", a=int)
-                    for keyword in keywords {
-                        let KeywordData { value, .. } = &keyword.node;
-                        self.in_type_definition = true;
-                        self.visit_expr(value);
-                        self.in_type_definition = prev_in_type_definition;
+                        // Ex) NamedTuple("a", a=int)
+                        for keyword in keywords {
+                            let KeywordData { value, .. } = &keyword.node;
+                            self.in_type_definition = true;
+                            self.visit_expr(value);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
                     }
-                } else if call_path.as_ref().map_or(false, |call_path| {
-                    ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
-                        .iter()
-                        .any(|target| *call_path == ["mypy_extensions", target])
-                }) {
-                    self.visit_expr(func);
+                    Some(Callable::TypedDict) => {
+                        self.visit_expr(func);
 
-                    // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
-                    let mut arguments = args.iter().chain(keywords.iter().map(|keyword| {
-                        let KeywordData { value, .. } = &keyword.node;
-                        value
-                    }));
-                    if let Some(expr) = arguments.next() {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
+                        // Ex) TypedDict("a", {"a": int})
+                        if args.len() > 1 {
+                            if let ExprKind::Dict { keys, values } = &args[1].node {
+                                for key in keys {
+                                    self.in_type_definition = false;
+                                    self.visit_expr(key);
+                                    self.in_type_definition = prev_in_type_definition;
+                                }
+                                for value in values {
+                                    self.in_type_definition = true;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
+                                }
+                            }
+                        }
+
+                        // Ex) TypedDict("a", a=int)
+                        for keyword in keywords {
+                            let KeywordData { value, .. } = &keyword.node;
+                            self.in_type_definition = true;
+                            self.visit_expr(value);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
                     }
-                    for expr in arguments {
-                        self.in_type_definition = false;
-                        self.visit_expr(expr);
-                        self.in_type_definition = prev_in_type_definition;
+                    Some(Callable::MypyExtension) => {
+                        self.visit_expr(func);
+
+                        // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
+                        let mut arguments = args.iter().chain(keywords.iter().map(|keyword| {
+                            let KeywordData { value, .. } = &keyword.node;
+                            value
+                        }));
+                        if let Some(expr) = arguments.next() {
+                            self.in_type_definition = true;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
+                        for expr in arguments {
+                            self.in_type_definition = false;
+                            self.visit_expr(expr);
+                            self.in_type_definition = prev_in_type_definition;
+                        }
                     }
-                } else {
-                    visitor::walk_expr(self, expr);
+                    None => {
+                        visitor::walk_expr(self, expr);
+                    }
                 }
             }
             ExprKind::Subscript { value, slice, ctx } => {
@@ -3482,7 +3496,7 @@ impl<'a> Checker<'a> {
                 if let Some(handler_names) = self.except_handlers.last() {
                     if handler_names
                         .iter()
-                        .any(|call_path| call_path.len() == 1 && call_path[0] == "NameError")
+                        .any(|call_path| call_path.as_slice() == ["NameError"])
                     {
                         return;
                     }

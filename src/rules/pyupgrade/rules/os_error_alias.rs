@@ -39,7 +39,7 @@ fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
     let mut before_replace: Vec<String> = vec![];
     if let Some(call_path) = checker.resolve_call_path(expr) {
         for module in ERROR_MODULES.iter() {
-            if call_path == [module, "error"] {
+            if call_path.as_slice() == [module, "error"] {
                 replacements.push("OSError".to_string());
                 before_replace.push(format!("{module}.error"));
                 break;

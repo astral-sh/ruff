@@ -579,3 +579,12 @@ def multiline_trailing_and_leading_space():
         "or exclamation point (not '\"')")
 def endswith_quote():
     """Whitespace at the end, but also a quote" """
+
+
+@expect('D209: Multi-line docstring closing quotes should be on a separate '
+        'line')
+@expect('D213: Multi-line docstring summary should start at the second line')
+def asdfljdjgf24():
+    """Summary.
+
+    Description.  """

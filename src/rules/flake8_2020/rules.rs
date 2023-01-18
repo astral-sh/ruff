@@ -9,7 +9,7 @@ use crate::violations;
 fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
     checker
         .resolve_call_path(expr)
-        .map_or(false, |path| path == ["sys", target])
+        .map_or(false, |call_path| call_path.as_slice() == ["sys", target])
 }
 
 /// YTT101, YTT102, YTT301, YTT303
@@ -182,7 +182,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
 pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     if checker
         .resolve_call_path(expr)
-        .map_or(false, |path| path == ["six", "PY3"])
+        .map_or(false, |call_path| call_path.as_slice() == ["six", "PY3"])
     {
         checker.diagnostics.push(Diagnostic::new(
             violations::SixPY3Referenced,

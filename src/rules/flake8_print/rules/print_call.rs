@@ -14,7 +14,7 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
         let call_path = checker.resolve_call_path(func);
         if call_path
             .as_ref()
-            .map_or(false, |call_path| *call_path == ["", "print"])
+            .map_or(false, |call_path| *call_path.as_slice() == ["", "print"])
         {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
@@ -26,7 +26,8 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                     if checker
                         .resolve_call_path(&keyword.node.value)
                         .map_or(true, |call_path| {
-                            call_path != ["sys", "stdout"] && call_path != ["sys", "stderr"]
+                            call_path.as_slice() != ["sys", "stdout"]
+                                && call_path.as_slice() != ["sys", "stderr"]
                         })
                     {
                         return;
@@ -34,10 +35,9 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                 }
             }
             Diagnostic::new(violations::PrintFound, Range::from_located(func))
-        } else if call_path
-            .as_ref()
-            .map_or(false, |call_path| *call_path == ["pprint", "pprint"])
-        {
+        } else if call_path.as_ref().map_or(false, |call_path| {
+            *call_path.as_slice() == ["pprint", "pprint"]
+        }) {
             Diagnostic::new(violations::PPrintFound, Range::from_located(func))
         } else {
             return;

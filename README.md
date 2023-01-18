@@ -34,7 +34,7 @@ An extremely fast Python linter, written in Rust.
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
 
-Ruff can be used to replace Flake8 (plus a variety of plugins), [`isort`](https://pypi.org/project/isort/),
+Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus a variety of plugins), [`isort`](https://pypi.org/project/isort/),
 [`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
 [`eradicate`](https://pypi.org/project/eradicate/), [`pyupgrade`](https://pypi.org/project/pyupgrade/),
 and [`autoflake`](https://pypi.org/project/autoflake/), all while executing tens or hundreds of
@@ -137,6 +137,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-commas (COM)](#flake8-commas-com)
+   1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -198,7 +199,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.224'
+  rev: 'v0.0.225'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -1004,7 +1005,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
-| SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
+| SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements | 🛠 |
 | SIM103 | ReturnBoolConditionDirectly | Return the condition `...` directly | 🛠 |
 | SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
 | SIM107 | ReturnInTryExceptFinally | Don't use `return` in `try`/`except` and `finally` |  |
@@ -1014,7 +1015,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
 | SIM112 | UseCapitalEnvironmentVariables | Use capitalized environment variable `...` instead of `...` | 🛠 |
 | SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
-| SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
+| SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements | 🛠 |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
 | SIM202 | NegateNotEqualOp | Use `left == right` instead of `not left != right` | 🛠 |
@@ -1026,7 +1027,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM221 | AOrNotA | Use `True` instead of `... or not ...` | 🛠 |
 | SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
-| SIM300 | YodaConditions | Yoda conditions are discouraged, use `left == right` instead | 🛠 |
+| SIM300 | YodaConditions | Yoda conditions are discouraged, use `x == 1` instead | 🛠 |
 | SIM401 | DictGetWithDefault | Use `var = dict.get(key, "default")` instead of an `if` block | 🛠 |
 
 ### flake8-tidy-imports (TID)
@@ -1112,7 +1113,6 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PLC0414 | UselessImportAlias | Import alias does not rename original package | 🛠 |
-| PLC2201 | MisplacedComparisonConstant | Comparison should be ... | 🛠 |
 | PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
 
 #### Error (PLE)
@@ -1158,6 +1158,14 @@ For more, see [flake8-commas](https://pypi.org/project/flake8-commas/2.1.0/) on 
 | COM812 | TrailingCommaMissing | Trailing comma missing | 🛠 |
 | COM818 | TrailingCommaOnBareTupleProhibited | Trailing comma on bare tuple prohibited |  |
 | COM819 | TrailingCommaProhibited | Trailing comma prohibited | 🛠 |
+
+### flake8-no-pep420 (INP)
+
+For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| INP001 | ImplicitNamespacePackage | File `...` is part of an implicit namespace package. Add an `__init__.py`. |  |
 
 ### Ruff-specific rules (RUF)
 
@@ -1452,6 +1460,7 @@ natively, including:
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
@@ -1519,6 +1528,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
@@ -2984,6 +2994,24 @@ combine-as-imports = true
 
 ---
 
+#### [`constants`](#constants)
+
+An override list of tokens to always recognize as a CONSTANT
+for `order-by-type` regardless of casing.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+constants = ["constant"]
+```
+
+---
+
 #### [`extra-standard-library`](#extra-standard-library)
 
 A list of modules to consider standard-library, in addition to those
@@ -3107,6 +3135,24 @@ known-third-party = ["src"]
 
 ---
 
+#### [`no-lines-before`](#no-lines-before)
+
+A list of sections that should _not_ be delineated from the previous
+section via empty lines.
+
+**Default value**: `[]`
+
+**Type**: `Option<Vec<ImportType>>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+no-lines-before = ["future", "standard-library"]
+```
+
+---
+
 #### [`order-by-type`](#order-by-type)
 
 Order imports by type, which is determined by case, in addition to
@@ -3199,6 +3245,24 @@ See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/confi
 ```toml
 [tool.ruff.isort]
 split-on-trailing-comma = false
+```
+
+---
+
+#### [`variables`](#variables)
+
+An override list of tokens to always recognize as a var
+for `order-by-type` regardless of casing.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+variables = ["VAR"]
 ```
 
 ---

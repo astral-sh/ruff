@@ -1,14 +1,16 @@
+use log::error;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    contains_call_path, contains_effect, create_expr, create_stmt, has_comments, unparse_expr,
+    contains_call_path, contains_effect, create_expr, create_stmt, has_comments_in, unparse_expr,
     unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
+use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violations;
 
 fn is_main_check(expr: &Expr) -> bool {
@@ -64,10 +66,30 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        violations::NestedIfStatements,
-        Range::from_located(stmt),
-    ));
+    let mut diagnostic = Diagnostic::new(violations::NestedIfStatements, Range::from_located(stmt));
+    if checker.patch(&RuleCode::SIM102) {
+        // The fixer preserves comments in the nested body, but removes comments between
+        // the outer and inner if statements.
+        let nested_if = &body[0];
+        if !has_comments_in(
+            Range::new(stmt.location, nested_if.location),
+            checker.locator,
+        ) {
+            match fix_if::fix_nested_if_statements(checker.locator, stmt) {
+                Ok(fix) => {
+                    if fix
+                        .content
+                        .lines()
+                        .all(|line| line.len() <= checker.settings.line_length)
+                    {
+                        diagnostic.amend(fix);
+                    }
+                }
+                Err(err) => error!("Failed to fix nested if: {err}"),
+            }
+        }
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 fn is_one_line_return_bool(stmts: &[Stmt]) -> bool {
@@ -96,14 +118,17 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
-    if checker.patch(&RuleCode::SIM103) {
+    if checker.patch(&RuleCode::SIM103)
+        && !(has_comments_in(Range::from_located(stmt), checker.locator)
+            || has_comments_in(Range::from_located(&orelse[0]), checker.locator))
+    {
         let return_stmt = create_stmt(StmtKind::Return {
             value: Some(test.clone()),
         });
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
-            stmt.end_location.unwrap(),
+            orelse[0].end_location.unwrap(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -199,7 +224,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     // Don't flag if the statement expression contains any comments.
-    if has_comments(stmt, checker.locator) {
+    if has_comments_in(Range::from_located(stmt), checker.locator) {
         return;
     }
 
@@ -302,7 +327,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Don't flag if the statement expression contains any comments.
-    if has_comments(stmt, checker.locator) {
+    if has_comments_in(Range::from_located(stmt), checker.locator) {
         return;
     }
 

@@ -80,7 +80,6 @@ ruff_macros::define_rule_mapping!(
     F901 => violations::RaiseNotImplemented,
     // pylint
     PLC0414 => violations::UselessImportAlias,
-    PLC2201 => violations::MisplacedComparisonConstant,
     PLC3002 => violations::UnnecessaryDirectLambdaCall,
     PLE0117 => violations::NonlocalWithoutBinding,
     PLE0118 => violations::UsedPriorGlobalDeclaration,
@@ -417,6 +416,8 @@ ruff_macros::define_rule_mapping!(
     COM812 => violations::TrailingCommaMissing,
     COM818 => violations::TrailingCommaOnBareTupleProhibited,
     COM819 => violations::TrailingCommaProhibited,
+    // flake8-no-pep420
+    INP001 => violations::ImplicitNamespacePackage,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -460,6 +461,7 @@ pub enum RuleOrigin {
     Pylint,
     Flake8Pie,
     Flake8Commas,
+    Flake8NoPep420,
     Ruff,
 }
 
@@ -526,6 +528,7 @@ impl RuleOrigin {
             RuleOrigin::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
             RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
             RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
+            RuleOrigin::Flake8NoPep420 => Prefixes::Single(RuleCodePrefix::INP),
             RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
         }
     }
@@ -538,6 +541,7 @@ pub enum LintSource {
     Tokens,
     Imports,
     NoQa,
+    Filesystem,
 }
 
 impl RuleCode {
@@ -568,6 +572,7 @@ impl RuleCode {
             | RuleCode::RUF003 => &LintSource::Tokens,
             RuleCode::E902 => &LintSource::Io,
             RuleCode::I001 | RuleCode::I002 => &LintSource::Imports,
+            RuleCode::INP001 => &LintSource::Filesystem,
             _ => &LintSource::Ast,
         }
     }

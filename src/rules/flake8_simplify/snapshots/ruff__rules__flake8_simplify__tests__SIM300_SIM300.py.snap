@@ -4,8 +4,7 @@ expression: diagnostics
 ---
 - kind:
     YodaConditions:
-      - "\"yoda\""
-      - compare
+      suggestion: "compare == \"yoda\""
   location:
     row: 2
     column: 0
@@ -23,8 +22,7 @@ expression: diagnostics
   parent: ~
 - kind:
     YodaConditions:
-      - "'yoda'"
-      - compare
+      suggestion: "compare == 'yoda'"
   location:
     row: 3
     column: 0
@@ -42,8 +40,7 @@ expression: diagnostics
   parent: ~
 - kind:
     YodaConditions:
-      - "42"
-      - age
+      suggestion: age == 42
   location:
     row: 4
     column: 0
@@ -58,5 +55,59 @@ expression: diagnostics
     end_location:
       row: 4
       column: 9
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: "compare >= \"yoda\""
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 17
+  fix:
+    content: "compare >= \"yoda\""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 17
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: "compare > 'yoda'"
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 16
+  fix:
+    content: "compare > 'yoda'"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 16
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age < 42
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 8
+  fix:
+    content: age < 42
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 8
   parent: ~
 

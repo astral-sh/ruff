@@ -762,6 +762,16 @@
       },
       "additionalProperties": false
     },
+    "ImportType": {
+      "type": "string",
+      "enum": [
+        "future",
+        "standard-library",
+        "third-party",
+        "first-party",
+        "local-folder"
+      ]
+    },
     "IsortOptions": {
       "type": "object",
       "properties": {
@@ -781,6 +791,16 @@
             "boolean",
             "null"
           ]
+        },
+        "constants": {
+          "description": "An override list of tokens to always recognize as a CONSTANT for `order-by-type` regardless of casing.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         },
         "extra-standard-library": {
           "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.",
@@ -833,6 +853,16 @@
             "type": "string"
           }
         },
+        "no-lines-before": {
+          "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ImportType"
+          }
+        },
         "order-by-type": {
           "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
           "type": [
@@ -877,6 +907,16 @@
             "boolean",
             "null"
           ]
+        },
+        "variables": {
+          "description": "An override list of tokens to always recognize as a var for `order-by-type` regardless of casing.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -1356,6 +1396,10 @@
         "ICN0",
         "ICN00",
         "ICN001",
+        "INP",
+        "INP0",
+        "INP00",
+        "INP001",
         "ISC",
         "ISC0",
         "ISC00",
@@ -1440,10 +1484,6 @@
         "PLC04",
         "PLC041",
         "PLC0414",
-        "PLC2",
-        "PLC22",
-        "PLC220",
-        "PLC2201",
         "PLC3",
         "PLC30",
         "PLC300",
