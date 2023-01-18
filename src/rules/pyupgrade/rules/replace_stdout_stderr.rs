@@ -80,10 +80,9 @@ fn generate_fix(locator: &Locator, stdout: &Keyword, stderr: &Keyword) -> Option
 
 /// UP022
 pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
-    if checker
-        .resolve_call_path(expr)
-        .map_or(false, |call_path| call_path == ["subprocess", "run"])
-    {
+    if checker.resolve_call_path(expr).map_or(false, |call_path| {
+        call_path.as_slice() == ["subprocess", "run"]
+    }) {
         // Find `stdout` and `stderr` kwargs.
         let Some(stdout) = find_keyword(kwargs, "stdout") else {
             return;
@@ -95,10 +94,14 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
             .resolve_call_path(&stdout.node.value)
-            .map_or(false, |call_path| call_path == ["subprocess", "PIPE"])
+            .map_or(false, |call_path| {
+                call_path.as_slice() == ["subprocess", "PIPE"]
+            })
             || !checker
                 .resolve_call_path(&stderr.node.value)
-                .map_or(false, |call_path| call_path == ["subprocess", "PIPE"])
+                .map_or(false, |call_path| {
+                    call_path.as_slice() == ["subprocess", "PIPE"]
+                })
         {
             return;
         }

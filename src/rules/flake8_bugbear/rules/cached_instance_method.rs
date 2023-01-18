@@ -7,7 +7,8 @@ use crate::violations;
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
     checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path == ["functools", "lru_cache"] || call_path == ["functools", "cache"]
+        call_path.as_slice() == ["functools", "lru_cache"]
+            || call_path.as_slice() == ["functools", "cache"]
     })
 }
 

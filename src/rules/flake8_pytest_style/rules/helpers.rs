@@ -18,15 +18,17 @@ pub fn get_mark_name(decorator: &Expr) -> &str {
 }
 
 pub fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
-    checker
-        .resolve_call_path(call)
-        .map_or(false, |call_path| call_path == ["pytest", "fail"])
+    checker.resolve_call_path(call).map_or(false, |call_path| {
+        call_path.as_slice() == ["pytest", "fail"]
+    })
 }
 
 pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
     checker
         .resolve_call_path(decorator)
-        .map_or(false, |call_path| call_path == ["pytest", "fixture"])
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["pytest", "fixture"]
+        })
 }
 
 pub fn is_pytest_mark(decorator: &Expr) -> bool {
@@ -41,13 +43,17 @@ pub fn is_pytest_mark(decorator: &Expr) -> bool {
 pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
     checker
         .resolve_call_path(decorator)
-        .map_or(false, |call_path| call_path == ["pytest", "yield_fixture"])
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["pytest", "yield_fixture"]
+        })
 }
 
 pub fn is_abstractmethod_decorator(decorator: &Expr, checker: &Checker) -> bool {
     checker
         .resolve_call_path(decorator)
-        .map_or(false, |call_path| call_path == ["abc", "abstractmethod"])
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["abc", "abstractmethod"]
+        })
 }
 
 /// Check if the expression is a constant that evaluates to false.
@@ -96,7 +102,7 @@ pub fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
     checker
         .resolve_call_path(decorator)
         .map_or(false, |call_path| {
-            call_path == ["pytest", "mark", "parametrize"]
+            call_path.as_slice() == ["pytest", "mark", "parametrize"]
         })
 }
 

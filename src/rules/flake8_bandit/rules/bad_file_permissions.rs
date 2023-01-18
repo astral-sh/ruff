@@ -94,7 +94,7 @@ pub fn bad_file_permissions(
 ) {
     if checker
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path == ["os", "chmod"])
+        .map_or(false, |call_path| call_path.as_slice() == ["os", "chmod"])
     {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(mode_arg) = call_args.get_argument("mode", Some(1)) {

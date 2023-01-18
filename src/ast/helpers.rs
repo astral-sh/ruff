@@ -10,8 +10,9 @@ use rustpython_ast::{
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
+use smallvec::smallvec;
 
-use crate::ast::types::{Binding, BindingKind, Range};
+use crate::ast::types::{Binding, BindingKind, CallPath, Range};
 use crate::checkers::ast::Checker;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 
@@ -62,6 +63,29 @@ pub fn collect_call_path(expr: &Expr) -> Vec<&str> {
     segments
 }
 
+fn collect_small_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) {
+    match &expr.node {
+        ExprKind::Call { func, .. } => {
+            collect_small_path_inner(func, parts);
+        }
+        ExprKind::Attribute { value, attr, .. } => {
+            collect_small_path_inner(value, parts);
+            parts.push(attr);
+        }
+        ExprKind::Name { id, .. } => {
+            parts.push(id);
+        }
+        _ => {}
+    }
+}
+
+/// Convert an `Expr` to its call path segments (like ["typing", "List"]).
+pub fn collect_small_path(expr: &Expr) -> CallPath {
+    let mut segments = smallvec![];
+    collect_small_path_inner(expr, &mut segments);
+    segments
+}
+
 /// Convert an `Expr` to its call path (like `List`, or `typing.List`).
 pub fn compose_call_path(expr: &Expr) -> Option<String> {
     let call_path = collect_call_path(expr);
@@ -90,7 +114,7 @@ pub fn contains_call_path(checker: &Checker, expr: &Expr, target: &[&str]) -> bo
     any_over_expr(expr, &|expr| {
         checker
             .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path == target)
+            .map_or(false, |call_path| call_path.as_slice() == target)
     })
 }
 
@@ -415,11 +439,11 @@ pub fn format_import_from_member(
 }
 
 /// Split a target string (like `typing.List`) into (`typing`, `List`).
-pub fn to_call_path(target: &str) -> Vec<&str> {
+pub fn to_call_path(target: &str) -> CallPath {
     if target.contains('.') {
         target.split('.').collect()
     } else {
-        vec!["", target]
+        smallvec!["", target]
     }
 }
 
