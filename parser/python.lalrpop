@@ -372,7 +372,7 @@ IfStatement: ast::Stmt = {
             let x = ast::Stmt {
                 custom: (),
                 location: i.0,
-                end_location: i.4.last().unwrap().end_location,
+                end_location,
                 node: ast::StmtKind::If { test: Box::new(i.2), body: i.4, orelse: last },
             };
             last = vec![x];
