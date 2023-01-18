@@ -2,7 +2,7 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKin
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    contains_call_path, contains_effect, create_expr, create_stmt, has_comments, unparse_expr,
+    contains_call_path, contains_effect, create_expr, create_stmt, has_comments_in, unparse_expr,
     unparse_stmt,
 };
 use crate::ast::types::Range;
@@ -97,7 +97,8 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         Range::from_located(stmt),
     );
     if checker.patch(&RuleCode::SIM103)
-        && !(has_comments(stmt, checker.locator) || has_comments(&orelse[0], checker.locator))
+        && !(has_comments_in(Range::from_located(stmt), checker.locator)
+            || has_comments_in(Range::from_located(&orelse[0]), checker.locator))
     {
         let return_stmt = create_stmt(StmtKind::Return {
             value: Some(test.clone()),
@@ -201,7 +202,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     // Don't flag if the statement expression contains any comments.
-    if has_comments(stmt, checker.locator) {
+    if has_comments_in(Range::from_located(stmt), checker.locator) {
         return;
     }
 
@@ -304,7 +305,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Don't flag if the statement expression contains any comments.
-    if has_comments(stmt, checker.locator) {
+    if has_comments_in(Range::from_located(stmt), checker.locator) {
         return;
     }
 
