@@ -55,8 +55,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             PartialEq,
             Eq,
             Clone,
-            Serialize,   // TODO(martin): Remove
-            Deserialize, // TODO(martin): Remove
             Hash,
             PartialOrd,
             Ord,

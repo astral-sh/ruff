@@ -51,11 +51,28 @@ export interface Diagnostic {
 
 #[derive(Serialize)]
 struct ExpandedMessage {
-    code: RuleCode,
+    code: SerializeRuleAsCode,
     message: String,
     location: Location,
     end_location: Location,
     fix: Option<ExpandedFix>,
+}
+
+struct SerializeRuleAsCode(RuleCode);
+
+impl Serialize for SerializeRuleAsCode {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.code())
+    }
+}
+
+impl From<Rule> for SerializeRuleAsCode {
+    fn from(rule: Rule) -> Self {
+        Self(rule)
+    }
 }
 
 #[derive(Serialize)]
@@ -182,7 +199,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
         .map(|diagnostic| ExpandedMessage {
-            code: diagnostic.kind.rule().clone(),
+            code: diagnostic.kind.rule().clone().into(),
             message: diagnostic.kind.body(),
             location: diagnostic.location,
             end_location: diagnostic.end_location,
@@ -224,7 +241,7 @@ mod test {
             "if (1, 2): pass",
             r#"{}"#,
             [ExpandedMessage {
-                code: RuleCode::F634,
+                code: RuleCode::F634.into(),
                 message: "If test is a tuple, which is always `True`".to_string(),
                 location: Location::new(1, 0),
                 end_location: Location::new(1, 15),
