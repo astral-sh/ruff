@@ -854,7 +854,7 @@
           }
         },
         "no-lines-before": {
-          "description": "Sections which should not be split with previous by empty lines",
+          "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
           "type": [
             "array",
             "null"

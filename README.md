@@ -3137,7 +3137,8 @@ known-third-party = ["src"]
 
 #### [`no-lines-before`](#no-lines-before)
 
-Sections which should not be split with previous by empty lines
+A list of sections that should _not_ be delineated from the previous
+section via empty lines.
 
 **Default value**: `[]`
 

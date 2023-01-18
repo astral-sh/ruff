@@ -210,7 +210,8 @@ pub struct Options {
             no-lines-before = ["future", "standard-library"]
         "#
     )]
-    /// Sections which should not be split with previous by empty lines
+    /// A list of sections that should _not_ be delineated from the previous
+    /// section via empty lines.
     pub no_lines_before: Option<Vec<ImportType>>,
 }
 

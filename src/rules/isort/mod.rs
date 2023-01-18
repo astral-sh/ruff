@@ -1076,6 +1076,7 @@ mod tests {
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
+
     #[test_case(Path::new("no_lines_before.py"))]
     fn no_lines_before(path: &Path) -> Result<()> {
         let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
