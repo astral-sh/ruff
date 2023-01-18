@@ -528,12 +528,25 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                     );
                     if checker.patch(diagnostic.kind.code()) {
                         // Insert a newline just before the end-quote(s).
+                        let num_trailing_quotes = "'''".len();
+                        let num_trailing_spaces = last_line
+                            .chars()
+                            .rev()
+                            .skip(num_trailing_quotes)
+                            .take_while(|c| c.is_whitespace())
+                            .count();
                         let content = format!("\n{}", whitespace::clean(docstring.indentation));
-                        diagnostic.amend(Fix::insertion(
+                        diagnostic.amend(Fix::replacement(
                             content,
                             Location::new(
                                 docstring.expr.end_location.unwrap().row(),
-                                docstring.expr.end_location.unwrap().column() - "\"\"\"".len(),
+                                docstring.expr.end_location.unwrap().column()
+                                    - num_trailing_spaces
+                                    - num_trailing_quotes,
+                            ),
+                            Location::new(
+                                docstring.expr.end_location.unwrap().row(),
+                                docstring.expr.end_location.unwrap().column() - num_trailing_quotes,
                             ),
                         ));
                     }
