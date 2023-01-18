@@ -50,7 +50,7 @@ where
                 }
             }
             ExprKind::Call { func, .. } => {
-                if collect_call_path(func) == vec!["request", "addfinalizer"] {
+                if collect_call_path(func).as_slice() == ["request", "addfinalizer"] {
                     self.addfinalizer_call = Some(expr);
                 };
                 visitor::walk_expr(self, expr);

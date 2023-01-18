@@ -18,8 +18,6 @@
 )]
 #![forbid(unsafe_code)]
 
-extern crate core;
-
 mod ast;
 mod autofix;
 pub mod cache;
