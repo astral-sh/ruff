@@ -3135,6 +3135,23 @@ known-third-party = ["src"]
 
 ---
 
+#### [`no-lines-before`](#no-lines-before)
+
+Sections which should not be split with previous by empty lines
+
+**Default value**: `[]`
+
+**Type**: `Option<Vec<ImportType>>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+no-lines-before = ["future", "standard-library"]
+```
+
+---
+
 #### [`order-by-type`](#order-by-type)
 
 Order imports by type, which is determined by case, in addition to
