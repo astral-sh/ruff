@@ -85,3 +85,9 @@ if key in a_dict:
     var = a_dict[key]
 else:
     var = foo()
+
+# OK (complex default value)
+if key in a_dict:
+    var = a_dict[key]
+else:
+    var = a_dict["fallback"]
