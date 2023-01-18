@@ -597,7 +597,7 @@ pub fn format_imports(
 
     // Generate replacement source code.
     let mut is_first_block = true;
-    for (import_type, import_block) in block_by_type.into_iter() {
+    for (import_type, import_block) in block_by_type {
         let mut imports = order_imports(
             import_block,
             order_by_type,
