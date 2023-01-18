@@ -2451,7 +2451,7 @@ where
                             }
                         }
                     }
-                    if self.settings.enabled.contains(&RuleCode::UP031) {
+                    if self.settings.rules.enabled(&RuleCode::UP031) {
                         pyupgrade::rules::printf_string_formatting(self, expr, right);
                     }
                 }

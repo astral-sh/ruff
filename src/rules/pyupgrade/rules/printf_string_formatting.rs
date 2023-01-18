@@ -77,10 +77,15 @@ fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -
 
 /// Given a string (like
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
+    let mut formats: Vec<PercentFormat> = vec![];
+
+    /*
+    let Ok(format_string) = CFormatString::from_str(&string[1..string.len() - 1]) else {
+        return;
+    };
     let mut string_start = 0;
     let mut string_end = 0;
     let mut in_fmt = false;
-    let mut formats: Vec<PercentFormat> = vec![];
 
     let mut i = 0;
     while i < string.len() {
@@ -139,6 +144,8 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     }
 
     assert!(!in_fmt, "end-of-string while parsing format");
+    formats
+    */
     formats
 }
 
