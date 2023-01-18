@@ -2829,9 +2829,13 @@ impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
 define_violation!(
     pub struct NestedIfStatements;
 );
-impl Violation for NestedIfStatements {
+impl AlwaysAutofixableViolation for NestedIfStatements {
     fn message(&self) -> String {
         "Use a single `if` statement instead of nested `if` statements".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Combine `if` statements using `and`".to_string()
     }
 
     fn placeholder() -> Self {

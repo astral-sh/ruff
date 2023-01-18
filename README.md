@@ -1004,7 +1004,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `...`, merge into a single call | 🛠 |
-| SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements |  |
+| SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements | 🛠 |
 | SIM103 | ReturnBoolConditionDirectly | Return the condition `...` directly | 🛠 |
 | SIM105 | UseContextlibSuppress | Use `contextlib.suppress(...)` instead of try-except-pass |  |
 | SIM107 | ReturnInTryExceptFinally | Don't use `return` in `try`/`except` and `finally` |  |

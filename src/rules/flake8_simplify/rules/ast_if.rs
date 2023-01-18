@@ -1,3 +1,4 @@
+use log::error;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
@@ -9,6 +10,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, RuleCode};
+use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violations;
 
 fn is_main_check(expr: &Expr) -> bool {
@@ -64,10 +66,30 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        violations::NestedIfStatements,
-        Range::from_located(stmt),
-    ));
+    let mut diagnostic = Diagnostic::new(violations::NestedIfStatements, Range::from_located(stmt));
+    if checker.patch(&RuleCode::SIM102) {
+        // The fixer preserves comments in the nested body, but removes comments between
+        // the outer and inner if statements.
+        let nested_if = &body[0];
+        if !has_comments_in(
+            Range::new(stmt.location, nested_if.location),
+            checker.locator,
+        ) {
+            match fix_if::fix_nested_if_statements(checker.locator, stmt) {
+                Ok(fix) => {
+                    if fix
+                        .content
+                        .lines()
+                        .all(|line| line.len() <= checker.settings.line_length)
+                    {
+                        diagnostic.amend(fix);
+                    }
+                }
+                Err(err) => error!("Failed to fix nested if: {err}"),
+            }
+        }
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 fn is_one_line_return_bool(stmts: &[Stmt]) -> bool {
