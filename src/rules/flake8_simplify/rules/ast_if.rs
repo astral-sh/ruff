@@ -96,14 +96,16 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
-    if checker.patch(&RuleCode::SIM103) {
+    if checker.patch(&RuleCode::SIM103)
+        && !(has_comments(stmt, checker.locator) || has_comments(&orelse[0], checker.locator))
+    {
         let return_stmt = create_stmt(StmtKind::Return {
             value: Some(test.clone()),
         });
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
-            stmt.end_location.unwrap(),
+            orelse[0].end_location.unwrap(),
         ));
     }
     checker.diagnostics.push(diagnostic);
