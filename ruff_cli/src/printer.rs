@@ -11,7 +11,7 @@ use itertools::iterate;
 use ruff::fs::relativize_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
-use ruff::registry::RuleCode;
+use ruff::registry::Rule;
 use ruff::settings::types::SerializationFormat;
 use ruff::{fix, notify_user};
 use serde::Serialize;
@@ -35,12 +35,29 @@ struct ExpandedFix<'a> {
 
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {
-    code: &'a RuleCode,
+    code: SerializeRuleAsCode<'a>,
     message: String,
     fix: Option<ExpandedFix<'a>>,
     location: Location,
     end_location: Location,
     filename: &'a str,
+}
+
+struct SerializeRuleAsCode<'a>(&'a Rule);
+
+impl Serialize for SerializeRuleAsCode<'_> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.code())
+    }
+}
+
+impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
+    fn from(rule: &'a Rule) -> Self {
+        Self(rule)
+    }
 }
 
 pub struct Printer<'a> {
@@ -143,7 +160,7 @@ impl<'a> Printer<'a> {
                             .messages
                             .iter()
                             .map(|message| ExpandedMessage {
-                                code: message.kind.rule(),
+                                code: message.kind.rule().into(),
                                 message: message.kind.body(),
                                 fix: message.fix.as_ref().map(|fix| ExpandedFix {
                                     content: &fix.content,
@@ -280,7 +297,7 @@ impl<'a> Printer<'a> {
                                 json!({
                                     "description": format!("({}) {}", message.kind.rule().code(), message.kind.body()),
                                     "severity": "major",
-                                    "fingerprint": message.kind.rule(),
+                                    "fingerprint": message.kind.rule().code(),
                                     "location": {
                                         "path": message.filename,
                                         "lines": {
