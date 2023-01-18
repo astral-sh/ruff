@@ -41,9 +41,3 @@ bindings = "bin"
 manifest-path = "ruff_cli/Cargo.toml"
 python-source = "python"
 strip = true
-
-[tool.setuptools]
-license-files = [
-  "LICENSE",
-  "licenses/*",
-]
