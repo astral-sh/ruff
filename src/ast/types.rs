@@ -243,4 +243,4 @@ impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
     }
 }
 
-pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 4]>;
+pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;

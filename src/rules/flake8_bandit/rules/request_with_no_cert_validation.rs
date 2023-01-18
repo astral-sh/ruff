@@ -30,44 +30,27 @@ pub fn request_with_no_cert_validation(
     keywords: &[Keyword],
 ) {
     if let Some(target) = checker.resolve_call_path(func).and_then(|call_path| {
-        REQUESTS_HTTP_VERBS
-            .iter()
-            .find(|target| call_path.as_slice() == ["requests", target)
-    }) {}
-    if let Some(call_path) = checker.resolve_call_path(func) {
-        let call_args = SimpleCallArgs::new(args, keywords);
-        for func_name in &REQUESTS_HTTP_VERBS {
-            if call_path.as_slice() == ["requests", func_name] {
-                if let Some(verify_arg) = call_args.get_argument("verify", None) {
-                    if let ExprKind::Constant {
-                        value: Constant::Bool(false),
-                        ..
-                    } = &verify_arg.node
-                    {
-                        checker.diagnostics.push(Diagnostic::new(
-                            violations::RequestWithNoCertValidation("requests".to_string()),
-                            Range::from_located(verify_arg),
-                        ));
-                    }
-                }
-                return;
+        if call_path.len() == 2 {
+            if call_path[0] == "requests" && REQUESTS_HTTP_VERBS.contains(&call_path[1]) {
+                return Some("requests");
+            }
+            if call_path[0] == "httpx" && HTTPX_METHODS.contains(&call_path[1]) {
+                return Some("httpx");
             }
         }
-        for func_name in &HTTPX_METHODS {
-            if call_path.as_slice() == ["httpx", func_name] {
-                if let Some(verify_arg) = call_args.get_argument("verify", None) {
-                    if let ExprKind::Constant {
-                        value: Constant::Bool(false),
-                        ..
-                    } = &verify_arg.node
-                    {
-                        checker.diagnostics.push(Diagnostic::new(
-                            violations::RequestWithNoCertValidation("httpx".to_string()),
-                            Range::from_located(verify_arg),
-                        ));
-                    }
-                }
-                return;
+        None
+    }) {
+        let call_args = SimpleCallArgs::new(args, keywords);
+        if let Some(verify_arg) = call_args.get_argument("verify", None) {
+            if let ExprKind::Constant {
+                value: Constant::Bool(false),
+                ..
+            } = &verify_arg.node
+            {
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::RequestWithNoCertValidation(target.to_string()),
+                    Range::from_located(verify_arg),
+                ));
             }
         }
     }

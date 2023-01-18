@@ -33,7 +33,7 @@ pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
             .find(|target| call_path.as_slice() == **target)
     }) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::Debugger(DebuggerUsingType::Call(format_call_path(&target))),
+            violations::Debugger(DebuggerUsingType::Call(format_call_path(target))),
             Range::from_located(expr),
         ));
     }

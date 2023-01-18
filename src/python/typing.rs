@@ -249,3 +249,13 @@ pub fn is_pep585_builtin(checker: &Checker, expr: &Expr) -> bool {
         PEP_585_BUILTINS_ELIGIBLE.contains(&call_path.as_slice())
     })
 }
+
+pub enum Callable {
+    ForwardRef,
+    Cast,
+    NewType,
+    TypeVar,
+    NamedTuple,
+    TypedDict,
+    MypyExtension,
+}

@@ -10,7 +10,7 @@ use rustpython_ast::{
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
-use smallvec::{smallvec, SmallVec};
+use smallvec::smallvec;
 
 use crate::ast::types::{Binding, BindingKind, CallPath, Range};
 use crate::checkers::ast::Checker;
@@ -110,11 +110,11 @@ pub fn format_call_path(call_path: &[&str]) -> String {
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-pub fn contains_call_path(checker: &Checker, expr: &Expr, target: CallPath) -> bool {
+pub fn contains_call_path(checker: &Checker, expr: &Expr, target: &[&str]) -> bool {
     any_over_expr(expr, &|expr| {
         checker
             .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path == target)
+            .map_or(false, |call_path| call_path.as_slice() == target)
     })
 }
 
