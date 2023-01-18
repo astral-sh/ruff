@@ -100,8 +100,7 @@ pub fn main() -> Result<ExitCode> {
 
 https://github.com/charliermarsh/ruff/issues/new?title=%5BPanic%5D
 
-quoting the executed command, along with the relevant file contents and `pyproject.toml` settings,
-we'd be very appreciative!
+quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
             "error".red().bold(),
         );
