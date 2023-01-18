@@ -1057,25 +1057,6 @@ impl AlwaysAutofixableViolation for UselessImportAlias {
 }
 
 define_violation!(
-    pub struct MisplacedComparisonConstant(pub String);
-);
-impl AlwaysAutofixableViolation for MisplacedComparisonConstant {
-    fn message(&self) -> String {
-        let MisplacedComparisonConstant(comparison) = self;
-        format!("Comparison should be {comparison}")
-    }
-
-    fn autofix_title(&self) -> String {
-        let MisplacedComparisonConstant(comparison) = self;
-        format!("Replace with {comparison}")
-    }
-
-    fn placeholder() -> Self {
-        MisplacedComparisonConstant("...".to_string())
-    }
-}
-
-define_violation!(
     pub struct UnnecessaryDirectLambdaCall;
 );
 impl Violation for UnnecessaryDirectLambdaCall {
@@ -3135,25 +3116,23 @@ impl AlwaysAutofixableViolation for AndFalse {
 
 define_violation!(
     pub struct YodaConditions {
-        pub variable: String,
-        pub constant: String,
+        pub suggestion: String,
     }
 );
 impl AlwaysAutofixableViolation for YodaConditions {
     fn message(&self) -> String {
-        let YodaConditions { variable, constant } = self;
-        format!("Yoda conditions are discouraged, use `{variable} == {constant}` instead")
+        let YodaConditions { suggestion } = self;
+        format!("Yoda conditions are discouraged, use `{suggestion}` instead")
     }
 
     fn autofix_title(&self) -> String {
-        let YodaConditions { variable, constant } = self;
-        format!("Replace Yoda condition with `{variable} == {constant}`")
+        let YodaConditions { suggestion } = self;
+        format!("Replace Yoda condition with `{suggestion}`")
     }
 
     fn placeholder() -> Self {
         YodaConditions {
-            variable: "x".to_string(),
-            constant: "1".to_string(),
+            suggestion: "x == 1".to_string(),
         }
     }
 }
