@@ -1,4 +1,4 @@
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Located, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
@@ -10,11 +10,29 @@ use crate::violations;
 pub fn use_contextlib_suppress(
     checker: &mut Checker,
     stmt: &Stmt,
+    body: &[Stmt],
     handlers: &[Excepthandler],
     orelse: &[Stmt],
     finalbody: &[Stmt],
 ) {
-    if handlers.len() != 1 || !orelse.is_empty() || !finalbody.is_empty() {
+    if !matches!(
+        body,
+        [Located {
+            node: StmtKind::Delete { .. }
+                | StmtKind::Assign { .. }
+                | StmtKind::AugAssign { .. }
+                | StmtKind::AnnAssign { .. }
+                | StmtKind::Assert { .. }
+                | StmtKind::Import { .. }
+                | StmtKind::ImportFrom { .. }
+                | StmtKind::Expr { .. }
+                | StmtKind::Pass,
+            ..
+        }]
+    ) || handlers.len() != 1
+        || !orelse.is_empty()
+        || !finalbody.is_empty()
+    {
         return;
     }
     let handler = &handlers[0];
