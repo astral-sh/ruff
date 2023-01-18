@@ -22,7 +22,7 @@ with contextlib.ExitStack() as stack:
 with contextlib.AsyncExitStack() as exit_stack:
     f = await exit_stack.enter_async_context(open("filename"))
 
-# SIM115
+# OK (false negative)
 with contextlib.ExitStack():
     f = exit_stack.enter_context(open("filename"))
 
@@ -30,7 +30,7 @@ with contextlib.ExitStack():
 with contextlib.ExitStack():
     f = open("filename")
 
-# SIM115 (false positive)
+# OK
 with contextlib.ExitStack() as exit_stack:
     exit_stack_ = exit_stack
     f = exit_stack_.enter_context(open("filename"))

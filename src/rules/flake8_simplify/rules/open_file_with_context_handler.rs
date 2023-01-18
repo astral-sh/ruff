@@ -18,34 +18,20 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
     let ExprKind::Call { func,  .. } = &value.node else {
          return false;
      };
-    let ExprKind::Attribute { value, attr, .. } = &func.node else {
+    let ExprKind::Attribute { attr, .. } = &func.node else {
         return false;
     };
     if attr != "enter_async_context" {
         return false;
     }
-    let ExprKind::Name { id, .. } = &value.node else {
-        return false;
-    };
-    // TODO(charlie): By relying on the binding tracking, we won't detect renames.
-    // This strategy favors false-positives over false-negatives.
-    let Some(binding) = checker.find_binding(id) else {
-        return false;
-    };
     for parent in &checker.parents {
-        if binding
-            .source
-            .as_ref()
-            .map_or(false, |source| source == parent)
-        {
-            if let StmtKind::With { items, .. } = &parent.node {
-                for item in items {
-                    if let ExprKind::Call { func, .. } = &item.context_expr.node {
-                        if checker.resolve_call_path(func).map_or(false, |call_path| {
-                            call_path == ["contextlib", "AsyncExitStack"]
-                        }) {
-                            return true;
-                        }
+        if let StmtKind::With { items, .. } = &parent.node {
+            for item in items {
+                if let ExprKind::Call { func, .. } = &item.context_expr.node {
+                    if checker.resolve_call_path(func).map_or(false, |call_path| {
+                        call_path == ["contextlib", "AsyncExitStack"]
+                    }) {
+                        return true;
                     }
                 }
             }
@@ -63,35 +49,21 @@ fn match_exit_stack(checker: &Checker) -> bool {
     let ExprKind::Call { func,  .. } = &expr.node else {
          return false;
      };
-    let ExprKind::Attribute { value, attr, .. } = &func.node else {
+    let ExprKind::Attribute { attr, .. } = &func.node else {
         return false;
     };
     if attr != "enter_context" {
         return false;
     }
-    let ExprKind::Name { id, .. } = &value.node else {
-        return false;
-    };
-    // TODO(charlie): By relying on the binding tracking, we won't detect renames.
-    // This strategy favors false-positives over false-negatives.
-    let Some(binding) = checker.find_binding(id) else {
-        return false;
-    };
     for parent in &checker.parents {
-        if binding
-            .source
-            .as_ref()
-            .map_or(false, |source| source == parent)
-        {
-            if let StmtKind::With { items, .. } = &parent.node {
-                for item in items {
-                    if let ExprKind::Call { func, .. } = &item.context_expr.node {
-                        if checker
-                            .resolve_call_path(func)
-                            .map_or(false, |call_path| call_path == ["contextlib", "ExitStack"])
-                        {
-                            return true;
-                        }
+        if let StmtKind::With { items, .. } = &parent.node {
+            for item in items {
+                if let ExprKind::Call { func, .. } = &item.context_expr.node {
+                    if checker
+                        .resolve_call_path(func)
+                        .map_or(false, |call_path| call_path == ["contextlib", "ExitStack"])
+                    {
+                        return true;
                     }
                 }
             }
