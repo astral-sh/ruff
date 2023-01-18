@@ -88,6 +88,7 @@ pub fn expand<'a>(
     rule_type: &Ident,
     prefix_ident: &Ident,
     variants: impl Iterator<Item = &'a Ident>,
+    variant_name: impl Fn(&str) -> &'a Ident,
 ) -> proc_macro2::TokenStream {
     // Build up a map from prefix to matching RuleCodes.
     let mut prefix_to_codes: BTreeMap<Ident, BTreeSet<String>> = BTreeMap::default();
@@ -129,7 +130,7 @@ pub fn expand<'a>(
         }
     });
 
-    let prefix_impl = generate_impls(rule_type, prefix_ident, &prefix_to_codes);
+    let prefix_impl = generate_impls(rule_type, prefix_ident, &prefix_to_codes, variant_name);
 
     let prefix_redirects = PREFIX_REDIRECTS.iter().map(|(alias, rule_code)| {
         let code = Ident::new(rule_code, Span::call_site());
@@ -177,16 +178,17 @@ pub fn expand<'a>(
     }
 }
 
-fn generate_impls(
+fn generate_impls<'a>(
     rule_type: &Ident,
     prefix_ident: &Ident,
     prefix_to_codes: &BTreeMap<Ident, BTreeSet<String>>,
+    variant_name: impl Fn(&str) -> &'a Ident,
 ) -> proc_macro2::TokenStream {
     let codes_match_arms = prefix_to_codes.iter().map(|(prefix, codes)| {
         let codes = codes.iter().map(|code| {
-            let code = Ident::new(code, Span::call_site());
+            let rule_variant = variant_name(code);
             quote! {
-                #rule_type::#code
+                #rule_type::#rule_variant
             }
         });
         let prefix_str = prefix.to_string();
