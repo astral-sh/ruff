@@ -1,7 +1,7 @@
 use rustpython_ast::Constant;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Primitive {
     Bool,
     Str,
@@ -24,7 +24,7 @@ impl Primitive {
         }
     }
 
-    pub fn builtin(&self) -> String {
+    pub fn builtin(self) -> String {
         match self {
             Primitive::Bool => "bool".to_string(),
             Primitive::Str => "str".to_string(),

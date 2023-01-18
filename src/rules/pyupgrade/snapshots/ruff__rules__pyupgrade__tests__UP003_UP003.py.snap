@@ -60,7 +60,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 4
-    column: 8
+    column: 9
   fix:
     content: float
     location:
@@ -68,7 +68,7 @@ expression: diagnostics
       column: 0
     end_location:
       row: 4
-      column: 8
+      column: 9
   parent: ~
 - kind:
     TypeOfPrimitive: Complex
