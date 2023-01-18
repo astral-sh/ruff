@@ -4,8 +4,8 @@ use rustpython_parser::token::Tok;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::Locator;
+use crate::registry::{Diagnostic, RuleCode};
+use crate::settings::{flags, Settings};
 use crate::violations;
 
 /// Simplified token type.
@@ -108,8 +108,11 @@ impl Context {
 }
 
 /// COM812, COM818, COM819
-#[allow(clippy::if_same_then_else, clippy::needless_bool)]
-pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnostic> {
+pub fn trailing_commas(
+    tokens: &[LexResult],
+    settings: &Settings,
+    autofix: flags::Autofix,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     let tokens = tokens
@@ -202,12 +205,8 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
             if comma_allowed && !is_singleton_tuplish {
                 true
             // Lambdas not handled by comma_allowed so handle it specially.
-            } else if context.type_ == ContextType::LambdaParameters
-                && token.type_ == TokenType::Colon
-            {
-                true
             } else {
-                false
+                context.type_ == ContextType::LambdaParameters && token.type_ == TokenType::Colon
             }
         };
         if comma_prohibited {
@@ -219,7 +218,11 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
                     end_location: comma.2,
                 },
             );
-            diagnostic.amend(Fix::deletion(comma.0, comma.2));
+            if matches!(autofix, flags::Autofix::Enabled)
+                && settings.rules.should_fix(&RuleCode::COM819)
+            {
+                diagnostic.amend(Fix::deletion(comma.0, comma.2));
+            }
             diagnostics.push(diagnostic);
         }
 
@@ -229,14 +232,13 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
             prev.type_ == TokenType::Comma && token.type_ == TokenType::Newline;
         if bare_comma_prohibited {
             let comma = prev.spanned.unwrap();
-            let diagnostic = Diagnostic::new(
+            diagnostics.push(Diagnostic::new(
                 violations::TrailingCommaOnBareTupleProhibited,
                 Range {
                     location: comma.0,
                     end_location: comma.2,
                 },
-            );
-            diagnostics.push(diagnostic);
+            ));
         }
 
         // Comma is required if:
@@ -262,7 +264,11 @@ pub fn trailing_commas(tokens: &[LexResult], _locator: &Locator) -> Vec<Diagnost
                     end_location: missing_comma.2,
                 },
             );
-            diagnostic.amend(Fix::insertion(",".to_owned(), missing_comma.2));
+            if matches!(autofix, flags::Autofix::Enabled)
+                && settings.rules.should_fix(&RuleCode::COM812)
+            {
+                diagnostic.amend(Fix::insertion(",".to_owned(), missing_comma.2));
+            }
             diagnostics.push(diagnostic);
         }
 
