@@ -782,6 +782,16 @@
             "null"
           ]
         },
+        "constants": {
+          "description": "An override list of tokens to always recognize as a CONSTANT for `order-by-type` regardless of casing.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "extra-standard-library": {
           "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.",
           "type": [
@@ -877,6 +887,16 @@
             "boolean",
             "null"
           ]
+        },
+        "variables": {
+          "description": "An override list of tokens to always recognize as a var for `order-by-type` regardless of casing.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false

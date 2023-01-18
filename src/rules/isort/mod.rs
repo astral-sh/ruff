@@ -389,6 +389,8 @@ fn order_imports<'a>(
     order_by_type: bool,
     relative_imports_order: RelatveImportsOrder,
     classes: &'a BTreeSet<String>,
+    constants: &'a BTreeSet<String>,
+    variables: &'a BTreeSet<String>,
 ) -> OrderedImportBlock<'a> {
     let mut ordered = OrderedImportBlock::default();
 
@@ -468,7 +470,14 @@ fn order_imports<'a>(
                     aliases
                         .into_iter()
                         .sorted_by(|(alias1, _), (alias2, _)| {
-                            cmp_members(alias1, alias2, order_by_type, classes)
+                            cmp_members(
+                                alias1,
+                                alias2,
+                                order_by_type,
+                                classes,
+                                constants,
+                                variables,
+                            )
                         })
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
@@ -480,9 +489,14 @@ fn order_imports<'a>(
                             (None, None) => Ordering::Equal,
                             (None, Some(_)) => Ordering::Less,
                             (Some(_), None) => Ordering::Greater,
-                            (Some((alias1, _)), Some((alias2, _))) => {
-                                cmp_members(alias1, alias2, order_by_type, classes)
-                            }
+                            (Some((alias1, _)), Some((alias2, _))) => cmp_members(
+                                alias1,
+                                alias2,
+                                order_by_type,
+                                classes,
+                                constants,
+                                variables,
+                            ),
                         },
                     )
                 },
@@ -559,6 +573,8 @@ pub fn format_imports(
     single_line_exclusions: &BTreeSet<String>,
     split_on_trailing_comma: bool,
     classes: &BTreeSet<String>,
+    constants: &BTreeSet<String>,
+    variables: &BTreeSet<String>,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -581,8 +597,14 @@ pub fn format_imports(
     // Generate replacement source code.
     let mut is_first_block = true;
     for import_block in block_by_type.into_values() {
-        let mut imports =
-            order_imports(import_block, order_by_type, relative_imports_order, classes);
+        let mut imports = order_imports(
+            import_block,
+            order_by_type,
+            relative_imports_order,
+            classes,
+            constants,
+            variables,
+        );
 
         if force_single_line {
             imports = force_single_line_imports(imports, single_line_exclusions);
@@ -702,6 +724,8 @@ mod tests {
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
     #[test_case(Path::new("order_by_type_with_custom_classes.py"))]
+    #[test_case(Path::new("order_by_type_with_custom_constants.py"))]
+    #[test_case(Path::new("order_by_type_with_custom_variables.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -840,6 +864,68 @@ mod tests {
                         "SELU".to_string(),
                         "N_CLASS".to_string(),
                         "CLASS".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(RuleCode::I001)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("order_by_type_with_custom_constants.py"))]
+    fn order_by_type_with_custom_constants(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "order_by_type_with_custom_constants_{}",
+            path.to_string_lossy()
+        );
+        let mut diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    order_by_type: true,
+                    constants: BTreeSet::from([
+                        "Const".to_string(),
+                        "constant".to_string(),
+                        "First".to_string(),
+                        "Last".to_string(),
+                        "A_constant".to_string(),
+                        "konst".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(RuleCode::I001)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("order_by_type_with_custom_variables.py"))]
+    fn order_by_type_with_custom_variables(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "order_by_type_with_custom_variables_{}",
+            path.to_string_lossy()
+        );
+        let mut diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    order_by_type: true,
+                    variables: BTreeSet::from([
+                        "VAR".to_string(),
+                        "Variable".to_string(),
+                        "MyVar".to_string(),
+                        "var_ABC".to_string(),
                     ]),
                     ..super::settings::Settings::default()
                 },
