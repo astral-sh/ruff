@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_common::cformat::{CFormatPart, CFormatStrOrBytes, CFormatString, CFormatQuantity};
+use rustpython_common::cformat::{CFormatPart, CFormatStrOrBytes, CFormatString, CFormatQuantity, CConversionFlags};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -77,6 +77,26 @@ fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -
     }
 }
 
+fn get_flags(flags: CConversionFlags) -> String {
+    let mut flag_string = String::new();
+    if flags.contains(CConversionFlags::ALTERNATE_FORM) {
+        flag_string.push('#');
+    }
+    if flags.contains(CConversionFlags::ZERO_PAD) {
+        flag_string.push('0');
+    }
+    if flags.contains(CConversionFlags::LEFT_ADJUST) {
+        flag_string.push('-');
+    }
+    if flags.contains(CConversionFlags::BLANK_SIGN) {
+        flag_string.push(' ');
+    }
+    if flags.contains(CConversionFlags::SIGN_CHAR) {
+        flag_string.push('+');
+    }
+    flag_string
+}
+
 /// Given a string (like
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let mut formats: Vec<PercentFormat> = vec![];
@@ -88,7 +108,6 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
         format_string.iter().map(|(_, part)| part).collect();
     for (i, part) in format_vec.iter().enumerate() {
         if let CFormatPart::Literal(item) = &part {
-            println!("{:?}", item);
             let mut current_format = PercentFormat::new(item.to_string(), None);
             let the_next = match format_vec.get(i + 1) {
                 Some(next) => next,
@@ -116,11 +135,14 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                     }
                     None => None
                 };
-                // Charlie, I have no clue how to get this to a string
-                println!("conversion_flag: {:?}", c_spec.flags);
+                let flags = if c_spec.flags.is_empty() {
+                    None
+                } else {
+                    Some(get_flags(c_spec.flags))
+                };
                 let perc_part = PercentFormatPart::new(
                     c_spec.mapping_key.clone(),
-                    None,
+                    flags,
                     clean_width,
                     clean_precision,
                     c_spec.format_char.to_string(),
@@ -561,10 +583,6 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     }
 
     let parsed = parse_percent_format(left_string);
-    println!("START");
-    for parse in &parsed {
-        println!("{parse:?}\n");
-    }
     let is_valid = check_statement(parsed, right);
     // If the statement is not valid, then bail
     if !is_valid {
@@ -645,7 +663,7 @@ mod test {
     #[test_case( "\"%.f\"",PercentFormatPart::new(None, None, None, Some(".".to_string()), "f".to_string()); "dot letter")]
     #[test_case( "\"%*d\"",PercentFormatPart::new(None, None, Some("*".to_string()), None, "d".to_string()); "star d")]
     #[test_case( "\"%5d\"",PercentFormatPart::new(None, None, Some("5".to_string()), None, "d".to_string()); "number letter")]
-    #[test_case( "\"% #0-+d\"",PercentFormatPart::new(None, Some(" #0-+".to_string()), None, None, "d".to_string()); "hastag and symbols")]
+    #[test_case( "\"% #0-+d\"",PercentFormatPart::new(None, Some("#0- +".to_string()), None, None, "d".to_string()); "hastag and symbols")]
     #[test_case( "\"%#o\"",PercentFormatPart::new(None, Some("#".to_string()), None, None, "o".to_string()); "format hashtag")]
     #[test_case( "\"%()s\"",PercentFormatPart::new(Some(String::new()), None, None, None, "s".to_string()); "empty paren")]
     #[test_case( "\"%(hi)s\"",PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string()); "word in paren")]
