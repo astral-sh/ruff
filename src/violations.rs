@@ -3134,21 +3134,27 @@ impl AlwaysAutofixableViolation for AndFalse {
 }
 
 define_violation!(
-    pub struct YodaConditions(pub String, pub String);
+    pub struct YodaConditions {
+        pub variable: String,
+        pub constant: String,
+    }
 );
 impl AlwaysAutofixableViolation for YodaConditions {
     fn message(&self) -> String {
-        let YodaConditions(left, right) = self;
-        format!("Yoda conditions are discouraged, use `{left} == {right}` instead")
+        let YodaConditions { variable, constant } = self;
+        format!("Yoda conditions are discouraged, use `{variable} == {constant}` instead")
     }
 
     fn autofix_title(&self) -> String {
-        let YodaConditions(left, right) = self;
-        format!("Replace Yoda condition with `{left} == {right}`")
+        let YodaConditions { variable, constant } = self;
+        format!("Replace Yoda condition with `{variable} == {constant}`")
     }
 
     fn placeholder() -> Self {
-        YodaConditions("left".to_string(), "right".to_string())
+        YodaConditions {
+            variable: "x".to_string(),
+            constant: "1".to_string(),
+        }
     }
 }
 

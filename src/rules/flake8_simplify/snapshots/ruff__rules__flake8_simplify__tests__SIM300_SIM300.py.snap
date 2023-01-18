@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     YodaConditions:
-      - "\"yoda\""
-      - compare
+      variable: compare
+      constant: "\"yoda\""
   location:
     row: 2
     column: 0
@@ -23,8 +23,8 @@ expression: diagnostics
   parent: ~
 - kind:
     YodaConditions:
-      - "'yoda'"
-      - compare
+      variable: compare
+      constant: "'yoda'"
   location:
     row: 3
     column: 0
@@ -42,8 +42,8 @@ expression: diagnostics
   parent: ~
 - kind:
     YodaConditions:
-      - "42"
-      - age
+      variable: age
+      constant: "42"
   location:
     row: 4
     column: 0
