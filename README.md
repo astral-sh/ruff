@@ -1161,7 +1161,7 @@ For more, see [flake8-commas](https://pypi.org/project/flake8-commas/2.1.0/) on 
 
 ### flake8-no-pep420 (INP)
 
-For more, see [flake8-no-pep420](https://pypi.org/project/flake8-boolean-trap/2.3.0/) on PyPI.
+For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
