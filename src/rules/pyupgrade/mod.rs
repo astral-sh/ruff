@@ -1,3 +1,4 @@
+//! Rules from [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/).
 mod fixes;
 mod helpers;
 pub(crate) mod rules;
@@ -30,8 +31,7 @@ mod tests {
     #[test_case(RuleCode::UP009, Path::new("UP009_3.py"); "UP009_3")]
     #[test_case(RuleCode::UP009, Path::new("UP009_4.py"); "UP009_4")]
     #[test_case(RuleCode::UP010, Path::new("UP010.py"); "UP010")]
-    #[test_case(RuleCode::UP011, Path::new("UP011_0.py"); "UP011_0")]
-    #[test_case(RuleCode::UP011, Path::new("UP011_1.py"); "UP011_1")]
+    #[test_case(RuleCode::UP011, Path::new("UP011.py"); "UP011")]
     #[test_case(RuleCode::UP012, Path::new("UP012.py"); "UP012")]
     #[test_case(RuleCode::UP013, Path::new("UP013.py"); "UP013")]
     #[test_case(RuleCode::UP014, Path::new("UP014.py"); "UP014")]
@@ -56,6 +56,8 @@ mod tests {
     #[test_case(RuleCode::UP030, Path::new("UP030_1.py"); "UP030_1")]
     #[test_case(RuleCode::UP031, Path::new("UP031_0.py"); "UP031_0")]
     #[test_case(RuleCode::UP031, Path::new("UP031_1.py"); "UP031_1")]
+    #[test_case(RuleCode::UP032, Path::new("UP032.py"); "UP032")]
+    #[test_case(RuleCode::UP033, Path::new("UP033.py"); "UP033")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

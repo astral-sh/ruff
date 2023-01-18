@@ -17,12 +17,12 @@ pub fn check_lines(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_blanket_noqa = settings.enabled.contains(&RuleCode::PGH004);
-    let enforce_blanket_type_ignore = settings.enabled.contains(&RuleCode::PGH003);
-    let enforce_doc_line_too_long = settings.enabled.contains(&RuleCode::W505);
-    let enforce_line_too_long = settings.enabled.contains(&RuleCode::E501);
-    let enforce_no_newline_at_end_of_file = settings.enabled.contains(&RuleCode::W292);
-    let enforce_unnecessary_coding_comment = settings.enabled.contains(&RuleCode::UP009);
+    let enforce_blanket_noqa = settings.rules.enabled(&RuleCode::PGH004);
+    let enforce_blanket_type_ignore = settings.rules.enabled(&RuleCode::PGH003);
+    let enforce_doc_line_too_long = settings.rules.enabled(&RuleCode::W505);
+    let enforce_line_too_long = settings.rules.enabled(&RuleCode::E501);
+    let enforce_no_newline_at_end_of_file = settings.rules.enabled(&RuleCode::W292);
+    let enforce_unnecessary_coding_comment = settings.rules.enabled(&RuleCode::UP009);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
@@ -37,7 +37,7 @@ pub fn check_lines(
                         index,
                         line,
                         matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(&RuleCode::UP009),
+                            && settings.rules.should_fix(&RuleCode::UP009),
                     ) {
                         diagnostics.push(diagnostic);
                     }
@@ -79,7 +79,7 @@ pub fn check_lines(
         if let Some(diagnostic) = no_newline_at_end_of_file(
             contents,
             matches!(autofix, flags::Autofix::Enabled)
-                && settings.fixable.contains(&RuleCode::W292),
+                && settings.rules.should_fix(&RuleCode::W292),
         ) {
             diagnostics.push(diagnostic);
         }

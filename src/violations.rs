@@ -3396,9 +3396,9 @@ impl AlwaysAutofixableViolation for UnnecessaryFutureImport {
 }
 
 define_violation!(
-    pub struct UnnecessaryLRUCacheParams;
+    pub struct LRUCacheWithoutParameters;
 );
-impl AlwaysAutofixableViolation for UnnecessaryLRUCacheParams {
+impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
     fn message(&self) -> String {
         "Unnecessary parameters to `functools.lru_cache`".to_string()
     }
@@ -3408,7 +3408,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLRUCacheParams {
     }
 
     fn placeholder() -> Self {
-        UnnecessaryLRUCacheParams
+        LRUCacheWithoutParameters
     }
 }
 
@@ -3814,6 +3814,40 @@ impl AlwaysAutofixableViolation for FormatLiterals {
 
     fn placeholder() -> Self {
         FormatLiterals
+    }
+}
+
+define_violation!(
+    pub struct FString;
+);
+impl AlwaysAutofixableViolation for FString {
+    fn message(&self) -> String {
+        "Use f-string instead of `format` call".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Convert to f-string".to_string()
+    }
+
+    fn placeholder() -> Self {
+        FString
+    }
+}
+
+define_violation!(
+    pub struct FunctoolsCache;
+);
+impl AlwaysAutofixableViolation for FunctoolsCache {
+    fn message(&self) -> String {
+        "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`".to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Rewrite with `@functools.cache".to_string()
+    }
+
+    fn placeholder() -> Self {
+        FunctoolsCache
     }
 }
 

@@ -1,3 +1,4 @@
+//! Rules from [isort](https://pypi.org/project/isort/5.10.1/).
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};

@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::directives;
 use crate::linter::check_path;
-use crate::registry::{RuleCode, RuleCodePrefix};
+use crate::registry::RuleCode;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
@@ -16,8 +16,7 @@ use crate::rules::{
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
-use crate::settings::types::PythonVersion;
-use crate::settings::{flags, Settings};
+use crate::settings::{defaults, flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -87,14 +86,14 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         // Propagate defaults.
         allowed_confusables: Some(Vec::default()),
         builtins: Some(Vec::default()),
-        dummy_variable_rgx: Some("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$".to_string()),
+        dummy_variable_rgx: Some(defaults::DUMMY_VARIABLE_RGX.as_str().to_string()),
         extend_ignore: Some(Vec::default()),
         extend_select: Some(Vec::default()),
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
-        line_length: Some(88),
-        select: Some(vec![RuleCodePrefix::E, RuleCodePrefix::F]),
-        target_version: Some(PythonVersion::default()),
+        line_length: Some(defaults::LINE_LENGTH),
+        select: Some(defaults::PREFIXES.to_vec()),
+        target_version: Some(defaults::TARGET_VERSION),
         // Ignore a bunch of options that don't make sense in a single-file editor.
         cache_dir: None,
         exclude: None,

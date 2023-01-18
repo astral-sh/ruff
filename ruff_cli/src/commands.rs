@@ -114,7 +114,7 @@ pub fn run(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    if settings.enabled.contains(&RuleCode::E902) {
+                    if settings.rules.enabled(&RuleCode::E902) {
                         Diagnostics::new(vec![Message {
                             kind: IOError(message).into(),
                             location: Location::default(),
@@ -296,7 +296,7 @@ pub fn explain(code: &RuleCode, format: SerializationFormat) -> Result<()> {
             println!(
                 "{} ({}): {}",
                 code.as_ref(),
-                code.origin().title(),
+                code.origin().name(),
                 code.kind().summary()
             );
         }
@@ -305,7 +305,7 @@ pub fn explain(code: &RuleCode, format: SerializationFormat) -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
                     code: code.as_ref(),
-                    origin: code.origin().title(),
+                    origin: code.origin().name(),
                     summary: &code.kind().summary(),
                 })?
             );

@@ -178,7 +178,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
         Some(sibling) => return_values_for_siblings(stmt, sibling),
     } {
         if loop_info.return_value && !loop_info.next_return_value {
-            if checker.settings.enabled.contains(&RuleCode::SIM110) {
+            if checker.settings.rules.enabled(&RuleCode::SIM110) {
                 let contents = return_stmt(
                     "any",
                     loop_info.test,
@@ -211,7 +211,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
         }
 
         if !loop_info.return_value && loop_info.next_return_value {
-            if checker.settings.enabled.contains(&RuleCode::SIM111) {
+            if checker.settings.rules.enabled(&RuleCode::SIM111) {
                 // Invert the condition.
                 let test = {
                     if let ExprKind::UnaryOp {

@@ -1,7 +1,5 @@
 //! Registry of [`RuleCode`] to [`DiagnosticKind`] mappings.
 
-use std::fmt;
-
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use ruff_macros::RuleCodePrefix;
@@ -234,7 +232,7 @@ ruff_macros::define_rule_mapping!(
     UP008 => violations::SuperCallWithParameters,
     UP009 => violations::PEP3120UnnecessaryCodingComment,
     UP010 => violations::UnnecessaryFutureImport,
-    UP011 => violations::UnnecessaryLRUCacheParams,
+    UP011 => violations::LRUCacheWithoutParameters,
     UP012 => violations::UnnecessaryEncodeUTF8,
     UP013 => violations::ConvertTypedDictFunctionalToClass,
     UP014 => violations::ConvertNamedTupleFunctionalToClass,
@@ -255,6 +253,8 @@ ruff_macros::define_rule_mapping!(
     UP029 => violations::UnnecessaryBuiltinImport,
     UP030 => violations::FormatLiterals,
     UP031 => violations::PrintfStringFormatting,
+    UP032 => violations::FString,
+    UP033 => violations::FunctoolsCache,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,
@@ -463,20 +463,6 @@ pub enum RuleOrigin {
     Ruff,
 }
 
-pub enum Platform {
-    PyPI,
-    GitHub,
-}
-
-impl fmt::Display for Platform {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Platform::PyPI => fmt.write_str("PyPI"),
-            Platform::GitHub => fmt.write_str("GitHub"),
-        }
-    }
-}
-
 pub enum Prefixes {
     Single(RuleCodePrefix),
     Multiple(Vec<(RuleCodePrefix, &'static str)>),
@@ -494,46 +480,9 @@ impl Prefixes {
     }
 }
 
-impl RuleOrigin {
-    pub fn title(&self) -> &'static str {
-        match self {
-            RuleOrigin::Eradicate => "eradicate",
-            RuleOrigin::Flake82020 => "flake8-2020",
-            RuleOrigin::Flake8Annotations => "flake8-annotations",
-            RuleOrigin::Flake8Bandit => "flake8-bandit",
-            RuleOrigin::Flake8BlindExcept => "flake8-blind-except",
-            RuleOrigin::Flake8BooleanTrap => "flake8-boolean-trap",
-            RuleOrigin::Flake8Bugbear => "flake8-bugbear",
-            RuleOrigin::Flake8Builtins => "flake8-builtins",
-            RuleOrigin::Flake8Comprehensions => "flake8-comprehensions",
-            RuleOrigin::Flake8Debugger => "flake8-debugger",
-            RuleOrigin::Flake8ErrMsg => "flake8-errmsg",
-            RuleOrigin::Flake8ImplicitStrConcat => "flake8-implicit-str-concat",
-            RuleOrigin::Flake8ImportConventions => "flake8-import-conventions",
-            RuleOrigin::Flake8Print => "flake8-print",
-            RuleOrigin::Flake8PytestStyle => "flake8-pytest-style",
-            RuleOrigin::Flake8Quotes => "flake8-quotes",
-            RuleOrigin::Flake8Return => "flake8-return",
-            RuleOrigin::Flake8TidyImports => "flake8-tidy-imports",
-            RuleOrigin::Flake8Simplify => "flake8-simplify",
-            RuleOrigin::Flake8UnusedArguments => "flake8-unused-arguments",
-            RuleOrigin::Flake8Datetimez => "flake8-datetimez",
-            RuleOrigin::Isort => "isort",
-            RuleOrigin::McCabe => "mccabe",
-            RuleOrigin::PandasVet => "pandas-vet",
-            RuleOrigin::PEP8Naming => "pep8-naming",
-            RuleOrigin::Pycodestyle => "pycodestyle",
-            RuleOrigin::Pydocstyle => "pydocstyle",
-            RuleOrigin::Pyflakes => "Pyflakes",
-            RuleOrigin::PygrepHooks => "pygrep-hooks",
-            RuleOrigin::Pylint => "Pylint",
-            RuleOrigin::Pyupgrade => "pyupgrade",
-            RuleOrigin::Flake8Pie => "flake8-pie",
-            RuleOrigin::Flake8Commas => "flake8-commas",
-            RuleOrigin::Ruff => "Ruff-specific rules",
-        }
-    }
+include!(concat!(env!("OUT_DIR"), "/origin.rs"));
 
+impl RuleOrigin {
     pub fn prefixes(&self) -> Prefixes {
         match self {
             RuleOrigin::Eradicate => Prefixes::Single(RuleCodePrefix::ERA),
@@ -578,131 +527,6 @@ impl RuleOrigin {
             RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
             RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
             RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
-        }
-    }
-
-    pub fn url(&self) -> Option<(&'static str, &'static Platform)> {
-        match self {
-            RuleOrigin::Eradicate => {
-                Some(("https://pypi.org/project/eradicate/2.1.0/", &Platform::PyPI))
-            }
-            RuleOrigin::Flake82020 => Some((
-                "https://pypi.org/project/flake8-2020/1.7.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Annotations => Some((
-                "https://pypi.org/project/flake8-annotations/2.9.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Bandit => Some((
-                "https://pypi.org/project/flake8-bandit/4.1.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8BlindExcept => Some((
-                "https://pypi.org/project/flake8-blind-except/0.2.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8BooleanTrap => Some((
-                "https://pypi.org/project/flake8-boolean-trap/0.1.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Bugbear => Some((
-                "https://pypi.org/project/flake8-bugbear/22.10.27/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Builtins => Some((
-                "https://pypi.org/project/flake8-builtins/2.0.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Comprehensions => Some((
-                "https://pypi.org/project/flake8-comprehensions/3.10.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Debugger => Some((
-                "https://pypi.org/project/flake8-debugger/4.1.2/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8ErrMsg => Some((
-                "https://pypi.org/project/flake8-errmsg/0.4.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8ImplicitStrConcat => Some((
-                "https://pypi.org/project/flake8-implicit-str-concat/0.3.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8ImportConventions => None,
-            RuleOrigin::Flake8Print => Some((
-                "https://pypi.org/project/flake8-print/5.0.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8PytestStyle => Some((
-                "https://pypi.org/project/flake8-pytest-style/1.6.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Quotes => Some((
-                "https://pypi.org/project/flake8-quotes/3.3.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Return => Some((
-                "https://pypi.org/project/flake8-return/1.2.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Simplify => Some((
-                "https://pypi.org/project/flake8-simplify/0.19.3/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8TidyImports => Some((
-                "https://pypi.org/project/flake8-tidy-imports/4.8.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8UnusedArguments => Some((
-                "https://pypi.org/project/flake8-unused-arguments/0.0.12/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Datetimez => Some((
-                "https://pypi.org/project/flake8-datetimez/20.10.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Isort => Some(("https://pypi.org/project/isort/5.10.1/", &Platform::PyPI)),
-            RuleOrigin::McCabe => Some(("https://pypi.org/project/mccabe/0.7.0/", &Platform::PyPI)),
-            RuleOrigin::PandasVet => Some((
-                "https://pypi.org/project/pandas-vet/0.2.3/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::PEP8Naming => Some((
-                "https://pypi.org/project/pep8-naming/0.13.2/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Pycodestyle => Some((
-                "https://pypi.org/project/pycodestyle/2.9.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Pydocstyle => Some((
-                "https://pypi.org/project/pydocstyle/6.1.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Pyflakes => {
-                Some(("https://pypi.org/project/pyflakes/2.5.0/", &Platform::PyPI))
-            }
-            RuleOrigin::Pylint => {
-                Some(("https://pypi.org/project/pylint/2.15.7/", &Platform::PyPI))
-            }
-            RuleOrigin::PygrepHooks => Some((
-                "https://github.com/pre-commit/pygrep-hooks",
-                &Platform::GitHub,
-            )),
-            RuleOrigin::Pyupgrade => {
-                Some(("https://pypi.org/project/pyupgrade/3.2.0/", &Platform::PyPI))
-            }
-            RuleOrigin::Flake8Pie => Some((
-                "https://pypi.org/project/flake8-pie/0.16.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Commas => Some((
-                "https://pypi.org/project/flake8-commas/2.1.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Ruff => None,
         }
     }
 }

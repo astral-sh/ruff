@@ -1,3 +1,4 @@
+//! Rules from [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/0.1.0/).
 pub(crate) mod rules;
 
 #[cfg(test)]
