@@ -2974,10 +2974,14 @@ impl AlwaysAutofixableViolation for ConvertLoopToAll {
 define_violation!(
     pub struct MultipleWithStatements;
 );
-impl Violation for MultipleWithStatements {
+impl AlwaysAutofixableViolation for MultipleWithStatements {
     fn message(&self) -> String {
         "Use a single `with` statement with multiple contexts instead of nested `with` statements"
             .to_string()
+    }
+
+    fn autofix_title(&self) -> String {
+        "Combine `with` statements".to_string()
     }
 
     fn placeholder() -> Self {

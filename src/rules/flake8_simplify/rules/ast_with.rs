@@ -1,9 +1,11 @@
+use log::error;
 use rustpython_ast::{Located, Stmt, StmtKind, Withitem};
 
-use crate::ast::helpers::first_colon_range;
+use super::fix_with;
+use crate::ast::helpers::{first_colon_range, has_comments_in};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
 fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
@@ -40,12 +42,33 @@ pub fn multiple_with_statements(
             ),
             checker.locator,
         );
-        checker.diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             violations::MultipleWithStatements,
             colon.map_or_else(
                 || Range::from_located(with_stmt),
                 |colon| Range::new(with_stmt.location, colon.end_location),
             ),
-        ));
+        );
+        if checker.patch(&RuleCode::SIM117) {
+            let nested_with = &with_body[0];
+            if !has_comments_in(
+                Range::new(with_stmt.location, nested_with.location),
+                checker.locator,
+            ) {
+                match fix_with::fix_multiple_with_statements(checker.locator, with_stmt) {
+                    Ok(fix) => {
+                        if fix
+                            .content
+                            .lines()
+                            .all(|line| line.len() <= checker.settings.line_length)
+                        {
+                            diagnostic.amend(fix);
+                        }
+                    }
+                    Err(err) => error!("Failed to fix nested with: {err}"),
+                }
+            }
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }

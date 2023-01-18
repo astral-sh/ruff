@@ -1014,7 +1014,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 | SIM111 | ConvertLoopToAll | Use `return all(x for x in y)` instead of `for` loop | 🛠 |
 | SIM112 | UseCapitalEnvironmentVariables | Use capitalized environment variable `...` instead of `...` | 🛠 |
 | SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
-| SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements |  |
+| SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements | 🛠 |
 | SIM118 | KeyInDict | Use `key in dict` instead of `key in dict.keys()` | 🛠 |
 | SIM201 | NegateEqualOp | Use `left != right` instead of `not left == right` | 🛠 |
 | SIM202 | NegateNotEqualOp | Use `left == right` instead of `not left != right` | 🛠 |
