@@ -137,6 +137,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-commas (COM)](#flake8-commas-com)
+   1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1157,6 +1158,14 @@ For more, see [flake8-commas](https://pypi.org/project/flake8-commas/2.1.0/) on 
 | COM812 | TrailingCommaMissing | Trailing comma missing | 🛠 |
 | COM818 | TrailingCommaOnBareTupleProhibited | Trailing comma on bare tuple prohibited |  |
 | COM819 | TrailingCommaProhibited | Trailing comma prohibited | 🛠 |
+
+### flake8-no-pep420 (INP)
+
+For more, see [flake8-no-pep420](https://pypi.org/project/flake8-boolean-trap/2.3.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| INP001 | ImplicitNamespacePackage | File `...` is part of an implicit namespace package. Add an `__init__.py`. |  |
 
 ### Ruff-specific rules (RUF)
 
