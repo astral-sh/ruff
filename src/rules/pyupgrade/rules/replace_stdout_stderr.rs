@@ -6,6 +6,7 @@ use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
+use crate::source_code::Locator;
 use crate::violations;
 
 #[derive(Debug)]
@@ -41,6 +42,42 @@ fn extract_middle(contents: &str) -> Option<MiddleContent> {
     })
 }
 
+/// Generate a [`Fix`] for a `stdout` and `stderr` [`Keyword`] pair.
+fn generate_fix(locator: &Locator, stdout: &Keyword, stderr: &Keyword) -> Option<Fix> {
+    let first = if stdout.location < stderr.location {
+        stdout
+    } else {
+        stderr
+    };
+    let last = if stdout.location > stderr.location {
+        stdout
+    } else {
+        stderr
+    };
+    let mut contents = String::from("capture_output=True");
+    if let Some(middle) = extract_middle(
+        &locator.slice_source_code_range(&Range::new(first.end_location.unwrap(), last.location)),
+    ) {
+        if middle.multi_line {
+            let Some(indent) = indentation(locator, first) else {
+                return None;
+            };
+            contents.push(',');
+            contents.push('\n');
+            contents.push_str(&indent);
+        } else {
+            contents.push(',');
+            contents.push(' ');
+        }
+        contents.push_str(middle.contents);
+    }
+    Some(Fix::replacement(
+        contents,
+        first.location,
+        last.end_location.unwrap(),
+    ))
+}
+
 /// UP022
 pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     if checker
@@ -69,38 +106,9 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
         let mut diagnostic =
             Diagnostic::new(violations::ReplaceStdoutStderr, Range::from_located(expr));
         if checker.patch(diagnostic.kind.code()) {
-            let first = if stdout.location < stderr.location {
-                stdout
-            } else {
-                stderr
+            if let Some(fix) = generate_fix(checker.locator, stdout, stderr) {
+                diagnostic.amend(fix);
             };
-            let last = if stdout.location > stderr.location {
-                stdout
-            } else {
-                stderr
-            };
-            let mut contents = String::from("capture_output=True");
-            if let Some(middle) =
-                extract_middle(&checker.locator.slice_source_code_range(&Range::new(
-                    first.end_location.unwrap(),
-                    last.location,
-                )))
-            {
-                if middle.multi_line {
-                    contents.push(',');
-                    contents.push('\n');
-                    contents.push_str(&indentation(&checker.locator, first));
-                } else {
-                    contents.push(',');
-                    contents.push(' ');
-                }
-                contents.push_str(middle.contents);
-            }
-            diagnostic.amend(Fix::replacement(
-                contents,
-                first.location,
-                last.end_location.unwrap(),
-            ));
         }
         checker.diagnostics.push(diagnostic);
     }
