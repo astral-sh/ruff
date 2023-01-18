@@ -157,8 +157,8 @@ quoting the executed command, along with the relevant file contents and `pyproje
         PyprojectDiscovery::Hierarchical(settings) => settings.cli.clone(),
     };
 
-    if let Some(code) = cli.explain {
-        commands::explain(&code, format)?;
+    if let Some(rule) = cli.explain {
+        commands::explain(&rule, format)?;
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_settings {

@@ -61,6 +61,7 @@ strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 titlecase = { version = "2.2.1" }
 toml_edit = { version = "0.17.1", features = ["easy"] }
+thiserror = { version = "1.0" }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support

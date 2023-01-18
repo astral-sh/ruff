@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
-use strum_macros::{AsRefStr, EnumIter, EnumString};
+use strum_macros::{AsRefStr, EnumIter};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
@@ -712,8 +712,6 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, RuleCode>> = Lazy::new(|
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use strum::IntoEnumIterator;
 
     use crate::registry::Rule;
@@ -722,7 +720,7 @@ mod tests {
     fn check_code_serialization() {
         for rule in Rule::iter() {
             assert!(
-                Rule::from_str(rule.code()).is_ok(),
+                Rule::from_code(rule.code()).is_ok(),
                 "{rule:?} could not be round-trip serialized."
             );
         }
