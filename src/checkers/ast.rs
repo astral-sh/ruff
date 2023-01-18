@@ -1384,7 +1384,7 @@ where
                 }
                 if self.settings.rules.enabled(&RuleCode::SIM105) {
                     flake8_simplify::rules::use_contextlib_suppress(
-                        self, stmt, handlers, orelse, finalbody,
+                        self, stmt, body, handlers, orelse, finalbody,
                     );
                 }
                 if self.settings.rules.enabled(&RuleCode::SIM107) {
