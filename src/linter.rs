@@ -7,6 +7,7 @@ use rustpython_parser::lexer::LexResult;
 use crate::ast::types::Range;
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
+use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::lines::check_lines;
 use crate::checkers::noqa::check_noqa;
@@ -72,7 +73,11 @@ pub fn check_path(
             .rules
             .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
-    if use_ast || use_imports || use_doc_lines {
+    let use_filesystem = settings
+        .rules
+        .iter_enabled()
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem));
+    if use_ast || use_imports || use_doc_lines || use_filesystem {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
             Ok(python_ast) => {
                 if use_ast {
@@ -103,6 +108,9 @@ pub fn check_path(
                 }
                 if use_doc_lines {
                     doc_lines.extend(doc_lines_from_ast(&python_ast));
+                }
+                if use_filesystem {
+                    diagnostics.extend(check_file_path(path, settings));
                 }
             }
             Err(parse_error) => {

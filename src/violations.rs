@@ -6088,6 +6088,22 @@ impl AlwaysAutofixableViolation for TrailingCommaProhibited {
     }
 }
 
+// flake8-no-pep420
+
+define_violation!(
+    pub struct ImplicitNamespacePackage(pub String);
+);
+impl Violation for ImplicitNamespacePackage {
+    fn message(&self) -> String {
+        let ImplicitNamespacePackage(filename) = self;
+        format!("File `{filename}` is part of an implicit namespace package. Add an `__init__.py`.")
+    }
+
+    fn placeholder() -> Self {
+        ImplicitNamespacePackage("...".to_string())
+    }
+}
+
 // Ruff
 
 define_violation!(

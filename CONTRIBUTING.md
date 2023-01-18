@@ -59,7 +59,7 @@ There are four phases to adding a new lint rule:
 1. Define the violation struct in `src/violations.rs` (e.g., `ModuleImportNotAtTopOfFile`).
 2. Map the violation struct to a rule code in `src/registry.rs` (e.g., `E402`).
 3. Define the logic for triggering the violation in `src/checkers/ast.rs` (for AST-based checks),
-   `src/checkers/tokens.rs` (for token-based checks), or `src/checkers/lines.rs` (for text-based checks).
+   `src/checkers/tokens.rs` (for token-based checks), `src/checkers/lines.rs` (for text-based checks) or `src/checkers/filesystem.rs` (for filesystem-based checks).
 4. Add a test fixture.
 5. Update the generated files (documentation and generated code).
 
