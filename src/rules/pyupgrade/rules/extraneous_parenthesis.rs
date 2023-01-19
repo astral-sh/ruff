@@ -15,15 +15,13 @@ use crate::violations;
 /// to be extraneous.
 struct CandidateInfo {
     valid: bool,
-    depth: u32,
     had_special: bool,
 }
 
 impl CandidateInfo {
-    fn new(valid: bool, depth: u32, had_special: bool) -> Self {
+    fn new(valid: bool, had_special: bool) -> Self {
         Self {
             valid,
-            depth,
             had_special,
         }
     }
@@ -42,15 +40,14 @@ fn valid_candidate(string: &str) -> CandidateInfo {
             Tok::Rpar => depth -= 1,
             Tok::Comma | Tok::Yield => {
                 if depth < 3 {
-                    return CandidateInfo::new(false, max_depth, true);
-                } else {
-                    had_special = true;
+                    return CandidateInfo::new(false, true);
                 }
+                had_special = true;
             }
             _ => (),
         }
     }
-    CandidateInfo::new(max_depth > 1, max_depth, had_special)
+    CandidateInfo::new(max_depth > 1, had_special)
 }
 
 /// UP034
@@ -101,7 +98,7 @@ pub fn extraneous_parenthesis(
             special_before = "(";
         }
         if is_multi_line {
-            let indent = indentation_greedy(checker.locator, &arg);
+            let indent = indentation_greedy(checker.locator, arg);
             let small_indent = if indent.len() > 3 { &indent[3..] } else { "" };
             new_string = format!(
                 "print(\n{indent}{special_before}{arg_string}{special_after}\n{small_indent})"
@@ -114,7 +111,7 @@ pub fn extraneous_parenthesis(
         let mut diagnostic = Diagnostic::new(violations::ExtraneousParenthesis, expr_range);
         if checker.patch(&Rule::ExtraneousParenthesis) {
             diagnostic.amend(Fix::replacement(
-                new_string.to_string(),
+                new_string,
                 expr.location,
                 expr.end_location.unwrap(),
             ));

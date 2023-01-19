@@ -728,6 +728,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP030 | FormatLiterals | Use implicit references for positional format fields | 🛠 |
 | UP032 | FString | Use f-string instead of `format` call | 🛠 |
 | UP033 | FunctoolsCache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
+| UP034 | ExtraneousParenthesis | Remove extraneous parenthesis from print statements | 🛠 |
 
 ### pep8-naming (N)
 
