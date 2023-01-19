@@ -7,18 +7,18 @@ expression: diagnostics
       - a
       - b
   location:
-    row: 1
+    row: 2
     column: 3
   end_location:
-    row: 1
+    row: 2
     column: 13
   fix:
     content: a == b
     location:
-      row: 1
+      row: 2
       column: 3
     end_location:
-      row: 1
+      row: 2
       column: 13
   parent: ~
 - kind:
@@ -26,18 +26,18 @@ expression: diagnostics
       - a
       - b + c
   location:
-    row: 4
+    row: 6
     column: 3
   end_location:
-    row: 4
+    row: 6
     column: 19
   fix:
     content: a == b + c
     location:
-      row: 4
+      row: 6
       column: 3
     end_location:
-      row: 4
+      row: 6
       column: 19
   parent: ~
 - kind:
@@ -45,18 +45,18 @@ expression: diagnostics
       - a + b
       - c
   location:
-    row: 7
+    row: 10
     column: 3
   end_location:
-    row: 7
+    row: 10
     column: 19
   fix:
     content: a + b == c
     location:
-      row: 7
+      row: 10
       column: 3
     end_location:
-      row: 7
+      row: 10
       column: 19
   parent: ~
 
