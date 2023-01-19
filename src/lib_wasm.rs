@@ -11,7 +11,7 @@ use crate::registry::RuleCode;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
@@ -134,6 +134,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         pep8_naming: Some(pep8_naming::settings::Settings::default().into()),
         pycodestyle: Some(pycodestyle::settings::Settings::default().into()),
         pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
+        pylint: Some(pylint::settings::Settings::default().into()),
         pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
     })?)
 }
