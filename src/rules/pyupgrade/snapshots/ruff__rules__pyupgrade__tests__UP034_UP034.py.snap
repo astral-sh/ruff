@@ -128,7 +128,7 @@ expression: diagnostics
     column: 8
   end_location:
     row: 23
-    column: 26
+    column: 24
   fix:
     content: print((yield 1))
     location:
@@ -136,7 +136,7 @@ expression: diagnostics
       column: 8
     end_location:
       row: 23
-      column: 26
+      column: 24
   parent: ~
 - kind:
     ExtraneousParenthesis: ~

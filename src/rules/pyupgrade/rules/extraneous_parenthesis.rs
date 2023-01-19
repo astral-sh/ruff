@@ -1,6 +1,6 @@
 use std::cmp::max;
 
-use rustpython_ast::{Expr, ExprKind, Keyword};
+use rustpython_ast::{Expr, Keyword};
 use rustpython_parser::lexer::{self, Tok};
 
 use crate::ast::types::Range;
@@ -62,14 +62,6 @@ pub fn extraneous_parenthesis(
     // If the function has more than one argument, or no arguments, we won't be
     // refactoring
     if args.len() != 1 {
-        return;
-    }
-    if let ExprKind::Name { id, .. } = &func.node {
-        // This fixer is only for print statements
-        if id != "print" {
-            return;
-        }
-    } else {
         return;
     }
     let arg = match args.get(0) {
