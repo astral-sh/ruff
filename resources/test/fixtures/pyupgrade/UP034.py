@@ -20,12 +20,12 @@ print(
 )
 
 def f():
-    x = print(((yield 1)))
+    x = int(((yield 1)))
 
 if True:
     print(
         ("foo{}".format(1))
-     )
+    )
 
 # These SHOULD NOT work
 print("foo")
@@ -39,7 +39,7 @@ print((1,))
 sum((block.code for block in blocks), [])
 
 def f():
-    x = print((yield 1))
+    x = int((yield 1))
 
 sum((i for i in range(3)), [])
 
