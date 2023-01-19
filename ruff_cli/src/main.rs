@@ -158,7 +158,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     };
 
     if let Some(rule) = cli.explain {
-        commands::explain(&rule, format)?;
+        commands::explain(rule, format)?;
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_settings {
