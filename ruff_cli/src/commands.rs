@@ -297,7 +297,7 @@ pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
                 "{} ({}): {}",
                 rule.code(),
                 rule.origin().name(),
-                rule.kind().summary()
+                rule.kind().body()
             );
         }
         SerializationFormat::Json => {
@@ -306,7 +306,7 @@ pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
                 serde_json::to_string_pretty(&Explanation {
                     code: rule.code(),
                     origin: rule.origin().name(),
-                    summary: &rule.kind().summary(),
+                    summary: &rule.kind().body(),
                 })?
             );
         }

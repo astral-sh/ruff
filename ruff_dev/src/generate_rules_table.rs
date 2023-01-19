@@ -32,7 +32,7 @@ fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
             "| {} | {} | {} | {} |",
             rule.code(),
             rule.as_ref(),
-            kind.summary().replace('|', r"\|"),
+            kind.body().replace('|', r"\|"),
             fix_token
         ));
         table_out.push('\n');
