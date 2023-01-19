@@ -25,13 +25,13 @@ fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
     table_out.push('\n');
-    for rule_code in prefix.codes() {
-        let kind = rule_code.kind();
+    for rule in prefix.codes() {
+        let kind = rule.kind();
         let fix_token = if kind.fixable() { "🛠" } else { "" };
         table_out.push_str(&format!(
             "| {} | {} | {} | {} |",
-            kind.rule().code(),
-            kind.as_ref(),
+            rule.code(),
+            rule.as_ref(),
             kind.summary().replace('|', r"\|"),
             fix_token
         ));
