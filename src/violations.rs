@@ -1350,9 +1350,7 @@ define_violation!(
 );
 impl Violation for UnaryPrefixIncrement {
     fn message(&self) -> String {
-        "Python does not support the unary prefix increment. Writing `++n` is equivalent to \
-         `+(+(n))`, which equals `n`. You meant `n += 1`."
-            .to_string()
+        format!("Python does not support the unary prefix increment")
     }
 
     fn placeholder() -> Self {
@@ -1420,10 +1418,7 @@ define_violation!(
 impl AlwaysAutofixableViolation for UnusedLoopControlVariable {
     fn message(&self) -> String {
         let UnusedLoopControlVariable(name) = self;
-        format!(
-            "Loop control variable `{name}` not used within the loop body. If this is intended, \
-             start the name with an underscore."
-        )
+        format!("Loop control variable `{name}` not used within the loop body")
     }
 
     fn autofix_title(&self) -> String {
@@ -1603,11 +1598,7 @@ define_violation!(
 );
 impl Violation for NoAssertRaisesException {
     fn message(&self) -> String {
-        "`assertRaises(Exception)` should be considered evil. It can lead to your test passing \
-         even if the code being tested is never executed due to a typo. Either assert for a more \
-         specific exception (builtin or custom), use `assertRaisesRegex`, or use the context \
-         manager form of `assertRaises`."
-            .to_string()
+        format!("`assertRaises(Exception)` should be considered evil")
     }
 
     fn placeholder() -> Self {
@@ -1733,10 +1724,7 @@ define_violation!(
 );
 impl Violation for StarArgUnpackingAfterKeywordArg {
     fn message(&self) -> String {
-        "Star-arg unpacking after a keyword argument is strongly discouraged. It only works when \
-         the keyword parameter is declared after all parameters supplied by the unpacked sequence, \
-         and this change of ordering can surprise and mislead readers."
-            .to_string()
+        format!("Star-arg unpacking after a keyword argument is strongly discouraged")
     }
 
     fn placeholder() -> Self {
@@ -5210,9 +5198,7 @@ define_violation!(
 );
 impl Violation for CallDatetimeToday {
     fn message(&self) -> String {
-        "The use of `datetime.datetime.today()` is not allowed. Use `datetime.datetime.now(tz=)` \
-         instead."
-            .to_string()
+        format!("The use of `datetime.datetime.today()` is not allowed")
     }
 
     fn placeholder() -> Self {
@@ -5225,9 +5211,7 @@ define_violation!(
 );
 impl Violation for CallDatetimeUtcnow {
     fn message(&self) -> String {
-        "The use of `datetime.datetime.utcnow()` is not allowed. Use `datetime.datetime.now(tz=)` \
-         instead."
-            .to_string()
+        format!("The use of `datetime.datetime.utcnow()` is not allowed")
     }
 
     fn placeholder() -> Self {
@@ -5240,9 +5224,7 @@ define_violation!(
 );
 impl Violation for CallDatetimeUtcfromtimestamp {
     fn message(&self) -> String {
-        "The use of `datetime.datetime.utcfromtimestamp()` is not allowed. Use \
-         `datetime.datetime.fromtimestamp(, tz=)` instead."
-            .to_string()
+        format!("The use of `datetime.datetime.utcfromtimestamp()` is not allowed")
     }
 
     fn placeholder() -> Self {
@@ -5297,9 +5279,7 @@ define_violation!(
 );
 impl Violation for CallDateToday {
     fn message(&self) -> String {
-        "The use of `datetime.date.today()` is not allowed. Use \
-         `datetime.datetime.now(tz=).date()` instead."
-            .to_string()
+        format!("The use of `datetime.date.today()` is not allowed.")
     }
 
     fn placeholder() -> Self {
@@ -5312,9 +5292,7 @@ define_violation!(
 );
 impl Violation for CallDateFromtimestamp {
     fn message(&self) -> String {
-        "The use of `datetime.date.fromtimestamp()` is not allowed. Use \
-         `datetime.datetime.fromtimestamp(, tz=).date()` instead."
-            .to_string()
+        format!("The use of `datetime.date.fromtimestamp()` is not allowed")
     }
 
     fn placeholder() -> Self {

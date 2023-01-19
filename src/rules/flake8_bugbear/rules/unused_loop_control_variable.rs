@@ -1,3 +1,23 @@
+//! Checks for unused loop variables.
+//!
+//! ## Why is this bad?
+//!
+//! Unused variables may signal a mistake or unfinished code.
+//!
+//! ## Example
+//!
+//! ```python
+//! for x in range(10):
+//!     method()
+//! ```
+//!
+//! Prefix the variable with an underscore:
+//!
+//! ```python
+//! for _x in range(10):
+//!     method()
+//! ```
+
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 

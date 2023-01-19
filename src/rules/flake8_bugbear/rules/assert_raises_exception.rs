@@ -1,3 +1,13 @@
+//! Checks for `self.assertRaises(Exception)`.
+//!
+//! ## Why is this bad?
+//!
+//! `assertRaises(Exception)` should be considered evil. It can lead to your
+//! test passing even if the code being tested is never executed due to a
+//! typo. Either assert for a more specific exception (builtin or
+//! custom), use `assertRaisesRegex`, or use the context manager form of
+//! `assertRaises`.
+
 use rustpython_ast::{ExprKind, Stmt, Withitem};
 
 use crate::ast::types::Range;
