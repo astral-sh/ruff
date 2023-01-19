@@ -181,7 +181,7 @@ pub struct Cli {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
-    pub explain: Option<Rule>,
+    pub explain: Option<&'static Rule>,
     /// Generate shell completion
     #[arg(
         long,
@@ -303,7 +303,7 @@ pub struct Arguments {
     pub config: Option<PathBuf>,
     pub diff: bool,
     pub exit_zero: bool,
-    pub explain: Option<Rule>,
+    pub explain: Option<&'static Rule>,
     pub files: Vec<PathBuf>,
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
     pub isolated: bool,
