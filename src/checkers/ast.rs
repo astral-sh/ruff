@@ -1977,49 +1977,7 @@ where
                     flake8_2020::rules::name_or_attribute(self, expr);
                 }
 
-                for (code, name) in vec![
-                    (Rule::UseOfDotIx, "ix"),
-                    (Rule::UseOfDotAt, "at"),
-                    (Rule::UseOfDotIat, "iat"),
-                    (Rule::UseOfDotValues, "values"),
-                ] {
-                    if self.settings.rules.enabled(&code) {
-                        if attr == name {
-                            // Avoid flagging on function calls (e.g., `df.values()`).
-                            if let Some(parent) = self.current_expr_parent() {
-                                if matches!(parent.node, ExprKind::Call { .. }) {
-                                    continue;
-                                }
-                            }
-                            // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`).
-                            if pandas_vet::helpers::is_dataframe_candidate(value) {
-                                // If the target is a named variable, avoid triggering on
-                                // irrelevant bindings (like imports).
-                                if let ExprKind::Name { id, .. } = &value.node {
-                                    if self.find_binding(id).map_or(true, |binding| {
-                                        matches!(
-                                            binding.kind,
-                                            BindingKind::Builtin
-                                                | BindingKind::ClassDefinition
-                                                | BindingKind::FunctionDefinition
-                                                | BindingKind::Export(..)
-                                                | BindingKind::FutureImportation
-                                                | BindingKind::StarImportation(..)
-                                                | BindingKind::Importation(..)
-                                                | BindingKind::FromImportation(..)
-                                                | BindingKind::SubmoduleImportation(..)
-                                        )
-                                    }) {
-                                        continue;
-                                    }
-                                }
-
-                                self.diagnostics
-                                    .push(Diagnostic::new(code.kind(), Range::from_located(expr)));
-                            }
-                        };
-                    }
-                }
+                pandas_vet::rules::check_attr(self, attr, value, expr);
 
                 if self.settings.rules.enabled(&Rule::BannedApi) {
                     flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
@@ -2377,54 +2335,8 @@ where
                     self.diagnostics
                         .extend(pandas_vet::rules::inplace_argument(keywords).into_iter());
                 }
-                for (code, name) in vec![
-                    (Rule::UseOfDotIsNull, "isnull"),
-                    (Rule::UseOfDotNotNull, "notnull"),
-                    (Rule::UseOfDotPivotOrUnstack, "pivot"),
-                    (Rule::UseOfDotPivotOrUnstack, "unstack"),
-                    (Rule::UseOfDotReadTable, "read_table"),
-                    (Rule::UseOfDotStack, "stack"),
-                ] {
-                    if self.settings.rules.enabled(&code) {
-                        if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                            if attr == name {
-                                if pandas_vet::helpers::is_dataframe_candidate(value) {
-                                    // If the target is a named variable, avoid triggering on
-                                    // irrelevant bindings (like non-Pandas imports).
-                                    if let ExprKind::Name { id, .. } = &value.node {
-                                        if self.find_binding(id).map_or(true, |binding| {
-                                            if let BindingKind::Importation(.., module) =
-                                                &binding.kind
-                                            {
-                                                module != &"pandas"
-                                            } else {
-                                                matches!(
-                                                    binding.kind,
-                                                    BindingKind::Builtin
-                                                        | BindingKind::ClassDefinition
-                                                        | BindingKind::FunctionDefinition
-                                                        | BindingKind::Export(..)
-                                                        | BindingKind::FutureImportation
-                                                        | BindingKind::StarImportation(..)
-                                                        | BindingKind::Importation(..)
-                                                        | BindingKind::FromImportation(..)
-                                                        | BindingKind::SubmoduleImportation(..)
-                                                )
-                                            }
-                                        }) {
-                                            continue;
-                                        }
-                                    }
+                pandas_vet::rules::check_call(self, func);
 
-                                    self.diagnostics.push(Diagnostic::new(
-                                        code.kind(),
-                                        Range::from_located(func),
-                                    ));
-                                }
-                            };
-                        }
-                    }
-                }
                 if self.settings.rules.enabled(&Rule::UseOfPdMerge) {
                     if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
                         self.diagnostics.push(diagnostic);
