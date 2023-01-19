@@ -145,7 +145,7 @@ expression: diagnostics
     column: 4
   end_location:
     row: 28
-    column: 6
+    column: 5
   fix:
     content: "print(\n        \"foo{}\".format(1)\n     )"
     location:
@@ -153,6 +153,6 @@ expression: diagnostics
       column: 4
     end_location:
       row: 28
-      column: 6
+      column: 5
   parent: ~
 

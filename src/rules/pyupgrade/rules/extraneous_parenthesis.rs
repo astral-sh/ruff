@@ -51,7 +51,6 @@ fn valid_candidate(string: &str) -> CandidateInfo {
 pub fn extraneous_parenthesis(
     checker: &mut Checker,
     expr: &Expr,
-    func: &Expr,
     args: &[Expr],
     kwargs: &[Keyword],
 ) {
