@@ -7,7 +7,7 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::indentation_greedy;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 /// A boolean of whether or not an expression has more than one set of
@@ -53,7 +53,7 @@ fn valid_candidate(string: &str) -> CandidateInfo {
     CandidateInfo::new(max_depth > 1, max_depth, had_special)
 }
 
-/// UP033
+/// UP034
 pub fn extraneous_parenthesis(
     checker: &mut Checker,
     expr: &Expr,
@@ -112,7 +112,7 @@ pub fn extraneous_parenthesis(
     }
     if !new_string.is_empty() && new_string != expr_string {
         let mut diagnostic = Diagnostic::new(violations::ExtraneousParenthesis, expr_range);
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(&Rule::ExtraneousParenthesis) {
             diagnostic.amend(Fix::replacement(
                 new_string.to_string(),
                 expr.location,
