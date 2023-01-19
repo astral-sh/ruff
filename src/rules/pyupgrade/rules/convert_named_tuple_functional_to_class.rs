@@ -29,10 +29,9 @@ fn match_named_tuple_assign<'a>(
     } = &value.node else {
         return None;
     };
-    if !checker
-        .resolve_call_path(func)
-        .map_or(false, |call_path| call_path == ["typing", "NamedTuple"])
-    {
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "NamedTuple"]
+    }) {
         return None;
     }
     Some((typename, args, keywords, func))

@@ -7,6 +7,7 @@ use rustpython_parser::lexer::LexResult;
 use crate::ast::types::Range;
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
+use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::lines::check_lines;
 use crate::checkers::noqa::check_noqa;
@@ -47,7 +48,7 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = settings.enabled.contains(&RuleCode::W505);
+    let use_doc_lines = settings.rules.enabled(&RuleCode::W505);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(&tokens));
@@ -55,22 +56,31 @@ pub fn check_path(
 
     // Run the token-based rules.
     if settings
-        .enabled
-        .iter()
+        .rules
+        .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Tokens))
     {
         diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
     }
 
+    // Run the filesystem-based rules.
+    if settings
+        .rules
+        .iter_enabled()
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem))
+    {
+        diagnostics.extend(check_file_path(path, settings));
+    }
+
     // Run the AST-based rules.
     let use_ast = settings
-        .enabled
-        .iter()
+        .rules
+        .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Ast));
     let use_imports = !directives.isort.skip_file
         && settings
-            .enabled
-            .iter()
+            .rules
+            .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports || use_doc_lines {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
@@ -106,7 +116,7 @@ pub fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.enabled.contains(&RuleCode::E999) {
+                if settings.rules.enabled(&RuleCode::E999) {
                     diagnostics.push(Diagnostic::new(
                         violations::SyntaxError(parse_error.error.to_string()),
                         Range::new(parse_error.location, parse_error.location),
@@ -124,8 +134,8 @@ pub fn check_path(
 
     // Run the lines-based rules.
     if settings
-        .enabled
-        .iter()
+        .rules
+        .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
     {
         diagnostics.extend(check_lines(
@@ -140,8 +150,8 @@ pub fn check_path(
     // Enforce `noqa` directives.
     if (matches!(noqa, flags::Noqa::Enabled) && !diagnostics.is_empty())
         || settings
-            .enabled
-            .iter()
+            .rules
+            .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQa))
     {
         check_noqa(
@@ -340,16 +350,15 @@ pub fn lint_fix(
             }
 
             eprintln!(
-                "
+                r#"
 {}: Failed to converge after {} iterations.
 
 This likely indicates a bug in `{}`. If you could open an issue at:
 
-{}/issues
+{}/issues/new?title=%5BInfinite%20loop%5D
 
-quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd \
-                 be very appreciative!
-",
+quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+"#,
                 "warning".yellow().bold(),
                 MAX_ITERATIONS,
                 CARGO_PKG_NAME,

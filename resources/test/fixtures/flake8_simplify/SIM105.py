@@ -41,3 +41,21 @@ except ValueError:
     pass
 finally:
     print('bar')
+
+try:
+    foo()
+    foo()
+except ValueError:
+    pass
+
+try:
+    for i in range(3):
+        foo()
+except ValueError:
+    pass
+
+def bar():
+    try:
+        return foo()
+    except ValueError:
+        pass

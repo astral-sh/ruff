@@ -6,6 +6,8 @@ use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::categorize::ImportType;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum RelatveImportsOrder {
@@ -181,6 +183,36 @@ pub struct Options {
     /// An override list of tokens to always recognize as a Class for
     /// `order-by-type` regardless of casing.
     pub classes: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"
+            constants = ["constant"]
+        "#
+    )]
+    /// An override list of tokens to always recognize as a CONSTANT
+    /// for `order-by-type` regardless of casing.
+    pub constants: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"
+            variables = ["VAR"]
+        "#
+    )]
+    /// An override list of tokens to always recognize as a var
+    /// for `order-by-type` regardless of casing.
+    pub variables: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Option<Vec<ImportType>>",
+        example = r#"
+            no-lines-before = ["future", "standard-library"]
+        "#
+    )]
+    /// A list of sections that should _not_ be delineated from the previous
+    /// section via empty lines.
+    pub no_lines_before: Option<Vec<ImportType>>,
 }
 
 #[derive(Debug, Hash)]
@@ -199,6 +231,9 @@ pub struct Settings {
     pub single_line_exclusions: BTreeSet<String>,
     pub split_on_trailing_comma: bool,
     pub classes: BTreeSet<String>,
+    pub constants: BTreeSet<String>,
+    pub variables: BTreeSet<String>,
+    pub no_lines_before: BTreeSet<ImportType>,
 }
 
 impl Default for Settings {
@@ -217,6 +252,9 @@ impl Default for Settings {
             single_line_exclusions: BTreeSet::new(),
             split_on_trailing_comma: true,
             classes: BTreeSet::new(),
+            constants: BTreeSet::new(),
+            variables: BTreeSet::new(),
+            no_lines_before: BTreeSet::new(),
         }
     }
 }
@@ -241,6 +279,9 @@ impl From<Options> for Settings {
             ),
             split_on_trailing_comma: options.split_on_trailing_comma.unwrap_or(true),
             classes: BTreeSet::from_iter(options.classes.unwrap_or_default()),
+            constants: BTreeSet::from_iter(options.constants.unwrap_or_default()),
+            variables: BTreeSet::from_iter(options.variables.unwrap_or_default()),
+            no_lines_before: BTreeSet::from_iter(options.no_lines_before.unwrap_or_default()),
         }
     }
 }
@@ -261,6 +302,9 @@ impl From<Settings> for Options {
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
             split_on_trailing_comma: Some(settings.split_on_trailing_comma),
             classes: Some(settings.classes.into_iter().collect()),
+            constants: Some(settings.constants.into_iter().collect()),
+            variables: Some(settings.variables.into_iter().collect()),
+            no_lines_before: Some(settings.no_lines_before.into_iter().collect()),
         }
     }
 }

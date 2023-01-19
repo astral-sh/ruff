@@ -1,3 +1,4 @@
+//! Rules from [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/).
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -14,6 +15,7 @@ mod tests {
 
     #[test_case(RuleCode::PIE790, Path::new("PIE790.py"); "PIE790")]
     #[test_case(RuleCode::PIE794, Path::new("PIE794.py"); "PIE794")]
+    #[test_case(RuleCode::PIE796, Path::new("PIE796.py"); "PIE796")]
     #[test_case(RuleCode::PIE807, Path::new("PIE807.py"); "PIE807")]
     fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());

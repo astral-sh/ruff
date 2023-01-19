@@ -17,7 +17,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
 
     // check `os.environ.get('foo')` and `os.getenv('foo')``
     if !checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path == ["os", "environ", "get"] || call_path == ["os", "getenv"]
+        call_path.as_slice() == ["os", "environ", "get"] || call_path.as_slice() == ["os", "getenv"]
     }) {
         return;
     }

@@ -86,6 +86,9 @@ pub fn organize_imports(
         &settings.isort.single_line_exclusions,
         settings.isort.split_on_trailing_comma,
         &settings.isort.classes,
+        &settings.isort.constants,
+        &settings.isort.variables,
+        &settings.isort.no_lines_before,
     );
 
     // Expand the span the entire range, including leading and trailing space.
@@ -99,7 +102,7 @@ pub fn organize_imports(
     } else {
         let mut diagnostic = Diagnostic::new(violations::UnsortedImports, range);
         if matches!(autofix, flags::Autofix::Enabled)
-            && settings.fixable.contains(diagnostic.kind.code())
+            && settings.rules.should_fix(diagnostic.kind.code())
         {
             diagnostic.amend(Fix::replacement(
                 indent(&expected, indentation),

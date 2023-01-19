@@ -227,10 +227,13 @@ impl<'a> Generator<'a> {
                 }
             }
             StmtKind::Return { value } => {
+                // TODO(charlie): Revisit precedence. In particular, look at how Astor handles
+                // precedence.
+                // See: https://github.com/berkerpeksag/astor/blob/8342d6aa5dcdcf20f89a19057527510c245c7a2e/astor/code_gen.py#L86
                 statement!({
                     if let Some(expr) = value {
                         self.p("return ");
-                        self.unparse_expr(expr, precedence::ATOM);
+                        self.unparse_expr(expr, 1);
                     } else {
                         self.p("return");
                     }

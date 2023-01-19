@@ -1,49 +1,67 @@
-# These SHOULD work
-print(("foo"))
+import functools
+from functools import lru_cache
 
-print(("hell((goodybe))o"))
 
-print((("foo")))
+@functools.lru_cache(maxsize=None)
+def fixme():
+    pass
 
-print((((1))))
 
-print(("foo{}".format(1)))
+@lru_cache(maxsize=None)
+def fixme():
+    pass
 
-print(
-    ("foo{}".format(1))
-)
 
-print(
-    (
-        "foo"
-    )
-)
+@other_decorator
+@functools.lru_cache(maxsize=None)
+def fixme():
+    pass
 
-def f():
-    x = int(((yield 1)))
 
-# These SHOULD NOT work
-print("foo")
+@functools.lru_cache(maxsize=None)
+@other_decorator
+def fixme():
+    pass
 
-print((1, 2, 3))
 
-print(())
+@functools.lru_cache()
+def ok():
+    pass
 
-print((1,))
 
-sum((block.code for block in blocks), [])
+@lru_cache()
+def ok():
+    pass
 
-def f():
-    x = int((yield 1))
 
-sum((i for i in range(3)), [])
+@functools.lru_cache(maxsize=64)
+def ok():
+    pass
 
-print((x for x in range(3)))
 
-print ((
-    "foo"
-))
+@lru_cache(maxsize=64)
+def ok():
+    pass
 
-print(
-    ("foo")
-)
+
+def user_func():
+    pass
+
+
+@lru_cache(user_func)
+def ok():
+    pass
+
+
+@lru_cache(user_func, maxsize=None)
+def ok():
+    pass
+
+
+def lru_cache(maxsize=None):
+    pass
+
+
+@lru_cache(maxsize=None)
+def ok():
+    pass

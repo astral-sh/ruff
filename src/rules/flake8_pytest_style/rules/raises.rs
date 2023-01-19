@@ -8,9 +8,9 @@ use crate::registry::{Diagnostic, RuleCode};
 use crate::violations;
 
 fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
-    checker
-        .resolve_call_path(func)
-        .map_or(false, |call_path| call_path == ["pytest", "raises"])
+    checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["pytest", "raises"]
+    })
 }
 
 fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -25,7 +25,7 @@ fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(checker, func) {
-        if checker.settings.enabled.contains(&RuleCode::PT010) {
+        if checker.settings.rules.enabled(&RuleCode::PT010) {
             if args.is_empty() && keywords.is_empty() {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::RaisesWithoutException,
@@ -34,7 +34,7 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
             }
         }
 
-        if checker.settings.enabled.contains(&RuleCode::PT011) {
+        if checker.settings.rules.enabled(&RuleCode::PT011) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.node.arg == Some("match".to_string()));
@@ -93,7 +93,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
 
 /// PT011
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
-    if let Some(call_path) = checker.resolve_call_path(exception) {
+    if let Some(call_path) = checker.resolve_call_path(exception).and_then(|call_path| {
         let is_broad_exception = checker
             .settings
             .flake8_pytest_style
@@ -107,10 +107,14 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
             )
             .any(|target| call_path == to_call_path(target));
         if is_broad_exception {
-            checker.diagnostics.push(Diagnostic::new(
-                violations::RaisesTooBroad(format_call_path(&call_path)),
-                Range::from_located(exception),
-            ));
+            Some(format_call_path(&call_path))
+        } else {
+            None
         }
+    }) {
+        checker.diagnostics.push(Diagnostic::new(
+            violations::RaisesTooBroad(call_path),
+            Range::from_located(exception),
+        ));
     }
 }

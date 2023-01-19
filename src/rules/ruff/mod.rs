@@ -1,4 +1,4 @@
-//! Module for Ruff-specific rules.
+//! Ruff-specific rules.
 
 pub(crate) mod rules;
 

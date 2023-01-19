@@ -1,3 +1,4 @@
+//! Rules from [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/).
 pub(crate) mod cformat;
 pub(crate) mod fixes;
 pub(crate) mod format;

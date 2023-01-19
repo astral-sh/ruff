@@ -1,3 +1,4 @@
+//! Rules from [Pylint](https://pypi.org/project/pylint/2.15.7/).
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -12,7 +13,6 @@ mod tests {
     use crate::settings::Settings;
 
     #[test_case(RuleCode::PLC0414, Path::new("import_aliasing.py"); "PLC0414")]
-    #[test_case(RuleCode::PLC2201, Path::new("misplaced_comparison_constant.py"); "PLC2201")]
     #[test_case(RuleCode::PLC3002, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
     #[test_case(RuleCode::PLE0117, Path::new("nonlocal_without_binding.py"); "PLE0117")]
     #[test_case(RuleCode::PLE0118, Path::new("used_prior_global_declaration.py"); "PLE0118")]

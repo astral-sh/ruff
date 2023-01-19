@@ -54,6 +54,11 @@ fn any_arg_is_str(slice: &Expr) -> bool {
     }
 }
 
+enum TypingMember {
+    Union,
+    Optional,
+}
+
 /// UP007
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
     // Avoid rewriting forward annotations.
@@ -61,53 +66,63 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         return;
     }
 
-    let call_path = checker.resolve_call_path(value);
-    if call_path.as_ref().map_or(false, |call_path| {
-        checker.match_typing_call_path(call_path, "Optional")
-    }) {
-        let mut diagnostic =
-            Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
-        if checker.patch(diagnostic.kind.code()) {
-            let mut generator: Generator = checker.stylist.into();
-            generator.unparse_expr(&optional(slice), 0);
-            diagnostic.amend(Fix::replacement(
-                generator.generate(),
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
+    let Some(typing_member) = checker.resolve_call_path(value).as_ref().and_then(|call_path| {
+        if checker.match_typing_call_path(call_path, "Optional") {
+            Some(TypingMember::Optional)
+        } else if checker.match_typing_call_path(call_path, "Union") {
+            Some(TypingMember::Union)
+        } else {
+            None
         }
-        checker.diagnostics.push(diagnostic);
-    } else if call_path.as_ref().map_or(false, |call_path| {
-        checker.match_typing_call_path(call_path, "Union")
-    }) {
-        let mut diagnostic =
-            Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
-        if checker.patch(diagnostic.kind.code()) {
-            match &slice.node {
-                ExprKind::Slice { .. } => {
-                    // Invalid type annotation.
-                }
-                ExprKind::Tuple { elts, .. } => {
-                    let mut generator: Generator = checker.stylist.into();
-                    generator.unparse_expr(&union(elts), 0);
-                    diagnostic.amend(Fix::replacement(
-                        generator.generate(),
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
-                }
-                _ => {
-                    // Single argument.
-                    let mut generator: Generator = checker.stylist.into();
-                    generator.unparse_expr(slice, 0);
-                    diagnostic.amend(Fix::replacement(
-                        generator.generate(),
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
+    }) else {
+        return;
+    };
+
+    match typing_member {
+        TypingMember::Optional => {
+            let mut diagnostic =
+                Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
+            if checker.patch(diagnostic.kind.code()) {
+                let mut generator: Generator = checker.stylist.into();
+                generator.unparse_expr(&optional(slice), 0);
+                diagnostic.amend(Fix::replacement(
+                    generator.generate(),
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
+            }
+            checker.diagnostics.push(diagnostic);
+        }
+        TypingMember::Union => {
+            let mut diagnostic =
+                Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
+            if checker.patch(diagnostic.kind.code()) {
+                match &slice.node {
+                    ExprKind::Slice { .. } => {
+                        // Invalid type annotation.
+                    }
+                    ExprKind::Tuple { elts, .. } => {
+                        let mut generator: Generator = checker.stylist.into();
+                        generator.unparse_expr(&union(elts), 0);
+                        diagnostic.amend(Fix::replacement(
+                            generator.generate(),
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
+                    }
+                    _ => {
+                        // Single argument.
+                        let mut generator: Generator = checker.stylist.into();
+                        generator.unparse_expr(slice, 0);
+                        diagnostic.amend(Fix::replacement(
+                            generator.generate(),
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
+                    }
                 }
             }
+            checker.diagnostics.push(diagnostic);
         }
-        checker.diagnostics.push(diagnostic);
     }
 }

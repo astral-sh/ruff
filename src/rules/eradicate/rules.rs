@@ -35,7 +35,7 @@ pub fn commented_out_code(
     if is_standalone_comment(&line) && comment_contains_code(&line, &settings.task_tags[..]) {
         let mut diagnostic = Diagnostic::new(violations::CommentedOutCode, Range::new(start, end));
         if matches!(autofix, flags::Autofix::Enabled)
-            && settings.fixable.contains(&RuleCode::ERA001)
+            && settings.rules.should_fix(&RuleCode::ERA001)
         {
             diagnostic.amend(Fix::deletion(location, end_location));
         }

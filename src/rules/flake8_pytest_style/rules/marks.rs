@@ -84,8 +84,8 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
 }
 
 pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
-    let enforce_parentheses = checker.settings.enabled.contains(&RuleCode::PT023);
-    let enforce_useless_usefixtures = checker.settings.enabled.contains(&RuleCode::PT026);
+    let enforce_parentheses = checker.settings.rules.enabled(&RuleCode::PT023);
+    let enforce_useless_usefixtures = checker.settings.rules.enabled(&RuleCode::PT026);
 
     for mark in get_mark_decorators(decorators) {
         if enforce_parentheses {

@@ -735,7 +735,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.223"
+version = "0.0.225"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
@@ -1906,7 +1906,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.223"
+version = "0.0.225"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -1946,6 +1946,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "shellexpand",
+ "smallvec",
  "strum",
  "strum_macros",
  "test-case",
@@ -1958,7 +1959,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.223"
+version = "0.0.225"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1995,7 +1996,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.223"
+version = "0.0.225"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
@@ -2016,7 +2017,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.223"
+version = "0.0.225"
 dependencies = [
  "once_cell",
  "proc-macro2",

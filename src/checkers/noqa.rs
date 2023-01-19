@@ -24,7 +24,7 @@ pub fn check_noqa(
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut ignored = vec![];
 
-    let enforce_noqa = settings.enabled.contains(&RuleCode::RUF100);
+    let enforce_noqa = settings.rules.enabled(&RuleCode::RUF100);
 
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {
@@ -108,7 +108,7 @@ pub fn check_noqa(
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(diagnostic.kind.code())
+                            && settings.rules.should_fix(diagnostic.kind.code())
                         {
                             diagnostic.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
@@ -135,7 +135,7 @@ pub fn check_noqa(
                             valid_codes.push(code);
                         } else {
                             if let Ok(rule_code) = RuleCode::from_str(code) {
-                                if settings.enabled.contains(&rule_code) {
+                                if settings.rules.enabled(&rule_code) {
                                     unmatched_codes.push(code);
                                 } else {
                                     disabled_codes.push(code);
@@ -172,7 +172,7 @@ pub fn check_noqa(
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(diagnostic.kind.code())
+                            && settings.rules.should_fix(diagnostic.kind.code())
                         {
                             if valid_codes.is_empty() {
                                 diagnostic.amend(Fix::deletion(

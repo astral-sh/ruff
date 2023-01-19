@@ -328,12 +328,12 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     let decorator = get_parametrize_decorator(checker, decorators);
     if let Some(decorator) = decorator {
         if let ExprKind::Call { args, .. } = &decorator.node {
-            if checker.settings.enabled.contains(&RuleCode::PT006) {
+            if checker.settings.rules.enabled(&RuleCode::PT006) {
                 if let Some(arg) = args.get(0) {
                     check_names(checker, arg);
                 }
             }
-            if checker.settings.enabled.contains(&RuleCode::PT007) {
+            if checker.settings.rules.enabled(&RuleCode::PT007) {
                 if let Some(arg) = args.get(1) {
                     check_values(checker, arg);
                 }

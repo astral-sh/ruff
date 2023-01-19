@@ -30,10 +30,9 @@ fn match_typed_dict_assign<'a>(
     } = &value.node else {
         return None;
     };
-    if !checker
-        .resolve_call_path(func)
-        .map_or(false, |call_path| call_path == ["typing", "TypedDict"])
-    {
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TypedDict"]
+    }) {
         return None;
     }
     Some((class_name, args, keywords, func))

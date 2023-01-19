@@ -15,11 +15,13 @@ fn is_abc_class(checker: &Checker, bases: &[Expr], keywords: &[Keyword]) -> bool
             .map_or(false, |arg| arg == "metaclass")
             && checker
                 .resolve_call_path(&keyword.node.value)
-                .map_or(false, |call_path| call_path == ["abc", "ABCMeta"])
+                .map_or(false, |call_path| {
+                    call_path.as_slice() == ["abc", "ABCMeta"]
+                })
     }) || bases.iter().any(|base| {
         checker
             .resolve_call_path(base)
-            .map_or(false, |call_path| call_path == ["abc", "ABC"])
+            .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
     })
 }
 
@@ -76,7 +78,7 @@ pub fn abstract_base_class(
         let has_abstract_decorator = is_abstract(checker, decorator_list);
         has_abstract_method |= has_abstract_decorator;
 
-        if !checker.settings.enabled.contains(&RuleCode::B027) {
+        if !checker.settings.rules.enabled(&RuleCode::B027) {
             continue;
         }
 
@@ -87,7 +89,7 @@ pub fn abstract_base_class(
             ));
         }
     }
-    if checker.settings.enabled.contains(&RuleCode::B024) {
+    if checker.settings.rules.enabled(&RuleCode::B024) {
         if !has_abstract_method {
             checker.diagnostics.push(Diagnostic::new(
                 violations::AbstractBaseClassWithoutAbstractMethod(name.to_string()),

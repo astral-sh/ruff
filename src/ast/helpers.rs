@@ -10,8 +10,9 @@ use rustpython_ast::{
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
+use smallvec::smallvec;
 
-use crate::ast::types::{Binding, BindingKind, Range};
+use crate::ast::types::{Binding, BindingKind, CallPath, Range};
 use crate::checkers::ast::Checker;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 
@@ -39,7 +40,7 @@ pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
     generator.generate()
 }
 
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
+fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) {
     match &expr.node {
         ExprKind::Call { func, .. } => {
             collect_call_path_inner(func, parts);
@@ -55,9 +56,9 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
     }
 }
 
-/// Convert an `Expr` to its call path segments (like ["typing", "List"]).
-pub fn collect_call_path(expr: &Expr) -> Vec<&str> {
-    let mut segments = vec![];
+/// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
+pub fn collect_call_path(expr: &Expr) -> CallPath {
+    let mut segments = smallvec![];
     collect_call_path_inner(expr, &mut segments);
     segments
 }
@@ -90,7 +91,7 @@ pub fn contains_call_path(checker: &Checker, expr: &Expr, target: &[&str]) -> bo
     any_over_expr(expr, &|expr| {
         checker
             .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path == target)
+            .map_or(false, |call_path| call_path.as_slice() == target)
     })
 }
 
@@ -121,12 +122,13 @@ pub fn contains_effect(checker: &Checker, expr: &Expr) -> bool {
         // Otherwise, avoid all complex expressions.
         matches!(
             expr.node,
-            ExprKind::Call { .. }
-                | ExprKind::Await { .. }
+            ExprKind::Await { .. }
+                | ExprKind::Call { .. }
+                | ExprKind::DictComp { .. }
                 | ExprKind::GeneratorExp { .. }
                 | ExprKind::ListComp { .. }
                 | ExprKind::SetComp { .. }
-                | ExprKind::DictComp { .. }
+                | ExprKind::Subscript { .. }
                 | ExprKind::Yield { .. }
                 | ExprKind::YieldFrom { .. }
         )
@@ -313,7 +315,9 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
 }
 
 /// Extract the names of all handled exceptions.
-pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<Vec<&str>> {
+pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<CallPath> {
+    // TODO(charlie): Use `resolve_call_path` to avoid false positives for
+    // overridden builtins.
     let mut handler_names = vec![];
     for handler in handlers {
         match &handler.node {
@@ -361,10 +365,9 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 }
 
 /// Returns `true` if a statement or expression includes at least one comment.
-pub fn has_comments<T>(located: &Located<T>, locator: &Locator) -> bool {
-    lexer::make_tokenizer(&locator.slice_source_code_range(&Range::from_located(located)))
-        .flatten()
-        .any(|(_, tok, _)| matches!(tok, Tok::Comment(..)))
+pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
+    lexer::make_tokenizer(&locator.slice_source_code_range(&range))
+        .any(|result| result.map_or(false, |(_, tok, _)| matches!(tok, Tok::Comment(..))))
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
@@ -416,11 +419,11 @@ pub fn format_import_from_member(
 }
 
 /// Split a target string (like `typing.List`) into (`typing`, `List`).
-pub fn to_call_path(target: &str) -> Vec<&str> {
+pub fn to_call_path(target: &str) -> CallPath {
     if target.contains('.') {
         target.split('.').collect()
     } else {
-        vec!["", target]
+        smallvec!["", target]
     }
 }
 
