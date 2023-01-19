@@ -341,6 +341,17 @@
         }
       ]
     },
+    "pylint": {
+      "description": "Options for the `pylint` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PylintOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pyupgrade": {
       "description": "Options for the `pyupgrade` plugin.",
       "anyOf": [
@@ -460,6 +471,20 @@
         }
       },
       "additionalProperties": false
+    },
+    "ConstantType": {
+      "type": "string",
+      "enum": [
+        "bool",
+        "bytes",
+        "complex",
+        "ellipsis",
+        "float",
+        "int",
+        "none",
+        "str",
+        "tuple"
+      ]
     },
     "Convention": {
       "oneOf": [
@@ -1042,6 +1067,22 @@
               "type": "null"
             }
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PylintOptions": {
+      "type": "object",
+      "properties": {
+        "allow-magic-value-types": {
+          "description": "Constant types to ignore when used as \"magic values\".",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ConstantType"
+          }
         }
       },
       "additionalProperties": false

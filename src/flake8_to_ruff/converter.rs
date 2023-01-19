@@ -454,6 +454,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -520,6 +521,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -586,6 +588,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -652,6 +655,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -723,6 +727,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -795,6 +800,7 @@ mod tests {
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -867,6 +873,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);

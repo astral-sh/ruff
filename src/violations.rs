@@ -1251,18 +1251,22 @@ impl AlwaysAutofixableViolation for UseSysExit {
 }
 
 define_violation!(
-    pub struct MagicValueComparison(pub String);
+    pub struct MagicValueComparison {
+        pub value: String,
+    }
 );
 impl Violation for MagicValueComparison {
     fn message(&self) -> String {
-        let MagicValueComparison(value) = self;
+        let MagicValueComparison { value } = self;
         format!(
             "Magic value used in comparison, consider replacing {value} with a constant variable"
         )
     }
 
     fn placeholder() -> Self {
-        MagicValueComparison("magic".to_string())
+        MagicValueComparison {
+            value: "magic".to_string(),
+        }
     }
 }
 

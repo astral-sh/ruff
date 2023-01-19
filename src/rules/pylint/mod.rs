@@ -1,5 +1,6 @@
 //! Rules from [Pylint](https://pypi.org/project/pylint/2.15.7/).
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -10,6 +11,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::RuleCode;
+    use crate::rules::pylint;
     use crate::settings::Settings;
 
     #[test_case(RuleCode::PLC0414, Path::new("import_aliasing.py"); "PLC0414")]
@@ -40,6 +42,21 @@ mod tests {
             &Settings::for_rules(vec![rule_code]),
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn allow_magic_value_types() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pylint/magic_value_comparison.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    allow_magic_value_types: vec![pylint::settings::ConstantType::Int],
+                },
+                ..Settings::for_rules(vec![RuleCode::PLR2004])
+            },
+        )?;
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }
