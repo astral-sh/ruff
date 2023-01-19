@@ -20,10 +20,7 @@ struct CandidateInfo {
 
 impl CandidateInfo {
     fn new(valid: bool, had_special: bool) -> Self {
-        Self {
-            valid,
-            had_special,
-        }
+        Self { valid, had_special }
     }
 }
 
