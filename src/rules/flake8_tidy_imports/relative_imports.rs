@@ -1,3 +1,4 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Stmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

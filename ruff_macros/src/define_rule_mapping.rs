@@ -8,7 +8,7 @@ use syn::{Ident, LitStr, Path, Token};
 pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut rule_variants = quote!();
     let mut diagkind_variants = quote!();
-    let mut rule_kind_match_arms = quote!();
+    let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
     let mut rule_origin_match_arms = quote!();
     let mut rule_code_match_arms = quote!();
@@ -26,9 +26,8 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             #name,
         });
         diagkind_variants.extend(quote! {#name(#path),});
-        rule_kind_match_arms.extend(
-            quote! {Self::#name => DiagnosticKind::#name(<#path as Violation>::placeholder()),},
-        );
+        rule_message_formats_match_arms
+            .extend(quote! {Self::#name => <#path as Violation>::message_formats(),});
         rule_autofixable_match_arms.extend(quote! {Self::#name => <#path as Violation>::AUTOFIX,});
         let origin = get_origin(code);
         rule_origin_match_arms.extend(quote! {Self::#name => RuleOrigin::#origin,});
@@ -86,9 +85,9 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         }
 
         impl Rule {
-            /// A placeholder representation of the `DiagnosticKind` for the diagnostic.
-            pub fn kind(&self) -> DiagnosticKind {
-                match self { #rule_kind_match_arms }
+            /// Returns the format strings used to report violations of this rule.
+            pub fn message_formats(&self) -> &'static [&'static str] {
+                match self { #rule_message_formats_match_arms }
             }
 
             pub fn autofixable(&self) -> Option<crate::violation::AutofixKind> {

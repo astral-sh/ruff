@@ -13,10 +13,12 @@
 )]
 #![forbid(unsafe_code)]
 
-use syn::{parse_macro_input, DeriveInput};
+use proc_macro::TokenStream;
+use syn::{parse_macro_input, DeriveInput, ItemFn};
 
 mod config;
 mod define_rule_mapping;
+mod derive_message_formats;
 mod prefixes;
 mod rule_code_prefix;
 
@@ -33,4 +35,10 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 pub fn define_rule_mapping(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mapping = parse_macro_input!(item as define_rule_mapping::Mapping);
     define_rule_mapping::define_rule_mapping(&mapping).into()
+}
+
+#[proc_macro_attribute]
+pub fn derive_message_formats(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let func = parse_macro_input!(item as ItemFn);
+    derive_message_formats::derive_message_formats(&func).into()
 }

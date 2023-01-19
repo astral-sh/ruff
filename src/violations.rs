@@ -1,6 +1,8 @@
+#![allow(clippy::useless_format)]
 use std::fmt;
 
 use itertools::Itertools;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Cmpop;
 use serde::{Deserialize, Serialize};
 
@@ -255,7 +257,7 @@ define_violation!(
 impl Violation for IOError {
     fn message(&self) -> String {
         let IOError(message) = self;
-        message.clone()
+        format!("{message}")
     }
 
     fn placeholder() -> Self {
@@ -4280,7 +4282,7 @@ define_violation!(
 );
 impl Violation for NoThisPrefix {
     fn message(&self) -> String {
-        "First word of the docstring should not be \"This\"".to_string()
+        r#"First word of the docstring should not be "This""#.to_string()
     }
 
     fn placeholder() -> Self {

@@ -26,7 +26,6 @@ fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
     table_out.push_str("| ---- | ---- | ------- | --- |");
     table_out.push('\n');
     for rule in prefix.codes() {
-        let kind = rule.kind();
         let fix_token = match rule.autofixable() {
             None => "",
             Some(_) => "🛠",
@@ -36,7 +35,7 @@ fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
             "| {} | {} | {} | {} |",
             rule.code(),
             rule.as_ref(),
-            kind.body().replace('|', r"\|"),
+            rule.message_formats()[0].replace('|', r"\|"),
             fix_token
         ));
         table_out.push('\n');

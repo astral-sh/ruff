@@ -18,8 +18,8 @@ pub trait Violation: Debug + PartialEq + Eq + Serialize + DeserializeOwned {
         None
     }
 
-    /// A placeholder instance of the violation.
-    fn placeholder() -> Self;
+    /// Returns the format strings used by [`message`](Violation::message).
+    fn message_formats() -> &'static [&'static str];
 }
 
 pub struct AutofixKind {
@@ -48,8 +48,9 @@ pub trait AlwaysAutofixableViolation:
     /// The title displayed for the available autofix.
     fn autofix_title(&self) -> String;
 
-    /// A placeholder instance of the violation.
-    fn placeholder() -> Self;
+    /// Returns the format strings used by
+    /// [`message`](AlwaysAutofixableViolation::message).
+    fn message_formats() -> &'static [&'static str];
 }
 
 /// A blanket implementation.
@@ -64,8 +65,8 @@ impl<VA: AlwaysAutofixableViolation> Violation for VA {
         Some(Self::autofix_title)
     }
 
-    fn placeholder() -> Self {
-        <Self as AlwaysAutofixableViolation>::placeholder()
+    fn message_formats() -> &'static [&'static str] {
+        <Self as AlwaysAutofixableViolation>::message_formats()
     }
 }
 
