@@ -381,7 +381,7 @@ Options:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --format <FORMAT>
-          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab]
+          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
       --cache-dir <CACHE_DIR>
@@ -2120,9 +2120,9 @@ force-exclude = true
 
 The style in which violation messages should be formatted: `"text"`
 (default), `"grouped"` (group messages by file), `"json"`
-(machine-readable), `"junit"` (machine-readable XML), `"github"`
-(GitHub Actions annotations), `"gitlab"`
-(GitLab CI code quality report) or `"pylint"` (Pylint text format).
+(machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+Actions annotations), `"gitlab"` (GitLab CI code quality report), or
+`"pylint"` (Pylint text format).
 
 **Default value**: `"text"`
 
