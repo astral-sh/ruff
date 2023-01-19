@@ -5,7 +5,10 @@ use crate::registry::Diagnostic;
 use crate::violations;
 
 mod ambiguous_unicode_character;
+mod unpack_instead_of_concatenating_to_collection_literal;
+
 pub use ambiguous_unicode_character::ambiguous_unicode_character;
+pub use unpack_instead_of_concatenating_to_collection_literal::unpack_instead_of_concatenating_to_collection_literal;
 
 #[derive(Clone, Copy)]
 pub enum Context {
