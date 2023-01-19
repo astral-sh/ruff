@@ -11,7 +11,7 @@ use crate::rules::flake8_pytest_style::types::{
 };
 use crate::rules::flake8_quotes::settings::Quote;
 use crate::rules::pyupgrade::types::Primitive;
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Violation, Availability};
 
 // pycodestyle errors
 
@@ -342,6 +342,8 @@ fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
     }
 }
 impl Violation for UnusedImport {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     fn message(&self) -> String {
         let UnusedImport(name, ignore_init, ..) = self;
         if *ignore_init {
@@ -684,6 +686,8 @@ define_violation!(
     pub struct MultiValueRepeatedKeyLiteral(pub String, pub bool);
 );
 impl Violation for MultiValueRepeatedKeyLiteral {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     fn message(&self) -> String {
         let MultiValueRepeatedKeyLiteral(name, ..) = self;
         format!("Dictionary key literal `{name}` repeated")
@@ -709,6 +713,8 @@ define_violation!(
     pub struct MultiValueRepeatedKeyVariable(pub String, pub bool);
 );
 impl Violation for MultiValueRepeatedKeyVariable {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     fn message(&self) -> String {
         let MultiValueRepeatedKeyVariable(name, ..) = self;
         format!("Dictionary key `{name}` repeated")
@@ -3502,6 +3508,8 @@ define_violation!(
     }
 );
 impl Violation for DatetimeTimezoneUTC {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     fn message(&self) -> String {
         "Use `datetime.UTC` alias".to_string()
     }
@@ -4010,6 +4018,8 @@ fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String
     "Insert single blank line".to_string()
 }
 impl Violation for BlankLineAfterSummary {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     fn message(&self) -> String {
         let BlankLineAfterSummary(num_lines) = self;
         if *num_lines == 0 {
