@@ -1,11 +1,13 @@
 use rustpython_ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
-use crate::ast::types::Range;
+use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violations;
+
+const DUNDER_METHODS: &[&str] = &["__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"];
 
 fn is_exception_check(stmt: &Stmt) -> bool {
     let StmtKind::If {test: _, body, orelse: _} = &stmt.node else {
@@ -33,6 +35,13 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     }
     if is_exception_check(checker.current_stmt()) {
         return;
+    }
+
+    // Avoid flagging issues in dunder implementations.
+    if let ScopeKind::Function(def) = &checker.current_scope().kind {
+        if DUNDER_METHODS.contains(&def.name) {
+            return;
+        }
     }
 
     let mut diagnostic = Diagnostic::new(
@@ -77,6 +86,13 @@ pub fn negation_with_not_equal_op(
     }
     if is_exception_check(checker.current_stmt()) {
         return;
+    }
+
+    // Avoid flagging issues in dunder implementations.
+    if let ScopeKind::Function(def) = &checker.current_scope().kind {
+        if DUNDER_METHODS.contains(&def.name) {
+            return;
+        }
     }
 
     let mut diagnostic = Diagnostic::new(
