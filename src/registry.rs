@@ -725,17 +725,4 @@ mod tests {
             );
         }
     }
-
-    #[test]
-    fn fixable_codes() {
-        for rule in Rule::iter() {
-            let kind = rule.kind();
-            if kind.fixable() {
-                assert!(
-                    kind.commit().is_some(),
-                    "{rule:?} is fixable but has no commit message."
-                );
-            }
-        }
-    }
 }

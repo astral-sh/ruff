@@ -70,6 +70,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             Hash,
             PartialOrd,
             Ord,
+            AsRefStr,
         )]
         pub enum Rule { #rule_variants }
 
