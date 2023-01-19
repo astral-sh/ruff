@@ -4,16 +4,11 @@ use rustc_hash::FxHashMap;
 
 use crate::ast;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum TrailingComma {
     Present,
+    #[default]
     Absent,
-}
-
-impl Default for TrailingComma {
-    fn default() -> Self {
-        TrailingComma::Absent
-    }
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
