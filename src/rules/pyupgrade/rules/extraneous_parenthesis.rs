@@ -1,6 +1,6 @@
 use std::cmp::max;
 
-use rustpython_ast::{Expr, Keyword};
+use rustpython_ast::{Expr, Keyword, ExprKind};
 use rustpython_parser::lexer::{self, Tok};
 
 use crate::ast::types::Range;
@@ -51,6 +51,7 @@ fn valid_candidate(string: &str) -> CandidateInfo {
 pub fn extraneous_parenthesis(
     checker: &mut Checker,
     expr: &Expr,
+    func: &Expr,
     args: &[Expr],
     kwargs: &[Keyword],
 ) {
@@ -63,6 +64,11 @@ pub fn extraneous_parenthesis(
     if args.len() != 1 {
         return;
     }
+    let func_name = if let ExprKind::Name { id, .. } = &func.node {
+        id
+    } else {
+        return;
+    };
     let arg = match args.get(0) {
         None => return,
         Some(arg) => arg,
@@ -89,10 +95,10 @@ pub fn extraneous_parenthesis(
             let indent = indentation_greedy(checker.locator, arg);
             let small_indent = if indent.len() > 3 { &indent[3..] } else { "" };
             new_string = format!(
-                "print(\n{indent}{special_before}{arg_string}{special_after}\n{small_indent})"
+                "{func_name}(\n{indent}{special_before}{arg_string}{special_after}\n{small_indent})"
             );
         } else {
-            new_string = format!("print({special_before}{arg_string}{special_after})");
+            new_string = format!("{func_name}({special_before}{arg_string}{special_after})");
         }
     }
     if !new_string.is_empty() && new_string != expr_string {
