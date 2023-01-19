@@ -19,14 +19,17 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut from_impls_for_diagkind = quote!();
 
     for (code, path, name) in &mapping.entries {
-        rule_variants.extend(quote! {#name,});
+        let code_str = LitStr::new(&code.to_string(), Span::call_site());
+        rule_variants.extend(quote! {
+            #[doc = #code_str]
+            #name,
+        });
         diagkind_variants.extend(quote! {#name(#path),});
         rule_kind_match_arms.extend(
             quote! {Self::#name => DiagnosticKind::#name(<#path as Violation>::placeholder()),},
         );
         let origin = get_origin(code);
         rule_origin_match_arms.extend(quote! {Self::#name => RuleOrigin::#origin,});
-        let code_str = LitStr::new(&code.to_string(), Span::call_site());
         rule_code_match_arms.extend(quote! {Self::#name => #code_str,});
         rule_from_code_match_arms.extend(quote! {#code_str => Ok(&Rule::#name), });
         diagkind_code_match_arms.extend(quote! {Self::#name(..) => &Rule::#name, });
