@@ -156,6 +156,7 @@ pub enum SerializationFormat {
     Grouped,
     Github,
     Gitlab,
+    Pylint,
 }
 
 impl Default for SerializationFormat {

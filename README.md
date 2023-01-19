@@ -2121,8 +2121,8 @@ force-exclude = true
 The style in which violation messages should be formatted: `"text"`
 (default), `"grouped"` (group messages by file), `"json"`
 (machine-readable), `"junit"` (machine-readable XML), `"github"`
-(GitHub Actions annotations) or `"gitlab"`
-(GitLab CI code quality report).
+(GitHub Actions annotations), `"gitlab"`
+(GitLab CI code quality report) or `\"pylint\"` (Pylint text format).
 
 **Default value**: `"text"`
 

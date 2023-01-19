@@ -312,6 +312,24 @@ impl<'a> Printer<'a> {
                     )?
                 )?;
             }
+            SerializationFormat::Pylint => {
+                // Generate error workflow command in pylint format.
+                // See: https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter
+                for message in &diagnostics.messages {
+                    let label = format!(
+                        "{}{}{}{} {}{}{} {}",
+                        relativize_path(Path::new(&message.filename)),
+                        ":",
+                        message.location.row(),
+                        ":",
+                        "[",
+                        message.kind.rule().code(),
+                        "]",
+                        message.kind.body(),
+                    );
+                    writeln!(stdout, "{label}")?;
+                }
+            }
         }
 
         stdout.flush()?;
