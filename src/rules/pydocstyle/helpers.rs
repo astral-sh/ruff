@@ -55,3 +55,11 @@ pub fn logical_line(content: &str) -> Option<usize> {
     }
     logical_line
 }
+
+/// Normalize a word by removing all non-alphanumeric characters
+/// and converting it to lowercase.
+pub fn normalize_word(first_word: &str) -> String {
+    first_word
+        .replace(|c: char| !c.is_alphanumeric(), "")
+        .to_lowercase()
+}
