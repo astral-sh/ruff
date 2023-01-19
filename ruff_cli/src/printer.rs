@@ -285,7 +285,7 @@ impl<'a> Printer<'a> {
                 }
             }
             SerializationFormat::Gitlab => {
-                // Generate JSON with errors in GitLab CI format
+                // Generate JSON with violations in GitLab CI format
                 // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implementing-a-custom-tool
                 writeln!(stdout,
                     "{}",
@@ -311,6 +311,20 @@ impl<'a> Printer<'a> {
                         .collect::<Vec<_>>()
                     )?
                 )?;
+            }
+            SerializationFormat::Pylint => {
+                // Generate violations in Pylint format.
+                // See: https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter
+                for message in &diagnostics.messages {
+                    let label = format!(
+                        "{}:{}: [{}] {}",
+                        relativize_path(Path::new(&message.filename)),
+                        message.location.row(),
+                        message.kind.rule().code(),
+                        message.kind.body(),
+                    );
+                    writeln!(stdout, "{label}")?;
+                }
             }
         }
 

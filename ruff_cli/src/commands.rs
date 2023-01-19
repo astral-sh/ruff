@@ -319,6 +319,9 @@ pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
         SerializationFormat::Gitlab => {
             bail!("`--explain` does not support GitLab format")
         }
+        SerializationFormat::Pylint => {
+            bail!("`--explain` does not support pylint format")
+        }
     };
     Ok(())
 }
