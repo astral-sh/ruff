@@ -11,7 +11,7 @@ mod tests {
 
     use super::settings::Quote;
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test_case(Path::new("doubles.py"))]
@@ -33,10 +33,10 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    RuleCode::Q000,
-                    RuleCode::Q001,
-                    RuleCode::Q002,
-                    RuleCode::Q003,
+                    Rule::BadQuotesInlineString,
+                    Rule::BadQuotesMultilineString,
+                    Rule::BadQuotesDocstring,
+                    Rule::AvoidQuoteEscape,
                 ])
             },
         )?;
@@ -63,10 +63,10 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    RuleCode::Q000,
-                    RuleCode::Q001,
-                    RuleCode::Q002,
-                    RuleCode::Q003,
+                    Rule::BadQuotesInlineString,
+                    Rule::BadQuotesMultilineString,
+                    Rule::BadQuotesDocstring,
+                    Rule::AvoidQuoteEscape,
                 ])
             },
         )?;
@@ -98,10 +98,10 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    RuleCode::Q000,
-                    RuleCode::Q001,
-                    RuleCode::Q002,
-                    RuleCode::Q003,
+                    Rule::BadQuotesInlineString,
+                    Rule::BadQuotesMultilineString,
+                    Rule::BadQuotesDocstring,
+                    Rule::AvoidQuoteEscape,
                 ])
             },
         )?;
@@ -133,10 +133,10 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..Settings::for_rules(vec![
-                    RuleCode::Q000,
-                    RuleCode::Q001,
-                    RuleCode::Q002,
-                    RuleCode::Q003,
+                    Rule::BadQuotesInlineString,
+                    Rule::BadQuotesMultilineString,
+                    Rule::BadQuotesDocstring,
+                    Rule::AvoidQuoteEscape,
                 ])
             },
         )?;

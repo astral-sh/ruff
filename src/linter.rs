@@ -16,7 +16,7 @@ use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
-use crate::registry::{Diagnostic, LintSource, RuleCode};
+use crate::registry::{Diagnostic, LintSource, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
 use crate::{directives, fs, rustpython_helpers, violations};
@@ -48,7 +48,7 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = settings.rules.enabled(&RuleCode::W505);
+    let use_doc_lines = settings.rules.enabled(&Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(&tokens));
@@ -116,7 +116,7 @@ pub fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.rules.enabled(&RuleCode::E999) {
+                if settings.rules.enabled(&Rule::SyntaxError) {
                     diagnostics.push(Diagnostic::new(
                         violations::SyntaxError(parse_error.error.to_string()),
                         Range::new(parse_error.location, parse_error.location),
@@ -170,7 +170,7 @@ pub fn check_path(
         if !ignores.is_empty() {
             return Ok(diagnostics
                 .into_iter()
-                .filter(|diagnostic| !ignores.contains(&diagnostic.kind.code()))
+                .filter(|diagnostic| !ignores.contains(&diagnostic.kind.rule()))
                 .collect());
         }
     }

@@ -4,7 +4,7 @@ use crate::ast::helpers::{create_expr, create_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::{Generator, Locator, Stylist};
 use crate::violations;
 
@@ -405,7 +405,7 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
 /// UP016
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
     if let Some(diagnostic) =
-        handle_next_on_six_dict(expr, checker.patch(&RuleCode::UP016), checker)
+        handle_next_on_six_dict(expr, checker.patch(&Rule::RemoveSixCompat), checker)
     {
         checker.diagnostics.push(diagnostic);
         return;
@@ -415,7 +415,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
         .resolve_call_path(expr)
         .map_or(false, |call_path| is_module_member(&call_path, "six"))
     {
-        let patch = checker.patch(&RuleCode::UP016);
+        let patch = checker.patch(&Rule::RemoveSixCompat);
         let diagnostic = match &expr.node {
             ExprKind::Call {
                 func,

@@ -95,7 +95,7 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
             violations::UseSysExit(name.to_string()),
             Range::from_located(func),
         );
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
                 diagnostic.amend(Fix::replacement(
                     content,

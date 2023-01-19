@@ -157,7 +157,7 @@ pub fn convert_named_tuple_functional_to_class(
         violations::ConvertNamedTupleFunctionalToClass(typename.to_string()),
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match match_defaults(keywords)
             .and_then(|defaults| create_properties_from_args(args, defaults))
         {

@@ -9,7 +9,7 @@ use crate::violations;
 fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
     let mut diagnostic =
         Diagnostic::new(violations::RewriteCElementTree, Range::from_located(node));
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         let contents = checker
             .locator
             .slice_source_code_range(&Range::from_located(node));

@@ -9,14 +9,18 @@ mod tests {
     use anyhow::Result;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings;
 
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_errmsg/EM.py"),
-            &settings::Settings::for_rules(vec![RuleCode::EM101, RuleCode::EM102, RuleCode::EM103]),
+            &settings::Settings::for_rules(vec![
+                Rule::RawStringInException,
+                Rule::FStringInException,
+                Rule::DotFormatInException,
+            ]),
         )?;
         insta::assert_yaml_snapshot!("defaults", diagnostics);
         Ok(())
@@ -31,9 +35,9 @@ mod tests {
                     max_string_length: 20,
                 },
                 ..settings::Settings::for_rules(vec![
-                    RuleCode::EM101,
-                    RuleCode::EM102,
-                    RuleCode::EM103,
+                    Rule::RawStringInException,
+                    Rule::FStringInException,
+                    Rule::DotFormatInException,
                 ])
             },
         )?;

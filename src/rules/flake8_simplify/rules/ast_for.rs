@@ -6,7 +6,7 @@ use crate::ast::helpers::{create_expr, create_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::{Generator, Stylist};
 use crate::violations;
 
@@ -178,7 +178,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
         Some(sibling) => return_values_for_siblings(stmt, sibling),
     } {
         if loop_info.return_value && !loop_info.next_return_value {
-            if checker.settings.rules.enabled(&RuleCode::SIM110) {
+            if checker.settings.rules.enabled(&Rule::ConvertLoopToAny) {
                 let contents = return_stmt(
                     "any",
                     loop_info.test,
@@ -196,7 +196,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     violations::ConvertLoopToAny(contents.clone()),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&RuleCode::SIM110) {
+                if checker.patch(&Rule::ConvertLoopToAny) {
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,
@@ -211,7 +211,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
         }
 
         if !loop_info.return_value && loop_info.next_return_value {
-            if checker.settings.rules.enabled(&RuleCode::SIM111) {
+            if checker.settings.rules.enabled(&Rule::ConvertLoopToAll) {
                 // Invert the condition.
                 let test = {
                     if let ExprKind::UnaryOp {
@@ -244,7 +244,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     violations::ConvertLoopToAll(contents.clone()),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&RuleCode::SIM111) {
+                if checker.patch(&Rule::ConvertLoopToAll) {
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,

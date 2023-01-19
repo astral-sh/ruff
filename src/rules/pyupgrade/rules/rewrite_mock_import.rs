@@ -12,7 +12,7 @@ use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::{Locator, Stylist};
 use crate::violations;
 use crate::violations::MockReference;
@@ -204,7 +204,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 violations::RewriteMockImport(MockReference::Attribute),
                 Range::from_located(value),
             );
-            if checker.patch(&RuleCode::UP026) {
+            if checker.patch(&Rule::RewriteMockImport) {
                 diagnostic.amend(Fix::replacement(
                     "mock".to_string(),
                     value.location,
@@ -226,7 +226,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| name.node.name == "mock" || name.node.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(&RuleCode::UP026) {
+                let content = if checker.patch(&Rule::RewriteMockImport) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         match format_import(stmt, &indent, checker.locator, checker.stylist) {
                             Ok(content) => Some(content),
@@ -275,7 +275,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     violations::RewriteMockImport(MockReference::Import),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&RuleCode::UP026) {
+                if checker.patch(&Rule::RewriteMockImport) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         match format_import_from(stmt, &indent, checker.locator, checker.stylist) {
                             Ok(content) => {

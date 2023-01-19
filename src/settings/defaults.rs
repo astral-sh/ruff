@@ -10,7 +10,7 @@ use crate::registry::RuleCodePrefix;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 
 pub const PREFIXES: &[RuleCodePrefix] = &[RuleCodePrefix::E, RuleCodePrefix::F];
@@ -84,6 +84,7 @@ impl Default for Settings {
             pep8_naming: pep8_naming::settings::Settings::default(),
             pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
+            pylint: pylint::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
         }
     }

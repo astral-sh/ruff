@@ -3,7 +3,7 @@
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
     eradicate, flake8_commas, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff,
@@ -19,20 +19,32 @@ pub fn check_tokens(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_ambiguous_unicode_character = settings.rules.enabled(&RuleCode::RUF001)
-        || settings.rules.enabled(&RuleCode::RUF002)
-        || settings.rules.enabled(&RuleCode::RUF003);
-    let enforce_quotes = settings.rules.enabled(&RuleCode::Q000)
-        || settings.rules.enabled(&RuleCode::Q001)
-        || settings.rules.enabled(&RuleCode::Q002)
-        || settings.rules.enabled(&RuleCode::Q003);
-    let enforce_commented_out_code = settings.rules.enabled(&RuleCode::ERA001);
-    let enforce_invalid_escape_sequence = settings.rules.enabled(&RuleCode::W605);
-    let enforce_implicit_string_concatenation =
-        settings.rules.enabled(&RuleCode::ISC001) || settings.rules.enabled(&RuleCode::ISC002);
-    let enforce_trailing_comma = settings.rules.enabled(&RuleCode::COM812)
-        || settings.rules.enabled(&RuleCode::COM818)
-        || settings.rules.enabled(&RuleCode::COM819);
+    let enforce_ambiguous_unicode_character = settings
+        .rules
+        .enabled(&Rule::AmbiguousUnicodeCharacterString)
+        || settings
+            .rules
+            .enabled(&Rule::AmbiguousUnicodeCharacterDocstring)
+        || settings
+            .rules
+            .enabled(&Rule::AmbiguousUnicodeCharacterComment);
+    let enforce_quotes = settings.rules.enabled(&Rule::BadQuotesInlineString)
+        || settings.rules.enabled(&Rule::BadQuotesMultilineString)
+        || settings.rules.enabled(&Rule::BadQuotesDocstring)
+        || settings.rules.enabled(&Rule::AvoidQuoteEscape);
+    let enforce_commented_out_code = settings.rules.enabled(&Rule::CommentedOutCode);
+    let enforce_invalid_escape_sequence = settings.rules.enabled(&Rule::InvalidEscapeSequence);
+    let enforce_implicit_string_concatenation = settings
+        .rules
+        .enabled(&Rule::SingleLineImplicitStringConcatenation)
+        || settings
+            .rules
+            .enabled(&Rule::MultiLineImplicitStringConcatenation);
+    let enforce_trailing_comma = settings.rules.enabled(&Rule::TrailingCommaMissing)
+        || settings
+            .rules
+            .enabled(&Rule::TrailingCommaOnBareTupleProhibited)
+        || settings.rules.enabled(&Rule::TrailingCommaProhibited);
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {
@@ -75,7 +87,7 @@ pub fn check_tokens(
                     settings,
                     autofix,
                 ) {
-                    if settings.rules.enabled(diagnostic.kind.code()) {
+                    if settings.rules.enabled(diagnostic.kind.rule()) {
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -101,7 +113,7 @@ pub fn check_tokens(
                     start,
                     end,
                     matches!(autofix, flags::Autofix::Enabled)
-                        && settings.rules.should_fix(&RuleCode::W605),
+                        && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
                 ));
             }
         }
@@ -112,7 +124,7 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_implicit_str_concat::rules::implicit(tokens)
                 .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.code())),
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
     }
 
@@ -121,7 +133,7 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_commas::rules::trailing_commas(tokens, settings, autofix)
                 .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.code())),
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
     }
 

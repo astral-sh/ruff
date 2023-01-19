@@ -108,7 +108,7 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
 
         let mut diagnostic =
             Diagnostic::new(violations::ReplaceStdoutStderr, Range::from_located(expr));
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) = generate_fix(checker.locator, stdout, stderr) {
                 diagnostic.amend(fix);
             };

@@ -4,7 +4,7 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 /// SIM112
@@ -40,7 +40,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
         violations::UseCapitalEnvironmentVariables(capital_env_var.clone(), env_var.clone()),
         Range::from_located(arg),
     );
-    if checker.patch(&RuleCode::SIM112) {
+    if checker.patch(&Rule::UseCapitalEnvironmentVariables) {
         let new_env_var = create_expr(ExprKind::Constant {
             value: capital_env_var.into(),
             kind: kind.clone(),
@@ -79,7 +79,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         violations::UseCapitalEnvironmentVariables(capital_env_var.clone(), env_var.clone()),
         Range::from_located(slice),
     );
-    if checker.patch(&RuleCode::SIM112) {
+    if checker.patch(&Rule::UseCapitalEnvironmentVariables) {
         let new_env_var = create_expr(ExprKind::Constant {
             value: capital_env_var.into(),
             kind: kind.clone(),

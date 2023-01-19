@@ -4,7 +4,7 @@ use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 fn pytest_mark_parentheses(
@@ -22,7 +22,7 @@ fn pytest_mark_parentheses(
         ),
         Range::from_located(decorator),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(fix);
     }
     checker.diagnostics.push(diagnostic);
@@ -75,7 +75,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
             violations::UseFixturesWithoutParameters,
             Range::from_located(decorator),
         );
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
             diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
         }
@@ -84,8 +84,14 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
 }
 
 pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
-    let enforce_parentheses = checker.settings.rules.enabled(&RuleCode::PT023);
-    let enforce_useless_usefixtures = checker.settings.rules.enabled(&RuleCode::PT026);
+    let enforce_parentheses = checker
+        .settings
+        .rules
+        .enabled(&Rule::IncorrectMarkParenthesesStyle);
+    let enforce_useless_usefixtures = checker
+        .settings
+        .rules
+        .enabled(&Rule::UseFixturesWithoutParameters);
 
     for mark in get_mark_decorators(decorators) {
         if enforce_parentheses {

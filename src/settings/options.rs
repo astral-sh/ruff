@@ -9,7 +9,7 @@ use crate::registry::RuleCodePrefix;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -208,9 +208,9 @@ pub struct Options {
     )]
     /// The style in which violation messages should be formatted: `"text"`
     /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"`
-    /// (GitHub Actions annotations) or `"gitlab"`
-    /// (GitLab CI code quality report).
+    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
+    /// Actions annotations), `"gitlab"` (GitLab CI code quality report), or
+    /// `"pylint"` (Pylint text format).
     pub format: Option<SerializationFormat>,
     #[option(
         default = r#"false"#,
@@ -461,6 +461,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `pydocstyle` plugin.
     pub pydocstyle: Option<pydocstyle::settings::Options>,
+    #[option_group]
+    /// Options for the `pylint` plugin.
+    pub pylint: Option<pylint::settings::Options>,
     #[option_group]
     /// Options for the `pyupgrade` plugin.
     pub pyupgrade: Option<pyupgrade::settings::Options>,

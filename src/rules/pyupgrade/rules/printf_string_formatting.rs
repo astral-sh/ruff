@@ -1,16 +1,17 @@
+use std::str::FromStr;
+
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_common::cformat::{CFormatPart, CFormatStrOrBytes, CFormatString, CFormatQuantity, CConversionFlags};
+use rustpython_common::cformat::{CConversionFlags, CFormatPart, CFormatQuantity, CFormatString};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{Diagnostic, Rule};
 use crate::rules::pyupgrade::helpers::{curly_escape, is_keyword};
 use crate::violations;
-use std::str::FromStr;
 
 static MAPPING_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\(([^()]*)\)").unwrap());
 static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").unwrap());
@@ -19,7 +20,7 @@ static PRECISION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\.(?:\*|\d*))?")
 static LENGTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[hlL]?").unwrap());
 static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % ([({])").unwrap());
 static PYTHON_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\W0-9]\w*").unwrap());
-static EMOJI_SYNTAX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\N\{.*?\}").unwrap());
+static EMOJI_SYNTAX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\N\{.*?}").unwrap());
 
 #[derive(Debug, PartialEq, Clone)]
 struct PercentFormatPart {
@@ -101,13 +102,13 @@ fn get_flags(flags: CConversionFlags) -> String {
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let mut formats: Vec<PercentFormat> = vec![];
 
-    let Ok(format_string) = CFormatString::from_str(&string) else {
+    let Ok(format_string) = CFormatString::from_str(string) else {
         return formats;
     };
     let format_vec: Vec<&CFormatPart<String>> =
         format_string.iter().map(|(_, part)| part).collect();
     for (i, part) in format_vec.iter().enumerate() {
-        println!("{:?}", part);
+        println!("{part:?}");
         if let CFormatPart::Literal(item) = &part {
             let mut current_format = PercentFormat::new(item.to_string(), None);
             let the_next = match format_vec.get(i + 1) {
@@ -124,17 +125,17 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                         // FOR REVIEWER: Not sure if below is the correct way to handle
                         // FromValuesTuple
                         CFormatQuantity::FromValuesTuple => Some("*".to_string()),
-                    }
-                    None => None
+                    },
+                    None => None,
                 };
                 let clean_precision = match &c_spec.precision {
                     Some(width_item) => match width_item {
                         CFormatQuantity::Amount(amount) => Some(format!(".{amount}")),
                         // FOR REVIEWER: Not sure if below is the correct way to handle
                         // FromValuesTuple
-                        CFormatQuantity::FromValuesTuple =>  None
-                    }
-                    None => None
+                        CFormatQuantity::FromValuesTuple => None,
+                    },
+                    None => None,
                 };
                 let flags = if c_spec.flags.is_empty() {
                     None
@@ -148,77 +149,75 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                     clean_precision,
                     c_spec.format_char.to_string(),
                 );
-                println!("{:?}", perc_part);
+                println!("{perc_part:?}");
                 current_format.parts = Some(perc_part);
             }
             formats.push(current_format);
         }
     }
 
-    /*
-    let mut string_start = 0;
-    let mut string_end = 0;
-    let mut in_fmt = false;
-
-    let mut i = 0;
-    while i < string.len() {
-        if in_fmt {
-            let mut key: Option<String> = None;
-            if let Some(key_item) = MAPPING_KEY_RE.captures(&string[i..]) {
-                if let Some(match_item) = key_item.get(1) {
-                    key = Some(match_item.as_str().to_string());
-                    // Have to use another regex because the rust Capture object does not have an
-                    // end() method
-                    i = MAPPING_KEY_RE.find_at(string, i).unwrap().end();
-                }
-            };
-
-            let conversion_flag = get_flag(&CONVERSION_FLAG_RE, string, &mut i);
-            let width = get_flag(&WIDTH_RE, string, &mut i);
-            let precision = get_flag(&PRECISION_RE, string, &mut i);
-
-            // length modifier is ignored
-            i = LENGTH_RE.find_at(string, i).unwrap().end();
-            // I use clone because nth consumes characters before position n
-            let conversion = match string.chars().nth(i) {
-                None => panic!("end-of-string while parsing format"),
-                Some(conv_item) => conv_item,
-            };
-            i += 1;
-
-            let fmt = PercentFormatPart::new(
-                key,
-                conversion_flag,
-                width,
-                precision,
-                conversion.to_string(),
-            );
-            let fmt_full =
-                PercentFormat::new(string[string_start..string_end].to_string(), Some(fmt));
-            formats.push(fmt_full);
-
-            in_fmt = false;
-            string_start = i;
-        } else {
-            i = match string[i..].find('%') {
-                None => {
-                    let fmt_full = PercentFormat::new(string[string_start..].to_string(), None);
-                    formats.push(fmt_full);
-                    return formats;
-                }
-                // Since we cut off the part of the string before `i` in the beginning, we need to
-                // add it back to get the proper index
-                Some(item) => item + i,
-            };
-            string_end = i;
-            i += 1;
-            in_fmt = true;
-        }
-    }
-
-    assert!(!in_fmt, "end-of-string while parsing format");
-    formats
-    */
+    // let mut string_start = 0;
+    // let mut string_end = 0;
+    // let mut in_fmt = false;
+    //
+    // let mut i = 0;
+    // while i < string.len() {
+    // if in_fmt {
+    // let mut key: Option<String> = None;
+    // if let Some(key_item) = MAPPING_KEY_RE.captures(&string[i..]) {
+    // if let Some(match_item) = key_item.get(1) {
+    // key = Some(match_item.as_str().to_string());
+    // Have to use another regex because the rust Capture object does not have an
+    // end() method
+    // i = MAPPING_KEY_RE.find_at(string, i).unwrap().end();
+    // }
+    // };
+    //
+    // let conversion_flag = get_flag(&CONVERSION_FLAG_RE, string, &mut i);
+    // let width = get_flag(&WIDTH_RE, string, &mut i);
+    // let precision = get_flag(&PRECISION_RE, string, &mut i);
+    //
+    // length modifier is ignored
+    // i = LENGTH_RE.find_at(string, i).unwrap().end();
+    // I use clone because nth consumes characters before position n
+    // let conversion = match string.chars().nth(i) {
+    // None => panic!("end-of-string while parsing format"),
+    // Some(conv_item) => conv_item,
+    // };
+    // i += 1;
+    //
+    // let fmt = PercentFormatPart::new(
+    // key,
+    // conversion_flag,
+    // width,
+    // precision,
+    // conversion.to_string(),
+    // );
+    // let fmt_full =
+    // PercentFormat::new(string[string_start..string_end].to_string(), Some(fmt));
+    // formats.push(fmt_full);
+    //
+    // in_fmt = false;
+    // string_start = i;
+    // } else {
+    // i = match string[i..].find('%') {
+    // None => {
+    // let fmt_full = PercentFormat::new(string[string_start..].to_string(), None);
+    // formats.push(fmt_full);
+    // return formats;
+    // }
+    // Since we cut off the part of the string before `i` in the beginning, we need
+    // to add it back to get the proper index
+    // Some(item) => item + i,
+    // };
+    // string_end = i;
+    // i += 1;
+    // in_fmt = true;
+    // }
+    // }
+    //
+    // assert!(!in_fmt, "end-of-string while parsing format");
+    // formats
     formats
 }
 
@@ -620,12 +619,14 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     );
     // Emoji sytnax is very rare and adds a lot of complexity to the code, so we are
     // only issuing a warning if it exists, and not fixing the code
-    if checker.patch(diagnostic.kind.code()) && !EMOJI_SYNTAX.is_match(&expr_string) {
-        diagnostic.amend(Fix::replacement(
-            new_string,
-            expr.location,
-            expr.end_location.unwrap(),
-        ));
+    if checker.patch(&Rule::PrintfStringFormatting) {
+        if !EMOJI_SYNTAX.is_match(&expr_string) {
+            diagnostic.amend(Fix::replacement(
+                new_string,
+                expr.location,
+                expr.end_location.unwrap(),
+            ));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

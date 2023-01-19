@@ -9,7 +9,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test_case(Path::new("test_pass"); "INP001_0")]
@@ -24,7 +24,7 @@ mod tests {
                 .join(path)
                 .join("example.py")
                 .as_path(),
-            &Settings::for_rule(RuleCode::INP001),
+            &Settings::for_rule(Rule::ImplicitNamespacePackage),
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())

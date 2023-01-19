@@ -49,16 +49,11 @@ impl<'a> Stylist<'a> {
 }
 
 /// The quotation style used in Python source code.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum Quote {
     Single,
+    #[default]
     Double,
-}
-
-impl Default for Quote {
-    fn default() -> Self {
-        Quote::Double
-    }
 }
 
 impl From<Quote> for char {
@@ -123,17 +118,12 @@ impl Deref for Indentation {
 
 /// The line ending style used in Python source code.
 /// See <https://docs.python.org/3/reference/lexical_analysis.html#physical-lines>
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum LineEnding {
+    #[default]
     Lf,
     Cr,
     CrLf,
-}
-
-impl Default for LineEnding {
-    fn default() -> Self {
-        LineEnding::Lf
-    }
 }
 
 impl Deref for LineEnding {

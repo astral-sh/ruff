@@ -10,39 +10,39 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
-    #[test_case(RuleCode::B002, Path::new("B002.py"); "B002")]
-    #[test_case(RuleCode::B003, Path::new("B003.py"); "B003")]
-    #[test_case(RuleCode::B004, Path::new("B004.py"); "B004")]
-    #[test_case(RuleCode::B005, Path::new("B005.py"); "B005")]
-    #[test_case(RuleCode::B006, Path::new("B006_B008.py"); "B006")]
-    #[test_case(RuleCode::B007, Path::new("B007.py"); "B007")]
-    #[test_case(RuleCode::B008, Path::new("B006_B008.py"); "B008")]
-    #[test_case(RuleCode::B009, Path::new("B009_B010.py"); "B009")]
-    #[test_case(RuleCode::B010, Path::new("B009_B010.py"); "B010")]
-    #[test_case(RuleCode::B011, Path::new("B011.py"); "B011")]
-    #[test_case(RuleCode::B012, Path::new("B012.py"); "B012")]
-    #[test_case(RuleCode::B013, Path::new("B013.py"); "B013")]
-    #[test_case(RuleCode::B014, Path::new("B014.py"); "B014")]
-    #[test_case(RuleCode::B015, Path::new("B015.py"); "B015")]
-    #[test_case(RuleCode::B016, Path::new("B016.py"); "B016")]
-    #[test_case(RuleCode::B017, Path::new("B017.py"); "B017")]
-    #[test_case(RuleCode::B018, Path::new("B018.py"); "B018")]
-    #[test_case(RuleCode::B019, Path::new("B019.py"); "B019")]
-    #[test_case(RuleCode::B020, Path::new("B020.py"); "B020")]
-    #[test_case(RuleCode::B021, Path::new("B021.py"); "B021")]
-    #[test_case(RuleCode::B022, Path::new("B022.py"); "B022")]
-    #[test_case(RuleCode::B023, Path::new("B023.py"); "B023")]
-    #[test_case(RuleCode::B024, Path::new("B024.py"); "B024")]
-    #[test_case(RuleCode::B025, Path::new("B025.py"); "B025")]
-    #[test_case(RuleCode::B026, Path::new("B026.py"); "B026")]
-    #[test_case(RuleCode::B027, Path::new("B027.py"); "B027")]
-    #[test_case(RuleCode::B904, Path::new("B904.py"); "B904")]
-    #[test_case(RuleCode::B905, Path::new("B905.py"); "B905")]
-    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+    #[test_case(Rule::UnaryPrefixIncrement, Path::new("B002.py"); "B002")]
+    #[test_case(Rule::AssignmentToOsEnviron, Path::new("B003.py"); "B003")]
+    #[test_case(Rule::UnreliableCallableCheck, Path::new("B004.py"); "B004")]
+    #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"); "B005")]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"); "B006")]
+    #[test_case(Rule::UnusedLoopControlVariable, Path::new("B007.py"); "B007")]
+    #[test_case(Rule::FunctionCallArgumentDefault, Path::new("B006_B008.py"); "B008")]
+    #[test_case(Rule::GetAttrWithConstant, Path::new("B009_B010.py"); "B009")]
+    #[test_case(Rule::SetAttrWithConstant, Path::new("B009_B010.py"); "B010")]
+    #[test_case(Rule::DoNotAssertFalse, Path::new("B011.py"); "B011")]
+    #[test_case(Rule::JumpStatementInFinally, Path::new("B012.py"); "B012")]
+    #[test_case(Rule::RedundantTupleInExceptionHandler, Path::new("B013.py"); "B013")]
+    #[test_case(Rule::DuplicateHandlerException, Path::new("B014.py"); "B014")]
+    #[test_case(Rule::UselessComparison, Path::new("B015.py"); "B015")]
+    #[test_case(Rule::CannotRaiseLiteral, Path::new("B016.py"); "B016")]
+    #[test_case(Rule::NoAssertRaisesException, Path::new("B017.py"); "B017")]
+    #[test_case(Rule::UselessExpression, Path::new("B018.py"); "B018")]
+    #[test_case(Rule::CachedInstanceMethod, Path::new("B019.py"); "B019")]
+    #[test_case(Rule::LoopVariableOverridesIterator, Path::new("B020.py"); "B020")]
+    #[test_case(Rule::FStringDocstring, Path::new("B021.py"); "B021")]
+    #[test_case(Rule::UselessContextlibSuppress, Path::new("B022.py"); "B022")]
+    #[test_case(Rule::FunctionUsesLoopVariable, Path::new("B023.py"); "B023")]
+    #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"); "B024")]
+    #[test_case(Rule::DuplicateTryBlockException, Path::new("B025.py"); "B025")]
+    #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"); "B026")]
+    #[test_case(Rule::EmptyMethodWithoutAbstractDecorator, Path::new("B027.py"); "B027")]
+    #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"); "B904")]
+    #[test_case(Rule::ZipWithoutExplicitStrict, Path::new("B905.py"); "B905")]
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_bugbear")
                 .join(path)
@@ -65,7 +65,7 @@ mod tests {
                         "fastapi.Query".to_string(),
                     ],
                 },
-                ..Settings::for_rules(vec![RuleCode::B008])
+                ..Settings::for_rules(vec![Rule::FunctionCallArgumentDefault])
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);

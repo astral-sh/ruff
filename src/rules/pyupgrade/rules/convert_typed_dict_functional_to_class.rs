@@ -200,7 +200,7 @@ pub fn convert_typed_dict_functional_to_class(
         violations::ConvertTypedDictFunctionalToClass(class_name.to_string()),
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match match_properties_and_total(args, keywords) {
             Ok((body, total_keyword)) => {
                 diagnostic.amend(convert_to_class(

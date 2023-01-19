@@ -11,7 +11,7 @@ use itertools::iterate;
 use ruff::fs::relativize_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
-use ruff::registry::RuleCode;
+use ruff::registry::Rule;
 use ruff::settings::types::SerializationFormat;
 use ruff::{fix, notify_user};
 use serde::Serialize;
@@ -35,12 +35,29 @@ struct ExpandedFix<'a> {
 
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {
-    code: &'a RuleCode,
+    code: SerializeRuleAsCode<'a>,
     message: String,
     fix: Option<ExpandedFix<'a>>,
     location: Location,
     end_location: Location,
     filename: &'a str,
+}
+
+struct SerializeRuleAsCode<'a>(&'a Rule);
+
+impl Serialize for SerializeRuleAsCode<'_> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.code())
+    }
+}
+
+impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
+    fn from(rule: &'a Rule) -> Self {
+        Self(rule)
+    }
 }
 
 pub struct Printer<'a> {
@@ -143,7 +160,7 @@ impl<'a> Printer<'a> {
                             .messages
                             .iter()
                             .map(|message| ExpandedMessage {
-                                code: message.kind.code(),
+                                code: message.kind.rule().into(),
                                 message: message.kind.body(),
                                 fix: message.fix.as_ref().map(|fix| ExpandedFix {
                                     content: &fix.content,
@@ -177,8 +194,10 @@ impl<'a> Printer<'a> {
                             message.location.column(),
                             message.kind.body()
                         ));
-                        let mut case =
-                            TestCase::new(format!("org.ruff.{}", message.kind.code()), status);
+                        let mut case = TestCase::new(
+                            format!("org.ruff.{}", message.kind.rule().code()),
+                            status,
+                        );
                         let file_path = Path::new(filename);
                         let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
                         let classname = file_path.parent().unwrap().join(file_stem);
@@ -248,14 +267,14 @@ impl<'a> Printer<'a> {
                         ":",
                         message.location.column(),
                         ":",
-                        message.kind.code().as_ref(),
+                        message.kind.rule().code(),
                         message.kind.body(),
                     );
                     writeln!(
                         stdout,
                         "::error title=Ruff \
                          ({}),file={},line={},col={},endLine={},endColumn={}::{}",
-                        message.kind.code(),
+                        message.kind.rule().code(),
                         message.filename,
                         message.location.row(),
                         message.location.column(),
@@ -266,7 +285,7 @@ impl<'a> Printer<'a> {
                 }
             }
             SerializationFormat::Gitlab => {
-                // Generate JSON with errors in GitLab CI format
+                // Generate JSON with violations in GitLab CI format
                 // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implementing-a-custom-tool
                 writeln!(stdout,
                     "{}",
@@ -276,9 +295,9 @@ impl<'a> Printer<'a> {
                             .iter()
                             .map(|message| {
                                 json!({
-                                    "description": format!("({}) {}", message.kind.code(), message.kind.body()),
+                                    "description": format!("({}) {}", message.kind.rule().code(), message.kind.body()),
                                     "severity": "major",
-                                    "fingerprint": message.kind.code(),
+                                    "fingerprint": message.kind.rule().code(),
                                     "location": {
                                         "path": message.filename,
                                         "lines": {
@@ -292,6 +311,20 @@ impl<'a> Printer<'a> {
                         .collect::<Vec<_>>()
                     )?
                 )?;
+            }
+            SerializationFormat::Pylint => {
+                // Generate violations in Pylint format.
+                // See: https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter
+                for message in &diagnostics.messages {
+                    let label = format!(
+                        "{}:{}: [{}] {}",
+                        relativize_path(Path::new(&message.filename)),
+                        message.location.row(),
+                        message.kind.rule().code(),
+                        message.kind.body(),
+                    );
+                    writeln!(stdout, "{label}")?;
+                }
             }
         }
 
@@ -361,7 +394,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
         ":".cyan(),
         message.location.column(),
         ":".cyan(),
-        message.kind.code().as_ref().red().bold(),
+        message.kind.rule().code().red().bold(),
         message.kind.body(),
     );
     writeln!(stdout, "{label}")?;
@@ -388,7 +421,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
                 source: &source.contents,
                 line_start: message.location.row(),
                 annotations: vec![SourceAnnotation {
-                    label: message.kind.code().as_ref(),
+                    label: message.kind.rule().code(),
                     annotation_type: AnnotationType::Error,
                     range: source.range,
                 }],
@@ -425,7 +458,7 @@ fn print_grouped_message<T: Write>(
         ":".cyan(),
         message.location.column(),
         " ".repeat(column_length - num_digits(message.location.column())),
-        message.kind.code().as_ref().red().bold(),
+        message.kind.rule().code().red().bold(),
         message.kind.body(),
     );
     writeln!(stdout, "{label}")?;
@@ -452,7 +485,7 @@ fn print_grouped_message<T: Write>(
                 source: &source.contents,
                 line_start: message.location.row(),
                 annotations: vec![SourceAnnotation {
-                    label: message.kind.code().as_ref(),
+                    label: message.kind.rule().code(),
                     annotation_type: AnnotationType::Error,
                     range: source.range,
                 }],

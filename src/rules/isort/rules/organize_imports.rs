@@ -102,7 +102,7 @@ pub fn organize_imports(
     } else {
         let mut diagnostic = Diagnostic::new(violations::UnsortedImports, range);
         if matches!(autofix, flags::Autofix::Enabled)
-            && settings.rules.should_fix(diagnostic.kind.code())
+            && settings.rules.should_fix(diagnostic.kind.rule())
         {
             diagnostic.amend(Fix::replacement(
                 indent(&expected, indentation),

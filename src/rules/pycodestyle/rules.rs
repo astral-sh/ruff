@@ -151,7 +151,7 @@ pub fn literal_comparisons(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
-            if checker.patch(diagnostic.kind.code()) && !helpers::is_constant_non_singleton(next) {
+            if checker.patch(diagnostic.kind.rule()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::Is);
             }
             diagnostics.push(diagnostic);
@@ -161,7 +161,7 @@ pub fn literal_comparisons(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
-            if checker.patch(diagnostic.kind.code()) && !helpers::is_constant_non_singleton(next) {
+            if checker.patch(diagnostic.kind.rule()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::IsNot);
             }
             diagnostics.push(diagnostic);
@@ -179,7 +179,7 @@ pub fn literal_comparisons(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
-                if checker.patch(diagnostic.kind.code())
+                if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(next)
                 {
                     bad_ops.insert(0, Cmpop::Is);
@@ -191,7 +191,7 @@ pub fn literal_comparisons(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
-                if checker.patch(diagnostic.kind.code())
+                if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(next)
                 {
                     bad_ops.insert(0, Cmpop::IsNot);
@@ -217,7 +217,7 @@ pub fn literal_comparisons(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
-                if checker.patch(diagnostic.kind.code())
+                if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
                     bad_ops.insert(idx, Cmpop::Is);
@@ -229,7 +229,7 @@ pub fn literal_comparisons(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
-                if checker.patch(diagnostic.kind.code())
+                if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
                     bad_ops.insert(idx, Cmpop::IsNot);
@@ -249,7 +249,7 @@ pub fn literal_comparisons(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch(diagnostic.kind.code())
+                    if checker.patch(diagnostic.kind.rule())
                         && !helpers::is_constant_non_singleton(comparator)
                     {
                         bad_ops.insert(idx, Cmpop::Is);
@@ -261,7 +261,7 @@ pub fn literal_comparisons(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch(diagnostic.kind.code())
+                    if checker.patch(diagnostic.kind.rule())
                         && !helpers::is_constant_non_singleton(comparator)
                     {
                         bad_ops.insert(idx, Cmpop::IsNot);
@@ -323,7 +323,7 @@ pub fn not_tests(
                                 violations::NotInTest,
                                 Range::from_located(operand),
                             );
-                            if checker.patch(diagnostic.kind.code()) && should_fix {
+                            if checker.patch(diagnostic.kind.rule()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
                                     expr.location,
@@ -339,7 +339,7 @@ pub fn not_tests(
                                 violations::NotIsTest,
                                 Range::from_located(operand),
                             );
-                            if checker.patch(diagnostic.kind.code()) && should_fix {
+                            if checker.patch(diagnostic.kind.rule()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
                                     expr.location,
@@ -455,7 +455,7 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                 violations::DoNotAssignLambda(id.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(diagnostic.kind.code()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)
                 {

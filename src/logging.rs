@@ -44,13 +44,14 @@ macro_rules! notify_user {
     }
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Default, PartialOrd, Ord, PartialEq, Eq)]
 pub enum LogLevel {
     // No output (+ `log::LevelFilter::Off`).
     Silent,
     // Only show lint violations, with no decorative output (+ `log::LevelFilter::Off`).
     Quiet,
     // All user-facing output (+ `log::LevelFilter::Info`).
+    #[default]
     Default,
     // All user-facing output (+ `log::LevelFilter::Debug`).
     Verbose,
@@ -64,12 +65,6 @@ impl LogLevel {
             LogLevel::Quiet => log::LevelFilter::Off,
             LogLevel::Silent => log::LevelFilter::Off,
         }
-    }
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        LogLevel::Default
     }
 }
 

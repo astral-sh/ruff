@@ -1,14 +1,12 @@
 //! `NoQA` enforcement and validation.
 
-use std::str::FromStr;
-
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::registry::{Diagnostic, DiagnosticKind, RuleCode, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, DiagnosticKind, Rule, CODE_REDIRECTS};
 use crate::settings::{flags, Settings};
 use crate::violations::UnusedCodes;
 use crate::{noqa, violations};
@@ -24,7 +22,7 @@ pub fn check_noqa(
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut ignored = vec![];
 
-    let enforce_noqa = settings.rules.enabled(&RuleCode::RUF100);
+    let enforce_noqa = settings.rules.enabled(&Rule::UnusedNOQA);
 
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {
@@ -56,13 +54,13 @@ pub fn check_noqa(
                 });
                 match noqa {
                     (Directive::All(..), matches) => {
-                        matches.push(diagnostic.kind.code().as_ref());
+                        matches.push(diagnostic.kind.rule().code());
                         ignored.push(index);
                         continue;
                     }
                     (Directive::Codes(.., codes), matches) => {
-                        if noqa::includes(diagnostic.kind.code(), codes) {
-                            matches.push(diagnostic.kind.code().as_ref());
+                        if noqa::includes(diagnostic.kind.rule(), codes) {
+                            matches.push(diagnostic.kind.rule().code());
                             ignored.push(index);
                             continue;
                         }
@@ -83,12 +81,12 @@ pub fn check_noqa(
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![]));
             match noqa {
                 (Directive::All(..), matches) => {
-                    matches.push(diagnostic.kind.code().as_ref());
+                    matches.push(diagnostic.kind.rule().code());
                     ignored.push(index);
                 }
                 (Directive::Codes(.., codes), matches) => {
-                    if noqa::includes(diagnostic.kind.code(), codes) {
-                        matches.push(diagnostic.kind.code().as_ref());
+                    if noqa::includes(diagnostic.kind.rule(), codes) {
+                        matches.push(diagnostic.kind.rule().code());
                         ignored.push(index);
                     }
                 }
@@ -108,7 +106,7 @@ pub fn check_noqa(
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.code())
+                            && settings.rules.should_fix(diagnostic.kind.rule())
                         {
                             diagnostic.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
@@ -125,8 +123,8 @@ pub fn check_noqa(
                     let mut valid_codes = vec![];
                     let mut self_ignore = false;
                     for code in codes {
-                        let code = CODE_REDIRECTS.get(code).map_or(code, AsRef::as_ref);
-                        if code == RuleCode::RUF100.as_ref() {
+                        let code = CODE_REDIRECTS.get(code).map_or(code, |r| r.code());
+                        if code == Rule::UnusedNOQA.code() {
                             self_ignore = true;
                             break;
                         }
@@ -134,8 +132,8 @@ pub fn check_noqa(
                         if matches.contains(&code) || settings.external.contains(code) {
                             valid_codes.push(code);
                         } else {
-                            if let Ok(rule_code) = RuleCode::from_str(code) {
-                                if settings.rules.enabled(&rule_code) {
+                            if let Ok(rule) = Rule::from_code(code) {
+                                if settings.rules.enabled(rule) {
                                     unmatched_codes.push(code);
                                 } else {
                                     disabled_codes.push(code);
@@ -172,7 +170,7 @@ pub fn check_noqa(
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.code())
+                            && settings.rules.should_fix(diagnostic.kind.rule())
                         {
                             if valid_codes.is_empty() {
                                 diagnostic.amend(Fix::deletion(

@@ -4,24 +4,13 @@ expression: diagnostics
 ---
 - kind:
     MagicValueComparison:
-      value: "10"
+      value: "'Hunter2'"
   location:
-    row: 5
-    column: 3
+    row: 50
+    column: 21
   end_location:
-    row: 5
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    MagicValueComparison:
-      value: "2"
-  location:
-    row: 35
-    column: 11
-  end_location:
-    row: 35
-    column: 12
+    row: 50
+    column: 30
   fix: ~
   parent: ~
 - kind:

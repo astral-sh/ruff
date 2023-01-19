@@ -148,7 +148,7 @@ fn handle_making_changes(
             violations::OSErrorAlias(compose_call_path(target)),
             Range::from_located(target),
         );
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 final_str,
                 target.location,

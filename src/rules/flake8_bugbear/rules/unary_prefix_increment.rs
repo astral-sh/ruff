@@ -1,3 +1,22 @@
+//! Checks for `++n`.
+//!
+//! ## Why is this bad?
+//!
+//! Python does not support the unary prefix increment. Writing `++n` is
+//! equivalent to `+(+(n))`, which equals `n`.
+//!
+//! ## Example
+//!
+//! ```python
+//! ++n;
+//! ```
+//!
+//! Use instead:
+//!
+//! ```python
+//! n += 1
+//! ```
+
 use rustpython_ast::{Expr, ExprKind, Unaryop};
 
 use crate::ast::types::Range;

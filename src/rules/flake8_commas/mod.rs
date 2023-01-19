@@ -9,7 +9,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings;
 
     #[test_case(Path::new("COM81.py"); "COM81")]
@@ -20,9 +20,9 @@ mod tests {
                 .join(path)
                 .as_path(),
             &settings::Settings::for_rules(vec![
-                RuleCode::COM812,
-                RuleCode::COM818,
-                RuleCode::COM819,
+                Rule::TrailingCommaMissing,
+                Rule::TrailingCommaOnBareTupleProhibited,
+                Rule::TrailingCommaProhibited,
             ]),
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
