@@ -1175,6 +1175,7 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
 | RUF004 | KeywordArgumentBeforeStarArgument | Keyword argument `{name}` must come after starred arguments |  |
+| RUF005 | UnpackInsteadOfConcatenatingToCollectionLiteral | Consider `{expr}` instead of concatenation |  |
 | RUF100 | UnusedNOQA | Unused blanket `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
