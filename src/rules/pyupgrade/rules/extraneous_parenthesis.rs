@@ -10,9 +10,26 @@ use std::cmp::max;
 
 /// A boolean of whether or not an expression has more than one set of parenthesis. Please note
 /// there are other factors besides this for a function to be extraneous.
-fn valid_candidate(string: &str) -> bool {
+struct CandidateInfo {
+    valid: bool,
+    depth: u32,
+    had_special: bool
+}
+
+impl CandidateInfo {
+    fn new(valid: bool, depth: u32, had_special: bool) -> Self {
+        Self {
+            valid,
+            depth,
+            had_special
+        }
+    }
+}
+
+fn valid_candidate(string: &str) -> CandidateInfo {
     let mut depth = 0;
     let mut max_depth = 0;
+    let mut had_special = false;
     for (_, tok, _) in lexer::make_tokenizer(string).flatten() {
         match tok {
             Tok::Lpar => {
@@ -20,11 +37,17 @@ fn valid_candidate(string: &str) -> bool {
                 max_depth = max(depth, max_depth);
             }
             Tok::Rpar => depth -= 1,
-            Tok::Comma | Tok::Yield if depth == 1 => return false,
+            Tok::Comma | Tok::Yield => {
+                if depth < 3 {
+                    return CandidateInfo::new(false, max_depth, true);
+                } else {
+                    had_special = true;
+                }
+            }
             _ => (),
         }
     }
-    max_depth > 1
+    CandidateInfo::new(max_depth > 1, max_depth, had_special)
 }
 
 /// UP033
@@ -63,11 +86,16 @@ pub fn extraneous_parenthesis(
         .slice_source_code_range(&expr_range)
         .to_string();
     let is_multi_line = expr_string.contains('\n');
-    if valid_candidate(&expr_string) {
+    let val_info = valid_candidate(&expr_string);
+    if val_info.valid {
         let arg_range = Range::from_located(arg);
         let arg_string = checker.locator.slice_source_code_range(&arg_range);
-        // This is a little aggressive, but I think I added sufficient checks to make sure it
-        // should happen
+        let mut special_before = "";
+        let mut special_after = "";
+        if val_info.had_special {
+            special_after = ")";
+            special_before = "(";
+        }
         if is_multi_line {
             let indent = indentation_greedy(checker.locator, &arg);
             let small_indent = if indent.len() > 3 {
@@ -75,9 +103,9 @@ pub fn extraneous_parenthesis(
             } else {
                 ""
             };
-            new_string = format!("print(\n{indent}{arg_string}\n{small_indent})");
+            new_string = format!("print(\n{indent}{special_before}{arg_string}{special_after}\n{small_indent})");
         } else {
-            new_string = format!("print({arg_string})");
+            new_string = format!("print({special_before}{arg_string}{special_after})");
         }
     }
     if !new_string.is_empty() && new_string != expr_string {
@@ -103,11 +131,11 @@ mod tests {
     #[test_case("print(\"hello((goodybe)) world\")", false ; "inside string")]
     #[test_case("print((1),)", false ; "a tuple")]
     #[test_case("print(yield (1))", false ; "a yield")]
-    #[test_case("print((((1),)))", false ; "nested tuple")]
+    #[test_case("print((((1),)))", true ; "nested tuple")]
     #[test_case("print((yield ((1),)))", false ; "nested yield")]
     #[test_case("print((1))", true ; "basic positive example")]
     #[test_case("print((\"hello world\"))", true ; "print a positive string")]
     fn test_valid_candidate(string: &str, expected: bool) {
-        assert_eq!(valid_candidate(string), expected);
+        assert_eq!(valid_candidate(string).valid, expected);
     }
 }
