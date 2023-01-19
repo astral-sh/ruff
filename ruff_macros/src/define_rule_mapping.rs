@@ -9,6 +9,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut rule_variants = quote!();
     let mut diagkind_variants = quote!();
     let mut rule_kind_match_arms = quote!();
+    let mut rule_autofixable_match_arms = quote!();
     let mut rule_origin_match_arms = quote!();
     let mut rule_code_match_arms = quote!();
     let mut rule_from_code_match_arms = quote!();
@@ -28,6 +29,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         rule_kind_match_arms.extend(
             quote! {Self::#name => DiagnosticKind::#name(<#path as Violation>::placeholder()),},
         );
+        rule_autofixable_match_arms.extend(quote! {Self::#name => <#path as Violation>::AUTOFIX,});
         let origin = get_origin(code);
         rule_origin_match_arms.extend(quote! {Self::#name => RuleOrigin::#origin,});
         rule_code_match_arms.extend(quote! {Self::#name => #code_str,});
@@ -87,6 +89,10 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             /// A placeholder representation of the `DiagnosticKind` for the diagnostic.
             pub fn kind(&self) -> DiagnosticKind {
                 match self { #rule_kind_match_arms }
+            }
+
+            pub fn autofixable(&self) -> Option<crate::violation::AutofixKind> {
+                match self { #rule_autofixable_match_arms }
             }
 
             pub fn origin(&self) -> RuleOrigin {

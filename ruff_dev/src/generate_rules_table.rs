@@ -27,7 +27,11 @@ fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
     table_out.push('\n');
     for rule in prefix.codes() {
         let kind = rule.kind();
-        let fix_token = if kind.fixable() { "🛠" } else { "" };
+        let fix_token = match rule.autofixable() {
+            None => "",
+            Some(_) => "🛠",
+        };
+
         table_out.push_str(&format!(
             "| {} | {} | {} | {} |",
             rule.code(),

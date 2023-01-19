@@ -4,6 +4,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 pub trait Violation: Debug + PartialEq + Eq + Serialize + DeserializeOwned {
+    /// `None` in the case an autofix is never available or otherwise Some
+    /// [`AutofixKind`] describing the available autofix.
+    const AUTOFIX: Option<AutofixKind> = None;
+
     /// The message used to describe the violation.
     fn message(&self) -> String;
 
@@ -16,6 +20,21 @@ pub trait Violation: Debug + PartialEq + Eq + Serialize + DeserializeOwned {
 
     /// A placeholder instance of the violation.
     fn placeholder() -> Self;
+}
+
+pub struct AutofixKind {
+    pub available: Availability,
+}
+
+pub enum Availability {
+    Sometimes,
+    Always,
+}
+
+impl AutofixKind {
+    pub const fn new(available: Availability) -> Self {
+        Self { available }
+    }
 }
 
 /// This trait exists just to make implementing the [`Violation`] trait more
@@ -35,6 +54,8 @@ pub trait AlwaysAutofixableViolation:
 
 /// A blanket implementation.
 impl<VA: AlwaysAutofixableViolation> Violation for VA {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     fn message(&self) -> String {
         <Self as AlwaysAutofixableViolation>::message(self)
     }

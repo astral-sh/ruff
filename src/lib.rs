@@ -47,6 +47,7 @@ mod violations;
 mod visibility;
 
 use cfg_if::cfg_if;
+pub use violation::{AutofixKind, Availability as AutofixAvailability};
 pub use violations::IOError;
 
 cfg_if! {
