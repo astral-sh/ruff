@@ -4,20 +4,25 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::rules::pylint::settings::ConstantType;
 use crate::violations;
 
-fn is_magic_value(constant: &Constant) -> bool {
+fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
+    if allowed_types.contains(&constant.into()) {
+        return false;
+    }
     match constant {
+        // Ignore `None`, `Bool`, and `Ellipsis` constants.
         Constant::None => false,
-        // E712 `if True == do_something():`
         Constant::Bool(_) => false,
+        Constant::Ellipsis => false,
+        // Otherwise, special-case some common string and integer types.
         Constant::Str(value) => !matches!(value.as_str(), "" | "__main__"),
-        Constant::Bytes(_) => true,
         Constant::Int(value) => !matches!(value.try_into(), Ok(-1 | 0 | 1)),
+        Constant::Bytes(_) => true,
         Constant::Tuple(_) => true,
         Constant::Float(_) => true,
         Constant::Complex { .. } => true,
-        Constant::Ellipsis => true,
     }
 }
 
@@ -38,13 +43,13 @@ pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &
 
     for comparison_expr in std::iter::once(left).chain(comparators.iter()) {
         if let ExprKind::Constant { value, .. } = &comparison_expr.node {
-            if is_magic_value(value) {
-                let diagnostic = Diagnostic::new(
-                    violations::MagicValueComparison(value.to_string()),
+            if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
+                checker.diagnostics.push(Diagnostic::new(
+                    violations::MagicValueComparison {
+                        value: value.to_string(),
+                    },
                     Range::from_located(comparison_expr),
-                );
-
-                checker.diagnostics.push(diagnostic);
+                ));
             }
         }
     }

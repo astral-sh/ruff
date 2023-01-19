@@ -18,7 +18,7 @@ use crate::registry::{RuleCode, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMP
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat, Version};
@@ -117,6 +117,7 @@ pub struct Settings {
     pub pep8_naming: pep8_naming::settings::Settings,
     pub pycodestyle: pycodestyle::settings::Settings,
     pub pydocstyle: pydocstyle::settings::Settings,
+    pub pylint: pylint::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
 }
 
@@ -200,6 +201,7 @@ impl Settings {
             pep8_naming: config.pep8_naming.map(Into::into).unwrap_or_default(),
             pycodestyle: config.pycodestyle.map(Into::into).unwrap_or_default(),
             pydocstyle: config.pydocstyle.map(Into::into).unwrap_or_default(),
+            pylint: config.pylint.map(Into::into).unwrap_or_default(),
             pyupgrade: config.pyupgrade.map(Into::into).unwrap_or_default(),
         })
     }

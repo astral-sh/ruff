@@ -3407,6 +3407,25 @@ convention = "google"
 
 ---
 
+### `pylint`
+
+#### [`allow-magic-value-types`](#allow-magic-value-types)
+
+Constant types to ignore when used as "magic values".
+
+**Default value**: `["str"]`
+
+**Type**: `Vec<ConstantType>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pylint]
+allow-magic-value-types = ["int"]
+```
+
+---
+
 ### `pyupgrade`
 
 #### [`keep-runtime-typing`](#keep-runtime-typing)

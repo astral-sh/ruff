@@ -17,7 +17,7 @@ use crate::registry::RuleCodePrefix;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
@@ -72,6 +72,7 @@ pub struct Configuration {
     pub pep8_naming: Option<pep8_naming::settings::Options>,
     pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
+    pub pylint: Option<pylint::settings::Options>,
     pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
 
@@ -178,6 +179,7 @@ impl Configuration {
             pep8_naming: options.pep8_naming,
             pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
+            pylint: options.pylint,
             pyupgrade: options.pyupgrade,
         })
     }
@@ -248,6 +250,7 @@ impl Configuration {
             pep8_naming: self.pep8_naming.or(config.pep8_naming),
             pycodestyle: self.pycodestyle.or(config.pycodestyle),
             pydocstyle: self.pydocstyle.or(config.pydocstyle),
+            pylint: self.pylint.or(config.pylint),
             pyupgrade: self.pyupgrade.or(config.pyupgrade),
         }
     }
