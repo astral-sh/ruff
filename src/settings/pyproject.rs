@@ -208,6 +208,7 @@ mod tests {
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -268,6 +269,7 @@ line-length = 79
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -328,6 +330,7 @@ exclude = ["foo.py"]
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -388,6 +391,7 @@ select = ["E501"]
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -449,6 +453,7 @@ ignore = ["E501"]
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -630,6 +635,7 @@ other-attribute = 1
                 }),
                 pycodestyle: None,
                 pydocstyle: None,
+                pylint: None,
                 pyupgrade: None,
             }
         );

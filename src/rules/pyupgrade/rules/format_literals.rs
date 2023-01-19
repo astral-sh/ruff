@@ -98,7 +98,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
     }
 
     let mut diagnostic = Diagnostic::new(violations::FormatLiterals, Range::from_located(expr));
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846
         if let Ok(contents) = generate_call(

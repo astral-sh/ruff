@@ -1,35 +1,44 @@
+use std::collections::HashMap;
+
 use proc_macro2::Span;
 use quote::quote;
 use syn::parse::Parse;
-use syn::{Ident, Path, Token};
+use syn::{Ident, LitStr, Path, Token};
 
-pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
-    let mut rulecode_variants = quote!();
+pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
+    let mut rule_variants = quote!();
     let mut diagkind_variants = quote!();
-    let mut rulecode_kind_match_arms = quote!();
-    let mut rulecode_origin_match_arms = quote!();
+    let mut rule_message_formats_match_arms = quote!();
+    let mut rule_autofixable_match_arms = quote!();
+    let mut rule_origin_match_arms = quote!();
+    let mut rule_code_match_arms = quote!();
+    let mut rule_from_code_match_arms = quote!();
     let mut diagkind_code_match_arms = quote!();
     let mut diagkind_body_match_arms = quote!();
     let mut diagkind_fixable_match_arms = quote!();
     let mut diagkind_commit_match_arms = quote!();
     let mut from_impls_for_diagkind = quote!();
 
-    for (code, path, name) in mapping.entries {
-        rulecode_variants.extend(quote! {#code,});
+    for (code, path, name) in &mapping.entries {
+        let code_str = LitStr::new(&code.to_string(), Span::call_site());
+        rule_variants.extend(quote! {
+            #[doc = #code_str]
+            #name,
+        });
         diagkind_variants.extend(quote! {#name(#path),});
-        rulecode_kind_match_arms.extend(
-            quote! {RuleCode::#code => DiagnosticKind::#name(<#path as Violation>::placeholder()),},
-        );
-        let origin = get_origin(&code);
-        rulecode_origin_match_arms.extend(quote! {RuleCode::#code => RuleOrigin::#origin,});
-        diagkind_code_match_arms.extend(quote! {DiagnosticKind::#name(..) => &RuleCode::#code, });
-        diagkind_body_match_arms
-            .extend(quote! {DiagnosticKind::#name(x) => Violation::message(x), });
+        rule_message_formats_match_arms
+            .extend(quote! {Self::#name => <#path as Violation>::message_formats(),});
+        rule_autofixable_match_arms.extend(quote! {Self::#name => <#path as Violation>::AUTOFIX,});
+        let origin = get_origin(code);
+        rule_origin_match_arms.extend(quote! {Self::#name => RuleOrigin::#origin,});
+        rule_code_match_arms.extend(quote! {Self::#name => #code_str,});
+        rule_from_code_match_arms.extend(quote! {#code_str => Ok(&Rule::#name), });
+        diagkind_code_match_arms.extend(quote! {Self::#name(..) => &Rule::#name, });
+        diagkind_body_match_arms.extend(quote! {Self::#name(x) => Violation::message(x), });
         diagkind_fixable_match_arms
-            .extend(quote! {DiagnosticKind::#name(x) => x.autofix_title_formatter().is_some(),});
-        diagkind_commit_match_arms.extend(
-            quote! {DiagnosticKind::#name(x) => x.autofix_title_formatter().map(|f| f(x)), },
-        );
+            .extend(quote! {Self::#name(x) => x.autofix_title_formatter().is_some(),});
+        diagkind_commit_match_arms
+            .extend(quote! {Self::#name(x) => x.autofix_title_formatter().map(|f| f(x)), });
         from_impls_for_diagkind.extend(quote! {
             impl From<#path> for DiagnosticKind {
                 fn from(x: #path) -> Self {
@@ -39,44 +48,72 @@ pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
         });
     }
 
+    let code_to_name: HashMap<_, _> = mapping
+        .entries
+        .iter()
+        .map(|(code, _, name)| (code.to_string(), name))
+        .collect();
+
+    let rulecodeprefix = super::rule_code_prefix::expand(
+        &Ident::new("Rule", Span::call_site()),
+        &Ident::new("RuleCodePrefix", Span::call_site()),
+        mapping.entries.iter().map(|(code, ..)| code),
+        |code| code_to_name[code],
+    );
+
     quote! {
         #[derive(
-            AsRefStr,
-            RuleCodePrefix,
             EnumIter,
-            EnumString,
             Debug,
-            Display,
             PartialEq,
             Eq,
             Clone,
-            Serialize,
-            Deserialize,
             Hash,
             PartialOrd,
             Ord,
+            AsRefStr,
         )]
-        pub enum RuleCode { #rulecode_variants }
+        pub enum Rule { #rule_variants }
 
         #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
         pub enum DiagnosticKind { #diagkind_variants }
 
+        #[derive(thiserror::Error, Debug)]
+        pub enum FromCodeError {
+            #[error("unknown rule code")]
+            Unknown,
+        }
 
-        impl RuleCode {
-            /// A placeholder representation of the `DiagnosticKind` for the diagnostic.
-            pub fn kind(&self) -> DiagnosticKind {
-                match self { #rulecode_kind_match_arms }
+        impl Rule {
+            /// Returns the format strings used to report violations of this rule.
+            pub fn message_formats(&self) -> &'static [&'static str] {
+                match self { #rule_message_formats_match_arms }
+            }
+
+            pub fn autofixable(&self) -> Option<crate::violation::AutofixKind> {
+                match self { #rule_autofixable_match_arms }
             }
 
             pub fn origin(&self) -> RuleOrigin {
-                match self { #rulecode_origin_match_arms }
+                match self { #rule_origin_match_arms }
+            }
+
+            pub fn code(&self) -> &'static str {
+                match self { #rule_code_match_arms }
+            }
+
+            pub fn from_code(code: &str) -> Result<&'static Self, FromCodeError> {
+                match code {
+                    #rule_from_code_match_arms
+                    _ => Err(FromCodeError::Unknown),
+                }
             }
         }
 
 
         impl DiagnosticKind {
-            /// A four-letter shorthand code for the diagnostic.
-            pub fn code(&self) -> &'static RuleCode {
+            /// The rule of the diagnostic.
+            pub fn rule(&self) -> &'static Rule {
                 match self { #diagkind_code_match_arms }
             }
 
@@ -97,6 +134,8 @@ pub fn define_rule_mapping(mapping: Mapping) -> proc_macro2::TokenStream {
         }
 
         #from_impls_for_diagkind
+
+        #rulecodeprefix
     }
 }
 

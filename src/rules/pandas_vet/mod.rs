@@ -12,12 +12,12 @@ mod tests {
     use textwrap::dedent;
 
     use crate::linter::check_path;
-    use crate::registry::{RuleCode, RuleCodePrefix};
+    use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
     use crate::{directives, rustpython_helpers, settings};
 
-    fn rule_code(contents: &str, expected: &[RuleCode]) -> Result<()> {
+    fn rule_code(contents: &str, expected: &[Rule]) -> Result<()> {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(RuleCodePrefix::PD.codes());
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
@@ -41,7 +41,7 @@ mod tests {
         )?;
         let actual = diagnostics
             .iter()
-            .map(|diagnostic| diagnostic.kind.code().clone())
+            .map(|diagnostic| diagnostic.kind.rule().clone())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
         Ok(())
@@ -56,7 +56,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         x.drop(['a'], axis=1, inplace=True)
-    "#, &[RuleCode::PD002]; "PD002_fail")]
+    "#, &[Rule::UseOfInplaceArgument]; "PD002_fail")]
     #[test_case(r#"
         import pandas as pd
         nas = pd.isna(val)
@@ -64,7 +64,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         nulls = pd.isnull(val)
-    "#, &[RuleCode::PD003]; "PD003_fail")]
+    "#, &[Rule::UseOfDotIsNull]; "PD003_fail")]
     #[test_case(r#"
         import pandas as pd
         print('bah humbug')
@@ -76,7 +76,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         not_nulls = pd.notnull(val)
-    "#, &[RuleCode::PD004]; "PD004_fail")]
+    "#, &[Rule::UseOfDotNotNull]; "PD004_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -91,7 +91,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         y = x.ix[[0, 2], 'A']
-    "#, &[RuleCode::PD007]; "PD007_fail")]
+    "#, &[Rule::UseOfDotIx]; "PD007_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -101,7 +101,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         index = x.at[:, ['B', 'A']]
-    "#, &[RuleCode::PD008]; "PD008_fail")]
+    "#, &[Rule::UseOfDotAt]; "PD008_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -111,7 +111,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         index = x.iat[:, 1:3]
-    "#, &[RuleCode::PD009]; "PD009_fail")]
+    "#, &[Rule::UseOfDotIat]; "PD009_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -133,7 +133,7 @@ mod tests {
             columns='bar',
             values='baz'
         )
-    "#, &[RuleCode::PD010]; "PD010_fail_pivot")]
+    "#, &[Rule::UseOfDotPivotOrUnstack]; "PD010_fail_pivot")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -148,7 +148,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         result = x.values
-    "#, &[RuleCode::PD011]; "PD011_fail_values")]
+    "#, &[Rule::UseOfDotValues]; "PD011_fail_values")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -177,7 +177,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         employees = pd.read_table(input_file)
-    "#, &[RuleCode::PD012]; "PD012_fail_read_table")]
+    "#, &[Rule::UseOfDotReadTable]; "PD012_fail_read_table")]
     #[test_case(r#"
         import pandas as pd
         employees = read_table
@@ -204,7 +204,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         y = x.stack(level=-1, dropna=True)
-    "#, &[RuleCode::PD013]; "PD013_fail_stack")]
+    "#, &[Rule::UseOfDotStack]; "PD013_fail_stack")]
     #[test_case(r#"
         import pandas as pd
         pd.stack(
@@ -220,7 +220,7 @@ mod tests {
         x = pd.DataFrame()
         y = pd.DataFrame()
         pd.merge(x, y)
-    "#, &[RuleCode::PD015]; "PD015_fail_merge_on_pandas_object")]
+    "#, &[Rule::UseOfPdMerge]; "PD015_fail_merge_on_pandas_object")]
     #[test_case(
         "pd.to_datetime(timestamp * 10 ** 9).strftime('%Y-%m-%d %H:%M:%S.%f')",
         &[];
@@ -241,8 +241,8 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         df = pd.DataFrame()
-    "#, &[RuleCode::PD901]; "PD901_fail_df_var")]
-    fn test_pandas_vet(code: &str, expected: &[RuleCode]) -> Result<()> {
+    "#, &[Rule::DfIsABadVariableName]; "PD901_fail_df_var")]
+    fn test_pandas_vet(code: &str, expected: &[Rule]) -> Result<()> {
         rule_code(code, expected)?;
         Ok(())
     }

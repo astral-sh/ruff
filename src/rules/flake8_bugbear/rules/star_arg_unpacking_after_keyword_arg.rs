@@ -1,3 +1,12 @@
+//! Checks for `f(x=0, *(1, 2))`.
+//!
+//! ## Why is this bad?
+//!
+//! Star-arg unpacking after a keyword argument is strongly discouraged. It only
+//! works when the keyword parameter is declared after all parameters supplied
+//! by the unpacked sequence, and this change of ordering can surprise and
+//! mislead readers.
+
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;

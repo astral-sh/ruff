@@ -47,11 +47,11 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::linter::test_path;
     use crate::settings;
 
-    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics =test_path(
             Path::new("./resources/test/fixtures/%s")

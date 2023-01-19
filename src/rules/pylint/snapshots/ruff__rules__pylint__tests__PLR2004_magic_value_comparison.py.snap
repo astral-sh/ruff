@@ -3,52 +3,46 @@ source: src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MagicValueComparison: "10"
+    MagicValueComparison:
+      value: "10"
   location:
-    row: 6
+    row: 5
     column: 3
   end_location:
-    row: 6
+    row: 5
     column: 5
   fix: ~
   parent: ~
 - kind:
-    MagicValueComparison: "2"
+    MagicValueComparison:
+      value: "2"
   location:
-    row: 36
+    row: 35
     column: 11
   end_location:
-    row: 36
+    row: 35
     column: 12
   fix: ~
   parent: ~
 - kind:
-    MagicValueComparison: "'Hunter2'"
+    MagicValueComparison:
+      value: "3.141592653589793"
   location:
-    row: 51
-    column: 21
-  end_location:
-    row: 51
-    column: 30
-  fix: ~
-  parent: ~
-- kind:
-    MagicValueComparison: "3.141592653589793"
-  location:
-    row: 57
+    row: 56
     column: 20
   end_location:
-    row: 57
+    row: 56
     column: 40
   fix: ~
   parent: ~
 - kind:
-    MagicValueComparison: "b'something'"
+    MagicValueComparison:
+      value: "b'something'"
   location:
-    row: 66
+    row: 65
     column: 17
   end_location:
-    row: 66
+    row: 65
     column: 29
   fix: ~
   parent: ~

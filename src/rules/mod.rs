@@ -1,3 +1,4 @@
+#![allow(clippy::useless_format)]
 pub mod eradicate;
 pub mod flake8_2020;
 pub mod flake8_annotations;

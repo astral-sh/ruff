@@ -10,7 +10,7 @@ use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 use crate::violations;
 
@@ -164,7 +164,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         &keyword.node.value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&RuleCode::UP015),
+                        checker.patch(&Rule::RedundantOpenModes),
                     ));
                 }
             }
@@ -181,7 +181,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&RuleCode::UP015),
+                    checker.patch(&Rule::RedundantOpenModes),
                 ));
             }
         }

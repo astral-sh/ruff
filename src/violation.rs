@@ -4,6 +4,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 pub trait Violation: Debug + PartialEq + Eq + Serialize + DeserializeOwned {
+    /// `None` in the case an autofix is never available or otherwise Some
+    /// [`AutofixKind`] describing the available autofix.
+    const AUTOFIX: Option<AutofixKind> = None;
+
     /// The message used to describe the violation.
     fn message(&self) -> String;
 
@@ -14,8 +18,23 @@ pub trait Violation: Debug + PartialEq + Eq + Serialize + DeserializeOwned {
         None
     }
 
-    /// A placeholder instance of the violation.
-    fn placeholder() -> Self;
+    /// Returns the format strings used by [`message`](Violation::message).
+    fn message_formats() -> &'static [&'static str];
+}
+
+pub struct AutofixKind {
+    pub available: Availability,
+}
+
+pub enum Availability {
+    Sometimes,
+    Always,
+}
+
+impl AutofixKind {
+    pub const fn new(available: Availability) -> Self {
+        Self { available }
+    }
 }
 
 /// This trait exists just to make implementing the [`Violation`] trait more
@@ -29,12 +48,15 @@ pub trait AlwaysAutofixableViolation:
     /// The title displayed for the available autofix.
     fn autofix_title(&self) -> String;
 
-    /// A placeholder instance of the violation.
-    fn placeholder() -> Self;
+    /// Returns the format strings used by
+    /// [`message`](AlwaysAutofixableViolation::message).
+    fn message_formats() -> &'static [&'static str];
 }
 
 /// A blanket implementation.
 impl<VA: AlwaysAutofixableViolation> Violation for VA {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     fn message(&self) -> String {
         <Self as AlwaysAutofixableViolation>::message(self)
     }
@@ -43,8 +65,8 @@ impl<VA: AlwaysAutofixableViolation> Violation for VA {
         Some(Self::autofix_title)
     }
 
-    fn placeholder() -> Self {
-        <Self as AlwaysAutofixableViolation>::placeholder()
+    fn message_formats() -> &'static [&'static str] {
+        <Self as AlwaysAutofixableViolation>::message_formats()
     }
 }
 

@@ -20,7 +20,7 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 
     let mut diagnostic =
         Diagnostic::new(violations::UselessImportAlias, Range::from_located(alias));
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             asname.to_string(),
             alias.location,

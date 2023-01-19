@@ -1,11 +1,13 @@
 use rustpython_ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
-use crate::ast::types::Range;
+use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violations;
+
+const DUNDER_METHODS: &[&str] = &["__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"];
 
 fn is_exception_check(stmt: &Stmt) -> bool {
     let StmtKind::If {test: _, body, orelse: _} = &stmt.node else {
@@ -35,6 +37,13 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         return;
     }
 
+    // Avoid flagging issues in dunder implementations.
+    if let ScopeKind::Function(def) = &checker.current_scope().kind {
+        if DUNDER_METHODS.contains(&def.name) {
+            return;
+        }
+    }
+
     let mut diagnostic = Diagnostic::new(
         violations::NegateEqualOp(
             unparse_expr(left, checker.stylist),
@@ -42,7 +51,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         ),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
@@ -79,6 +88,13 @@ pub fn negation_with_not_equal_op(
         return;
     }
 
+    // Avoid flagging issues in dunder implementations.
+    if let ScopeKind::Function(def) = &checker.current_scope().kind {
+        if DUNDER_METHODS.contains(&def.name) {
+            return;
+        }
+    }
+
     let mut diagnostic = Diagnostic::new(
         violations::NegateNotEqualOp(
             unparse_expr(left, checker.stylist),
@@ -86,7 +102,7 @@ pub fn negation_with_not_equal_op(
         ),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
@@ -119,7 +135,7 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
         violations::DoubleNegation(operand.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(operand, checker.stylist),
             expr.location,

@@ -4,7 +4,7 @@ use crate::ast::helpers::collect_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 /// UP017
@@ -17,7 +17,7 @@ pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
             violations::DatetimeTimezoneUTC { straight_import },
             Range::from_located(expr),
         );
-        if checker.patch(&RuleCode::UP017) {
+        if checker.patch(&Rule::DatetimeTimezoneUTC) {
             if straight_import {
                 diagnostic.amend(Fix::replacement(
                     "datetime.UTC".to_string(),

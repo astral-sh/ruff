@@ -8,7 +8,7 @@ use crate::ast::visitor::Visitor;
 use crate::ast::{cast, helpers, visitor};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::visibility::Visibility;
 use crate::{violations, visibility};
 
@@ -85,14 +85,22 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 .chain(args.kwonlyargs.iter())
             {
                 if let Some(expr) = &arg.node.annotation {
-                    if checker.settings.rules.enabled(&RuleCode::ANN401) {
+                    if checker
+                        .settings
+                        .rules
+                        .enabled(&Rule::DynamicallyTypedExpression)
+                    {
                         check_dynamically_typed(checker, expr, || arg.node.arg.to_string());
                     };
                 } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.rules.enabled(&RuleCode::ANN001) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::MissingTypeFunctionArgument)
+                        {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::MissingTypeFunctionArgument(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -106,7 +114,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             if let Some(arg) = &args.vararg {
                 if let Some(expr) = &arg.node.annotation {
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker.settings.rules.enabled(&RuleCode::ANN401) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::DynamicallyTypedExpression)
+                        {
                             let name = arg.node.arg.to_string();
                             check_dynamically_typed(checker, expr, || format!("*{name}"));
                         }
@@ -115,7 +127,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.rules.enabled(&RuleCode::ANN002) {
+                        if checker.settings.rules.enabled(&Rule::MissingTypeArgs) {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::MissingTypeArgs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -129,7 +141,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             if let Some(arg) = &args.kwarg {
                 if let Some(expr) = &arg.node.annotation {
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker.settings.rules.enabled(&RuleCode::ANN401) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::DynamicallyTypedExpression)
+                        {
                             let name = arg.node.arg.to_string();
                             check_dynamically_typed(checker, expr, || format!("**{name}"));
                         }
@@ -138,7 +154,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.rules.enabled(&RuleCode::ANN003) {
+                        if checker.settings.rules.enabled(&Rule::MissingTypeKwargs) {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::MissingTypeKwargs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -150,7 +166,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
             // ANN201, ANN202, ANN401
             if let Some(expr) = &returns {
-                if checker.settings.rules.enabled(&RuleCode::ANN401) {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(&Rule::DynamicallyTypedExpression)
+                {
                     check_dynamically_typed(checker, expr, || name.to_string());
                 };
             } else {
@@ -164,7 +184,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
                 match visibility {
                     Visibility::Public => {
-                        if checker.settings.rules.enabled(&RuleCode::ANN201) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::MissingReturnTypePublicFunction)
+                        {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::MissingReturnTypePublicFunction(name.to_string()),
                                 helpers::identifier_range(stmt, checker.locator),
@@ -172,7 +196,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         }
                     }
                     Visibility::Private => {
-                        if checker.settings.rules.enabled(&RuleCode::ANN202) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::MissingReturnTypePrivateFunction)
+                        {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::MissingReturnTypePrivateFunction(name.to_string()),
                                 helpers::identifier_range(stmt, checker.locator),
@@ -203,14 +231,22 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 // ANN401 for dynamically typed arguments
                 if let Some(annotation) = &arg.node.annotation {
                     has_any_typed_arg = true;
-                    if checker.settings.rules.enabled(&RuleCode::ANN401) {
+                    if checker
+                        .settings
+                        .rules
+                        .enabled(&Rule::DynamicallyTypedExpression)
+                    {
                         check_dynamically_typed(checker, annotation, || arg.node.arg.to_string());
                     }
                 } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.rules.enabled(&RuleCode::ANN001) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::MissingTypeFunctionArgument)
+                        {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::MissingTypeFunctionArgument(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -225,7 +261,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 has_any_typed_arg = true;
                 if let Some(expr) = &arg.node.annotation {
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker.settings.rules.enabled(&RuleCode::ANN401) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::DynamicallyTypedExpression)
+                        {
                             let name = arg.node.arg.to_string();
                             check_dynamically_typed(checker, expr, || format!("*{name}"));
                         }
@@ -234,7 +274,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.rules.enabled(&RuleCode::ANN002) {
+                        if checker.settings.rules.enabled(&Rule::MissingTypeArgs) {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::MissingTypeArgs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -249,7 +289,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 has_any_typed_arg = true;
                 if let Some(expr) = &arg.node.annotation {
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker.settings.rules.enabled(&RuleCode::ANN401) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::DynamicallyTypedExpression)
+                        {
                             let name = arg.node.arg.to_string();
                             check_dynamically_typed(checker, expr, || format!("**{name}"));
                         }
@@ -258,7 +302,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
-                        if checker.settings.rules.enabled(&RuleCode::ANN003) {
+                        if checker.settings.rules.enabled(&Rule::MissingTypeKwargs) {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::MissingTypeKwargs(arg.node.arg.to_string()),
                                 Range::from_located(arg),
@@ -273,14 +317,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 if let Some(arg) = args.args.first() {
                     if arg.node.annotation.is_none() {
                         if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
-                            if checker.settings.rules.enabled(&RuleCode::ANN102) {
+                            if checker.settings.rules.enabled(&Rule::MissingTypeCls) {
                                 checker.diagnostics.push(Diagnostic::new(
                                     violations::MissingTypeCls(arg.node.arg.to_string()),
                                     Range::from_located(arg),
                                 ));
                             }
                         } else {
-                            if checker.settings.rules.enabled(&RuleCode::ANN101) {
+                            if checker.settings.rules.enabled(&Rule::MissingTypeSelf) {
                                 checker.diagnostics.push(Diagnostic::new(
                                     violations::MissingTypeSelf(arg.node.arg.to_string()),
                                     Range::from_located(arg),
@@ -293,7 +337,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
             // ANN201, ANN202
             if let Some(expr) = &returns {
-                if checker.settings.rules.enabled(&RuleCode::ANN401) {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(&Rule::DynamicallyTypedExpression)
+                {
                     check_dynamically_typed(checker, expr, || name.to_string());
                 }
             } else {
@@ -306,14 +354,22 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 }
 
                 if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
-                    if checker.settings.rules.enabled(&RuleCode::ANN206) {
+                    if checker
+                        .settings
+                        .rules
+                        .enabled(&Rule::MissingReturnTypeClassMethod)
+                    {
                         checker.diagnostics.push(Diagnostic::new(
                             violations::MissingReturnTypeClassMethod(name.to_string()),
                             helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
                 } else if visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
-                    if checker.settings.rules.enabled(&RuleCode::ANN205) {
+                    if checker
+                        .settings
+                        .rules
+                        .enabled(&Rule::MissingReturnTypeStaticMethod)
+                    {
                         checker.diagnostics.push(Diagnostic::new(
                             violations::MissingReturnTypeStaticMethod(name.to_string()),
                             helpers::identifier_range(stmt, checker.locator),
@@ -322,7 +378,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 } else if visibility::is_init(cast::name(stmt)) {
                     // Allow omission of return annotation in `__init__` functions, as long as at
                     // least one argument is typed.
-                    if checker.settings.rules.enabled(&RuleCode::ANN204) {
+                    if checker
+                        .settings
+                        .rules
+                        .enabled(&Rule::MissingReturnTypeSpecialMethod)
+                    {
                         if !(checker.settings.flake8_annotations.mypy_init_return
                             && has_any_typed_arg)
                         {
@@ -330,7 +390,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 violations::MissingReturnTypeSpecialMethod(name.to_string()),
                                 helpers::identifier_range(stmt, checker.locator),
                             );
-                            if checker.patch(diagnostic.kind.code()) {
+                            if checker.patch(diagnostic.kind.rule()) {
                                 match fixes::add_return_none_annotation(checker.locator, stmt) {
                                     Ok(fix) => {
                                         diagnostic.amend(fix);
@@ -342,7 +402,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         }
                     }
                 } else if visibility::is_magic(cast::name(stmt)) {
-                    if checker.settings.rules.enabled(&RuleCode::ANN204) {
+                    if checker
+                        .settings
+                        .rules
+                        .enabled(&Rule::MissingReturnTypeSpecialMethod)
+                    {
                         checker.diagnostics.push(Diagnostic::new(
                             violations::MissingReturnTypeSpecialMethod(name.to_string()),
                             helpers::identifier_range(stmt, checker.locator),
@@ -351,7 +415,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 } else {
                     match visibility {
                         Visibility::Public => {
-                            if checker.settings.rules.enabled(&RuleCode::ANN201) {
+                            if checker
+                                .settings
+                                .rules
+                                .enabled(&Rule::MissingReturnTypePublicFunction)
+                            {
                                 checker.diagnostics.push(Diagnostic::new(
                                     violations::MissingReturnTypePublicFunction(name.to_string()),
                                     helpers::identifier_range(stmt, checker.locator),
@@ -359,7 +427,11 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             }
                         }
                         Visibility::Private => {
-                            if checker.settings.rules.enabled(&RuleCode::ANN202) {
+                            if checker
+                                .settings
+                                .rules
+                                .enabled(&Rule::MissingReturnTypePrivateFunction)
+                            {
                                 checker.diagnostics.push(Diagnostic::new(
                                     violations::MissingReturnTypePrivateFunction(name.to_string()),
                                     helpers::identifier_range(stmt, checker.locator),

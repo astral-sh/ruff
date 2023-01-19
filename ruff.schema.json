@@ -227,7 +227,7 @@
       ]
     },
     "format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations) or `\"gitlab\"` (GitLab CI code quality report).",
+      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), or `\"pylint\"` (Pylint text format).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -335,6 +335,17 @@
       "anyOf": [
         {
           "$ref": "#/definitions/Pydocstyle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pylint": {
+      "description": "Options for the `pylint` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PylintOptions"
         },
         {
           "type": "null"
@@ -460,6 +471,17 @@
         }
       },
       "additionalProperties": false
+    },
+    "ConstantType": {
+      "type": "string",
+      "enum": [
+        "bytes",
+        "complex",
+        "float",
+        "int",
+        "str",
+        "tuple"
+      ]
     },
     "Convention": {
       "oneOf": [
@@ -1042,6 +1064,22 @@
               "type": "null"
             }
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PylintOptions": {
+      "type": "object",
+      "properties": {
+        "allow-magic-value-types": {
+          "description": "Constant types to ignore when used as \"magic values\".",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ConstantType"
+          }
         }
       },
       "additionalProperties": false
@@ -1766,7 +1804,8 @@
         "junit",
         "grouped",
         "github",
-        "gitlab"
+        "gitlab",
+        "pylint"
       ]
     },
     "Strictness": {

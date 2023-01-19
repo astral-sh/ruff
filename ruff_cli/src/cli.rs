@@ -4,7 +4,7 @@ use clap::{command, Parser};
 use regex::Regex;
 use ruff::fs;
 use ruff::logging::LogLevel;
-use ruff::registry::{RuleCode, RuleCodePrefix};
+use ruff::registry::{Rule, RuleCodePrefix};
 use ruff::resolver::ConfigProcessor;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
@@ -169,6 +169,7 @@ pub struct Cli {
     /// Explain a rule.
     #[arg(
         long,
+        value_parser=Rule::from_code,
         // Fake subcommands.
         conflicts_with = "add_noqa",
         conflicts_with = "clean",
@@ -180,7 +181,7 @@ pub struct Cli {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
-    pub explain: Option<RuleCode>,
+    pub explain: Option<&'static Rule>,
     /// Generate shell completion
     #[arg(
         long,
@@ -302,7 +303,7 @@ pub struct Arguments {
     pub config: Option<PathBuf>,
     pub diff: bool,
     pub exit_zero: bool,
-    pub explain: Option<RuleCode>,
+    pub explain: Option<&'static Rule>,
     pub files: Vec<PathBuf>,
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
     pub isolated: bool,

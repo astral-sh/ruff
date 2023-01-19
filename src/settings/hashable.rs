@@ -12,7 +12,7 @@ use super::types::FilePattern;
 pub struct HashableRegex(Regex);
 
 impl Hash for HashableRegex {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.as_str().hash(state);
     }
 }
@@ -49,7 +49,7 @@ impl Deref for HashableGlobMatcher {
 }
 
 impl Hash for HashableGlobMatcher {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.glob().hash(state);
     }
 }
@@ -87,7 +87,7 @@ impl Deref for HashableGlobSet {
 }
 
 impl Hash for HashableGlobSet {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         for pattern in self.patterns.iter().sorted() {
             pattern.hash(state);
         }

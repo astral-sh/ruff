@@ -44,11 +44,11 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
         }
     };
 
-    if !checker.settings.rules.enabled(diagnostic.kind.code()) {
+    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
         return;
     }
 
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         let defined_by = checker.current_stmt();
         let defined_in = checker.current_stmt_parent();
         if matches!(defined_by.node, StmtKind::Expr { .. }) {

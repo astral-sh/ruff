@@ -1,3 +1,4 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Stmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -23,16 +24,13 @@ define_violation!(
     pub struct RelativeImports(pub Strictness);
 );
 impl Violation for RelativeImports {
+    #[derive_message_formats]
     fn message(&self) -> String {
         let RelativeImports(strictness) = self;
         match strictness {
-            Strictness::Parents => "Relative imports from parent modules are banned".to_string(),
-            Strictness::All => "Relative imports are banned".to_string(),
+            Strictness::Parents => format!("Relative imports from parent modules are banned"),
+            Strictness::All => format!("Relative imports are banned"),
         }
-    }
-
-    fn placeholder() -> Self {
-        RelativeImports(Strictness::All)
     }
 }
 
@@ -64,7 +62,7 @@ mod tests {
 
     use super::Strictness;
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test]
@@ -76,7 +74,7 @@ mod tests {
                     ban_relative_imports: Strictness::Parents,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![RuleCode::TID252])
+                ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
         insta::assert_yaml_snapshot!(diagnostics);
@@ -92,7 +90,7 @@ mod tests {
                     ban_relative_imports: Strictness::All,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![RuleCode::TID252])
+                ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
         insta::assert_yaml_snapshot!(diagnostics);

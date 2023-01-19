@@ -7,11 +7,11 @@ use wasm_bindgen::prelude::*;
 
 use crate::directives;
 use crate::linter::check_path;
-use crate::registry::RuleCode;
+use crate::registry::Rule;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
@@ -51,11 +51,28 @@ export interface Diagnostic {
 
 #[derive(Serialize)]
 struct ExpandedMessage {
-    code: RuleCode,
+    code: SerializeRuleAsCode,
     message: String,
     location: Location,
     end_location: Location,
     fix: Option<ExpandedFix>,
+}
+
+struct SerializeRuleAsCode(Rule);
+
+impl Serialize for SerializeRuleAsCode {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.code())
+    }
+}
+
+impl From<Rule> for SerializeRuleAsCode {
+    fn from(rule: Rule) -> Self {
+        Self(rule)
+    }
 }
 
 #[derive(Serialize)]
@@ -134,6 +151,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         pep8_naming: Some(pep8_naming::settings::Settings::default().into()),
         pycodestyle: Some(pycodestyle::settings::Settings::default().into()),
         pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
+        pylint: Some(pylint::settings::Settings::default().into()),
         pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
     })?)
 }
@@ -181,7 +199,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
         .map(|diagnostic| ExpandedMessage {
-            code: diagnostic.kind.code().clone(),
+            code: diagnostic.kind.rule().clone().into(),
             message: diagnostic.kind.body(),
             location: diagnostic.location,
             end_location: diagnostic.end_location,
@@ -223,7 +241,7 @@ mod test {
             "if (1, 2): pass",
             r#"{}"#,
             [ExpandedMessage {
-                code: RuleCode::F634,
+                code: Rule::IfTuple.into(),
                 message: "If test is a tuple, which is always `True`".to_string(),
                 location: Location::new(1, 0),
                 end_location: Location::new(1, 15),

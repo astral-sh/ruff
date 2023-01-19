@@ -21,7 +21,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
             ),
         );
         let mut diagnostic = Diagnostic::new(violations::ReplaceUniversalNewlines, range);
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "text".to_string(),
                 range.location,

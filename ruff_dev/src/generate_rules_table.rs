@@ -25,14 +25,17 @@ fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
     table_out.push('\n');
-    for rule_code in prefix.codes() {
-        let kind = rule_code.kind();
-        let fix_token = if kind.fixable() { "🛠" } else { "" };
+    for rule in prefix.codes() {
+        let fix_token = match rule.autofixable() {
+            None => "",
+            Some(_) => "🛠",
+        };
+
         table_out.push_str(&format!(
             "| {} | {} | {} | {} |",
-            kind.code().as_ref(),
-            kind.as_ref(),
-            kind.summary().replace('|', r"\|"),
+            rule.code(),
+            rule.as_ref(),
+            rule.message_formats()[0].replace('|', r"\|"),
             fix_token
         ));
         table_out.push('\n');

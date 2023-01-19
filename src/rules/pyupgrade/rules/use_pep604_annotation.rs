@@ -82,7 +82,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         TypingMember::Optional => {
             let mut diagnostic =
                 Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
-            if checker.patch(diagnostic.kind.code()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 let mut generator: Generator = checker.stylist.into();
                 generator.unparse_expr(&optional(slice), 0);
                 diagnostic.amend(Fix::replacement(
@@ -96,7 +96,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         TypingMember::Union => {
             let mut diagnostic =
                 Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
-            if checker.patch(diagnostic.kind.code()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {
                         // Invalid type annotation.

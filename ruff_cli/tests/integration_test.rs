@@ -151,3 +151,12 @@ fn test_show_source() -> Result<()> {
     assert!(str::from_utf8(&output.get_output().stdout)?.contains("l = 1"));
     Ok(())
 }
+
+#[test]
+fn explain_status_codes() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    cmd.args(["-", "--explain", "F401"]).assert().success();
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    cmd.args(["-", "--explain", "RUF404"]).assert().failure();
+    Ok(())
+}
