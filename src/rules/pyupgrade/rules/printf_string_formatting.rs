@@ -107,6 +107,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let format_vec: Vec<&CFormatPart<String>> =
         format_string.iter().map(|(_, part)| part).collect();
     for (i, part) in format_vec.iter().enumerate() {
+        println!("{:?}", part);
         if let CFormatPart::Literal(item) = &part {
             let mut current_format = PercentFormat::new(item.to_string(), None);
             let the_next = match format_vec.get(i + 1) {
@@ -122,7 +123,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                         CFormatQuantity::Amount(amount) => Some(amount.to_string()),
                         // FOR REVIEWER: Not sure if below is the correct way to handle
                         // FromValuesTuple
-                        CFormatQuantity::FromValuesTuple =>  None
+                        CFormatQuantity::FromValuesTuple => Some("*".to_string()),
                     }
                     None => None
                 };
@@ -147,6 +148,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                     clean_precision,
                     c_spec.format_char.to_string(),
                 );
+                println!("{:?}", perc_part);
                 current_format.parts = Some(perc_part);
             }
             formats.push(current_format);
@@ -416,7 +418,7 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> Option<String> {
                 already_seen.push(key_string.clone());
                 let mut new_string = String::new();
                 if is_multi_line && indent.is_empty() {
-                    indent = indentation(checker, key).to_string();
+                    indent = indentation(checker.locator, key).unwrap().to_string();
                 }
                 let value_range = Range::new(value.location, value.end_location.unwrap());
                 let value_string = checker.locator.slice_source_code_range(&value_range);
