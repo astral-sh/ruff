@@ -1,6 +1,6 @@
 use std::cmp::max;
 
-use rustpython_ast::{Expr, Keyword, ExprKind};
+use rustpython_ast::{Expr, ExprKind, Keyword};
 use rustpython_parser::lexer::{self, Tok};
 
 use crate::ast::types::Range;
@@ -95,7 +95,8 @@ pub fn extraneous_parenthesis(
             let indent = indentation_greedy(checker.locator, arg);
             let small_indent = if indent.len() > 3 { &indent[3..] } else { "" };
             new_string = format!(
-                "{func_name}(\n{indent}{special_before}{arg_string}{special_after}\n{small_indent})"
+                "{func_name}(\n{indent}{special_before}{arg_string}{special_after}\\
+                 n{small_indent})"
             );
         } else {
             new_string = format!("{func_name}({special_before}{arg_string}{special_after})");
