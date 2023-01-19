@@ -54,7 +54,7 @@ fn apply_fixes<'a>(
 
         // Add all contents from `last_pos` to `fix.location`.
         let slice = locator.slice_source_code_range(&Range::new(last_pos, fix.location));
-        output.append(&slice);
+        output.append(slice);
 
         // Add the patch itself.
         output.append(&fix.content);
@@ -67,7 +67,7 @@ fn apply_fixes<'a>(
 
     // Add the remaining content.
     let slice = locator.slice_source_code_at(last_pos);
-    output.append(&slice);
+    output.append(slice);
 
     (Cow::from(output.finish()), num_fixed)
 }

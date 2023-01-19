@@ -117,7 +117,7 @@ fn format_import(
     stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text)?;
+    let mut tree = match_module(module_text)?;
     let mut import = match_import(&mut tree)?;
 
     let Import { names, .. } = import.clone();
@@ -147,7 +147,7 @@ fn format_import_from(
     stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text).unwrap();
+    let mut tree = match_module(module_text).unwrap();
     let mut import = match_import_from(&mut tree)?;
 
     let ImportFrom {
@@ -228,7 +228,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
                 let content = if checker.patch(&Rule::RewriteMockImport) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
-                        match format_import(stmt, &indent, checker.locator, checker.stylist) {
+                        match format_import(stmt, indent, checker.locator, checker.stylist) {
                             Ok(content) => Some(content),
                             Err(e) => {
                                 error!("Failed to rewrite `mock` import: {e}");
@@ -277,7 +277,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 );
                 if checker.patch(&Rule::RewriteMockImport) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
-                        match format_import_from(stmt, &indent, checker.locator, checker.stylist) {
+                        match format_import_from(stmt, indent, checker.locator, checker.stylist) {
                             Ok(content) => {
                                 diagnostic.amend(Fix::replacement(
                                     content,

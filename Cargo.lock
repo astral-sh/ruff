@@ -1880,6 +1880,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "shellexpand",
  "smallvec",
+ "str_indices",
  "strum",
  "strum_macros",
  "test-case",

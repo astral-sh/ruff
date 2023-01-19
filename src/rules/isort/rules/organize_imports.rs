@@ -38,7 +38,7 @@ pub fn organize_imports(
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice_source_code_range(&extract_indentation_range(&block.imports));
-    let indentation = leading_space(&indentation);
+    let indentation = leading_space(indentation);
 
     let range = extract_range(&block.imports);
 
@@ -96,7 +96,7 @@ pub fn organize_imports(
         Location::new(range.location.row(), 0),
         Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
     );
-    let actual = dedent(&locator.slice_source_code_range(&range));
+    let actual = dedent(locator.slice_source_code_range(&range));
     if actual == dedent(&expected) {
         None
     } else {

@@ -17,7 +17,7 @@ pub fn remove_unused_format_arguments_from_dict(
     locator: &Locator,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text)?;
+    let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
 
     let new_dict = {
@@ -63,7 +63,7 @@ pub fn remove_unused_keyword_arguments_from_format_call(
     locator: &Locator,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&location);
-    let mut tree = match_module(&module_text)?;
+    let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
 
     let new_call = {
@@ -112,7 +112,7 @@ pub fn remove_exception_handler_assignment(
     // End of the token just before the `as` to the semicolon.
     let mut prev = None;
     for (start, tok, end) in
-        lexer::make_tokenizer_located(&contents, excepthandler.location).flatten()
+        lexer::make_tokenizer_located(contents, excepthandler.location).flatten()
     {
         if matches!(tok, Tok::As) {
             fix_start = prev;

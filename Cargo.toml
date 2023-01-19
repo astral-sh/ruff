@@ -57,6 +57,7 @@ semver = { version = "1.0.16" }
 serde = { version = "1.0.147", features = ["derive"] }
 shellexpand = { version = "3.0.0" }
 smallvec = { version = "1.10.0" }
+str_indices = "0.4.1"
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
