@@ -114,7 +114,7 @@ pub fn run(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    if settings.rules.enabled(&Rule::E902) {
+                    if settings.rules.enabled(&Rule::IOError) {
                         Diagnostics::new(vec![Message {
                             kind: IOError(message).into(),
                             location: Location::default(),

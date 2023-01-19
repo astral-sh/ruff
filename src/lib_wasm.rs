@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::directives;
 use crate::linter::check_path;
-use crate::registry::RuleCode;
+use crate::registry::Rule;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
@@ -58,7 +58,7 @@ struct ExpandedMessage {
     fix: Option<ExpandedFix>,
 }
 
-struct SerializeRuleAsCode(RuleCode);
+struct SerializeRuleAsCode(Rule);
 
 impl Serialize for SerializeRuleAsCode {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -241,7 +241,7 @@ mod test {
             "if (1, 2): pass",
             r#"{}"#,
             [ExpandedMessage {
-                code: RuleCode::F634.into(),
+                code: Rule::IfTuple.into(),
                 message: "If test is a tuple, which is always `True`".to_string(),
                 location: Location::new(1, 0),
                 end_location: Location::new(1, 15),

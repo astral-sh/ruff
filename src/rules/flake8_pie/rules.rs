@@ -8,7 +8,7 @@ use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 /// PIE790
@@ -33,7 +33,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                     violations::NoUnnecessaryPass,
                     Range::from_located(pass_stmt),
                 );
-                if checker.patch(&RuleCode::PIE790) {
+                if checker.patch(&Rule::NoUnnecessaryPass) {
                     match delete_stmt(pass_stmt, None, &[], checker.locator, checker.indexer) {
                         Ok(fix) => {
                             diagnostic.amend(fix);
@@ -86,7 +86,7 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                 violations::DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(&RuleCode::PIE794) {
+            if checker.patch(&Rule::DupeClassFieldDefinitions) {
                 let deleted: Vec<&Stmt> = checker
                     .deletions
                     .iter()
@@ -162,7 +162,7 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
             if elts.is_empty() {
                 let mut diagnostic =
                     Diagnostic::new(violations::PreferListBuiltin, Range::from_located(expr));
-                if checker.patch(&RuleCode::PIE807) {
+                if checker.patch(&Rule::PreferListBuiltin) {
                     diagnostic.amend(Fix::replacement(
                         "list".to_string(),
                         expr.location,

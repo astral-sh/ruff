@@ -4,7 +4,7 @@ use rustpython_parser::token::Tok;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::violations;
 
@@ -219,7 +219,7 @@ pub fn trailing_commas(
                 },
             );
             if matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&RuleCode::COM819)
+                && settings.rules.should_fix(&Rule::TrailingCommaProhibited)
             {
                 diagnostic.amend(Fix::deletion(comma.0, comma.2));
             }
@@ -265,7 +265,7 @@ pub fn trailing_commas(
                 },
             );
             if matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&RuleCode::COM812)
+                && settings.rules.should_fix(&Rule::TrailingCommaMissing)
             {
                 diagnostic.amend(Fix::insertion(",".to_owned(), missing_comma.2));
             }

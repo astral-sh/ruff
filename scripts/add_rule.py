@@ -44,9 +44,9 @@ def main(*, name: str, code: str, origin: str) -> None:
 
     with open(mod_rs, "w") as fp:
         for line in content.splitlines():
-            if line.strip() == "fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {":
-                indent = line.split("fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {")[0]
-                fp.write(f'{indent}#[test_case(RuleCode::{code}, Path::new("{code}.py"); "{code}")]')
+            if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
+                indent = line.split("fn rules(rule_code: Rule, path: &Path) -> Result<()> {")[0]
+                fp.write(f'{indent}#[test_case(Rule::{code}, Path::new("{code}.py"); "{code}")]')
                 fp.write("\n")
 
             fp.write(line)

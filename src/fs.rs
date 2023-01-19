@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use path_absolutize::{path_dedot, Absolutize};
 use rustc_hash::FxHashSet;
 
-use crate::registry::RuleCode;
+use crate::registry::Rule;
 use crate::settings::hashable::{HashableGlobMatcher, HashableHashSet};
 
 /// Extract the absolute path and basename (as strings) from a Path.
@@ -29,9 +29,9 @@ pub(crate) fn ignores_from_path<'a>(
     pattern_code_pairs: &'a [(
         HashableGlobMatcher,
         HashableGlobMatcher,
-        HashableHashSet<RuleCode>,
+        HashableHashSet<Rule>,
     )],
-) -> Result<FxHashSet<&'a RuleCode>> {
+) -> Result<FxHashSet<&'a Rule>> {
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()

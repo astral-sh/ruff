@@ -113,7 +113,7 @@ mod tests {
 
     use super::ApiBan;
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test]
@@ -139,7 +139,7 @@ mod tests {
                     .into(),
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![RuleCode::TID251])
+                ..Settings::for_rules(vec![Rule::BannedApi])
             },
         )?;
         insta::assert_yaml_snapshot!(diagnostics);

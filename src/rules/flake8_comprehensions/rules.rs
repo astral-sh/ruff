@@ -5,7 +5,7 @@ use rustpython_ast::{Comprehension, Constant, Expr, ExprKind, Keyword, Unaryop};
 use super::fixes;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 fn function_name(func: &Expr) -> Option<&str> {
@@ -65,7 +65,7 @@ pub fn unnecessary_generator_list(
             violations::UnnecessaryGeneratorList,
             Range::from_located(expr),
         );
-        if checker.patch(&RuleCode::C400) {
+        if checker.patch(&Rule::UnnecessaryGeneratorList) {
             match fixes::fix_unnecessary_generator_list(checker.locator, expr) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
@@ -96,7 +96,7 @@ pub fn unnecessary_generator_set(
             violations::UnnecessaryGeneratorSet,
             Range::from_located(expr),
         );
-        if checker.patch(&RuleCode::C401) {
+        if checker.patch(&Rule::UnnecessaryGeneratorSet) {
             match fixes::fix_unnecessary_generator_set(checker.locator, expr) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
@@ -126,7 +126,7 @@ pub fn unnecessary_generator_dict(
                     violations::UnnecessaryGeneratorDict,
                     Range::from_located(expr),
                 );
-                if checker.patch(&RuleCode::C402) {
+                if checker.patch(&Rule::UnnecessaryGeneratorDict) {
                     match fixes::fix_unnecessary_generator_dict(checker.locator, expr) {
                         Ok(fix) => {
                             diagnostic.amend(fix);
@@ -160,7 +160,7 @@ pub fn unnecessary_list_comprehension_set(
             violations::UnnecessaryListComprehensionSet,
             Range::from_located(expr),
         );
-        if checker.patch(&RuleCode::C403) {
+        if checker.patch(&Rule::UnnecessaryListComprehensionSet) {
             match fixes::fix_unnecessary_list_comprehension_set(checker.locator, expr) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
@@ -199,7 +199,7 @@ pub fn unnecessary_list_comprehension_dict(
         violations::UnnecessaryListComprehensionDict,
         Range::from_located(expr),
     );
-    if checker.patch(&RuleCode::C404) {
+    if checker.patch(&Rule::UnnecessaryListComprehensionDict) {
         match fixes::fix_unnecessary_list_comprehension_dict(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -233,7 +233,7 @@ pub fn unnecessary_literal_set(
         violations::UnnecessaryLiteralSet(kind.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(&RuleCode::C405) {
+    if checker.patch(&Rule::UnnecessaryLiteralSet) {
         match fixes::fix_unnecessary_literal_set(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -274,7 +274,7 @@ pub fn unnecessary_literal_dict(
         violations::UnnecessaryLiteralDict(kind.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(&RuleCode::C406) {
+    if checker.patch(&Rule::UnnecessaryLiteralDict) {
         match fixes::fix_unnecessary_literal_dict(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -315,7 +315,7 @@ pub fn unnecessary_collection_call(
         violations::UnnecessaryCollectionCall(id.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(&RuleCode::C408) {
+    if checker.patch(&Rule::UnnecessaryCollectionCall) {
         match fixes::fix_unnecessary_collection_call(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -348,7 +348,7 @@ pub fn unnecessary_literal_within_tuple_call(
         violations::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(&RuleCode::C409) {
+    if checker.patch(&Rule::UnnecessaryLiteralWithinTupleCall) {
         match fixes::fix_unnecessary_literal_within_tuple_call(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -381,7 +381,7 @@ pub fn unnecessary_literal_within_list_call(
         violations::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(&RuleCode::C410) {
+    if checker.patch(&Rule::UnnecessaryLiteralWithinListCall) {
         match fixes::fix_unnecessary_literal_within_list_call(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -405,7 +405,7 @@ pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     }
     let mut diagnostic =
         Diagnostic::new(violations::UnnecessaryListCall, Range::from_located(expr));
-    if checker.patch(&RuleCode::C411) {
+    if checker.patch(&Rule::UnnecessaryListCall) {
         match fixes::fix_unnecessary_list_call(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -448,7 +448,7 @@ pub fn unnecessary_call_around_sorted(
         violations::UnnecessaryCallAroundSorted(outer.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(&RuleCode::C413) {
+    if checker.patch(&Rule::UnnecessaryCallAroundSorted) {
         match fixes::fix_unnecessary_call_around_sorted(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -611,7 +611,7 @@ pub fn unnecessary_comprehension(
         violations::UnnecessaryComprehension(id.to_string()),
         Range::from_located(expr),
     );
-    if checker.patch(&RuleCode::C416) {
+    if checker.patch(&Rule::UnnecessaryComprehension) {
         match fixes::fix_unnecessary_comprehension(checker.locator, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);

@@ -6,7 +6,7 @@ use rustpython_parser::ast::Location;
 use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::registry::{Diagnostic, DiagnosticKind, Rule, RuleCode, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, DiagnosticKind, Rule, CODE_REDIRECTS};
 use crate::settings::{flags, Settings};
 use crate::violations::UnusedCodes;
 use crate::{noqa, violations};
@@ -22,7 +22,7 @@ pub fn check_noqa(
     let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
     let mut ignored = vec![];
 
-    let enforce_noqa = settings.rules.enabled(&RuleCode::RUF100);
+    let enforce_noqa = settings.rules.enabled(&Rule::UnusedNOQA);
 
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {
@@ -124,7 +124,7 @@ pub fn check_noqa(
                     let mut self_ignore = false;
                     for code in codes {
                         let code = CODE_REDIRECTS.get(code).map_or(code, |r| r.code());
-                        if code == RuleCode::RUF100.code() {
+                        if code == Rule::UnusedNOQA.code() {
                             self_ignore = true;
                             break;
                         }

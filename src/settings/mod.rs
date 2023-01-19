@@ -14,7 +14,7 @@ use rustc_hash::FxHashSet;
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{RuleCode, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
@@ -78,7 +78,7 @@ pub struct Settings {
     pub per_file_ignores: Vec<(
         HashableGlobMatcher,
         HashableGlobMatcher,
-        HashableHashSet<RuleCode>,
+        HashableHashSet<Rule>,
     )>,
 
     pub show_source: bool,
@@ -207,7 +207,7 @@ impl Settings {
     }
 
     #[cfg(test)]
-    pub fn for_rule(rule_code: RuleCode) -> Self {
+    pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: [rule_code].into(),
             ..Settings::default()
@@ -215,7 +215,7 @@ impl Settings {
     }
 
     #[cfg(test)]
-    pub fn for_rules(rule_codes: Vec<RuleCode>) -> Self {
+    pub fn for_rules(rule_codes: Vec<Rule>) -> Self {
         Self {
             rules: rule_codes.into(),
             ..Settings::default()
@@ -293,7 +293,7 @@ pub fn resolve_per_file_ignores(
     Vec<(
         HashableGlobMatcher,
         HashableGlobMatcher,
-        HashableHashSet<RuleCode>,
+        HashableHashSet<Rule>,
     )>,
 > {
     per_file_ignores
@@ -319,8 +319,8 @@ struct RuleCodeSpec<'a> {
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// rule codes.
-fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<RuleCode> {
-    let mut codes: FxHashSet<RuleCode> = FxHashSet::default();
+fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<Rule> {
+    let mut codes: FxHashSet<Rule> = FxHashSet::default();
     for spec in specs {
         for specificity in [
             SuffixLength::None,
@@ -348,7 +348,7 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
 }
 
 /// Warn if the set of enabled codes contains any incompatibilities.
-fn validate_enabled(enabled: FxHashSet<RuleCode>) -> FxHashSet<RuleCode> {
+fn validate_enabled(enabled: FxHashSet<Rule>) -> FxHashSet<Rule> {
     for (a, b, message) in INCOMPATIBLE_CODES {
         if enabled.contains(a) && enabled.contains(b) {
             warn_user_once!("{}", message);
@@ -361,7 +361,7 @@ fn validate_enabled(enabled: FxHashSet<RuleCode>) -> FxHashSet<RuleCode> {
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::registry::{RuleCode, RuleCodePrefix};
+    use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::{resolve_codes, RuleCodeSpec};
 
     #[test]
@@ -370,21 +370,25 @@ mod tests {
             select: &[RuleCodePrefix::W],
             ignore: &[],
         }]);
-        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W505, RuleCode::W605]);
+        let expected = FxHashSet::from_iter([
+            Rule::NoNewLineAtEndOfFile,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+        ]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
             select: &[RuleCodePrefix::W6],
             ignore: &[],
         }]);
-        let expected = FxHashSet::from_iter([RuleCode::W605]);
+        let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
             select: &[RuleCodePrefix::W],
             ignore: &[RuleCodePrefix::W292],
         }]);
-        let expected = FxHashSet::from_iter([RuleCode::W505, RuleCode::W605]);
+        let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
@@ -404,7 +408,11 @@ mod tests {
                 ignore: &[],
             },
         ]);
-        let expected = FxHashSet::from_iter([RuleCode::W292, RuleCode::W505, RuleCode::W605]);
+        let expected = FxHashSet::from_iter([
+            Rule::NoNewLineAtEndOfFile,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+        ]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([
@@ -417,7 +425,7 @@ mod tests {
                 ignore: &[RuleCodePrefix::W],
             },
         ]);
-        let expected = FxHashSet::from_iter([RuleCode::W292]);
+        let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
         assert_eq!(actual, expected);
     }
 }

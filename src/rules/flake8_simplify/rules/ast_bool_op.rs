@@ -9,7 +9,7 @@ use crate::ast::helpers::{contains_effect, create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 /// Return `true` if two `Expr` instances are equivalent names.
@@ -66,7 +66,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 violations::DuplicateIsinstanceCall(arg_name.to_string()),
                 Range::from_located(expr),
             );
-            if checker.patch(&RuleCode::SIM101) {
+            if checker.patch(&Rule::DuplicateIsinstanceCall) {
                 // Grab the types used in each duplicate `isinstance` call.
                 let types: Vec<&Expr> = indices
                     .iter()
@@ -179,7 +179,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             ),
             Range::from_located(expr),
         );
-        if checker.patch(&RuleCode::SIM109) {
+        if checker.patch(&Rule::CompareWithTuple) {
             // Create a `x in (a, b)` compare expr.
             let in_expr = create_expr(ExprKind::Compare {
                 left: Box::new(create_expr(ExprKind::Name {
@@ -241,7 +241,7 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
                     violations::AAndNotA(id.to_string()),
                     Range::from_located(expr),
                 );
-                if checker.patch(&RuleCode::SIM220) {
+                if checker.patch(&Rule::AAndNotA) {
                     diagnostic.amend(Fix::replacement(
                         "False".to_string(),
                         expr.location,
@@ -293,7 +293,7 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
                     violations::AOrNotA(id.to_string()),
                     Range::from_located(expr),
                 );
-                if checker.patch(&RuleCode::SIM220) {
+                if checker.patch(&Rule::AAndNotA) {
                     diagnostic.amend(Fix::replacement(
                         "True".to_string(),
                         expr.location,
@@ -321,7 +321,7 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
         } = &value.node
         {
             let mut diagnostic = Diagnostic::new(violations::OrTrue, Range::from_located(value));
-            if checker.patch(&RuleCode::SIM223) {
+            if checker.patch(&Rule::AndFalse) {
                 diagnostic.amend(Fix::replacement(
                     "True".to_string(),
                     expr.location,
@@ -348,7 +348,7 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
         } = &value.node
         {
             let mut diagnostic = Diagnostic::new(violations::AndFalse, Range::from_located(value));
-            if checker.patch(&RuleCode::SIM223) {
+            if checker.patch(&Rule::AndFalse) {
                 diagnostic.amend(Fix::replacement(
                     "False".to_string(),
                     expr.location,
