@@ -475,13 +475,10 @@
     "ConstantType": {
       "type": "string",
       "enum": [
-        "bool",
         "bytes",
         "complex",
-        "ellipsis",
         "float",
         "int",
-        "none",
         "str",
         "tuple"
       ]

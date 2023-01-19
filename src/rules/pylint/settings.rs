@@ -1,5 +1,6 @@
 //! Settings for the `pylint` plugin.
 
+use anyhow::anyhow;
 use ruff_macros::ConfigurationOptions;
 use rustpython_ast::Constant;
 use schemars::JsonSchema;
@@ -8,29 +9,28 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ConstantType {
-    Bool,
     Bytes,
     Complex,
-    Ellipsis,
     Float,
     Int,
-    None,
     Str,
     Tuple,
 }
 
-impl From<&Constant> for ConstantType {
-    fn from(value: &Constant) -> Self {
+impl TryFrom<&Constant> for ConstantType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &Constant) -> Result<Self, Self::Error> {
         match value {
-            Constant::Bool(..) => Self::Bool,
-            Constant::Bytes(..) => Self::Bytes,
-            Constant::Complex { .. } => Self::Complex,
-            Constant::Ellipsis => Self::Ellipsis,
-            Constant::Float(..) => Self::Float,
-            Constant::Int(..) => Self::Int,
-            Constant::None => Self::None,
-            Constant::Str(..) => Self::Str,
-            Constant::Tuple(..) => Self::Tuple,
+            Constant::Bytes(..) => Ok(Self::Bytes),
+            Constant::Complex { .. } => Ok(Self::Complex),
+            Constant::Float(..) => Ok(Self::Float),
+            Constant::Int(..) => Ok(Self::Int),
+            Constant::Str(..) => Ok(Self::Str),
+            Constant::Tuple(..) => Ok(Self::Tuple),
+            Constant::Bool(..) | Constant::Ellipsis | Constant::None => {
+                Err(anyhow!("Singleton constants are unsupported"))
+            }
         }
     }
 }

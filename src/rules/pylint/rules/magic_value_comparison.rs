@@ -8,8 +8,10 @@ use crate::rules::pylint::settings::ConstantType;
 use crate::violations;
 
 fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
-    if allowed_types.contains(&constant.into()) {
-        return false;
+    if let Ok(constant_type) = ConstantType::try_from(constant) {
+        if allowed_types.contains(&constant_type) {
+            return false;
+        }
     }
     match constant {
         // Ignore `None`, `Bool`, and `Ellipsis` constants.
