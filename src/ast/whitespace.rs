@@ -20,6 +20,24 @@ pub fn indentation<'a, T>(locator: &'a Locator, located: &'a Located<T>) -> Opti
     }
 }
 
+/// Returns all leading indentation for a line
+pub fn indentation_greedy<'a, T>(locator: &'a Locator, located: &'a Located<T>) -> String {
+    let range = Range::from_located(located);
+    let indentation = locator.slice_source_code_range(&Range::new(
+        Location::new(range.location.row(), 0),
+        Location::new(range.location.row(), range.location.column()),
+    ));
+    let mut new_str = String::new();
+    for character in  indentation.chars() {
+        if character.is_whitespace() {
+            new_str.push(character);
+        } else {
+            break;
+        }
+    }
+    new_str
+}
+
 /// Extract the leading words from a line of text.
 pub fn leading_words(line: &str) -> &str {
     let line = line.trim();

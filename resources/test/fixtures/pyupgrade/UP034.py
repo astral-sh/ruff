@@ -22,6 +22,11 @@ print(
 def f():
     x = int(((yield 1)))
 
+if True:
+    print(
+        ("foo{}".format(1))
+     )
+
 # These SHOULD NOT work
 print("foo")
 
@@ -39,11 +44,3 @@ def f():
 sum((i for i in range(3)), [])
 
 print((x for x in range(3)))
-
-print ((
-    "foo"
-))
-
-print(
-    ("foo")
-)
