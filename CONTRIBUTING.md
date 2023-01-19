@@ -54,18 +54,22 @@ prior to merging.
 
 ### Example: Adding a new lint rule
 
-There are four phases to adding a new lint rule:
+At a high level, the steps involved in adding a new lint rule are as follows:
 
-1. Define the violation struct in `src/violations.rs` (e.g., `ModuleImportNotAtTopOfFile`).
-2. Map the violation struct to a rule code in `src/registry.rs` (e.g., `E402`).
-3. Define the logic for triggering the violation in `src/checkers/ast.rs` (for AST-based checks),
-   `src/checkers/tokens.rs` (for token-based checks), `src/checkers/lines.rs` (for text-based checks) or `src/checkers/filesystem.rs` (for filesystem-based checks).
-4. Add a test fixture.
-5. Update the generated files (documentation and generated code).
+1. Create a file for your rule (e.g., `src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
+2. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
+3. Map the violation struct to a rule code in `src/registry.rs` (e.g., `E402`).
+4. Define the logic for triggering the violation in `src/checkers/ast.rs` (for AST-based checks),
+   `src/checkers/tokens.rs` (for token-based checks), `src/checkers/lines.rs` (for text-based
+   checks), or `src/checkers/filesystem.rs` (for filesystem-based checks).
+5. Add a test fixture.
+6. Update the generated files (documentation and generated code).
 
-To define the violation, open up `src/violations.rs`, and define a new struct using the
-`define_violation!` macro. There are plenty of examples in that file, so feel free to pattern-match
-against the existing structs.
+To define the violation, start by creating a dedicated file for your rule under the appropriate
+rule origin (e.g., `src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
+contain a struct defined via `define_violation!`, along with a function that creates the violation
+based on any required inputs. (Many of the existing examples live in `src/violations.rs`, but we're
+looking to place new rules in their own files.)
 
 To trigger the violation, you'll likely want to augment the logic in `src/checkers/ast.rs`, which
 defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
