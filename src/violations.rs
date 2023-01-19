@@ -2894,27 +2894,25 @@ impl AlwaysAutofixableViolation for UseTernaryOperator {
 }
 
 define_violation!(
-    pub struct CompareWithTuple(pub String, pub Vec<String>, pub String);
+    pub struct CompareWithTuple {
+        pub replacement: String,
+    }
 );
 impl AlwaysAutofixableViolation for CompareWithTuple {
     fn message(&self) -> String {
-        let CompareWithTuple(value, values, or_op) = self;
-        let values = values.join(", ");
-        format!("Use `{value} in ({values})` instead of `{or_op}`")
+        let CompareWithTuple { replacement } = self;
+        format!("Use `{replacement}` instead of multiple equality comparisons")
     }
 
     fn autofix_title(&self) -> String {
-        let CompareWithTuple(value, values, or_op) = self;
-        let values = values.join(", ");
-        format!("Replace `{or_op}` with `{value} in {values}`")
+        let CompareWithTuple { replacement, .. } = self;
+        format!("Replace with `{replacement}`")
     }
 
     fn placeholder() -> Self {
-        CompareWithTuple(
-            "value".to_string(),
-            vec!["...".to_string(), "...".to_string()],
-            "value == ... or value == ...".to_string(),
-        )
+        CompareWithTuple {
+            replacement: "value in (... ,...)".to_string(),
+        }
     }
 }
 

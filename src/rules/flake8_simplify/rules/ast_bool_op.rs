@@ -2,10 +2,9 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use itertools::Either::{Left, Right};
-use rustc_hash::FxHashMap;
 use rustpython_ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use crate::ast::helpers::{contains_effect, create_expr, unparse_expr};
+use crate::ast::helpers::{contains_effect, create_expr, has_comments_in, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -30,7 +29,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
     // Locate duplicate `isinstance` calls, represented as a map from argument name
     // to indices of the relevant `Expr` instances in `values`.
-    let mut duplicates = FxHashMap::default();
+    let mut duplicates = BTreeMap::new();
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
         let ExprKind::Call { func, args, keywords } = &call.node else {
@@ -136,62 +135,98 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     }
 }
 
+fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
+    let ExprKind::Compare { left, ops, comparators } = &expr.node else {
+        return None;
+    };
+    if ops.len() != 1 || comparators.len() != 1 {
+        return None;
+    }
+    if !matches!(&ops[0], Cmpop::Eq) {
+        return None;
+    }
+    let ExprKind::Name { id, .. } = &left.node else {
+        return None;
+    };
+    let comparator = &comparators[0];
+    if !matches!(&comparator.node, ExprKind::Name { .. }) {
+        return None;
+    }
+    Some((id, comparator))
+}
+
 /// SIM109
 pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
         return;
     };
 
-    let mut id_to_values = BTreeMap::<&str, Vec<&Expr>>::new();
-    for value in values {
-        let ExprKind::Compare { left, ops, comparators } = &value.node else {
-            continue;
-        };
-        if ops.len() != 1 || comparators.len() != 1 {
-            continue;
+    // Given `a == "foo" or a == "bar"`, we generate `{"a": [(0, "foo"), (1,
+    // "bar")]}`.
+    let mut id_to_comparators: BTreeMap<&str, Vec<(usize, &Expr)>> = BTreeMap::new();
+    for (index, value) in values.iter().enumerate() {
+        if let Some((id, comparator)) = match_eq_target(value) {
+            id_to_comparators
+                .entry(id)
+                .or_default()
+                .push((index, comparator));
         }
-        if !matches!(&ops[0], Cmpop::Eq) {
-            continue;
-        }
-        let ExprKind::Name { id, .. } = &left.node else {
-            continue;
-        };
-        let comparator = &comparators[0];
-        if !matches!(&comparator.node, ExprKind::Name { .. }) {
-            continue;
-        }
-        id_to_values.entry(id).or_default().push(comparator);
     }
 
-    for (value, values) in id_to_values {
-        if values.len() == 1 {
+    for (id, matches) in id_to_comparators {
+        if matches.len() == 1 {
             continue;
         }
-        let str_values = values
+
+        let (indices, comparators): (Vec<_>, Vec<_>) = matches.iter().copied().unzip();
+
+        // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
+        if comparators
             .iter()
-            .map(|value| unparse_expr(value, checker.stylist))
-            .collect();
+            .any(|expr| contains_effect(checker, expr))
+        {
+            continue;
+        }
+
+        // Avoid removing comments.
+        if has_comments_in(Range::from_located(expr), checker.locator) {
+            continue;
+        }
+
+        // Create a `x in (a, b)` expression.
+        let in_expr = create_expr(ExprKind::Compare {
+            left: Box::new(create_expr(ExprKind::Name {
+                id: id.to_string(),
+                ctx: ExprContext::Load,
+            })),
+            ops: vec![Cmpop::In],
+            comparators: vec![create_expr(ExprKind::Tuple {
+                elts: comparators.into_iter().map(Clone::clone).collect(),
+                ctx: ExprContext::Load,
+            })],
+        });
         let mut diagnostic = Diagnostic::new(
-            violations::CompareWithTuple(
-                value.to_string(),
-                str_values,
-                unparse_expr(expr, checker.stylist),
-            ),
+            violations::CompareWithTuple {
+                replacement: unparse_expr(&in_expr, checker.stylist),
+            },
             Range::from_located(expr),
         );
         if checker.patch(&Rule::CompareWithTuple) {
-            // Create a `x in (a, b)` compare expr.
-            let in_expr = create_expr(ExprKind::Compare {
-                left: Box::new(create_expr(ExprKind::Name {
-                    id: value.to_string(),
-                    ctx: ExprContext::Load,
-                })),
-                ops: vec![Cmpop::In],
-                comparators: vec![create_expr(ExprKind::Tuple {
-                    elts: values.into_iter().map(Clone::clone).collect(),
-                    ctx: ExprContext::Load,
-                })],
-            });
+            let unmatched: Vec<Expr> = values
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| !indices.contains(index))
+                .map(|(_, elt)| elt.clone())
+                .collect();
+            let in_expr = if unmatched.is_empty() {
+                in_expr
+            } else {
+                // Wrap in a `x in (a, b) or ...` boolean operation.
+                create_expr(ExprKind::BoolOp {
+                    op: Boolop::Or,
+                    values: iter::once(in_expr).chain(unmatched).collect(),
+                })
+            };
             diagnostic.amend(Fix::replacement(
                 unparse_expr(&in_expr, checker.stylist),
                 expr.location,
