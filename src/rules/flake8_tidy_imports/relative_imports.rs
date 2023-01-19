@@ -24,16 +24,13 @@ define_violation!(
     pub struct RelativeImports(pub Strictness);
 );
 impl Violation for RelativeImports {
+    #[derive_message_formats]
     fn message(&self) -> String {
         let RelativeImports(strictness) = self;
         match strictness {
-            Strictness::Parents => "Relative imports from parent modules are banned".to_string(),
-            Strictness::All => "Relative imports are banned".to_string(),
+            Strictness::Parents => format!("Relative imports from parent modules are banned"),
+            Strictness::All => format!("Relative imports are banned"),
         }
-    }
-
-    fn placeholder() -> Self {
-        RelativeImports(Strictness::All)
     }
 }
 

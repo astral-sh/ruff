@@ -27,16 +27,10 @@ define_violation!(
     }
 );
 impl Violation for BannedApi {
+    #[derive_message_formats]
     fn message(&self) -> String {
         let BannedApi { name, message } = self;
         format!("`{name}` is banned: {message}")
-    }
-
-    fn placeholder() -> Self {
-        BannedApi {
-            name: "...".to_string(),
-            message: "...".to_string(),
-        }
     }
 }
 
