@@ -1,3 +1,4 @@
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Alias, Expr, Located};
 use schemars::JsonSchema;
