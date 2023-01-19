@@ -1,10 +1,11 @@
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Expr, ExprKind, Keyword, KeywordData, Location};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
+use crate::message::Location;
 use crate::registry::{Diagnostic, DiagnosticKind};
+use crate::rules::ruff::rules::Context;
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 use crate::violations;
@@ -1597,13 +1598,6 @@ static CONFUSABLES: Lazy<FxHashMap<u32, u32>> = Lazy::new(|| {
     ])
 });
 
-#[derive(Clone, Copy)]
-pub enum Context {
-    String,
-    Docstring,
-    Comment,
-}
-
 pub fn ambiguous_unicode_character(
     locator: &Locator,
     start: Location,
@@ -1675,30 +1669,5 @@ pub fn ambiguous_unicode_character(
         }
     }
 
-    diagnostics
-}
-
-/// RUF004
-pub fn keyword_argument_before_star_argument(
-    args: &[Expr],
-    keywords: &[Keyword],
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-    if let Some(arg) = args
-        .iter()
-        .rfind(|arg| matches!(arg.node, ExprKind::Starred { .. }))
-    {
-        for keyword in keywords {
-            if keyword.location < arg.location {
-                let KeywordData { arg, .. } = &keyword.node;
-                if let Some(arg) = arg {
-                    diagnostics.push(Diagnostic::new(
-                        violations::KeywordArgumentBeforeStarArgument(arg.to_string()),
-                        Range::from_located(keyword),
-                    ));
-                }
-            }
-        }
-    }
     diagnostics
 }
