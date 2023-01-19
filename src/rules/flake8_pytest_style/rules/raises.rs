@@ -4,7 +4,7 @@ use super::helpers::is_empty_or_null_string;
 use crate::ast::helpers::{format_call_path, to_call_path};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
@@ -25,7 +25,11 @@ fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(checker, func) {
-        if checker.settings.rules.enabled(&RuleCode::PT010) {
+        if checker
+            .settings
+            .rules
+            .enabled(&Rule::RaisesWithoutException)
+        {
             if args.is_empty() && keywords.is_empty() {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::RaisesWithoutException,
@@ -34,7 +38,7 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
             }
         }
 
-        if checker.settings.rules.enabled(&RuleCode::PT011) {
+        if checker.settings.rules.enabled(&Rule::RaisesTooBroad) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.node.arg == Some("match".to_string()));

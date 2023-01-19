@@ -10,7 +10,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test_case(0)]
@@ -22,7 +22,7 @@ mod tests {
             Path::new("./resources/test/fixtures/mccabe/C901.py"),
             &Settings {
                 mccabe: super::settings::Settings { max_complexity },
-                ..Settings::for_rules(vec![RuleCode::C901])
+                ..Settings::for_rules(vec![Rule::FunctionIsTooComplex])
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);

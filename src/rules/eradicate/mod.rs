@@ -10,11 +10,11 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings;
 
-    #[test_case(RuleCode::ERA001, Path::new("ERA001.py"); "ERA001")]
-    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
+    #[test_case(Rule::CommentedOutCode, Path::new("ERA001.py"); "ERA001")]
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/eradicate")

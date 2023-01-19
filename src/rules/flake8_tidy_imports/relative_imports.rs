@@ -64,7 +64,7 @@ mod tests {
 
     use super::Strictness;
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test]
@@ -76,7 +76,7 @@ mod tests {
                     ban_relative_imports: Strictness::Parents,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![RuleCode::TID252])
+                ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
         insta::assert_yaml_snapshot!(diagnostics);
@@ -92,7 +92,7 @@ mod tests {
                     ban_relative_imports: Strictness::All,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![RuleCode::TID252])
+                ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
         insta::assert_yaml_snapshot!(diagnostics);

@@ -1,4 +1,4 @@
-//! Registry of [`RuleCode`] to [`DiagnosticKind`] mappings.
+//! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
 
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -542,35 +542,35 @@ pub enum LintSource {
     Filesystem,
 }
 
-impl RuleCode {
+impl Rule {
     /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            RuleCode::RUF100 => &LintSource::NoQa,
-            RuleCode::E501
-            | RuleCode::W292
-            | RuleCode::W505
-            | RuleCode::UP009
-            | RuleCode::PGH003
-            | RuleCode::PGH004 => &LintSource::Lines,
-            RuleCode::ERA001
-            | RuleCode::ISC001
-            | RuleCode::ISC002
-            | RuleCode::Q000
-            | RuleCode::Q001
-            | RuleCode::Q002
-            | RuleCode::Q003
-            | RuleCode::W605
-            | RuleCode::COM812
-            | RuleCode::COM818
-            | RuleCode::COM819
-            | RuleCode::RUF001
-            | RuleCode::RUF002
-            | RuleCode::RUF003 => &LintSource::Tokens,
-            RuleCode::E902 => &LintSource::Io,
-            RuleCode::I001 | RuleCode::I002 => &LintSource::Imports,
-            RuleCode::INP001 => &LintSource::Filesystem,
+            Rule::UnusedNOQA => &LintSource::NoQa,
+            Rule::LineTooLong
+            | Rule::NoNewLineAtEndOfFile
+            | Rule::DocLineTooLong
+            | Rule::PEP3120UnnecessaryCodingComment
+            | Rule::BlanketTypeIgnore
+            | Rule::BlanketNOQA => &LintSource::Lines,
+            Rule::CommentedOutCode
+            | Rule::SingleLineImplicitStringConcatenation
+            | Rule::MultiLineImplicitStringConcatenation
+            | Rule::BadQuotesInlineString
+            | Rule::BadQuotesMultilineString
+            | Rule::BadQuotesDocstring
+            | Rule::AvoidQuoteEscape
+            | Rule::InvalidEscapeSequence
+            | Rule::TrailingCommaMissing
+            | Rule::TrailingCommaOnBareTupleProhibited
+            | Rule::TrailingCommaProhibited
+            | Rule::AmbiguousUnicodeCharacterString
+            | Rule::AmbiguousUnicodeCharacterDocstring
+            | Rule::AmbiguousUnicodeCharacterComment => &LintSource::Tokens,
+            Rule::IOError => &LintSource::Io,
+            Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
+            Rule::ImplicitNamespacePackage => &LintSource::Filesystem,
             _ => &LintSource::Ast,
         }
     }
@@ -649,64 +649,64 @@ impl Diagnostic {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(RuleCode, RuleCode, &str)] = &[(
-    RuleCode::D203,
-    RuleCode::D211,
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[(
+    Rule::OneBlankLineBeforeClass,
+    Rule::NoBlankLineBeforeClass,
     "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
      Consider adding `D203` to `ignore`.",
 )];
 
-/// A hash map from deprecated to latest `RuleCode`.
-pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, RuleCode>> = Lazy::new(|| {
+/// A hash map from deprecated to latest `Rule`.
+pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, Rule>> = Lazy::new(|| {
     FxHashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
-        ("U001", RuleCode::UP001),
-        ("U003", RuleCode::UP003),
-        ("U004", RuleCode::UP004),
-        ("U005", RuleCode::UP005),
-        ("U006", RuleCode::UP006),
-        ("U007", RuleCode::UP007),
-        ("U008", RuleCode::UP008),
-        ("U009", RuleCode::UP009),
-        ("U010", RuleCode::UP010),
-        ("U011", RuleCode::UP011),
-        ("U012", RuleCode::UP012),
-        ("U013", RuleCode::UP013),
-        ("U014", RuleCode::UP014),
-        ("U015", RuleCode::UP015),
-        ("U016", RuleCode::UP016),
-        ("U017", RuleCode::UP017),
-        ("U019", RuleCode::UP019),
+        ("U001", Rule::UselessMetaclassType),
+        ("U003", Rule::TypeOfPrimitive),
+        ("U004", Rule::UselessObjectInheritance),
+        ("U005", Rule::DeprecatedUnittestAlias),
+        ("U006", Rule::UsePEP585Annotation),
+        ("U007", Rule::UsePEP604Annotation),
+        ("U008", Rule::SuperCallWithParameters),
+        ("U009", Rule::PEP3120UnnecessaryCodingComment),
+        ("U010", Rule::UnnecessaryFutureImport),
+        ("U011", Rule::LRUCacheWithoutParameters),
+        ("U012", Rule::UnnecessaryEncodeUTF8),
+        ("U013", Rule::ConvertTypedDictFunctionalToClass),
+        ("U014", Rule::ConvertNamedTupleFunctionalToClass),
+        ("U015", Rule::RedundantOpenModes),
+        ("U016", Rule::RemoveSixCompat),
+        ("U017", Rule::DatetimeTimezoneUTC),
+        ("U019", Rule::TypingTextStrAlias),
         // TODO(charlie): Remove by 2023-02-01.
-        ("I252", RuleCode::TID252),
-        ("M001", RuleCode::RUF100),
+        ("I252", Rule::RelativeImports),
+        ("M001", Rule::UnusedNOQA),
         // TODO(charlie): Remove by 2023-02-01.
-        ("PDV002", RuleCode::PD002),
-        ("PDV003", RuleCode::PD003),
-        ("PDV004", RuleCode::PD004),
-        ("PDV007", RuleCode::PD007),
-        ("PDV008", RuleCode::PD008),
-        ("PDV009", RuleCode::PD009),
-        ("PDV010", RuleCode::PD010),
-        ("PDV011", RuleCode::PD011),
-        ("PDV012", RuleCode::PD012),
-        ("PDV013", RuleCode::PD013),
-        ("PDV015", RuleCode::PD015),
-        ("PDV901", RuleCode::PD901),
+        ("PDV002", Rule::UseOfInplaceArgument),
+        ("PDV003", Rule::UseOfDotIsNull),
+        ("PDV004", Rule::UseOfDotNotNull),
+        ("PDV007", Rule::UseOfDotIx),
+        ("PDV008", Rule::UseOfDotAt),
+        ("PDV009", Rule::UseOfDotIat),
+        ("PDV010", Rule::UseOfDotPivotOrUnstack),
+        ("PDV011", Rule::UseOfDotValues),
+        ("PDV012", Rule::UseOfDotReadTable),
+        ("PDV013", Rule::UseOfDotStack),
+        ("PDV015", Rule::UseOfPdMerge),
+        ("PDV901", Rule::DfIsABadVariableName),
         // TODO(charlie): Remove by 2023-02-01.
-        ("R501", RuleCode::RET501),
-        ("R502", RuleCode::RET502),
-        ("R503", RuleCode::RET503),
-        ("R504", RuleCode::RET504),
-        ("R505", RuleCode::RET505),
-        ("R506", RuleCode::RET506),
-        ("R507", RuleCode::RET507),
-        ("R508", RuleCode::RET508),
+        ("R501", Rule::UnnecessaryReturnNone),
+        ("R502", Rule::ImplicitReturnValue),
+        ("R503", Rule::ImplicitReturn),
+        ("R504", Rule::UnnecessaryAssign),
+        ("R505", Rule::SuperfluousElseReturn),
+        ("R506", Rule::SuperfluousElseRaise),
+        ("R507", Rule::SuperfluousElseContinue),
+        ("R508", Rule::SuperfluousElseBreak),
         // TODO(charlie): Remove by 2023-02-01.
-        ("IC001", RuleCode::ICN001),
-        ("IC002", RuleCode::ICN001),
-        ("IC003", RuleCode::ICN001),
-        ("IC004", RuleCode::ICN001),
+        ("IC001", Rule::ImportAliasIsNotConventional),
+        ("IC002", Rule::ImportAliasIsNotConventional),
+        ("IC003", Rule::ImportAliasIsNotConventional),
+        ("IC004", Rule::ImportAliasIsNotConventional),
     ])
 });
 

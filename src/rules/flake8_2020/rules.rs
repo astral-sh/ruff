@@ -3,7 +3,7 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
@@ -27,13 +27,21 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     ..
                 } = &upper.node
                 {
-                    if *i == BigInt::from(1) && checker.settings.rules.enabled(&RuleCode::YTT303) {
+                    if *i == BigInt::from(1)
+                        && checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::SysVersionSlice1Referenced)
+                    {
                         checker.diagnostics.push(Diagnostic::new(
                             violations::SysVersionSlice1Referenced,
                             Range::from_located(value),
                         ));
                     } else if *i == BigInt::from(3)
-                        && checker.settings.rules.enabled(&RuleCode::YTT101)
+                        && checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::SysVersionSlice3Referenced)
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             violations::SysVersionSlice3Referenced,
@@ -47,12 +55,15 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 value: Constant::Int(i),
                 ..
             } => {
-                if *i == BigInt::from(2) && checker.settings.rules.enabled(&RuleCode::YTT102) {
+                if *i == BigInt::from(2)
+                    && checker.settings.rules.enabled(&Rule::SysVersion2Referenced)
+                {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::SysVersion2Referenced,
                         Range::from_located(value),
                     ));
-                } else if *i == BigInt::from(0) && checker.settings.rules.enabled(&RuleCode::YTT301)
+                } else if *i == BigInt::from(0)
+                    && checker.settings.rules.enabled(&Rule::SysVersion0Referenced)
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::SysVersion0Referenced,
@@ -89,7 +100,10 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     ) = (ops, comparators)
                     {
                         if *n == BigInt::from(3)
-                            && checker.settings.rules.enabled(&RuleCode::YTT201)
+                            && checker
+                                .settings
+                                .rules
+                                .enabled(&Rule::SysVersionInfo0Eq3Referenced)
                         {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::SysVersionInfo0Eq3Referenced,
@@ -110,7 +124,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         }],
                     ) = (ops, comparators)
                     {
-                        if checker.settings.rules.enabled(&RuleCode::YTT203) {
+                        if checker.settings.rules.enabled(&Rule::SysVersionInfo1CmpInt) {
                             checker.diagnostics.push(Diagnostic::new(
                                 violations::SysVersionInfo1CmpInt,
                                 Range::from_located(left),
@@ -136,7 +150,11 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                 }],
             ) = (ops, comparators)
             {
-                if checker.settings.rules.enabled(&RuleCode::YTT204) {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(&Rule::SysVersionInfoMinorCmpInt)
+                {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::SysVersionInfoMinorCmpInt,
                         Range::from_located(left),
@@ -162,13 +180,13 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
         ) = (ops, comparators)
         {
             if s.len() == 1 {
-                if checker.settings.rules.enabled(&RuleCode::YTT302) {
+                if checker.settings.rules.enabled(&Rule::SysVersionCmpStr10) {
                     checker.diagnostics.push(Diagnostic::new(
                         violations::SysVersionCmpStr10,
                         Range::from_located(left),
                     ));
                 }
-            } else if checker.settings.rules.enabled(&RuleCode::YTT103) {
+            } else if checker.settings.rules.enabled(&Rule::SysVersionCmpStr3) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SysVersionCmpStr3,
                     Range::from_located(left),

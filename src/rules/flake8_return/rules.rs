@@ -9,7 +9,7 @@ use crate::ast::visitor::Visitor;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 use crate::violations::Branch;
 
@@ -30,7 +30,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic =
             Diagnostic::new(violations::UnnecessaryReturnNone, Range::from_located(stmt));
-        if checker.patch(&RuleCode::RET501) {
+        if checker.patch(&Rule::UnnecessaryReturnNone) {
             diagnostic.amend(Fix::replacement(
                 "return".to_string(),
                 stmt.location,
@@ -49,7 +49,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic =
             Diagnostic::new(violations::ImplicitReturnValue, Range::from_located(stmt));
-        if checker.patch(&RuleCode::RET502) {
+        if checker.patch(&Rule::ImplicitReturnValue) {
             diagnostic.amend(Fix::replacement(
                 "return None".to_string(),
                 stmt.location,
@@ -106,7 +106,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         _ => {
             let mut diagnostic =
                 Diagnostic::new(violations::ImplicitReturn, Range::from_located(last_stmt));
-            if checker.patch(&RuleCode::RET503) {
+            if checker.patch(&Rule::ImplicitReturn) {
                 if let Some(indent) = indentation(checker.locator, last_stmt) {
                     let mut content = String::new();
                     content.push_str(&indent);
@@ -228,7 +228,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
     };
     for child in body {
         if matches!(child.node, StmtKind::Return { .. }) {
-            if checker.settings.rules.enabled(&RuleCode::RET505) {
+            if checker.settings.rules.enabled(&Rule::SuperfluousElseReturn) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseReturn(branch),
                     elif_else_range(stmt, checker.locator)
@@ -238,7 +238,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Break) {
-            if checker.settings.rules.enabled(&RuleCode::RET508) {
+            if checker.settings.rules.enabled(&Rule::SuperfluousElseBreak) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseBreak(branch),
                     elif_else_range(stmt, checker.locator)
@@ -248,7 +248,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Raise { .. }) {
-            if checker.settings.rules.enabled(&RuleCode::RET506) {
+            if checker.settings.rules.enabled(&Rule::SuperfluousElseRaise) {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseRaise(branch),
                     elif_else_range(stmt, checker.locator)
@@ -258,7 +258,11 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
             return true;
         }
         if matches!(child.node, StmtKind::Continue) {
-            if checker.settings.rules.enabled(&RuleCode::RET507) {
+            if checker
+                .settings
+                .rules
+                .enabled(&Rule::SuperfluousElseContinue)
+            {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::SuperfluousElseContinue(branch),
                     elif_else_range(stmt, checker.locator)
@@ -321,10 +325,13 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
         visitor.stack
     };
 
-    if checker.settings.rules.enabled(&RuleCode::RET505)
-        || checker.settings.rules.enabled(&RuleCode::RET506)
-        || checker.settings.rules.enabled(&RuleCode::RET507)
-        || checker.settings.rules.enabled(&RuleCode::RET508)
+    if checker.settings.rules.enabled(&Rule::SuperfluousElseReturn)
+        || checker.settings.rules.enabled(&Rule::SuperfluousElseRaise)
+        || checker
+            .settings
+            .rules
+            .enabled(&Rule::SuperfluousElseContinue)
+        || checker.settings.rules.enabled(&Rule::SuperfluousElseBreak)
     {
         if superfluous_elif(checker, &stack) {
             return;
@@ -340,20 +347,20 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
     }
 
     if !result_exists(&stack.returns) {
-        if checker.settings.rules.enabled(&RuleCode::RET501) {
+        if checker.settings.rules.enabled(&Rule::UnnecessaryReturnNone) {
             unnecessary_return_none(checker, &stack);
         }
         return;
     }
 
-    if checker.settings.rules.enabled(&RuleCode::RET502) {
+    if checker.settings.rules.enabled(&Rule::ImplicitReturnValue) {
         implicit_return_value(checker, &stack);
     }
-    if checker.settings.rules.enabled(&RuleCode::RET503) {
+    if checker.settings.rules.enabled(&Rule::ImplicitReturn) {
         implicit_return(checker, last_stmt);
     }
 
-    if checker.settings.rules.enabled(&RuleCode::RET504) {
+    if checker.settings.rules.enabled(&Rule::UnnecessaryAssign) {
         for (_, expr) in &stack.returns {
             if let Some(expr) = expr {
                 unnecessary_assign(checker, &stack, expr);

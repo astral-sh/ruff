@@ -12,7 +12,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 
 use super::hashable::HashableHashSet;
 use crate::fs;
-use crate::registry::{RuleCode, RuleCodePrefix};
+use crate::registry::{Rule, RuleCodePrefix};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
@@ -89,7 +89,7 @@ impl FromStr for FilePattern {
 pub struct PerFileIgnore {
     pub basename: String,
     pub absolute: PathBuf,
-    pub codes: HashableHashSet<RuleCode>,
+    pub codes: HashableHashSet<Rule>,
 }
 
 impl PerFileIgnore {

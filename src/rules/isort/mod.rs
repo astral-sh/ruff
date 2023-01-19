@@ -684,7 +684,7 @@ mod tests {
     use super::categorize::ImportType;
     use super::settings::RelatveImportsOrder;
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
@@ -737,7 +737,7 @@ mod tests {
                 .as_path(),
             &Settings {
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -757,7 +757,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -778,7 +778,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -798,7 +798,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -821,7 +821,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -841,7 +841,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
@@ -871,7 +871,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
@@ -903,7 +903,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
@@ -933,7 +933,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
@@ -954,7 +954,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
@@ -979,7 +979,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(RuleCode::I002)
+                ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -1004,7 +1004,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(RuleCode::I002)
+                ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -1028,7 +1028,7 @@ mod tests {
                         .to_string()]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(RuleCode::I002)
+                ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -1050,7 +1050,7 @@ mod tests {
                     required_imports: BTreeSet::from(["import os".to_string()]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(RuleCode::I002)
+                ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -1070,7 +1070,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -1096,7 +1096,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);

@@ -10,13 +10,13 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings;
 
-    #[test_case(RuleCode::A001, Path::new("A001.py"); "A001")]
-    #[test_case(RuleCode::A002, Path::new("A002.py"); "A002")]
-    #[test_case(RuleCode::A003, Path::new("A003.py"); "A003")]
-    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
+    #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"); "A001")]
+    #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"); "A002")]
+    #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"); "A003")]
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_builtins")

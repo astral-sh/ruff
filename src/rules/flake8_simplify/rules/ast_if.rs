@@ -9,7 +9,7 @@ use crate::ast::helpers::{
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violations;
 
@@ -67,7 +67,7 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
     }
 
     let mut diagnostic = Diagnostic::new(violations::NestedIfStatements, Range::from_located(stmt));
-    if checker.patch(&RuleCode::SIM102) {
+    if checker.patch(&Rule::NestedIfStatements) {
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
         let nested_if = &body[0];
@@ -118,7 +118,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
-    if checker.patch(&RuleCode::SIM103)
+    if checker.patch(&Rule::ReturnBoolConditionDirectly)
         && !(has_comments_in(Range::from_located(stmt), checker.locator)
             || has_comments_in(Range::from_located(&orelse[0]), checker.locator))
     {
@@ -232,7 +232,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         violations::UseTernaryOperator(contents.clone()),
         Range::from_located(stmt),
     );
-    if checker.patch(&RuleCode::SIM108) {
+    if checker.patch(&Rule::UseTernaryOperator) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -335,7 +335,7 @@ pub fn use_dict_get_with_default(
         violations::DictGetWithDefault(contents.clone()),
         Range::from_located(stmt),
     );
-    if checker.patch(&RuleCode::SIM401) {
+    if checker.patch(&Rule::DictGetWithDefault) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

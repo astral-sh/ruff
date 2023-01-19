@@ -12,15 +12,15 @@ mod tests {
     use test_case::test_case;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings;
 
-    #[test_case(RuleCode::ARG001, Path::new("ARG.py"); "ARG001")]
-    #[test_case(RuleCode::ARG002, Path::new("ARG.py"); "ARG002")]
-    #[test_case(RuleCode::ARG003, Path::new("ARG.py"); "ARG003")]
-    #[test_case(RuleCode::ARG004, Path::new("ARG.py"); "ARG004")]
-    #[test_case(RuleCode::ARG005, Path::new("ARG.py"); "ARG005")]
-    fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {
+    #[test_case(Rule::UnusedFunctionArgument, Path::new("ARG.py"); "ARG001")]
+    #[test_case(Rule::UnusedMethodArgument, Path::new("ARG.py"); "ARG002")]
+    #[test_case(Rule::UnusedClassMethodArgument, Path::new("ARG.py"); "ARG003")]
+    #[test_case(Rule::UnusedStaticMethodArgument, Path::new("ARG.py"); "ARG004")]
+    #[test_case(Rule::UnusedLambdaArgument, Path::new("ARG.py"); "ARG005")]
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_unused_arguments")
@@ -41,11 +41,11 @@ mod tests {
                     ignore_variadic_names: true,
                 },
                 ..settings::Settings::for_rules(vec![
-                    RuleCode::ARG001,
-                    RuleCode::ARG002,
-                    RuleCode::ARG003,
-                    RuleCode::ARG004,
-                    RuleCode::ARG005,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UnusedMethodArgument,
+                    Rule::UnusedClassMethodArgument,
+                    Rule::UnusedStaticMethodArgument,
+                    Rule::UnusedLambdaArgument,
                 ])
             },
         )?;
@@ -62,11 +62,11 @@ mod tests {
                     ignore_variadic_names: false,
                 },
                 ..settings::Settings::for_rules(vec![
-                    RuleCode::ARG001,
-                    RuleCode::ARG002,
-                    RuleCode::ARG003,
-                    RuleCode::ARG004,
-                    RuleCode::ARG005,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UnusedMethodArgument,
+                    Rule::UnusedClassMethodArgument,
+                    Rule::UnusedStaticMethodArgument,
+                    Rule::UnusedLambdaArgument,
                 ])
             },
         )?;

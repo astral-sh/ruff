@@ -6,7 +6,7 @@ use crate::ast::helpers::create_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Generator;
 use crate::violations;
 
@@ -328,12 +328,20 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     let decorator = get_parametrize_decorator(checker, decorators);
     if let Some(decorator) = decorator {
         if let ExprKind::Call { args, .. } = &decorator.node {
-            if checker.settings.rules.enabled(&RuleCode::PT006) {
+            if checker
+                .settings
+                .rules
+                .enabled(&Rule::ParametrizeNamesWrongType)
+            {
                 if let Some(arg) = args.get(0) {
                     check_names(checker, arg);
                 }
             }
-            if checker.settings.rules.enabled(&RuleCode::PT007) {
+            if checker
+                .settings
+                .rules
+                .enabled(&Rule::ParametrizeValuesWrongType)
+            {
                 if let Some(arg) = args.get(1) {
                     check_values(checker, arg);
                 }

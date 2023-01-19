@@ -10,14 +10,14 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
-            &Settings::for_rule(RuleCode::ICN001),
+            &Settings::for_rule(Rule::ImportAliasIsNotConventional),
         )?;
         insta::assert_yaml_snapshot!("defaults", diagnostics);
         Ok(())
@@ -36,7 +36,7 @@ mod tests {
                     ])),
                 }
                 .into(),
-                ..Settings::for_rule(RuleCode::ICN001)
+                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
         insta::assert_yaml_snapshot!("custom", diagnostics);
@@ -58,7 +58,7 @@ mod tests {
                     extend_aliases: None,
                 }
                 .into(),
-                ..Settings::for_rule(RuleCode::ICN001)
+                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
         insta::assert_yaml_snapshot!("remove_default", diagnostics);
@@ -78,7 +78,7 @@ mod tests {
                     )])),
                 }
                 .into(),
-                ..Settings::for_rule(RuleCode::ICN001)
+                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
         insta::assert_yaml_snapshot!("override_default", diagnostics);
