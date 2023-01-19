@@ -1,0 +1,158 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 14
+  fix:
+    content: "print(\"foo\")"
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 14
+  parent: ~
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 27
+  fix:
+    content: "print(\"hell((goodybe))o\")"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 27
+  parent: ~
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 16
+  fix:
+    content: "print(\"foo\")"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 16
+  parent: ~
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 14
+  fix:
+    content: print(1)
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 14
+  parent: ~
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 26
+  fix:
+    content: "print(\"foo{}\".format(1))"
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 26
+  parent: ~
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 14
+    column: 1
+  fix:
+    content: "print(\n    \"foo{}\".format(1)\n )"
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 14
+      column: 1
+  parent: ~
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 20
+    column: 1
+  fix:
+    content: "print(\n        \"foo\"\n     )"
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 20
+      column: 1
+  parent: ~
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 23
+    column: 8
+  end_location:
+    row: 23
+    column: 26
+  fix:
+    content: print((yield 1))
+    location:
+      row: 23
+      column: 8
+    end_location:
+      row: 23
+      column: 26
+  parent: ~
+- kind:
+    ExtraneousParenthesis: ~
+  location:
+    row: 26
+    column: 4
+  end_location:
+    row: 28
+    column: 6
+  fix:
+    content: "print(\n        \"foo{}\".format(1)\n     )"
+    location:
+      row: 26
+      column: 4
+    end_location:
+      row: 28
+      column: 6
+  parent: ~
+

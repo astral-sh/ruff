@@ -2,6 +2,7 @@ pub(crate) use convert_named_tuple_functional_to_class::convert_named_tuple_func
 pub(crate) use convert_typed_dict_functional_to_class::convert_typed_dict_functional_to_class;
 pub(crate) use datetime_utc_alias::datetime_utc_alias;
 pub(crate) use deprecated_unittest_alias::deprecated_unittest_alias;
+pub(crate) use extraneous_parenthesis::extraneous_parenthesis;
 pub(crate) use f_strings::f_strings;
 pub(crate) use format_literals::format_literals;
 pub(crate) use functools_cache::functools_cache;
@@ -32,7 +33,6 @@ pub(crate) use use_pep585_annotation::use_pep585_annotation;
 pub(crate) use use_pep604_annotation::use_pep604_annotation;
 pub(crate) use useless_metaclass_type::useless_metaclass_type;
 pub(crate) use useless_object_inheritance::useless_object_inheritance;
-pub(crate) use extraneous_parenthesis::extraneous_parenthesis;
 
 use crate::ast::helpers;
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -44,6 +44,7 @@ mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
 mod datetime_utc_alias;
 mod deprecated_unittest_alias;
+mod extraneous_parenthesis;
 mod f_strings;
 mod format_literals;
 mod functools_cache;
@@ -70,7 +71,6 @@ mod use_pep585_annotation;
 mod use_pep604_annotation;
 mod useless_metaclass_type;
 mod useless_object_inheritance;
-mod extraneous_parenthesis;
 
 /// UP008
 pub fn super_args(

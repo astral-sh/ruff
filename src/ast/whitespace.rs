@@ -28,7 +28,7 @@ pub fn indentation_greedy<'a, T>(locator: &'a Locator, located: &'a Located<T>) 
         Location::new(range.location.row(), range.location.column()),
     ));
     let mut new_str = String::new();
-    for character in  indentation.chars() {
+    for character in indentation.chars() {
         if character.is_whitespace() {
             new_str.push(character);
         } else {

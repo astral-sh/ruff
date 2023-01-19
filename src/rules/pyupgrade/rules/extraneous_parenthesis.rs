@@ -1,19 +1,22 @@
+use std::cmp::max;
+
+use rustpython_ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::lexer::{self, Tok};
+
 use crate::ast::types::Range;
+use crate::ast::whitespace::indentation_greedy;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::ast::whitespace::indentation_greedy;
 use crate::violations;
-use rustpython_ast::{Expr, ExprKind, Keyword};
-use rustpython_parser::lexer::{self, Tok};
-use std::cmp::max;
 
-/// A boolean of whether or not an expression has more than one set of parenthesis. Please note
-/// there are other factors besides this for a function to be extraneous.
+/// A boolean of whether or not an expression has more than one set of
+/// parenthesis. Please note there are other factors besides this for a function
+/// to be extraneous.
 struct CandidateInfo {
     valid: bool,
     depth: u32,
-    had_special: bool
+    had_special: bool,
 }
 
 impl CandidateInfo {
@@ -21,7 +24,7 @@ impl CandidateInfo {
         Self {
             valid,
             depth,
-            had_special
+            had_special,
         }
     }
 }
@@ -62,7 +65,8 @@ pub fn extraneous_parenthesis(
     if !kwargs.is_empty() {
         return;
     }
-    // If the function has more than one argument, or no arguments, we won't be refactoring
+    // If the function has more than one argument, or no arguments, we won't be
+    // refactoring
     if args.len() != 1 {
         return;
     }
@@ -98,12 +102,10 @@ pub fn extraneous_parenthesis(
         }
         if is_multi_line {
             let indent = indentation_greedy(checker.locator, &arg);
-            let small_indent = if indent.len() > 3 {
-                &indent[3..]
-            } else {
-                ""
-            };
-            new_string = format!("print(\n{indent}{special_before}{arg_string}{special_after}\n{small_indent})");
+            let small_indent = if indent.len() > 3 { &indent[3..] } else { "" };
+            new_string = format!(
+                "print(\n{indent}{special_before}{arg_string}{special_after}\n{small_indent})"
+            );
         } else {
             new_string = format!("print({special_before}{arg_string}{special_after})");
         }
@@ -123,8 +125,9 @@ pub fn extraneous_parenthesis(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use test_case::test_case;
+
+    use super::*;
 
     #[test_case("print(1)", false ; "basic print")]
     #[test_case("print(\"hello world\")", false ; "print a string")]
