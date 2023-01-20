@@ -42,3 +42,11 @@ def f():
         return "foo"
     else:
         return False
+
+
+def f():
+    # SIM103 (but not fixable)
+    if a:
+        return False
+    else:
+        return True
