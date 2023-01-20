@@ -417,6 +417,9 @@ ruff_macros::define_rule_mapping!(
     COM819 => violations::TrailingCommaProhibited,
     // flake8-no-pep420
     INP001 => violations::ImplicitNamespacePackage,
+    // flake8-executable
+    EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
+    EXE005 => rules::flake8_executable::rules::ShebangNewline,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -462,6 +465,7 @@ pub enum RuleOrigin {
     Flake8Pie,
     Flake8Commas,
     Flake8NoPep420,
+    Flake8Executable,
     Ruff,
 }
 
@@ -529,6 +533,7 @@ impl RuleOrigin {
             RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
             RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
             RuleOrigin::Flake8NoPep420 => Prefixes::Single(RuleCodePrefix::INP),
+            RuleOrigin::Flake8Executable => Prefixes::Single(RuleCodePrefix::EXE),
             RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
         }
     }
@@ -555,7 +560,9 @@ impl Rule {
             | Rule::DocLineTooLong
             | Rule::PEP3120UnnecessaryCodingComment
             | Rule::BlanketTypeIgnore
-            | Rule::BlanketNOQA => &LintSource::Lines,
+            | Rule::BlanketNOQA
+            | Rule::ShebangNewline
+            | Rule::ShebangWhitespace => &LintSource::Lines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString

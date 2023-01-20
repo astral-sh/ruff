@@ -1,6 +1,7 @@
 //! Lint rules based on checking raw physical lines.
 
 use crate::registry::{Diagnostic, Rule};
+use crate::rules::flake8_executable::rules::{shebang_newline, shebang_whitespace};
 use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, no_newline_at_end_of_file,
 };
@@ -18,6 +19,8 @@ pub fn check_lines(
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     let enforce_blanket_noqa = settings.rules.enabled(&Rule::BlanketNOQA);
+    let enforce_shebang_whitespace = settings.rules.enabled(&Rule::ShebangWhitespace);
+    let enforce_shebang_newline = settings.rules.enabled(&Rule::ShebangNewline);
     let enforce_blanket_type_ignore = settings.rules.enabled(&Rule::BlanketTypeIgnore);
     let enforce_doc_line_too_long = settings.rules.enabled(&Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(&Rule::LineTooLong);
@@ -56,6 +59,23 @@ pub fn check_lines(
 
             if enforce_blanket_noqa {
                 if let Some(diagnostic) = blanket_noqa(index, line) {
+                    diagnostics.push(diagnostic);
+                }
+            }
+
+            if enforce_shebang_whitespace {
+                if let Some(diagnostic) = shebang_whitespace(
+                    index,
+                    line,
+                    matches!(autofix, flags::Autofix::Enabled)
+                        && settings.rules.should_fix(&Rule::ShebangWhitespace),
+                ) {
+                    diagnostics.push(diagnostic);
+                }
+            }
+
+            if enforce_shebang_newline {
+                if let Some(diagnostic) = shebang_newline(index, line) {
                     diagnostics.push(diagnostic);
                 }
             }

@@ -138,6 +138,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
+   1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1166,6 +1167,15 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+
+### flake8-executable (EXE)
+
+For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| EXE004 | shebang-whitespace | There is whitespace before the shebang. | 🛠 |
+| EXE005 | shebang-newline | The shebang is not in the beginning of the file. |  |
 
 ### Ruff-specific rules (RUF)
 
