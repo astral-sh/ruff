@@ -13,6 +13,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings;
 
+    #[test_case(Path::new("EXE003.py"); "EXE003")]
     #[test_case(Path::new("EXE004_1.py"); "EXE004_1")]
     #[test_case(Path::new("EXE004_2.py"); "EXE004_2")]
     #[test_case(Path::new("EXE004_3.py"); "EXE004_3")]
@@ -25,7 +26,11 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_executable")
                 .join(path)
                 .as_path(),
-            &settings::Settings::for_rules(vec![Rule::ShebangWhitespace, Rule::ShebangNewline]),
+            &settings::Settings::for_rules(vec![
+                Rule::ShebangWhitespace,
+                Rule::ShebangNewline,
+                Rule::ShebangPython,
+            ]),
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())

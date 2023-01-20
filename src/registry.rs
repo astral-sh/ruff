@@ -418,6 +418,7 @@ ruff_macros::define_rule_mapping!(
     // flake8-no-pep420
     INP001 => violations::ImplicitNamespacePackage,
     // flake8-executable
+    EXE003 => rules::flake8_executable::rules::ShebangPython,
     EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
     // Ruff
@@ -562,7 +563,8 @@ impl Rule {
             | Rule::BlanketTypeIgnore
             | Rule::BlanketNOQA
             | Rule::ShebangNewline
-            | Rule::ShebangWhitespace => &LintSource::Lines,
+            | Rule::ShebangWhitespace
+            | Rule::ShebangPython => &LintSource::Lines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
