@@ -141,12 +141,11 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
-1. [Development](#development)
+1. [Contributing](#contributing)
 1. [Releases](#releases)
 1. [Benchmarks](#benchmarks)
 1. [Reference](#reference)
 1. [License](#license)
-1. [Contributing](#contributing)
 
 ## Installation and Usage
 
@@ -199,7 +198,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.227'
+  rev: 'v0.0.228'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -1642,24 +1641,10 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 
 Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
-## Development
+## Contributing
 
-Ruff is written in Rust (1.65.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
-for development.
-
-Assuming you have `cargo` installed, you can run:
-
-```shell
-cargo run resources/test/fixtures
-```
-
-For rustfmt and Clippy, we use [nightly Rust](https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust):
-
-```shell
-cargo +nightly fmt
-cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic
-cargo test --all
-```
+Contributions are welcome and hugely appreciated. To get started, check out the
+[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
 
 ## Releases
 
@@ -3459,8 +3444,3 @@ keep-runtime-typing = true
 ## License
 
 MIT
-
-## Contributing
-
-Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).

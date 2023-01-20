@@ -37,13 +37,16 @@ After cloning the repository, run Ruff locally with:
 cargo run resources/test/fixtures --no-cache
 ```
 
-Prior to opening a pull request, ensure that your code has been auto-formatted, and that it passes
-both the lint and test validation checks:
+Prior to opening a pull request, ensure that your code has been auto-formatted,
+and that it passes both the lint and test validation checks.
+
+For rustfmt and Clippy, we use [nightly Rust][nightly], as it is stricter than stable Rust.
+(However, tests and builds use stable Rust.)
 
 ```shell
 cargo +nightly fmt --all     # Auto-formatting...
-cargo +nightly clippy --all  # Linting...
-cargo +nightly test --all    # Testing...
+cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic  # Linting...
+cargo test --all    # Testing...
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -127,3 +130,5 @@ them to [PyPI](https://pypi.org/project/ruff/).
 
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
+
+[nightly]: https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust

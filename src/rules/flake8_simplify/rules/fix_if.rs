@@ -12,7 +12,7 @@ use crate::ast::types::Range;
 use crate::ast::whitespace;
 use crate::cst::matchers::match_module;
 use crate::fix::Fix;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 
 fn parenthesize_and_operand(expr: Expression) -> Expression {
     match &expr {
@@ -32,6 +32,7 @@ fn parenthesize_and_operand(expr: Expression) -> Expression {
 /// (SIM102) Convert `if a: if b:` to `if a and b:`.
 pub(crate) fn fix_nested_if_statements(
     locator: &Locator,
+    stylist: &Stylist,
     stmt: &rustpython_ast::Stmt,
 ) -> Result<Fix> {
     // Infer the indentation of the outer block.
@@ -62,7 +63,10 @@ pub(crate) fn fix_nested_if_statements(
     let module_text = if outer_indent.is_empty() {
         module_text
     } else {
-        Cow::Owned(format!("def f():\n{module_text}"))
+        Cow::Owned(format!(
+            "def f():{}{module_text}",
+            stylist.line_ending().as_str()
+        ))
     };
 
     // Parse the CST.
@@ -113,7 +117,10 @@ pub(crate) fn fix_nested_if_statements(
     }));
     outer_if.body = inner_if.body.clone();
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        ..Default::default()
+    };
     tree.codegen(&mut state);
 
     // Reconstruct and reformat the code.
@@ -121,7 +128,9 @@ pub(crate) fn fix_nested_if_statements(
     let module_text = if outer_indent.is_empty() {
         &module_text
     } else {
-        module_text.strip_prefix("def f():\n").unwrap()
+        module_text
+            .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
+            .unwrap()
     };
     let contents = if is_elif {
         module_text.replacen("if", "elif", 1)
