@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use rustc_hash::FxHashSet;
 use rustpython_common::cformat::{
-    CFormatError, CFormatPart, CFormatQuantity, CFormatSpec, CFormatString,
+    CFormatError, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatSpec, CFormatString,
 };
 
 pub(crate) struct CFormatSummary {
@@ -45,7 +45,7 @@ impl TryFrom<&str> for CFormatSummary {
                 num_positional += 1;
                 starred = true;
             }
-            if precision == &Some(CFormatQuantity::FromValuesTuple) {
+            if precision == &Some(CFormatPrecision::Quantity(CFormatQuantity::FromValuesTuple)) {
                 num_positional += 1;
                 starred = true;
             }

@@ -1938,9 +1938,9 @@ dependencies = [
  "ropey",
  "ruff_macros",
  "rustc-hash",
- "rustpython-ast",
- "rustpython-common",
- "rustpython-parser",
+ "rustpython-ast 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+ "rustpython-common 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+ "rustpython-parser 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
  "schemars",
  "semver",
  "serde",
@@ -2006,9 +2006,9 @@ dependencies = [
  "once_cell",
  "ruff",
  "ruff_cli",
- "rustpython-ast",
- "rustpython-common",
- "rustpython-parser",
+ "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa)",
+ "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa)",
+ "rustpython-parser 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa)",
  "schemars",
  "serde_json",
  "strum",
@@ -2062,11 +2062,46 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604#bfd31f7ffff4c3cbea5aee5bb044237f9be1d604"
+dependencies = [
+ "num-bigint",
+ "rustpython-common 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+ "rustpython-compiler-core 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+]
+
+[[package]]
+name = "rustpython-ast"
+version = "0.2.0"
 source = "git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa#ff90fe52eea578c8ebdd9d95e078cc041a5959fa"
 dependencies = [
  "num-bigint",
- "rustpython-common",
- "rustpython-compiler-core",
+ "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa)",
+ "rustpython-compiler-core 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa)",
+]
+
+[[package]]
+name = "rustpython-common"
+version = "0.2.0"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604#bfd31f7ffff4c3cbea5aee5bb044237f9be1d604"
+dependencies = [
+ "ascii",
+ "bitflags",
+ "cfg-if 1.0.0",
+ "hexf-parse",
+ "itertools",
+ "lexical-parse-float",
+ "libc",
+ "lock_api",
+ "num-bigint",
+ "num-complex",
+ "num-traits",
+ "once_cell",
+ "radium",
+ "rand 0.8.5",
+ "siphasher",
+ "unic-ucd-category",
+ "volatile",
+ "widestring",
 ]
 
 [[package]]
@@ -2097,6 +2132,23 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604#bfd31f7ffff4c3cbea5aee5bb044237f9be1d604"
+dependencies = [
+ "bincode",
+ "bitflags",
+ "bstr 0.2.17",
+ "itertools",
+ "lz4_flex",
+ "num-bigint",
+ "num-complex",
+ "num_enum",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "rustpython-compiler-core"
+version = "0.2.0"
 source = "git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa#ff90fe52eea578c8ebdd9d95e078cc041a5959fa"
 dependencies = [
  "bincode",
@@ -2109,6 +2161,31 @@ dependencies = [
  "num_enum",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "rustpython-parser"
+version = "0.2.0"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604#bfd31f7ffff4c3cbea5aee5bb044237f9be1d604"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "itertools",
+ "lalrpop",
+ "lalrpop-util",
+ "log",
+ "num-bigint",
+ "num-traits",
+ "phf 0.10.1",
+ "phf_codegen 0.10.0",
+ "rustc-hash",
+ "rustpython-ast 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+ "rustpython-compiler-core 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+ "thiserror",
+ "tiny-keccak",
+ "unic-emoji-char",
+ "unic-ucd-ident",
+ "unicode_names2",
 ]
 
 [[package]]
@@ -2127,8 +2204,8 @@ dependencies = [
  "phf 0.10.1",
  "phf_codegen 0.10.0",
  "rustc-hash",
- "rustpython-ast",
- "rustpython-compiler-core",
+ "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa)",
+ "rustpython-compiler-core 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa)",
  "thiserror",
  "tiny-keccak",
  "unic-emoji-char",

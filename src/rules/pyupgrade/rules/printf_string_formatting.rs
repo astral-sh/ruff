@@ -3,7 +3,7 @@ use std::str::FromStr;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_common::cformat::{
-    CConversionFlags, CFormatPart, CFormatQuantity, CFormatSpec, CFormatString,
+    CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatSpec, CFormatString,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
@@ -17,7 +17,6 @@ use crate::violations;
 
 static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % ([({])").unwrap());
 static PYTHON_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\W0-9]\w*").unwrap());
-static EMOJI_SYNTAX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\N\{.*?}").unwrap());
 
 #[derive(Debug, PartialEq, Clone)]
 struct PercentFormatPart {
@@ -44,24 +43,23 @@ impl PercentFormatPart {
             conversion,
         }
     }
+}
 
-    fn from_rustpython(spec: &CFormatSpec) -> Self {
+impl From<&CFormatSpec> for PercentFormatPart {
+    fn from(spec: &CFormatSpec) -> Self {
         let clean_width = match &spec.min_field_width {
             Some(width_item) => match width_item {
                 CFormatQuantity::Amount(amount) => Some(amount.to_string()),
-                // FOR REVIEWER: Not sure if below is the correct way to handle
-                // FromValuesTuple
                 CFormatQuantity::FromValuesTuple => Some("*".to_string()),
             },
             None => None,
         };
         let clean_precision = match &spec.precision {
-            Some(width_item) => match width_item {
+            Some(CFormatPrecision::Quantity(quantity)) => match quantity {
                 CFormatQuantity::Amount(amount) => Some(format!(".{amount}")),
-                // FOR REVIEWER: Not sure if below is the correct way to handle
-                // FromValuesTuple
                 CFormatQuantity::FromValuesTuple => Some(".*".to_string()),
             },
+            Some(CFormatPrecision::Dot) => Some(".".to_string()),
             None => None,
         };
         let flags = if spec.flags.is_empty() {
@@ -69,8 +67,7 @@ impl PercentFormatPart {
         } else {
             Some(get_flags(spec.flags))
         };
-
-        PercentFormatPart::new(
+        Self::new(
             spec.mapping_key.clone(),
             flags,
             clean_width,
@@ -92,8 +89,8 @@ impl PercentFormat {
     }
 }
 
-/// Converts `RustPython`'s C Conversion Flags into their python string
-/// representation
+/// Converts the `RustPython` Conversion Flags into their Python string
+/// representation.
 fn get_flags(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
     if flags.contains(CConversionFlags::ALTERNATE_FORM) {
@@ -114,7 +111,7 @@ fn get_flags(flags: CConversionFlags) -> String {
     flag_string
 }
 
-/// Converts a string to a vector of `PercentFormat` structs
+/// Converts a string to a vector of [`PercentFormat`] structs.
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let mut formats: Vec<PercentFormat> = vec![];
 
@@ -134,7 +131,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                 }
             };
             if let CFormatPart::Spec(c_spec) = &the_next {
-                current_format.parts = Some(PercentFormatPart::from_rustpython(c_spec));
+                current_format.parts = Some(c_spec.into());
             }
             formats.push(current_format);
         }
@@ -256,8 +253,6 @@ fn percent_to_format(string: &str) -> String {
 /// If the tuple has one argument it removes the comma, otherwise it returns the
 /// tuple as is
 fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
-    // FOR REVIEWER: Let me know if you want this redone in libcst, the reason I
-    // didnt is because it starts as a Tuple, but ends as a Call
     let mut base_string = checker
         .locator
         .slice_source_code_range(&Range::from_located(right))
@@ -515,16 +510,12 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         violations::PrintfStringFormatting,
         Range::from_located(expr),
     );
-    // Emoji sytnax is very rare and adds a lot of complexity to the code, so we are
-    // only issuing a warning if it exists, and not fixing the code
     if checker.patch(&Rule::PrintfStringFormatting) {
-        if !EMOJI_SYNTAX.is_match(&expr_string) {
-            diagnostic.amend(Fix::replacement(
-                new_string,
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
-        }
+        diagnostic.amend(Fix::replacement(
+            new_string,
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -569,8 +560,6 @@ mod test {
     #[test_case( "\"%()s\"",PercentFormatPart::new(Some(String::new()), None, None, None, "s".to_string()); "empty paren")]
     #[test_case( "\"%(hi)s\"",PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string()); "word in paren")]
     #[test_case( "\"%s\"",PercentFormatPart::new(None, None, None, None, "s".to_string()); "format s")]
-    // #[test_case( "\"%%\"",PercentFormatPart::new(None, None, None, None, "%".to_string());
-    // "format double percentage")]
     #[test_case( "\"%a\"",PercentFormatPart::new(None, None, None, None, "a".to_string()); "format an a")]
     #[test_case( "\"%r\"",PercentFormatPart::new(None, None, None, None, "r".to_string()); "format an r")]
     fn test_parse_percent_format(sample: &str, expected: PercentFormatPart) {
