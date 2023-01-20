@@ -10,17 +10,8 @@ Example usage:
 
 import argparse
 import os
-from pathlib import Path
 
-ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-def dir_name(plugin: str) -> str:
-    return plugin.replace("-", "_")
-
-
-def pascal_case(plugin: str) -> str:
-    return "".join(word.title() for word in plugin.split("-"))
+from _utils import ROOT_DIR, dir_name, pascal_case
 
 
 def main(*, plugin: str, url: str) -> None:
