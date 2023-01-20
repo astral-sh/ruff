@@ -128,7 +128,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
-            orelse[0].end_location.unwrap(),
+            stmt.end_location.unwrap(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -253,6 +253,7 @@ pub fn use_dict_get_with_default(
     test: &Expr,
     body: &Vec<Stmt>,
     orelse: &Vec<Stmt>,
+    parent: Option<&Stmt>,
 ) {
     if body.len() != 1 || orelse.len() != 1 {
         return;
@@ -299,6 +300,36 @@ pub fn use_dict_get_with_default(
     // Check that the default value is not "complex".
     if contains_effect(checker, default_val) {
         return;
+    }
+
+    // It's part of a bigger if-elif block:
+    // https://github.com/MartinThoma/flake8-simplify/issues/115
+    if let Some(StmtKind::If {
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
+    {
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
+        }
     }
 
     let contents = unparse_stmt(

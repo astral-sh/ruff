@@ -91,3 +91,20 @@ if key in a_dict:
     var = a_dict[key]
 else:
     var = a_dict["fallback"]
+
+# OK (false negative for elif)
+if foo():
+    pass
+elif key in a_dict:
+    vars[idx] = a_dict[key]
+else:
+    vars[idx] = "default"
+
+# OK (false negative for nested else)
+if foo():
+    pass
+else:
+    if key in a_dict:
+        vars[idx] = a_dict[key]
+    else:
+        vars[idx] = "default"
