@@ -42,7 +42,7 @@ def main(*, name: str, code: str, origin: str) -> None:
             fp.write("\n")
 
     # Add the relevant rule function.
-    with open(ROOT_DIR / "src/rules" / dir_name(origin) / "rules.rs", "a") as fp:
+    with open(ROOT_DIR / "src/rules" / dir_name(origin) / (snake_case(name) + ".rs"), "w") as fp:
         fp.write(
             f"""
 /// {code}
