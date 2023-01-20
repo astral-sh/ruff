@@ -28,71 +28,71 @@ struct PercentFormatPart {
     conversion: String,
 }
 
-// Can we just remove this and use
-impl PercentFormatPart {
-    fn new(
-        key: Option<String>,
-        conversion_flag: Option<String>,
-        width: Option<String>,
-        precision: Option<String>,
-        conversion: String,
-    ) -> Self {
-        Self {
-            key,
-            conversion_flag,
-            width,
-            precision,
-            conversion,
-        }
-    }
-}
+// // Can we just remove this and use
+// impl PercentFormatPart {
+//     fn new(
+//         key: Option<String>,
+//         conversion_flag: Option<String>,
+//         width: Option<String>,
+//         precision: Option<String>,
+//         conversion: String,
+//     ) -> Self {
+//         Self {
+//             key,
+//             conversion_flag,
+//             width,
+//             precision,
+//             conversion,
+//         }
+//     }
+// }
+//
+// impl From<&CFormatSpec> for PercentFormatPart {
+//     fn from(spec: &CFormatSpec) -> Self {
+//         let clean_width = match &spec.min_field_width {
+//             Some(width_item) => match width_item {
+//                 CFormatQuantity::Amount(amount) => Some(amount.to_string()),
+//                 CFormatQuantity::FromValuesTuple => Some("*".to_string()),
+//             },
+//             None => None,
+//         };
+//         let clean_precision = match &spec.precision {
+//             Some(CFormatPrecision::Quantity(quantity)) => match quantity {
+//                 CFormatQuantity::Amount(amount) =>
+// Some(format!(".{amount}")),                 CFormatQuantity::FromValuesTuple
+// => Some(".*".to_string()),             },
+//             Some(CFormatPrecision::Dot) => Some(".".to_string()),
+//             None => None,
+//         };
+//         let flags = if spec.flags.is_empty() {
+//             None
+//         } else {
+//             Some(parse_conversion_flags(spec.flags))
+//         };
+//         Self::new(
+//             spec.mapping_key.clone(),
+//             flags,
+//             clean_width,
+//             clean_precision,
+//             spec.format_char.to_string(),
+//         )
+//     }
+// }
 
-impl From<&CFormatSpec> for PercentFormatPart {
-    fn from(spec: &CFormatSpec) -> Self {
-        let clean_width = match &spec.min_field_width {
-            Some(width_item) => match width_item {
-                CFormatQuantity::Amount(amount) => Some(amount.to_string()),
-                CFormatQuantity::FromValuesTuple => Some("*".to_string()),
-            },
-            None => None,
-        };
-        let clean_precision = match &spec.precision {
-            Some(CFormatPrecision::Quantity(quantity)) => match quantity {
-                CFormatQuantity::Amount(amount) => Some(format!(".{amount}")),
-                CFormatQuantity::FromValuesTuple => Some(".*".to_string()),
-            },
-            Some(CFormatPrecision::Dot) => Some(".".to_string()),
-            None => None,
-        };
-        let flags = if spec.flags.is_empty() {
-            None
-        } else {
-            Some(parse_conversion_flags(spec.flags))
-        };
-        Self::new(
-            spec.mapping_key.clone(),
-            flags,
-            clean_width,
-            clean_precision,
-            spec.format_char.to_string(),
-        )
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct PercentFormat {
-    item: String,
-    format_spec: Option<PercentFormatPart>,
-}
-
-impl PercentFormat {
-    fn new(item: String, parts: Option<PercentFormatPart>) -> Self {
-        Self {
-            item,
-            format_spec: parts,
-        }
-    }
-}
+// #[derive(Debug, PartialEq, Clone)]
+// struct PercentFormat {
+//     item: String,
+//     format_spec: Option<PercentFormatPart>,
+// }
+//
+// impl PercentFormat {
+//     fn new(item: String, parts: Option<PercentFormatPart>) -> Self {
+//         Self {
+//             item,
+//             format_spec: parts,
+//         }
+//     }
+// }
 
 /// Converts the `RustPython` Conversion Flags into their Python string
 /// representation.
@@ -116,30 +116,31 @@ fn parse_conversion_flags(flags: CConversionFlags) -> String {
     flag_string
 }
 
-/// Converts a string to a vector of [`PercentFormat`] structs.
-fn parse_percent_format(string: &str) -> Result<Vec<PercentFormat>> {
-    let format_string =
-        CFormatString::from_str(string).map_err(|_| anyhow!("Failed to parse CFormatString"))?;
-
-    let format_parts: Vec<&CFormatPart<String>> =
-        format_string.iter().map(|(_, part)| part).collect();
-
-    let mut formats: Vec<PercentFormat> = vec![];
-    for (i, part) in format_parts.iter().enumerate() {
-        if let CFormatPart::Literal(item) = &part {
-            let mut current_format = PercentFormat::new(item.to_string(), None);
-            let Some(format_part) = format_parts.get(i + 1) else {
-                formats.push(current_format);
-                continue;
-            };
-            if let CFormatPart::Spec(c_spec) = &format_part {
-                current_format.format_spec = Some(c_spec.into());
-            }
-            formats.push(current_format);
-        }
-    }
-    Ok(formats)
-}
+// /// Converts a string to a vector of [`PercentFormat`] structs.
+// fn parse_percent_format(string: &str) -> Result<Vec<PercentFormat>> {
+//     let format_string =
+//         CFormatString::from_str(string).map_err(|_| anyhow!("Failed to parse
+// CFormatString"))?;
+//
+//     let format_parts: Vec<&CFormatPart<String>> =
+//         format_string.iter().map(|(_, part)| part).collect();
+//
+//     let mut formats: Vec<PercentFormat> = vec![];
+//     for (i, part) in format_parts.iter().enumerate() {
+//         if let CFormatPart::Literal(item) = &part {
+//             let mut current_format = PercentFormat::new(item.to_string(),
+// None);             let Some(format_part) = format_parts.get(i + 1) else {
+//                 formats.push(current_format);
+//                 continue;
+//             };
+//             if let CFormatPart::Spec(c_spec) = &format_part {
+//                 current_format.format_spec = Some(c_spec.into());
+//             }
+//             formats.push(current_format);
+//         }
+//     }
+//     Ok(formats)
+// }
 
 /// Removes the first instance of a given element from a vector, if the item is
 /// not in the vector, nothing happens
@@ -325,13 +326,6 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
         if is_multi_line {
             // If this is a multi-line dictionary, abort.
             let Some(indent) = indent else {
-                println!(
-                    "{:?}",
-                    checker.locator.slice_source_code_range(&Range::new(
-                        right.location,
-                        right.end_location.unwrap()
-                    ))
-                );
                 return None;
             };
 
@@ -385,7 +379,7 @@ fn fix_percent_format_dict(
 
 /// Returns true if any of the [`PercentFormatPart`] components
 /// (`conversion_flag`, `width`, and `precision`) are non-empty.
-fn is_nontrivial(pf: &PercentFormatPart) -> bool {
+fn is_nontrivial(pf: &CFormatSpec) -> bool {
     let mut cf_bool = false;
     let mut w_bool = false;
     let mut precision_bool = false;
@@ -403,35 +397,37 @@ fn is_nontrivial(pf: &PercentFormatPart) -> bool {
 
 /// Returns `true` if the sequence of [`PercentFormatPart`] indicate that an
 /// [`Expr`] can be converted.
-fn convertable(parsed: &[PercentFormat], right: &Expr) -> bool {
-    for item in parsed {
-        let Some(ref fmt) = item.format_spec else {
+fn convertable(format_string: &CFormatString, right: &Expr) -> bool {
+    for (.., format_part) in format_string.iter() {
+        let CFormatPart::Spec(ref fmt) = format_part else {
             continue;
         };
+
         // These require out-of-order parameter consumption.
-        if fmt.width == Some("*".to_string()) || fmt.precision == Some(".*".to_string()) {
+        if matches!(fmt.min_field_width, Some(CFormatQuantity::FromValuesTuple)) {
             return false;
         }
+        if matches!(
+            fmt.precision,
+            Some(CFormatPrecision::Quantity(CFormatQuantity::FromValuesTuple))
+        ) {
+            return false;
+        }
+
         // These conversions require modification of parameters.
-        if vec!["d", "i", "u", "c"].contains(&&fmt.conversion[..]) {
+        if vec!["d", "i", "u", "c"].contains(&&fmt.format_char[..]) {
             return false;
         }
+
         // py2: %#o formats different from {:#o}.
-        if fmt
-            .conversion_flag
-            .clone()
-            .unwrap_or_default()
-            .contains('#')
-            && fmt.conversion == "o"
-        {
+        if fmt.flags.contains(CConversionFlags::ALTERNATE_FORM) && fmt.format_char == "o" {
             return false;
         }
         // No equivalent in format.
-        if let Some(key) = &fmt.key {
-            if key.is_empty() {
-                return false;
-            }
+        if fmt.mapping_key.map_or(false, |key| key.is_empty()) {
+            return false;
         }
+
         // py2: conversion is subject to modifiers.
         let nontrivial = is_nontrivial(fmt);
         if fmt.conversion == *"%" && nontrivial {
@@ -473,7 +469,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     }
 
     // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
-    let Ok(parsed) = parse_percent_format(left_string) else {
+    let Ok(format_string) = CFormatString::from_str(string) else {
         return;
     };
     println!("{:?}", parsed);
