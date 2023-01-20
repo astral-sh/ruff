@@ -251,7 +251,8 @@ ruff_macros::define_rule_mapping!(
     UP029 => violations::UnnecessaryBuiltinImport,
     UP030 => violations::FormatLiterals,
     UP032 => violations::FString,
-        UP033 => violations::FunctoolsCache,
+    UP033 => violations::FunctoolsCache,
+    UP035 => violations::ImportReplacements,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,

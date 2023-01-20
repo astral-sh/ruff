@@ -32,6 +32,7 @@ pub(crate) use use_pep585_annotation::use_pep585_annotation;
 pub(crate) use use_pep604_annotation::use_pep604_annotation;
 pub(crate) use useless_metaclass_type::useless_metaclass_type;
 pub(crate) use useless_object_inheritance::useless_object_inheritance;
+pub(crate) use import_replacements::import_replacements;
 
 use crate::ast::helpers;
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -69,6 +70,7 @@ mod use_pep585_annotation;
 mod use_pep604_annotation;
 mod useless_metaclass_type;
 mod useless_object_inheritance;
+mod import_replacements;
 
 /// UP008
 pub fn super_args(
