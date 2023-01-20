@@ -11,7 +11,7 @@ Example usage:
 import argparse
 import os
 
-from _utils import ROOT_DIR, dir_name, pascal_case
+from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
 
 
 def main(*, plugin: str, url: str) -> None:
@@ -67,23 +67,21 @@ mod tests {
 
     with open(ROOT_DIR / "src/registry.rs", "w") as fp:
         for line in content.splitlines():
+            indent = get_indent(line)
+
             if line.strip() == "// Ruff":
-                indent = line.split("// Ruff")[0]
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
             elif line.strip() == "Ruff,":
-                indent = line.split("Ruff,")[0]
                 fp.write(f"{indent}{pascal_case(plugin)},")
                 fp.write("\n")
 
             elif line.strip() == 'RuleOrigin::Ruff => "Ruff-specific rules",':
-                indent = line.split('RuleOrigin::Ruff => "Ruff-specific rules",')[0]
                 fp.write(f'{indent}RuleOrigin::{pascal_case(plugin)} => "{plugin}",')
                 fp.write("\n")
 
             elif line.strip() == "RuleOrigin::Ruff => vec![RuleCodePrefix::RUF],":
-                indent = line.split("RuleOrigin::Ruff => vec![RuleCodePrefix::RUF],")[0]
                 fp.write(
                     f"{indent}RuleOrigin::{pascal_case(plugin)} => vec![\n"
                     f'{indent}    todo!("Fill-in prefix after generating codes")\n'
@@ -92,7 +90,6 @@ mod tests {
                 fp.write("\n")
 
             elif line.strip() == "RuleOrigin::Ruff => None,":
-                indent = line.split("RuleOrigin::Ruff => None,")[0]
                 fp.write(f"{indent}RuleOrigin::{pascal_case(plugin)} => " f'Some(("{url}", &Platform::PyPI)),')
                 fp.write("\n")
 
@@ -105,7 +102,7 @@ mod tests {
     with open(ROOT_DIR / "src/violations.rs", "w") as fp:
         for line in content.splitlines():
             if line.strip() == "// Ruff":
-                indent = line.split("// Ruff")[0]
+                indent = get_indent(line)
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
