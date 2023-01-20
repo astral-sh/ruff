@@ -19,7 +19,7 @@ use ruff::registry::Rule;
 use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
-use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError};
+use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
 use serde::Serialize;
 use walkdir::WalkDir;
 
@@ -293,12 +293,22 @@ struct Explanation<'a> {
 pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
     match format {
         SerializationFormat::Text | SerializationFormat::Grouped => {
-            println!(
-                "{} ({}): {}",
-                rule.code(),
-                rule.origin().name(),
-                rule.message_formats()[0]
-            );
+            println!("{}\n", rule.as_ref());
+            println!("Code: {} ({})\n", rule.code(), rule.origin().name());
+
+            if let Some(autofix) = rule.autofixable() {
+                println!(
+                    "{}",
+                    match autofix.available {
+                        AutofixAvailability::Sometimes => "Autofix is sometimes available.\n",
+                        AutofixAvailability::Always => "Autofix is always available.\n",
+                    }
+                );
+            }
+            println!("Message formats:\n");
+            for format in rule.message_formats() {
+                println!("* {format}");
+            }
         }
         SerializationFormat::Json => {
             println!(
