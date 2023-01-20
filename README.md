@@ -1651,12 +1651,12 @@ Assuming you have `cargo` installed, you can run:
 cargo run resources/test/fixtures
 ```
 
-For development, we use [nightly Rust](https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust):
+For rustfmt and Clippy, we use [nightly Rust](https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust):
 
 ```shell
 cargo +nightly fmt
 cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic
-cargo +nightly test --all
+cargo test --all
 ```
 
 ## Releases
