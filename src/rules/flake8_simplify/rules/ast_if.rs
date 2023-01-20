@@ -75,7 +75,7 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
             Range::new(stmt.location, nested_if.location),
             checker.locator,
         ) {
-            match fix_if::fix_nested_if_statements(checker.locator, stmt) {
+            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
                 Ok(fix) => {
                     if fix
                         .content
