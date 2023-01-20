@@ -14,6 +14,7 @@ use crate::{rules, violations};
 
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
+    E101 => violations::MixedSpacesAndTabs,
     E401 => violations::MultipleImportsOnOneLine,
     E402 => violations::ModuleImportNotAtTopOfFile,
     E501 => violations::LineTooLong,
@@ -556,7 +557,8 @@ impl Rule {
             | Rule::DocLineTooLong
             | Rule::PEP3120UnnecessaryCodingComment
             | Rule::BlanketTypeIgnore
-            | Rule::BlanketNOQA => &LintSource::Lines,
+            | Rule::BlanketNOQA
+            | Rule::MixedSpacesAndTabs => &LintSource::Lines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString

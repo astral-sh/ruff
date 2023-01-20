@@ -78,6 +78,23 @@ pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<D
     }
 }
 
+/// E101
+pub fn mixed_spaces_and_tabs(lineno: usize, line: &str) -> Option<Diagnostic> {
+    let indent = leading_space(line);
+
+    if indent.contains(' ') && indent.contains('\t') {
+        Some(Diagnostic::new(
+            violations::MixedSpacesAndTabs,
+            Range::new(
+                Location::new(lineno + 1, 0),
+                Location::new(lineno + 1, indent.chars().count()),
+            ),
+        ))
+    } else {
+        None
+    }
+}
+
 /// W505
 pub fn doc_line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
     let Some(limit) = settings.pycodestyle.max_doc_length else {

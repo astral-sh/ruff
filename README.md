@@ -598,6 +598,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 #### Error (E)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
 | E401 | multiple-imports-on-one-line | Multiple imports on one line |  |
 | E402 | module-import-not-at-top-of-file | Module level import not at top of file |  |
 | E501 | line-too-long | Line too long ({length} > {limit} characters) |  |
