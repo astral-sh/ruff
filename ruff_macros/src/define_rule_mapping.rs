@@ -73,6 +73,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             Ord,
             AsRefStr,
         )]
+        #[strum(serialize_all = "kebab-case")]
         pub enum Rule { #rule_variants }
 
         #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]

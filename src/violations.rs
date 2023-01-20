@@ -3279,10 +3279,14 @@ impl Violation for PublicInit {
 define_violation!(
     pub struct FitsOnOneLine;
 );
-impl Violation for FitsOnOneLine {
+impl AlwaysAutofixableViolation for FitsOnOneLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("One-line docstring should fit on one line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Reformat to one line".to_string()
     }
 }
 

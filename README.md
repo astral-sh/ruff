@@ -548,49 +548,49 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| F401 | UnusedImport | `{name}` imported but unused; consider adding to `__all__` or using a redundant alias | 🛠 |
-| F402 | ImportShadowedByLoopVar | Import `{name}` from line {line} shadowed by loop variable |  |
-| F403 | ImportStarUsed | `from {name} import *` used; unable to detect undefined names |  |
-| F404 | LateFutureImport | `from __future__` imports must occur at the beginning of the file |  |
-| F405 | ImportStarUsage | `{name}` may be undefined, or defined from star imports: {sources} |  |
-| F406 | ImportStarNotPermitted | `from {name} import *` only allowed at module level |  |
-| F407 | FutureFeatureNotDefined | Future feature `{name}` is not defined |  |
-| F501 | PercentFormatInvalidFormat | '...' % ... has invalid format string: {message} |  |
-| F502 | PercentFormatExpectedMapping | '...' % ... expected mapping but got sequence |  |
-| F503 | PercentFormatExpectedSequence | '...' % ... expected sequence but got mapping |  |
-| F504 | PercentFormatExtraNamedArguments | '...' % ... has unused named argument(s): {message} | 🛠 |
-| F505 | PercentFormatMissingArgument | '...' % ... is missing argument(s) for placeholder(s): {message} |  |
-| F506 | PercentFormatMixedPositionalAndNamed | '...' % ... has mixed positional and named placeholders |  |
-| F507 | PercentFormatPositionalCountMismatch | '...' % ... has {wanted} placeholder(s) but {got} substitution(s) |  |
-| F508 | PercentFormatStarRequiresSequence | '...' % ... `*` specifier requires sequence |  |
-| F509 | PercentFormatUnsupportedFormatCharacter | '...' % ... has unsupported format character '{char}' |  |
-| F521 | StringDotFormatInvalidFormat | '...'.format(...) has invalid format string: {message} |  |
-| F522 | StringDotFormatExtraNamedArguments | '...'.format(...) has unused named argument(s): {message} | 🛠 |
-| F523 | StringDotFormatExtraPositionalArguments | '...'.format(...) has unused arguments at position(s): {message} |  |
-| F524 | StringDotFormatMissingArguments | '...'.format(...) is missing argument(s) for placeholder(s): {message} |  |
-| F525 | StringDotFormatMixingAutomatic | '...'.format(...) mixes automatic and manual numbering |  |
-| F541 | FStringMissingPlaceholders | f-string without any placeholders | 🛠 |
-| F601 | MultiValueRepeatedKeyLiteral | Dictionary key literal `{name}` repeated | 🛠 |
-| F602 | MultiValueRepeatedKeyVariable | Dictionary key `{name}` repeated | 🛠 |
-| F621 | ExpressionsInStarAssignment | Too many expressions in star-unpacking assignment |  |
-| F622 | TwoStarredExpressions | Two starred expressions in assignment |  |
-| F631 | AssertTuple | Assert test is a non-empty tuple, which is always `True` |  |
-| F632 | IsLiteral | Use `==` to compare constant literals | 🛠 |
-| F633 | InvalidPrintSyntax | Use of `>>` is invalid with `print` function |  |
-| F634 | IfTuple | If test is a tuple, which is always `True` |  |
-| F701 | BreakOutsideLoop | `break` outside loop |  |
-| F702 | ContinueOutsideLoop | `continue` not properly in loop |  |
-| F704 | YieldOutsideFunction | `{keyword}` statement outside of a function |  |
-| F706 | ReturnOutsideFunction | `return` statement outside of a function/method |  |
-| F707 | DefaultExceptNotLast | An `except` block as not the last exception handler |  |
-| F722 | ForwardAnnotationSyntaxError | Syntax error in forward annotation: `{body}` |  |
-| F811 | RedefinedWhileUnused | Redefinition of unused `{name}` from line {line} |  |
-| F821 | UndefinedName | Undefined name `{name}` |  |
-| F822 | UndefinedExport | Undefined name `{name}` in `__all__` |  |
-| F823 | UndefinedLocal | Local variable `{name}` referenced before assignment |  |
-| F841 | UnusedVariable | Local variable `{name}` is assigned to but never used | 🛠 |
-| F842 | UnusedAnnotation | Local variable `{name}` is annotated but never used |  |
-| F901 | RaiseNotImplemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
+| F401 | unused-import | `{name}` imported but unused; consider adding to `__all__` or using a redundant alias | 🛠 |
+| F402 | import-shadowed-by-loop-var | Import `{name}` from line {line} shadowed by loop variable |  |
+| F403 | import-star-used | `from {name} import *` used; unable to detect undefined names |  |
+| F404 | late-future-import | `from __future__` imports must occur at the beginning of the file |  |
+| F405 | import-star-usage | `{name}` may be undefined, or defined from star imports: {sources} |  |
+| F406 | import-star-not-permitted | `from {name} import *` only allowed at module level |  |
+| F407 | future-feature-not-defined | Future feature `{name}` is not defined |  |
+| F501 | percent-format-invalid-format | '...' % ... has invalid format string: {message} |  |
+| F502 | percent-format-expected-mapping | '...' % ... expected mapping but got sequence |  |
+| F503 | percent-format-expected-sequence | '...' % ... expected sequence but got mapping |  |
+| F504 | percent-format-extra-named-arguments | '...' % ... has unused named argument(s): {message} | 🛠 |
+| F505 | percent-format-missing-argument | '...' % ... is missing argument(s) for placeholder(s): {message} |  |
+| F506 | percent-format-mixed-positional-and-named | '...' % ... has mixed positional and named placeholders |  |
+| F507 | percent-format-positional-count-mismatch | '...' % ... has {wanted} placeholder(s) but {got} substitution(s) |  |
+| F508 | percent-format-star-requires-sequence | '...' % ... `*` specifier requires sequence |  |
+| F509 | percent-format-unsupported-format-character | '...' % ... has unsupported format character '{char}' |  |
+| F521 | string-dot-format-invalid-format | '...'.format(...) has invalid format string: {message} |  |
+| F522 | string-dot-format-extra-named-arguments | '...'.format(...) has unused named argument(s): {message} | 🛠 |
+| F523 | string-dot-format-extra-positional-arguments | '...'.format(...) has unused arguments at position(s): {message} |  |
+| F524 | string-dot-format-missing-arguments | '...'.format(...) is missing argument(s) for placeholder(s): {message} |  |
+| F525 | string-dot-format-mixing-automatic | '...'.format(...) mixes automatic and manual numbering |  |
+| F541 | f-string-missing-placeholders | f-string without any placeholders | 🛠 |
+| F601 | multi-value-repeated-key-literal | Dictionary key literal `{name}` repeated | 🛠 |
+| F602 | multi-value-repeated-key-variable | Dictionary key `{name}` repeated | 🛠 |
+| F621 | expressions-in-star-assignment | Too many expressions in star-unpacking assignment |  |
+| F622 | two-starred-expressions | Two starred expressions in assignment |  |
+| F631 | assert-tuple | Assert test is a non-empty tuple, which is always `True` |  |
+| F632 | is-literal | Use `==` to compare constant literals | 🛠 |
+| F633 | invalid-print-syntax | Use of `>>` is invalid with `print` function |  |
+| F634 | if-tuple | If test is a tuple, which is always `True` |  |
+| F701 | break-outside-loop | `break` outside loop |  |
+| F702 | continue-outside-loop | `continue` not properly in loop |  |
+| F704 | yield-outside-function | `{keyword}` statement outside of a function |  |
+| F706 | return-outside-function | `return` statement outside of a function/method |  |
+| F707 | default-except-not-last | An `except` block as not the last exception handler |  |
+| F722 | forward-annotation-syntax-error | Syntax error in forward annotation: `{body}` |  |
+| F811 | redefined-while-unused | Redefinition of unused `{name}` from line {line} |  |
+| F821 | undefined-name | Undefined name `{name}` |  |
+| F822 | undefined-export | Undefined name `{name}` in `__all__` |  |
+| F823 | undefined-local | Local variable `{name}` referenced before assignment |  |
+| F841 | unused-variable | Local variable `{name}` is assigned to but never used | 🛠 |
+| F842 | unused-annotation | Local variable `{name}` is annotated but never used |  |
+| F901 | raise-not-implemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
 ### pycodestyle (E, W)
 
@@ -599,28 +599,28 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 #### Error (E)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| E401 | MultipleImportsOnOneLine | Multiple imports on one line |  |
-| E402 | ModuleImportNotAtTopOfFile | Module level import not at top of file |  |
-| E501 | LineTooLong | Line too long ({length} > {limit} characters) |  |
-| E711 | NoneComparison | Comparison to `None` should be `cond is None` | 🛠 |
-| E712 | TrueFalseComparison | Comparison to `True` should be `cond is True` | 🛠 |
-| E713 | NotInTest | Test for membership should be `not in` | 🛠 |
-| E714 | NotIsTest | Test for object identity should be `is not` | 🛠 |
-| E721 | TypeComparison | Do not compare types, use `isinstance()` |  |
-| E722 | DoNotUseBareExcept | Do not use bare `except` |  |
-| E731 | DoNotAssignLambda | Do not assign a `lambda` expression, use a `def` | 🛠 |
-| E741 | AmbiguousVariableName | Ambiguous variable name: `{name}` |  |
-| E742 | AmbiguousClassName | Ambiguous class name: `{name}` |  |
-| E743 | AmbiguousFunctionName | Ambiguous function name: `{name}` |  |
-| E902 | IOError | {message} |  |
-| E999 | SyntaxError | SyntaxError: {message} |  |
+| E401 | multiple-imports-on-one-line | Multiple imports on one line |  |
+| E402 | module-import-not-at-top-of-file | Module level import not at top of file |  |
+| E501 | line-too-long | Line too long ({length} > {limit} characters) |  |
+| E711 | none-comparison | Comparison to `None` should be `cond is None` | 🛠 |
+| E712 | true-false-comparison | Comparison to `True` should be `cond is True` | 🛠 |
+| E713 | not-in-test | Test for membership should be `not in` | 🛠 |
+| E714 | not-is-test | Test for object identity should be `is not` | 🛠 |
+| E721 | type-comparison | Do not compare types, use `isinstance()` |  |
+| E722 | do-not-use-bare-except | Do not use bare `except` |  |
+| E731 | do-not-assign-lambda | Do not assign a `lambda` expression, use a `def` | 🛠 |
+| E741 | ambiguous-variable-name | Ambiguous variable name: `{name}` |  |
+| E742 | ambiguous-class-name | Ambiguous class name: `{name}` |  |
+| E743 | ambiguous-function-name | Ambiguous function name: `{name}` |  |
+| E902 | io-error | {message} |  |
+| E999 | syntax-error | SyntaxError: {message} |  |
 
 #### Warning (W)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| W292 | NoNewLineAtEndOfFile | No newline at end of file | 🛠 |
-| W505 | DocLineTooLong | Doc line too long ({length} > {limit} characters) |  |
-| W605 | InvalidEscapeSequence | Invalid escape sequence: '\{char}' | 🛠 |
+| W292 | no-new-line-at-end-of-file | No newline at end of file | 🛠 |
+| W505 | doc-line-too-long | Doc line too long ({length} > {limit} characters) |  |
+| W605 | invalid-escape-sequence | Invalid escape sequence: '\{char}' | 🛠 |
 
 ### mccabe (C90)
 
@@ -628,7 +628,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C901 | FunctionIsTooComplex | `{name}` is too complex ({complexity}) |  |
+| C901 | function-is-too-complex | `{name}` is too complex ({complexity}) |  |
 
 ### isort (I)
 
@@ -636,8 +636,8 @@ For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| I001 | UnsortedImports | Import block is un-sorted or un-formatted | 🛠 |
-| I002 | MissingRequiredImport | Missing required import: `{name}` | 🛠 |
+| I001 | unsorted-imports | Import block is un-sorted or un-formatted | 🛠 |
+| I002 | missing-required-import | Missing required import: `{name}` | 🛠 |
 
 ### pydocstyle (D)
 
@@ -645,51 +645,51 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| D100 | PublicModule | Missing docstring in public module |  |
-| D101 | PublicClass | Missing docstring in public class |  |
-| D102 | PublicMethod | Missing docstring in public method |  |
-| D103 | PublicFunction | Missing docstring in public function |  |
-| D104 | PublicPackage | Missing docstring in public package |  |
-| D105 | MagicMethod | Missing docstring in magic method |  |
-| D106 | PublicNestedClass | Missing docstring in public nested class |  |
-| D107 | PublicInit | Missing docstring in `__init__` |  |
-| D200 | FitsOnOneLine | One-line docstring should fit on one line |  |
-| D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found {num_lines}) | 🛠 |
-| D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found {num_lines}) | 🛠 |
-| D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring | 🛠 |
-| D204 | OneBlankLineAfterClass | 1 blank line required after class docstring | 🛠 |
-| D205 | BlankLineAfterSummary | 1 blank line required between summary line and description | 🛠 |
-| D206 | IndentWithSpaces | Docstring should be indented with spaces, not tabs |  |
-| D207 | NoUnderIndentation | Docstring is under-indented | 🛠 |
-| D208 | NoOverIndentation | Docstring is over-indented | 🛠 |
-| D209 | NewLineAfterLastParagraph | Multi-line docstring closing quotes should be on a separate line | 🛠 |
-| D210 | NoSurroundingWhitespace | No whitespaces allowed surrounding docstring text | 🛠 |
-| D211 | NoBlankLineBeforeClass | No blank lines allowed before class docstring | 🛠 |
-| D212 | MultiLineSummaryFirstLine | Multi-line docstring summary should start at the first line |  |
-| D213 | MultiLineSummarySecondLine | Multi-line docstring summary should start at the second line |  |
-| D214 | SectionNotOverIndented | Section is over-indented ("{name}") | 🛠 |
-| D215 | SectionUnderlineNotOverIndented | Section underline is over-indented ("{name}") | 🛠 |
-| D300 | UsesTripleQuotes | Use """triple double quotes""" |  |
-| D301 | UsesRPrefixForBackslashedContent | Use r""" if any backslashes in a docstring |  |
-| D400 | EndsInPeriod | First line should end with a period | 🛠 |
-| D402 | NoSignature | First line should not be the function's signature |  |
-| D403 | FirstLineCapitalized | First word of the first line should be properly capitalized |  |
-| D404 | NoThisPrefix | First word of the docstring should not be "This" |  |
-| D405 | CapitalizeSectionName | Section name should be properly capitalized ("{name}") | 🛠 |
-| D406 | NewLineAfterSectionName | Section name should end with a newline ("{name}") | 🛠 |
-| D407 | DashedUnderlineAfterSection | Missing dashed underline after section ("{name}") | 🛠 |
-| D408 | SectionUnderlineAfterName | Section underline should be in the line following the section's name ("{name}") | 🛠 |
-| D409 | SectionUnderlineMatchesSectionLength | Section underline should match the length of its name ("{name}") | 🛠 |
-| D410 | BlankLineAfterSection | Missing blank line after section ("{name}") | 🛠 |
-| D411 | BlankLineBeforeSection | Missing blank line before section ("{name}") | 🛠 |
-| D412 | NoBlankLinesBetweenHeaderAndContent | No blank lines allowed between a section header and its content ("{name}") | 🛠 |
-| D413 | BlankLineAfterLastSection | Missing blank line after last section ("{name}") | 🛠 |
-| D414 | NonEmptySection | Section has no content ("{name}") |  |
-| D415 | EndsInPunctuation | First line should end with a period, question mark, or exclamation point | 🛠 |
-| D416 | SectionNameEndsInColon | Section name should end with a colon ("{name}") | 🛠 |
-| D417 | DocumentAllArguments | Missing argument description in the docstring: `{name}` |  |
-| D418 | SkipDocstring | Function decorated with `@overload` shouldn't contain a docstring |  |
-| D419 | NonEmpty | Docstring is empty |  |
+| D100 | public-module | Missing docstring in public module |  |
+| D101 | public-class | Missing docstring in public class |  |
+| D102 | public-method | Missing docstring in public method |  |
+| D103 | public-function | Missing docstring in public function |  |
+| D104 | public-package | Missing docstring in public package |  |
+| D105 | magic-method | Missing docstring in magic method |  |
+| D106 | public-nested-class | Missing docstring in public nested class |  |
+| D107 | public-init | Missing docstring in `__init__` |  |
+| D200 | fits-on-one-line | One-line docstring should fit on one line | 🛠 |
+| D201 | no-blank-line-before-function | No blank lines allowed before function docstring (found {num_lines}) | 🛠 |
+| D202 | no-blank-line-after-function | No blank lines allowed after function docstring (found {num_lines}) | 🛠 |
+| D203 | one-blank-line-before-class | 1 blank line required before class docstring | 🛠 |
+| D204 | one-blank-line-after-class | 1 blank line required after class docstring | 🛠 |
+| D205 | blank-line-after-summary | 1 blank line required between summary line and description | 🛠 |
+| D206 | indent-with-spaces | Docstring should be indented with spaces, not tabs |  |
+| D207 | no-under-indentation | Docstring is under-indented | 🛠 |
+| D208 | no-over-indentation | Docstring is over-indented | 🛠 |
+| D209 | new-line-after-last-paragraph | Multi-line docstring closing quotes should be on a separate line | 🛠 |
+| D210 | no-surrounding-whitespace | No whitespaces allowed surrounding docstring text | 🛠 |
+| D211 | no-blank-line-before-class | No blank lines allowed before class docstring | 🛠 |
+| D212 | multi-line-summary-first-line | Multi-line docstring summary should start at the first line |  |
+| D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line |  |
+| D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
+| D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
+| D300 | uses-triple-quotes | Use """triple double quotes""" |  |
+| D301 | uses-r-prefix-for-backslashed-content | Use r""" if any backslashes in a docstring |  |
+| D400 | ends-in-period | First line should end with a period | 🛠 |
+| D402 | no-signature | First line should not be the function's signature |  |
+| D403 | first-line-capitalized | First word of the first line should be properly capitalized |  |
+| D404 | no-this-prefix | First word of the docstring should not be "This" |  |
+| D405 | capitalize-section-name | Section name should be properly capitalized ("{name}") | 🛠 |
+| D406 | new-line-after-section-name | Section name should end with a newline ("{name}") | 🛠 |
+| D407 | dashed-underline-after-section | Missing dashed underline after section ("{name}") | 🛠 |
+| D408 | section-underline-after-name | Section underline should be in the line following the section's name ("{name}") | 🛠 |
+| D409 | section-underline-matches-section-length | Section underline should match the length of its name ("{name}") | 🛠 |
+| D410 | blank-line-after-section | Missing blank line after section ("{name}") | 🛠 |
+| D411 | blank-line-before-section | Missing blank line before section ("{name}") | 🛠 |
+| D412 | no-blank-lines-between-header-and-content | No blank lines allowed between a section header and its content ("{name}") | 🛠 |
+| D413 | blank-line-after-last-section | Missing blank line after last section ("{name}") | 🛠 |
+| D414 | non-empty-section | Section has no content ("{name}") |  |
+| D415 | ends-in-punctuation | First line should end with a period, question mark, or exclamation point | 🛠 |
+| D416 | section-name-ends-in-colon | Section name should end with a colon ("{name}") | 🛠 |
+| D417 | document-all-arguments | Missing argument description in the docstring: `{name}` |  |
+| D418 | skip-docstring | Function decorated with `@overload` shouldn't contain a docstring |  |
+| D419 | non-empty | Docstring is empty |  |
 
 ### pyupgrade (UP)
 
@@ -697,38 +697,38 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| UP001 | UselessMetaclassType | `__metaclass__ = type` is implied | 🛠 |
-| UP003 | TypeOfPrimitive | Use `{}` instead of `type(...)` | 🛠 |
-| UP004 | UselessObjectInheritance | Class `{name}` inherits from `object` | 🛠 |
-| UP005 | DeprecatedUnittestAlias | `{alias}` is deprecated, use `{target}` | 🛠 |
-| UP006 | UsePEP585Annotation | Use `{}` instead of `{}` for type annotations | 🛠 |
-| UP007 | UsePEP604Annotation | Use `X \| Y` for type annotations | 🛠 |
-| UP008 | SuperCallWithParameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
-| UP009 | PEP3120UnnecessaryCodingComment | UTF-8 encoding declaration is unnecessary | 🛠 |
-| UP010 | UnnecessaryFutureImport | Unnecessary `__future__` import `{import}` for target Python version | 🛠 |
-| UP011 | LRUCacheWithoutParameters | Unnecessary parameters to `functools.lru_cache` | 🛠 |
-| UP012 | UnnecessaryEncodeUTF8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
-| UP013 | ConvertTypedDictFunctionalToClass | Convert `{name}` from `TypedDict` functional to class syntax | 🛠 |
-| UP014 | ConvertNamedTupleFunctionalToClass | Convert `{name}` from `NamedTuple` functional to class syntax | 🛠 |
-| UP015 | RedundantOpenModes | Unnecessary open mode parameters | 🛠 |
-| UP016 | RemoveSixCompat | Unnecessary `six` compatibility usage | 🛠 |
-| UP017 | DatetimeTimezoneUTC | Use `datetime.UTC` alias | 🛠 |
-| UP018 | NativeLiterals | Unnecessary call to `{literal_type}` | 🛠 |
-| UP019 | TypingTextStrAlias | `typing.Text` is deprecated, use `str` | 🛠 |
-| UP020 | OpenAlias | Use builtin `open` | 🛠 |
-| UP021 | ReplaceUniversalNewlines | `universal_newlines` is deprecated, use `text` | 🛠 |
-| UP022 | ReplaceStdoutStderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
-| UP023 | RewriteCElementTree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
-| UP024 | OSErrorAlias | Replace aliased errors with `OSError` | 🛠 |
-| UP025 | RewriteUnicodeLiteral | Remove unicode literals from strings | 🛠 |
-| UP026 | RewriteMockImport | `mock` is deprecated, use `unittest.mock` | 🛠 |
-| UP027 | RewriteListComprehension | Replace unpacked list comprehension with a generator expression | 🛠 |
-| UP028 | RewriteYieldFrom | Replace `yield` over `for` loop with `yield from` | 🛠 |
-| UP029 | UnnecessaryBuiltinImport | Unnecessary builtin import: `{import}` | 🛠 |
-| UP030 | FormatLiterals | Use implicit references for positional format fields | 🛠 |
-| UP032 | FString | Use f-string instead of `format` call | 🛠 |
-| UP033 | FunctoolsCache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
-| UP034 | ExtraneousParenthesis | Remove extraneous parenthesis from print statements | 🛠 |
+| UP001 | useless-metaclass-type | `__metaclass__ = type` is implied | 🛠 |
+| UP003 | type-of-primitive | Use `{}` instead of `type(...)` | 🛠 |
+| UP004 | useless-object-inheritance | Class `{name}` inherits from `object` | 🛠 |
+| UP005 | deprecated-unittest-alias | `{alias}` is deprecated, use `{target}` | 🛠 |
+| UP006 | use-pep585-annotation | Use `{}` instead of `{}` for type annotations | 🛠 |
+| UP007 | use-pep604-annotation | Use `X \| Y` for type annotations | 🛠 |
+| UP008 | super-call-with-parameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
+| UP009 | pep3120-unnecessary-coding-comment | UTF-8 encoding declaration is unnecessary | 🛠 |
+| UP010 | unnecessary-future-import | Unnecessary `__future__` import `{import}` for target Python version | 🛠 |
+| UP011 | lru-cache-without-parameters | Unnecessary parameters to `functools.lru_cache` | 🛠 |
+| UP012 | unnecessary-encode-utf8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
+| UP013 | convert-typed-dict-functional-to-class | Convert `{name}` from `TypedDict` functional to class syntax | 🛠 |
+| UP014 | convert-named-tuple-functional-to-class | Convert `{name}` from `NamedTuple` functional to class syntax | 🛠 |
+| UP015 | redundant-open-modes | Unnecessary open mode parameters | 🛠 |
+| UP016 | remove-six-compat | Unnecessary `six` compatibility usage | 🛠 |
+| UP017 | datetime-timezone-utc | Use `datetime.UTC` alias | 🛠 |
+| UP018 | native-literals | Unnecessary call to `{literal_type}` | 🛠 |
+| UP019 | typing-text-str-alias | `typing.Text` is deprecated, use `str` | 🛠 |
+| UP020 | open-alias | Use builtin `open` | 🛠 |
+| UP021 | replace-universal-newlines | `universal_newlines` is deprecated, use `text` | 🛠 |
+| UP022 | replace-stdout-stderr | Sending stdout and stderr to pipe is deprecated, use `capture_output` | 🛠 |
+| UP023 | rewrite-c-element-tree | `cElementTree` is deprecated, use `ElementTree` | 🛠 |
+| UP024 | os-error-alias | Replace aliased errors with `OSError` | 🛠 |
+| UP025 | rewrite-unicode-literal | Remove unicode literals from strings | 🛠 |
+| UP026 | rewrite-mock-import | `mock` is deprecated, use `unittest.mock` | 🛠 |
+| UP027 | rewrite-list-comprehension | Replace unpacked list comprehension with a generator expression | 🛠 |
+| UP028 | rewrite-yield-from | Replace `yield` over `for` loop with `yield from` | 🛠 |
+| UP029 | unnecessary-builtin-import | Unnecessary builtin import: `{import}` | 🛠 |
+| UP030 | format-literals | Use implicit references for positional format fields | 🛠 |
+| UP032 | f-string | Use f-string instead of `format` call | 🛠 |
+| UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
+| UP034 | extraneous-parenthesis | Remove extraneous parenthesis from print statements | 🛠 |
 
 ### pep8-naming (N)
 
@@ -736,21 +736,21 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyP
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| N801 | InvalidClassName | Class name `{name}` should use CapWords convention  |  |
-| N802 | InvalidFunctionName | Function name `{name}` should be lowercase |  |
-| N803 | InvalidArgumentName | Argument name `{name}` should be lowercase |  |
-| N804 | InvalidFirstArgumentNameForClassMethod | First argument of a class method should be named `cls` |  |
-| N805 | InvalidFirstArgumentNameForMethod | First argument of a method should be named `self` |  |
-| N806 | NonLowercaseVariableInFunction | Variable `{name}` in function should be lowercase |  |
-| N807 | DunderFunctionName | Function name should not start and end with `__` |  |
-| N811 | ConstantImportedAsNonConstant | Constant `{name}` imported as non-constant `{asname}` |  |
-| N812 | LowercaseImportedAsNonLowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
-| N813 | CamelcaseImportedAsLowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
-| N814 | CamelcaseImportedAsConstant | Camelcase `{name}` imported as constant `{asname}` |  |
-| N815 | MixedCaseVariableInClassScope | Variable `{name}` in class scope should not be mixedCase |  |
-| N816 | MixedCaseVariableInGlobalScope | Variable `{name}` in global scope should not be mixedCase |  |
-| N817 | CamelcaseImportedAsAcronym | Camelcase `{name}` imported as acronym `{asname}` |  |
-| N818 | ErrorSuffixOnExceptionName | Exception name `{name}` should be named with an Error suffix |  |
+| N801 | invalid-class-name | Class name `{name}` should use CapWords convention  |  |
+| N802 | invalid-function-name | Function name `{name}` should be lowercase |  |
+| N803 | invalid-argument-name | Argument name `{name}` should be lowercase |  |
+| N804 | invalid-first-argument-name-for-class-method | First argument of a class method should be named `cls` |  |
+| N805 | invalid-first-argument-name-for-method | First argument of a method should be named `self` |  |
+| N806 | non-lowercase-variable-in-function | Variable `{name}` in function should be lowercase |  |
+| N807 | dunder-function-name | Function name should not start and end with `__` |  |
+| N811 | constant-imported-as-non-constant | Constant `{name}` imported as non-constant `{asname}` |  |
+| N812 | lowercase-imported-as-non-lowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
+| N813 | camelcase-imported-as-lowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
+| N814 | camelcase-imported-as-constant | Camelcase `{name}` imported as constant `{asname}` |  |
+| N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
+| N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
+| N817 | camelcase-imported-as-acronym | Camelcase `{name}` imported as acronym `{asname}` |  |
+| N818 | error-suffix-on-exception-name | Exception name `{name}` should be named with an Error suffix |  |
 
 ### flake8-2020 (YTT)
 
@@ -758,16 +758,16 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| YTT101 | SysVersionSlice3Referenced | `sys.version[:3]` referenced (python3.10), use `sys.version_info` |  |
-| YTT102 | SysVersion2Referenced | `sys.version[2]` referenced (python3.10), use `sys.version_info` |  |
-| YTT103 | SysVersionCmpStr3 | `sys.version` compared to string (python3.10), use `sys.version_info` |  |
-| YTT201 | SysVersionInfo0Eq3Referenced | `sys.version_info[0] == 3` referenced (python4), use `>=` |  |
-| YTT202 | SixPY3Referenced | `six.PY3` referenced (python4), use `not six.PY2` |  |
-| YTT203 | SysVersionInfo1CmpInt | `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple |  |
-| YTT204 | SysVersionInfoMinorCmpInt | `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple |  |
-| YTT301 | SysVersion0Referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
-| YTT302 | SysVersionCmpStr10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
-| YTT303 | SysVersionSlice1Referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
+| YTT101 | sys-version-slice3-referenced | `sys.version[:3]` referenced (python3.10), use `sys.version_info` |  |
+| YTT102 | sys-version2-referenced | `sys.version[2]` referenced (python3.10), use `sys.version_info` |  |
+| YTT103 | sys-version-cmp-str3 | `sys.version` compared to string (python3.10), use `sys.version_info` |  |
+| YTT201 | sys-version-info0-eq3-referenced | `sys.version_info[0] == 3` referenced (python4), use `>=` |  |
+| YTT202 | six-py3-referenced | `six.PY3` referenced (python4), use `not six.PY2` |  |
+| YTT203 | sys-version-info1-cmp-int | `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT204 | sys-version-info-minor-cmp-int | `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple |  |
+| YTT301 | sys-version0-referenced | `sys.version[0]` referenced (python10), use `sys.version_info` |  |
+| YTT302 | sys-version-cmp-str10 | `sys.version` compared to string (python10), use `sys.version_info` |  |
+| YTT303 | sys-version-slice1-referenced | `sys.version[:1]` referenced (python10), use `sys.version_info` |  |
 
 ### flake8-annotations (ANN)
 
@@ -775,17 +775,17 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ANN001 | MissingTypeFunctionArgument | Missing type annotation for function argument `{name}` |  |
-| ANN002 | MissingTypeArgs | Missing type annotation for `*{name}` |  |
-| ANN003 | MissingTypeKwargs | Missing type annotation for `**{name}` |  |
-| ANN101 | MissingTypeSelf | Missing type annotation for `{name}` in method |  |
-| ANN102 | MissingTypeCls | Missing type annotation for `{name}` in classmethod |  |
-| ANN201 | MissingReturnTypePublicFunction | Missing return type annotation for public function `{name}` |  |
-| ANN202 | MissingReturnTypePrivateFunction | Missing return type annotation for private function `{name}` |  |
-| ANN204 | MissingReturnTypeSpecialMethod | Missing return type annotation for special method `{name}` | 🛠 |
-| ANN205 | MissingReturnTypeStaticMethod | Missing return type annotation for staticmethod `{name}` |  |
-| ANN206 | MissingReturnTypeClassMethod | Missing return type annotation for classmethod `{name}` |  |
-| ANN401 | DynamicallyTypedExpression | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
+| ANN001 | missing-type-function-argument | Missing type annotation for function argument `{name}` |  |
+| ANN002 | missing-type-args | Missing type annotation for `*{name}` |  |
+| ANN003 | missing-type-kwargs | Missing type annotation for `**{name}` |  |
+| ANN101 | missing-type-self | Missing type annotation for `{name}` in method |  |
+| ANN102 | missing-type-cls | Missing type annotation for `{name}` in classmethod |  |
+| ANN201 | missing-return-type-public-function | Missing return type annotation for public function `{name}` |  |
+| ANN202 | missing-return-type-private-function | Missing return type annotation for private function `{name}` |  |
+| ANN204 | missing-return-type-special-method | Missing return type annotation for special method `{name}` | 🛠 |
+| ANN205 | missing-return-type-static-method | Missing return type annotation for staticmethod `{name}` |  |
+| ANN206 | missing-return-type-class-method | Missing return type annotation for classmethod `{name}` |  |
+| ANN401 | dynamically-typed-expression | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
 
 ### flake8-bandit (S)
 
@@ -793,21 +793,21 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| S101 | AssertUsed | Use of `assert` detected |  |
-| S102 | ExecUsed | Use of `exec` detected |  |
-| S103 | BadFilePermissions | `os.chmod` setting a permissive mask `{mask:#o}` on file or directory |  |
-| S104 | HardcodedBindAllInterfaces | Possible binding to all interfaces |  |
-| S105 | HardcodedPasswordString | Possible hardcoded password: "{}" |  |
-| S106 | HardcodedPasswordFuncArg | Possible hardcoded password: "{}" |  |
-| S107 | HardcodedPasswordDefault | Possible hardcoded password: "{}" |  |
-| S108 | HardcodedTempFile | Probable insecure usage of temporary file or directory: "{}" |  |
-| S113 | RequestWithoutTimeout | Probable use of requests call with timeout set to `{value}` |  |
-| S324 | HashlibInsecureHashFunction | Probable use of insecure hash functions in `hashlib`: "{}" |  |
-| S501 | RequestWithNoCertValidation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |
-| S506 | UnsafeYAMLLoad | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
-| S508 | SnmpInsecureVersion | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
-| S509 | SnmpWeakCryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
-| S701 | Jinja2AutoescapeFalse | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
+| S101 | assert-used | Use of `assert` detected |  |
+| S102 | exec-used | Use of `exec` detected |  |
+| S103 | bad-file-permissions | `os.chmod` setting a permissive mask `{mask:#o}` on file or directory |  |
+| S104 | hardcoded-bind-all-interfaces | Possible binding to all interfaces |  |
+| S105 | hardcoded-password-string | Possible hardcoded password: "{}" |  |
+| S106 | hardcoded-password-func-arg | Possible hardcoded password: "{}" |  |
+| S107 | hardcoded-password-default | Possible hardcoded password: "{}" |  |
+| S108 | hardcoded-temp-file | Probable insecure usage of temporary file or directory: "{}" |  |
+| S113 | request-without-timeout | Probable use of requests call with timeout set to `{value}` |  |
+| S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: "{}" |  |
+| S501 | request-with-no-cert-validation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |
+| S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
+| S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
+| S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
+| S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
 
 ### flake8-blind-except (BLE)
 
@@ -815,7 +815,7 @@ For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| BLE001 | BlindExcept | Do not catch blind exception: `{name}` |  |
+| BLE001 | blind-except | Do not catch blind exception: `{name}` |  |
 
 ### flake8-boolean-trap (FBT)
 
@@ -823,9 +823,9 @@ For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| FBT001 | BooleanPositionalArgInFunctionDefinition | Boolean positional arg in function definition |  |
-| FBT002 | BooleanDefaultValueInFunctionDefinition | Boolean default value in function definition |  |
-| FBT003 | BooleanPositionalValueInFunctionCall | Boolean positional value in function call |  |
+| FBT001 | boolean-positional-arg-in-function-definition | Boolean positional arg in function definition |  |
+| FBT002 | boolean-default-value-in-function-definition | Boolean default value in function definition |  |
+| FBT003 | boolean-positional-value-in-function-call | Boolean positional value in function call |  |
 
 ### flake8-bugbear (B)
 
@@ -833,34 +833,34 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| B002 | UnaryPrefixIncrement | Python does not support the unary prefix increment |  |
-| B003 | AssignmentToOsEnviron | Assigning to `os.environ` doesn't clear the environment |  |
-| B004 | UnreliableCallableCheck |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
-| B005 | StripWithMultiCharacters | Using `.strip()` with multi-character strings is misleading the reader |  |
-| B006 | MutableArgumentDefault | Do not use mutable data structures for argument defaults |  |
-| B007 | UnusedLoopControlVariable | Loop control variable `{name}` not used within the loop body | 🛠 |
-| B008 | FunctionCallArgumentDefault | Do not perform function call `{name}` in argument defaults |  |
-| B009 | GetAttrWithConstant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
-| B010 | SetAttrWithConstant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
-| B011 | DoNotAssertFalse | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
-| B012 | JumpStatementInFinally | `{name}` inside finally blocks cause exceptions to be silenced |  |
-| B013 | RedundantTupleInExceptionHandler | A length-one tuple literal is redundant. Write `except {name}` instead of `except ({name},)`. | 🛠 |
-| B014 | DuplicateHandlerException | Exception handler with duplicate exception: `{name}` | 🛠 |
-| B015 | UselessComparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
-| B016 | CannotRaiseLiteral | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
-| B017 | NoAssertRaisesException | `assertRaises(Exception)` should be considered evil |  |
-| B018 | UselessExpression | Found useless expression. Either assign it to a variable or remove it. |  |
-| B019 | CachedInstanceMethod | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
-| B020 | LoopVariableOverridesIterator | Loop control variable `{name}` overrides iterable it iterates |  |
-| B021 | FStringDocstring | f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring. |  |
-| B022 | UselessContextlibSuppress | No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant |  |
-| B023 | FunctionUsesLoopVariable | Function definition does not bind loop variable `{name}` |  |
-| B024 | AbstractBaseClassWithoutAbstractMethod | `{name}` is an abstract base class, but it has no abstract methods |  |
-| B025 | DuplicateTryBlockException | try-except block with duplicate exception `{name}` |  |
-| B026 | StarArgUnpackingAfterKeywordArg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
-| B027 | EmptyMethodWithoutAbstractDecorator | `{name}` is an empty method in an abstract base class, but has no abstract decorator |  |
-| B904 | RaiseWithoutFromInsideExcept | Within an except clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |  |
-| B905 | ZipWithoutExplicitStrict | `zip()` without an explicit `strict=` parameter |  |
+| B002 | unary-prefix-increment | Python does not support the unary prefix increment |  |
+| B003 | assignment-to-os-environ | Assigning to `os.environ` doesn't clear the environment |  |
+| B004 | unreliable-callable-check |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
+| B005 | strip-with-multi-characters | Using `.strip()` with multi-character strings is misleading the reader |  |
+| B006 | mutable-argument-default | Do not use mutable data structures for argument defaults |  |
+| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within the loop body | 🛠 |
+| B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
+| B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
+| B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
+| B011 | do-not-assert-false | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
+| B012 | jump-statement-in-finally | `{name}` inside finally blocks cause exceptions to be silenced |  |
+| B013 | redundant-tuple-in-exception-handler | A length-one tuple literal is redundant. Write `except {name}` instead of `except ({name},)`. | 🛠 |
+| B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
+| B015 | useless-comparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
+| B016 | cannot-raise-literal | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
+| B017 | no-assert-raises-exception | `assertRaises(Exception)` should be considered evil |  |
+| B018 | useless-expression | Found useless expression. Either assign it to a variable or remove it. |  |
+| B019 | cached-instance-method | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
+| B020 | loop-variable-overrides-iterator | Loop control variable `{name}` overrides iterable it iterates |  |
+| B021 | f-string-docstring | f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring. |  |
+| B022 | useless-contextlib-suppress | No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant |  |
+| B023 | function-uses-loop-variable | Function definition does not bind loop variable `{name}` |  |
+| B024 | abstract-base-class-without-abstract-method | `{name}` is an abstract base class, but it has no abstract methods |  |
+| B025 | duplicate-try-block-exception | try-except block with duplicate exception `{name}` |  |
+| B026 | star-arg-unpacking-after-keyword-arg | Star-arg unpacking after a keyword argument is strongly discouraged |  |
+| B027 | empty-method-without-abstract-decorator | `{name}` is an empty method in an abstract base class, but has no abstract decorator |  |
+| B904 | raise-without-from-inside-except | Within an except clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |  |
+| B905 | zip-without-explicit-strict | `zip()` without an explicit `strict=` parameter |  |
 
 ### flake8-builtins (A)
 
@@ -868,9 +868,9 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| A001 | BuiltinVariableShadowing | Variable `{name}` is shadowing a python builtin |  |
-| A002 | BuiltinArgumentShadowing | Argument `{name}` is shadowing a python builtin |  |
-| A003 | BuiltinAttributeShadowing | Class attribute `{name}` is shadowing a python builtin |  |
+| A001 | builtin-variable-shadowing | Variable `{name}` is shadowing a python builtin |  |
+| A002 | builtin-argument-shadowing | Argument `{name}` is shadowing a python builtin |  |
+| A003 | builtin-attribute-shadowing | Class attribute `{name}` is shadowing a python builtin |  |
 
 ### flake8-comprehensions (C4)
 
@@ -878,22 +878,22 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C400 | UnnecessaryGeneratorList | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
-| C401 | UnnecessaryGeneratorSet | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
-| C402 | UnnecessaryGeneratorDict | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
-| C403 | UnnecessaryListComprehensionSet | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
-| C404 | UnnecessaryListComprehensionDict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
-| C405 | UnnecessaryLiteralSet | Unnecessary `{obj_type}` literal (rewrite as a `set` literal) | 🛠 |
-| C406 | UnnecessaryLiteralDict | Unnecessary `{obj_type}` literal (rewrite as a `dict` literal) | 🛠 |
-| C408 | UnnecessaryCollectionCall | Unnecessary `{obj_type}` call (rewrite as a literal) | 🛠 |
-| C409 | UnnecessaryLiteralWithinTupleCall | Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal) | 🛠 |
-| C410 | UnnecessaryLiteralWithinListCall | Unnecessary `{literal}` literal passed to `list()` (remove the outer call to `list()`) | 🛠 |
-| C411 | UnnecessaryListCall | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
-| C413 | UnnecessaryCallAroundSorted | Unnecessary `{func}` call around `sorted()` | 🛠 |
-| C414 | UnnecessaryDoubleCastOrProcess | Unnecessary `{inner}` call within `{outer}()` |  |
-| C415 | UnnecessarySubscriptReversal | Unnecessary subscript reversal of iterable within `{func}()` |  |
-| C416 | UnnecessaryComprehension | Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`) | 🛠 |
-| C417 | UnnecessaryMap | Unnecessary `map` usage (rewrite using a generator expression) |  |
+| C400 | unnecessary-generator-list | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
+| C401 | unnecessary-generator-set | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
+| C402 | unnecessary-generator-dict | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
+| C403 | unnecessary-list-comprehension-set | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
+| C404 | unnecessary-list-comprehension-dict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
+| C405 | unnecessary-literal-set | Unnecessary `{obj_type}` literal (rewrite as a `set` literal) | 🛠 |
+| C406 | unnecessary-literal-dict | Unnecessary `{obj_type}` literal (rewrite as a `dict` literal) | 🛠 |
+| C408 | unnecessary-collection-call | Unnecessary `{obj_type}` call (rewrite as a literal) | 🛠 |
+| C409 | unnecessary-literal-within-tuple-call | Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal) | 🛠 |
+| C410 | unnecessary-literal-within-list-call | Unnecessary `{literal}` literal passed to `list()` (remove the outer call to `list()`) | 🛠 |
+| C411 | unnecessary-list-call | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
+| C413 | unnecessary-call-around-sorted | Unnecessary `{func}` call around `sorted()` | 🛠 |
+| C414 | unnecessary-double-cast-or-process | Unnecessary `{inner}` call within `{outer}()` |  |
+| C415 | unnecessary-subscript-reversal | Unnecessary subscript reversal of iterable within `{func}()` |  |
+| C416 | unnecessary-comprehension | Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`) | 🛠 |
+| C417 | unnecessary-map | Unnecessary `map` usage (rewrite using a generator expression) |  |
 
 ### flake8-debugger (T10)
 
@@ -901,7 +901,7 @@ For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| T100 | Debugger | Trace found: `{name}` used |  |
+| T100 | debugger | Trace found: `{name}` used |  |
 
 ### flake8-errmsg (EM)
 
@@ -909,9 +909,9 @@ For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/0.4.0/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| EM101 | RawStringInException | Exception must not use a string literal, assign to variable first |  |
-| EM102 | FStringInException | Exception must not use an f-string literal, assign to variable first |  |
-| EM103 | DotFormatInException | Exception must not use a `.format()` string directly, assign to variable first |  |
+| EM101 | raw-string-in-exception | Exception must not use a string literal, assign to variable first |  |
+| EM102 | f-string-in-exception | Exception must not use an f-string literal, assign to variable first |  |
+| EM103 | dot-format-in-exception | Exception must not use a `.format()` string directly, assign to variable first |  |
 
 ### flake8-implicit-str-concat (ISC)
 
@@ -919,9 +919,9 @@ For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-impli
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ISC001 | SingleLineImplicitStringConcatenation | Implicitly concatenated string literals on one line |  |
-| ISC002 | MultiLineImplicitStringConcatenation | Implicitly concatenated string literals over continuation line |  |
-| ISC003 | ExplicitStringConcatenation | Explicitly concatenated string should be implicitly concatenated |  |
+| ISC001 | single-line-implicit-string-concatenation | Implicitly concatenated string literals on one line |  |
+| ISC002 | multi-line-implicit-string-concatenation | Implicitly concatenated string literals over continuation line |  |
+| ISC003 | explicit-string-concatenation | Explicitly concatenated string should be implicitly concatenated |  |
 
 ### flake8-import-conventions (ICN)
 
@@ -929,7 +929,7 @@ For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ICN001 | ImportAliasIsNotConventional | `{name}` should be imported as `{asname}` |  |
+| ICN001 | import-alias-is-not-conventional | `{name}` should be imported as `{asname}` |  |
 
 ### flake8-print (T20)
 
@@ -937,8 +937,8 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on Py
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| T201 | PrintFound | `print` found | 🛠 |
-| T203 | PPrintFound | `pprint` found | 🛠 |
+| T201 | print-found | `print` found | 🛠 |
+| T203 | p-print-found | `pprint` found | 🛠 |
 
 ### flake8-pytest-style (PT)
 
@@ -946,31 +946,31 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PT001 | IncorrectFixtureParenthesesStyle | Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}` | 🛠 |
-| PT002 | FixturePositionalArgs | Configuration for fixture `{function}` specified via positional args, use kwargs |  |
-| PT003 | ExtraneousScopeFunction | `scope='function'` is implied in `@pytest.fixture()` |  |
-| PT004 | MissingFixtureNameUnderscore | Fixture `{function}` does not return anything, add leading underscore |  |
-| PT005 | IncorrectFixtureNameUnderscore | Fixture `{function}` returns a value, remove leading underscore |  |
-| PT006 | ParametrizeNamesWrongType | Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}` | 🛠 |
-| PT007 | ParametrizeValuesWrongType | Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}` |  |
-| PT008 | PatchWithLambda | Use `return_value=` instead of patching with `lambda` |  |
-| PT009 | UnittestAssertion | Use a regular `assert` instead of unittest-style `{assertion}` | 🛠 |
-| PT010 | RaisesWithoutException | set the expected exception in `pytest.raises()` |  |
-| PT011 | RaisesTooBroad | `pytest.raises({exception})` is too broad, set the `match` parameter or use a more specific exception |  |
-| PT012 | RaisesWithMultipleStatements | `pytest.raises()` block should contain a single simple statement |  |
-| PT013 | IncorrectPytestImport | Found incorrect import of pytest, use simple `import pytest` instead |  |
-| PT015 | AssertAlwaysFalse | Assertion always fails, replace with `pytest.fail()` |  |
-| PT016 | FailWithoutMessage | No message passed to `pytest.fail()` |  |
-| PT017 | AssertInExcept | Found assertion on exception `{name}` in except block, use `pytest.raises()` instead |  |
-| PT018 | CompositeAssertion | Assertion should be broken down into multiple parts |  |
-| PT019 | FixtureParamWithoutValue | Fixture `{name}` without value is injected as parameter, use `@pytest.mark.usefixtures` instead |  |
-| PT020 | DeprecatedYieldFixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
-| PT021 | FixtureFinalizerCallback | Use `yield` instead of `request.addfinalizer` |  |
-| PT022 | UselessYieldFixture | No teardown in fixture `{name}`, use `return` instead of `yield` | 🛠 |
-| PT023 | IncorrectMarkParenthesesStyle | Use `@pytest.mark.{mark_name}{expected_parens}` over `@pytest.mark.{mark_name}{actual_parens}` | 🛠 |
-| PT024 | UnnecessaryAsyncioMarkOnFixture | `pytest.mark.asyncio` is unnecessary for fixtures | 🛠 |
-| PT025 | ErroneousUseFixturesOnFixture | `pytest.mark.usefixtures` has no effect on fixtures | 🛠 |
-| PT026 | UseFixturesWithoutParameters | Useless `pytest.mark.usefixtures` without parameters | 🛠 |
+| PT001 | incorrect-fixture-parentheses-style | Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}` | 🛠 |
+| PT002 | fixture-positional-args | Configuration for fixture `{function}` specified via positional args, use kwargs |  |
+| PT003 | extraneous-scope-function | `scope='function'` is implied in `@pytest.fixture()` |  |
+| PT004 | missing-fixture-name-underscore | Fixture `{function}` does not return anything, add leading underscore |  |
+| PT005 | incorrect-fixture-name-underscore | Fixture `{function}` returns a value, remove leading underscore |  |
+| PT006 | parametrize-names-wrong-type | Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}` | 🛠 |
+| PT007 | parametrize-values-wrong-type | Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}` |  |
+| PT008 | patch-with-lambda | Use `return_value=` instead of patching with `lambda` |  |
+| PT009 | unittest-assertion | Use a regular `assert` instead of unittest-style `{assertion}` | 🛠 |
+| PT010 | raises-without-exception | set the expected exception in `pytest.raises()` |  |
+| PT011 | raises-too-broad | `pytest.raises({exception})` is too broad, set the `match` parameter or use a more specific exception |  |
+| PT012 | raises-with-multiple-statements | `pytest.raises()` block should contain a single simple statement |  |
+| PT013 | incorrect-pytest-import | Found incorrect import of pytest, use simple `import pytest` instead |  |
+| PT015 | assert-always-false | Assertion always fails, replace with `pytest.fail()` |  |
+| PT016 | fail-without-message | No message passed to `pytest.fail()` |  |
+| PT017 | assert-in-except | Found assertion on exception `{name}` in except block, use `pytest.raises()` instead |  |
+| PT018 | composite-assertion | Assertion should be broken down into multiple parts |  |
+| PT019 | fixture-param-without-value | Fixture `{name}` without value is injected as parameter, use `@pytest.mark.usefixtures` instead |  |
+| PT020 | deprecated-yield-fixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
+| PT021 | fixture-finalizer-callback | Use `yield` instead of `request.addfinalizer` |  |
+| PT022 | useless-yield-fixture | No teardown in fixture `{name}`, use `return` instead of `yield` | 🛠 |
+| PT023 | incorrect-mark-parentheses-style | Use `@pytest.mark.{mark_name}{expected_parens}` over `@pytest.mark.{mark_name}{actual_parens}` | 🛠 |
+| PT024 | unnecessary-asyncio-mark-on-fixture | `pytest.mark.asyncio` is unnecessary for fixtures | 🛠 |
+| PT025 | erroneous-use-fixtures-on-fixture | `pytest.mark.usefixtures` has no effect on fixtures | 🛠 |
+| PT026 | use-fixtures-without-parameters | Useless `pytest.mark.usefixtures` without parameters | 🛠 |
 
 ### flake8-quotes (Q)
 
@@ -978,10 +978,10 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| Q000 | BadQuotesInlineString | Double quotes found but single quotes preferred | 🛠 |
-| Q001 | BadQuotesMultilineString | Double quote multiline found but single quotes preferred | 🛠 |
-| Q002 | BadQuotesDocstring | Double quote docstring found but single quotes preferred | 🛠 |
-| Q003 | AvoidQuoteEscape | Change outer quotes to avoid escaping inner quotes | 🛠 |
+| Q000 | bad-quotes-inline-string | Double quotes found but single quotes preferred | 🛠 |
+| Q001 | bad-quotes-multiline-string | Double quote multiline found but single quotes preferred | 🛠 |
+| Q002 | bad-quotes-docstring | Double quote docstring found but single quotes preferred | 🛠 |
+| Q003 | avoid-quote-escape | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
 ### flake8-return (RET)
 
@@ -989,14 +989,14 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RET501 | UnnecessaryReturnNone | Do not explicitly `return None` in function if it is the only possible return value | 🛠 |
-| RET502 | ImplicitReturnValue | Do not implicitly `return None` in function able to return non-`None` value | 🛠 |
-| RET503 | ImplicitReturn | Missing explicit `return` at the end of function able to return non-`None` value | 🛠 |
-| RET504 | UnnecessaryAssign | Unnecessary variable assignment before `return` statement |  |
-| RET505 | SuperfluousElseReturn | Unnecessary `{branch}` after `return` statement |  |
-| RET506 | SuperfluousElseRaise | Unnecessary `{branch}` after `raise` statement |  |
-| RET507 | SuperfluousElseContinue | Unnecessary `{branch}` after `continue` statement |  |
-| RET508 | SuperfluousElseBreak | Unnecessary `{branch}` after `break` statement |  |
+| RET501 | unnecessary-return-none | Do not explicitly `return None` in function if it is the only possible return value | 🛠 |
+| RET502 | implicit-return-value | Do not implicitly `return None` in function able to return non-`None` value | 🛠 |
+| RET503 | implicit-return | Missing explicit `return` at the end of function able to return non-`None` value | 🛠 |
+| RET504 | unnecessary-assign | Unnecessary variable assignment before `return` statement |  |
+| RET505 | superfluous-else-return | Unnecessary `{branch}` after `return` statement |  |
+| RET506 | superfluous-else-raise | Unnecessary `{branch}` after `raise` statement |  |
+| RET507 | superfluous-else-continue | Unnecessary `{branch}` after `continue` statement |  |
+| RET508 | superfluous-else-break | Unnecessary `{branch}` after `break` statement |  |
 
 ### flake8-simplify (SIM)
 
@@ -1004,31 +1004,31 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| SIM101 | DuplicateIsinstanceCall | Multiple `isinstance` calls for `{name}`, merge into a single call | 🛠 |
-| SIM102 | NestedIfStatements | Use a single `if` statement instead of nested `if` statements | 🛠 |
-| SIM103 | ReturnBoolConditionDirectly | Return the condition `{cond}` directly | 🛠 |
-| SIM105 | UseContextlibSuppress | Use `contextlib.suppress({exception})` instead of try-except-pass |  |
-| SIM107 | ReturnInTryExceptFinally | Don't use `return` in `try`/`except` and `finally` |  |
-| SIM108 | UseTernaryOperator | Use ternary operator `{contents}` instead of if-else-block | 🛠 |
-| SIM109 | CompareWithTuple | Use `{replacement}` instead of multiple equality comparisons | 🛠 |
-| SIM110 | ConvertLoopToAny | Use `{any}` instead of `for` loop | 🛠 |
-| SIM111 | ConvertLoopToAll | Use `{all}` instead of `for` loop | 🛠 |
-| SIM112 | UseCapitalEnvironmentVariables | Use capitalized environment variable `{expected}` instead of `{original}` | 🛠 |
-| SIM115 | OpenFileWithContextHandler | Use context handler for opening files |  |
-| SIM117 | MultipleWithStatements | Use a single `with` statement with multiple contexts instead of nested `with` statements | 🛠 |
-| SIM118 | KeyInDict | Use `{key} in {dict}` instead of `{key} in {dict}.keys()` | 🛠 |
-| SIM201 | NegateEqualOp | Use `{left} != {right}` instead of `not {left} == {right}` | 🛠 |
-| SIM202 | NegateNotEqualOp | Use `{left} == {right}` instead of `not {left} != {right}` | 🛠 |
-| SIM208 | DoubleNegation | Use `{expr}` instead of `not (not {expr})` | 🛠 |
-| SIM210 | IfExprWithTrueFalse | Use `bool({expr})` instead of `True if {expr} else False` | 🛠 |
-| SIM211 | IfExprWithFalseTrue | Use `not {expr}` instead of `False if {expr} else True` | 🛠 |
-| SIM212 | IfExprWithTwistedArms | Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not {expr_else} else {expr_else}` | 🛠 |
-| SIM220 | AAndNotA | Use `False` instead of `{name} and not {name}` | 🛠 |
-| SIM221 | AOrNotA | Use `True` instead of `{name} or not {name}` | 🛠 |
-| SIM222 | OrTrue | Use `True` instead of `... or True` | 🛠 |
-| SIM223 | AndFalse | Use `False` instead of `... and False` | 🛠 |
-| SIM300 | YodaConditions | Yoda conditions are discouraged, use `{suggestion}` instead | 🛠 |
-| SIM401 | DictGetWithDefault | Use `{contents}` instead of an `if` block | 🛠 |
+| SIM101 | duplicate-isinstance-call | Multiple `isinstance` calls for `{name}`, merge into a single call | 🛠 |
+| SIM102 | nested-if-statements | Use a single `if` statement instead of nested `if` statements | 🛠 |
+| SIM103 | return-bool-condition-directly | Return the condition `{cond}` directly | 🛠 |
+| SIM105 | use-contextlib-suppress | Use `contextlib.suppress({exception})` instead of try-except-pass |  |
+| SIM107 | return-in-try-except-finally | Don't use `return` in `try`/`except` and `finally` |  |
+| SIM108 | use-ternary-operator | Use ternary operator `{contents}` instead of if-else-block | 🛠 |
+| SIM109 | compare-with-tuple | Use `{replacement}` instead of multiple equality comparisons | 🛠 |
+| SIM110 | convert-loop-to-any | Use `{any}` instead of `for` loop | 🛠 |
+| SIM111 | convert-loop-to-all | Use `{all}` instead of `for` loop | 🛠 |
+| SIM112 | use-capital-environment-variables | Use capitalized environment variable `{expected}` instead of `{original}` | 🛠 |
+| SIM115 | open-file-with-context-handler | Use context handler for opening files |  |
+| SIM117 | multiple-with-statements | Use a single `with` statement with multiple contexts instead of nested `with` statements | 🛠 |
+| SIM118 | key-in-dict | Use `{key} in {dict}` instead of `{key} in {dict}.keys()` | 🛠 |
+| SIM201 | negate-equal-op | Use `{left} != {right}` instead of `not {left} == {right}` | 🛠 |
+| SIM202 | negate-not-equal-op | Use `{left} == {right}` instead of `not {left} != {right}` | 🛠 |
+| SIM208 | double-negation | Use `{expr}` instead of `not (not {expr})` | 🛠 |
+| SIM210 | if-expr-with-true-false | Use `bool({expr})` instead of `True if {expr} else False` | 🛠 |
+| SIM211 | if-expr-with-false-true | Use `not {expr}` instead of `False if {expr} else True` | 🛠 |
+| SIM212 | if-expr-with-twisted-arms | Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not {expr_else} else {expr_else}` | 🛠 |
+| SIM220 | a-and-not-a | Use `False` instead of `{name} and not {name}` | 🛠 |
+| SIM221 | a-or-not-a | Use `True` instead of `{name} or not {name}` | 🛠 |
+| SIM222 | or-true | Use `True` instead of `... or True` | 🛠 |
+| SIM223 | and-false | Use `False` instead of `... and False` | 🛠 |
+| SIM300 | yoda-conditions | Yoda conditions are discouraged, use `{suggestion}` instead | 🛠 |
+| SIM401 | dict-get-with-default | Use `{contents}` instead of an `if` block | 🛠 |
 
 ### flake8-tidy-imports (TID)
 
@@ -1036,8 +1036,8 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TID251 | BannedApi | `{name}` is banned: {message} |  |
-| TID252 | RelativeImports | Relative imports from parent modules are banned |  |
+| TID251 | banned-api | `{name}` is banned: {message} |  |
+| TID252 | relative-imports | Relative imports from parent modules are banned |  |
 
 ### flake8-unused-arguments (ARG)
 
@@ -1045,11 +1045,11 @@ For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-a
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ARG001 | UnusedFunctionArgument | Unused function argument: `{name}` |  |
-| ARG002 | UnusedMethodArgument | Unused method argument: `{name}` |  |
-| ARG003 | UnusedClassMethodArgument | Unused class method argument: `{name}` |  |
-| ARG004 | UnusedStaticMethodArgument | Unused static method argument: `{name}` |  |
-| ARG005 | UnusedLambdaArgument | Unused lambda argument: `{name}` |  |
+| ARG001 | unused-function-argument | Unused function argument: `{name}` |  |
+| ARG002 | unused-method-argument | Unused method argument: `{name}` |  |
+| ARG003 | unused-class-method-argument | Unused class method argument: `{name}` |  |
+| ARG004 | unused-static-method-argument | Unused static method argument: `{name}` |  |
+| ARG005 | unused-lambda-argument | Unused lambda argument: `{name}` |  |
 
 ### flake8-datetimez (DTZ)
 
@@ -1057,15 +1057,15 @@ For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/20.10
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| DTZ001 | CallDatetimeWithoutTzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
-| DTZ002 | CallDatetimeToday | The use of `datetime.datetime.today()` is not allowed |  |
-| DTZ003 | CallDatetimeUtcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
-| DTZ004 | CallDatetimeUtcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
-| DTZ005 | CallDatetimeNowWithoutTzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
-| DTZ006 | CallDatetimeFromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
-| DTZ007 | CallDatetimeStrptimeWithoutZone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` |  |
-| DTZ011 | CallDateToday | The use of `datetime.date.today()` is not allowed. |  |
-| DTZ012 | CallDateFromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+| DTZ001 | call-datetime-without-tzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
+| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed |  |
+| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
+| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
+| DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
+| DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
+| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` |  |
+| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
+| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
 
 ### eradicate (ERA)
 
@@ -1073,7 +1073,7 @@ For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ERA001 | CommentedOutCode | Found commented-out code | 🛠 |
+| ERA001 | commented-out-code | Found commented-out code | 🛠 |
 
 ### pandas-vet (PD)
 
@@ -1081,18 +1081,18 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/0.2.3/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PD002 | UseOfInplaceArgument | `inplace=True` should be avoided; it has inconsistent behavior |  |
-| PD003 | UseOfDotIsNull | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
-| PD004 | UseOfDotNotNull | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
-| PD007 | UseOfDotIx | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
-| PD008 | UseOfDotAt | Use `.loc` instead of `.at`.  If speed is important, use numpy. |  |
-| PD009 | UseOfDotIat | Use `.iloc` instead of `.iat`.  If speed is important, use numpy. |  |
-| PD010 | UseOfDotPivotOrUnstack | `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality |  |
-| PD011 | UseOfDotValues | Use `.to_numpy()` instead of `.values` |  |
-| PD012 | UseOfDotReadTable | `.read_csv` is preferred to `.read_table`; provides same functionality |  |
-| PD013 | UseOfDotStack | `.melt` is preferred to `.stack`; provides same functionality |  |
-| PD015 | UseOfPdMerge | Use `.merge` method instead of `pd.merge` function. They have equivalent functionality. |  |
-| PD901 | DfIsABadVariableName | `df` is a bad variable name. Be kinder to your future self. |  |
+| PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior |  |
+| PD003 | use-of-dot-is-null | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
+| PD004 | use-of-dot-not-null | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
+| PD007 | use-of-dot-ix | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
+| PD008 | use-of-dot-at | Use `.loc` instead of `.at`.  If speed is important, use numpy. |  |
+| PD009 | use-of-dot-iat | Use `.iloc` instead of `.iat`.  If speed is important, use numpy. |  |
+| PD010 | use-of-dot-pivot-or-unstack | `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality |  |
+| PD011 | use-of-dot-values | Use `.to_numpy()` instead of `.values` |  |
+| PD012 | use-of-dot-read-table | `.read_csv` is preferred to `.read_table`; provides same functionality |  |
+| PD013 | use-of-dot-stack | `.melt` is preferred to `.stack`; provides same functionality |  |
+| PD015 | use-of-pd-merge | Use `.merge` method instead of `pd.merge` function. They have equivalent functionality. |  |
+| PD901 | df-is-a-bad-variable-name | `df` is a bad variable name. Be kinder to your future self. |  |
 
 ### pygrep-hooks (PGH)
 
@@ -1100,10 +1100,10 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PGH001 | NoEval | No builtin `eval()` allowed |  |
-| PGH002 | DeprecatedLogWarn | `warn` is deprecated in favor of `warning` |  |
-| PGH003 | BlanketTypeIgnore | Use specific rule codes when ignoring type issues |  |
-| PGH004 | BlanketNOQA | Use specific rule codes when using `noqa` |  |
+| PGH001 | no-eval | No builtin `eval()` allowed |  |
+| PGH002 | deprecated-log-warn | `warn` is deprecated in favor of `warning` |  |
+| PGH003 | blanket-type-ignore | Use specific rule codes when ignoring type issues |  |
+| PGH004 | blanket-noqa | Use specific rule codes when using `noqa` |  |
 
 ### Pylint (PLC, PLE, PLR, PLW)
 
@@ -1112,31 +1112,31 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
 #### Convention (PLC)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLC0414 | UselessImportAlias | Import alias does not rename original package | 🛠 |
-| PLC3002 | UnnecessaryDirectLambdaCall | Lambda expression called directly. Execute the expression inline instead. |  |
+| PLC0414 | useless-import-alias | Import alias does not rename original package | 🛠 |
+| PLC3002 | unnecessary-direct-lambda-call | Lambda expression called directly. Execute the expression inline instead. |  |
 
 #### Error (PLE)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLE0117 | NonlocalWithoutBinding | Nonlocal name `{name}` found without binding |  |
-| PLE0118 | UsedPriorGlobalDeclaration | Name `{name}` is used prior to global declaration on line {line} |  |
-| PLE1142 | AwaitOutsideAsync | `await` should be used within an async function |  |
+| PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
+| PLE0118 | used-prior-global-declaration | Name `{name}` is used prior to global declaration on line {line} |  |
+| PLE1142 | await-outside-async | `await` should be used within an async function |  |
 
 #### Refactor (PLR)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLR0133 | ConstantComparison | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
-| PLR0206 | PropertyWithParameters | Cannot have defined parameters for properties |  |
-| PLR0402 | ConsiderUsingFromImport | Use `from {module} import {name}` in lieu of alias |  |
-| PLR1701 | ConsiderMergingIsinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
-| PLR1722 | UseSysExit | Use `sys.exit()` instead of `{name}` | 🛠 |
-| PLR2004 | MagicValueComparison | Magic value used in comparison, consider replacing {value} with a constant variable |  |
+| PLR0133 | constant-comparison | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
+| PLR0206 | property-with-parameters | Cannot have defined parameters for properties |  |
+| PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias |  |
+| PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
+| PLR1722 | use-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
+| PLR2004 | magic-value-comparison | Magic value used in comparison, consider replacing {value} with a constant variable |  |
 
 #### Warning (PLW)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLW0120 | UselessElseOnLoop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
-| PLW0602 | GlobalVariableNotAssigned | Using global for `{name}` but no assignment is done |  |
+| PLW0120 | useless-else-on-loop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
+| PLW0602 | global-variable-not-assigned | Using global for `{name}` but no assignment is done |  |
 
 ### flake8-pie (PIE)
 
@@ -1144,10 +1144,10 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PIE790 | NoUnnecessaryPass | Unnecessary `pass` statement | 🛠 |
-| PIE794 | DupeClassFieldDefinitions | Class field `{name}` is defined multiple times | 🛠 |
-| PIE796 | PreferUniqueEnums | Enum contains duplicate value: `{value}` |  |
-| PIE807 | PreferListBuiltin | Prefer `list()` over useless lambda | 🛠 |
+| PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
+| PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
+| PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
+| PIE807 | prefer-list-builtin | Prefer `list()` over useless lambda | 🛠 |
 
 ### flake8-commas (COM)
 
@@ -1155,9 +1155,9 @@ For more, see [flake8-commas](https://pypi.org/project/flake8-commas/2.1.0/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| COM812 | TrailingCommaMissing | Trailing comma missing | 🛠 |
-| COM818 | TrailingCommaOnBareTupleProhibited | Trailing comma on bare tuple prohibited |  |
-| COM819 | TrailingCommaProhibited | Trailing comma prohibited | 🛠 |
+| COM812 | trailing-comma-missing | Trailing comma missing | 🛠 |
+| COM818 | trailing-comma-on-bare-tuple-prohibited | Trailing comma on bare tuple prohibited |  |
+| COM819 | trailing-comma-prohibited | Trailing comma prohibited | 🛠 |
 
 ### flake8-no-pep420 (INP)
 
@@ -1165,18 +1165,18 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| INP001 | ImplicitNamespacePackage | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+| INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
 
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RUF001 | AmbiguousUnicodeCharacterString | String contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF004 | KeywordArgumentBeforeStarArgument | Keyword argument `{name}` must come after starred arguments |  |
-| RUF005 | UnpackInsteadOfConcatenatingToCollectionLiteral | Consider `{expr}` instead of concatenation |  |
-| RUF100 | UnusedNOQA | Unused blanket `noqa` directive | 🛠 |
+| RUF001 | ambiguous-unicode-character-string | String contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
+| RUF002 | ambiguous-unicode-character-docstring | Docstring contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
+| RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
+| RUF004 | keyword-argument-before-star-argument | Keyword argument `{name}` must come after starred arguments |  |
+| RUF005 | unpack-instead-of-concatenating-to-collection-literal | Consider `{expr}` instead of concatenation |  |
+| RUF100 | unused-noqa | Unused blanket `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
 
