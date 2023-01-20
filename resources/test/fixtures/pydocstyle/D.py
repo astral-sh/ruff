@@ -624,3 +624,13 @@ def one_liner():
     """
 
     "Wrong."""
+
+
+@expect('D404: First word of the docstring should not be "This"')
+def starts_with_this():
+    """This is a docstring."""
+
+
+@expect('D404: First word of the docstring should not be "This"')
+def starts_with_space_then_this():
+    """ This is a docstring that starts with a space."""  # noqa: D210
