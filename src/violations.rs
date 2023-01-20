@@ -4380,7 +4380,7 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
     fn message(&self) -> String {
         format!(
             "The use of `datetime.datetime.strptime()` without %z must be followed by \
-             `.replace(tzinfo=)`"
+             `.replace(tzinfo=)` or `.astimezone()`"
         )
     }
 }
