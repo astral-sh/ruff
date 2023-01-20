@@ -433,7 +433,7 @@ ruff_macros::define_rule_mapping!(
 );
 
 #[derive(EnumIter, Debug, PartialEq, Eq)]
-pub enum RuleOrigin {
+pub enum Linter {
     Pyflakes,
     Pycodestyle,
     McCabe,
@@ -489,55 +489,55 @@ impl Prefixes {
     }
 }
 
-include!(concat!(env!("OUT_DIR"), "/origin.rs"));
+include!(concat!(env!("OUT_DIR"), "/linter.rs"));
 
-impl RuleOrigin {
+impl Linter {
     pub fn prefixes(&self) -> Prefixes {
         match self {
-            RuleOrigin::Eradicate => Prefixes::Single(RuleCodePrefix::ERA),
-            RuleOrigin::Flake82020 => Prefixes::Single(RuleCodePrefix::YTT),
-            RuleOrigin::Flake8Annotations => Prefixes::Single(RuleCodePrefix::ANN),
-            RuleOrigin::Flake8Bandit => Prefixes::Single(RuleCodePrefix::S),
-            RuleOrigin::Flake8BlindExcept => Prefixes::Single(RuleCodePrefix::BLE),
-            RuleOrigin::Flake8BooleanTrap => Prefixes::Single(RuleCodePrefix::FBT),
-            RuleOrigin::Flake8Bugbear => Prefixes::Single(RuleCodePrefix::B),
-            RuleOrigin::Flake8Builtins => Prefixes::Single(RuleCodePrefix::A),
-            RuleOrigin::Flake8Comprehensions => Prefixes::Single(RuleCodePrefix::C4),
-            RuleOrigin::Flake8Datetimez => Prefixes::Single(RuleCodePrefix::DTZ),
-            RuleOrigin::Flake8Debugger => Prefixes::Single(RuleCodePrefix::T10),
-            RuleOrigin::Flake8ErrMsg => Prefixes::Single(RuleCodePrefix::EM),
-            RuleOrigin::Flake8ImplicitStrConcat => Prefixes::Single(RuleCodePrefix::ISC),
-            RuleOrigin::Flake8ImportConventions => Prefixes::Single(RuleCodePrefix::ICN),
-            RuleOrigin::Flake8Print => Prefixes::Single(RuleCodePrefix::T20),
-            RuleOrigin::Flake8PytestStyle => Prefixes::Single(RuleCodePrefix::PT),
-            RuleOrigin::Flake8Quotes => Prefixes::Single(RuleCodePrefix::Q),
-            RuleOrigin::Flake8Return => Prefixes::Single(RuleCodePrefix::RET),
-            RuleOrigin::Flake8Simplify => Prefixes::Single(RuleCodePrefix::SIM),
-            RuleOrigin::Flake8TidyImports => Prefixes::Single(RuleCodePrefix::TID),
-            RuleOrigin::Flake8UnusedArguments => Prefixes::Single(RuleCodePrefix::ARG),
-            RuleOrigin::Isort => Prefixes::Single(RuleCodePrefix::I),
-            RuleOrigin::McCabe => Prefixes::Single(RuleCodePrefix::C90),
-            RuleOrigin::PEP8Naming => Prefixes::Single(RuleCodePrefix::N),
-            RuleOrigin::PandasVet => Prefixes::Single(RuleCodePrefix::PD),
-            RuleOrigin::Pycodestyle => Prefixes::Multiple(vec![
+            Linter::Eradicate => Prefixes::Single(RuleCodePrefix::ERA),
+            Linter::Flake82020 => Prefixes::Single(RuleCodePrefix::YTT),
+            Linter::Flake8Annotations => Prefixes::Single(RuleCodePrefix::ANN),
+            Linter::Flake8Bandit => Prefixes::Single(RuleCodePrefix::S),
+            Linter::Flake8BlindExcept => Prefixes::Single(RuleCodePrefix::BLE),
+            Linter::Flake8BooleanTrap => Prefixes::Single(RuleCodePrefix::FBT),
+            Linter::Flake8Bugbear => Prefixes::Single(RuleCodePrefix::B),
+            Linter::Flake8Builtins => Prefixes::Single(RuleCodePrefix::A),
+            Linter::Flake8Comprehensions => Prefixes::Single(RuleCodePrefix::C4),
+            Linter::Flake8Datetimez => Prefixes::Single(RuleCodePrefix::DTZ),
+            Linter::Flake8Debugger => Prefixes::Single(RuleCodePrefix::T10),
+            Linter::Flake8ErrMsg => Prefixes::Single(RuleCodePrefix::EM),
+            Linter::Flake8ImplicitStrConcat => Prefixes::Single(RuleCodePrefix::ISC),
+            Linter::Flake8ImportConventions => Prefixes::Single(RuleCodePrefix::ICN),
+            Linter::Flake8Print => Prefixes::Single(RuleCodePrefix::T20),
+            Linter::Flake8PytestStyle => Prefixes::Single(RuleCodePrefix::PT),
+            Linter::Flake8Quotes => Prefixes::Single(RuleCodePrefix::Q),
+            Linter::Flake8Return => Prefixes::Single(RuleCodePrefix::RET),
+            Linter::Flake8Simplify => Prefixes::Single(RuleCodePrefix::SIM),
+            Linter::Flake8TidyImports => Prefixes::Single(RuleCodePrefix::TID),
+            Linter::Flake8UnusedArguments => Prefixes::Single(RuleCodePrefix::ARG),
+            Linter::Isort => Prefixes::Single(RuleCodePrefix::I),
+            Linter::McCabe => Prefixes::Single(RuleCodePrefix::C90),
+            Linter::PEP8Naming => Prefixes::Single(RuleCodePrefix::N),
+            Linter::PandasVet => Prefixes::Single(RuleCodePrefix::PD),
+            Linter::Pycodestyle => Prefixes::Multiple(vec![
                 (RuleCodePrefix::E, "Error"),
                 (RuleCodePrefix::W, "Warning"),
             ]),
-            RuleOrigin::Pydocstyle => Prefixes::Single(RuleCodePrefix::D),
-            RuleOrigin::Pyflakes => Prefixes::Single(RuleCodePrefix::F),
-            RuleOrigin::PygrepHooks => Prefixes::Single(RuleCodePrefix::PGH),
-            RuleOrigin::Pylint => Prefixes::Multiple(vec![
+            Linter::Pydocstyle => Prefixes::Single(RuleCodePrefix::D),
+            Linter::Pyflakes => Prefixes::Single(RuleCodePrefix::F),
+            Linter::PygrepHooks => Prefixes::Single(RuleCodePrefix::PGH),
+            Linter::Pylint => Prefixes::Multiple(vec![
                 (RuleCodePrefix::PLC, "Convention"),
                 (RuleCodePrefix::PLE, "Error"),
                 (RuleCodePrefix::PLR, "Refactor"),
                 (RuleCodePrefix::PLW, "Warning"),
             ]),
-            RuleOrigin::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
-            RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
-            RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
-            RuleOrigin::Flake8NoPep420 => Prefixes::Single(RuleCodePrefix::INP),
-            RuleOrigin::Flake8Executable => Prefixes::Single(RuleCodePrefix::EXE),
-            RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
+            Linter::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
+            Linter::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
+            Linter::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
+            Linter::Flake8NoPep420 => Prefixes::Single(RuleCodePrefix::INP),
+            Linter::Flake8Executable => Prefixes::Single(RuleCodePrefix::EXE),
+            Linter::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
         }
     }
 }
