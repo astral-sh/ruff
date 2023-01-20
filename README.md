@@ -146,7 +146,6 @@ developer of [Zulip](https://github.com/zulip/zulip):
 1. [Benchmarks](#benchmarks)
 1. [Reference](#reference)
 1. [License](#license)
-1. [Contributing](#contributing)
 
 ## Installation and Usage
 
@@ -1643,7 +1642,8 @@ Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a 
 
 ## Development
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to Ruff.
+Contributions are welcome and hugely appreciated. To get started, check out the
+[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
 
 ## Releases
 
@@ -3443,8 +3443,3 @@ keep-runtime-typing = true
 ## License
 
 MIT
-
-## Contributing
-
-Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
