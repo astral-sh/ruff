@@ -12,6 +12,10 @@ pub enum ShebangDirective<'a> {
 }
 
 pub fn extract_shebang(line: &str) -> ShebangDirective {
+    // Minor optimization to avoid matches in the common case.
+    if !line.contains('!') {
+        return ShebangDirective::None;
+    }
     match SHEBANG_REGEX.captures(line) {
         Some(caps) => match caps.name("spaces") {
             Some(spaces) => match caps.name("directive") {

@@ -4,7 +4,7 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
+use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::violation::Violation;
 
 define_violation!(
@@ -18,8 +18,7 @@ impl Violation for ShebangPython {
 }
 
 /// EXE003
-pub fn shebang_python(lineno: usize, line: &str) -> Option<Diagnostic> {
-    let shebang = extract_shebang(line);
+pub fn shebang_python(lineno: usize, shebang: &ShebangDirective) -> Option<Diagnostic> {
     if let ShebangDirective::Match(_, start, end, content) = shebang {
         if content.contains("python") {
             None
@@ -28,7 +27,7 @@ pub fn shebang_python(lineno: usize, line: &str) -> Option<Diagnostic> {
                 ShebangPython,
                 Range::new(
                     Location::new(lineno + 1, start - 2),
-                    Location::new(lineno + 1, end),
+                    Location::new(lineno + 1, *end),
                 ),
             );
 

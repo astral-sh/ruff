@@ -4,7 +4,7 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
+use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::violation::Violation;
 
 define_violation!(
@@ -17,16 +17,15 @@ impl Violation for ShebangNewline {
     }
 }
 
-// EXE005
-pub fn shebang_newline(lineno: usize, line: &str) -> Option<Diagnostic> {
-    let shebang = extract_shebang(line);
+/// EXE005
+pub fn shebang_newline(lineno: usize, shebang: &ShebangDirective) -> Option<Diagnostic> {
     if let ShebangDirective::Match(_, start, end, _) = shebang {
         if lineno > 1 {
             let diagnostic = Diagnostic::new(
                 ShebangNewline,
                 Range::new(
-                    Location::new(lineno + 1, start),
-                    Location::new(lineno + 1, end),
+                    Location::new(lineno + 1, *start),
+                    Location::new(lineno + 1, *end),
                 ),
             );
             Some(diagnostic)
