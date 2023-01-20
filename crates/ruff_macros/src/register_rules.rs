@@ -5,7 +5,7 @@ use quote::quote;
 use syn::parse::Parse;
 use syn::{Attribute, Ident, LitStr, Path, Token};
 
-pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
+pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
     let mut rule_variants = quote!();
     let mut diagnostic_kind_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
@@ -19,7 +19,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut diagnostic_kind_commit_match_arms = quote!();
     let mut from_impls_for_diagnostic_kind = quote!();
 
-    for (code, path, name, attr) in &mapping.entries {
+    for (code, path, name, attr) in &input.entries {
         let code_str = LitStr::new(&code.to_string(), Span::call_site());
         rule_variants.extend(quote! {
             #[doc = #code_str]
@@ -55,7 +55,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         });
     }
 
-    let code_to_name: HashMap<_, _> = mapping
+    let code_to_name: HashMap<_, _> = input
         .entries
         .iter()
         .map(|(code, _, name, _)| (code.to_string(), name))
@@ -64,7 +64,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let rule_code_prefix = super::rule_code_prefix::expand(
         &Ident::new("Rule", Span::call_site()),
         &Ident::new("RuleCodePrefix", Span::call_site()),
-        mapping.entries.iter().map(|(code, .., attr)| (code, attr)),
+        input.entries.iter().map(|(code, .., attr)| (code, attr)),
         |code| code_to_name[code],
     );
 
@@ -161,11 +161,11 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     }
 }
 
-pub struct Mapping {
+pub struct Input {
     entries: Vec<(Ident, Path, Ident, Vec<Attribute>)>,
 }
 
-impl Parse for Mapping {
+impl Parse for Input {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut entries = Vec::new();
         while !input.is_empty() {
