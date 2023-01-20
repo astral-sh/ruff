@@ -18,7 +18,7 @@ expression: diagnostics
     row: 7
     column: 4
   end_location:
-    row: 8
+    row: 10
     column: 12
   fix: ~
   parent: ~

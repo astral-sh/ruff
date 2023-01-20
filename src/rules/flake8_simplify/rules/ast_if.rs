@@ -128,7 +128,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
-            orelse[0].end_location.unwrap(),
+            stmt.end_location.unwrap(),
         ));
     }
     checker.diagnostics.push(diagnostic);
