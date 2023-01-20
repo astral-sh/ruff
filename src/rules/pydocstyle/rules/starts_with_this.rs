@@ -14,7 +14,7 @@ pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
         return;
     }
 
-    let Some(first_word) = body.split(' ').next() else {
+    let Some(first_word) = trimmed.split(' ').next() else {
         return
     };
     if normalize_word(first_word) != "this" {
