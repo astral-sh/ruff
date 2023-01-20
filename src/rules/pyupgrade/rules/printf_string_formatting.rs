@@ -44,6 +44,7 @@ impl PercentFormatPart {
             conversion,
         }
     }
+
     fn from_rustpython(spec: &CFormatSpec) -> Self {
         let clean_width = match &spec.min_field_width {
             Some(width_item) => match width_item {
@@ -68,14 +69,14 @@ impl PercentFormatPart {
         } else {
             Some(get_flags(spec.flags))
         };
-        let perc_part = PercentFormatPart::new(
+
+        PercentFormatPart::new(
             spec.mapping_key.clone(),
             flags,
             clean_width,
             clean_precision,
             spec.format_char.to_string(),
-        );
-        perc_part
+        )
     }
 }
 
@@ -91,7 +92,8 @@ impl PercentFormat {
     }
 }
 
-/// Converts RustPython's C Conversion Flags into their python string representation
+/// Converts `RustPython`'s C Conversion Flags into their python string
+/// representation
 fn get_flags(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
     if flags.contains(CConversionFlags::ALTERNATE_FORM) {
@@ -112,8 +114,7 @@ fn get_flags(flags: CConversionFlags) -> String {
     flag_string
 }
 
-
-/// Converts a string to a vector of PercentFormat structs
+/// Converts a string to a vector of `PercentFormat` structs
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let mut formats: Vec<PercentFormat> = vec![];
 
@@ -133,7 +134,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                 }
             };
             if let CFormatPart::Spec(c_spec) = &the_next {
-               current_format.parts = Some(PercentFormatPart::from_rustpython(c_spec));
+                current_format.parts = Some(PercentFormatPart::from_rustpython(c_spec));
             }
             formats.push(current_format);
         }
@@ -568,7 +569,8 @@ mod test {
     #[test_case( "\"%()s\"",PercentFormatPart::new(Some(String::new()), None, None, None, "s".to_string()); "empty paren")]
     #[test_case( "\"%(hi)s\"",PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string()); "word in paren")]
     #[test_case( "\"%s\"",PercentFormatPart::new(None, None, None, None, "s".to_string()); "format s")]
-    // #[test_case( "\"%%\"",PercentFormatPart::new(None, None, None, None, "%".to_string()); "format double percentage")]
+    // #[test_case( "\"%%\"",PercentFormatPart::new(None, None, None, None, "%".to_string());
+    // "format double percentage")]
     #[test_case( "\"%a\"",PercentFormatPart::new(None, None, None, None, "a".to_string()); "format an a")]
     #[test_case( "\"%r\"",PercentFormatPart::new(None, None, None, None, "r".to_string()); "format an r")]
     fn test_parse_percent_format(sample: &str, expected: PercentFormatPart) {
