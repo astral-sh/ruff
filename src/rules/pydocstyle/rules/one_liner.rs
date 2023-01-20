@@ -34,7 +34,9 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 // If removing whitespace would lead to an invalid string of quote
                 // characters, avoid applying the fix.
                 let trimmed = docstring.body.trim();
-                if !trimmed.ends_with(trailing.chars().last().unwrap()) {
+                if !trimmed.ends_with(trailing.chars().last().unwrap())
+                    && !trimmed.starts_with(leading.chars().last().unwrap())
+                {
                     diagnostic.amend(Fix::replacement(
                         format!("{leading}{trimmed}{trailing}"),
                         docstring.expr.location,

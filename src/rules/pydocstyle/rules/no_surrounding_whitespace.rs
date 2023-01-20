@@ -32,7 +32,9 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
         if let Some(pattern) = leading_quote(contents) {
             // If removing whitespace would lead to an invalid string of quote
             // characters, avoid applying the fix.
-            if !trimmed.ends_with(pattern.chars().last().unwrap()) {
+            if !trimmed.ends_with(pattern.chars().last().unwrap())
+                && !trimmed.starts_with(pattern.chars().last().unwrap())
+            {
                 diagnostic.amend(Fix::replacement(
                     trimmed.to_string(),
                     Location::new(
