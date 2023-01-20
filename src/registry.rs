@@ -422,6 +422,7 @@ ruff_macros::define_rule_mapping!(
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
     RUF003 => violations::AmbiguousUnicodeCharacterComment,
     RUF004 => violations::KeywordArgumentBeforeStarArgument,
+    RUF005 => violations::UnpackInsteadOfConcatenatingToCollectionLiteral,
     RUF100 => violations::UnusedNOQA,
 );
 
