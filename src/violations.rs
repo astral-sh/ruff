@@ -2652,6 +2652,18 @@ impl AlwaysAutofixableViolation for DictGetWithDefault {
         format!("Replace with `{contents}`")
     }
 }
+
+define_violation!(
+    pub struct UnpackInsteadOfConcatenatingToCollectionLiteral(pub String);
+);
+impl Violation for UnpackInsteadOfConcatenatingToCollectionLiteral {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnpackInsteadOfConcatenatingToCollectionLiteral(expr) = self;
+        format!("Consider `{expr}` instead of concatenation")
+    }
+}
+
 // pyupgrade
 
 define_violation!(

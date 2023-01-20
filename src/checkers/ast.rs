@@ -2725,6 +2725,13 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnpackInsteadOfConcatenatingToCollectionLiteral)
+                {
+                    ruff::rules::unpack_instead_of_concatenating_to_collection_literal(self, expr);
+                }
             }
             ExprKind::UnaryOp { op, operand } => {
                 let check_not_in = self.settings.rules.enabled(&Rule::NotInTest);
