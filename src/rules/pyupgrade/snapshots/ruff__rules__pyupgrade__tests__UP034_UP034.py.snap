@@ -130,7 +130,7 @@ expression: diagnostics
     row: 23
     column: 24
   fix:
-    content: print((yield 1))
+    content: int((yield 1))
     location:
       row: 23
       column: 8
