@@ -84,6 +84,21 @@ jobs:
       # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --all --no-deps
 
+  scripts:
+    name: "test scripts"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --origin pylint
+      - run: cargo check
+      - run: ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/
+      - run: cargo check
+
 # TODO(charlie): Re-enable the `wasm-pack` tests.
 # See: https://github.com/charliermarsh/ruff/issues/1425
 #  wasm-pack-test:
