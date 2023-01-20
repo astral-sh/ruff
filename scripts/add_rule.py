@@ -11,7 +11,7 @@ Example usage:
 
 import argparse
 
-from _utils import ROOT_DIR, dir_name
+from _utils import ROOT_DIR, dir_name, get_indent
 
 
 def snake_case(name: str) -> str:
@@ -34,7 +34,7 @@ def main(*, name: str, code: str, origin: str) -> None:
     with open(mod_rs, "w") as fp:
         for line in content.splitlines():
             if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
-                indent = line.split("fn rules(rule_code: Rule, path: &Path) -> Result<()> {")[0]
+                indent = get_indent(line)
                 fp.write(f'{indent}#[test_case(Rule::{code}, Path::new("{code}.py"); "{code}")]')
                 fp.write("\n")
 
@@ -99,7 +99,7 @@ impl Violation for %s {
                 continue
 
             if line.strip() == f"// {origin}":
-                indent = line.split("//")[0]
+                indent = get_indent(line)
                 fp.write(f"{indent}{code} => violations::{name},")
                 fp.write("\n")
                 has_written = True
