@@ -31,6 +31,7 @@ mod multi_line_summary_start;
 mod newline_after_last_paragraph;
 mod no_signature;
 mod no_surrounding_whitespace;
+pub mod non_imperative_mood;
 mod not_empty;
 mod not_missing;
 mod one_liner;

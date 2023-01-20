@@ -672,6 +672,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D300 | uses-triple-quotes | Use """triple double quotes""" |  |
 | D301 | uses-r-prefix-for-backslashed-content | Use r""" if any backslashes in a docstring |  |
 | D400 | ends-in-period | First line should end with a period | 🛠 |
+| D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
 | D403 | first-line-capitalized | First word of the first line should be properly capitalized |  |
 | D404 | no-this-prefix | First word of the docstring should not be "This" |  |

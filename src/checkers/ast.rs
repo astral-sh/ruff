@@ -4497,6 +4497,7 @@ impl<'a> Checker<'a> {
                 .rules
                 .enabled(&Rule::UsesRPrefixForBackslashedContent)
             || self.settings.rules.enabled(&Rule::EndsInPeriod)
+            || self.settings.rules.enabled(&Rule::NonImperativeMood)
             || self.settings.rules.enabled(&Rule::NoSignature)
             || self.settings.rules.enabled(&Rule::FirstLineCapitalized)
             || self.settings.rules.enabled(&Rule::NoThisPrefix)
@@ -4644,6 +4645,9 @@ impl<'a> Checker<'a> {
                 }
                 if self.settings.rules.enabled(&Rule::EndsInPeriod) {
                     pydocstyle::rules::ends_with_period(self, &docstring);
+                }
+                if self.settings.rules.enabled(&Rule::NonImperativeMood) {
+                    pydocstyle::rules::non_imperative_mood::non_imperative_mood(self, &docstring);
                 }
                 if self.settings.rules.enabled(&Rule::NoSignature) {
                     pydocstyle::rules::no_signature(self, &docstring);
