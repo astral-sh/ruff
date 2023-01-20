@@ -27,6 +27,7 @@ def main(*, plugin: str, url: str) -> None:
     with open(rust_module / "rules.rs", "w+") as fp:
         fp.write("use crate::checkers::ast::Checker;\n")
     with open(rust_module / "mod.rs", "w+") as fp:
+        fp.write(f"//! Rules from [{plugin}]({url}).\n")
         fp.write("pub(crate) mod rules;\n")
         fp.write("\n")
         fp.write(
@@ -77,20 +78,12 @@ mod tests {
                 fp.write(f"{indent}{pascal_case(plugin)},")
                 fp.write("\n")
 
-            elif line.strip() == 'RuleOrigin::Ruff => "Ruff-specific rules",':
-                fp.write(f'{indent}RuleOrigin::{pascal_case(plugin)} => "{plugin}",')
-                fp.write("\n")
-
             elif line.strip() == "RuleOrigin::Ruff => vec![RuleCodePrefix::RUF],":
                 fp.write(
                     f"{indent}RuleOrigin::{pascal_case(plugin)} => vec![\n"
                     f'{indent}    todo!("Fill-in prefix after generating codes")\n'
                     f"{indent}],"
                 )
-                fp.write("\n")
-
-            elif line.strip() == "RuleOrigin::Ruff => None,":
-                fp.write(f"{indent}RuleOrigin::{pascal_case(plugin)} => " f'Some(("{url}", &Platform::PyPI)),')
                 fp.write("\n")
 
             fp.write(line)
