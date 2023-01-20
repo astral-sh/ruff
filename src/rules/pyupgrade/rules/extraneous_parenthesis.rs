@@ -95,9 +95,7 @@ pub fn extraneous_parenthesis(
             let indent = indentation_greedy(checker.locator, arg);
             let small_indent = if indent.len() > 3 { &indent[3..] } else { "" };
             let before_fmt = format!("{func_name}(\n{indent}{special_before}");
-            new_string = format!(
-                "{before_fmt}{arg_string}{special_after}\n{small_indent})"
-            );
+            new_string = format!("{before_fmt}{arg_string}{special_after}\n{small_indent})");
         } else {
             new_string = format!("{func_name}({special_before}{arg_string}{special_after})");
         }
