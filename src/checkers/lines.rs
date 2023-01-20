@@ -3,7 +3,7 @@
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::flake8_executable::rules::{shebang_newline, shebang_python, shebang_whitespace};
 use crate::rules::pycodestyle::rules::{
-    doc_line_too_long, line_too_long, no_newline_at_end_of_file,
+    doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
@@ -29,6 +29,7 @@ pub fn check_lines(
     let enforce_unnecessary_coding_comment = settings
         .rules
         .enabled(&Rule::PEP3120UnnecessaryCodingComment);
+    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(&Rule::MixedSpacesAndTabs);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
@@ -96,6 +97,12 @@ pub fn check_lines(
                 if let Some(diagnostic) = doc_line_too_long(index, line, settings) {
                     diagnostics.push(diagnostic);
                 }
+            }
+        }
+
+        if enforce_mixed_spaces_and_tabs {
+            if let Some(diagnostic) = mixed_spaces_and_tabs(index, line) {
+                diagnostics.push(diagnostic);
             }
         }
 

@@ -14,6 +14,7 @@ use crate::{rules, violations};
 
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
+    E101 => violations::MixedSpacesAndTabs,
     E401 => violations::MultipleImportsOnOneLine,
     E402 => violations::ModuleImportNotAtTopOfFile,
     E501 => violations::LineTooLong,
@@ -281,6 +282,7 @@ ruff_macros::define_rule_mapping!(
     D300 => violations::UsesTripleQuotes,
     D301 => violations::UsesRPrefixForBackslashedContent,
     D400 => violations::EndsInPeriod,
+    D401 => crate::rules::pydocstyle::rules::non_imperative_mood::NonImperativeMood,
     D402 => violations::NoSignature,
     D403 => violations::FirstLineCapitalized,
     D404 => violations::NoThisPrefix,
@@ -556,15 +558,16 @@ impl Rule {
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
             Rule::UnusedNOQA => &LintSource::NoQa,
-            Rule::LineTooLong
-            | Rule::NoNewLineAtEndOfFile
-            | Rule::DocLineTooLong
-            | Rule::PEP3120UnnecessaryCodingComment
+            Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
-            | Rule::BlanketNOQA
+            | Rule::DocLineTooLong
+            | Rule::LineTooLong
+            | Rule::MixedSpacesAndTabs
+            | Rule::NoNewLineAtEndOfFile
+            | Rule::PEP3120UnnecessaryCodingComment
             | Rule::ShebangNewline
-            | Rule::ShebangWhitespace
-            | Rule::ShebangPython => &LintSource::Lines,
+            | Rule::ShebangPython
+            | Rule::ShebangWhitespace => &LintSource::Lines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString

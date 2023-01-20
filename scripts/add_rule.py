@@ -10,19 +10,8 @@ Example usage:
 """
 
 import argparse
-import os
-from pathlib import Path
 
-ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-def dir_name(origin: str) -> str:
-    return origin.replace("-", "_")
-
-
-def pascal_case(origin: str) -> str:
-    """Convert from snake-case to PascalCase."""
-    return "".join(word.title() for word in origin.split("-"))
+from _utils import ROOT_DIR, dir_name, get_indent
 
 
 def snake_case(name: str) -> str:
@@ -45,7 +34,7 @@ def main(*, name: str, code: str, origin: str) -> None:
     with open(mod_rs, "w") as fp:
         for line in content.splitlines():
             if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
-                indent = line.split("fn rules(rule_code: Rule, path: &Path) -> Result<()> {")[0]
+                indent = get_indent(line)
                 fp.write(f'{indent}#[test_case(Rule::{code}, Path::new("{code}.py"); "{code}")]')
                 fp.write("\n")
 
@@ -53,7 +42,7 @@ def main(*, name: str, code: str, origin: str) -> None:
             fp.write("\n")
 
     # Add the relevant rule function.
-    with open(ROOT_DIR / "src/rules" / dir_name(origin) / "rules.rs", "a") as fp:
+    with open(ROOT_DIR / "src/rules" / dir_name(origin) / (snake_case(name) + ".rs"), "w") as fp:
         fp.write(
             f"""
 /// {code}
@@ -76,16 +65,14 @@ pub fn {snake_case(name)}(checker: &mut Checker) {{}}
     pub struct %s;
 );
 impl Violation for %s {
+    #[derive_message_formats]
     fn message(&self) -> String {
-        todo!("Implement message")
-    }
-
-    fn placeholder() -> Self {
-        %s
+        todo!("implement message");
+        format!("TODO: write message")
     }
 }
 """
-                    % (name, name, name)
+                    % (name, name)
                 )
                 fp.write("\n")
 
@@ -102,7 +89,7 @@ impl Violation for %s {
             if has_written:
                 continue
 
-            if line.startswith("define_rule_mapping!"):
+            if line.startswith("ruff_macros::define_rule_mapping!"):
                 seen_macro = True
                 continue
 
@@ -110,10 +97,12 @@ impl Violation for %s {
                 continue
 
             if line.strip() == f"// {origin}":
-                indent = line.split("//")[0]
+                indent = get_indent(line)
                 fp.write(f"{indent}{code} => violations::{name},")
                 fp.write("\n")
                 has_written = True
+
+    assert has_written
 
 
 if __name__ == "__main__":

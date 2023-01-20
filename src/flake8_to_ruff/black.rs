@@ -27,7 +27,7 @@ struct Pyproject {
 
 pub fn parse_black_options<P: AsRef<Path>>(path: P) -> Result<Option<Black>> {
     let contents = std::fs::read_to_string(path)?;
-    Ok(toml_edit::easy::from_str::<Pyproject>(&contents)?
+    Ok(toml::from_str::<Pyproject>(&contents)?
         .tool
         .and_then(|tool| tool.black))
 }

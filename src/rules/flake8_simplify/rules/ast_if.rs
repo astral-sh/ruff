@@ -75,7 +75,7 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
             Range::new(stmt.location, nested_if.location),
             checker.locator,
         ) {
-            match fix_if::fix_nested_if_statements(checker.locator, stmt) {
+            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
                 Ok(fix) => {
                     if fix
                         .content
@@ -92,17 +92,35 @@ pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
     checker.diagnostics.push(diagnostic);
 }
 
-fn is_one_line_return_bool(stmts: &[Stmt]) -> bool {
+enum Bool {
+    True,
+    False,
+}
+
+impl From<bool> for Bool {
+    fn from(value: bool) -> Self {
+        if value {
+            Bool::True
+        } else {
+            Bool::False
+        }
+    }
+}
+
+fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
     if stmts.len() != 1 {
-        return false;
+        return None;
     }
     let StmtKind::Return { value } = &stmts[0].node else {
-        return false;
+        return None;
     };
     let Some(ExprKind::Constant { value, .. }) = value.as_ref().map(|value| &value.node) else {
-        return false;
+        return None;
     };
-    matches!(value, Constant::Bool(_))
+    let Constant::Bool(value) = value else {
+        return None;
+    };
+    Some((*value).into())
 }
 
 /// SIM103
@@ -110,17 +128,18 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     let StmtKind::If { test, body, orelse } = &stmt.node else {
         return;
     };
-    if !(is_one_line_return_bool(body) && is_one_line_return_bool(orelse)) {
+    let (Some(if_return), Some(else_return)) = (is_one_line_return_bool(body), is_one_line_return_bool(orelse)) else {
         return;
-    }
+    };
     let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
     if checker.patch(&Rule::ReturnBoolConditionDirectly)
-        && !(has_comments_in(Range::from_located(stmt), checker.locator)
-            || has_comments_in(Range::from_located(&orelse[0]), checker.locator))
+        && matches!(if_return, Bool::True)
+        && matches!(else_return, Bool::False)
+        && !has_comments_in(Range::from_located(stmt), checker.locator)
     {
         let return_stmt = create_stmt(StmtKind::Return {
             value: Some(test.clone()),

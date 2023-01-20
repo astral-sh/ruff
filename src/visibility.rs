@@ -80,12 +80,12 @@ pub fn is_init(name: &str) -> bool {
     name == "__init__"
 }
 
-/// Returns `true` if a function is an `__new__`.
+/// Returns `true` if a function is a `__new__`.
 pub fn is_new(name: &str) -> bool {
     name == "__new__"
 }
 
-/// Returns `true` if a function is an `__call__`.
+/// Returns `true` if a function is a `__call__`.
 pub fn is_call(name: &str) -> bool {
     name == "__call__"
 }

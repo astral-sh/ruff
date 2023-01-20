@@ -36,6 +36,7 @@ mod tests {
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_4.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_0.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_1.py"))]
+    #[test_case(Rule::MixedSpacesAndTabs, Path::new("E101.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
