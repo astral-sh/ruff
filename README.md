@@ -201,8 +201,6 @@ Ruff also works with [pre-commit](https://pre-commit.com):
   rev: 'v0.0.228'
   hooks:
     - id: ruff
-      # Respect `exclude` and `extend-exclude` settings.
-      args: ["--force-exclude"]
 ```
 
 ## Configuration
