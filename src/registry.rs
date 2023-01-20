@@ -2,6 +2,7 @@
 
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use ruff_macros::ParseCode;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
@@ -432,44 +433,85 @@ ruff_macros::define_rule_mapping!(
     RUF100 => violations::UnusedNOQA,
 );
 
-#[derive(EnumIter, Debug, PartialEq, Eq)]
+#[derive(EnumIter, Debug, PartialEq, Eq, ParseCode)]
 pub enum Linter {
+    #[prefix = "F"]
     Pyflakes,
+    #[prefix = "E"]
+    #[prefix = "W"]
     Pycodestyle,
+    #[prefix = "C9"]
     McCabe,
+    #[prefix = "I"]
     Isort,
+    #[prefix = "D"]
     Pydocstyle,
+    #[prefix = "UP"]
     Pyupgrade,
+    #[prefix = "N"]
     PEP8Naming,
+    #[prefix = "YTT"]
     Flake82020,
+    #[prefix = "ANN"]
     Flake8Annotations,
+    #[prefix = "S"]
     Flake8Bandit,
+    #[prefix = "BLE"]
     Flake8BlindExcept,
+    #[prefix = "FBT"]
     Flake8BooleanTrap,
+    #[prefix = "B"]
     Flake8Bugbear,
+    #[prefix = "A"]
     Flake8Builtins,
+    #[prefix = "C4"]
     Flake8Comprehensions,
+    #[prefix = "T10"]
     Flake8Debugger,
+    #[prefix = "EM"]
     Flake8ErrMsg,
+    #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
+    #[prefix = "ICN"]
     Flake8ImportConventions,
+    #[prefix = "T20"]
     Flake8Print,
+    #[prefix = "PT"]
     Flake8PytestStyle,
+    #[prefix = "Q"]
     Flake8Quotes,
+    #[prefix = "RET"]
     Flake8Return,
+    #[prefix = "SIM"]
     Flake8Simplify,
+    #[prefix = "TID"]
     Flake8TidyImports,
+    #[prefix = "ARG"]
     Flake8UnusedArguments,
+    #[prefix = "DTZ"]
     Flake8Datetimez,
+    #[prefix = "ERA"]
     Eradicate,
+    #[prefix = "PD"]
     PandasVet,
+    #[prefix = "PGH"]
     PygrepHooks,
+    #[prefix = "PL"]
     Pylint,
+    #[prefix = "PIE"]
     Flake8Pie,
+    #[prefix = "COM"]
     Flake8Commas,
+    #[prefix = "INP"]
     Flake8NoPep420,
+    #[prefix = "EXE"]
     Flake8Executable,
+    #[prefix = "RUF"]
     Ruff,
+}
+
+pub trait ParseCode: Sized {
+    fn parse_code(code: &str) -> Option<(Self, &str)>;
 }
 
 pub enum Prefixes {
@@ -688,7 +730,7 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, Rule>> = Lazy::new(|| {
 mod tests {
     use strum::IntoEnumIterator;
 
-    use crate::registry::Rule;
+    use super::{Linter, ParseCode, Rule};
 
     #[test]
     fn check_code_serialization() {
@@ -697,6 +739,14 @@ mod tests {
                 Rule::from_code(rule.code()).is_ok(),
                 "{rule:?} could not be round-trip serialized."
             );
+        }
+    }
+
+    #[test]
+    fn test_linter_prefixes() {
+        for rule in Rule::iter() {
+            Linter::parse_code(rule.code())
+                .unwrap_or_else(|| panic!("couldn't parse {:?}", rule.code()));
         }
     }
 }

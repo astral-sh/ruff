@@ -10,7 +10,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut diagkind_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
-    let mut rule_origin_match_arms = quote!();
     let mut rule_code_match_arms = quote!();
     let mut rule_from_code_match_arms = quote!();
     let mut diagkind_code_match_arms = quote!();
@@ -29,8 +28,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         rule_message_formats_match_arms
             .extend(quote! {Self::#name => <#path as Violation>::message_formats(),});
         rule_autofixable_match_arms.extend(quote! {Self::#name => <#path as Violation>::AUTOFIX,});
-        let origin = get_origin(code);
-        rule_origin_match_arms.extend(quote! {Self::#name => Linter::#origin,});
         rule_code_match_arms.extend(quote! {Self::#name => #code_str,});
         rule_from_code_match_arms.extend(quote! {#code_str => Ok(&Rule::#name), });
         diagkind_code_match_arms.extend(quote! {Self::#name(..) => &Rule::#name, });
@@ -95,10 +92,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
                 match self { #rule_autofixable_match_arms }
             }
 
-            pub fn origin(&self) -> Linter {
-                match self { #rule_origin_match_arms }
-            }
-
             pub fn code(&self) -> &'static str {
                 match self { #rule_code_match_arms }
             }
@@ -140,19 +133,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     }
 }
 
-fn get_origin(ident: &Ident) -> Ident {
-    let ident = ident.to_string();
-    let mut iter = crate::prefixes::PREFIX_TO_LINTER.iter();
-    let linter = loop {
-        let (prefix, linter) = iter
-            .next()
-            .unwrap_or_else(|| panic!("code doesn't start with any recognized prefix: {ident}"));
-        if ident.starts_with(prefix) {
-            break linter;
-        }
-    };
-    Ident::new(linter, Span::call_site())
-}
 pub struct Mapping {
     entries: Vec<(Ident, Path, Ident)>,
 }

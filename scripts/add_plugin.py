@@ -74,7 +74,8 @@ mod tests {
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
-            elif line.strip() == "Ruff,":
+            elif line.strip() == '#[prefix = "RUF"]':
+                fp.write(f'{indent}#[prefix = "TODO"]\n')
                 fp.write(f"{indent}{pascal_case(plugin)},")
                 fp.write("\n")
 
