@@ -14,7 +14,7 @@ use rustc_hash::FxHashSet;
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{Rule, RuleCodePrefix, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, RuleSelector, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
@@ -237,12 +237,12 @@ impl Settings {
 }
 
 fn build_rule_table(
-    fixable: Option<Vec<RuleCodePrefix>>,
-    unfixable: Option<Vec<RuleCodePrefix>>,
-    select: Option<Vec<RuleCodePrefix>>,
-    ignore: Option<Vec<RuleCodePrefix>>,
-    extend_select: &[Vec<RuleCodePrefix>],
-    extend_ignore: &[Vec<RuleCodePrefix>],
+    fixable: Option<Vec<RuleSelector>>,
+    unfixable: Option<Vec<RuleSelector>>,
+    select: Option<Vec<RuleSelector>>,
+    ignore: Option<Vec<RuleSelector>>,
+    extend_select: &[Vec<RuleSelector>],
+    extend_ignore: &[Vec<RuleSelector>],
     pydocstyle: &Option<pydocstyle::settings::Options>,
 ) -> RuleTable {
     let mut rules = RuleTable::empty();
@@ -313,8 +313,8 @@ pub fn resolve_per_file_ignores(
 
 #[derive(Debug)]
 struct RuleCodeSpec<'a> {
-    select: &'a [RuleCodePrefix],
-    ignore: &'a [RuleCodePrefix],
+    select: &'a [RuleSelector],
+    ignore: &'a [RuleSelector],
 }
 
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
@@ -361,13 +361,13 @@ fn validate_enabled(enabled: FxHashSet<Rule>) -> FxHashSet<Rule> {
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::registry::{Rule, RuleCodePrefix};
+    use crate::registry::{Rule, RuleSelector};
     use crate::settings::{resolve_codes, RuleCodeSpec};
 
     #[test]
     fn rule_codes() {
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleCodePrefix::W],
+            select: &[RuleSelector::W],
             ignore: &[],
         }]);
         let expected = FxHashSet::from_iter([
@@ -378,33 +378,33 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleCodePrefix::W6],
+            select: &[RuleSelector::W6],
             ignore: &[],
         }]);
         let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleCodePrefix::W],
-            ignore: &[RuleCodePrefix::W292],
+            select: &[RuleSelector::W],
+            ignore: &[RuleSelector::W292],
         }]);
         let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleCodePrefix::W605],
-            ignore: &[RuleCodePrefix::W605],
+            select: &[RuleSelector::W605],
+            ignore: &[RuleSelector::W605],
         }]);
         let expected = FxHashSet::from_iter([]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([
             RuleCodeSpec {
-                select: &[RuleCodePrefix::W],
-                ignore: &[RuleCodePrefix::W292],
+                select: &[RuleSelector::W],
+                ignore: &[RuleSelector::W292],
             },
             RuleCodeSpec {
-                select: &[RuleCodePrefix::W292],
+                select: &[RuleSelector::W292],
                 ignore: &[],
             },
         ]);
@@ -417,12 +417,12 @@ mod tests {
 
         let actual = resolve_codes([
             RuleCodeSpec {
-                select: &[RuleCodePrefix::W],
-                ignore: &[RuleCodePrefix::W292],
+                select: &[RuleSelector::W],
+                ignore: &[RuleSelector::W292],
             },
             RuleCodeSpec {
-                select: &[RuleCodePrefix::W292],
-                ignore: &[RuleCodePrefix::W],
+                select: &[RuleSelector::W292],
+                ignore: &[RuleSelector::W],
             },
         ]);
         let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);

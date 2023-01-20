@@ -6,14 +6,14 @@ use rustc_hash::FxHashSet;
 use super::hashable::{HashableGlobSet, HashableHashSet};
 use super::types::{FilePattern, PythonVersion};
 use super::Settings;
-use crate::registry::RuleCodePrefix;
+use crate::registry::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
     mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 
-pub const PREFIXES: &[RuleCodePrefix] = &[RuleCodePrefix::E, RuleCodePrefix::F];
+pub const PREFIXES: &[RuleSelector] = &[RuleSelector::E, RuleSelector::F];
 
 pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
 
@@ -51,7 +51,7 @@ pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            rules: PREFIXES.iter().flat_map(RuleCodePrefix::codes).into(),
+            rules: PREFIXES.iter().flat_map(RuleSelector::codes).into(),
             allowed_confusables: FxHashSet::from_iter([]).into(),
             builtins: vec![],
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone().into(),

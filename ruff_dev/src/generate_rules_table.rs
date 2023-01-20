@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::Args;
-use ruff::registry::{Linter, Prefixes, RuleCodePrefix};
+use ruff::registry::{Linter, Prefixes, RuleSelector};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -20,7 +20,7 @@ pub struct Cli {
     pub(crate) dry_run: bool,
 }
 
-fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
+fn generate_table(table_out: &mut String, prefix: &RuleSelector) {
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");

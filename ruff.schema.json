@@ -73,7 +73,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "extend-select": {
@@ -83,7 +83,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "external": {
@@ -117,7 +117,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "flake8-annotations": {
@@ -244,7 +244,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "ignore-init-module-imports": {
@@ -315,7 +315,7 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "$ref": "#/definitions/RuleCodePrefix"
+          "$ref": "#/definitions/RuleSelector"
         }
       }
     },
@@ -388,7 +388,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "show-source": {
@@ -446,7 +446,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "update-check": {
@@ -1134,7 +1134,7 @@
         }
       ]
     },
-    "RuleCodePrefix": {
+    "RuleSelector": {
       "type": "string",
       "enum": [
         "A",
