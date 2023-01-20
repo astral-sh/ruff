@@ -1,6 +1,7 @@
 [tool.ruff]
 select = ["ALL"]
 ignore = [
+    "S101", # assert-used
     "PLR2004", # magic-value-comparison
 ]
 

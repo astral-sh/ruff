@@ -91,7 +91,7 @@ impl Violation for %s {
             if has_written:
                 continue
 
-            if line.startswith("define_rule_mapping!"):
+            if line.startswith("ruff_macros::define_rule_mapping!"):
                 seen_macro = True
                 continue
 
@@ -103,6 +103,8 @@ impl Violation for %s {
                 fp.write(f"{indent}{code} => violations::{name},")
                 fp.write("\n")
                 has_written = True
+
+    assert has_written
 
 
 if __name__ == "__main__":
