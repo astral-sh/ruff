@@ -123,12 +123,9 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     for (i, part) in format_vec.iter().enumerate() {
         if let CFormatPart::Literal(item) = &part {
             let mut current_format = PercentFormat::new(item.to_string(), None);
-            let the_next = match format_vec.get(i + 1) {
-                Some(next) => next,
-                None => {
-                    formats.push(current_format);
-                    continue;
-                }
+            let Some(the_next) = format_vec.get(i + 1) else {
+                formats.push(current_format);
+                continue;
             };
             if let CFormatPart::Spec(c_spec) = &the_next {
                 current_format.parts = Some(c_spec.into());
@@ -188,11 +185,9 @@ fn any_percent_format(pf: &PercentFormatPart) -> bool {
 fn handle_part(part: &PercentFormat) -> String {
     let mut string = part.item.clone();
     string = curly_escape(&string);
-    let mut fmt = match part.parts.clone() {
-        None => return string,
-        Some(item) => item,
+    let Some(mut fmt) = part.parts.clone() else {
+        return string;
     };
-
     if fmt.conversion == *"%" {
         string.push('%');
         return string;
@@ -404,9 +399,8 @@ fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
 /// things
 fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
     for item in parsed {
-        let fmt = match item.parts {
-            None => continue,
-            Some(item) => item,
+        let Some(fmt) = item.parts else {
+            continue;
         };
         // timid: these require out-of-order parameter consumption
         if fmt.width == Some("*".to_string()) || fmt.precision == Some(".*".to_string()) {
