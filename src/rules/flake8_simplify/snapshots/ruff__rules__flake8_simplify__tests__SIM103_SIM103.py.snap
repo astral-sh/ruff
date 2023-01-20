@@ -25,8 +25,8 @@ expression: diagnostics
     row: 13
     column: 4
   end_location:
-    row: 14
-    column: 19
+    row: 16
+    column: 20
   fix:
     content: return b
     location:
