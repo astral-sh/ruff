@@ -383,7 +383,7 @@ s = (
 
 s2 = (
     'this'
-    'is a also a string'
+    'is also a string'
 )
 
 t = (
