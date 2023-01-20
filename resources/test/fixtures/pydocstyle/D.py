@@ -588,3 +588,21 @@ def asdfljdjgf24():
     """Summary.
 
     Description.  """
+
+
+@expect('D200: One-line docstring should fit on one line with quotes '
+        '(found 3)')
+@expect('D212: Multi-line docstring summary should start at the first line')
+def one_liner():
+    """
+
+    Wrong."""
+
+
+@expect('D200: One-line docstring should fit on one line with quotes '
+        '(found 3)')
+@expect('D212: Multi-line docstring summary should start at the first line')
+def one_liner():
+    r"""Wrong.
+
+    """
