@@ -6,7 +6,7 @@ Example usage:
     python scripts/add_rule.py \
         --name PreferListBuiltin \
         --code PIE807 \
-        --origin flake8-pie
+        --linter flake8-pie
 """
 
 import argparse
@@ -19,16 +19,16 @@ def snake_case(name: str) -> str:
     return "".join(f"_{word.lower()}" if word.isupper() else word for word in name).lstrip("_")
 
 
-def main(*, name: str, code: str, origin: str) -> None:
+def main(*, name: str, code: str, linter: str) -> None:
     # Create a test fixture.
     with open(
-        ROOT_DIR / "resources/test/fixtures" / dir_name(origin) / f"{code}.py",
+        ROOT_DIR / "resources/test/fixtures" / dir_name(linter) / f"{code}.py",
         "a",
     ):
         pass
 
     # Add the relevant `#testcase` macro.
-    mod_rs = ROOT_DIR / "src/rules" / dir_name(origin) / "mod.rs"
+    mod_rs = ROOT_DIR / "src/rules" / dir_name(linter) / "mod.rs"
     content = mod_rs.read_text()
 
     with open(mod_rs, "w") as fp:
@@ -42,7 +42,7 @@ def main(*, name: str, code: str, origin: str) -> None:
             fp.write("\n")
 
     # Add the relevant rule function.
-    with open(ROOT_DIR / "src/rules" / dir_name(origin) / (snake_case(name) + ".rs"), "w") as fp:
+    with open(ROOT_DIR / "src/rules" / dir_name(linter) / (snake_case(name) + ".rs"), "w") as fp:
         fp.write(
             f"""
 /// {code}
@@ -59,7 +59,7 @@ pub fn {snake_case(name)}(checker: &mut Checker) {{}}
             fp.write(line)
             fp.write("\n")
 
-            if line.startswith(f"// {origin}"):
+            if line.startswith(f"// {linter}"):
                 fp.write(
                     """define_violation!(
     pub struct %s;
@@ -96,7 +96,7 @@ impl Violation for %s {
             if not seen_macro:
                 continue
 
-            if line.strip() == f"// {origin}":
+            if line.strip() == f"// {linter}":
                 indent = get_indent(line)
                 fp.write(f"{indent}{code} => violations::{name},")
                 fp.write("\n")
@@ -108,7 +108,7 @@ impl Violation for %s {
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate boilerplate for a new rule.",
-        epilog="python scripts/add_rule.py --name PreferListBuiltin --code PIE807 --origin flake8-pie",
+        epilog="python scripts/add_rule.py --name PreferListBuiltin --code PIE807 --linter flake8-pie",
     )
     parser.add_argument(
         "--name",
@@ -123,11 +123,11 @@ if __name__ == "__main__":
         help="The code of the check to generate (e.g., 'A001').",
     )
     parser.add_argument(
-        "--origin",
+        "--linter",
         type=str,
         required=True,
         help="The source with which the check originated (e.g., 'flake8-builtins').",
     )
     args = parser.parse_args()
 
-    main(name=args.name, code=args.code, origin=args.origin)
+    main(name=args.name, code=args.code, linter=args.linter)

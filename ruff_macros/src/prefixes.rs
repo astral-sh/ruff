@@ -1,7 +1,7 @@
-// Longer prefixes should come first so that you can find an origin for a code
+// Longer prefixes should come first so that you can find a linter for a code
 // by simply picking the first entry that starts with the given prefix.
 
-pub const PREFIX_TO_ORIGIN: &[(&str, &str)] = &[
+pub const PREFIX_TO_LINTER: &[(&str, &str)] = &[
     ("ANN", "Flake8Annotations"),
     ("ARG", "Flake8UnusedArguments"),
     ("A", "Flake8Builtins"),
@@ -41,12 +41,12 @@ pub const PREFIX_TO_ORIGIN: &[(&str, &str)] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::PREFIX_TO_ORIGIN;
+    use super::PREFIX_TO_LINTER;
 
     #[test]
     fn order() {
-        for (idx, (prefix, _)) in PREFIX_TO_ORIGIN.iter().enumerate() {
-            for (prior_prefix, _) in PREFIX_TO_ORIGIN[..idx].iter() {
+        for (idx, (prefix, _)) in PREFIX_TO_LINTER.iter().enumerate() {
+            for (prior_prefix, _) in PREFIX_TO_LINTER[..idx].iter() {
                 assert!(!prefix.starts_with(prior_prefix));
             }
         }

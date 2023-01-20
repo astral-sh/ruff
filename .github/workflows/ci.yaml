@@ -94,7 +94,7 @@ jobs:
           profile: minimal
           override: true
       - uses: Swatinem/rust-cache@v1
-      - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --origin pylint
+      - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
       - run: cargo check
       - run: ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/
       - run: cargo check
