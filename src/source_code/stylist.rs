@@ -118,23 +118,38 @@ impl Deref for Indentation {
 
 /// The line ending style used in Python source code.
 /// See <https://docs.python.org/3/reference/lexical_analysis.html#physical-lines>
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LineEnding {
-    #[default]
     Lf,
     Cr,
     CrLf,
+}
+
+impl Default for LineEnding {
+    fn default() -> Self {
+        if cfg!(windows) {
+            LineEnding::CrLf
+        } else {
+            LineEnding::Lf
+        }
+    }
+}
+
+impl LineEnding {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LineEnding::CrLf => "\r\n",
+            LineEnding::Lf => "\n",
+            LineEnding::Cr => "\r",
+        }
+    }
 }
 
 impl Deref for LineEnding {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        match &self {
-            LineEnding::CrLf => "\r\n",
-            LineEnding::Lf => "\n",
-            LineEnding::Cr => "\r",
-        }
+        self.as_str()
     }
 }
 
