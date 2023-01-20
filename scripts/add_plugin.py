@@ -78,11 +78,10 @@ mod tests {
                 fp.write(f"{indent}{pascal_case(plugin)},")
                 fp.write("\n")
 
-            elif line.strip() == "RuleOrigin::Ruff => vec![RuleCodePrefix::RUF],":
+            elif line.strip() == "RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),":
+                prefix = 'todo!("Fill-in prefix after generating codes")'
                 fp.write(
-                    f"{indent}RuleOrigin::{pascal_case(plugin)} => vec![\n"
-                    f'{indent}    todo!("Fill-in prefix after generating codes")\n'
-                    f"{indent}],"
+                    f"{indent}RuleOrigin::{pascal_case(plugin)} => Prefixes::Single({prefix}),"
                 )
                 fp.write("\n")
 
