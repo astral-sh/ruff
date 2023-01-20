@@ -120,8 +120,10 @@ fn parse_conversion_flags(flags: CConversionFlags) -> String {
 fn parse_percent_format(string: &str) -> Result<Vec<PercentFormat>> {
     let format_string =
         CFormatString::from_str(string).map_err(|_| anyhow!("Failed to parse CFormatString"))?;
+
     let format_parts: Vec<&CFormatPart<String>> =
         format_string.iter().map(|(_, part)| part).collect();
+
     let mut formats: Vec<PercentFormat> = vec![];
     for (i, part) in format_parts.iter().enumerate() {
         if let CFormatPart::Literal(item) = &part {
@@ -474,6 +476,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     let Ok(parsed) = parse_percent_format(left_string) else {
         return;
     };
+    println!("{:?}", parsed);
     if !convertable(&parsed, right) {
         return;
     }
