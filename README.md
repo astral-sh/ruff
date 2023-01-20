@@ -141,7 +141,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
-1. [Development](#development)
+1. [Contributing](#contributing)
 1. [Releases](#releases)
 1. [Benchmarks](#benchmarks)
 1. [Reference](#reference)
@@ -1640,7 +1640,7 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 
 Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
-## Development
+## Contributing
 
 Contributions are welcome and hugely appreciated. To get started, check out the
 [contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
