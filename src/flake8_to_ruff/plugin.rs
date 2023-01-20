@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 
-use crate::registry::RuleCodePrefix;
+use crate::registry::RuleSelector;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
@@ -98,32 +98,32 @@ impl fmt::Debug for Plugin {
 }
 
 impl Plugin {
-    pub fn prefix(&self) -> RuleCodePrefix {
+    pub fn prefix(&self) -> RuleSelector {
         match self {
-            Plugin::Flake8Annotations => RuleCodePrefix::ANN,
-            Plugin::Flake8Bandit => RuleCodePrefix::S,
+            Plugin::Flake8Annotations => RuleSelector::ANN,
+            Plugin::Flake8Bandit => RuleSelector::S,
             // TODO(charlie): Handle rename of `B` to `BLE`.
-            Plugin::Flake8BlindExcept => RuleCodePrefix::BLE,
-            Plugin::Flake8Bugbear => RuleCodePrefix::B,
-            Plugin::Flake8Builtins => RuleCodePrefix::A,
-            Plugin::Flake8Comprehensions => RuleCodePrefix::C4,
-            Plugin::Flake8Datetimez => RuleCodePrefix::DTZ,
-            Plugin::Flake8Debugger => RuleCodePrefix::T1,
-            Plugin::Flake8Docstrings => RuleCodePrefix::D,
+            Plugin::Flake8BlindExcept => RuleSelector::BLE,
+            Plugin::Flake8Bugbear => RuleSelector::B,
+            Plugin::Flake8Builtins => RuleSelector::A,
+            Plugin::Flake8Comprehensions => RuleSelector::C4,
+            Plugin::Flake8Datetimez => RuleSelector::DTZ,
+            Plugin::Flake8Debugger => RuleSelector::T1,
+            Plugin::Flake8Docstrings => RuleSelector::D,
             // TODO(charlie): Handle rename of `E` to `ERA`.
-            Plugin::Flake8Eradicate => RuleCodePrefix::ERA,
-            Plugin::Flake8ErrMsg => RuleCodePrefix::EM,
-            Plugin::Flake8ImplicitStrConcat => RuleCodePrefix::ISC,
-            Plugin::Flake8Print => RuleCodePrefix::T2,
-            Plugin::Flake8PytestStyle => RuleCodePrefix::PT,
-            Plugin::Flake8Quotes => RuleCodePrefix::Q,
-            Plugin::Flake8Return => RuleCodePrefix::RET,
-            Plugin::Flake8Simplify => RuleCodePrefix::SIM,
-            Plugin::Flake8TidyImports => RuleCodePrefix::TID25,
-            Plugin::McCabe => RuleCodePrefix::C9,
-            Plugin::PandasVet => RuleCodePrefix::PD,
-            Plugin::PEP8Naming => RuleCodePrefix::N,
-            Plugin::Pyupgrade => RuleCodePrefix::UP,
+            Plugin::Flake8Eradicate => RuleSelector::ERA,
+            Plugin::Flake8ErrMsg => RuleSelector::EM,
+            Plugin::Flake8ImplicitStrConcat => RuleSelector::ISC,
+            Plugin::Flake8Print => RuleSelector::T2,
+            Plugin::Flake8PytestStyle => RuleSelector::PT,
+            Plugin::Flake8Quotes => RuleSelector::Q,
+            Plugin::Flake8Return => RuleSelector::RET,
+            Plugin::Flake8Simplify => RuleSelector::SIM,
+            Plugin::Flake8TidyImports => RuleSelector::TID25,
+            Plugin::McCabe => RuleSelector::C9,
+            Plugin::PandasVet => RuleSelector::PD,
+            Plugin::PEP8Naming => RuleSelector::N,
+            Plugin::Pyupgrade => RuleSelector::UP,
         }
     }
 }
@@ -249,7 +249,7 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
 ///
 /// For example, if the user ignores `ANN101`, we should infer that
 /// `flake8-annotations` is active.
-pub fn infer_plugins_from_codes(codes: &BTreeSet<RuleCodePrefix>) -> Vec<Plugin> {
+pub fn infer_plugins_from_codes(codes: &BTreeSet<RuleSelector>) -> Vec<Plugin> {
     [
         Plugin::Flake8Annotations,
         Plugin::Flake8Bandit,
@@ -287,10 +287,10 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<RuleCodePrefix>) -> Vec<Plugin>
     .collect()
 }
 
-/// Resolve the set of enabled `RuleCodePrefix` values for the given
+/// Resolve the set of enabled `RuleSelector` values for the given
 /// plugins.
-pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleCodePrefix> {
-    let mut select = BTreeSet::from([RuleCodePrefix::F, RuleCodePrefix::E, RuleCodePrefix::W]);
+pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleSelector> {
+    let mut select = BTreeSet::from([RuleSelector::F, RuleSelector::E, RuleSelector::W]);
     select.extend(plugins.iter().map(Plugin::prefix));
     select
 }

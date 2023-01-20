@@ -4,7 +4,7 @@ use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::registry::RuleCodePrefix;
+use crate::registry::RuleSelector;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -18,55 +18,55 @@ pub enum Convention {
 }
 
 impl Convention {
-    pub fn codes(self) -> &'static [RuleCodePrefix] {
+    pub fn codes(self) -> &'static [RuleSelector] {
         match self {
             Convention::Google => &[
                 // All errors except D203, D204, D213, D215, D400, D401, D404, D406, D407, D408,
                 // D409 and D413.
-                RuleCodePrefix::D203,
-                RuleCodePrefix::D204,
-                RuleCodePrefix::D213,
-                RuleCodePrefix::D215,
-                RuleCodePrefix::D400,
-                RuleCodePrefix::D404,
-                RuleCodePrefix::D406,
-                RuleCodePrefix::D407,
-                RuleCodePrefix::D408,
-                RuleCodePrefix::D409,
-                RuleCodePrefix::D413,
+                RuleSelector::D203,
+                RuleSelector::D204,
+                RuleSelector::D213,
+                RuleSelector::D215,
+                RuleSelector::D400,
+                RuleSelector::D404,
+                RuleSelector::D406,
+                RuleSelector::D407,
+                RuleSelector::D408,
+                RuleSelector::D409,
+                RuleSelector::D413,
             ],
             Convention::Numpy => &[
                 // All errors except D107, D203, D212, D213, D402, D413, D415, D416, and D417.
-                RuleCodePrefix::D107,
-                RuleCodePrefix::D203,
-                RuleCodePrefix::D212,
-                RuleCodePrefix::D213,
-                RuleCodePrefix::D402,
-                RuleCodePrefix::D413,
-                RuleCodePrefix::D415,
-                RuleCodePrefix::D416,
-                RuleCodePrefix::D417,
+                RuleSelector::D107,
+                RuleSelector::D203,
+                RuleSelector::D212,
+                RuleSelector::D213,
+                RuleSelector::D402,
+                RuleSelector::D413,
+                RuleSelector::D415,
+                RuleSelector::D416,
+                RuleSelector::D417,
             ],
             Convention::Pep257 => &[
                 // All errors except D203, D212, D213, D214, D215, D404, D405, D406, D407, D408,
                 // D409, D410, D411, D413, D415, D416 and D417.
-                RuleCodePrefix::D203,
-                RuleCodePrefix::D212,
-                RuleCodePrefix::D213,
-                RuleCodePrefix::D214,
-                RuleCodePrefix::D215,
-                RuleCodePrefix::D404,
-                RuleCodePrefix::D405,
-                RuleCodePrefix::D406,
-                RuleCodePrefix::D407,
-                RuleCodePrefix::D408,
-                RuleCodePrefix::D409,
-                RuleCodePrefix::D410,
-                RuleCodePrefix::D411,
-                RuleCodePrefix::D413,
-                RuleCodePrefix::D415,
-                RuleCodePrefix::D416,
-                RuleCodePrefix::D417,
+                RuleSelector::D203,
+                RuleSelector::D212,
+                RuleSelector::D213,
+                RuleSelector::D214,
+                RuleSelector::D215,
+                RuleSelector::D404,
+                RuleSelector::D405,
+                RuleSelector::D406,
+                RuleSelector::D407,
+                RuleSelector::D408,
+                RuleSelector::D409,
+                RuleSelector::D410,
+                RuleSelector::D411,
+                RuleSelector::D413,
+                RuleSelector::D415,
+                RuleSelector::D416,
+                RuleSelector::D417,
             ],
         }
     }

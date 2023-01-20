@@ -129,7 +129,7 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::registry::RuleCodePrefix;
+    use crate::registry::RuleSelector;
     use crate::rules::flake8_quotes::settings::Quote;
     use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
     use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
@@ -369,7 +369,7 @@ select = ["E501"]
                     per_file_ignores: None,
                     required_version: None,
                     respect_gitignore: None,
-                    select: Some(vec![RuleCodePrefix::E501]),
+                    select: Some(vec![RuleSelector::E501]),
                     show_source: None,
                     src: None,
                     target_version: None,
@@ -417,14 +417,14 @@ ignore = ["E501"]
                     extend: None,
                     extend_exclude: None,
                     extend_ignore: None,
-                    extend_select: Some(vec![RuleCodePrefix::RUF100]),
+                    extend_select: Some(vec![RuleSelector::RUF100]),
                     external: None,
                     fix: None,
                     fix_only: None,
                     fixable: None,
                     force_exclude: None,
                     format: None,
-                    ignore: Some(vec![RuleCodePrefix::E501]),
+                    ignore: Some(vec![RuleSelector::E501]),
                     ignore_init_module_imports: None,
                     line_length: None,
                     namespace_packages: None,
@@ -534,7 +534,7 @@ other-attribute = 1
                 cache_dir: None,
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
-                    vec![RuleCodePrefix::F401]
+                    vec![RuleSelector::F401]
                 )])),
                 dummy_variable_rgx: None,
                 respect_gitignore: None,
