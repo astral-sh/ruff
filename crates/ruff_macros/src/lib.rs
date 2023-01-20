@@ -3,9 +3,9 @@
 use syn::{parse_macro_input, DeriveInput, ItemFn};
 
 mod config;
-mod define_rule_mapping;
 mod define_violation;
 mod derive_message_formats;
+mod register_rules;
 mod rule_code_prefix;
 mod rule_namespace;
 
@@ -19,9 +19,9 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 }
 
 #[proc_macro]
-pub fn define_rule_mapping(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let mapping = parse_macro_input!(item as define_rule_mapping::Mapping);
-    define_rule_mapping::define_rule_mapping(&mapping).into()
+pub fn register_rules(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let mapping = parse_macro_input!(item as register_rules::Input);
+    register_rules::register_rules(&mapping).into()
 }
 
 #[proc_macro]

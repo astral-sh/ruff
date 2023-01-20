@@ -10,7 +10,7 @@ use crate::fix::Fix;
 use crate::rules;
 use crate::violation::Violation;
 
-ruff_macros::define_rule_mapping!(
+ruff_macros::register_rules!(
     // pycodestyle errors
     E101 => rules::pycodestyle::rules::MixedSpacesAndTabs,
     #[cfg(feature = "logical_lines")]

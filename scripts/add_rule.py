@@ -119,7 +119,7 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
             if has_written:
                 continue
 
-            if line.startswith("ruff_macros::define_rule_mapping!"):
+            if line.startswith("ruff_macros::register_rules!"):
                 seen_macro = True
                 continue
 
