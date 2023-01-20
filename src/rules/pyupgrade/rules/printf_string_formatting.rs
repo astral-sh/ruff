@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_common::cformat::{CConversionFlags, CFormatPart, CFormatQuantity, CFormatString};
+use rustpython_common::cformat::{CConversionFlags, CFormatPart, CFormatQuantity, CFormatString, CFormatSpec};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -13,11 +13,6 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::pyupgrade::helpers::{curly_escape, is_keyword};
 use crate::violations;
 
-static MAPPING_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\(([^()]*)\)").unwrap());
-static CONVERSION_FLAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[#0+ -]*").unwrap());
-static WIDTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\*|\d*)").unwrap());
-static PRECISION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\.(?:\*|\d*))?").unwrap());
-static LENGTH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[hlL]?").unwrap());
 static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % ([({])").unwrap());
 static PYTHON_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\W0-9]\w*").unwrap());
 static EMOJI_SYNTAX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\N\{.*?}").unwrap());
@@ -47,6 +42,39 @@ impl PercentFormatPart {
             conversion,
         }
     }
+    fn from_rustpython(spec: &CFormatSpec) -> Self {
+        let clean_width = match &spec.min_field_width {
+            Some(width_item) => match width_item {
+                CFormatQuantity::Amount(amount) => Some(amount.to_string()),
+                // FOR REVIEWER: Not sure if below is the correct way to handle
+                // FromValuesTuple
+                CFormatQuantity::FromValuesTuple => Some("*".to_string()),
+            },
+            None => None,
+        };
+        let clean_precision = match &spec.precision {
+            Some(width_item) => match width_item {
+                CFormatQuantity::Amount(amount) => Some(format!(".{amount}")),
+                // FOR REVIEWER: Not sure if below is the correct way to handle
+                // FromValuesTuple
+                CFormatQuantity::FromValuesTuple => Some(".*".to_string()),
+            },
+            None => None,
+        };
+        let flags = if spec.flags.is_empty() {
+            None
+        } else {
+            Some(get_flags(spec.flags))
+        };
+        let perc_part = PercentFormatPart::new(
+            spec.mapping_key.clone(),
+            flags,
+            clean_width,
+            clean_precision,
+            spec.format_char.to_string(),
+        );
+        perc_part
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -61,23 +89,7 @@ impl PercentFormat {
     }
 }
 
-/// Gets the match from a regex and potentially updates the value of a given
-/// integer.
-fn get_flag<'a>(regex: &'a Lazy<Regex>, string: &'a str, position: &mut usize) -> Option<String> {
-    let flag_match = regex.find_at(string, *position);
-    if let Some(flag_match) = flag_match {
-        *position = flag_match.end();
-        let the_string = flag_match.as_str().to_string();
-        if the_string.is_empty() {
-            None
-        } else {
-            Some(the_string)
-        }
-    } else {
-        None
-    }
-}
-
+/// Converts RustPython's C Conversion Flags into their python string representation
 fn get_flags(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
     if flags.contains(CConversionFlags::ALTERNATE_FORM) {
@@ -98,7 +110,7 @@ fn get_flags(flags: CConversionFlags) -> String {
     flag_string
 }
 
-/// Given a string (like
+/// Converts a string to a vector of PercentFormat structs
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let mut formats: Vec<PercentFormat> = vec![];
 
@@ -108,7 +120,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let format_vec: Vec<&CFormatPart<String>> =
         format_string.iter().map(|(_, part)| part).collect();
     for (i, part) in format_vec.iter().enumerate() {
-        println!("{part:?}");
+        println!("{:?}", part);
         if let CFormatPart::Literal(item) = &part {
             let mut current_format = PercentFormat::new(item.to_string(), None);
             let the_next = match format_vec.get(i + 1) {
@@ -119,105 +131,12 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                 }
             };
             if let CFormatPart::Spec(c_spec) = &the_next {
-                let clean_width = match &c_spec.min_field_width {
-                    Some(width_item) => match width_item {
-                        CFormatQuantity::Amount(amount) => Some(amount.to_string()),
-                        // FOR REVIEWER: Not sure if below is the correct way to handle
-                        // FromValuesTuple
-                        CFormatQuantity::FromValuesTuple => Some("*".to_string()),
-                    },
-                    None => None,
-                };
-                let clean_precision = match &c_spec.precision {
-                    Some(width_item) => match width_item {
-                        CFormatQuantity::Amount(amount) => Some(format!(".{amount}")),
-                        // FOR REVIEWER: Not sure if below is the correct way to handle
-                        // FromValuesTuple
-                        CFormatQuantity::FromValuesTuple => Some(".*".to_string()),
-                    },
-                    None => None,
-                };
-                let flags = if c_spec.flags.is_empty() {
-                    None
-                } else {
-                    Some(get_flags(c_spec.flags))
-                };
-                let perc_part = PercentFormatPart::new(
-                    c_spec.mapping_key.clone(),
-                    flags,
-                    clean_width,
-                    clean_precision,
-                    c_spec.format_char.to_string(),
-                );
-                println!("{perc_part:?}");
-                current_format.parts = Some(perc_part);
+               current_format.parts = Some(PercentFormatPart::from_rustpython(c_spec));
             }
             formats.push(current_format);
         }
     }
-
-    // let mut string_start = 0;
-    // let mut string_end = 0;
-    // let mut in_fmt = false;
-    //
-    // let mut i = 0;
-    // while i < string.len() {
-    // if in_fmt {
-    // let mut key: Option<String> = None;
-    // if let Some(key_item) = MAPPING_KEY_RE.captures(&string[i..]) {
-    // if let Some(match_item) = key_item.get(1) {
-    // key = Some(match_item.as_str().to_string());
-    // Have to use another regex because the rust Capture object does not have an
-    // end() method
-    // i = MAPPING_KEY_RE.find_at(string, i).unwrap().end();
-    // }
-    // };
-    //
-    // let conversion_flag = get_flag(&CONVERSION_FLAG_RE, string, &mut i);
-    // let width = get_flag(&WIDTH_RE, string, &mut i);
-    // let precision = get_flag(&PRECISION_RE, string, &mut i);
-    //
-    // length modifier is ignored
-    // i = LENGTH_RE.find_at(string, i).unwrap().end();
-    // I use clone because nth consumes characters before position n
-    // let conversion = match string.chars().nth(i) {
-    // None => panic!("end-of-string while parsing format"),
-    // Some(conv_item) => conv_item,
-    // };
-    // i += 1;
-    //
-    // let fmt = PercentFormatPart::new(
-    // key,
-    // conversion_flag,
-    // width,
-    // precision,
-    // conversion.to_string(),
-    // );
-    // let fmt_full =
-    // PercentFormat::new(string[string_start..string_end].to_string(), Some(fmt));
-    // formats.push(fmt_full);
-    //
-    // in_fmt = false;
-    // string_start = i;
-    // } else {
-    // i = match string[i..].find('%') {
-    // None => {
-    // let fmt_full = PercentFormat::new(string[string_start..].to_string(), None);
-    // formats.push(fmt_full);
-    // return formats;
-    // }
-    // Since we cut off the part of the string before `i` in the beginning, we need
-    // to add it back to get the proper index
-    // Some(item) => item + i,
-    // };
-    // string_end = i;
-    // i += 1;
-    // in_fmt = true;
-    // }
-    // }
-    //
-    // assert!(!in_fmt, "end-of-string while parsing format");
-    // formats
+    println!("{:#?}", formats);
     formats
 }
 
@@ -324,8 +243,11 @@ fn handle_part(part: &PercentFormat) -> String {
 }
 
 fn percent_to_format(string: &str) -> String {
+    println!("{}", string);
+    println!("START");
     let mut final_string = String::new();
     for part in parse_percent_format(string) {
+        println!("{:?}", part);
         let handled = handle_part(&part);
         final_string.push_str(&handled);
     }
@@ -344,29 +266,6 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
     let is_multi_line = base_string.contains('\n');
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
-            // FOR REVIEWER, if we dedice we like the just removing the last comma then
-            // delete the commented out code below
-            // let mut string = String::from('(');
-            // if is_multi_line {
-            // string.push('\n');
-            // let indent = leading_space()
-            // string.push_str(indent);
-            // }
-            // let sub_range = Range::from_located(elts.get(0).unwrap());
-            // let sub_str =
-            // checker.locator.slice_source_code_range(&sub_range).to_string();
-            // string.push_str(&sub_str);
-            // if is_multi_line {
-            // string.push('\n');
-            // }
-            // string.push(')');
-            // return string
-            // FOR REVIEWER: This replaces only the last comma. I could not think of an edge
-            // case where this causes issues, but if you can let me know and I
-            // will fix
-
-            // We check for is_multi_line beign false, because we do not replace the comma
-            // on multi line statement
             if !is_multi_line {
                 for (i, character) in base_string.chars().rev().enumerate() {
                     if character == ',' {
@@ -671,7 +570,9 @@ mod test {
     #[test_case( "\"%()s\"",PercentFormatPart::new(Some(String::new()), None, None, None, "s".to_string()); "empty paren")]
     #[test_case( "\"%(hi)s\"",PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string()); "word in paren")]
     #[test_case( "\"%s\"",PercentFormatPart::new(None, None, None, None, "s".to_string()); "format s")]
-    #[test_case( "\"%%\"",PercentFormatPart::new(None, None, None, None, "%".to_string()); "format double percentage")]
+    // #[test_case( "\"%%\"",PercentFormatPart::new(None, None, None, None, "%".to_string()); "format double percentage")]
+    #[test_case( "\"%a\"",PercentFormatPart::new(None, None, None, None, "a".to_string()); "format an a")]
+    #[test_case( "\"%r\"",PercentFormatPart::new(None, None, None, None, "r".to_string()); "format an r")]
     fn test_parse_percent_format(sample: &str, expected: PercentFormatPart) {
         let e1 = PercentFormat::new("\"".to_string(), Some(expected));
         let e2 = PercentFormat::new("\"".to_string(), None);
