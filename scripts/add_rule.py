@@ -65,16 +65,14 @@ pub fn {snake_case(name)}(checker: &mut Checker) {{}}
     pub struct %s;
 );
 impl Violation for %s {
+    #[derive_message_formats]
     fn message(&self) -> String {
-        todo!("Implement message")
-    }
-
-    fn placeholder() -> Self {
-        %s
+        todo!("implement message");
+        format!("TODO: write message")
     }
 }
 """
-                    % (name, name, name)
+                    % (name, name)
                 )
                 fp.write("\n")
 
