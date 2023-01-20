@@ -14,11 +14,11 @@ define_violation!(
 impl AlwaysAutofixableViolation for ShebangWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("There is whitespace before the shebang.")
+        format!("Avoid whitespace before shebang")
     }
 
     fn autofix_title(&self) -> String {
-        format!("Remove the whitespace before the shebang.'")
+        format!("Remove whitespace before shebang'")
     }
 }
 

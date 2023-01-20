@@ -7,6 +7,7 @@ static SHEBANG_REGEX: Lazy<Regex> =
 #[derive(Debug)]
 pub enum ShebangDirective<'a> {
     None,
+    // whitespace length, start of shebang, end, shebang contents
     Match(usize, usize, usize, &'a str),
 }
 

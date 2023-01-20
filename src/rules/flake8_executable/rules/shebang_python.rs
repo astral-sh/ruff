@@ -13,7 +13,7 @@ define_violation!(
 impl Violation for ShebangPython {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Shebang is present but does not contain \"python\".")
+        format!("Shebang should contain \"python\"")
     }
 }
 
@@ -21,7 +21,9 @@ impl Violation for ShebangPython {
 pub fn shebang_python(lineno: usize, line: &str) -> Option<Diagnostic> {
     let shebang = extract_shebang(line);
     if let ShebangDirective::Match(_, start, end, content) = shebang {
-        if !content.contains("python") {
+        if content.contains("python") {
+            None
+        } else {
             let diagnostic = Diagnostic::new(
                 ShebangPython,
                 Range::new(
@@ -31,8 +33,6 @@ pub fn shebang_python(lineno: usize, line: &str) -> Option<Diagnostic> {
             );
 
             Some(diagnostic)
-        } else {
-            None
         }
     } else {
         None

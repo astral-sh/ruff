@@ -13,7 +13,7 @@ define_violation!(
 impl Violation for ShebangNewline {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The shebang is not in the beginning of the file.")
+        format!("Shebang should be at the beginning of the file")
     }
 }
 

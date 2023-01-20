@@ -1174,9 +1174,9 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| EXE003 | shebang-python | Shebang is present but does not contain "python". |  |
-| EXE004 | shebang-whitespace | There is whitespace before the shebang. | 🛠 |
-| EXE005 | shebang-newline | The shebang is not in the beginning of the file. |  |
+| EXE003 | shebang-python | Shebang should contain "python" |  |
+| EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
+| EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
 
 ### Ruff-specific rules (RUF)
 
