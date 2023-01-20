@@ -1369,12 +1369,17 @@ where
                     flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
-                        self.current_stmt_parent().map(|parent| parent.0),
+                        self.current_stmt_parent().map(std::convert::Into::into),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::DictGetWithDefault) {
                     flake8_simplify::rules::use_dict_get_with_default(
-                        self, stmt, test, body, orelse,
+                        self,
+                        stmt,
+                        test,
+                        body,
+                        orelse,
+                        self.current_stmt_parent().map(std::convert::Into::into),
                     );
                 }
             }
