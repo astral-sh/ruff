@@ -138,6 +138,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
+   1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -201,8 +202,6 @@ Ruff also works with [pre-commit](https://pre-commit.com):
   rev: 'v0.0.228'
   hooks:
     - id: ruff
-      # Respect `exclude` and `extend-exclude` settings.
-      args: ["--force-exclude"]
 ```
 
 ## Configuration
@@ -598,6 +597,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 #### Error (E)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
 | E401 | multiple-imports-on-one-line | Multiple imports on one line |  |
 | E402 | module-import-not-at-top-of-file | Module level import not at top of file |  |
 | E501 | line-too-long | Line too long ({length} > {limit} characters) |  |
@@ -1168,6 +1168,16 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0
 | ---- | ---- | ------- | --- |
 | INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
 
+### flake8-executable (EXE)
+
+For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| EXE003 | shebang-python | Shebang should contain "python" |  |
+| EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
+| EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
+
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
@@ -1460,11 +1470,13 @@ natively, including:
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
+- [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
@@ -1528,11 +1540,13 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
+- [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
