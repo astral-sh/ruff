@@ -2,7 +2,9 @@ use std::str::FromStr;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_common::cformat::{CConversionFlags, CFormatPart, CFormatQuantity, CFormatString, CFormatSpec};
+use rustpython_common::cformat::{
+    CConversionFlags, CFormatPart, CFormatQuantity, CFormatSpec, CFormatString,
+};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -110,6 +112,7 @@ fn get_flags(flags: CConversionFlags) -> String {
     flag_string
 }
 
+
 /// Converts a string to a vector of PercentFormat structs
 fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let mut formats: Vec<PercentFormat> = vec![];
@@ -120,7 +123,6 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
     let format_vec: Vec<&CFormatPart<String>> =
         format_string.iter().map(|(_, part)| part).collect();
     for (i, part) in format_vec.iter().enumerate() {
-        println!("{:?}", part);
         if let CFormatPart::Literal(item) = &part {
             let mut current_format = PercentFormat::new(item.to_string(), None);
             let the_next = match format_vec.get(i + 1) {
@@ -136,7 +138,6 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
             formats.push(current_format);
         }
     }
-    println!("{:#?}", formats);
     formats
 }
 
@@ -243,11 +244,8 @@ fn handle_part(part: &PercentFormat) -> String {
 }
 
 fn percent_to_format(string: &str) -> String {
-    println!("{}", string);
-    println!("START");
     let mut final_string = String::new();
     for part in parse_percent_format(string) {
-        println!("{:?}", part);
         let handled = handle_part(&part);
         final_string.push_str(&handled);
     }
@@ -584,7 +582,7 @@ mod test {
 
     #[test]
     fn test_one_parenthesis_non_formatting() {
-        let sample = "\"Writing merged info for %s slides (%s unrecognized)\"";
+        let sample = "Writing merged info for %s slides (%s unrecognized)";
         let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
         let e1 = PercentFormat::new("Writing merged info for ".to_string(), Some(sube1.clone()));
         let e2 = PercentFormat::new(" slides (".to_string(), Some(sube1));
@@ -597,7 +595,7 @@ mod test {
 
     #[test]
     fn test_two_parenthesis_non_formatting() {
-        let sample = "\"Expected one image (got %d) per channel (got %d)\"";
+        let sample = "Expected one image (got %d) per channel (got %d)";
         let sube1 = PercentFormatPart::new(None, None, None, None, "d".to_string());
         let e1 = PercentFormat::new("Expected one image (got ".to_string(), Some(sube1.clone()));
         let e2 = PercentFormat::new(") per channel (got ".to_string(), Some(sube1));
@@ -626,12 +624,12 @@ mod test {
         assert_eq!(received, expected);
     }
 
-    #[test_case("%s", "{}"; "simple string")]
-    #[test_case("%%%s", "%{}"; "three percents")]
-    #[test_case("%(foo)s", "{foo}"; "word in string")]
-    #[test_case("%2f", "{:2f}"; "formatting in string")]
-    #[test_case("%r", "{!r}"; "format an r")]
-    #[test_case("%a", "{!a}"; "format an a")]
+    #[test_case("\"%s\"", "\"{}\""; "simple string")]
+    #[test_case("\"%%%s\"", "\"%{}\""; "three percents")]
+    #[test_case("\"%(foo)s\"", "\"{foo}\""; "word in string")]
+    #[test_case("\"%2f\"", "\"{:2f}\""; "formatting in string")]
+    #[test_case("\"%r\"", "\"{!r}\""; "format an r")]
+    #[test_case("\"%a\"", "\"{!a}\""; "format an a")]
     fn test_percent_to_format(sample: &str, expected: &str) {
         let received = percent_to_format(sample);
         assert_eq!(received, expected);
