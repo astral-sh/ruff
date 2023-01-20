@@ -653,7 +653,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D105 | MagicMethod | Missing docstring in magic method |  |
 | D106 | PublicNestedClass | Missing docstring in public nested class |  |
 | D107 | PublicInit | Missing docstring in `__init__` |  |
-| D200 | FitsOnOneLine | One-line docstring should fit on one line |  |
+| D200 | FitsOnOneLine | One-line docstring should fit on one line | 🛠 |
 | D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found {num_lines}) | 🛠 |
 | D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found {num_lines}) | 🛠 |
 | D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring | 🛠 |
@@ -1175,6 +1175,7 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0
 | RUF002 | AmbiguousUnicodeCharacterDocstring | Docstring contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
 | RUF003 | AmbiguousUnicodeCharacterComment | Comment contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
 | RUF004 | KeywordArgumentBeforeStarArgument | Keyword argument `{name}` must come after starred arguments |  |
+| RUF005 | UnpackInsteadOfConcatenatingToCollectionLiteral | Consider `{expr}` instead of concatenation |  |
 | RUF100 | UnusedNOQA | Unused blanket `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->

@@ -24,6 +24,7 @@ mod tests {
     #[test_case(Rule::MagicMethod, Path::new("D.py"); "D105")]
     #[test_case(Rule::PublicNestedClass, Path::new("D.py"); "D106")]
     #[test_case(Rule::PublicInit, Path::new("D.py"); "D107")]
+    #[test_case(Rule::FitsOnOneLine, Path::new("D.py"); "D200")]
     #[test_case(Rule::NoBlankLineBeforeFunction, Path::new("D.py"); "D201")]
     #[test_case(Rule::NoBlankLineAfterFunction, Path::new("D.py"); "D202")]
     #[test_case(Rule::OneBlankLineBeforeClass, Path::new("D.py"); "D203")]

@@ -202,4 +202,14 @@ expression: diagnostics
     column: 21
   fix: ~
   parent: ~
+- kind:
+    MultiLineSummarySecondLine: ~
+  location:
+    row: 606
+    column: 4
+  end_location:
+    row: 608
+    column: 7
+  fix: ~
+  parent: ~
 

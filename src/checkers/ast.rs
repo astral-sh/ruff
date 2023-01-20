@@ -2725,6 +2725,13 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnpackInsteadOfConcatenatingToCollectionLiteral)
+                {
+                    ruff::rules::unpack_instead_of_concatenating_to_collection_literal(self, expr);
+                }
             }
             ExprKind::UnaryOp { op, operand } => {
                 let check_not_in = self.settings.rules.enabled(&Rule::NotInTest);
@@ -4556,18 +4563,18 @@ impl<'a> Checker<'a> {
 
                 // Extract a `Docstring` from a `Definition`.
                 let expr = definition.docstring.unwrap();
-                let content = self
+                let contents = self
                     .locator
                     .slice_source_code_range(&Range::from_located(expr));
                 let indentation = self.locator.slice_source_code_range(&Range::new(
                     Location::new(expr.location.row(), 0),
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
-                let body = pydocstyle::helpers::raw_contents(&content);
+                let body = pydocstyle::helpers::raw_contents(&contents);
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,
-                    contents: &content,
+                    contents: &contents,
                     indentation: &indentation,
                     body,
                 };
