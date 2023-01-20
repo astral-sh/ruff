@@ -1,7 +1,7 @@
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 use super::super::types;
-use super::helpers::is_pytest_parametrize;
+use super::helpers::{is_pytest_parametrize, split_names};
 use crate::ast::helpers::create_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -63,20 +63,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
             value: Constant::Str(string),
             ..
         } => {
-            // Match the following pytest code:
-            //    [x.strip() for x in argnames.split(",") if x.strip()]
-            let names = string
-                .split(',')
-                .filter_map(|s| {
-                    let trimmed = s.trim();
-                    if trimmed.is_empty() {
-                        None
-                    } else {
-                        Some(trimmed)
-                    }
-                })
-                .collect::<Vec<&str>>();
-
+            let names = split_names(string);
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
@@ -246,7 +233,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
 }
 
 /// PT007
-fn check_values(checker: &mut Checker, expr: &Expr) {
+fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     let values_type = checker.settings.flake8_pytest_style.parametrize_values_type;
 
     let values_row_type = checker
@@ -254,24 +241,38 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    match &expr.node {
+    let is_multi_named = if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &names.node
+    {
+        split_names(string).len() > 1
+    } else {
+        true
+    };
+
+    match &values.node {
         ExprKind::List { elts, .. } => {
             if values_type != types::ParametrizeValuesType::List {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::ParametrizeValuesWrongType(values_type, values_row_type),
-                    Range::from_located(expr),
+                    Range::from_located(values),
                 ));
             }
-            handle_value_rows(checker, elts, values_type, values_row_type);
+            if is_multi_named {
+                handle_value_rows(checker, elts, values_type, values_row_type);
+            }
         }
         ExprKind::Tuple { elts, .. } => {
             if values_type != types::ParametrizeValuesType::Tuple {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::ParametrizeValuesWrongType(values_type, values_row_type),
-                    Range::from_located(expr),
+                    Range::from_located(values),
                 ));
             }
-            handle_value_rows(checker, elts, values_type, values_row_type);
+            if is_multi_named {
+                handle_value_rows(checker, elts, values_type, values_row_type);
+            }
         }
         _ => {}
     }
@@ -333,8 +334,8 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
                 .rules
                 .enabled(&Rule::ParametrizeNamesWrongType)
             {
-                if let Some(arg) = args.get(0) {
-                    check_names(checker, arg);
+                if let Some(names) = args.get(0) {
+                    check_names(checker, names);
                 }
             }
             if checker
@@ -342,8 +343,10 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
                 .rules
                 .enabled(&Rule::ParametrizeValuesWrongType)
             {
-                if let Some(arg) = args.get(1) {
-                    check_values(checker, arg);
+                if let Some(names) = args.get(0) {
+                    if let Some(values) = args.get(1) {
+                        check_values(checker, names, values);
+                    }
                 }
             }
         }

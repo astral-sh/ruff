@@ -53,4 +53,14 @@ expression: diagnostics
       row: 608
       column: 7
   parent: ~
+- kind:
+    FitsOnOneLine: ~
+  location:
+    row: 615
+    column: 4
+  end_location:
+    row: 617
+    column: 7
+  fix: ~
+  parent: ~
 

@@ -2,6 +2,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::registry::Diagnostic;
+use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::violations;
 
 /// D404
@@ -16,11 +17,7 @@ pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     let Some(first_word) = body.split(' ').next() else {
         return
     };
-    if first_word
-        .replace(|c: char| !c.is_alphanumeric(), "")
-        .to_lowercase()
-        != "this"
-    {
+    if normalize_word(first_word) != "this" {
         return;
     }
     checker.diagnostics.push(Diagnostic::new(

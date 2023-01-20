@@ -132,3 +132,19 @@ pub fn is_empty_or_null_string(expr: &Expr) -> bool {
         _ => false,
     }
 }
+
+pub fn split_names(names: &str) -> Vec<&str> {
+    // Match the following pytest code:
+    //    [x.strip() for x in argnames.split(",") if x.strip()]
+    names
+        .split(',')
+        .filter_map(|s| {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        })
+        .collect::<Vec<&str>>()
+}

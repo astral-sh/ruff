@@ -199,7 +199,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.226'
+  rev: 'v0.0.227'
   hooks:
     - id: ruff
       # Respect `exclude` and `extend-exclude` settings.
@@ -672,6 +672,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D300 | uses-triple-quotes | Use """triple double quotes""" |  |
 | D301 | uses-r-prefix-for-backslashed-content | Use r""" if any backslashes in a docstring |  |
 | D400 | ends-in-period | First line should end with a period | 🛠 |
+| D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
 | D403 | first-line-capitalized | First word of the first line should be properly capitalized |  |
 | D404 | no-this-prefix | First word of the docstring should not be "This" |  |
@@ -729,6 +730,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP031 | printf-string-formatting | Use format specifiers instead of percent format | 🛠 |
 | UP032 | f-string | Use f-string instead of `format` call | 🛠 |
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
+| UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
 
 ### pep8-naming (N)
 
@@ -1063,7 +1065,7 @@ For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/20.10
 | DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
 | DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
 | DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
-| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` |  |
+| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
 | DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
 | DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
 
@@ -1651,12 +1653,12 @@ Assuming you have `cargo` installed, you can run:
 cargo run resources/test/fixtures
 ```
 
-For development, we use [nightly Rust](https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust):
+For rustfmt and Clippy, we use [nightly Rust](https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust):
 
 ```shell
 cargo +nightly fmt
 cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic
-cargo +nightly test --all
+cargo test --all
 ```
 
 ## Releases

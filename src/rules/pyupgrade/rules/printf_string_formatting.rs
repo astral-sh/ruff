@@ -431,7 +431,7 @@ fn convertable(parsed: &[PercentFormat], right: &Expr) -> bool {
             }
         }
         // py2: conversion is subject to modifiers.
-        let nontrivial = is_nontrivial(&fmt);
+        let nontrivial = is_nontrivial(fmt);
         if fmt.conversion == *"%" && nontrivial {
             return false;
         }
@@ -532,7 +532,7 @@ mod test {
         let sample = "\"%s two! %s\"";
         let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
         let e1 = PercentFormat::new("\"".to_string(), Some(sube1.clone()));
-        let e2 = PercentFormat::new(" two! ".to_string(), Some(sube1.clone()));
+        let e2 = PercentFormat::new(" two! ".to_string(), Some(sube1));
         let e3 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2, e3];
 

@@ -30,22 +30,20 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(pattern) = leading_quote(contents) {
-            if let Some(quote) = pattern.chars().last() {
-                // If removing whitespace would lead to an invalid string of quote
-                // characters, avoid applying the fix.
-                if !trimmed.ends_with(quote) {
-                    diagnostic.amend(Fix::replacement(
-                        trimmed.to_string(),
-                        Location::new(
-                            docstring.expr.location.row(),
-                            docstring.expr.location.column() + pattern.len(),
-                        ),
-                        Location::new(
-                            docstring.expr.location.row(),
-                            docstring.expr.location.column() + pattern.len() + line.chars().count(),
-                        ),
-                    ));
-                }
+            // If removing whitespace would lead to an invalid string of quote
+            // characters, avoid applying the fix.
+            if !trimmed.ends_with(pattern.chars().last().unwrap()) {
+                diagnostic.amend(Fix::replacement(
+                    trimmed.to_string(),
+                    Location::new(
+                        docstring.expr.location.row(),
+                        docstring.expr.location.column() + pattern.len(),
+                    ),
+                    Location::new(
+                        docstring.expr.location.row(),
+                        docstring.expr.location.column() + pattern.len() + line.chars().count(),
+                    ),
+                ));
             }
         }
     }
