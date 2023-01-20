@@ -70,7 +70,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2022-11-01
+          toolchain: 1.65.0
           override: true
       - uses: Swatinem/rust-cache@v1
       - run: cargo install cargo-insta
@@ -122,7 +122,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2022-11-01
+          toolchain: 1.65.0
           override: true
       - uses: Swatinem/rust-cache@v1
       - uses: actions/setup-python@v4
