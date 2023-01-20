@@ -251,7 +251,8 @@ ruff_macros::define_rule_mapping!(
     UP029 => violations::UnnecessaryBuiltinImport,
     UP030 => violations::FormatLiterals,
     UP032 => violations::FString,
-        UP033 => violations::FunctoolsCache,
+    UP033 => violations::FunctoolsCache,
+    UP034 => violations::ExtraneousParentheses,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,
@@ -555,20 +556,21 @@ impl Rule {
             | Rule::PEP3120UnnecessaryCodingComment
             | Rule::BlanketTypeIgnore
             | Rule::BlanketNOQA => &LintSource::Lines,
-            Rule::CommentedOutCode
-            | Rule::SingleLineImplicitStringConcatenation
-            | Rule::MultiLineImplicitStringConcatenation
+            Rule::AmbiguousUnicodeCharacterComment
+            | Rule::AmbiguousUnicodeCharacterDocstring
+            | Rule::AmbiguousUnicodeCharacterString
+            | Rule::AvoidQuoteEscape
+            | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
-            | Rule::BadQuotesDocstring
-            | Rule::AvoidQuoteEscape
+            | Rule::CommentedOutCode
+            | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
+            | Rule::MultiLineImplicitStringConcatenation
+            | Rule::SingleLineImplicitStringConcatenation
             | Rule::TrailingCommaMissing
             | Rule::TrailingCommaOnBareTupleProhibited
-            | Rule::TrailingCommaProhibited
-            | Rule::AmbiguousUnicodeCharacterString
-            | Rule::AmbiguousUnicodeCharacterDocstring
-            | Rule::AmbiguousUnicodeCharacterComment => &LintSource::Tokens,
+            | Rule::TrailingCommaProhibited => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
             Rule::ImplicitNamespacePackage => &LintSource::Filesystem,

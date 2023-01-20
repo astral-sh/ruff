@@ -3153,6 +3153,20 @@ impl AlwaysAutofixableViolation for FormatLiterals {
 }
 
 define_violation!(
+    pub struct ExtraneousParentheses;
+);
+impl AlwaysAutofixableViolation for ExtraneousParentheses {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Avoid extraneous parentheses")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove extraneous parentheses".to_string()
+    }
+}
+
+define_violation!(
     pub struct FString;
 );
 impl AlwaysAutofixableViolation for FString {
