@@ -1643,22 +1643,7 @@ Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a 
 
 ## Development
 
-Ruff is written in Rust (1.65.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
-for development.
-
-Assuming you have `cargo` installed, you can run:
-
-```shell
-cargo run resources/test/fixtures
-```
-
-For rustfmt and Clippy, we use [nightly Rust](https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust):
-
-```shell
-cargo +nightly fmt
-cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic
-cargo test --all
-```
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to Ruff.
 
 ## Releases
 
