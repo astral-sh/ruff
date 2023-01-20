@@ -6,7 +6,8 @@ use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
-    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff,
+    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_quotes, pycodestyle, pyupgrade,
+    ruff,
 };
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
@@ -45,6 +46,7 @@ pub fn check_tokens(
             .rules
             .enabled(&Rule::TrailingCommaOnBareTupleProhibited)
         || settings.rules.enabled(&Rule::TrailingCommaProhibited);
+    let enforce_extraneous_parenthesis = settings.rules.enabled(&Rule::ExtraneousParentheses);
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {
@@ -134,6 +136,14 @@ pub fn check_tokens(
             flake8_commas::rules::trailing_commas(tokens, settings, autofix)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        );
+    }
+
+    // UP034
+    if enforce_extraneous_parenthesis {
+        diagnostics.extend(
+            pyupgrade::rules::extraneous_parentheses(tokens, locator, settings, autofix)
+                .into_iter(),
         );
     }
 

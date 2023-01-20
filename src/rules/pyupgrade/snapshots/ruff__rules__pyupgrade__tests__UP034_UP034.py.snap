@@ -3,156 +3,173 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ExtraneousParenthesis: ~
+    ExtraneousParentheses: ~
   location:
     row: 2
-    column: 0
+    column: 6
   end_location:
     row: 2
-    column: 14
+    column: 13
   fix:
-    content: "print(\"foo\")"
+    content: "\"foo\""
     location:
       row: 2
-      column: 0
+      column: 6
     end_location:
       row: 2
-      column: 14
+      column: 13
   parent: ~
 - kind:
-    ExtraneousParenthesis: ~
+    ExtraneousParentheses: ~
   location:
-    row: 4
-    column: 0
+    row: 5
+    column: 6
   end_location:
-    row: 4
-    column: 27
-  fix:
-    content: "print(\"hell((goodybe))o\")"
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 27
-  parent: ~
-- kind:
-    ExtraneousParenthesis: ~
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 16
-  fix:
-    content: "print(\"foo\")"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 16
-  parent: ~
-- kind:
-    ExtraneousParenthesis: ~
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 14
-  fix:
-    content: print(1)
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 14
-  parent: ~
-- kind:
-    ExtraneousParenthesis: ~
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
+    row: 5
     column: 26
   fix:
-    content: "print(\"foo{}\".format(1))"
+    content: "\"hell((goodybe))o\""
     location:
-      row: 10
-      column: 0
+      row: 5
+      column: 6
     end_location:
-      row: 10
+      row: 5
       column: 26
   parent: ~
 - kind:
-    ExtraneousParenthesis: ~
+    ExtraneousParentheses: ~
   location:
-    row: 12
-    column: 0
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 15
+  fix:
+    content: "(\"foo\")"
+    location:
+      row: 8
+      column: 6
+    end_location:
+      row: 8
+      column: 15
+  parent: ~
+- kind:
+    ExtraneousParentheses: ~
+  location:
+    row: 11
+    column: 6
+  end_location:
+    row: 11
+    column: 13
+  fix:
+    content: ((1))
+    location:
+      row: 11
+      column: 6
+    end_location:
+      row: 11
+      column: 13
+  parent: ~
+- kind:
+    ExtraneousParentheses: ~
+  location:
+    row: 14
+    column: 6
   end_location:
     row: 14
-    column: 1
+    column: 25
   fix:
-    content: "print(\n    \"foo{}\".format(1)\n )"
+    content: "\"foo{}\".format(1)"
     location:
-      row: 12
-      column: 0
+      row: 14
+      column: 6
     end_location:
       row: 14
-      column: 1
+      column: 25
   parent: ~
 - kind:
-    ExtraneousParenthesis: ~
+    ExtraneousParentheses: ~
   location:
-    row: 16
-    column: 0
-  end_location:
-    row: 20
-    column: 1
-  fix:
-    content: "print(\n        \"foo\"\n     )"
-    location:
-      row: 16
-      column: 0
-    end_location:
-      row: 20
-      column: 1
-  parent: ~
-- kind:
-    ExtraneousParenthesis: ~
-  location:
-    row: 23
-    column: 8
-  end_location:
-    row: 23
-    column: 24
-  fix:
-    content: int((yield 1))
-    location:
-      row: 23
-      column: 8
-    end_location:
-      row: 23
-      column: 24
-  parent: ~
-- kind:
-    ExtraneousParenthesis: ~
-  location:
-    row: 26
+    row: 18
     column: 4
   end_location:
-    row: 28
-    column: 5
+    row: 18
+    column: 23
   fix:
-    content: "print(\n        \"foo{}\".format(1)\n     )"
+    content: "\"foo{}\".format(1)"
     location:
-      row: 26
+      row: 18
       column: 4
     end_location:
-      row: 28
+      row: 18
+      column: 23
+  parent: ~
+- kind:
+    ExtraneousParentheses: ~
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 25
+    column: 5
+  fix:
+    content: "\n        \"foo\"\n    "
+    location:
+      row: 23
+      column: 4
+    end_location:
+      row: 25
       column: 5
+  parent: ~
+- kind:
+    ExtraneousParentheses: ~
+  location:
+    row: 30
+    column: 12
+  end_location:
+    row: 30
+    column: 23
+  fix:
+    content: (yield 1)
+    location:
+      row: 30
+      column: 12
+    end_location:
+      row: 30
+      column: 23
+  parent: ~
+- kind:
+    ExtraneousParentheses: ~
+  location:
+    row: 35
+    column: 8
+  end_location:
+    row: 35
+    column: 27
+  fix:
+    content: "\"foo{}\".format(1)"
+    location:
+      row: 35
+      column: 8
+    end_location:
+      row: 35
+      column: 27
+  parent: ~
+- kind:
+    ExtraneousParentheses: ~
+  location:
+    row: 39
+    column: 6
+  end_location:
+    row: 39
+    column: 27
+  fix:
+    content: x for x in range(3)
+    location:
+      row: 39
+      column: 6
+    end_location:
+      row: 39
+      column: 27
   parent: ~
 

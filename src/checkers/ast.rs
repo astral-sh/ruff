@@ -2112,9 +2112,6 @@ where
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias(self, &expr);
                 }
-                if self.settings.rules.enabled(&Rule::ExtraneousParenthesis) {
-                    pyupgrade::rules::extraneous_parenthesis(self, expr, func, args, keywords);
-                }
 
                 // flake8-print
                 if self.settings.rules.enabled(&Rule::PrintFound)
