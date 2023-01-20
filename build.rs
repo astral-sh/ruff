@@ -12,7 +12,7 @@ const RULES_SUBMODULE_DOC_PREFIX: &str = "//! Rules from ";
 /// The `src/rules/*/mod.rs` files are expected to have a first line such as the
 /// following:
 ///
-///     //! Rules from [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/).
+///     //! Rules from [pyflakes](https://pypi.org/project/pyflakes/2.5.0/).
 ///
 /// This function extracts the link label and url from these comments and
 /// generates the `name` and `url` functions for the `RuleOrigin` enum
@@ -20,7 +20,7 @@ const RULES_SUBMODULE_DOC_PREFIX: &str = "//! Rules from ";
 fn generate_origin_name_and_url(out_dir: &Path) {
     println!("cargo:rerun-if-changed=src/rules/");
 
-    let mut name_match_arms: String = r#"RuleOrigin::Ruff => "Ruff-specific rules","#.into();
+    let mut name_match_arms: String = r#"RuleOrigin::Ruff => "ruff-specific rules","#.into();
     let mut url_match_arms: String = r#"RuleOrigin::Ruff => None,"#.into();
 
     for file in fs::read_dir("src/rules/")
@@ -48,6 +48,9 @@ fn generate_origin_name_and_url(out_dir: &Path) {
             .unwrap()
             .split_once("](")
             .unwrap();
+
+        let name_is_lower = name.chars().all(|c| !c.is_uppercase());
+        assert!(name_is_lower, "expected name on the first line in {mod_rs_path} to be lowercase, was `{name}`");
 
         let dirname = file.file_name();
         let dirname = dirname.to_str().unwrap();
