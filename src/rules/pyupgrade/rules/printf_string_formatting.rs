@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_common::cformat::{
@@ -27,6 +28,7 @@ struct PercentFormatPart {
     conversion: String,
 }
 
+// Can we just remove this and use
 impl PercentFormatPart {
     fn new(
         key: Option<String>,
@@ -65,7 +67,7 @@ impl From<&CFormatSpec> for PercentFormatPart {
         let flags = if spec.flags.is_empty() {
             None
         } else {
-            Some(get_flags(spec.flags))
+            Some(parse_conversion_flags(spec.flags))
         };
         Self::new(
             spec.mapping_key.clone(),
@@ -80,18 +82,21 @@ impl From<&CFormatSpec> for PercentFormatPart {
 #[derive(Debug, PartialEq, Clone)]
 struct PercentFormat {
     item: String,
-    parts: Option<PercentFormatPart>,
+    format_spec: Option<PercentFormatPart>,
 }
 
 impl PercentFormat {
     fn new(item: String, parts: Option<PercentFormatPart>) -> Self {
-        Self { item, parts }
+        Self {
+            item,
+            format_spec: parts,
+        }
     }
 }
 
 /// Converts the `RustPython` Conversion Flags into their Python string
 /// representation.
-fn get_flags(flags: CConversionFlags) -> String {
+fn parse_conversion_flags(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
     if flags.contains(CConversionFlags::ALTERNATE_FORM) {
         flag_string.push('#');
@@ -112,28 +117,26 @@ fn get_flags(flags: CConversionFlags) -> String {
 }
 
 /// Converts a string to a vector of [`PercentFormat`] structs.
-fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
-    let mut formats: Vec<PercentFormat> = vec![];
-
-    let Ok(format_string) = CFormatString::from_str(string) else {
-        return formats;
-    };
-    let format_vec: Vec<&CFormatPart<String>> =
+fn parse_percent_format(string: &str) -> Result<Vec<PercentFormat>> {
+    let format_string =
+        CFormatString::from_str(string).map_err(|_| anyhow!("Failed to parse CFormatString"))?;
+    let format_parts: Vec<&CFormatPart<String>> =
         format_string.iter().map(|(_, part)| part).collect();
-    for (i, part) in format_vec.iter().enumerate() {
+    let mut formats: Vec<PercentFormat> = vec![];
+    for (i, part) in format_parts.iter().enumerate() {
         if let CFormatPart::Literal(item) = &part {
             let mut current_format = PercentFormat::new(item.to_string(), None);
-            let Some(the_next) = format_vec.get(i + 1) else {
+            let Some(format_part) = format_parts.get(i + 1) else {
                 formats.push(current_format);
                 continue;
             };
-            if let CFormatPart::Spec(c_spec) = &the_next {
-                current_format.parts = Some(c_spec.into());
+            if let CFormatPart::Spec(c_spec) = &format_part {
+                current_format.format_spec = Some(c_spec.into());
             }
             formats.push(current_format);
         }
     }
-    formats
+    Ok(formats)
 }
 
 /// Removes the first instance of a given element from a vector, if the item is
@@ -182,10 +185,11 @@ fn any_percent_format(pf: &PercentFormatPart) -> bool {
     cf_bool || w_bool || precision_bool || conversion_bool
 }
 
+/// Convert a [`PercentFormat`] struct into a `String`.
 fn handle_part(part: &PercentFormat) -> String {
     let mut string = part.item.clone();
     string = curly_escape(&string);
-    let Some(mut fmt) = part.parts.clone() else {
+    let Some(mut fmt) = part.format_spec.clone() else {
         return string;
     };
     if fmt.conversion == *"%" {
@@ -208,54 +212,49 @@ fn handle_part(part: &PercentFormat) -> String {
     }
     if any_percent_format(&fmt) {
         parts.push(":".to_string());
-    }
-    if let Some(conversion_flag) = &fmt.conversion_flag {
-        if !conversion_flag.is_empty() {
-            let simplified = simplify_conversion_flag(conversion_flag);
-            parts.push(simplified);
+        if let Some(conversion_flag) = &fmt.conversion_flag {
+            if !conversion_flag.is_empty() {
+                let simplified = simplify_conversion_flag(conversion_flag);
+                parts.push(simplified);
+            }
         }
-    }
-    if let Some(width) = &fmt.width {
-        if !width.is_empty() {
-            parts.push(width.to_string());
+        if let Some(width) = &fmt.width {
+            if !width.is_empty() {
+                parts.push(width.to_string());
+            }
         }
-    }
-
-    if let Some(precision) = &fmt.precision {
-        if !precision.is_empty() {
-            parts.push(precision.to_string());
+        if let Some(precision) = &fmt.precision {
+            if !precision.is_empty() {
+                parts.push(precision.to_string());
+            }
         }
     }
     if !fmt.conversion.is_empty() {
         parts.push(fmt.conversion);
     }
-    for character in converter.chars() {
-        parts.push(character.to_string());
-    }
+    parts.push(converter);
     parts.push("}".to_string());
     String::from_iter(parts)
 }
 
-fn percent_to_format(string: &str) -> String {
-    let mut final_string = String::new();
-    for part in parse_percent_format(string) {
-        let handled = handle_part(&part);
-        final_string.push_str(&handled);
+/// Convert a sequence of [`PercentFormat`] structs into a `String`.
+fn percent_to_format(parsed: &[PercentFormat]) -> String {
+    let mut contents = String::new();
+    for part in parsed {
+        contents.push_str(&handle_part(part));
     }
-    final_string
+    contents
 }
 
-/// If the tuple has one argument it removes the comma, otherwise it returns the
-/// tuple as is
-fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
+/// If a tuple has one argument, remove the comma; otherwise, return it as-is.
+fn clean_params_tuple(checker: &mut Checker, right: &Expr) -> String {
     let mut base_string = checker
         .locator
         .slice_source_code_range(&Range::from_located(right))
         .to_string();
-    let is_multi_line = base_string.contains('\n');
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
-            if !is_multi_line {
+            if right.location.row() == right.end_location.unwrap().row() {
                 for (i, character) in base_string.chars().rev().enumerate() {
                     if character == ',' {
                         let correct_index = base_string.len() - i - 1;
@@ -270,16 +269,13 @@ fn clean_right_tuple(checker: &mut Checker, right: &Expr) -> String {
 }
 
 /// Converts a dictionary to a function call while preserving as much styling as
-/// possible. This function also looks for areas that might cause issues, and
-/// returns an empty string if it finds one
-fn clean_right_dict(checker: &mut Checker, right: &Expr) -> Option<String> {
-    let whole_range = Range::new(right.location, right.end_location.unwrap());
-    let whole_string = checker.locator.slice_source_code_range(&whole_range);
-    let is_multi_line = whole_string.contains('\n');
+/// possible.
+fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String> {
+    let is_multi_line = right.location.row() < right.end_location.unwrap().row();
     let mut new_string = String::new();
     if let ExprKind::Dict { keys, values } = &right.node {
         let mut new_vals: Vec<String> = vec![];
-        let mut indent = String::new();
+        let mut indent = None;
         let mut already_seen: Vec<String> = vec![];
         for (key, value) in keys.iter().zip(values.iter()) {
             // The original unit tests of pyupgrade reveal that we should not rewrite
@@ -289,23 +285,24 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> Option<String> {
                 ..
             } = &key.node
             {
-                // If the dictionary key is not a valid python variable name, then do not fix
+                // If the dictionary key is not a valid variable name, abort.
                 if !PYTHON_NAME.is_match(key_string) {
                     return None;
                 }
-                // We should not rewrite if the key is a python keyword
+                // If the key is a Python keyword, abort.
                 if is_keyword(key_string) {
                     return None;
                 }
-                // If there are multiple entries of the same key, we need to return because we
-                // cannot handle this ambiguity
+                // If there are multiple entries of the same key, abort.
                 if already_seen.contains(key_string) {
                     return None;
                 }
                 already_seen.push(key_string.clone());
                 let mut new_string = String::new();
-                if is_multi_line && indent.is_empty() {
-                    indent = indentation(checker.locator, key).unwrap().to_string();
+                if is_multi_line {
+                    if indent.is_none() {
+                        indent = indentation(checker.locator, key);
+                    }
                 }
                 let value_range = Range::new(value.location, value.end_location.unwrap());
                 let value_string = checker.locator.slice_source_code_range(&value_range);
@@ -314,27 +311,35 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> Option<String> {
                 new_string.push_str(&value_string);
                 new_vals.push(new_string);
             } else {
-                // If there are any non-string keys, we should be timid and not modify the
-                // string
+                // If there are any non-string keys, abort.
                 return None;
             }
         }
-        // If we couldn't parse out key values return an empty string so that we don't
-        // attempt a fix
+        // If we couldn't parse out key values, abort.
         if new_vals.is_empty() {
             return None;
         }
         new_string.push('(');
         if is_multi_line {
+            // If this is a multi-line dictionary, abort.
+            let Some(indent) = indent else {
+                println!(
+                    "{:?}",
+                    checker.locator.slice_source_code_range(&Range::new(
+                        right.location,
+                        right.end_location.unwrap()
+                    ))
+                );
+                return None;
+            };
+
             for item in &new_vals {
                 new_string.push('\n');
                 new_string.push_str(&indent);
                 new_string.push_str(item);
-                // This implementation adds a trailing comma always, let me know if you want a
-                // more in-depth solution
                 new_string.push(',');
             }
-            // For the ending parentheses we want to go back one indent
+            // For the ending parentheses we want to go back one indent.
             new_string.push('\n');
             if indent.len() > 3 {
                 new_string.push_str(&indent[3..]);
@@ -347,39 +352,38 @@ fn clean_right_dict(checker: &mut Checker, right: &Expr) -> Option<String> {
     Some(new_string)
 }
 
-fn fix_percent_format_tuple(checker: &mut Checker, right: &Expr, left_string: &str) -> String {
-    let mut cleaned_string = percent_to_format(left_string);
-    cleaned_string.push_str(".format");
-    let right_string = clean_right_tuple(checker, right);
-    cleaned_string.push_str(&right_string);
-    cleaned_string
+fn fix_percent_format_tuple(
+    checker: &mut Checker,
+    params: &Expr,
+    parsed: &[PercentFormat],
+) -> String {
+    let mut contents = percent_to_format(parsed);
+    contents.push_str(".format");
+    let params_string = clean_params_tuple(checker, params);
+    contents.push_str(&params_string);
+    contents
 }
 
 fn fix_percent_format_dict(
     checker: &mut Checker,
-    right: &Expr,
-    left_string: &str,
+    params: &Expr,
+    parsed: &[PercentFormat],
 ) -> Option<String> {
-    let mut cleaned_string = percent_to_format(left_string);
-    cleaned_string.push_str(".format");
-    let right_string = match clean_right_dict(checker, right) {
-        // If we could not properly parse the dictionary we should None so the program knows not to
-        // fix this
-        None => return None,
-        Some(string) => {
-            if string.is_empty() {
-                return None;
-            }
-            string
-        }
+    let mut contents = percent_to_format(parsed);
+    contents.push_str(".format");
+    let Some(params_string) = clean_params_dictionary(checker, params) else {
+        return None;
     };
-    cleaned_string.push_str(&right_string);
-    Some(cleaned_string)
+    if params_string.is_empty() {
+        return None;
+    };
+    contents.push_str(&params_string);
+    Some(contents)
 }
 
-/// Returns true if any of `conversion_flag`, `width`, and `precision` are a
-/// non-empty string
-fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
+/// Returns true if any of the [`PercentFormatPart`] components
+/// (`conversion_flag`, `width`, and `precision`) are non-empty.
+fn is_nontrivial(pf: &PercentFormatPart) -> bool {
     let mut cf_bool = false;
     let mut w_bool = false;
     let mut precision_bool = false;
@@ -395,22 +399,22 @@ fn get_nontrivial_fmt(pf: &PercentFormatPart) -> bool {
     cf_bool || w_bool || precision_bool
 }
 
-/// Checks the string for a number of issues that mean we should not convert
-/// things
-fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
+/// Returns `true` if the sequence of [`PercentFormatPart`] indicate that an
+/// [`Expr`] can be converted.
+fn convertable(parsed: &[PercentFormat], right: &Expr) -> bool {
     for item in parsed {
-        let Some(fmt) = item.parts else {
+        let Some(ref fmt) = item.format_spec else {
             continue;
         };
-        // timid: these require out-of-order parameter consumption
+        // These require out-of-order parameter consumption.
         if fmt.width == Some("*".to_string()) || fmt.precision == Some(".*".to_string()) {
             return false;
         }
-        // these conversions require modification of parameters
+        // These conversions require modification of parameters.
         if vec!["d", "i", "u", "c"].contains(&&fmt.conversion[..]) {
             return false;
         }
-        // timid: py2: %#o formats different from {:#o} (--py3?)
+        // py2: %#o formats different from {:#o}.
         if fmt
             .conversion_flag
             .clone()
@@ -420,31 +424,29 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
         {
             return false;
         }
-        // no equivalent in format
+        // No equivalent in format.
         if let Some(key) = &fmt.key {
             if key.is_empty() {
                 return false;
             }
         }
-        // timid: py2: conversion is subject to modifiers (--py3?)
-        let nontrivial_fmt = get_nontrivial_fmt(&fmt);
-        if fmt.conversion == *"%" && nontrivial_fmt {
+        // py2: conversion is subject to modifiers.
+        let nontrivial = is_nontrivial(&fmt);
+        if fmt.conversion == *"%" && nontrivial {
             return false;
         }
-        // no equivalent in format
-        if vec!["a", "r"].contains(&&fmt.conversion[..]) && nontrivial_fmt {
+        // No equivalent in format.
+        if vec!["a", "r"].contains(&&fmt.conversion[..]) && nontrivial {
             return false;
         }
-        // %s with None and width is not supported
+        // %s with None and width is not supported.
         if let Some(width) = &fmt.width {
             if !width.is_empty() && fmt.conversion == *"s" {
                 return false;
             }
         }
-        // all dict substitutions must be named
+        // All dict substitutions must be named.
         if let ExprKind::Dict { .. } = &right.node {
-            // Technically a value of "" would also count as `not key`, (which is what the
-            // python code uses) BUT we already have a check above for this
             if fmt.key.is_none() {
                 return false;
             }
@@ -455,14 +457,12 @@ fn check_statement(parsed: Vec<PercentFormat>, right: &Expr) -> bool {
 
 /// UP031
 pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
-    let expr_string = checker
+    let existing = checker
         .locator
         .slice_source_code_range(&Range::from_located(expr));
 
-    let mut split = MODULO_CALL.split(&expr_string);
-    // Pyupgrade does this test in the functions that change, but I am relying on
-    // this logic for something else, so I will use it here, pyupgrade notes
-    // this is an overly timid check
+    // Split `"%s" % "Hello, world"` into `"%s"` and `"Hello, world"`.
+    let mut split = MODULO_CALL.split(&existing);
     let Some(left_string) = split.next() else {
         return
     };
@@ -470,43 +470,40 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         return;
     }
 
-    let parsed = parse_percent_format(left_string);
-    let is_valid = check_statement(parsed, right);
-    // If the statement is not valid, then bail
-    if !is_valid {
+    // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
+    let Ok(parsed) = parse_percent_format(left_string) else {
+        return;
+    };
+    if !convertable(&parsed, right) {
         return;
     }
-    let mut new_string = String::new();
+
+    let mut contents = String::with_capacity(existing.len());
     match &right.node {
         ExprKind::Tuple { .. } => {
-            new_string = fix_percent_format_tuple(checker, right, left_string);
+            contents = fix_percent_format_tuple(checker, right, &parsed);
         }
         ExprKind::Dict { .. } => {
-            new_string = match fix_percent_format_dict(checker, right, left_string) {
-                None => return,
+            contents = match fix_percent_format_dict(checker, right, &parsed) {
                 Some(string) => string,
+                None => return,
             };
         }
         _ => {}
     }
-    // We should not replace if the string we get back is empty
-    if new_string.is_empty() {
+
+    // If there is no change, then bail.
+    if existing == contents {
         return;
     }
-    let old_string = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(expr));
-    // If there is no change, then bail
-    if new_string == old_string {
-        return;
-    }
+
     let mut diagnostic = Diagnostic::new(
         violations::PrintfStringFormatting,
         Range::from_located(expr),
     );
     if checker.patch(&Rule::PrintfStringFormatting) {
         diagnostic.amend(Fix::replacement(
-            new_string,
+            contents,
             expr.location,
             expr.end_location.unwrap(),
         ));
@@ -526,42 +523,55 @@ mod test {
         let e1 = PercentFormat::new("\"\"".to_string(), None);
         let expected = vec![e1];
 
-        let received = parse_percent_format(sample);
+        let received = parse_percent_format(sample).unwrap();
         assert_eq!(received, expected);
     }
 
     #[test]
-    fn test_parse_percent_format_double_two() {
+    fn test_parse_percent_format_twice() {
         let sample = "\"%s two! %s\"";
+        let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
+        let e1 = PercentFormat::new("\"".to_string(), Some(sube1.clone()));
+        let e2 = PercentFormat::new(" two! ".to_string(), Some(sube1.clone()));
+        let e3 = PercentFormat::new("\"".to_string(), None);
+        let expected = vec![e1, e2, e3];
+
+        let received = parse_percent_format(sample).unwrap();
+        assert_eq!(received, expected);
+    }
+
+    #[test]
+    fn test_parse_percent_format_consecutive() {
+        let sample = "\"%s%s\"";
         let sube1 = PercentFormatPart::new(None, None, None, None, "s".to_string());
         let e1 = PercentFormat::new(" two! ".to_string(), Some(sube1.clone()));
         let e2 = PercentFormat::new("\"".to_string(), Some(sube1));
         let e3 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e2, e1, e3];
 
-        let received = parse_percent_format(sample);
+        let received = parse_percent_format(sample).unwrap();
         assert_eq!(received, expected);
     }
 
-    #[test_case("\"%ld\"",PercentFormatPart::new(None, None, None, None, "d".to_string()); "two letter")]
-    #[test_case( "\"%.*f\"",PercentFormatPart::new(None, None, None, Some(".*".to_string()), "f".to_string()); "dot star letter")]
-    #[test_case( "\"%.5f\"",PercentFormatPart::new(None, None, None, Some(".5".to_string()), "f".to_string()); "dot number letter")]
-    #[test_case( "\"%.f\"",PercentFormatPart::new(None, None, None, Some(".".to_string()), "f".to_string()); "dot letter")]
-    #[test_case( "\"%*d\"",PercentFormatPart::new(None, None, Some("*".to_string()), None, "d".to_string()); "star d")]
-    #[test_case( "\"%5d\"",PercentFormatPart::new(None, None, Some("5".to_string()), None, "d".to_string()); "number letter")]
-    #[test_case( "\"% #0-+d\"",PercentFormatPart::new(None, Some("#0- +".to_string()), None, None, "d".to_string()); "hastag and symbols")]
-    #[test_case( "\"%#o\"",PercentFormatPart::new(None, Some("#".to_string()), None, None, "o".to_string()); "format hashtag")]
-    #[test_case( "\"%()s\"",PercentFormatPart::new(Some(String::new()), None, None, None, "s".to_string()); "empty paren")]
-    #[test_case( "\"%(hi)s\"",PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string()); "word in paren")]
-    #[test_case( "\"%s\"",PercentFormatPart::new(None, None, None, None, "s".to_string()); "format s")]
-    #[test_case( "\"%a\"",PercentFormatPart::new(None, None, None, None, "a".to_string()); "format an a")]
-    #[test_case( "\"%r\"",PercentFormatPart::new(None, None, None, None, "r".to_string()); "format an r")]
+    #[test_case("\"%ld\"", PercentFormatPart::new(None, None, None, None, "d".to_string()); "two letter")]
+    #[test_case( "\"%.*f\"", PercentFormatPart::new(None, None, None, Some(".*".to_string()), "f".to_string()); "dot star letter")]
+    #[test_case( "\"%.5f\"", PercentFormatPart::new(None, None, None, Some(".5".to_string()), "f".to_string()); "dot number letter")]
+    #[test_case( "\"%.f\"", PercentFormatPart::new(None, None, None, Some(".".to_string()), "f".to_string()); "dot letter")]
+    #[test_case( "\"%*d\"", PercentFormatPart::new(None, None, Some("*".to_string()), None, "d".to_string()); "star d")]
+    #[test_case( "\"%5d\"", PercentFormatPart::new(None, None, Some("5".to_string()), None, "d".to_string()); "number letter")]
+    #[test_case( "\"% #0-+d\"", PercentFormatPart::new(None, Some("#0- +".to_string()), None, None, "d".to_string()); "hashtag and symbols")]
+    #[test_case( "\"%#o\"", PercentFormatPart::new(None, Some("#".to_string()), None, None, "o".to_string()); "format hashtag")]
+    #[test_case( "\"%()s\"", PercentFormatPart::new(Some(String::new()), None, None, None, "s".to_string()); "empty paren")]
+    #[test_case( "\"%(hi)s\"", PercentFormatPart::new(Some("hi".to_string()), None, None, None, "s".to_string()); "word in paren")]
+    #[test_case( "\"%s\"", PercentFormatPart::new(None, None, None, None, "s".to_string()); "format s")]
+    #[test_case( "\"%a\"", PercentFormatPart::new(None, None, None, None, "a".to_string()); "format an a")]
+    #[test_case( "\"%r\"", PercentFormatPart::new(None, None, None, None, "r".to_string()); "format an r")]
     fn test_parse_percent_format(sample: &str, expected: PercentFormatPart) {
         let e1 = PercentFormat::new("\"".to_string(), Some(expected));
         let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
-        let received = parse_percent_format(sample);
+        let received = parse_percent_format(sample).unwrap();
         assert_eq!(received, expected);
     }
 
@@ -574,7 +584,7 @@ mod test {
         let e3 = PercentFormat::new(" unrecognized)".to_string(), None);
         let expected = vec![e1, e2, e3];
 
-        let received = parse_percent_format(sample);
+        let received = parse_percent_format(sample).unwrap();
         assert_eq!(received, expected);
     }
 
@@ -587,7 +597,7 @@ mod test {
         let e3 = PercentFormat::new(")".to_string(), None);
         let expected = vec![e1, e2, e3];
 
-        let received = parse_percent_format(sample);
+        let received = parse_percent_format(sample).unwrap();
         assert_eq!(received, expected);
     }
 
@@ -605,7 +615,7 @@ mod test {
         let e2 = PercentFormat::new("\"".to_string(), None);
         let expected = vec![e1, e2];
 
-        let received = parse_percent_format(sample);
+        let received = parse_percent_format(sample).unwrap();
         assert_eq!(received, expected);
     }
 
@@ -616,7 +626,7 @@ mod test {
     #[test_case("\"%r\"", "\"{!r}\""; "format an r")]
     #[test_case("\"%a\"", "\"{!a}\""; "format an a")]
     fn test_percent_to_format(sample: &str, expected: &str) {
-        let received = percent_to_format(sample);
+        let received = percent_to_format(&parse_percent_format(sample).unwrap());
         assert_eq!(received, expected);
     }
 
