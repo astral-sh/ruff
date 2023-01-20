@@ -31,11 +31,16 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 helpers::leading_quote(docstring.contents),
                 helpers::trailing_quote(docstring.contents),
             ) {
-                diagnostic.amend(Fix::replacement(
-                    format!("{leading}{}{trailing}", docstring.body.trim()),
-                    docstring.expr.location,
-                    docstring.expr.end_location.unwrap(),
-                ));
+                // If removing whitespace would lead to an invalid string of quote
+                // characters, avoid applying the fix.
+                let trimmed = docstring.body.trim();
+                if !trimmed.ends_with(trailing.chars().last().unwrap()) {
+                    diagnostic.amend(Fix::replacement(
+                        format!("{leading}{trimmed}{trailing}"),
+                        docstring.expr.location,
+                        docstring.expr.end_location.unwrap(),
+                    ));
+                }
             }
         }
         checker.diagnostics.push(diagnostic);
