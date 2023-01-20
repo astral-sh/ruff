@@ -133,7 +133,7 @@ fn parse_percent_format(string: &str) -> Vec<PercentFormat> {
                         CFormatQuantity::Amount(amount) => Some(format!(".{amount}")),
                         // FOR REVIEWER: Not sure if below is the correct way to handle
                         // FromValuesTuple
-                        CFormatQuantity::FromValuesTuple => None,
+                        CFormatQuantity::FromValuesTuple => Some(".*".to_string()),
                     },
                     None => None,
                 };
