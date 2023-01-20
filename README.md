@@ -653,7 +653,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D105 | MagicMethod | Missing docstring in magic method |  |
 | D106 | PublicNestedClass | Missing docstring in public nested class |  |
 | D107 | PublicInit | Missing docstring in `__init__` |  |
-| D200 | FitsOnOneLine | One-line docstring should fit on one line |  |
+| D200 | FitsOnOneLine | One-line docstring should fit on one line | 🛠 |
 | D201 | NoBlankLineBeforeFunction | No blank lines allowed before function docstring (found {num_lines}) | 🛠 |
 | D202 | NoBlankLineAfterFunction | No blank lines allowed after function docstring (found {num_lines}) | 🛠 |
 | D203 | OneBlankLineBeforeClass | 1 blank line required before class docstring | 🛠 |
