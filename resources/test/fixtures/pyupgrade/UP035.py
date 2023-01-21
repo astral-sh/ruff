@@ -36,11 +36,6 @@ from collections import Counter, Mapping
 import sys
 
 if True:
-    from six.moves import queue, urllib_request
-
-from six.moves import urllib_request, filter, getcwd
-
-if True:
     from collections import (
         Mapping,
         Callable,
