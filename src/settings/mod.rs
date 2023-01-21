@@ -210,9 +210,9 @@ impl Settings {
     }
 
     #[cfg(test)]
-    pub fn for_rules(rule_codes: Vec<Rule>) -> Self {
+    pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
-            rules: rule_codes.into(),
+            rules: rules.into(),
             ..Settings::default()
         }
     }
@@ -323,12 +323,12 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
         ] {
             for selector in spec.select {
                 if selector.specificity() == specificity {
-                    rules.extend(selector.codes());
+                    rules.extend(selector);
                 }
             }
             for selector in spec.ignore {
                 if selector.specificity() == specificity {
-                    for rule in selector.codes() {
+                    for rule in selector {
                         rules.remove(&rule);
                     }
                 }

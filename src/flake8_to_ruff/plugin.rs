@@ -275,9 +275,8 @@ pub fn infer_plugins_from_codes(selectors: &BTreeSet<RuleSelector>) -> Vec<Plugi
     .filter(|plugin| {
         for selector in selectors {
             if selector
-                .codes()
-                .iter()
-                .any(|rule| plugin.selector().codes().contains(rule))
+                .into_iter()
+                .any(|rule| plugin.selector().into_iter().any(|r| r == rule))
             {
                 return true;
             }

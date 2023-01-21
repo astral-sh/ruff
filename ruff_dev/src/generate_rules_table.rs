@@ -25,7 +25,7 @@ fn generate_table(table_out: &mut String, selector: &RuleSelector) {
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
     table_out.push('\n');
-    for rule in selector.codes() {
+    for rule in selector {
         let fix_token = match rule.autofixable() {
             None => "",
             Some(_) => "🛠",

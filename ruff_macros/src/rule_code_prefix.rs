@@ -184,7 +184,7 @@ fn generate_impls<'a>(
     prefix_to_codes: &BTreeMap<Ident, BTreeSet<String>>,
     variant_name: impl Fn(&str) -> &'a Ident,
 ) -> proc_macro2::TokenStream {
-    let codes_match_arms = prefix_to_codes.iter().map(|(prefix, codes)| {
+    let into_iter_match_arms = prefix_to_codes.iter().map(|(prefix, codes)| {
         let codes = codes.iter().map(|code| {
             let rule_variant = variant_name(code);
             quote! {
@@ -198,12 +198,12 @@ fn generate_impls<'a>(
                     crate::warn_user_once!(
                         "`{}` has been remapped to `{}`", #prefix_str, #target
                     );
-                    vec![#(#codes),*]
+                    vec![#(#codes),*].into_iter()
                 }
             }
         } else {
             quote! {
-                #prefix_ident::#prefix => vec![#(#codes),*],
+                #prefix_ident::#prefix => vec![#(#codes),*].into_iter(),
             }
         }
     });
@@ -248,19 +248,24 @@ fn generate_impls<'a>(
 
     quote! {
         impl #prefix_ident {
-            pub fn codes(&self) -> Vec<#rule_type> {
-                use colored::Colorize;
-
-                #[allow(clippy::match_same_arms)]
-                match self {
-                    #(#codes_match_arms)*
-                }
-            }
-
             pub fn specificity(&self) -> SuffixLength {
                 #[allow(clippy::match_same_arms)]
                 match self {
                     #(#specificity_match_arms)*
+                }
+            }
+        }
+
+        impl IntoIterator for &#prefix_ident {
+            type Item = #rule_type;
+            type IntoIter = ::std::vec::IntoIter<Self::Item>;
+
+            fn into_iter(self) -> Self::IntoIter {
+                use colored::Colorize;
+
+                #[allow(clippy::match_same_arms)]
+                match self {
+                    #(#into_iter_match_arms)*
                 }
             }
         }
