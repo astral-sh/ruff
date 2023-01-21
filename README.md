@@ -543,7 +543,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 <!-- Begin auto-generated sections. -->
 ### Pyflakes (F)
 
-For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
+For more, see [Pyflakes](https://pypi.org/project/pyflakes/3.0.1/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -593,7 +593,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/) on PyPI.
 
 ### pycodestyle (E, W)
 
-For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI.
+For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.10.0/) on PyPI.
 
 #### Error (E)
 | Code | Name | Message | Fix |
@@ -632,7 +632,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 
 ### isort (I)
 
-For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
+For more, see [isort](https://pypi.org/project/isort/5.11.4/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -641,7 +641,7 @@ For more, see [isort](https://pypi.org/project/isort/5.10.1/) on PyPI.
 
 ### pydocstyle (D)
 
-For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
+For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.3.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -694,7 +694,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 
 ### pyupgrade (UP)
 
-For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
+For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.3.1/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -734,7 +734,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 
 ### pep8-naming (N)
 
-For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/) on PyPI.
+For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.3/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -831,7 +831,7 @@ For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap
 
 ### flake8-bugbear (B)
 
-For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/) on PyPI.
+For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/23.1.20/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -866,7 +866,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/22.10.27/
 
 ### flake8-builtins (A)
 
-For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.0.1/) on PyPI.
+For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.1.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -976,7 +976,7 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 
 ### flake8-quotes (Q)
 
-For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/) on PyPI.
+For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.2/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1109,7 +1109,7 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 
 ### Pylint (PLC, PLE, PLR, PLW)
 
-For more, see [Pylint](https://pypi.org/project/pylint/2.15.7/) on PyPI.
+For more, see [Pylint](https://pypi.org/project/pylint/2.15.10/) on PyPI.
 
 #### Convention (PLC)
 | Code | Name | Message | Fix |
@@ -1171,7 +1171,7 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0
 
 ### flake8-executable (EXE)
 
-For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1.1/) on PyPI.
+For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1.2/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
