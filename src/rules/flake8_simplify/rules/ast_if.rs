@@ -53,10 +53,12 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     if !(orelse.is_empty() && body.len() == 1) {
         return None;
     }
-    find_last_nested_if(inner_body).or(Some((
-        test,
-        inner_body.last().expect("Expected body to be non-empty"),
-    )))
+    find_last_nested_if(inner_body).or_else(|| {
+        Some((
+            test,
+            inner_body.last().expect("Expected body to be non-empty"),
+        ))
+    })
 }
 
 /// SIM102
