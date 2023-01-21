@@ -37,7 +37,7 @@ use crate::rules::{
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pie, flake8_print,
     flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pygrep_hooks, pylint, pyupgrade, ruff,
+    pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -1543,6 +1543,9 @@ where
                     flake8_simplify::rules::return_in_try_except_finally(
                         self, body, handlers, finalbody,
                     );
+                }
+                if self.settings.rules.enabled(&Rule::TryConsiderElse) {
+                    tryceratops::rules::try_consider_else(self, body, orelse);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
