@@ -2020,7 +2020,7 @@ source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3
 dependencies = [
  "ascii",
  "bitflags",
- "cfg-if 1.0.0",
+ "cfg-if",
  "hexf-parse",
  "itertools",
  "lexical-parse-float",
@@ -2031,7 +2031,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "radium",
- "rand 0.8.5",
+ "rand",
  "siphasher",
  "unic-ucd-category",
  "volatile",
