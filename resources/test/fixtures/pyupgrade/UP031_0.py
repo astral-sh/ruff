@@ -48,26 +48,6 @@ print("%(to_list)s" % {"to_list": []})
 
 print("%(k)s" % {"k": "v", "i": 1, "j": []})
 
-print((
-    "foo %s "
-    "bar %s" % (x, y)
-))
-
-print((
-    "foo %s "
-    "bar %s"
-) % (x, y))
-
-print(
-    "foo %(foo)s "
-    "bar %(bar)s" % {"foo": x, "bar": y}
-)
-
-print((
-    "foo %(foo)s "
-    "bar %(bar)s"
-) % {"foo": x, "bar": y})
-
 print("%(ab)s" % {"a" "b": 1})
 
 print("%(a)s" % {"a"  :  1})

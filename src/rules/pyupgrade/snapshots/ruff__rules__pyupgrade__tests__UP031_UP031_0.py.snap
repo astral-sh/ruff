@@ -317,7 +317,7 @@ expression: diagnostics
     row: 45
     column: 1
   fix:
-    content: "\"{k}\".format(\n    k=\"v\",\n    i=\"j\",\n )"
+    content: "\"{k}\".format(\n    k=\"v\",\n    i=\"j\",\n)"
     location:
       row: 42
       column: 6
@@ -362,19 +362,36 @@ expression: diagnostics
 - kind:
     PrintfStringFormatting: ~
   location:
-    row: 52
-    column: 4
+    row: 51
+    column: 6
+  end_location:
+    row: 51
+    column: 29
+  fix:
+    content: "\"{ab}\".format(ab=1)"
+    location:
+      row: 51
+      column: 6
+    end_location:
+      row: 51
+      column: 29
+  parent: ~
+- kind:
+    PrintfStringFormatting: ~
+  location:
+    row: 53
+    column: 6
   end_location:
     row: 53
-    column: 21
+    column: 27
   fix:
-    content: "\"foo {} \"\n    \"bar {}\".format(x, y)"
+    content: "\"{a}\".format(a=1)"
     location:
-      row: 52
-      column: 4
+      row: 53
+      column: 6
     end_location:
       row: 53
-      column: 21
+      column: 27
   parent: ~
 - kind:
     PrintfStringFormatting: ~
@@ -382,102 +399,17 @@ expression: diagnostics
     row: 56
     column: 6
   end_location:
-    row: 59
-    column: 10
-  fix:
-    content: "(\n    \"foo {} \"\n    \"bar {}\"\n).format(x, y)"
-    location:
-      row: 56
-      column: 6
-    end_location:
-      row: 59
-      column: 10
-  parent: ~
-- kind:
-    PrintfStringFormatting: ~
-  location:
-    row: 62
-    column: 4
-  end_location:
-    row: 63
-    column: 40
-  fix:
-    content: "\"foo {foo} \"\n    \"bar {bar}\".format(foo=x, bar=y)"
-    location:
-      row: 62
-      column: 4
-    end_location:
-      row: 63
-      column: 40
-  parent: ~
-- kind:
-    PrintfStringFormatting: ~
-  location:
-    row: 66
-    column: 6
-  end_location:
-    row: 69
-    column: 24
-  fix:
-    content: "(\n    \"foo {foo} \"\n    \"bar {bar}\"\n).format(foo=x, bar=y)"
-    location:
-      row: 66
-      column: 6
-    end_location:
-      row: 69
-      column: 24
-  parent: ~
-- kind:
-    PrintfStringFormatting: ~
-  location:
-    row: 71
-    column: 6
-  end_location:
-    row: 71
-    column: 29
-  fix:
-    content: "\"{ab}\".format(ab=1)"
-    location:
-      row: 71
-      column: 6
-    end_location:
-      row: 71
-      column: 29
-  parent: ~
-- kind:
-    PrintfStringFormatting: ~
-  location:
-    row: 73
-    column: 6
-  end_location:
-    row: 73
-    column: 27
-  fix:
-    content: "\"{a}\".format(a=1)"
-    location:
-      row: 73
-      column: 6
-    end_location:
-      row: 73
-      column: 27
-  parent: ~
-- kind:
-    PrintfStringFormatting: ~
-  location:
-    row: 76
-    column: 6
-  end_location:
-    row: 76
+    row: 56
     column: 29
   fix: ~
   parent: ~
 - kind:
     PrintfStringFormatting: ~
   location:
-    row: 78
+    row: 58
     column: 6
   end_location:
-    row: 78
+    row: 58
     column: 40
   fix: ~
   parent: ~

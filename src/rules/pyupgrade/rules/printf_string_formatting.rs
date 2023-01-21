@@ -199,7 +199,6 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
         }
         contents.push('(');
         if is_multi_line {
-            // If this is a multi-line dictionary, abort.
             let Some(indent) = indent else {
                 return None;
             };
@@ -211,10 +210,14 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                 contents.push(',');
             }
 
-            // For the ending parentheses, go back one indent.
             contents.push('\n');
-            if indent.len() > 3 {
-                contents.push_str(&indent[3..]);
+
+            // For the ending parentheses, go back one indent.
+            let default_indent: &str = checker.stylist.indentation();
+            if let Some(ident) = indent.strip_prefix(default_indent) {
+                contents.push_str(ident);
+            } else {
+                contents.push_str(&indent);
             }
         } else {
             contents.push_str(&arguments.join(", "));
@@ -286,7 +289,22 @@ fn convertible(format_string: &CFormatString, right: &Expr) -> bool {
 }
 
 /// UP031
-pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
+pub(crate) fn printf_string_formatting(
+    checker: &mut Checker,
+    expr: &Expr,
+    left: &Expr,
+    right: &Expr,
+) {
+    // For now, introduce some restrictions:
+    // - If the string spans multiple lines, abort.
+    // - If the modulo symbol is on a separate line, abort.
+    if left.location.row() != left.end_location.unwrap().row() {
+        return;
+    }
+    if right.location.row() != left.end_location.unwrap().row() {
+        return;
+    }
+
     let existing = checker
         .locator
         .slice_source_code_range(&Range::from_located(expr));
@@ -325,13 +343,18 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     // TODO(charlie): Avoid any fixes that result in overly long lines.
     // TODO(charlie): Avoid fixing cases in which the modulo is on its own line.
     let contents = format!("{format_string}.format{params_string}");
+    for line in contents.lines() {
+        if line.len() > checker.settings.line_length {
+            return;
+        }
+    }
 
     let mut diagnostic = Diagnostic::new(
         violations::PrintfStringFormatting,
         Range::from_located(expr),
     );
     if checker.patch(&Rule::PrintfStringFormatting) {
-        if !EMOJI_SYNTAX.is_match(&left_string) {
+        if !EMOJI_SYNTAX.is_match(left_string) {
             diagnostic.amend(Fix::replacement(
                 contents,
                 expr.location,

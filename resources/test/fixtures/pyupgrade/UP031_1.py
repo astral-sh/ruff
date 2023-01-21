@@ -34,3 +34,24 @@ pytest.param('"%8s" % (None,)', id="unsafe width-string conversion"),
 "%(1)s" % {1: 2, "1": 2}
 
 "%(and)s" % {"and": 2}
+
+# OK (false negatives)
+print((
+    "foo %s "
+    "bar %s" % (x, y)
+))
+
+print((
+    "foo %s "
+    "bar %s"
+) % (x, y))
+
+print(
+    "foo %(foo)s "
+    "bar %(bar)s" % {"foo": x, "bar": y}
+)
+
+print((
+    "foo %(foo)s "
+    "bar %(bar)s"
+) % {"foo": x, "bar": y})

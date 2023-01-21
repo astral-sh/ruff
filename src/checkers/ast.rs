@@ -2715,7 +2715,7 @@ where
                     }
 
                     if self.settings.rules.enabled(&Rule::PrintfStringFormatting) {
-                        pyupgrade::rules::printf_string_formatting(self, expr, right);
+                        pyupgrade::rules::printf_string_formatting(self, expr, left, right);
                     }
                 }
             }
