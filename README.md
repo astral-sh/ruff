@@ -1539,7 +1539,7 @@ Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements 
 
 Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
 
-Pylint parity is being tracked in [#689](https://github.com/charliermarsh/ruff/issues/689).
+Pylint parity is being tracked in [#970](https://github.com/charliermarsh/ruff/issues/970).
 
 ### Which tools does Ruff replace?
 
