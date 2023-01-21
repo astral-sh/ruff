@@ -53,32 +53,36 @@ fn get_name(exc: &Expr) -> Option<&Expr> {
     }
 }
 
-fn check_raise_type(exc: &Expr) -> bool {
-    let builtin_exceptions = vec![
-        "ArithmeticError",
-        "AssertionError",
-        "AttributeError",
-        "BufferError",
-        "EOFError",
-        "Exception",
-        "ImportError",
-        "LookupError",
-        "MemoryError",
-        "NameError",
-        "ReferenceError",
-        "RuntimeError",
-        "SyntaxError",
-        "SystemError",
-        "ValueError",
-    ];
+fn resolve_name(checker: &mut Checker, exc: &Expr) -> bool {
+    return checker.resolve_call_path(exc).map_or(false, |call_path| {
+        [
+            "ArithmeticError",
+            "AssertionError",
+            "AttributeError",
+            "BufferError",
+            "EOFError",
+            "Exception",
+            "ImportError",
+            "LookupError",
+            "MemoryError",
+            "NameError",
+            "ReferenceError",
+            "RuntimeError",
+            "SyntaxError",
+            "SystemError",
+            "ValueError",
+        ]
+        .iter()
+        .any(|target| call_path.as_slice() == ["", target])
+    });
+}
 
+fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
     match &exc.node {
-        ExprKind::Name { id, .. } => {
-            return builtin_exceptions.contains(&id.as_str());
-        }
+        ExprKind::Name { .. } => resolve_name(checker, exc),
         ExprKind::Call { func, .. } => {
-            if let ExprKind::Name { id, .. } = &func.node {
-                return builtin_exceptions.contains(&id.as_str());
+            if let ExprKind::Name { .. } = &func.node {
+                return resolve_name(checker, func);
             }
             false
         }
@@ -87,7 +91,7 @@ fn check_raise_type(exc: &Expr) -> bool {
 }
 
 fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
-    if check_raise_type(exc) {
+    if check_raise_type(checker, exc) {
         let mut diagnostic = Diagnostic::new(PreferTypeError, Range::from_located(item));
 
         if checker.patch(diagnostic.kind.rule()) {
