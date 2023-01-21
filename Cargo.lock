@@ -1871,9 +1871,9 @@ dependencies = [
  "ropey",
  "ruff_macros",
  "rustc-hash",
- "rustpython-ast 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
- "rustpython-common 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
- "rustpython-parser 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+ "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c)",
+ "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c)",
+ "rustpython-parser 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c)",
  "schemars",
  "semver",
  "serde",
@@ -2005,11 +2005,11 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604#bfd31f7ffff4c3cbea5aee5bb044237f9be1d604"
+source = "git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c#62aa942bf506ea3d41ed0503b947b84141fdaa3c"
 dependencies = [
  "num-bigint",
- "rustpython-common 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
- "rustpython-compiler-core 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+ "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c)",
+ "rustpython-compiler-core 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c)",
 ]
 
 [[package]]
@@ -2025,7 +2025,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604#bfd31f7ffff4c3cbea5aee5bb044237f9be1d604"
+source = "git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c#62aa942bf506ea3d41ed0503b947b84141fdaa3c"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2075,7 +2075,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604#bfd31f7ffff4c3cbea5aee5bb044237f9be1d604"
+source = "git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c#62aa942bf506ea3d41ed0503b947b84141fdaa3c"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2109,7 +2109,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604#bfd31f7ffff4c3cbea5aee5bb044237f9be1d604"
+source = "git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c#62aa942bf506ea3d41ed0503b947b84141fdaa3c"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2122,8 +2122,8 @@ dependencies = [
  "phf 0.10.1",
  "phf_codegen 0.10.0",
  "rustc-hash",
- "rustpython-ast 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
- "rustpython-compiler-core 0.2.0 (git+https://github.com/charliermarsh/RustPython.git?rev=bfd31f7ffff4c3cbea5aee5bb044237f9be1d604)",
+ "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c)",
+ "rustpython-compiler-core 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=62aa942bf506ea3d41ed0503b947b84141fdaa3c)",
  "thiserror",
  "tiny-keccak",
  "unic-emoji-char",
