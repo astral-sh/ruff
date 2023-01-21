@@ -149,8 +149,7 @@ impl Configuration {
                 per_file_ignores
                     .into_iter()
                     .map(|(pattern, prefixes)| {
-                        let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
-                        PerFileIgnore::new(pattern, absolute, &prefixes)
+                        PerFileIgnore::new(pattern, &prefixes, Some(project_root))
                     })
                     .collect()
             }),
