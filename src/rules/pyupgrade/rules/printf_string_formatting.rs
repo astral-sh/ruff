@@ -1,24 +1,23 @@
 use std::str::FromStr;
 
-use once_cell::sync::Lazy;
-use regex::Regex;
+use rustpython_ast::Location;
 use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
+use crate::python::identifiers::is_identifier;
+use crate::python::keyword::KWLIST;
 use crate::registry::{Diagnostic, Rule};
-use crate::rules::pyupgrade::helpers::{curly_escape, is_keyword};
+use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
+use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violations;
-
-static MODULO_CALL: Lazy<Regex> = Lazy::new(|| Regex::new(r" % ([({])").unwrap());
-static PYTHON_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^\W0-9]\w*").unwrap());
-static EMOJI_SYNTAX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\N\{.*?}").unwrap());
 
 fn simplify_conversion_flag(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
@@ -163,11 +162,11 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
             } = &key.node
             {
                 // If the dictionary key is not a valid variable name, abort.
-                if !PYTHON_NAME.is_match(key_string) {
+                if !is_identifier(key_string) {
                     return None;
                 }
                 // If the key is a Python keyword, abort.
-                if is_keyword(key_string) {
+                if KWLIST.contains(&key_string.as_str()) {
                     return None;
                 }
                 // If there are multiple entries of the same key, abort.
@@ -230,7 +229,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
 
 /// Returns `true` if the sequence of [`PercentFormatPart`] indicate that an
 /// [`Expr`] can be converted.
-fn convertible(format_string: &CFormatString, right: &Expr) -> bool {
+fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
     for (.., format_part) in format_string.iter() {
         let CFormatPart::Spec(ref fmt) = format_part else {
             continue;
@@ -280,7 +279,7 @@ fn convertible(format_string: &CFormatString, right: &Expr) -> bool {
         }
 
         // All dict substitutions must be named.
-        if let ExprKind::Dict { .. } = &right.node {
+        if let ExprKind::Dict { .. } = &params.node {
             if fmt.mapping_key.is_none() {
                 return false;
             }
@@ -296,12 +295,7 @@ pub(crate) fn printf_string_formatting(
     left: &Expr,
     right: &Expr,
 ) {
-    // For now, introduce some restrictions:
-    // - If the string spans multiple lines, abort.
-    // - If the modulo symbol is on a separate line, abort.
-    if left.location.row() != left.end_location.unwrap().row() {
-        return;
-    }
+    // If the modulo symbol is on a separate line, abort.
     if right.location.row() != left.end_location.unwrap().row() {
         return;
     }
@@ -310,34 +304,45 @@ pub(crate) fn printf_string_formatting(
         .locator
         .slice_source_code_range(&Range::from_located(expr));
 
-    // We need to collect a few pieces:
-    // - Any content before the first string segment.
-    // - All string segments.
-    // - Any content between the string segments.
-    // - Any content between the last string segment and the modulo symbol.
-    let strings = vec![];
+    // Grab each string segment (in case there's an implicit concatenation).
+    let mut strings: Vec<(Location, Location)> = vec![];
+    for (start, tok, end) in lexer::make_tokenizer_located(&existing, expr.location).flatten() {
+        if matches!(tok, Tok::String { .. }) {
+            strings.push((start, end));
+        } else if matches!(tok, Tok::Percent) {
+            break;
+        }
+    }
 
-    for (start, tok, end) in lexer::make_tokenizer_located(&existing, expr.location) {}
-
-    // Split `"%s" % "Hello, world"` into `"%s"` and `"Hello, world"`.
-    let mut split = MODULO_CALL.split(&existing);
-    let Some(left_string) = split.next() else {
-        return
-    };
-    if split.count() < 1 {
+    // If there are no string segments, abort.
+    if strings.is_empty() {
         return;
     }
 
-    // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
-    let Ok(format_string) = CFormatString::from_str(left_string) else {
-        return;
-    };
+    // Parse each string segment.
+    let mut format_strings = vec![];
+    for (start, end) in &strings {
+        let string = checker
+            .locator
+            .slice_source_code_range(&Range::new(*start, *end));
+        let (Some(leader), Some(trailer)) = (leading_quote(&string), trailing_quote(&string)) else {
+            return;
+        };
+        let string = &string[leader.len()..string.len() - trailer.len()];
 
-    if !convertible(&format_string, right) {
-        return;
+        // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
+        let Ok(format_string) = CFormatString::from_str(string) else {
+            return;
+        };
+        if !convertible(&format_string, right) {
+            return;
+        }
+
+        let format_string = percent_to_format(&format_string);
+        format_strings.push(format!("{leader}{format_string}{trailer}"));
     }
 
-    let format_string = percent_to_format(&format_string);
+    // Parse the parameters.
     let params_string = match right.node {
         ExprKind::Tuple { .. } => clean_params_tuple(checker, right),
         ExprKind::Dict { .. } => {
@@ -350,27 +355,45 @@ pub(crate) fn printf_string_formatting(
         _ => return,
     };
 
-    // TODO(charlie): Avoid any fixes that result in overly long lines.
-    // TODO(charlie): Avoid fixing cases in which the modulo is on its own line.
-    let contents = format!("{format_string}.format{params_string}");
-    for line in contents.lines() {
-        if line.len() > checker.settings.line_length {
-            return;
+    // Reconstruct the string.
+    let mut contents = String::new();
+    let mut prev = None;
+    for ((start, end), format_string) in strings.iter().zip(format_strings) {
+        // Add the content before the string segment.
+        match prev {
+            None => {
+                contents.push_str(
+                    &checker
+                        .locator
+                        .slice_source_code_range(&Range::new(expr.location, *start)),
+                );
+            }
+            Some(prev) => {
+                contents.push_str(
+                    &checker
+                        .locator
+                        .slice_source_code_range(&Range::new(prev, *start)),
+                );
+            }
         }
+        // Add the string itself.
+        contents.push_str(&format_string);
+        prev = Some(*end);
     }
+
+    // Add the `.format` call.
+    contents.push_str(&format!(".format{params_string}"));
 
     let mut diagnostic = Diagnostic::new(
         violations::PrintfStringFormatting,
         Range::from_located(expr),
     );
     if checker.patch(&Rule::PrintfStringFormatting) {
-        if !EMOJI_SYNTAX.is_match(left_string) {
-            diagnostic.amend(Fix::replacement(
-                contents,
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
-        }
+        diagnostic.amend(Fix::replacement(
+            contents,
+            expr.location,
+            expr.end_location.unwrap(),
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }

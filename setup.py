@@ -13,6 +13,7 @@ Please use `python -m pip install .` instead.
 )
 sys.exit(1)
 
+"abc".isidentifier()
 
 # The below code will never execute, however GitHub is particularly
 # picky about where it finds Python packaging metadata.

@@ -52,7 +52,16 @@ print("%(ab)s" % {"a" "b": 1})
 
 print("%(a)s" % {"a"  :  1})
 
-# UP031 (without fix)
+print((
+    "foo %s "
+    "bar %s" % (x, y)
+))
+
+print(
+    "foo %(foo)s "
+    "bar %(bar)s" % {"foo": x, "bar": y}
+)
+
 print("%s \N{snowman}" % (a,))
 
 print("%(foo)s \N{snowman}" % {"foo": 1})

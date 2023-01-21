@@ -397,20 +397,68 @@ expression: diagnostics
     PrintfStringFormatting: ~
   location:
     row: 56
-    column: 6
+    column: 4
   end_location:
-    row: 56
-    column: 29
-  fix: ~
+    row: 57
+    column: 21
+  fix:
+    content: "\"foo {} \"\n    \"bar {}\".format(x, y)"
+    location:
+      row: 56
+      column: 4
+    end_location:
+      row: 57
+      column: 21
   parent: ~
 - kind:
     PrintfStringFormatting: ~
   location:
-    row: 58
+    row: 61
+    column: 4
+  end_location:
+    row: 62
+    column: 40
+  fix:
+    content: "\"foo {foo} \"\n    \"bar {bar}\".format(foo=x, bar=y)"
+    location:
+      row: 61
+      column: 4
+    end_location:
+      row: 62
+      column: 40
+  parent: ~
+- kind:
+    PrintfStringFormatting: ~
+  location:
+    row: 65
     column: 6
   end_location:
-    row: 58
+    row: 65
+    column: 29
+  fix:
+    content: "\"{} \\N{snowman}\".format(a)"
+    location:
+      row: 65
+      column: 6
+    end_location:
+      row: 65
+      column: 29
+  parent: ~
+- kind:
+    PrintfStringFormatting: ~
+  location:
+    row: 67
+    column: 6
+  end_location:
+    row: 67
     column: 40
-  fix: ~
+  fix:
+    content: "\"{foo} \\N{snowman}\".format(foo=1)"
+    location:
+      row: 67
+      column: 6
+    end_location:
+      row: 67
+      column: 40
   parent: ~
 
