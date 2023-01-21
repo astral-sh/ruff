@@ -252,6 +252,7 @@ ruff_macros::define_rule_mapping!(
     UP028 => violations::RewriteYieldFrom,
     UP029 => violations::UnnecessaryBuiltinImport,
     UP030 => violations::FormatLiterals,
+    UP031 => violations::PrintfStringFormatting,
     UP032 => violations::FString,
     UP033 => violations::FunctoolsCache,
     UP034 => violations::ExtraneousParentheses,

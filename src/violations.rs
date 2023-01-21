@@ -3016,6 +3016,20 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 }
 
 define_violation!(
+    pub struct PrintfStringFormatting;
+);
+impl AlwaysAutofixableViolation for PrintfStringFormatting {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use format specifiers instead of percent format")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with format specifiers".to_string()
+    }
+}
+
+define_violation!(
     pub struct ReplaceStdoutStderr;
 );
 impl AlwaysAutofixableViolation for ReplaceStdoutStderr {

@@ -727,6 +727,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP028 | rewrite-yield-from | Replace `yield` over `for` loop with `yield from` | 🛠 |
 | UP029 | unnecessary-builtin-import | Unnecessary builtin import: `{import}` | 🛠 |
 | UP030 | format-literals | Use implicit references for positional format fields | 🛠 |
+| UP031 | printf-string-formatting | Use format specifiers instead of percent format | 🛠 |
 | UP032 | f-string | Use f-string instead of `format` call | 🛠 |
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
