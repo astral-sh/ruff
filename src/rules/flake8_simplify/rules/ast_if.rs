@@ -37,6 +37,16 @@ fn is_main_check(expr: &Expr) -> bool {
     false
 }
 
+/// Find the last nested if statement and return the test expression and the first statement.
+///
+/// ```python
+/// if xxx:
+///     if yyy:
+///      # ^^^ returns this expression
+///         z = 1
+///       # ^^^^^ and this statement
+///         ...
+/// ```
 fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     let [Stmt { node: StmtKind::If { test, body: inner_body, orelse }, ..}] = body else { return None };
     if !(orelse.is_empty() && body.len() == 1) {
