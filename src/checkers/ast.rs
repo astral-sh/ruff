@@ -3587,7 +3587,6 @@ impl<'a> Checker<'a> {
     {
         let binding_index = self.bindings.len();
 
-        let mut overridden = None;
         if let Some((stack_index, scope_index)) = self
             .scope_stack
             .iter()
@@ -3619,7 +3618,6 @@ impl<'a> Checker<'a> {
                         | BindingKind::FutureImportation
                 );
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
-                    overridden = Some((*scope_index, *existing_binding_index));
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
                             violations::ImportShadowedByLoopVar(
@@ -3639,7 +3637,6 @@ impl<'a> Checker<'a> {
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
-                        overridden = Some((*scope_index, *existing_binding_index));
                         if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
                             self.diagnostics.push(Diagnostic::new(
                                 violations::RedefinedWhileUnused(
@@ -3657,13 +3654,6 @@ impl<'a> Checker<'a> {
                         .push(binding_index);
                 }
             }
-        }
-
-        // If we're about to lose the binding, store it as overridden.
-        if let Some((scope_index, binding_index)) = overridden {
-            self.scopes[scope_index]
-                .overridden
-                .push((name, binding_index));
         }
 
         // Assume the rebound name is used as a global or within a loop.
