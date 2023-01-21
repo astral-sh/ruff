@@ -11,6 +11,7 @@ use libcst_native::{
 use once_cell::sync::Lazy;
 use rustpython_ast::Stmt;
 use std::collections::HashMap;
+use crate::source_code::Locator;
 
 static REPLACE_MODS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     let mut m = HashMap::new();
@@ -54,16 +55,21 @@ static REPLACE_MODS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     m.insert("tkinter_tkfiledialog", "tkinter.filedialog");
     m.insert("tkinter_tksimpledialog", "tkinter.simpledialog");
     m.insert("tkinter_ttk", "tkinter.ttk");
-    m.insert("urllib.error", "urllib.error");
-    m.insert("urllib.parse", "urllib.parse");
-    m.insert("urllib.request", "urllib.request");
-    m.insert("urllib.response", "urllib.response");
-    m.insert("urllib.robotparser", "urllib.robotparser");
     m.insert("urllib_error", "urllib.error");
     m.insert("urllib_parse", "urllib.parse");
     m.insert("urllib_robotparser", "urllib.robotparser");
     m.insert("xmlrpc_client", "xmlrpc.client");
     m.insert("xmlrpc_server", "xmlrpc.server");
+    m
+});
+
+static REPLACE_MODS_URLLIB: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert("error", "urllib.error");
+    m.insert("parse", "urllib.parse");
+    m.insert("request", "urllib.request");
+    m.insert("response", "urllib.response");
+    m.insert("robotparser", "urllib.robotparser");
     m
 });
 
@@ -74,21 +80,8 @@ fn get_asname(asname: &AsName) -> Option<String> {
     None
 }
 
-/// UP036
-pub fn import_replacements_six(checker: &mut Checker, stmt: &Stmt, module: &Option<String>) {
-    // Pyupgrade only works with import_from statements, so this linter does that as
-    // well
-
-    // This only applies to six.moves libraries
-    if let Some(module_text) = module {
-        if module_text != "six.moves" {
-            return;
-        }
-    } else {
-        return;
-    }
-    let module_text = checker
-        .locator
+fn refactor_segment(locator: &Locator, stmt: &Stmt, replace: &Lazy<HashMap<&str, &str>>) -> Option<String> {
+    let module_text = locator
         .slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text).unwrap();
     let mut import = match_import_from(&mut tree).unwrap();
@@ -97,7 +90,7 @@ pub fn import_replacements_six(checker: &mut Checker, stmt: &Stmt, module: &Opti
     if let ImportNames::Aliases(item_names) = &import.names {
         for name in item_names {
             if let NameOrAttribute::N(the_name) = &name.name {
-                match REPLACE_MODS.get(the_name.value) {
+                match replace.get(the_name.value) {
                     Some(raw_name) => {
                         new_entries.push_str(&format!("import {}", raw_name));
                         if let Some(asname) = &name.asname {
@@ -116,7 +109,7 @@ pub fn import_replacements_six(checker: &mut Checker, stmt: &Stmt, module: &Opti
     }
     // If nothing was different, there is no need to change
     if new_entries.is_empty() {
-        return;
+        return None;
     }
     import.names = ImportNames::Aliases(keep_names);
     let mut state = CodegenState::default();
@@ -126,6 +119,31 @@ pub fn import_replacements_six(checker: &mut Checker, stmt: &Stmt, module: &Opti
     if final_str.chars().last() == Some('\n') {
         final_str.pop();
     }
+    Some(final_str)
+}
+
+/// UP036
+pub fn import_replacements_six(checker: &mut Checker, stmt: &Stmt, module: &Option<String>) {
+    // Pyupgrade only works with import_from statements, so this linter does that as
+    // well
+
+    // This only applies to six.moves libraries
+    let final_string: Option<String>;
+    if let Some(module_text) = module {
+        if module_text == "six.moves" {
+            final_string = refactor_segment(&checker.locator, stmt, &REPLACE_MODS);
+        } else if module_text == "six.moves.urllib" {
+            final_string = refactor_segment(&checker.locator, stmt, &REPLACE_MODS_URLLIB);
+        } else {
+            return;
+        }
+    } else {
+        return;
+    }
+    let final_str = match final_string {
+        Some(s) => s,
+        None => return,
+    };
     let range = Range::from_located(stmt);
     let mut diagnostic = Diagnostic::new(violations::ImportReplacementsSix, range);
     if checker.patch(&Rule::ImportReplacementsSix) {
