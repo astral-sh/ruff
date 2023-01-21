@@ -6,8 +6,8 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::types::PythonVersion;
-use crate::violations;
 use crate::source_code::Locator;
+use crate::violations;
 
 const BAD_MODULES: &[&str] = &[
     "collections",
@@ -182,7 +182,6 @@ const TYPINGEXTENSIONS_TO_TYPING_311: &[&str] = &[
     "reveal_type",
 ];
 
-
 fn has_match(set1: &[&str], set2: &[AliasData]) -> bool {
     set2.iter().any(|x| set1.contains(&x.name.as_str()))
 }
@@ -320,7 +319,8 @@ impl<'a> FixImports<'a> {
         let (matching_names, unmatching_names) = self.get_import_lists(matches);
         let unmatching = self.get_str(&unmatching_names, self.module);
         let matching = self.get_str(&matching_names, replace);
-        // We don't replace if there is just an unmatching, because then we don't need to refactor
+        // We don't replace if there is just an unmatching, because then we don't need
+        // to refactor
         if !unmatching.is_empty() && !matching.is_empty() {
             Some(format!("{unmatching}\n{}{matching}", self.starting_indent))
         } else if !matching.is_empty() {
@@ -382,7 +382,6 @@ fn clean_indent<T>(locator: &Locator, located: &Located<T>) -> String {
         None => "    ".to_string(),
         Some(item) => item.to_string(),
     }
-
 }
 
 /// UP035
@@ -412,7 +411,7 @@ pub fn import_replacements(
     let indent = match names.get(0) {
         None => return,
         Some(item) if is_multi_line => clean_indent(checker.locator, item),
-        Some(_) => String::new()
+        Some(_) => String::new(),
     };
     let starting_indent = clean_indent(checker.locator, stmt);
     let fixer = FixImports::new(

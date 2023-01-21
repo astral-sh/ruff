@@ -1,17 +1,19 @@
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_import, match_import_from, match_module};
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::violations;
+use std::collections::HashMap;
+
 use libcst_native::{
     AsName, AssignTargetExpression, Codegen, CodegenState, ImportAlias, ImportNames,
     NameOrAttribute,
 };
 use once_cell::sync::Lazy;
 use rustpython_ast::Stmt;
-use std::collections::HashMap;
+
+use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
+use crate::cst::matchers::{match_import, match_import_from, match_module};
+use crate::fix::Fix;
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
+use crate::violations;
 
 static REPLACE_MODS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     let mut m = HashMap::new();
@@ -80,9 +82,12 @@ fn get_asname(asname: &AsName) -> Option<String> {
     None
 }
 
-fn refactor_segment(locator: &Locator, stmt: &Stmt, replace: &Lazy<HashMap<&str, &str>>) -> Option<String> {
-    let module_text = locator
-        .slice_source_code_range(&Range::from_located(stmt));
+fn refactor_segment(
+    locator: &Locator,
+    stmt: &Stmt,
+    replace: &Lazy<HashMap<&str, &str>>,
+) -> Option<String> {
+    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(&module_text).unwrap();
     let mut import = match_import_from(&mut tree).unwrap();
     let mut new_entries = String::new();
