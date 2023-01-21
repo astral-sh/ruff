@@ -42,3 +42,6 @@ if True:
         Bad,
         Good,
     )
+
+# These SHOULD NOT change
+from a import b
