@@ -5,6 +5,12 @@ if a:
 
 # SIM102
 if a:
+    if b:
+        if c:
+            d
+
+# SIM102
+if a:
     pass
 elif b:
     if c:

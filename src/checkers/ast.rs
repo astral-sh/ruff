@@ -1359,7 +1359,13 @@ where
                     flake8_type_checking::rules::empty_type_checking_block(self, test, body);
                 }
                 if self.settings.rules.enabled(&Rule::NestedIfStatements) {
-                    flake8_simplify::rules::nested_if_statements(self, stmt);
+                    flake8_simplify::rules::nested_if_statements(
+                        self,
+                        stmt,
+                        test,
+                        body,
+                        self.current_stmt_parent().map(Into::into),
+                    );
                 }
                 if self
                     .settings
