@@ -1391,6 +1391,15 @@ where
                         self.current_stmt_parent().map(std::convert::Into::into),
                     );
                 }
+                if self.settings.rules.enabled(&Rule::PreferTypeError) {
+                    tryceratops::rules::prefer_type_error(
+                        self,
+                        body,
+                        test,
+                        orelse,
+                        self.current_stmt_parent().map(Into::into),
+                    );
+                }
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.rules.enabled(&Rule::AssertTuple) {
