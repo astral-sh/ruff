@@ -1194,6 +1194,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| TRY201 | verbose-raise | Use 'raise' without specifying exception name |  |
 | TRY300 | try-consider-else | Consider `else` block |  |
 
 ### Ruff-specific rules (RUF)
