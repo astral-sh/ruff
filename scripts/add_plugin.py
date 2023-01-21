@@ -89,12 +89,6 @@ mod tests {
                 fp.write(f"{indent}{pascal_case(plugin)},")
                 fp.write("\n")
 
-            elif line.strip() == "Linter::Ruff => Prefixes::Single(RuleSelector::RUF),":
-                fp.write(
-                    f"{indent}Linter::{pascal_case(plugin)} => Prefixes::Single(RuleSelector::{prefix_code}),"
-                )
-                fp.write("\n")
-
             fp.write(line)
             fp.write("\n")
 
