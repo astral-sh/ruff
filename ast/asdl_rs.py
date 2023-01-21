@@ -241,8 +241,9 @@ class StructVisitor(TypeInfoEmitVisitor):
         if fieldtype and fieldtype.boxed and (not (parent.product or field.seq) or field.opt):
             typ = f"Box<{typ}>"
         if field.opt or (
-            # Add `Option` to allow `Dict.keys` to contain `None` for dictionary unpacking
-            # in a dict literal.
+            # When a dictionary literal contains dictionary unpacking (e.g., `{**d}`),
+            # the expression to be unpacked goes in `values` with a `None` at the corresponding
+            # position in `keys`. To handle this, the type of `keys` needs to be `Option<Vec<T>>`.
             constructor == "Dict" and field.name == "keys"
         ):
             typ = f"Option<{typ}>"
