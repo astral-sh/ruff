@@ -104,7 +104,7 @@ pub fn convert(
                 "builtins" => {
                     options.builtins = Some(parser::parse_strings(value.as_ref()));
                 }
-                "max-line-length" | "max_line_length" => match value.clone().parse::<usize>() {
+                "max-line-length" | "max_line_length" => match value.parse::<usize>() {
                     Ok(line_length) => options.line_length = Some(line_length),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
@@ -241,7 +241,7 @@ pub fn convert(
                     }
                 },
                 // mccabe
-                "max-complexity" | "max_complexity" => match value.clone().parse::<usize>() {
+                "max-complexity" | "max_complexity" => match value.parse::<usize>() {
                     Ok(max_complexity) => mccabe.max_complexity = Some(max_complexity),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
@@ -249,7 +249,7 @@ pub fn convert(
                 },
                 // flake8-errmsg
                 "errmsg-max-string-length" | "errmsg_max_string_length" => {
-                    match value.clone().parse::<usize>() {
+                    match value.parse::<usize>() {
                         Ok(max_string_length) => {
                             flake8_errmsg.max_string_length = Some(max_string_length);
                         }
