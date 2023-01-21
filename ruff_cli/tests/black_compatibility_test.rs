@@ -13,7 +13,7 @@ use assert_cmd::Command;
 use itertools::Itertools;
 use log::info;
 use ruff::logging::{set_up_logging, LogLevel};
-use ruff::registry::Linter;
+use ruff::registry::{Linter, RuleNamespace};
 use strum::IntoEnumIterator;
 use walkdir::WalkDir;
 
@@ -180,7 +180,7 @@ fn test_ruff_black_compatibility() -> Result<()> {
         // problem. Ruff would add a `# noqa: W292`  after the first run, black introduces a
         // newline, and ruff removes the `# noqa: W292` again.
         .filter(|linter| *linter != Linter::Ruff)
-        .map(|linter| linter.prefixes().as_list(","))
+        .map(|linter| linter.prefixes().join(","))
         .join(",");
     let ruff_args = [
         "-",
