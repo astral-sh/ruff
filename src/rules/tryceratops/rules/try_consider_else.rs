@@ -13,7 +13,7 @@ define_violation!(
 impl Violation for TryConsiderElse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Consider else block")
+        format!("Consider `else` block")
     }
 }
 

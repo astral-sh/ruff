@@ -1193,7 +1193,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TRY300 | try-consider-else | Consider else block |  |
+| TRY300 | try-consider-else | Consider `else` block |  |
 
 ### Ruff-specific rules (RUF)
 
