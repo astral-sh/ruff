@@ -5,8 +5,9 @@ use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
 use crate::settings::types::PythonVersion;
+use crate::violations;
+use crate::source_code::Locator;
 
 const BAD_MODULES: &[&str] = &[
     "collections",
@@ -162,23 +163,23 @@ const TYPINGEXTENSIONS_TO_TYPING_310: &[&str] = &[
 // Items below this require python 3.11 or higher
 
 const TYPINGEXTENSIONS_TO_TYPING_311: &[&str] = &[
- "Any",
- "LiteralString",
- "NamedTuple",
- "Never",
- "NotRequired",
- "Required",
- "Self",
- "TypedDict",
- "Unpack",
- "assert_never",
- "assert_type",
- "clear_overloads",
- "dataclass_transform",
- "final",
- "get_overloads",
- "overload",
- "reveal_type",
+    "Any",
+    "LiteralString",
+    "NamedTuple",
+    "Never",
+    "NotRequired",
+    "Required",
+    "Self",
+    "TypedDict",
+    "Unpack",
+    "assert_never",
+    "assert_type",
+    "clear_overloads",
+    "dataclass_transform",
+    "final",
+    "get_overloads",
+    "overload",
+    "reveal_type",
 ];
 
 fn has_match(set1: &[&str], set2: &[AliasData]) -> bool {
@@ -189,13 +190,24 @@ struct FixImports<'a> {
     module: &'a str,
     multi_line: bool,
     names: &'a [AliasData],
+    // This is the indent level of the first named import
     indent: &'a str,
+    // This is the indent for the parenthese at the end of a multi-line statement
     short_indent: &'a str,
+    // This is the indent of the actual import statement
+    starting_indent: &'a str,
     version: PythonVersion,
 }
 
 impl<'a> FixImports<'a> {
-    fn new(module: &'a str, multi_line: bool, names: &'a [AliasData], indent: &'a str, version: PythonVersion) -> Self {
+    fn new(
+        module: &'a str,
+        multi_line: bool,
+        names: &'a [AliasData],
+        indent: &'a str,
+        version: PythonVersion,
+        starting_indent: &'a str,
+    ) -> Self {
         let short_indent = if indent.len() > 3 {
             &indent[3..]
         } else {
@@ -207,12 +219,12 @@ impl<'a> FixImports<'a> {
             names,
             indent,
             short_indent,
-            version
+            version,
+            starting_indent,
         }
     }
 
     fn check_replacement(&self) -> Option<String> {
-        println!("Checking replacement for {}", self.module);
         match self.module {
             "collections" => self.create_new_str(COLLECTIONS_TO_ABC, "collections.abc"),
             "pipes" => self.create_new_str(PIPES_TO_SHLEX, "shlex"),
@@ -237,45 +249,67 @@ impl<'a> FixImports<'a> {
                 } else {
                     None
                 }
-                },
+            }
             "typing_extensions" => {
                 if has_match(TYPINGEXTENSIONS_TO_TYPING, self.names) {
                     self.create_new_str(TYPINGEXTENSIONS_TO_TYPING, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_37, self.names) && self.version >= PythonVersion::Py37 {
+                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_37, self.names)
+                    && self.version >= PythonVersion::Py37
+                {
                     self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_37, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_38, self.names) && self.version >= PythonVersion::Py38 {
+                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_38, self.names)
+                    && self.version >= PythonVersion::Py38
+                {
                     self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_38, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_39, self.names) && self.version >= PythonVersion::Py39 {
+                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_39, self.names)
+                    && self.version >= PythonVersion::Py39
+                {
                     self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_39, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_310, self.names) && self.version >= PythonVersion::Py310 {
+                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_310, self.names)
+                    && self.version >= PythonVersion::Py310
+                {
                     self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_310, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_311, self.names) && self.version >= PythonVersion::Py311 {
+                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_311, self.names)
+                    && self.version >= PythonVersion::Py311
+                {
                     self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_311, "typing")
                 } else {
                     None
                 }
             }
             "mypy_extensions" => {
-                if has_match(MYPYEXTENSIONS_TO_TYPING_37, self.names) && self.version >= PythonVersion::Py37 {
+                if has_match(MYPYEXTENSIONS_TO_TYPING_37, self.names)
+                    && self.version >= PythonVersion::Py37
+                {
                     self.create_new_str(MYPYEXTENSIONS_TO_TYPING_37, "typing")
-                } else if has_match(MYPYEXTENSIONS_TO_TYPING_38, self.names) && self.version >= PythonVersion::Py38 {
+                } else if has_match(MYPYEXTENSIONS_TO_TYPING_38, self.names)
+                    && self.version >= PythonVersion::Py38
+                {
                     self.create_new_str(MYPYEXTENSIONS_TO_TYPING_38, "typing")
                 } else {
                     None
                 }
             }
             "typing" => {
-                if has_match(TYPING_TO_COLLECTIONSABC_39, self.names) && self.version >= PythonVersion::Py39 {
+                if has_match(TYPING_TO_COLLECTIONSABC_39, self.names)
+                    && self.version >= PythonVersion::Py39
+                {
                     self.create_new_str(TYPING_TO_COLLECTIONSABC_39, "collections.abc")
-                } else if has_match(TYPING_TO_RE_39, self.names) && self.version >= PythonVersion::Py39 {
+                } else if has_match(TYPING_TO_RE_39, self.names)
+                    && self.version >= PythonVersion::Py39
+                {
                     self.create_new_str(TYPING_TO_RE_39, "re")
-                } else if has_match(TYPING_TO_COLLECTIONSABC_310, self.names) && self.version >= PythonVersion::Py310 {
+                } else if has_match(TYPING_TO_COLLECTIONSABC_310, self.names)
+                    && self.version >= PythonVersion::Py310
+                {
                     self.create_new_str(TYPING_TO_COLLECTIONSABC_310, "collections.abc")
                 } else {
                     None
                 }
             }
-            "typing.re" if self.version >= PythonVersion::Py39 => self.create_new_str(TYPINGRE_TO_RE_39, "re"),
+            "typing.re" if self.version >= PythonVersion::Py39 => {
+                self.create_new_str(TYPINGRE_TO_RE_39, "re")
+            }
             _ => None,
         }
     }
@@ -286,12 +320,7 @@ impl<'a> FixImports<'a> {
         let unmatching = self.get_str(&unmatching_names, self.module);
         let matching = self.get_str(&matching_names, replace);
         if !unmatching.is_empty() && !matching.is_empty() {
-            let shorter_indent = if self.short_indent.len() > 0 {
-                self.short_indent[1..].to_string()
-            } else {
-                String::new()
-            };
-            Some(format!("{unmatching}\n{shorter_indent}{matching}"))
+            Some(format!("{unmatching}\n{}{matching}", self.starting_indent))
         } else if !unmatching.is_empty() {
             Some(unmatching)
         } else if !matching.is_empty() {
@@ -347,6 +376,15 @@ impl<'a> FixImports<'a> {
     }
 }
 
+fn clean_indent<T>(locator: &Locator, located: &Located<T>) -> String {
+    match indentation(locator, located) {
+        // This is an opninionated way of formatting import statements
+        None => "    ".to_string(),
+        Some(item) => item.to_string(),
+    }
+
+}
+
 /// UP035
 pub fn import_replacements(
     checker: &mut Checker,
@@ -371,19 +409,20 @@ pub fn import_replacements(
         .locator
         .slice_source_code_range(&Range::from_located(stmt));
     let is_multi_line = module_text.contains('\n');
-    let indent = if is_multi_line {
-        match names.get(0) {
-            None => return,
-            Some(item) => match indentation(checker.locator, item) {
-                // This is an opninionated way of formatting import statements
-                None => "    ".to_string(),
-                Some(item) => item.to_string(),
-            },
-        }
-    } else {
-        String::new()
+    let indent = match names.get(0) {
+        None => return,
+        Some(item) if is_multi_line => clean_indent(checker.locator, item),
+        Some(_) => String::new()
     };
-    let fixer = FixImports::new(clean_mod, is_multi_line, &clean_names, &indent, checker.settings.target_version);
+    let starting_indent = clean_indent(checker.locator, stmt);
+    let fixer = FixImports::new(
+        clean_mod,
+        is_multi_line,
+        &clean_names,
+        &indent,
+        checker.settings.target_version,
+        &starting_indent,
+    );
     let clean_result = match fixer.check_replacement() {
         None => return,
         Some(item) => item,
