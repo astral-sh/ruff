@@ -1231,16 +1231,16 @@ where
                     }
 
                     if let Some(asname) = &alias.node.asname {
-                        let full_name = helpers::format_import_from_member(
-                            level.as_ref(),
-                            module.as_deref(),
-                            &alias.node.name,
-                        );
                         if self
-                            .settings
-                            .rules
-                            .enabled(&Rule::ImportAliasIsNotConventional)
+                        .settings
+                        .rules
+                        .enabled(&Rule::ImportAliasIsNotConventional)
                         {
+                            let full_name = helpers::format_import_from_member(
+                                level.as_ref(),
+                                module.as_deref(),
+                                &alias.node.name,
+                            );
                             if let Some(diagnostic) =
                                 flake8_import_conventions::rules::check_conventional_import(
                                     stmt,
