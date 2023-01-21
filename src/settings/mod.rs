@@ -320,6 +320,7 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
             SuffixLength::Two,
             SuffixLength::Three,
             SuffixLength::Four,
+            SuffixLength::Five,
         ] {
             for selector in spec.select {
                 if selector.specificity() == specificity {
