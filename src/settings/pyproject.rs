@@ -602,10 +602,14 @@ other-attribute = 1
                         "pandas".to_string(),
                         "pd".to_string(),
                     )])),
-                    extend_aliases: Some(FxHashMap::from_iter([(
-                        "dask.dataframe".to_string(),
-                        "dd".to_string(),
-                    )])),
+                    extend_aliases: Some(FxHashMap::from_iter([
+                        ("dask.dataframe".to_string(), "dd".to_string(),),
+                        ("xml.dom.minidom".to_string(), "md".to_string(),),
+                        (
+                            "xml.dom.minidom.parseString".to_string(),
+                            "pstr".to_string(),
+                        )
+                    ])),
                 }),
                 flake8_unused_arguments: None,
                 isort: None,
