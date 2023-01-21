@@ -6,7 +6,7 @@ use colored::Colorize;
 use super::black::Black;
 use super::plugin::Plugin;
 use super::{parser, plugin};
-use crate::registry::RuleCodePrefix;
+use crate::registry::RuleSelector;
 use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
@@ -32,7 +32,7 @@ pub fn convert(
         .expect("Unable to find flake8 section in INI file");
 
     // Extract all referenced rule code prefixes, to power plugin inference.
-    let mut referenced_codes: BTreeSet<RuleCodePrefix> = BTreeSet::default();
+    let mut referenced_codes: BTreeSet<RuleSelector> = BTreeSet::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
             match key.as_str() {
@@ -104,7 +104,7 @@ pub fn convert(
                 "builtins" => {
                     options.builtins = Some(parser::parse_strings(value.as_ref()));
                 }
-                "max-line-length" | "max_line_length" => match value.clone().parse::<usize>() {
+                "max-line-length" | "max_line_length" => match value.parse::<usize>() {
                     Ok(line_length) => options.line_length = Some(line_length),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
@@ -241,7 +241,7 @@ pub fn convert(
                     }
                 },
                 // mccabe
-                "max-complexity" | "max_complexity" => match value.clone().parse::<usize>() {
+                "max-complexity" | "max_complexity" => match value.parse::<usize>() {
                     Ok(max_complexity) => mccabe.max_complexity = Some(max_complexity),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
@@ -249,7 +249,7 @@ pub fn convert(
                 },
                 // flake8-errmsg
                 "errmsg-max-string-length" | "errmsg_max_string_length" => {
-                    match value.clone().parse::<usize>() {
+                    match value.parse::<usize>() {
                         Ok(max_string_length) => {
                             flake8_errmsg.max_string_length = Some(max_string_length);
                         }
@@ -392,7 +392,7 @@ mod tests {
 
     use super::super::plugin::Plugin;
     use super::convert;
-    use crate::registry::RuleCodePrefix;
+    use crate::registry::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
     use crate::settings::options::Options;
@@ -428,11 +428,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -495,11 +491,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -562,11 +554,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -629,11 +617,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -696,11 +680,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -772,10 +752,10 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                RuleCodePrefix::D,
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
+                RuleSelector::D,
+                RuleSelector::E,
+                RuleSelector::F,
+                RuleSelector::W,
             ]),
             show_source: None,
             src: None,
@@ -842,10 +822,10 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::Q,
-                RuleCodePrefix::W,
+                RuleSelector::E,
+                RuleSelector::F,
+                RuleSelector::Q,
+                RuleSelector::W,
             ]),
             show_source: None,
             src: None,

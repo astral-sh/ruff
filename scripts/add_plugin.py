@@ -74,14 +74,15 @@ mod tests {
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
-            elif line.strip() == "Ruff,":
+            elif line.strip() == '#[prefix = "RUF"]':
+                fp.write(f'{indent}#[prefix = "TODO"]\n')
                 fp.write(f"{indent}{pascal_case(plugin)},")
                 fp.write("\n")
 
-            elif line.strip() == "RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),":
+            elif line.strip() == "Linter::Ruff => Prefixes::Single(RuleSelector::RUF),":
                 prefix = 'todo!("Fill-in prefix after generating codes")'
                 fp.write(
-                    f"{indent}RuleOrigin::{pascal_case(plugin)} => Prefixes::Single({prefix}),"
+                    f"{indent}Linter::{pascal_case(plugin)} => Prefixes::Single({prefix}),"
                 )
                 fp.write("\n")
 

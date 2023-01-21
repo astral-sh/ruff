@@ -2,6 +2,7 @@
 
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use ruff_macros::ParseCode;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
@@ -433,49 +434,90 @@ ruff_macros::define_rule_mapping!(
     RUF100 => violations::UnusedNOQA,
 );
 
-#[derive(EnumIter, Debug, PartialEq, Eq)]
-pub enum RuleOrigin {
+#[derive(EnumIter, Debug, PartialEq, Eq, ParseCode)]
+pub enum Linter {
+    #[prefix = "F"]
     Pyflakes,
+    #[prefix = "E"]
+    #[prefix = "W"]
     Pycodestyle,
+    #[prefix = "C9"]
     McCabe,
+    #[prefix = "I"]
     Isort,
+    #[prefix = "D"]
     Pydocstyle,
+    #[prefix = "UP"]
     Pyupgrade,
+    #[prefix = "N"]
     PEP8Naming,
+    #[prefix = "YTT"]
     Flake82020,
+    #[prefix = "ANN"]
     Flake8Annotations,
+    #[prefix = "S"]
     Flake8Bandit,
+    #[prefix = "BLE"]
     Flake8BlindExcept,
+    #[prefix = "FBT"]
     Flake8BooleanTrap,
+    #[prefix = "B"]
     Flake8Bugbear,
+    #[prefix = "A"]
     Flake8Builtins,
+    #[prefix = "C4"]
     Flake8Comprehensions,
+    #[prefix = "T10"]
     Flake8Debugger,
+    #[prefix = "EM"]
     Flake8ErrMsg,
+    #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
+    #[prefix = "ICN"]
     Flake8ImportConventions,
+    #[prefix = "T20"]
     Flake8Print,
+    #[prefix = "PT"]
     Flake8PytestStyle,
+    #[prefix = "Q"]
     Flake8Quotes,
+    #[prefix = "RET"]
     Flake8Return,
+    #[prefix = "SIM"]
     Flake8Simplify,
+    #[prefix = "TID"]
     Flake8TidyImports,
+    #[prefix = "ARG"]
     Flake8UnusedArguments,
+    #[prefix = "DTZ"]
     Flake8Datetimez,
+    #[prefix = "ERA"]
     Eradicate,
+    #[prefix = "PD"]
     PandasVet,
+    #[prefix = "PGH"]
     PygrepHooks,
+    #[prefix = "PL"]
     Pylint,
+    #[prefix = "PIE"]
     Flake8Pie,
+    #[prefix = "COM"]
     Flake8Commas,
+    #[prefix = "INP"]
     Flake8NoPep420,
+    #[prefix = "EXE"]
     Flake8Executable,
+    #[prefix = "RUF"]
     Ruff,
 }
 
+pub trait ParseCode: Sized {
+    fn parse_code(code: &str) -> Option<(Self, &str)>;
+}
+
 pub enum Prefixes {
-    Single(RuleCodePrefix),
-    Multiple(Vec<(RuleCodePrefix, &'static str)>),
+    Single(RuleSelector),
+    Multiple(Vec<(RuleSelector, &'static str)>),
 }
 
 impl Prefixes {
@@ -490,55 +532,55 @@ impl Prefixes {
     }
 }
 
-include!(concat!(env!("OUT_DIR"), "/origin.rs"));
+include!(concat!(env!("OUT_DIR"), "/linter.rs"));
 
-impl RuleOrigin {
+impl Linter {
     pub fn prefixes(&self) -> Prefixes {
         match self {
-            RuleOrigin::Eradicate => Prefixes::Single(RuleCodePrefix::ERA),
-            RuleOrigin::Flake82020 => Prefixes::Single(RuleCodePrefix::YTT),
-            RuleOrigin::Flake8Annotations => Prefixes::Single(RuleCodePrefix::ANN),
-            RuleOrigin::Flake8Bandit => Prefixes::Single(RuleCodePrefix::S),
-            RuleOrigin::Flake8BlindExcept => Prefixes::Single(RuleCodePrefix::BLE),
-            RuleOrigin::Flake8BooleanTrap => Prefixes::Single(RuleCodePrefix::FBT),
-            RuleOrigin::Flake8Bugbear => Prefixes::Single(RuleCodePrefix::B),
-            RuleOrigin::Flake8Builtins => Prefixes::Single(RuleCodePrefix::A),
-            RuleOrigin::Flake8Comprehensions => Prefixes::Single(RuleCodePrefix::C4),
-            RuleOrigin::Flake8Datetimez => Prefixes::Single(RuleCodePrefix::DTZ),
-            RuleOrigin::Flake8Debugger => Prefixes::Single(RuleCodePrefix::T10),
-            RuleOrigin::Flake8ErrMsg => Prefixes::Single(RuleCodePrefix::EM),
-            RuleOrigin::Flake8ImplicitStrConcat => Prefixes::Single(RuleCodePrefix::ISC),
-            RuleOrigin::Flake8ImportConventions => Prefixes::Single(RuleCodePrefix::ICN),
-            RuleOrigin::Flake8Print => Prefixes::Single(RuleCodePrefix::T20),
-            RuleOrigin::Flake8PytestStyle => Prefixes::Single(RuleCodePrefix::PT),
-            RuleOrigin::Flake8Quotes => Prefixes::Single(RuleCodePrefix::Q),
-            RuleOrigin::Flake8Return => Prefixes::Single(RuleCodePrefix::RET),
-            RuleOrigin::Flake8Simplify => Prefixes::Single(RuleCodePrefix::SIM),
-            RuleOrigin::Flake8TidyImports => Prefixes::Single(RuleCodePrefix::TID),
-            RuleOrigin::Flake8UnusedArguments => Prefixes::Single(RuleCodePrefix::ARG),
-            RuleOrigin::Isort => Prefixes::Single(RuleCodePrefix::I),
-            RuleOrigin::McCabe => Prefixes::Single(RuleCodePrefix::C90),
-            RuleOrigin::PEP8Naming => Prefixes::Single(RuleCodePrefix::N),
-            RuleOrigin::PandasVet => Prefixes::Single(RuleCodePrefix::PD),
-            RuleOrigin::Pycodestyle => Prefixes::Multiple(vec![
-                (RuleCodePrefix::E, "Error"),
-                (RuleCodePrefix::W, "Warning"),
+            Linter::Eradicate => Prefixes::Single(RuleSelector::ERA),
+            Linter::Flake82020 => Prefixes::Single(RuleSelector::YTT),
+            Linter::Flake8Annotations => Prefixes::Single(RuleSelector::ANN),
+            Linter::Flake8Bandit => Prefixes::Single(RuleSelector::S),
+            Linter::Flake8BlindExcept => Prefixes::Single(RuleSelector::BLE),
+            Linter::Flake8BooleanTrap => Prefixes::Single(RuleSelector::FBT),
+            Linter::Flake8Bugbear => Prefixes::Single(RuleSelector::B),
+            Linter::Flake8Builtins => Prefixes::Single(RuleSelector::A),
+            Linter::Flake8Comprehensions => Prefixes::Single(RuleSelector::C4),
+            Linter::Flake8Datetimez => Prefixes::Single(RuleSelector::DTZ),
+            Linter::Flake8Debugger => Prefixes::Single(RuleSelector::T10),
+            Linter::Flake8ErrMsg => Prefixes::Single(RuleSelector::EM),
+            Linter::Flake8ImplicitStrConcat => Prefixes::Single(RuleSelector::ISC),
+            Linter::Flake8ImportConventions => Prefixes::Single(RuleSelector::ICN),
+            Linter::Flake8Print => Prefixes::Single(RuleSelector::T20),
+            Linter::Flake8PytestStyle => Prefixes::Single(RuleSelector::PT),
+            Linter::Flake8Quotes => Prefixes::Single(RuleSelector::Q),
+            Linter::Flake8Return => Prefixes::Single(RuleSelector::RET),
+            Linter::Flake8Simplify => Prefixes::Single(RuleSelector::SIM),
+            Linter::Flake8TidyImports => Prefixes::Single(RuleSelector::TID),
+            Linter::Flake8UnusedArguments => Prefixes::Single(RuleSelector::ARG),
+            Linter::Isort => Prefixes::Single(RuleSelector::I),
+            Linter::McCabe => Prefixes::Single(RuleSelector::C90),
+            Linter::PEP8Naming => Prefixes::Single(RuleSelector::N),
+            Linter::PandasVet => Prefixes::Single(RuleSelector::PD),
+            Linter::Pycodestyle => Prefixes::Multiple(vec![
+                (RuleSelector::E, "Error"),
+                (RuleSelector::W, "Warning"),
             ]),
-            RuleOrigin::Pydocstyle => Prefixes::Single(RuleCodePrefix::D),
-            RuleOrigin::Pyflakes => Prefixes::Single(RuleCodePrefix::F),
-            RuleOrigin::PygrepHooks => Prefixes::Single(RuleCodePrefix::PGH),
-            RuleOrigin::Pylint => Prefixes::Multiple(vec![
-                (RuleCodePrefix::PLC, "Convention"),
-                (RuleCodePrefix::PLE, "Error"),
-                (RuleCodePrefix::PLR, "Refactor"),
-                (RuleCodePrefix::PLW, "Warning"),
+            Linter::Pydocstyle => Prefixes::Single(RuleSelector::D),
+            Linter::Pyflakes => Prefixes::Single(RuleSelector::F),
+            Linter::PygrepHooks => Prefixes::Single(RuleSelector::PGH),
+            Linter::Pylint => Prefixes::Multiple(vec![
+                (RuleSelector::PLC, "Convention"),
+                (RuleSelector::PLE, "Error"),
+                (RuleSelector::PLR, "Refactor"),
+                (RuleSelector::PLW, "Warning"),
             ]),
-            RuleOrigin::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
-            RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
-            RuleOrigin::Flake8Commas => Prefixes::Single(RuleCodePrefix::COM),
-            RuleOrigin::Flake8NoPep420 => Prefixes::Single(RuleCodePrefix::INP),
-            RuleOrigin::Flake8Executable => Prefixes::Single(RuleCodePrefix::EXE),
-            RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
+            Linter::Pyupgrade => Prefixes::Single(RuleSelector::UP),
+            Linter::Flake8Pie => Prefixes::Single(RuleSelector::PIE),
+            Linter::Flake8Commas => Prefixes::Single(RuleSelector::COM),
+            Linter::Flake8NoPep420 => Prefixes::Single(RuleSelector::INP),
+            Linter::Flake8Executable => Prefixes::Single(RuleSelector::EXE),
+            Linter::Ruff => Prefixes::Single(RuleSelector::RUF),
         }
     }
 }
@@ -689,7 +731,7 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, Rule>> = Lazy::new(|| {
 mod tests {
     use strum::IntoEnumIterator;
 
-    use crate::registry::Rule;
+    use super::{Linter, ParseCode, Rule};
 
     #[test]
     fn check_code_serialization() {
@@ -698,6 +740,14 @@ mod tests {
                 Rule::from_code(rule.code()).is_ok(),
                 "{rule:?} could not be round-trip serialized."
             );
+        }
+    }
+
+    #[test]
+    fn test_linter_prefixes() {
+        for rule in Rule::iter() {
+            Linter::parse_code(rule.code())
+                .unwrap_or_else(|| panic!("couldn't parse {:?}", rule.code()));
         }
     }
 }

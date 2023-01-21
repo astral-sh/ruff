@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::Args;
-use ruff::registry::{Prefixes, RuleCodePrefix, RuleOrigin};
+use ruff::registry::{Linter, Prefixes, RuleSelector};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -20,7 +20,7 @@ pub struct Cli {
     pub(crate) dry_run: bool,
 }
 
-fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
+fn generate_table(table_out: &mut String, prefix: &RuleSelector) {
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
@@ -47,22 +47,22 @@ pub fn main(cli: &Cli) -> Result<()> {
     // Generate the table string.
     let mut table_out = String::new();
     let mut toc_out = String::new();
-    for origin in RuleOrigin::iter() {
-        let prefixes = origin.prefixes();
+    for linter in Linter::iter() {
+        let prefixes = linter.prefixes();
         let codes_csv: String = prefixes.as_list(", ");
-        table_out.push_str(&format!("### {} ({codes_csv})", origin.name()));
+        table_out.push_str(&format!("### {} ({codes_csv})", linter.name()));
         table_out.push('\n');
         table_out.push('\n');
 
         toc_out.push_str(&format!(
             "   1. [{} ({})](#{}-{})\n",
-            origin.name(),
+            linter.name(),
             codes_csv,
-            origin.name().to_lowercase().replace(' ', "-"),
+            linter.name().to_lowercase().replace(' ', "-"),
             codes_csv.to_lowercase().replace(',', "-").replace(' ', "")
         ));
 
-        if let Some(url) = origin.url() {
+        if let Some(url) = linter.url() {
             let host = url
                 .trim_start_matches("https://")
                 .split('/')
@@ -70,7 +70,7 @@ pub fn main(cli: &Cli) -> Result<()> {
                 .unwrap();
             table_out.push_str(&format!(
                 "For more, see [{}]({}) on {}.",
-                origin.name(),
+                linter.name(),
                 url,
                 match host {
                     "pypi.org" => "PyPI",
@@ -78,7 +78,7 @@ pub fn main(cli: &Cli) -> Result<()> {
                     host => panic!(
                         "unexpected host in URL of {}, expected pypi.org or github.com but found \
                          {host}",
-                        origin.name()
+                        linter.name()
                     ),
                 }
             ));

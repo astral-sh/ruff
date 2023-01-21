@@ -10,7 +10,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut diagkind_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
-    let mut rule_origin_match_arms = quote!();
     let mut rule_code_match_arms = quote!();
     let mut rule_from_code_match_arms = quote!();
     let mut diagkind_code_match_arms = quote!();
@@ -29,8 +28,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         rule_message_formats_match_arms
             .extend(quote! {Self::#name => <#path as Violation>::message_formats(),});
         rule_autofixable_match_arms.extend(quote! {Self::#name => <#path as Violation>::AUTOFIX,});
-        let origin = get_origin(code);
-        rule_origin_match_arms.extend(quote! {Self::#name => RuleOrigin::#origin,});
         rule_code_match_arms.extend(quote! {Self::#name => #code_str,});
         rule_from_code_match_arms.extend(quote! {#code_str => Ok(&Rule::#name), });
         diagkind_code_match_arms.extend(quote! {Self::#name(..) => &Rule::#name, });
@@ -56,7 +53,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
     let rulecodeprefix = super::rule_code_prefix::expand(
         &Ident::new("Rule", Span::call_site()),
-        &Ident::new("RuleCodePrefix", Span::call_site()),
+        &Ident::new("RuleSelector", Span::call_site()),
         mapping.entries.iter().map(|(code, ..)| code),
         |code| code_to_name[code],
     );
@@ -93,10 +90,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
             pub fn autofixable(&self) -> Option<crate::violation::AutofixKind> {
                 match self { #rule_autofixable_match_arms }
-            }
-
-            pub fn origin(&self) -> RuleOrigin {
-                match self { #rule_origin_match_arms }
             }
 
             pub fn code(&self) -> &'static str {
@@ -140,19 +133,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     }
 }
 
-fn get_origin(ident: &Ident) -> Ident {
-    let ident = ident.to_string();
-    let mut iter = crate::prefixes::PREFIX_TO_ORIGIN.iter();
-    let origin = loop {
-        let (prefix, origin) = iter
-            .next()
-            .unwrap_or_else(|| panic!("code doesn't start with any recognized prefix: {ident}"));
-        if ident.starts_with(prefix) {
-            break origin;
-        }
-    };
-    Ident::new(origin, Span::call_site())
-}
 pub struct Mapping {
     entries: Vec<(Ident, Path, Ident)>,
 }

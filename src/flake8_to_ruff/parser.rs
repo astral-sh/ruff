@@ -6,16 +6,16 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use crate::registry::{RuleCodePrefix, PREFIX_REDIRECTS};
+use crate::registry::{RuleSelector, PREFIX_REDIRECTS};
 use crate::settings::types::PatternPrefixPair;
 use crate::warn_user;
 
 static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
-/// Parse a comma-separated list of `RuleCodePrefix` values (e.g.,
+/// Parse a comma-separated list of `RuleSelector` values (e.g.,
 /// "F401,E501").
-pub fn parse_prefix_codes(value: &str) -> Vec<RuleCodePrefix> {
-    let mut codes: Vec<RuleCodePrefix> = vec![];
+pub fn parse_prefix_codes(value: &str) -> Vec<RuleSelector> {
+    let mut codes: Vec<RuleSelector> = vec![];
     for code in COMMA_SEPARATED_LIST_RE.split(value) {
         let code = code.trim();
         if code.is_empty() {
@@ -23,7 +23,7 @@ pub fn parse_prefix_codes(value: &str) -> Vec<RuleCodePrefix> {
         }
         if let Some(code) = PREFIX_REDIRECTS.get(code) {
             codes.push(code.clone());
-        } else if let Ok(code) = RuleCodePrefix::from_str(code) {
+        } else if let Ok(code) = RuleSelector::from_str(code) {
             codes.push(code);
         } else {
             warn_user!("Unsupported prefix code: {code}");
@@ -96,7 +96,7 @@ impl State {
                         prefix: code.clone(),
                     });
                 }
-            } else if let Ok(code) = RuleCodePrefix::from_str(code) {
+            } else if let Ok(code) = RuleSelector::from_str(code) {
                 for filename in &self.filenames {
                     codes.push(PatternPrefixPair {
                         pattern: filename.clone(),
@@ -190,8 +190,8 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair
 /// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
 pub fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
-) -> FxHashMap<String, Vec<RuleCodePrefix>> {
-    let mut per_file_ignores: FxHashMap<String, Vec<RuleCodePrefix>> = FxHashMap::default();
+) -> FxHashMap<String, Vec<RuleSelector>> {
+    let mut per_file_ignores: FxHashMap<String, Vec<RuleSelector>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
@@ -206,33 +206,33 @@ mod tests {
     use anyhow::Result;
 
     use super::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
-    use crate::registry::RuleCodePrefix;
+    use crate::registry::RuleSelector;
     use crate::settings::types::PatternPrefixPair;
 
     #[test]
     fn it_parses_prefix_codes() {
         let actual = parse_prefix_codes("");
-        let expected: Vec<RuleCodePrefix> = vec![];
+        let expected: Vec<RuleSelector> = vec![];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes(" ");
-        let expected: Vec<RuleCodePrefix> = vec![];
+        let expected: Vec<RuleSelector> = vec![];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401");
-        let expected = vec![RuleCodePrefix::F401];
+        let expected = vec![RuleSelector::F401];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401,");
-        let expected = vec![RuleCodePrefix::F401];
+        let expected = vec![RuleSelector::F401];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401,E501");
-        let expected = vec![RuleCodePrefix::F401, RuleCodePrefix::E501];
+        let expected = vec![RuleSelector::F401, RuleSelector::E501];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401, E501");
-        let expected = vec![RuleCodePrefix::F401, RuleCodePrefix::E501];
+        let expected = vec![RuleSelector::F401, RuleSelector::E501];
         assert_eq!(actual, expected);
     }
 
@@ -285,11 +285,11 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "locust/test/*".to_string(),
-                prefix: RuleCodePrefix::F841,
+                prefix: RuleSelector::F841,
             },
             PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                prefix: RuleCodePrefix::F841,
+                prefix: RuleSelector::F841,
             },
         ];
         assert_eq!(actual, expected);
@@ -305,23 +305,23 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "t/*".to_string(),
-                prefix: RuleCodePrefix::D,
+                prefix: RuleSelector::D,
             },
             PatternPrefixPair {
                 pattern: "setup.py".to_string(),
-                prefix: RuleCodePrefix::D,
+                prefix: RuleSelector::D,
             },
             PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                prefix: RuleCodePrefix::D,
+                prefix: RuleSelector::D,
             },
             PatternPrefixPair {
                 pattern: "docs/*".to_string(),
-                prefix: RuleCodePrefix::D,
+                prefix: RuleSelector::D,
             },
             PatternPrefixPair {
                 pattern: "extra/*".to_string(),
-                prefix: RuleCodePrefix::D,
+                prefix: RuleSelector::D,
             },
         ];
         assert_eq!(actual, expected);
@@ -343,47 +343,47 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "scrapy/__init__.py".to_string(),
-                prefix: RuleCodePrefix::E402,
+                prefix: RuleSelector::E402,
             },
             PatternPrefixPair {
                 pattern: "scrapy/core/downloader/handlers/http.py".to_string(),
-                prefix: RuleCodePrefix::F401,
+                prefix: RuleSelector::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/http/__init__.py".to_string(),
-                prefix: RuleCodePrefix::F401,
+                prefix: RuleSelector::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/linkextractors/__init__.py".to_string(),
-                prefix: RuleCodePrefix::E402,
+                prefix: RuleSelector::E402,
             },
             PatternPrefixPair {
                 pattern: "scrapy/linkextractors/__init__.py".to_string(),
-                prefix: RuleCodePrefix::F401,
+                prefix: RuleSelector::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/selector/__init__.py".to_string(),
-                prefix: RuleCodePrefix::F401,
+                prefix: RuleSelector::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/spiders/__init__.py".to_string(),
-                prefix: RuleCodePrefix::E402,
+                prefix: RuleSelector::E402,
             },
             PatternPrefixPair {
                 pattern: "scrapy/spiders/__init__.py".to_string(),
-                prefix: RuleCodePrefix::F401,
+                prefix: RuleSelector::F401,
             },
             PatternPrefixPair {
                 pattern: "scrapy/utils/url.py".to_string(),
-                prefix: RuleCodePrefix::F403,
+                prefix: RuleSelector::F403,
             },
             PatternPrefixPair {
                 pattern: "scrapy/utils/url.py".to_string(),
-                prefix: RuleCodePrefix::F405,
+                prefix: RuleSelector::F405,
             },
             PatternPrefixPair {
                 pattern: "tests/test_loader.py".to_string(),
-                prefix: RuleCodePrefix::E741,
+                prefix: RuleSelector::E741,
             },
         ];
         assert_eq!(actual, expected);

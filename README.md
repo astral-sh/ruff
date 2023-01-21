@@ -1981,7 +1981,7 @@ recommended to only use `extend-ignore` when extending a
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2006,7 +2006,7 @@ recommended to only use `extend-select` when extending a
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2081,7 +2081,7 @@ A list of rule codes or prefixes to consider autofixable.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2153,7 +2153,7 @@ specific prefixes.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2231,7 +2231,7 @@ exclude, when considering any matching files.
 
 **Default value**: `{}`
 
-**Type**: `HashMap<String, Vec<RuleCodePrefix>>`
+**Type**: `HashMap<String, Vec<RuleSelector>>`
 
 **Example usage**:
 
@@ -2295,7 +2295,7 @@ specific prefixes.
 
 **Default value**: `["E", "F"]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2439,7 +2439,7 @@ A list of rule codes or prefixes to consider non-autofix-able.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 

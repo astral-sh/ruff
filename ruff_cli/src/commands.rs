@@ -15,7 +15,7 @@ use ruff::cache::CACHE_DIR_NAME;
 use ruff::linter::add_noqa_to_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
-use ruff::registry::Rule;
+use ruff::registry::{Linter, ParseCode, Rule};
 use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
@@ -285,16 +285,17 @@ pub fn show_files(
 #[derive(Serialize)]
 struct Explanation<'a> {
     code: &'a str,
-    origin: &'a str,
+    linter: &'a str,
     summary: &'a str,
 }
 
 /// Explain a `Rule` to the user.
 pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
+    let (linter, _) = Linter::parse_code(rule.code()).unwrap();
     match format {
         SerializationFormat::Text | SerializationFormat::Grouped => {
             println!("{}\n", rule.as_ref());
-            println!("Code: {} ({})\n", rule.code(), rule.origin().name());
+            println!("Code: {} ({})\n", rule.code(), linter.name());
 
             if let Some(autofix) = rule.autofixable() {
                 println!(
@@ -315,7 +316,7 @@ pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
                     code: rule.code(),
-                    origin: rule.origin().name(),
+                    linter: linter.name(),
                     summary: rule.message_formats()[0],
                 })?
             );

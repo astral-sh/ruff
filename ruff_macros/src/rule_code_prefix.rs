@@ -7,8 +7,8 @@ use syn::Ident;
 
 const ALL: &str = "ALL";
 
-/// A hash map from deprecated `RuleCodePrefix` to latest
-/// `RuleCodePrefix`.
+/// A hash map from deprecated `RuleSelector` to latest
+/// `RuleSelector`.
 pub static PREFIX_REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
@@ -169,7 +169,7 @@ pub fn expand<'a>(
 
         #prefix_impl
 
-        /// A hash map from deprecated `RuleCodePrefix` to latest `RuleCodePrefix`.
+        /// A hash map from deprecated `RuleSelector` to latest `RuleSelector`.
         pub static PREFIX_REDIRECTS: ::once_cell::sync::Lazy<::rustc_hash::FxHashMap<&'static str, #prefix_ident>> = ::once_cell::sync::Lazy::new(|| {
             ::rustc_hash::FxHashMap::from_iter([
                 #(#prefix_redirects),*

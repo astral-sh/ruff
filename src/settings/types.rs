@@ -12,7 +12,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 
 use super::hashable::HashableHashSet;
 use crate::fs;
-use crate::registry::{Rule, RuleCodePrefix};
+use crate::registry::{Rule, RuleSelector};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
@@ -93,8 +93,8 @@ pub struct PerFileIgnore {
 }
 
 impl PerFileIgnore {
-    pub fn new(basename: String, absolute: PathBuf, prefixes: &[RuleCodePrefix]) -> Self {
-        let codes: FxHashSet<_> = prefixes.iter().flat_map(RuleCodePrefix::codes).collect();
+    pub fn new(basename: String, absolute: PathBuf, prefixes: &[RuleSelector]) -> Self {
+        let codes: FxHashSet<_> = prefixes.iter().flat_map(RuleSelector::codes).collect();
         Self {
             basename,
             absolute,
@@ -106,7 +106,7 @@ impl PerFileIgnore {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PatternPrefixPair {
     pub pattern: String,
-    pub prefix: RuleCodePrefix,
+    pub prefix: RuleSelector,
 }
 
 impl PatternPrefixPair {
@@ -140,7 +140,7 @@ impl FromStr for PatternPrefixPair {
             (tokens[0].trim(), tokens[1].trim())
         };
         let pattern = pattern_str.into();
-        let prefix = RuleCodePrefix::from_str(code_string)?;
+        let prefix = RuleSelector::from_str(code_string)?;
         Ok(Self { pattern, prefix })
     }
 }
