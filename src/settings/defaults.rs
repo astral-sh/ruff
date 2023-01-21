@@ -52,7 +52,7 @@ pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            rules: PREFIXES.iter().flat_map(RuleSelector::codes).into(),
+            rules: PREFIXES.iter().flat_map(IntoIterator::into_iter).into(),
             allowed_confusables: FxHashSet::from_iter([]).into(),
             builtins: vec![],
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone().into(),
