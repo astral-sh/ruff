@@ -20,12 +20,12 @@ pub struct Cli {
     pub(crate) dry_run: bool,
 }
 
-fn generate_table(table_out: &mut String, prefix: &RuleSelector) {
+fn generate_table(table_out: &mut String, selector: &RuleSelector) {
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
     table_out.push('\n');
-    for rule in prefix.codes() {
+    for rule in selector.codes() {
         let fix_token = match rule.autofixable() {
             None => "",
             Some(_) => "🛠",
@@ -89,10 +89,10 @@ pub fn main(cli: &Cli) -> Result<()> {
         match prefixes {
             Prefixes::Single(prefix) => generate_table(&mut table_out, &prefix),
             Prefixes::Multiple(entries) => {
-                for (prefix, category) in entries {
-                    table_out.push_str(&format!("#### {category} ({})", prefix.as_ref()));
+                for (selector, category) in entries {
+                    table_out.push_str(&format!("#### {category} ({})", selector.as_ref()));
                     table_out.push('\n');
-                    generate_table(&mut table_out, &prefix);
+                    generate_table(&mut table_out, &selector);
                 }
             }
         }

@@ -297,7 +297,7 @@ pub fn resolve_per_file_ignores(
             // Construct basename matcher.
             let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-            Ok((absolute.into(), basename.into(), per_file_ignore.codes))
+            Ok((absolute.into(), basename.into(), per_file_ignore.rules))
         })
         .collect()
 }
@@ -311,7 +311,7 @@ struct RuleCodeSpec<'a> {
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// rule codes.
 fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<Rule> {
-    let mut codes: FxHashSet<Rule> = FxHashSet::default();
+    let mut rules: FxHashSet<Rule> = FxHashSet::default();
     for spec in specs {
         for specificity in [
             SuffixLength::None,
@@ -321,21 +321,21 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
             SuffixLength::Three,
             SuffixLength::Four,
         ] {
-            for prefix in spec.select {
-                if prefix.specificity() == specificity {
-                    codes.extend(prefix.codes());
+            for selector in spec.select {
+                if selector.specificity() == specificity {
+                    rules.extend(selector.codes());
                 }
             }
-            for prefix in spec.ignore {
-                if prefix.specificity() == specificity {
-                    for code in prefix.codes() {
-                        codes.remove(&code);
+            for selector in spec.ignore {
+                if selector.specificity() == specificity {
+                    for rule in selector.codes() {
+                        rules.remove(&rule);
                     }
                 }
             }
         }
     }
-    codes
+    rules
 }
 
 /// Warn if the set of enabled codes contains any incompatibilities.
