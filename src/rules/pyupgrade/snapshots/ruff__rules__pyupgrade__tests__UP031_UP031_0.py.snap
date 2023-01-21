@@ -461,4 +461,21 @@ expression: diagnostics
       row: 67
       column: 40
   parent: ~
+- kind:
+    PrintfStringFormatting: ~
+  location:
+    row: 69
+    column: 6
+  end_location:
+    row: 69
+    column: 35
+  fix:
+    content: "(\"foo {} \" \"bar {}\").format(x, y)"
+    location:
+      row: 69
+      column: 6
+    end_location:
+      row: 69
+      column: 35
+  parent: ~
 

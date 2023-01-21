@@ -65,3 +65,5 @@ print(
 print("%s \N{snowman}" % (a,))
 
 print("%(foo)s \N{snowman}" % {"foo": 1})
+
+print(("foo %s " "bar %s") % (x, y))

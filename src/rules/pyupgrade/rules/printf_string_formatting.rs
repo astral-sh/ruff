@@ -126,24 +126,24 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple(checker: &mut Checker, right: &Expr) -> String {
-    let mut base_string = checker
+    let mut contents = checker
         .locator
         .slice_source_code_range(&Range::from_located(right))
         .to_string();
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
             if right.location.row() == right.end_location.unwrap().row() {
-                for (i, character) in base_string.chars().rev().enumerate() {
+                for (i, character) in contents.chars().rev().enumerate() {
                     if character == ',' {
-                        let correct_index = base_string.len() - i - 1;
-                        base_string.remove(correct_index);
+                        let correct_index = contents.len() - i - 1;
+                        contents.remove(correct_index);
                         break;
                     }
                 }
             }
         }
     }
-    base_string
+    contents
 }
 
 /// Converts a dictionary to a function call while preserving as much styling as
@@ -300,16 +300,24 @@ pub(crate) fn printf_string_formatting(
         return;
     }
 
-    let existing = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(expr));
-
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<(Location, Location)> = vec![];
-    for (start, tok, end) in lexer::make_tokenizer_located(&existing, expr.location).flatten() {
+    let mut extension = None;
+    for (start, tok, end) in lexer::make_tokenizer_located(
+        &checker
+            .locator
+            .slice_source_code_range(&Range::from_located(expr)),
+        expr.location,
+    )
+    .flatten()
+    {
         if matches!(tok, Tok::String { .. }) {
             strings.push((start, end));
+        } else if matches!(tok, Tok::Rpar) {
+            // If we hit a right paren, we have to preserve it.
+            extension = Some((start, end));
         } else if matches!(tok, Tok::Percent) {
+            // Break as soon as we find the modulo symbol.
             break;
         }
     }
@@ -379,6 +387,14 @@ pub(crate) fn printf_string_formatting(
         // Add the string itself.
         contents.push_str(&format_string);
         prev = Some(*end);
+    }
+
+    if let Some((.., end)) = extension {
+        contents.push_str(
+            &checker
+                .locator
+                .slice_source_code_range(&Range::new(prev.unwrap(), end)),
+        );
     }
 
     // Add the `.format` call.
