@@ -14,8 +14,8 @@ use crate::rules::flake8_quotes::settings::Quote;
 use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
 use crate::rules::pydocstyle::settings::Convention;
 use crate::rules::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
+    flake8_annotations, flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_pytest_style,
+    flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
@@ -90,6 +90,7 @@ pub fn convert(
     let mut options = Options::default();
     let mut flake8_annotations = flake8_annotations::settings::Options::default();
     let mut flake8_bugbear = flake8_bugbear::settings::Options::default();
+    let mut flake8_builtins = flake8_builtins::settings::Options::default();
     let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
     let mut flake8_pytest_style = flake8_pytest_style::settings::Options::default();
     let mut flake8_quotes = flake8_quotes::settings::Options::default();
@@ -145,6 +146,11 @@ pub fn convert(
                 // flake8-bugbear
                 "extend-immutable-calls" | "extend_immutable_calls" => {
                     flake8_bugbear.extend_immutable_calls =
+                        Some(parser::parse_strings(value.as_ref()));
+                }
+                // flake8-builtins
+                "builtins-ignorelist" | "builtins_ignorelist" => {
+                    flake8_builtins.builtins_ignorelist =
                         Some(parser::parse_strings(value.as_ref()));
                 }
                 // flake8-annotations
@@ -345,6 +351,9 @@ pub fn convert(
     if flake8_bugbear != flake8_bugbear::settings::Options::default() {
         options.flake8_bugbear = Some(flake8_bugbear);
     }
+    if flake8_builtins != flake8_builtins::settings::Options::default() {
+        options.flake8_builtins = Some(flake8_builtins);
+    }
     if flake8_errmsg != flake8_errmsg::settings::Options::default() {
         options.flake8_errmsg = Some(flake8_errmsg);
     }
@@ -439,6 +448,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -502,6 +512,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -565,6 +576,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -628,6 +640,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -691,6 +704,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
@@ -767,6 +781,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -837,6 +852,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {

@@ -12,6 +12,9 @@ per-file-ignores = { "__init__.py" = ["F401"] }
 [tool.ruff.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
+[tool.ruff.flake8-builtins]
+builtins-ignorelist = ["id", "dir"]
+
 [tool.ruff.flake8-quotes]
 inline-quotes = "single"
 multiline-quotes = "double"
