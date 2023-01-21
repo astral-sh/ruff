@@ -217,10 +217,10 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
 /// PT019
 fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
     args.args.iter().chain(&args.kwonlyargs).for_each(|arg| {
-        let name = arg.node.arg.to_string();
+        let name = &arg.node.arg;
         if name.starts_with('_') {
             checker.diagnostics.push(Diagnostic::new(
-                violations::FixtureParamWithoutValue(name),
+                violations::FixtureParamWithoutValue(name.to_string()),
                 Range::from_located(arg),
             ));
         }
