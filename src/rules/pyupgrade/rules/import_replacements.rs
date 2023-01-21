@@ -47,6 +47,66 @@ const COLLECTIONS_TO_ABC: &[&str] = &[
     "ValuesView",
 ];
 
+const PIPES_TO_SHLEX: &[&str] = &["quote"];
+
+const SIX_TO_IO: &[&str] = &["BytesIO", "StringIO"];
+
+const SIX_TO_FUNCTOOLS: &[&str] = &["wraps"];
+
+const SIXMOVES_TO_IO: &[&str] = &["io"];
+
+const SIXMOVES_TO_COLLECTIONS: &[&str] = &["UserDict", "UserList", "UserString"];
+
+const SIXMOVES_TO_ITERTOOLS: &[&str] = &["filterfalse", "zip_longest"];
+
+const SIXMOVES_TO_OS: &[&str] = &["getcwd", "getcwdb"];
+
+const SIXMOVES_TO_SUBPROCESS: &[&str] = &["getouput"];
+
+const SIXMOVES_TO_SYS: &[&str] = &["intern"];
+
+const SIXMOVES_TO_URLLIB: &[&str] = &["parse", "request", "response", "error", "robotparser"];
+
+const TYPINGEXTENSIONS_TO_TYPING: &[&str] = &[
+    "AsyncIterable",
+    "AsyncIterator",
+    "Awaitable",
+    "ClassVar",
+    "ContextManager",
+    "Coroutine",
+    "DefaultDict",
+    "NewType",
+    "TYPE_CHECKING",
+    "Text",
+    "Type",
+];
+
+// Items below this require python 3.7 or higher
+
+const MYPYEXTENSIONS_TO_TYPING_37: &[&str] = &["NoReturn"];
+
+const TYPINGEXTENSION_TO_TYPING_37: &[&str] = &[
+    "AsyncContextManager",
+    "AsyncGenerator",
+    "ChainMap",
+    "Counter",
+    "Deque",
+    "NoReturn",
+];
+
+// Items below this require python 3.8 or higher
+
+const MYPYEXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
+
+const TYPINGEXTENSION_TO_TYPING_38: &[&str] = &[
+    "Final",
+    "Literal",
+    "OrderedDict",
+    "Protocol",
+    "SupportsInded",
+    "runtime_checkable",
+];
+
 struct FixImports<'a> {
     module: &'a str,
     multi_line: bool,
