@@ -119,7 +119,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             .rules
                             .enabled(&Rule::DynamicallyTypedExpression)
                         {
-                            let name = arg.node.arg.to_string();
+                            let name = &arg.node.arg;
                             check_dynamically_typed(checker, expr, || format!("*{name}"));
                         }
                     }
@@ -146,7 +146,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             .rules
                             .enabled(&Rule::DynamicallyTypedExpression)
                         {
-                            let name = arg.node.arg.to_string();
+                            let name = &arg.node.arg;
                             check_dynamically_typed(checker, expr, || format!("**{name}"));
                         }
                     }
@@ -266,7 +266,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             .rules
                             .enabled(&Rule::DynamicallyTypedExpression)
                         {
-                            let name = arg.node.arg.to_string();
+                            let name = &arg.node.arg;
                             check_dynamically_typed(checker, expr, || format!("*{name}"));
                         }
                     }
@@ -294,7 +294,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             .rules
                             .enabled(&Rule::DynamicallyTypedExpression)
                         {
-                            let name = arg.node.arg.to_string();
+                            let name = &arg.node.arg;
                             check_dynamically_typed(checker, expr, || format!("**{name}"));
                         }
                     }
