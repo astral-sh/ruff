@@ -45,7 +45,6 @@ const COLLECTIONS_TO_ABC: &[&str] = &[
     "ValuesView",
 ];
 
-
 struct FixImports<'a> {
     module: &'a str,
     multi_line: bool,
@@ -105,16 +104,34 @@ impl<'a> FixImports<'a> {
         if names.is_empty() {
             return String::new();
         }
+        let after_comma = if self.multi_line { '\n' } else { ' ' };
+        let start_imps = if self.multi_line { "(\n" } else { "" };
+        let after_imps = if self.multi_line {
+            let short_indent = if self.indent.len() > 3 {
+                &self.indent[3..]
+            } else {
+                ""
+            };
+            format!("\n{short_indent})")
+        } else {
+            "".to_string()
+        };
         let mut full_names: Vec<String> = vec![];
         for name in names {
             let asname_str = match &name.asname {
                 Some(item) => format!(" as {}", item),
                 None => String::new(),
             };
-            let final_string = format!("{}{}", name.name, asname_str);
+            let final_string = format!("{}{}{}", self.indent, name.name, asname_str);
             full_names.push(final_string);
         }
-        format!("from {} import {}", module, full_names.join(", "))
+        format!(
+            "from {} import {}{}{}",
+            module,
+            start_imps,
+            full_names.join(format!(",{}", after_comma).as_str()),
+            after_imps
+        )
     }
 }
 
@@ -140,6 +157,10 @@ pub fn import_replacements(
     let module_text = checker
         .locator
         .slice_source_code_range(&Range::from_located(stmt));
+    let indent = match names.get(0) {
+        None => return,
+        Some(item) => item
+    };
     let is_mulit_line = module_text.contains('\n');
     let fixer = FixImports::new(clean_mod, is_mulit_line, &clean_names, "");
     let clean_result = fixer.check_replacement();
