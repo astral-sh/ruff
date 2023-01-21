@@ -212,6 +212,7 @@ impl<'a> FixImports<'a> {
     }
 
     fn check_replacement(&self) -> Option<String> {
+        println!("Checking replacement for {}", self.module);
         match self.module {
             "collections" => self.create_new_str(COLLECTIONS_TO_ABC, "collections.abc"),
             "pipes" => self.create_new_str(PIPES_TO_SHLEX, "shlex"),
@@ -285,7 +286,12 @@ impl<'a> FixImports<'a> {
         let unmatching = self.get_str(&unmatching_names, self.module);
         let matching = self.get_str(&matching_names, replace);
         if !unmatching.is_empty() && !matching.is_empty() {
-            Some(format!("{unmatching}\n{}{matching}", self.short_indent))
+            let shorter_indent = if self.short_indent.len() > 0 {
+                self.short_indent[1..].to_string()
+            } else {
+                String::new()
+            };
+            Some(format!("{unmatching}\n{shorter_indent}{matching}"))
         } else if !unmatching.is_empty() {
             Some(unmatching)
         } else if !matching.is_empty() {
@@ -369,7 +375,8 @@ pub fn import_replacements(
         match names.get(0) {
             None => return,
             Some(item) => match indentation(checker.locator, item) {
-                None => return,
+                // This is an opninionated way of formatting import statements
+                None => "    ".to_string(),
                 Some(item) => item.to_string(),
             },
         }
