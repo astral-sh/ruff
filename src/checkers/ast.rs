@@ -1356,7 +1356,13 @@ where
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
                 if self.settings.rules.enabled(&Rule::NestedIfStatements) {
-                    flake8_simplify::rules::nested_if_statements(self, stmt);
+                    flake8_simplify::rules::nested_if_statements(
+                        self,
+                        stmt,
+                        test,
+                        body,
+                        self.current_stmt_parent().map(Into::into),
+                    );
                 }
                 if self
                     .settings

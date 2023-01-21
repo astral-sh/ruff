@@ -3,8 +3,8 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKin
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    contains_call_path, contains_effect, create_expr, create_stmt, has_comments_in, unparse_expr,
-    unparse_stmt,
+    contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range,
+    has_comments_in, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -37,36 +37,51 @@ fn is_main_check(expr: &Expr) -> bool {
     false
 }
 
+fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
+    let [Stmt { node: StmtKind::If { test, body: inner_body, orelse }, ..}] = body else { return None };
+    if !(orelse.is_empty() && body.len() == 1) {
+        return None;
+    }
+    find_last_nested_if(inner_body).or(Some((
+        test,
+        inner_body.last().expect("Expect body to be non-empty"),
+    )))
+}
+
 /// SIM102
-pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
-    let StmtKind::If { test, body, orelse } = &stmt.node else {
-        return;
-    };
-
-    // if a: <---
-    //     if b: <---
-    //         c
-    let is_nested_if = {
-        if orelse.is_empty() && body.len() == 1 {
-            if let StmtKind::If { orelse, .. } = &body[0].node {
-                orelse.is_empty()
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    };
-
-    if !is_nested_if {
-        return;
-    };
-
+pub fn nested_if_statements(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &[Stmt],
+    parent: Option<&Stmt>,
+) {
     if is_main_check(test) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(violations::NestedIfStatements, Range::from_located(stmt));
+    if let Some(parent) = parent {
+        if let StmtKind::If { body, orelse, .. } = &parent.node {
+            if orelse.is_empty() && body.len() == 1 {
+                return;
+            }
+        }
+    }
+
+    let Some((test, first_stmt)) = find_last_nested_if(body) else {
+        return;
+    };
+    let colon = first_colon_range(
+        Range::new(test.end_location.unwrap(), first_stmt.location),
+        checker.locator,
+    );
+    let mut diagnostic = Diagnostic::new(
+        violations::NestedIfStatements,
+        colon.map_or_else(
+            || Range::from_located(stmt),
+            |colon| Range::new(stmt.location, colon.end_location),
+        ),
+    );
     if checker.patch(&Rule::NestedIfStatements) {
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
