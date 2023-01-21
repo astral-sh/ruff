@@ -63,26 +63,6 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing: id
-  location:
-    row: 8
-    column: 16
-  end_location:
-    row: 8
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    BuiltinArgumentShadowing: dir
-  location:
-    row: 8
-    column: 20
-  end_location:
-    row: 8
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
     BuiltinArgumentShadowing: float
   location:
     row: 11

@@ -23,16 +23,6 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: dir
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 32
-  fix: ~
-  parent: ~
-- kind:
     BuiltinVariableShadowing: print
   location:
     row: 5
@@ -100,16 +90,6 @@ expression: diagnostics
   end_location:
     row: 9
     column: 8
-  fix: ~
-  parent: ~
-- kind:
-    BuiltinVariableShadowing: id
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 2
   fix: ~
   parent: ~
 - kind:

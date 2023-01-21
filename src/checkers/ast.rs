@@ -4731,6 +4731,7 @@ impl<'a> Checker<'a> {
                     name,
                     located,
                     flake8_builtins::types::ShadowingType::Attribute,
+                    &self.settings.flake8_builtins.builtins_ignorelist,
                 ) {
                     self.diagnostics.push(diagnostic);
                 }
@@ -4741,6 +4742,7 @@ impl<'a> Checker<'a> {
                     name,
                     located,
                     flake8_builtins::types::ShadowingType::Variable,
+                    &self.settings.flake8_builtins.builtins_ignorelist,
                 ) {
                     self.diagnostics.push(diagnostic);
                 }
@@ -4754,6 +4756,7 @@ impl<'a> Checker<'a> {
                 name,
                 arg,
                 flake8_builtins::types::ShadowingType::Argument,
+                &self.settings.flake8_builtins.builtins_ignorelist,
             ) {
                 self.diagnostics.push(diagnostic);
             }
