@@ -1,8 +1,6 @@
-use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
-use ropey::RopeBuilder;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
@@ -14,10 +12,7 @@ pub mod fixer;
 pub mod helpers;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file<'a>(
-    diagnostics: &'a [Diagnostic],
-    locator: &'a Locator<'a>,
-) -> Option<(Cow<'a, str>, usize)> {
+pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, usize)> {
     if diagnostics.iter().all(|check| check.fix.is_none()) {
         return None;
     }
@@ -32,8 +27,8 @@ pub fn fix_file<'a>(
 fn apply_fixes<'a>(
     fixes: impl Iterator<Item = &'a Fix>,
     locator: &'a Locator<'a>,
-) -> (Cow<'a, str>, usize) {
-    let mut output = RopeBuilder::new();
+) -> (String, usize) {
+    let mut output = String::new();
     let mut last_pos: Location = Location::new(1, 0);
     let mut applied: BTreeSet<&Fix> = BTreeSet::default();
     let mut num_fixed: usize = 0;
@@ -54,10 +49,10 @@ fn apply_fixes<'a>(
 
         // Add all contents from `last_pos` to `fix.location`.
         let slice = locator.slice_source_code_range(&Range::new(last_pos, fix.location));
-        output.append(slice);
+        output.push_str(slice);
 
         // Add the patch itself.
-        output.append(&fix.content);
+        output.push_str(&fix.content);
 
         // Track that the fix was applied.
         last_pos = fix.end_location;
@@ -67,9 +62,9 @@ fn apply_fixes<'a>(
 
     // Add the remaining content.
     let slice = locator.slice_source_code_at(last_pos);
-    output.append(slice);
+    output.push_str(slice);
 
-    (Cow::from(output.finish()), num_fixed)
+    (output, num_fixed)
 }
 
 #[cfg(test)]

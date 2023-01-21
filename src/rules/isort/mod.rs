@@ -8,7 +8,6 @@ use comments::Comment;
 use helpers::trailing_comma;
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ropey::RopeBuilder;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Stmt, StmtKind};
 use settings::RelatveImportsOrder;
@@ -593,7 +592,7 @@ pub fn format_imports(
         extra_standard_library,
     );
 
-    let mut output = RopeBuilder::new();
+    let mut output = String::new();
 
     // Generate replacement source code.
     let mut is_first_block = true;
@@ -630,14 +629,14 @@ pub fn format_imports(
         if is_first_block {
             is_first_block = false;
         } else if !no_lines_before.contains(&import_type) {
-            output.append(stylist.line_ending());
+            output.push_str(stylist.line_ending());
         }
 
         let mut is_first_statement = true;
         for import in imports {
             match import {
                 Import((alias, comments)) => {
-                    output.append(&format::format_import(
+                    output.push_str(&format::format_import(
                         &alias,
                         &comments,
                         is_first_statement,
@@ -645,7 +644,7 @@ pub fn format_imports(
                     ));
                 }
                 ImportFrom((import_from, comments, trailing_comma, aliases)) => {
-                    output.append(&format::format_import_from(
+                    output.push_str(&format::format_import_from(
                         &import_from,
                         &comments,
                         &aliases,
@@ -663,14 +662,14 @@ pub fn format_imports(
     match trailer {
         None => {}
         Some(Trailer::Sibling) => {
-            output.append(stylist.line_ending());
+            output.push_str(stylist.line_ending());
         }
         Some(Trailer::FunctionDef | Trailer::ClassDef) => {
-            output.append(stylist.line_ending());
-            output.append(stylist.line_ending());
+            output.push_str(stylist.line_ending());
+            output.push_str(stylist.line_ending());
         }
     }
-    output.finish().to_string()
+    output
 }
 
 #[cfg(test)]
