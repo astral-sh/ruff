@@ -6,6 +6,7 @@ use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::lexer;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
@@ -308,6 +309,15 @@ pub(crate) fn printf_string_formatting(
     let existing = checker
         .locator
         .slice_source_code_range(&Range::from_located(expr));
+
+    // We need to collect a few pieces:
+    // - Any content before the first string segment.
+    // - All string segments.
+    // - Any content between the string segments.
+    // - Any content between the last string segment and the modulo symbol.
+    let strings = vec![];
+
+    for (start, tok, end) in lexer::make_tokenizer_located(&existing, expr.location) {}
 
     // Split `"%s" % "Hello, world"` into `"%s"` and `"Hello, world"`.
     let mut split = MODULO_CALL.split(&existing);
