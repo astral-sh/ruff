@@ -273,7 +273,7 @@ impl<'a> Checker<'a> {
             Location::new(*noqa_lineno, 0),
             Location::new(noqa_lineno + 1, 0),
         ));
-        match noqa::extract_noqa_directive(&line) {
+        match noqa::extract_noqa_directive(line) {
             Directive::None => false,
             Directive::All(..) => true,
             Directive::Codes(.., codes) => noqa::includes(code, &codes),
@@ -4610,12 +4610,13 @@ impl<'a> Checker<'a> {
                     Location::new(expr.location.row(), 0),
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
-                let body = pydocstyle::helpers::raw_contents(&contents);
+
+                let body = pydocstyle::helpers::raw_contents(contents);
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,
-                    contents: &contents,
-                    indentation: &indentation,
+                    contents,
+                    indentation,
                     body,
                 };
 

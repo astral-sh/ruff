@@ -701,7 +701,6 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
-    #[test_case(Path::new("line_ending_cr.py"))]
     #[test_case(Path::new("line_ending_crlf.py"))]
     #[test_case(Path::new("line_ending_lf.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]

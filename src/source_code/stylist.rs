@@ -170,7 +170,7 @@ fn detect_quote(contents: &str, locator: &Locator) -> Option<Quote> {
     for (start, tok, end) in lexer::make_tokenizer(contents).flatten() {
         if let Tok::String { .. } = tok {
             let content = locator.slice_source_code_range(&Range::new(start, end));
-            if let Some(pattern) = leading_quote(&content) {
+            if let Some(pattern) = leading_quote(content) {
                 if pattern.contains('\'') {
                     return Some(Quote::Single);
                 } else if pattern.contains('"') {

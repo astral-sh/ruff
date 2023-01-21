@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use anyhow::{bail, Result};
 use libcst_native::{
     BooleanOp, BooleanOperation, Codegen, CodegenState, CompoundStatement, Expression, If,
@@ -52,9 +50,9 @@ pub(crate) fn fix_nested_if_statements(
     // If this is an `elif`, we have to remove the `elif` keyword for now. (We'll
     // restore the `el` later on.)
     let module_text = if is_elif {
-        Cow::Owned(contents.replacen("elif", "if", 1))
+        contents.replacen("elif", "if", 1)
     } else {
-        contents
+        contents.to_string()
     };
 
     // If the block is indented, "embed" it in a function definition, to preserve
@@ -63,10 +61,7 @@ pub(crate) fn fix_nested_if_statements(
     let module_text = if outer_indent.is_empty() {
         module_text
     } else {
-        Cow::Owned(format!(
-            "def f():{}{module_text}",
-            stylist.line_ending().as_str()
-        ))
+        format!("def f():{}{module_text}", stylist.line_ending().as_str())
     };
 
     // Parse the CST.
@@ -82,7 +77,7 @@ pub(crate) fn fix_nested_if_statements(
         let Suite::IndentedBlock(indented_block) = &mut embedding.body else {
             bail!("Expected indented block")
         };
-        indented_block.indent = Some(&outer_indent);
+        indented_block.indent = Some(outer_indent);
 
         &mut *indented_block.body
     };

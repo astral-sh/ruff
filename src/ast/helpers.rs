@@ -366,7 +366,7 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 
 /// Returns `true` if a statement or expression includes at least one comment.
 pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
-    lexer::make_tokenizer(&locator.slice_source_code_range(&range))
+    lexer::make_tokenizer(locator.slice_source_code_range(&range))
         .any(|result| result.map_or(false, |(_, tok, _)| matches!(tok, Tok::Comment(..))))
 }
 
@@ -486,7 +486,7 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
             | StmtKind::AsyncFunctionDef { .. }
     ) {
         let contents = locator.slice_source_code_range(&Range::from_located(stmt));
-        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt.location).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt.location).flatten() {
             if matches!(tok, Tok::Name { .. }) {
                 return Range::new(start, end);
             }
@@ -515,7 +515,7 @@ pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
 // Return the ranges of `Name` tokens within a specified node.
 pub fn find_names<T>(located: &Located<T>, locator: &Locator) -> Vec<Range> {
     let contents = locator.slice_source_code_range(&Range::from_located(located));
-    lexer::make_tokenizer_located(&contents, located.location)
+    lexer::make_tokenizer_located(contents, located.location)
         .flatten()
         .filter(|(_, tok, _)| matches!(tok, Tok::Name { .. }))
         .map(|(start, _, end)| Range {
@@ -535,7 +535,7 @@ pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> O
             let type_end_location = type_.end_location.unwrap();
             let contents =
                 locator.slice_source_code_range(&Range::new(type_end_location, body[0].location));
-            let range = lexer::make_tokenizer_located(&contents, type_end_location)
+            let range = lexer::make_tokenizer_located(contents, type_end_location)
                 .flatten()
                 .tuple_windows()
                 .find(|(tok, next_tok)| {
@@ -562,7 +562,7 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
         location: handler.location,
         end_location: end,
     });
-    let range = lexer::make_tokenizer_located(&contents, handler.location)
+    let range = lexer::make_tokenizer_located(contents, handler.location)
         .flatten()
         .find(|(_, kind, _)| matches!(kind, Tok::Except { .. }))
         .map(|(location, _, end_location)| Range {
@@ -576,7 +576,7 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
 /// Find f-strings that don't contain any formatted values in a `JoinedStr`.
 pub fn find_useless_f_strings(expr: &Expr, locator: &Locator) -> Vec<(Range, Range)> {
     let contents = locator.slice_source_code_range(&Range::from_located(expr));
-    lexer::make_tokenizer_located(&contents, expr.location)
+    lexer::make_tokenizer_located(contents, expr.location)
         .flatten()
         .filter_map(|(location, tok, end_location)| match tok {
             Tok::String {
@@ -630,7 +630,7 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
                     .expect("Expected orelse to be non-empty")
                     .location,
             });
-            let range = lexer::make_tokenizer_located(&contents, body_end)
+            let range = lexer::make_tokenizer_located(contents, body_end)
                 .flatten()
                 .find(|(_, kind, _)| matches!(kind, Tok::Else))
                 .map(|(location, _, end_location)| Range {
@@ -646,7 +646,7 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
 pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
     let contents = locator.slice_source_code_range(&range);
-    let range = lexer::make_tokenizer_located(&contents, range.location)
+    let range = lexer::make_tokenizer_located(contents, range.location)
         .flatten()
         .find(|(_, kind, _)| matches!(kind, Tok::Colon))
         .map(|(location, _, end_location)| Range {
@@ -676,7 +676,7 @@ pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
         _ => return None,
     };
     let contents = locator.slice_source_code_range(&Range::new(start, end));
-    let range = lexer::make_tokenizer_located(&contents, start)
+    let range = lexer::make_tokenizer_located(contents, start)
         .flatten()
         .find(|(_, kind, _)| matches!(kind, Tok::Elif | Tok::Else))
         .map(|(location, _, end_location)| Range {
