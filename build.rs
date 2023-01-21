@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
-    generate_origin_name_and_url(&out_dir);
+    generate_linter_name_and_url(&out_dir);
 }
 
 const RULES_SUBMODULE_DOC_PREFIX: &str = "//! Rules from ";
@@ -15,13 +15,13 @@ const RULES_SUBMODULE_DOC_PREFIX: &str = "//! Rules from ";
 ///     //! Rules from [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/).
 ///
 /// This function extracts the link label and url from these comments and
-/// generates the `name` and `url` functions for the `RuleOrigin` enum
+/// generates the `name` and `url` functions for the `Linter` enum
 /// accordingly, so that they can be used by `ruff_dev::generate_rules_table`.
-fn generate_origin_name_and_url(out_dir: &Path) {
+fn generate_linter_name_and_url(out_dir: &Path) {
     println!("cargo:rerun-if-changed=src/rules/");
 
-    let mut name_match_arms: String = r#"RuleOrigin::Ruff => "Ruff-specific rules","#.into();
-    let mut url_match_arms: String = r#"RuleOrigin::Ruff => None,"#.into();
+    let mut name_match_arms: String = r#"Linter::Ruff => "Ruff-specific rules","#.into();
+    let mut url_match_arms: String = r#"Linter::Ruff => None,"#.into();
 
     for file in fs::read_dir("src/rules/")
         .unwrap()
@@ -62,14 +62,14 @@ fn generate_origin_name_and_url(out_dir: &Path) {
             })
             .collect::<String>();
 
-        name_match_arms.push_str(&format!(r#"RuleOrigin::{variant_name} => "{name}","#));
-        url_match_arms.push_str(&format!(r#"RuleOrigin::{variant_name} => Some("{url}"),"#));
+        name_match_arms.push_str(&format!(r#"Linter::{variant_name} => "{name}","#));
+        url_match_arms.push_str(&format!(r#"Linter::{variant_name} => Some("{url}"),"#));
     }
 
     write!(
-        BufWriter::new(fs::File::create(out_dir.join("origin.rs")).unwrap()),
+        BufWriter::new(fs::File::create(out_dir.join("linter.rs")).unwrap()),
         "
-        impl RuleOrigin {{
+        impl Linter {{
             pub fn name(&self) -> &'static str {{
                 match self {{ {name_match_arms} }}
             }}

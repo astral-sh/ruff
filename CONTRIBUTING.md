@@ -37,13 +37,16 @@ After cloning the repository, run Ruff locally with:
 cargo run resources/test/fixtures --no-cache
 ```
 
-Prior to opening a pull request, ensure that your code has been auto-formatted, and that it passes
-both the lint and test validation checks:
+Prior to opening a pull request, ensure that your code has been auto-formatted,
+and that it passes both the lint and test validation checks.
+
+For rustfmt and Clippy, we use [nightly Rust][nightly], as it is stricter than stable Rust.
+(However, tests and builds use stable Rust.)
 
 ```shell
 cargo +nightly fmt --all     # Auto-formatting...
-cargo +nightly clippy --all  # Linting...
-cargo +nightly test --all    # Testing...
+cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic  # Linting...
+cargo test --all    # Testing...
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -66,7 +69,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 6. Update the generated files (documentation and generated code).
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
-rule origin (e.g., `src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
+rule linter (e.g., `src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
 contain a struct defined via `define_violation!`, along with a function that creates the violation
 based on any required inputs. (Many of the existing examples live in `src/violations.rs`, but we're
 looking to place new rules in their own files.)
@@ -78,7 +81,7 @@ collecting diagnostics as it goes.
 If you need to inspect the AST, you can run `cargo +nightly dev print-ast` with a Python file. Grep
 for the `Check::new` invocations to understand how other, similar rules are implemented.
 
-To add a test fixture, create a file under `resources/test/fixtures/[origin]`, named to match
+To add a test fixture, create a file under `resources/test/fixtures/[linter]`, named to match
 the code you defined earlier (e.g., `resources/test/fixtures/pycodestyle/E402.py`). This file should
 contain a variety of violations and non-violations designed to evaluate and demonstrate the behavior
 of your lint rule.
@@ -87,7 +90,7 @@ Run `cargo +nightly dev generate-all` to generate the code for your new fixture.
 locally with (e.g.) `cargo run resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `src/[origin]/mod.rs` file. Then, run `cargo test --all`.
+`test_case` macro in the relevant `src/[linter]/mod.rs` file. Then, run `cargo test --all`.
 Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
 generated snapshot, then commit the snapshot file alongside the rest of your changes.
 
@@ -127,3 +130,5 @@ them to [PyPI](https://pypi.org/project/ruff/).
 
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
+
+[nightly]: https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust

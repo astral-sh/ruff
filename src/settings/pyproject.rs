@@ -31,13 +31,13 @@ impl Pyproject {
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
     let contents = fs::read_file(path)?;
-    toml_edit::easy::from_str(&contents).map_err(Into::into)
+    toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    toml_edit::easy::from_str(&contents).map_err(Into::into)
+    toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -129,7 +129,7 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::registry::RuleCodePrefix;
+    use crate::registry::RuleSelector;
     use crate::rules::flake8_quotes::settings::Quote;
     use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
     use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
@@ -144,17 +144,17 @@ mod tests {
 
     #[test]
     fn deserialize() -> Result<()> {
-        let pyproject: Pyproject = toml_edit::easy::from_str(r#""#)?;
+        let pyproject: Pyproject = toml::from_str(r#""#)?;
         assert_eq!(pyproject.tool, None);
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 "#,
         )?;
         assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -214,7 +214,7 @@ mod tests {
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -275,7 +275,7 @@ line-length = 79
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -336,7 +336,7 @@ exclude = ["foo.py"]
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -369,7 +369,7 @@ select = ["E501"]
                     per_file_ignores: None,
                     required_version: None,
                     respect_gitignore: None,
-                    select: Some(vec![RuleCodePrefix::E501]),
+                    select: Some(vec![RuleSelector::E501]),
                     show_source: None,
                     src: None,
                     target_version: None,
@@ -397,7 +397,7 @@ select = ["E501"]
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -417,14 +417,14 @@ ignore = ["E501"]
                     extend: None,
                     extend_exclude: None,
                     extend_ignore: None,
-                    extend_select: Some(vec![RuleCodePrefix::RUF100]),
+                    extend_select: Some(vec![RuleSelector::RUF100]),
                     external: None,
                     fix: None,
                     fix_only: None,
                     fixable: None,
                     force_exclude: None,
                     format: None,
-                    ignore: Some(vec![RuleCodePrefix::E501]),
+                    ignore: Some(vec![RuleSelector::E501]),
                     ignore_init_module_imports: None,
                     line_length: None,
                     namespace_packages: None,
@@ -459,7 +459,7 @@ ignore = ["E501"]
             })
         );
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -468,7 +468,7 @@ line_length = 79
         )
         .is_err());
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -477,7 +477,7 @@ select = ["E123"]
         )
         .is_err());
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -534,7 +534,7 @@ other-attribute = 1
                 cache_dir: None,
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
-                    vec![RuleCodePrefix::F401]
+                    vec![RuleSelector::F401]
                 )])),
                 dummy_variable_rgx: None,
                 respect_gitignore: None,

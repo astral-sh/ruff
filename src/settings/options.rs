@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::registry::RuleCodePrefix;
+use crate::registry::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
@@ -135,7 +135,7 @@ pub struct Options {
     pub extend_exclude: Option<Vec<String>>,
     #[option(
         default = "[]",
-        value_type = "Vec<RuleCodePrefix>",
+        value_type = "Vec<RuleSelector>",
         example = r#"
             # Skip unused variable rules (`F841`).
             extend-ignore = ["F841"]
@@ -149,10 +149,10 @@ pub struct Options {
     /// would overwrite a more specific rule in `select`. It is
     /// recommended to only use `extend-ignore` when extending a
     /// `pyproject.toml` file via `extend`.
-    pub extend_ignore: Option<Vec<RuleCodePrefix>>,
+    pub extend_ignore: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",
-        value_type = "Vec<RuleCodePrefix>",
+        value_type = "Vec<RuleSelector>",
         example = r#"
             # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
@@ -166,7 +166,7 @@ pub struct Options {
     /// would overwrite a more specific rule in `ignore`. It is
     /// recommended to only use `extend-select` when extending a
     /// `pyproject.toml` file via `extend`.
-    pub extend_select: Option<Vec<RuleCodePrefix>>,
+    pub extend_select: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",
         value_type = "Vec<String>",
@@ -190,14 +190,14 @@ pub struct Options {
     pub fix_only: Option<bool>,
     #[option(
         default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]"#,
-        value_type = "Vec<RuleCodePrefix>",
+        value_type = "Vec<RuleSelector>",
         example = r#"
             # Only allow autofix behavior for `E` and `F` rules.
             fixable = ["E", "F"]
         "#
     )]
     /// A list of rule codes or prefixes to consider autofixable.
-    pub fixable: Option<Vec<RuleCodePrefix>>,
+    pub fixable: Option<Vec<RuleSelector>>,
     #[option(
         default = r#""text""#,
         value_type = "SerializationType",
@@ -232,7 +232,7 @@ pub struct Options {
     pub force_exclude: Option<bool>,
     #[option(
         default = "[]",
-        value_type = "Vec<RuleCodePrefix>",
+        value_type = "Vec<RuleSelector>",
         example = r#"
             # Skip unused variable rules (`F841`).
             ignore = ["F841"]
@@ -245,7 +245,7 @@ pub struct Options {
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
-    pub ignore: Option<Vec<RuleCodePrefix>>,
+    pub ignore: Option<Vec<RuleSelector>>,
     #[option(
         default = "false",
         value_type = "bool",
@@ -294,7 +294,7 @@ pub struct Options {
     pub respect_gitignore: Option<bool>,
     #[option(
         default = r#"["E", "F"]"#,
-        value_type = "Vec<RuleCodePrefix>",
+        value_type = "Vec<RuleSelector>",
         example = r#"
             # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             select = ["E", "F", "B", "Q"]
@@ -307,7 +307,7 @@ pub struct Options {
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes.
-    pub select: Option<Vec<RuleCodePrefix>>,
+    pub select: Option<Vec<RuleSelector>>,
     #[option(
         default = "false",
         value_type = "bool",
@@ -403,14 +403,14 @@ pub struct Options {
     pub typing_modules: Option<Vec<String>>,
     #[option(
         default = "[]",
-        value_type = "Vec<RuleCodePrefix>",
+        value_type = "Vec<RuleSelector>",
         example = r#"
             # Disable autofix for unused imports (`F401`).
             unfixable = ["F401"]
         "#
     )]
     /// A list of rule codes or prefixes to consider non-autofix-able.
-    pub unfixable: Option<Vec<RuleCodePrefix>>,
+    pub unfixable: Option<Vec<RuleSelector>>,
     #[option(
         default = "false",
         value_type = "bool",
@@ -470,7 +470,7 @@ pub struct Options {
     // Tables are required to go last.
     #[option(
         default = "{}",
-        value_type = "HashMap<String, Vec<RuleCodePrefix>>",
+        value_type = "HashMap<String, Vec<RuleSelector>>",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
             [tool.ruff.per-file-ignores]
@@ -480,5 +480,5 @@ pub struct Options {
     )]
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files.
-    pub per_file_ignores: Option<FxHashMap<String, Vec<RuleCodePrefix>>>,
+    pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 }

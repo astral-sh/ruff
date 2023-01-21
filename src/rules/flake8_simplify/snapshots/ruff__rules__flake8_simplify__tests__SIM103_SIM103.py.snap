@@ -53,4 +53,14 @@ expression: diagnostics
       row: 27
       column: 24
   parent: ~
+- kind:
+    ReturnBoolConditionDirectly: a
+  location:
+    row: 49
+    column: 4
+  end_location:
+    row: 52
+    column: 19
+  fix: ~
+  parent: ~
 

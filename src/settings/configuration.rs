@@ -13,7 +13,7 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::fs;
-use crate::registry::RuleCodePrefix;
+use crate::registry::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
@@ -34,28 +34,28 @@ pub struct Configuration {
     pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
     pub extend_exclude: Vec<FilePattern>,
-    pub extend_ignore: Vec<Vec<RuleCodePrefix>>,
-    pub extend_select: Vec<Vec<RuleCodePrefix>>,
+    pub extend_ignore: Vec<Vec<RuleSelector>>,
+    pub extend_select: Vec<Vec<RuleSelector>>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
-    pub fixable: Option<Vec<RuleCodePrefix>>,
+    pub fixable: Option<Vec<RuleSelector>>,
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
-    pub ignore: Option<Vec<RuleCodePrefix>>,
+    pub ignore: Option<Vec<RuleSelector>>,
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
-    pub select: Option<Vec<RuleCodePrefix>>,
+    pub select: Option<Vec<RuleSelector>>,
     pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
-    pub unfixable: Option<Vec<RuleCodePrefix>>,
+    pub unfixable: Option<Vec<RuleSelector>>,
     pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,

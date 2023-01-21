@@ -2,6 +2,7 @@ pub(crate) use convert_named_tuple_functional_to_class::convert_named_tuple_func
 pub(crate) use convert_typed_dict_functional_to_class::convert_typed_dict_functional_to_class;
 pub(crate) use datetime_utc_alias::datetime_utc_alias;
 pub(crate) use deprecated_unittest_alias::deprecated_unittest_alias;
+pub(crate) use extraneous_parentheses::extraneous_parentheses;
 pub(crate) use f_strings::f_strings;
 pub(crate) use format_literals::format_literals;
 pub(crate) use functools_cache::functools_cache;
@@ -44,6 +45,7 @@ mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
 mod datetime_utc_alias;
 mod deprecated_unittest_alias;
+mod extraneous_parentheses;
 mod f_strings;
 mod format_literals;
 mod functools_cache;

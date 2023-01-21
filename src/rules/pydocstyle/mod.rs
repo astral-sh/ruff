@@ -44,6 +44,7 @@ mod tests {
     #[test_case(Rule::UsesRPrefixForBackslashedContent, Path::new("D.py"); "D301")]
     #[test_case(Rule::EndsInPeriod, Path::new("D.py"); "D400_0")]
     #[test_case(Rule::EndsInPeriod, Path::new("D400.py"); "D400_1")]
+    #[test_case(Rule::NonImperativeMood, Path::new("D401.py"); "D401")]
     #[test_case(Rule::NoSignature, Path::new("D.py"); "D402")]
     #[test_case(Rule::FirstLineCapitalized, Path::new("D.py"); "D403")]
     #[test_case(Rule::NoThisPrefix, Path::new("D.py"); "D404")]

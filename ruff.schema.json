@@ -73,7 +73,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "extend-select": {
@@ -83,7 +83,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "external": {
@@ -117,7 +117,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "flake8-annotations": {
@@ -244,7 +244,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "ignore-init-module-imports": {
@@ -315,7 +315,7 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "$ref": "#/definitions/RuleCodePrefix"
+          "$ref": "#/definitions/RuleSelector"
         }
       }
     },
@@ -388,7 +388,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "show-source": {
@@ -446,7 +446,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "update-check": {
@@ -1134,7 +1134,7 @@
         }
       ]
     },
-    "RuleCodePrefix": {
+    "RuleSelector": {
       "type": "string",
       "enum": [
         "A",
@@ -1277,6 +1277,7 @@
         "D4",
         "D40",
         "D400",
+        "D401",
         "D402",
         "D403",
         "D404",
@@ -1310,6 +1311,9 @@
         "DTZ011",
         "DTZ012",
         "E",
+        "E1",
+        "E10",
+        "E101",
         "E4",
         "E40",
         "E401",
@@ -1347,6 +1351,12 @@
         "ERA0",
         "ERA00",
         "ERA001",
+        "EXE",
+        "EXE0",
+        "EXE00",
+        "EXE003",
+        "EXE004",
+        "EXE005",
         "F",
         "F4",
         "F40",
@@ -1768,6 +1778,7 @@
         "UP030",
         "UP032",
         "UP033",
+        "UP034",
         "W",
         "W2",
         "W29",

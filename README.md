@@ -138,15 +138,15 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
+   1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
-1. [Development](#development)
+1. [Contributing](#contributing)
 1. [Releases](#releases)
 1. [Benchmarks](#benchmarks)
 1. [Reference](#reference)
 1. [License](#license)
-1. [Contributing](#contributing)
 
 ## Installation and Usage
 
@@ -199,11 +199,9 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.226'
+  rev: 'v0.0.228'
   hooks:
     - id: ruff
-      # Respect `exclude` and `extend-exclude` settings.
-      args: ["--force-exclude"]
 ```
 
 ## Configuration
@@ -599,6 +597,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.9.1/) on PyPI
 #### Error (E)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
 | E401 | multiple-imports-on-one-line | Multiple imports on one line |  |
 | E402 | module-import-not-at-top-of-file | Module level import not at top of file |  |
 | E501 | line-too-long | Line too long ({length} > {limit} characters) |  |
@@ -672,6 +671,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/) on PyPI.
 | D300 | uses-triple-quotes | Use """triple double quotes""" |  |
 | D301 | uses-r-prefix-for-backslashed-content | Use r""" if any backslashes in a docstring |  |
 | D400 | ends-in-period | First line should end with a period | 🛠 |
+| D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
 | D403 | first-line-capitalized | First word of the first line should be properly capitalized |  |
 | D404 | no-this-prefix | First word of the docstring should not be "This" |  |
@@ -728,6 +728,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP030 | format-literals | Use implicit references for positional format fields | 🛠 |
 | UP032 | f-string | Use f-string instead of `format` call | 🛠 |
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
+| UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
 
 ### pep8-naming (N)
 
@@ -1062,7 +1063,7 @@ For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/20.10
 | DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
 | DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
 | DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
-| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` |  |
+| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
 | DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
 | DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
 
@@ -1165,6 +1166,16 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+
+### flake8-executable (EXE)
+
+For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1.1/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| EXE003 | shebang-python | Shebang should contain "python" |  |
+| EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
+| EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
 
 ### Ruff-specific rules (RUF)
 
@@ -1458,11 +1469,13 @@ natively, including:
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
+- [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
@@ -1526,11 +1539,13 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
 - [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
 - [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
+- [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
+- [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
@@ -1639,24 +1654,10 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 
 Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
-## Development
+## Contributing
 
-Ruff is written in Rust (1.65.0). You'll need to install the [Rust toolchain](https://www.rust-lang.org/tools/install)
-for development.
-
-Assuming you have `cargo` installed, you can run:
-
-```shell
-cargo run resources/test/fixtures
-```
-
-For development, we use [nightly Rust](https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust):
-
-```shell
-cargo +nightly fmt
-cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic
-cargo +nightly test --all
-```
+Contributions are welcome and hugely appreciated. To get started, check out the
+[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
 
 ## Releases
 
@@ -1979,7 +1980,7 @@ recommended to only use `extend-ignore` when extending a
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2004,7 +2005,7 @@ recommended to only use `extend-select` when extending a
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2079,7 +2080,7 @@ A list of rule codes or prefixes to consider autofixable.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2151,7 +2152,7 @@ specific prefixes.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2229,7 +2230,7 @@ exclude, when considering any matching files.
 
 **Default value**: `{}`
 
-**Type**: `HashMap<String, Vec<RuleCodePrefix>>`
+**Type**: `HashMap<String, Vec<RuleSelector>>`
 
 **Example usage**:
 
@@ -2293,7 +2294,7 @@ specific prefixes.
 
 **Default value**: `["E", "F"]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -2437,7 +2438,7 @@ A list of rule codes or prefixes to consider non-autofix-able.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleCodePrefix>`
+**Type**: `Vec<RuleSelector>`
 
 **Example usage**:
 
@@ -3456,8 +3457,3 @@ keep-runtime-typing = true
 ## License
 
 MIT
-
-## Contributing
-
-Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
