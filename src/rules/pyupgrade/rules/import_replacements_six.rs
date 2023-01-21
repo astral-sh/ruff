@@ -9,7 +9,7 @@ use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_import, match_import_from, match_module};
+use crate::cst::matchers::{match_import_from, match_module};
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
@@ -108,7 +108,7 @@ fn refactor_segment(
                     None => keep_names.push(name.clone()),
                 }
             } else {
-                keep_names.push(name.clone())
+                keep_names.push(name.clone());
             }
         }
     }
@@ -121,7 +121,7 @@ fn refactor_segment(
     import.codegen(&mut state);
     let mut final_str = state.to_string();
     final_str.push_str(&format!("\n{}", new_entries));
-    if final_str.chars().last() == Some('\n') {
+    if final_str.ends_with('\n') {
         final_str.pop();
     }
     Some(final_str)
@@ -136,9 +136,9 @@ pub fn import_replacements_six(checker: &mut Checker, stmt: &Stmt, module: &Opti
     let final_string: Option<String>;
     if let Some(module_text) = module {
         if module_text == "six.moves" {
-            final_string = refactor_segment(&checker.locator, stmt, &REPLACE_MODS);
+            final_string = refactor_segment(checker.locator, stmt, &REPLACE_MODS);
         } else if module_text == "six.moves.urllib" {
-            final_string = refactor_segment(&checker.locator, stmt, &REPLACE_MODS_URLLIB);
+            final_string = refactor_segment(checker.locator, stmt, &REPLACE_MODS_URLLIB);
         } else {
             return;
         }

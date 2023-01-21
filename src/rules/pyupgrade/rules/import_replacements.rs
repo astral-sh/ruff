@@ -219,8 +219,8 @@ impl<'a> FixImports<'a> {
             names,
             indent,
             short_indent,
-            version,
             starting_indent,
+            version,
         }
     }
 

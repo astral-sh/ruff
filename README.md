@@ -729,6 +729,8 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/) on PyPI.
 | UP032 | f-string | Use f-string instead of `format` call | 🛠 |
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
+| UP035 | import-replacements | Replace old formatting imports with their new versions | 🛠 |
+| UP036 | import-replacements-six | Replace old formatting imports with their new versions | 🛠 |
 
 ### pep8-naming (N)
 
