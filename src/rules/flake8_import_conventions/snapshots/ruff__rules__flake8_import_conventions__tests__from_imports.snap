@@ -7,10 +7,22 @@ expression: diagnostics
       - xml.dom.minidom
       - md
   location:
-    row: 2
+    row: 3
     column: 0
   end_location:
-    row: 2
+    row: 3
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    ImportAliasIsNotConventional:
+      - xml.dom.minidom
+      - md
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
     column: 31
   fix: ~
   parent: ~
@@ -19,11 +31,23 @@ expression: diagnostics
       - xml.dom.minidom
       - md
   location:
-    row: 3
+    row: 5
     column: 0
   end_location:
-    row: 3
+    row: 5
     column: 36
+  fix: ~
+  parent: ~
+- kind:
+    ImportAliasIsNotConventional:
+      - xml.dom.minidom
+      - md
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 27
   fix: ~
   parent: ~
 - kind:
@@ -31,11 +55,47 @@ expression: diagnostics
       - xml.dom.minidom.parseString
       - pstr
   location:
-    row: 4
+    row: 7
     column: 0
   end_location:
-    row: 4
+    row: 7
     column: 48
+  fix: ~
+  parent: ~
+- kind:
+    ImportAliasIsNotConventional:
+      - xml.dom.minidom.parseString
+      - pstr
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 39
+  fix: ~
+  parent: ~
+- kind:
+    ImportAliasIsNotConventional:
+      - xml.dom.minidom.parseString
+      - pstr
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    ImportAliasIsNotConventional:
+      - xml.dom.minidom.parseString
+      - pstr
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 61
   fix: ~
   parent: ~
 
