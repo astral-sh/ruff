@@ -8,7 +8,7 @@ expression: diagnostics
     row: 2
     column: 0
   end_location:
-    row: 4
+    row: 3
     column: 9
   fix:
     content: "if a and b:\n    c\n"
@@ -22,29 +22,36 @@ expression: diagnostics
 - kind:
     NestedIfStatements: ~
   location:
-    row: 9
+    row: 7
     column: 0
   end_location:
-    row: 11
-    column: 9
+    row: 9
+    column: 13
   fix:
-    content: "elif b and c:\n    d\n"
+    content: "if a and b:\n    if c:\n        d\n"
     location:
-      row: 9
+      row: 7
       column: 0
     end_location:
-      row: 12
+      row: 11
       column: 0
   parent: ~
 - kind:
     NestedIfStatements: ~
   location:
-    row: 14
+    row: 15
     column: 0
   end_location:
-    row: 17
+    row: 16
     column: 9
-  fix: ~
+  fix:
+    content: "elif b and c:\n    d\n"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 18
+      column: 0
   parent: ~
 - kind:
     NestedIfStatements: ~
@@ -52,83 +59,93 @@ expression: diagnostics
     row: 20
     column: 0
   end_location:
-    row: 23
+    row: 22
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    NestedIfStatements: ~
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 27
     column: 9
   fix:
     content: "if a and b:\n    # Fixable due to placement of this comment.\n    c\n"
     location:
-      row: 20
+      row: 26
       column: 0
     end_location:
-      row: 24
+      row: 30
       column: 0
   parent: ~
 - kind:
     NestedIfStatements: ~
   location:
-    row: 45
+    row: 51
     column: 4
   end_location:
-    row: 57
-    column: 23
+    row: 52
+    column: 16
   fix:
     content: "    if True and True:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
     location:
-      row: 45
+      row: 51
       column: 0
     end_location:
-      row: 58
+      row: 64
       column: 0
   parent: ~
 - kind:
     NestedIfStatements: ~
   location:
-    row: 61
+    row: 67
     column: 0
   end_location:
-    row: 73
-    column: 23
+    row: 68
+    column: 12
   fix:
     content: "if True and True:\n    \"\"\"this\nis valid\"\"\"\n\n    \"\"\"the indentation on\n        this line is significant\"\"\"\n\n    \"this is\" \\\n\"allowed too\"\n\n    (\"so is\"\n\"this for some reason\")\n"
     location:
-      row: 61
+      row: 67
       column: 0
     end_location:
-      row: 74
+      row: 80
       column: 0
   parent: ~
 - kind:
     NestedIfStatements: ~
   location:
-    row: 77
+    row: 83
     column: 4
   end_location:
-    row: 81
-    column: 32
+    row: 86
+    column: 10
   fix:
     content: "    if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n        \"multiprocessing.\"\n    )):\n        print(\"Bad module!\")\n"
     location:
-      row: 77
+      row: 83
       column: 0
     end_location:
-      row: 82
+      row: 88
       column: 0
   parent: ~
 - kind:
     NestedIfStatements: ~
   location:
-    row: 84
+    row: 90
     column: 0
   end_location:
-    row: 88
-    column: 28
+    row: 93
+    column: 6
   fix:
     content: "if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n    \"multiprocessing.\"\n)):\n    print(\"Bad module!\")\n"
     location:
-      row: 84
+      row: 90
       column: 0
     end_location:
-      row: 89
+      row: 95
       column: 0
   parent: ~
 

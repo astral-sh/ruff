@@ -139,6 +139,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-executable (EXE)](#flake8-executable-exe)
+   1. [flake8-type-checking (TYP)](#flake8-type-checking-typ)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1177,6 +1178,14 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1
 | EXE003 | shebang-python | Shebang should contain "python" |  |
 | EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
 | EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
+
+### flake8-type-checking (TYP)
+
+For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/2.3.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| TYP005 | empty-type-checking-block | Found empty type-checking block |  |
 
 ### Ruff-specific rules (RUF)
 

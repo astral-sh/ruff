@@ -425,6 +425,8 @@ ruff_macros::define_rule_mapping!(
     EXE003 => rules::flake8_executable::rules::ShebangPython,
     EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
+    // flake8-type-checking
+    TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -507,6 +509,8 @@ pub enum Linter {
     Flake8NoPep420,
     #[prefix = "EXE"]
     Flake8Executable,
+    #[prefix = "TYP"]
+    Flake8TypeChecking,
     #[prefix = "RUF"]
     Ruff,
 }
@@ -580,6 +584,7 @@ impl Linter {
             Linter::Flake8Commas => Prefixes::Single(RuleSelector::COM),
             Linter::Flake8NoPep420 => Prefixes::Single(RuleSelector::INP),
             Linter::Flake8Executable => Prefixes::Single(RuleSelector::EXE),
+            Linter::Flake8TypeChecking => Prefixes::Single(RuleSelector::TYP),
             Linter::Ruff => Prefixes::Single(RuleSelector::RUF),
         }
     }
