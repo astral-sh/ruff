@@ -126,15 +126,7 @@ pub struct Settings {
 impl Settings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
-            rules: build_rule_table(
-                &config.fixable,
-                &config.unfixable,
-                &config.select,
-                &config.ignore,
-                &config.extend_select,
-                &config.extend_ignore,
-                &config.pydocstyle,
-            ),
+            rules: (&config).into(),
             allowed_confusables: config
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
@@ -239,54 +231,50 @@ impl Settings {
     }
 }
 
-fn build_rule_table(
-    fixable: &Option<Vec<RuleSelector>>,
-    unfixable: &Option<Vec<RuleSelector>>,
-    select: &Option<Vec<RuleSelector>>,
-    ignore: &Option<Vec<RuleSelector>>,
-    extend_select: &[Vec<RuleSelector>],
-    extend_ignore: &[Vec<RuleSelector>],
-    pydocstyle: &Option<pydocstyle::settings::Options>,
-) -> RuleTable {
-    let mut rules = RuleTable::empty();
+impl From<&Configuration> for RuleTable {
+    fn from(config: &Configuration) -> Self {
+        let mut rules = RuleTable::empty();
 
-    let fixable = resolve_codes([RuleCodeSpec {
-        select: fixable.as_deref().unwrap_or(CATEGORIES),
-        ignore: unfixable.as_deref().unwrap_or_default(),
-    }]);
+        let fixable = resolve_codes([RuleCodeSpec {
+            select: config.fixable.as_deref().unwrap_or(CATEGORIES),
+            ignore: config.unfixable.as_deref().unwrap_or_default(),
+        }]);
 
-    for code in validate_enabled(resolve_codes(
-        [RuleCodeSpec {
-            select: select.as_deref().unwrap_or(defaults::PREFIXES),
-            ignore: ignore.as_deref().unwrap_or_default(),
-        }]
-        .into_iter()
-        .chain(
-            extend_select
-                .iter()
-                .zip(extend_ignore.iter())
-                .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
-        )
-        .chain(
-            // If a docstring convention is specified, force-disable any incompatible error
-            // codes.
-            if let Some(convention) = pydocstyle
-                .as_ref()
-                .and_then(|pydocstyle| pydocstyle.convention)
-            {
-                Left(iter::once(RuleCodeSpec {
-                    select: &[],
-                    ignore: convention.codes(),
-                }))
-            } else {
-                Right(iter::empty())
-            },
-        ),
-    )) {
-        let fix = fixable.contains(&code);
-        rules.enable(code, fix);
+        for code in validate_enabled(resolve_codes(
+            [RuleCodeSpec {
+                select: config.select.as_deref().unwrap_or(defaults::PREFIXES),
+                ignore: config.ignore.as_deref().unwrap_or_default(),
+            }]
+            .into_iter()
+            .chain(
+                config
+                    .extend_select
+                    .iter()
+                    .zip(config.extend_ignore.iter())
+                    .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
+            )
+            .chain(
+                // If a docstring convention is specified, force-disable any incompatible error
+                // codes.
+                if let Some(convention) = config
+                    .pydocstyle
+                    .as_ref()
+                    .and_then(|pydocstyle| pydocstyle.convention)
+                {
+                    Left(iter::once(RuleCodeSpec {
+                        select: &[],
+                        ignore: convention.codes(),
+                    }))
+                } else {
+                    Right(iter::empty())
+                },
+            ),
+        )) {
+            let fix = fixable.contains(&code);
+            rules.enable(code, fix);
+        }
+        rules
     }
-    rules
 }
 
 /// Given a list of patterns, create a `GlobSet`.
