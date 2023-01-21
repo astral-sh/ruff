@@ -186,7 +186,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                     .slice_source_code_range(&Range::from_located(value));
                 contents.push_str(key_string);
                 contents.push('=');
-                contents.push_str(&value_string);
+                contents.push_str(value_string);
                 arguments.push(contents);
             } else {
                 // If there are any non-string keys, abort.
@@ -205,7 +205,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
 
             for item in &arguments {
                 contents.push('\n');
-                contents.push_str(&indent);
+                contents.push_str(indent);
                 contents.push_str(item);
                 contents.push(',');
             }
@@ -217,7 +217,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
             if let Some(ident) = indent.strip_prefix(default_indent) {
                 contents.push_str(ident);
             } else {
-                contents.push_str(&indent);
+                contents.push_str(indent);
             }
         } else {
             contents.push_str(&arguments.join(", "));
@@ -304,7 +304,7 @@ pub(crate) fn printf_string_formatting(
     let mut strings: Vec<(Location, Location)> = vec![];
     let mut extension = None;
     for (start, tok, end) in lexer::make_tokenizer_located(
-        &checker
+        checker
             .locator
             .slice_source_code_range(&Range::from_located(expr)),
         expr.location,
@@ -333,7 +333,7 @@ pub(crate) fn printf_string_formatting(
         let string = checker
             .locator
             .slice_source_code_range(&Range::new(*start, *end));
-        let (Some(leader), Some(trailer)) = (leading_quote(&string), trailing_quote(&string)) else {
+        let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
         let string = &string[leader.len()..string.len() - trailer.len()];
@@ -371,14 +371,14 @@ pub(crate) fn printf_string_formatting(
         match prev {
             None => {
                 contents.push_str(
-                    &checker
+                    checker
                         .locator
                         .slice_source_code_range(&Range::new(expr.location, *start)),
                 );
             }
             Some(prev) => {
                 contents.push_str(
-                    &checker
+                    checker
                         .locator
                         .slice_source_code_range(&Range::new(prev, *start)),
                 );
@@ -391,7 +391,7 @@ pub(crate) fn printf_string_formatting(
 
     if let Some((.., end)) = extension {
         contents.push_str(
-            &checker
+            checker
                 .locator
                 .slice_source_code_range(&Range::new(prev.unwrap(), end)),
         );
