@@ -127,10 +127,10 @@ impl Settings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
             rules: build_rule_table(
-                config.fixable,
-                config.unfixable,
-                config.select,
-                config.ignore,
+                &config.fixable,
+                &config.unfixable,
+                &config.select,
+                &config.ignore,
                 &config.extend_select,
                 &config.extend_ignore,
                 &config.pydocstyle,
@@ -240,10 +240,10 @@ impl Settings {
 }
 
 fn build_rule_table(
-    fixable: Option<Vec<RuleSelector>>,
-    unfixable: Option<Vec<RuleSelector>>,
-    select: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
+    fixable: &Option<Vec<RuleSelector>>,
+    unfixable: &Option<Vec<RuleSelector>>,
+    select: &Option<Vec<RuleSelector>>,
+    ignore: &Option<Vec<RuleSelector>>,
     extend_select: &[Vec<RuleSelector>],
     extend_ignore: &[Vec<RuleSelector>],
     pydocstyle: &Option<pydocstyle::settings::Options>,
@@ -251,14 +251,14 @@ fn build_rule_table(
     let mut rules = RuleTable::empty();
 
     let fixable = resolve_codes([RuleCodeSpec {
-        select: &fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
-        ignore: &unfixable.unwrap_or_default(),
+        select: fixable.as_deref().unwrap_or(CATEGORIES),
+        ignore: unfixable.as_deref().unwrap_or_default(),
     }]);
 
     for code in validate_enabled(resolve_codes(
         [RuleCodeSpec {
-            select: &select.unwrap_or_else(|| defaults::PREFIXES.to_vec()),
-            ignore: &ignore.unwrap_or_default(),
+            select: select.as_deref().unwrap_or(defaults::PREFIXES),
+            ignore: ignore.as_deref().unwrap_or_default(),
         }]
         .into_iter()
         .chain(
