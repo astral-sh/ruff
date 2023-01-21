@@ -94,6 +94,7 @@ pub fn expand<'a>(
     let mut prefix_to_codes: BTreeMap<String, BTreeSet<String>> = BTreeMap::default();
 
     let mut all_codes = BTreeSet::new();
+    let mut pl_codes = BTreeSet::new();
 
     for variant in variants {
         let code_str = variant.to_string();
@@ -109,10 +110,14 @@ pub fn expand<'a>(
                 .or_default()
                 .insert(code_str.clone());
         }
+        if code_str.starts_with("PL") {
+            pl_codes.insert(code_str.to_string());
+        }
         all_codes.insert(code_str);
     }
 
     prefix_to_codes.insert(ALL.to_string(), all_codes);
+    prefix_to_codes.insert("PL".to_string(), pl_codes);
 
     // Add any prefix aliases (e.g., "U" to "UP").
     for (alias, rule_code) in PREFIX_REDIRECTS.iter() {
@@ -150,6 +155,7 @@ pub fn expand<'a>(
             Two,
             Three,
             Four,
+            Five,
         }
 
         #[derive(
@@ -217,13 +223,17 @@ fn generate_impls<'a>(
                 #prefix_ident::#prefix => SuffixLength::None,
             }
         } else {
-            let num_numeric = prefix_str.chars().filter(|char| char.is_numeric()).count();
+            let mut num_numeric = prefix_str.chars().filter(|char| char.is_numeric()).count();
+            if prefix_str != "PL" && prefix_str.starts_with("PL") {
+                num_numeric += 1;
+            }
             let suffix_len = match num_numeric {
                 0 => quote! { SuffixLength::Zero },
                 1 => quote! { SuffixLength::One },
                 2 => quote! { SuffixLength::Two },
                 3 => quote! { SuffixLength::Three },
                 4 => quote! { SuffixLength::Four },
+                5 => quote! { SuffixLength::Five },
                 _ => panic!("Invalid prefix: {prefix}"),
             };
             quote! {
