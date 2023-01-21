@@ -54,8 +54,6 @@ pandas = "pd"
 
 [tool.ruff.flake8-import-conventions.extend-aliases]
 "dask.dataframe" = "dd"
-"xml.dom.minidom" = "md"
-"xml.dom.minidom.parseString" = "pstr"
 
 [tool.ruff.flake8-pytest-style]
 fixture-parentheses = false
