@@ -1234,6 +1234,23 @@ where
                         if self
                             .settings
                             .rules
+                            .enabled(&Rule::ImportAliasIsNotConventional)
+                        {
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_conventional_import(
+                                    stmt,
+                                    &alias.node.name,
+                                    alias.node.asname.as_deref(),
+                                    &self.settings.flake8_import_conventions.aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+
+                        if self
+                            .settings
+                            .rules
                             .enabled(&Rule::ConstantImportedAsNonConstant)
                         {
                             if let Some(diagnostic) =
