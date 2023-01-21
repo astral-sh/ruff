@@ -93,6 +93,8 @@ pub fn expand<'a>(
     // Build up a map from prefix to matching RuleCodes.
     let mut prefix_to_codes: BTreeMap<String, BTreeSet<String>> = BTreeMap::default();
 
+    let mut all_codes = BTreeSet::new();
+
     for variant in variants {
         let code_str = variant.to_string();
         let code_prefix_len = code_str
@@ -107,11 +109,10 @@ pub fn expand<'a>(
                 .or_default()
                 .insert(code_str.clone());
         }
-        prefix_to_codes
-            .entry(ALL.to_string())
-            .or_default()
-            .insert(code_str.clone());
+        all_codes.insert(code_str);
     }
+
+    prefix_to_codes.insert(ALL.to_string(), all_codes);
 
     // Add any prefix aliases (e.g., "U" to "UP").
     for (alias, rule_code) in PREFIX_REDIRECTS.iter() {
