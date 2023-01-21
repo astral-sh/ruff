@@ -1,9 +1,10 @@
 use crate::ast::types::Range;
+use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
-use rustpython_ast::{AliasData, Located, Stmt, StmtKind};
+use rustpython_ast::{AliasData, Located, Stmt};
 
 const BAD_MODULES: &[&str] = &[
     "collections",
@@ -157,12 +158,34 @@ pub fn import_replacements(
     let module_text = checker
         .locator
         .slice_source_code_range(&Range::from_located(stmt));
-    let indent = match names.get(0) {
-        None => return,
-        Some(item) => item
+    let is_multi_line = module_text.contains('\n');
+    let indent = if is_multi_line {
+        match names.get(0) {
+            None => return,
+            Some(item) => match indentation(checker.locator, item) {
+                None => return,
+                Some(item) => item.to_string(),
+            },
+        }
+    } else {
+        String::new()
     };
-    let is_mulit_line = module_text.contains('\n');
-    let fixer = FixImports::new(clean_mod, is_mulit_line, &clean_names, "");
-    let clean_result = fixer.check_replacement();
-    println!("{:?}", clean_result);
+    let fixer = FixImports::new(clean_mod, is_multi_line, &clean_names, &indent);
+    let clean_result = match fixer.check_replacement() {
+        None => return,
+        Some(item) => item,
+    };
+    if clean_result == module_text {
+        return;
+    }
+    let range = Range::from_located(stmt);
+    let mut diagnostic = Diagnostic::new(violations::ImportReplacements, range);
+    if checker.patch(&Rule::ImportReplacements) {
+        diagnostic.amend(Fix::replacement(
+            clean_result,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }
