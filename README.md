@@ -140,6 +140,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [flake8-type-checking (TYP)](#flake8-type-checking-typ)
+   1. [tryceratops (TRY)](#tryceratops-try)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1185,6 +1186,14 @@ For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checki
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | TYP005 | empty-type-checking-block | Found empty type-checking block |  |
+
+### tryceratops (TRY)
+
+For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| TRY300 | try-consider-else | Consider else block |  |
 
 ### Ruff-specific rules (RUF)
 
