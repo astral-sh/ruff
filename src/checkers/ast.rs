@@ -2618,7 +2618,7 @@ where
                             .enabled(&Rule::PercentFormatUnsupportedFormatCharacter)
                     {
                         let location = Range::from_located(expr);
-                        match pyflakes::cformat::CFormatSummary::try_from(value.as_ref()) {
+                        match pyflakes::cformat::CFormatSummary::try_from(value.as_str()) {
                             Err(CFormatError {
                                 typ: CFormatErrorType::UnsupportedFormatChar(c),
                                 ..
@@ -2713,6 +2713,7 @@ where
                             }
                         }
                     }
+
                     if self.settings.rules.enabled(&Rule::PrintfStringFormatting) {
                         pyupgrade::rules::printf_string_formatting(self, expr, right);
                     }

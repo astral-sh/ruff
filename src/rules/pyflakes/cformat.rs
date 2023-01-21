@@ -13,12 +13,8 @@ pub(crate) struct CFormatSummary {
     pub keywords: FxHashSet<String>,
 }
 
-impl TryFrom<&str> for CFormatSummary {
-    type Error = CFormatError;
-
-    fn try_from(literal: &str) -> Result<Self, Self::Error> {
-        let format_string = CFormatString::from_str(literal)?;
-
+impl From<&CFormatString> for CFormatSummary {
+    fn from(format_string: &CFormatString) -> Self {
         let mut starred = false;
         let mut num_positional = 0;
         let mut keywords = FxHashSet::default();
@@ -51,11 +47,20 @@ impl TryFrom<&str> for CFormatSummary {
             }
         }
 
-        Ok(CFormatSummary {
+        Self {
             starred,
             num_positional,
             keywords,
-        })
+        }
+    }
+}
+
+impl TryFrom<&str> for CFormatSummary {
+    type Error = CFormatError;
+
+    fn try_from(literal: &str) -> Result<Self, Self::Error> {
+        let format_string = CFormatString::from_str(literal)?;
+        Ok(Self::from(&format_string))
     }
 }
 
