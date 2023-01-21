@@ -1,10 +1,11 @@
+use rustpython_ast::{AliasData, Located, Stmt};
+
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violations;
-use rustpython_ast::{AliasData, Located, Stmt};
 
 const BAD_MODULES: &[&str] = &[
     "collections",
@@ -66,14 +67,14 @@ impl<'a> FixImports<'a> {
             multi_line,
             names,
             indent,
-            short_indent
+            short_indent,
         }
     }
 
     fn check_replacement(&self) -> Option<String> {
         match self.module {
             "collections" => self.create_new_str(COLLECTIONS_TO_ABC, "collections.abc"),
-            _ => return None,
+            _ => None,
         }
     }
 
@@ -93,7 +94,8 @@ impl<'a> FixImports<'a> {
         }
     }
 
-    /// Returns a list of imports that does and does not have a match in the given list of matches
+    /// Returns a list of imports that does and does not have a match in the
+    /// given list of matches
     fn get_import_lists(&self, matches: &[&str]) -> (Vec<AliasData>, Vec<AliasData>) {
         let mut unmatching_names: Vec<AliasData> = vec![];
         let mut matching_names: Vec<AliasData> = vec![];
@@ -117,7 +119,7 @@ impl<'a> FixImports<'a> {
         let after_imps = if self.multi_line {
             format!("\n{})", self.short_indent)
         } else {
-            "".to_string()
+            String::new()
         };
         let mut full_names: Vec<String> = vec![];
         for name in names {
@@ -145,7 +147,8 @@ pub fn import_replacements(
     names: &Vec<Located<AliasData>>,
     module: &Option<String>,
 ) {
-    // Pyupgrade only works with import_from statements, so this linter does that as well
+    // Pyupgrade only works with import_from statements, so this linter does that as
+    // well
     let clean_mod = match module {
         None => return,
         Some(item) => item,

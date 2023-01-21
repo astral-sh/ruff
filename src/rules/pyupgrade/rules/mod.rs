@@ -6,6 +6,7 @@ pub(crate) use extraneous_parentheses::extraneous_parentheses;
 pub(crate) use f_strings::f_strings;
 pub(crate) use format_literals::format_literals;
 pub(crate) use functools_cache::functools_cache;
+pub(crate) use import_replacements::import_replacements;
 pub(crate) use lru_cache_without_parameters::lru_cache_without_parameters;
 pub(crate) use native_literals::native_literals;
 use once_cell::sync::Lazy;
@@ -33,7 +34,6 @@ pub(crate) use use_pep585_annotation::use_pep585_annotation;
 pub(crate) use use_pep604_annotation::use_pep604_annotation;
 pub(crate) use useless_metaclass_type::useless_metaclass_type;
 pub(crate) use useless_object_inheritance::useless_object_inheritance;
-pub(crate) use import_replacements::import_replacements;
 
 use crate::ast::helpers;
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -49,6 +49,7 @@ mod extraneous_parentheses;
 mod f_strings;
 mod format_literals;
 mod functools_cache;
+mod import_replacements;
 mod lru_cache_without_parameters;
 mod native_literals;
 mod open_alias;
@@ -72,7 +73,6 @@ mod use_pep585_annotation;
 mod use_pep604_annotation;
 mod useless_metaclass_type;
 mod useless_object_inheritance;
-mod import_replacements;
 
 /// UP008
 pub fn super_args(
