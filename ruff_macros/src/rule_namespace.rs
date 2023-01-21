@@ -44,7 +44,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     }
 
     Ok(quote! {
-        impl crate::registry::ParseCode for #ident {
+        impl crate::registry::RuleNamespace for #ident {
             fn parse_code(code: &str) -> Option<(Self, &str)> {
                 #if_statements
                 None

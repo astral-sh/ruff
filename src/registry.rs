@@ -2,7 +2,7 @@
 
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use ruff_macros::ParseCode;
+use ruff_macros::RuleNamespace;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
@@ -439,7 +439,7 @@ ruff_macros::define_rule_mapping!(
     RUF100 => violations::UnusedNOQA,
 );
 
-#[derive(EnumIter, Debug, PartialEq, Eq, ParseCode)]
+#[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
 pub enum Linter {
     #[prefix = "F"]
     Pyflakes,
@@ -520,7 +520,7 @@ pub enum Linter {
     Ruff,
 }
 
-pub trait ParseCode: Sized {
+pub trait RuleNamespace: Sized {
     fn parse_code(code: &str) -> Option<(Self, &str)>;
 }
 
@@ -742,7 +742,7 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, Rule>> = Lazy::new(|| {
 mod tests {
     use strum::IntoEnumIterator;
 
-    use super::{Linter, ParseCode, Rule};
+    use super::{Linter, Rule, RuleNamespace};
 
     #[test]
     fn check_code_serialization() {
