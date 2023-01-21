@@ -13,8 +13,8 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings;
 
-    #[test_case(Rule::TryConsiderElse, Path::new("TRY300.py"); "TRY300")]
     #[test_case(Rule::PreferTypeError, Path::new("TRY004.py"); "TRY004")]
+    #[test_case(Rule::TryConsiderElse, Path::new("TRY300.py"); "TRY300")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
