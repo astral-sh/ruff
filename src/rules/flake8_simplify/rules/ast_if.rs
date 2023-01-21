@@ -54,7 +54,7 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     }
     find_last_nested_if(inner_body).or(Some((
         test,
-        inner_body.last().expect("Expect body to be non-empty"),
+        inner_body.last().expect("Expected body to be non-empty"),
     )))
 }
 
