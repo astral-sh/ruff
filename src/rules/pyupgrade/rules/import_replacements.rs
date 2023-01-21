@@ -51,15 +51,22 @@ struct FixImports<'a> {
     multi_line: bool,
     names: &'a [AliasData],
     indent: &'a str,
+    short_indent: &'a str,
 }
 
 impl<'a> FixImports<'a> {
     fn new(module: &'a str, multi_line: bool, names: &'a [AliasData], indent: &'a str) -> Self {
+        let short_indent = if indent.len() > 3 {
+            &indent[3..]
+        } else {
+            indent
+        };
         Self {
             module,
             multi_line,
             names,
             indent,
+            short_indent
         }
     }
 
@@ -76,7 +83,7 @@ impl<'a> FixImports<'a> {
         let unmatching = self.get_str(&unmatching_names, self.module);
         let matching = self.get_str(&matching_names, replace);
         if !unmatching.is_empty() && !matching.is_empty() {
-            Some(format!("{unmatching}\n{matching}"))
+            Some(format!("{unmatching}\n{}{matching}", self.short_indent))
         } else if !unmatching.is_empty() {
             Some(unmatching)
         } else if !matching.is_empty() {
@@ -108,12 +115,7 @@ impl<'a> FixImports<'a> {
         let after_comma = if self.multi_line { '\n' } else { ' ' };
         let start_imps = if self.multi_line { "(\n" } else { "" };
         let after_imps = if self.multi_line {
-            let short_indent = if self.indent.len() > 3 {
-                &self.indent[3..]
-            } else {
-                ""
-            };
-            format!("\n{short_indent})")
+            format!("\n{})", self.short_indent)
         } else {
             "".to_string()
         };
