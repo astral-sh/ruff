@@ -37,7 +37,8 @@ fn is_main_check(expr: &Expr) -> bool {
     false
 }
 
-/// Find the last nested if statement and return the test expression and the first statement.
+/// Find the last nested if statement and return the test expression and the
+/// first statement.
 ///
 /// ```python
 /// if xxx:
