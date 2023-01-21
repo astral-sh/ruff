@@ -8,22 +8,22 @@ expression: diagnostics
       - false
       - false
   location:
-    row: 28
-    column: 4
+    row: 37
+    column: 8
   end_location:
-    row: 28
-    column: 9
+    row: 37
+    column: 13
   fix:
-    content: "from typing import (\n    Mapping,  # noqa: F401\n    )"
+    content: "from typing import (\n        Mapping,  # noqa: F401\n        )"
     location:
-      row: 26
-      column: 0
+      row: 35
+      column: 4
     end_location:
-      row: 29
-      column: 1
+      row: 38
+      column: 5
   parent:
-    row: 26
-    column: 0
+    row: 35
+    column: 4
 - kind:
     UnusedNOQA:
       unknown: []
@@ -31,19 +31,19 @@ expression: diagnostics
       unmatched:
         - F401
   location:
-    row: 39
-    column: 15
+    row: 52
+    column: 19
   end_location:
-    row: 39
-    column: 27
+    row: 52
+    column: 31
   fix:
     content: ""
     location:
-      row: 39
-      column: 13
+      row: 52
+      column: 17
     end_location:
-      row: 39
-      column: 27
+      row: 52
+      column: 31
   parent: ~
 - kind:
     UnusedNOQA:
@@ -52,18 +52,39 @@ expression: diagnostics
       unmatched:
         - F401
   location:
-    row: 44
+    row: 59
+    column: 19
+  end_location:
+    row: 59
+    column: 31
+  fix:
+    content: ""
+    location:
+      row: 59
+      column: 17
+    end_location:
+      row: 59
+      column: 31
+  parent: ~
+- kind:
+    UnusedNOQA:
+      unknown: []
+      disabled:
+        - F501
+      unmatched: []
+  location:
+    row: 66
     column: 15
   end_location:
-    row: 44
+    row: 66
     column: 27
   fix:
     content: ""
     location:
-      row: 44
+      row: 66
       column: 13
     end_location:
-      row: 44
+      row: 66
       column: 27
   parent: ~
 - kind:
@@ -73,40 +94,19 @@ expression: diagnostics
         - F501
       unmatched: []
   location:
-    row: 49
-    column: 11
+    row: 72
+    column: 26
   end_location:
-    row: 49
-    column: 23
+    row: 72
+    column: 38
   fix:
     content: ""
     location:
-      row: 49
-      column: 9
+      row: 72
+      column: 24
     end_location:
-      row: 49
-      column: 23
-  parent: ~
-- kind:
-    UnusedNOQA:
-      unknown: []
-      disabled:
-        - F501
-      unmatched: []
-  location:
-    row: 53
-    column: 22
-  end_location:
-    row: 53
-    column: 34
-  fix:
-    content: ""
-    location:
-      row: 53
-      column: 20
-    end_location:
-      row: 53
-      column: 34
+      row: 72
+      column: 38
   parent: ~
 - kind:
     UnusedImport:
@@ -114,19 +114,19 @@ expression: diagnostics
       - false
       - true
   location:
-    row: 64
-    column: 19
+    row: 89
+    column: 23
   end_location:
-    row: 64
-    column: 28
+    row: 89
+    column: 32
   fix:
-    content: ""
+    content: pass
     location:
-      row: 64
-      column: 0
+      row: 89
+      column: 4
     end_location:
-      row: 65
-      column: 0
+      row: 89
+      column: 52
   parent: ~
 - kind:
     UnusedImport:
@@ -134,19 +134,19 @@ expression: diagnostics
       - false
       - true
   location:
-    row: 64
-    column: 30
+    row: 89
+    column: 34
   end_location:
-    row: 64
-    column: 48
+    row: 89
+    column: 52
   fix:
-    content: ""
+    content: pass
     location:
-      row: 64
-      column: 0
+      row: 89
+      column: 4
     end_location:
-      row: 65
-      column: 0
+      row: 89
+      column: 52
   parent: ~
 - kind:
     UnusedNOQA:
@@ -155,18 +155,18 @@ expression: diagnostics
         - F501
       unmatched: []
   location:
-    row: 64
-    column: 50
+    row: 89
+    column: 54
   end_location:
-    row: 64
-    column: 62
+    row: 89
+    column: 66
   fix:
     content: ""
     location:
-      row: 64
-      column: 48
+      row: 89
+      column: 52
     end_location:
-      row: 64
-      column: 62
+      row: 89
+      column: 66
   parent: ~
 

@@ -201,7 +201,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.228'
+  rev: 'v0.0.229'
   hooks:
     - id: ruff
 ```
@@ -1195,6 +1195,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | TRY201 | verbose-raise | Use 'raise' without specifying exception name |  |
+| TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type |  |
 | TRY300 | try-consider-else | Consider `else` block |  |
 
 ### Ruff-specific rules (RUF)

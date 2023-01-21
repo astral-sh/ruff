@@ -1234,6 +1234,28 @@ where
                         if self
                             .settings
                             .rules
+                            .enabled(&Rule::ImportAliasIsNotConventional)
+                        {
+                            let full_name = helpers::format_import_from_member(
+                                level.as_ref(),
+                                module.as_deref(),
+                                &alias.node.name,
+                            );
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_conventional_import(
+                                    stmt,
+                                    &full_name,
+                                    alias.node.asname.as_deref(),
+                                    &self.settings.flake8_import_conventions.aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+
+                        if self
+                            .settings
+                            .rules
                             .enabled(&Rule::ConstantImportedAsNonConstant)
                         {
                             if let Some(diagnostic) =
@@ -1389,6 +1411,15 @@ where
                         body,
                         orelse,
                         self.current_stmt_parent().map(std::convert::Into::into),
+                    );
+                }
+                if self.settings.rules.enabled(&Rule::PreferTypeError) {
+                    tryceratops::rules::prefer_type_error(
+                        self,
+                        body,
+                        test,
+                        orelse,
+                        self.current_stmt_parent().map(Into::into),
                     );
                 }
             }
@@ -3590,7 +3621,6 @@ impl<'a> Checker<'a> {
     {
         let binding_index = self.bindings.len();
 
-        let mut overridden = None;
         if let Some((stack_index, scope_index)) = self
             .scope_stack
             .iter()
@@ -3622,7 +3652,6 @@ impl<'a> Checker<'a> {
                         | BindingKind::FutureImportation
                 );
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
-                    overridden = Some((*scope_index, *existing_binding_index));
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
                             violations::ImportShadowedByLoopVar(
@@ -3642,7 +3671,6 @@ impl<'a> Checker<'a> {
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
-                        overridden = Some((*scope_index, *existing_binding_index));
                         if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
                             self.diagnostics.push(Diagnostic::new(
                                 violations::RedefinedWhileUnused(
@@ -3660,13 +3688,6 @@ impl<'a> Checker<'a> {
                         .push(binding_index);
                 }
             }
-        }
-
-        // If we're about to lose the binding, store it as overridden.
-        if let Some((scope_index, binding_index)) = overridden {
-            self.scopes[scope_index]
-                .overridden
-                .push((name, binding_index));
         }
 
         // Assume the rebound name is used as a global or within a loop.

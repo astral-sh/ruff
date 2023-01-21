@@ -429,6 +429,7 @@ ruff_macros::define_rule_mapping!(
     TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // tryceratops
     TRY201 => rules::tryceratops::rules::VerboseRaise,
+    TRY004 => rules::tryceratops::rules::PreferTypeError,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
