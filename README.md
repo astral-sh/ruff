@@ -1151,7 +1151,7 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 | PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
 | PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
 | PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
-| PIE804 | NoUnnecessaryDictKwargs | Unnecessary dict kwarg spread | 🛠 |
+| PIE804 | no-unnecessary-dict-kwarg | Unnecessary dict kwarg spread |  |
 | PIE807 | prefer-list-builtin | Prefer `list()` over useless lambda | 🛠 |
 
 ### flake8-commas (COM)

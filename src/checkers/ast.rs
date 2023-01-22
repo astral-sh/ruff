@@ -2208,7 +2208,7 @@ where
                 }
 
                 // flake8-pie
-                if self.settings.enabled.contains(&RuleCode::PIE804) {
+                if self.settings.rules.enabled(&Rule::NoUnnecessaryDictKwargs) {
                     flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, func, keywords)
                 }
 

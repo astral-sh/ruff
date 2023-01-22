@@ -4987,17 +4987,10 @@ impl Violation for PreferUniqueEnums {
 define_violation!(
     pub struct NoUnnecessaryDictKwargs;
 );
-impl AlwaysAutofixableViolation for NoUnnecessaryDictKwargs {
+impl Violation for NoUnnecessaryDictKwargs {
+    #[derive_message_formats]
     fn message(&self) -> String {
-        "Unnecessary dict kwargs".to_string()
-    }
-
-    fn autofix_title(&self) -> String {
-        "Unnecessary dict kwargs".to_string()
-    }
-
-    fn placeholder() -> Self {
-        NoUnnecessaryDictKwargs
+        format!("Unnecessary dict kwargs")
     }
 }
 

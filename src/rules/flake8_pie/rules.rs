@@ -152,11 +152,18 @@ where
     }
 }
 
-fn is_valid_kwarg_name(key: &Located<ExprKind>) -> bool {
-    if let ExprKind::Constant {
-        value: Constant::Str(key_str),
+fn is_valid_kwarg_name(key: &Option<Located<ExprKind>>) -> bool {
+    if key.is_none() {
+        return true;
+    }
+    if let Some(Located {
+        node:
+            ExprKind::Constant {
+                value: Constant::Str(key_str),
+                ..
+            },
         ..
-    } = &key.node
+    }) = &key
     {
         // can't have empty keyword args
         if key_str.is_empty() {
@@ -203,13 +210,6 @@ pub fn no_unnecessary_dict_kwargs(
                     violations::NoUnnecessaryDictKwargs,
                     Range::from_located(expr),
                 );
-                // if checker.patch(&RuleCode::PIE804) {
-                //     diagnostic.amend(Fix::replacement(
-                //         "list".to_string(),
-                //         expr.location,
-                //         expr.end_location.unwrap(),
-                //     ));
-                // }
                 checker.diagnostics.push(diagnostic);
             }
         }
