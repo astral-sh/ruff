@@ -85,14 +85,14 @@ fn refactor_segment(
         clean_names.push(name.node.clone());
     }
 
-    let formatting = ImportFormatting::new(locator, stmt, &names);
+    let formatting = ImportFormatting::new(locator, stmt, names);
     for name in names {
         let import_name = name.node.name.as_str();
         match replace.get(import_name) {
             None => keep_names.push(name.node.clone()),
             Some(item) => {
                 // Only replace if the name remains the name, or if there is an as on the import
-                let new_name = item.split(".").last().unwrap_or_default();
+                let new_name = item.split('.').last().unwrap_or_default();
                 if name.node.asname.is_some() || import_name == new_name {
                     new_entries.push_str(&format!("{}import {item}", formatting.start_indent));
                     if let Some(final_name) = &name.node.asname {
@@ -134,7 +134,7 @@ fn replace_from_only(
     if let Some(item) = replace.get(new_moudle_text.as_str()) {
         let original = locator.slice_source_code_range(&Range::from_located(stmt));
         let new_str = original.replace(module, item);
-        return Some(new_str.to_string());
+        return Some(new_str);
     }
     None
 }
@@ -144,7 +144,7 @@ pub fn import_replacements_six(
     checker: &mut Checker,
     stmt: &Stmt,
     module: &Option<String>,
-    names: &Vec<Located<AliasData>>,
+    names: &[Located<AliasData>],
 ) {
     // Pyupgrade only works with import_from statements, so this linter does that as
     // well
@@ -152,18 +152,18 @@ pub fn import_replacements_six(
     if let Some(module_text) = module {
         if module_text == "six.moves" {
             final_string =
-                refactor_segment(checker.locator, stmt, &REPLACE_MODS, &names, module_text);
+                refactor_segment(checker.locator, stmt, &REPLACE_MODS, names, module_text);
         } else if module_text == "six.moves.urllib" {
             final_string = refactor_segment(
                 checker.locator,
                 stmt,
                 &REPLACE_MODS_URLLIB,
-                &names,
+                names,
                 module_text,
             );
         } else if module_text.contains("six.moves.urllib") {
             final_string = replace_from_only(
-                &module_text,
+                module_text,
                 checker.locator,
                 stmt,
                 &REPLACE_MODS_URLLIB,
@@ -171,7 +171,7 @@ pub fn import_replacements_six(
             );
         } else if module_text.contains("six.moves") {
             final_string = replace_from_only(
-                &module_text,
+                module_text,
                 checker.locator,
                 stmt,
                 &REPLACE_MODS,

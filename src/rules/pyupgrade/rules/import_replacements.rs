@@ -381,7 +381,7 @@ pub fn import_replacements(
     let module_text = checker
         .locator
         .slice_source_code_range(&Range::from_located(stmt));
-    let formatting = ImportFormatting::new(checker.locator, stmt, &names);
+    let formatting = ImportFormatting::new(checker.locator, stmt, names);
     let fixer = FixImports::new(
         clean_mod,
         formatting.multi_line,
