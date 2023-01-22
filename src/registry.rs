@@ -429,6 +429,32 @@ ruff_macros::define_rule_mapping!(
     // tryceratops
     TRY004 => rules::tryceratops::rules::PreferTypeError,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
+    // flake8-use-pathlib
+    PTH100 => rules::flake8_use_pathlib::violations::PathlibAbspath,
+    PTH101 => rules::flake8_use_pathlib::violations::PathlibChmod,
+    PTH102 => rules::flake8_use_pathlib::violations::PathlibMkdir,
+    PTH103 => rules::flake8_use_pathlib::violations::PathlibMakedirs,
+    PTH104 => rules::flake8_use_pathlib::violations::PathlibRename,
+    PTH105 => rules::flake8_use_pathlib::violations::PathlibReplace,
+    PTH106 => rules::flake8_use_pathlib::violations::PathlibRmdir,
+    PTH107 => rules::flake8_use_pathlib::violations::PathlibRemove,
+    PTH108 => rules::flake8_use_pathlib::violations::PathlibUnlink,
+    PTH109 => rules::flake8_use_pathlib::violations::PathlibGetcwd,
+    PTH110 => rules::flake8_use_pathlib::violations::PathlibExists,
+    PTH111 => rules::flake8_use_pathlib::violations::PathlibExpanduser,
+    PTH112 => rules::flake8_use_pathlib::violations::PathlibIsDir,
+    PTH113 => rules::flake8_use_pathlib::violations::PathlibIsFile,
+    PTH114 => rules::flake8_use_pathlib::violations::PathlibIsLink,
+    PTH115 => rules::flake8_use_pathlib::violations::PathlibReadlink,
+    PTH116 => rules::flake8_use_pathlib::violations::PathlibStat,
+    PTH117 => rules::flake8_use_pathlib::violations::PathlibIsAbs,
+    PTH118 => rules::flake8_use_pathlib::violations::PathlibJoin,
+    PTH119 => rules::flake8_use_pathlib::violations::PathlibBasename,
+    PTH120 => rules::flake8_use_pathlib::violations::PathlibDirname,
+    PTH121 => rules::flake8_use_pathlib::violations::PathlibSamefile,
+    PTH122 => rules::flake8_use_pathlib::violations::PathlibSplitext,
+    PTH123 => rules::flake8_use_pathlib::violations::PathlibOpen,
+    PTH124 => rules::flake8_use_pathlib::violations::PathlibPyPath,
     // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -515,6 +541,8 @@ pub enum Linter {
     Flake8TypeChecking,
     #[prefix = "TRY"]
     Tryceratops,
+    #[prefix = "PTH"]
+    Flake8UsePathlib,
     #[prefix = "RUF"]
     Ruff,
 }

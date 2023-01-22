@@ -141,6 +141,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [flake8-type-checking (TYP)](#flake8-type-checking-typ)
    1. [tryceratops (TRY)](#tryceratops-try)
+   1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1196,6 +1197,38 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | ---- | ---- | ------- | --- |
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
 | TRY300 | try-consider-else | Consider `else` block |  |
+
+### flake8-use-pathlib (PTH)
+
+For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PTH100 | pathlib-abspath | `os.path.abspath` should be replaced by `.resolve()` |  |
+| PTH101 | pathlib-chmod | `os.chmod` should be replaced by `.chmod()` |  |
+| PTH102 | pathlib-mkdir | `os.mkdir` should be replaced by `.mkdir()` |  |
+| PTH103 | pathlib-makedirs | `os.makedirs` should be replaced by `.mkdir(parents=True)` |  |
+| PTH104 | pathlib-rename | `os.rename` should be replaced by `.rename()` |  |
+| PTH105 | pathlib-replace | `os.replace`should be replaced by `.replace()` |  |
+| PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
+| PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
+| PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
+| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
+| PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
+| PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
+| PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
+| PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
+| PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
+| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
+| PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
+| PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
+| PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
+| PTH119 | pathlib-basename | `os.path.basename` should be replaced by `.name` |  |
+| PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
+| PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
+| PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
+| PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
+| PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
 
 ### Ruff-specific rules (RUF)
 

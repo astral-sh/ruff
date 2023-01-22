@@ -36,8 +36,8 @@ use crate::rules::{
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pie, flake8_print,
     flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
+    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -2544,6 +2544,35 @@ where
                     .enabled(&Rule::OpenFileWithContextHandler)
                 {
                     flake8_simplify::rules::open_file_with_context_handler(self, func);
+                }
+
+                // flake8-use-pathlib
+                if self.settings.rules.enabled(&Rule::PathlibAbspath)
+                    || self.settings.rules.enabled(&Rule::PathlibChmod)
+                    || self.settings.rules.enabled(&Rule::PathlibMkdir)
+                    || self.settings.rules.enabled(&Rule::PathlibMakedirs)
+                    || self.settings.rules.enabled(&Rule::PathlibRename)
+                    || self.settings.rules.enabled(&Rule::PathlibReplace)
+                    || self.settings.rules.enabled(&Rule::PathlibRmdir)
+                    || self.settings.rules.enabled(&Rule::PathlibRemove)
+                    || self.settings.rules.enabled(&Rule::PathlibUnlink)
+                    || self.settings.rules.enabled(&Rule::PathlibGetcwd)
+                    || self.settings.rules.enabled(&Rule::PathlibExists)
+                    || self.settings.rules.enabled(&Rule::PathlibExpanduser)
+                    || self.settings.rules.enabled(&Rule::PathlibIsDir)
+                    || self.settings.rules.enabled(&Rule::PathlibIsFile)
+                    || self.settings.rules.enabled(&Rule::PathlibIsLink)
+                    || self.settings.rules.enabled(&Rule::PathlibReadlink)
+                    || self.settings.rules.enabled(&Rule::PathlibStat)
+                    || self.settings.rules.enabled(&Rule::PathlibIsAbs)
+                    || self.settings.rules.enabled(&Rule::PathlibJoin)
+                    || self.settings.rules.enabled(&Rule::PathlibBasename)
+                    || self.settings.rules.enabled(&Rule::PathlibSamefile)
+                    || self.settings.rules.enabled(&Rule::PathlibSplitext)
+                    || self.settings.rules.enabled(&Rule::PathlibOpen)
+                    || self.settings.rules.enabled(&Rule::PathlibPyPath)
+                {
+                    flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
                 }
             }
             ExprKind::Dict { keys, values } => {

@@ -116,7 +116,7 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
 
             if line.strip() == f"// {linter}":
                 indent = get_indent(line)
-                fp.write(f"{indent}{code} => rules::{linter}::rules::{name},")
+                fp.write(f"{indent}{code} => rules::{dir_name(linter)}::rules::{name},")
                 fp.write("\n")
                 has_written = True
 
