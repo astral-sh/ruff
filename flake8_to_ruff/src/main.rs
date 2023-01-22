@@ -57,15 +57,13 @@ fn main() -> Result<()> {
         None => (None, None),
     };
 
+    let external_config = flake8_to_ruff::ExternalConfig {
+        black: black.as_ref(),
+        isort: isort.as_ref(),
+    };
+
     // Create Ruff's pyproject.toml section.
-    let pyproject = flake8_to_ruff::convert(
-        &config,
-        flake8_to_ruff::ExternalConfig {
-            black: black.as_ref(),
-            isort: isort.as_ref(),
-        },
-        cli.plugin,
-    )?;
+    let pyproject = flake8_to_ruff::convert(&config, &external_config, cli.plugin)?;
     println!("{}", toml_edit::easy::to_string_pretty(&pyproject)?);
 
     Ok(())

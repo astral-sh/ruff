@@ -23,7 +23,7 @@ use crate::warn_user;
 
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
-    external_config: ExternalConfig,
+    external_config: &ExternalConfig,
     plugins: Option<Vec<Plugin>>,
 ) -> Result<Pyproject> {
     // Extract the Flake8 section.
@@ -425,7 +425,7 @@ mod tests {
     fn it_converts_empty() -> Result<()> {
         let actual = convert(
             &HashMap::from([("flake8".to_string(), HashMap::default())]),
-            ExternalConfig::default(),
+            &ExternalConfig::default(),
             None,
         )?;
         let expected = Pyproject::new(Options {
@@ -489,7 +489,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
             )]),
-            ExternalConfig::default(),
+            &ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -553,7 +553,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
             )]),
-            ExternalConfig::default(),
+            &ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -617,7 +617,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
             )]),
-            ExternalConfig::default(),
+            &ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -681,7 +681,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
             )]),
-            ExternalConfig::default(),
+            &ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -753,7 +753,7 @@ mod tests {
                     Some("numpy".to_string()),
                 )]),
             )]),
-            ExternalConfig::default(),
+            &ExternalConfig::default(),
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
@@ -824,7 +824,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
             )]),
-            ExternalConfig::default(),
+            &ExternalConfig::default(),
             None,
         )?;
         let expected = Pyproject::new(Options {
