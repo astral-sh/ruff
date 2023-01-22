@@ -3,9 +3,12 @@
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::rules::ruff::rules::Context;
-use crate::rules::{eradicate, flake8_implicit_str_concat, flake8_quotes, pycodestyle, ruff};
+use crate::rules::{
+    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_quotes, pycodestyle, pyupgrade,
+    ruff,
+};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 
@@ -17,17 +20,33 @@ pub fn check_tokens(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_ambiguous_unicode_character = settings.enabled.contains(&RuleCode::RUF001)
-        || settings.enabled.contains(&RuleCode::RUF002)
-        || settings.enabled.contains(&RuleCode::RUF003);
-    let enforce_quotes = settings.enabled.contains(&RuleCode::Q000)
-        || settings.enabled.contains(&RuleCode::Q001)
-        || settings.enabled.contains(&RuleCode::Q002)
-        || settings.enabled.contains(&RuleCode::Q003);
-    let enforce_commented_out_code = settings.enabled.contains(&RuleCode::ERA001);
-    let enforce_invalid_escape_sequence = settings.enabled.contains(&RuleCode::W605);
-    let enforce_implicit_string_concatenation = settings.enabled.contains(&RuleCode::ISC001)
-        || settings.enabled.contains(&RuleCode::ISC002);
+    let enforce_ambiguous_unicode_character = settings
+        .rules
+        .enabled(&Rule::AmbiguousUnicodeCharacterString)
+        || settings
+            .rules
+            .enabled(&Rule::AmbiguousUnicodeCharacterDocstring)
+        || settings
+            .rules
+            .enabled(&Rule::AmbiguousUnicodeCharacterComment);
+    let enforce_quotes = settings.rules.enabled(&Rule::BadQuotesInlineString)
+        || settings.rules.enabled(&Rule::BadQuotesMultilineString)
+        || settings.rules.enabled(&Rule::BadQuotesDocstring)
+        || settings.rules.enabled(&Rule::AvoidQuoteEscape);
+    let enforce_commented_out_code = settings.rules.enabled(&Rule::CommentedOutCode);
+    let enforce_invalid_escape_sequence = settings.rules.enabled(&Rule::InvalidEscapeSequence);
+    let enforce_implicit_string_concatenation = settings
+        .rules
+        .enabled(&Rule::SingleLineImplicitStringConcatenation)
+        || settings
+            .rules
+            .enabled(&Rule::MultiLineImplicitStringConcatenation);
+    let enforce_trailing_comma = settings.rules.enabled(&Rule::TrailingCommaMissing)
+        || settings
+            .rules
+            .enabled(&Rule::TrailingCommaOnBareTupleProhibited)
+        || settings.rules.enabled(&Rule::TrailingCommaProhibited);
+    let enforce_extraneous_parenthesis = settings.rules.enabled(&Rule::ExtraneousParentheses);
 
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in tokens.iter().flatten() {
@@ -70,7 +89,7 @@ pub fn check_tokens(
                     settings,
                     autofix,
                 ) {
-                    if settings.enabled.contains(diagnostic.kind.code()) {
+                    if settings.rules.enabled(diagnostic.kind.rule()) {
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -96,7 +115,7 @@ pub fn check_tokens(
                     start,
                     end,
                     matches!(autofix, flags::Autofix::Enabled)
-                        && settings.fixable.contains(&RuleCode::W605),
+                        && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
                 ));
             }
         }
@@ -107,7 +126,24 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_implicit_str_concat::rules::implicit(tokens)
                 .into_iter()
-                .filter(|diagnostic| settings.enabled.contains(diagnostic.kind.code())),
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        );
+    }
+
+    // COM812, COM818, COM819
+    if enforce_trailing_comma {
+        diagnostics.extend(
+            flake8_commas::rules::trailing_commas(tokens, settings, autofix)
+                .into_iter()
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        );
+    }
+
+    // UP034
+    if enforce_extraneous_parenthesis {
+        diagnostics.extend(
+            pyupgrade::rules::extraneous_parentheses(tokens, locator, settings, autofix)
+                .into_iter(),
         );
     }
 

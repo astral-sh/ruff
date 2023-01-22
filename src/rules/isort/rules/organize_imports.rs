@@ -13,7 +13,7 @@ use crate::ast::whitespace::leading_space;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violations;
 
 fn extract_range(body: &[&Stmt]) -> Range {
@@ -31,19 +31,20 @@ fn extract_indentation_range(body: &[&Stmt]) -> Range {
 pub fn organize_imports(
     block: &Block,
     locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
     stylist: &Stylist,
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice_source_code_range(&extract_indentation_range(&block.imports));
-    let indentation = leading_space(&indentation);
+    let indentation = leading_space(indentation);
 
     let range = extract_range(&block.imports);
 
     // Special-cases: there's leading or trailing content in the import block. These
     // are too hard to get right, and relatively rare, so flag but don't fix.
-    if preceded_by_multi_statement_line(block.imports.first().unwrap(), locator)
+    if preceded_by_multi_statement_line(block.imports.first().unwrap(), locator, indexer)
         || followed_by_multi_statement_line(block.imports.last().unwrap(), locator)
     {
         return Some(Diagnostic::new(violations::UnsortedImports, range));
@@ -85,6 +86,9 @@ pub fn organize_imports(
         &settings.isort.single_line_exclusions,
         settings.isort.split_on_trailing_comma,
         &settings.isort.classes,
+        &settings.isort.constants,
+        &settings.isort.variables,
+        &settings.isort.no_lines_before,
     );
 
     // Expand the span the entire range, including leading and trailing space.
@@ -92,13 +96,13 @@ pub fn organize_imports(
         Location::new(range.location.row(), 0),
         Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
     );
-    let actual = dedent(&locator.slice_source_code_range(&range));
+    let actual = dedent(locator.slice_source_code_range(&range));
     if actual == dedent(&expected) {
         None
     } else {
         let mut diagnostic = Diagnostic::new(violations::UnsortedImports, range);
         if matches!(autofix, flags::Autofix::Enabled)
-            && settings.fixable.contains(diagnostic.kind.code())
+            && settings.rules.should_fix(diagnostic.kind.rule())
         {
             diagnostic.amend(Fix::replacement(
                 indent(&expected, indentation),

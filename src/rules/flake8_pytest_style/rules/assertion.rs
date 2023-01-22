@@ -103,10 +103,10 @@ pub fn unittest_assertion(
                     violations::UnittestAssertion(unittest_assert.to_string()),
                     Range::from_located(func),
                 );
-                if checker.patch(diagnostic.kind.code()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         diagnostic.amend(Fix::replacement(
-                            unparse_stmt(&stmt, checker.style),
+                            unparse_stmt(&stmt, checker.stylist),
                             call.location,
                             call.end_location.unwrap(),
                         ));

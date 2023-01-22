@@ -7,7 +7,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.221"
+version = "0.0.230"
 description = "An extremely fast Python linter, written in Rust."
 authors = [
   { name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" },
@@ -41,9 +41,3 @@ bindings = "bin"
 manifest-path = "ruff_cli/Cargo.toml"
 python-source = "python"
 strip = true
-
-[tool.setuptools]
-license-files = [
-  "LICENSE",
-  "licenses/*",
-]

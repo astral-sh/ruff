@@ -6,22 +6,12 @@ Example usage:
     python scripts/add_rule.py \
         --name PreferListBuiltin \
         --code PIE807 \
-        --origin flake8-pie
+        --linter flake8-pie
 """
 
 import argparse
-import os
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-def dir_name(origin: str) -> str:
-    return origin.replace("-", "_")
-
-
-def pascal_case(origin: str) -> str:
-    """Convert from snake-case to PascalCase."""
-    return "".join(word.title() for word in origin.split("-"))
+from _utils import ROOT_DIR, dir_name, get_indent
 
 
 def snake_case(name: str) -> str:
@@ -29,73 +19,87 @@ def snake_case(name: str) -> str:
     return "".join(f"_{word.lower()}" if word.isupper() else word for word in name).lstrip("_")
 
 
-def main(*, name: str, code: str, origin: str) -> None:
+def main(*, name: str, code: str, linter: str) -> None:
     # Create a test fixture.
-    with open(
-        os.path.join(ROOT_DIR, f"resources/test/fixtures/{dir_name(origin)}/{code}.py"),
-        "a",
-    ):
+    with (ROOT_DIR / "resources/test/fixtures" / dir_name(linter) / f"{code}.py").open("a"):
         pass
 
-    # Add the relevant `#testcase` macro.
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(origin)}/mod.rs")) as fp:
-        content = fp.read()
+    plugin_module = ROOT_DIR / "src/rules" / dir_name(linter)
+    rule_name_snake = snake_case(name)
 
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(origin)}/mod.rs"), "w") as fp:
+    # Add the relevant `#testcase` macro.
+    mod_rs = plugin_module / "mod.rs"
+    content = mod_rs.read_text()
+
+    with mod_rs.open("w") as fp:
         for line in content.splitlines():
-            if line.strip() == "fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {":
-                indent = line.split("fn rules(rule_code: RuleCode, path: &Path) -> Result<()> {")[0]
-                fp.write(f'{indent}#[test_case(RuleCode::{code}, Path::new("{code}.py"); "{code}")]')
+            if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
+                indent = get_indent(line)
+                fp.write(f'{indent}#[test_case(Rule::{name}, Path::new("{code}.py"); "{code}")]')
                 fp.write("\n")
 
             fp.write(line)
             fp.write("\n")
 
+    # Add the exports 
+    rules_dir = plugin_module / "rules"
+    rules_mod = rules_dir / "mod.rs"
+
+    contents = rules_mod.read_text()
+    parts = contents.split("\n\n")
+    if len(parts) == 2:
+        new_contents = parts[0] + "\n"
+        new_contents += f"pub use {rule_name_snake}::{{{rule_name_snake}, {name}}};"
+        new_contents += "\n"
+        new_contents += "\n"
+        new_contents += parts[1]
+        new_contents += f"mod {rule_name_snake};"
+        new_contents += "\n"
+        rules_mod.write_text(new_contents)
+    else:
+        with rules_mod.open("a") as fp:
+            fp.write(f"pub use {rule_name_snake}::{{{rule_name_snake}, {name}}};")
+            fp.write("\n")
+            fp.write(f"mod {rule_name_snake};")
+            fp.write("\n")
+
     # Add the relevant rule function.
-    with open(os.path.join(ROOT_DIR, f"src/{dir_name(origin)}/rules.rs"), "a") as fp:
+    with (rules_dir / f"{rule_name_snake}.rs").open("w") as fp:
+        fp.write(
+            """use ruff_macros::derive_message_formats;
+
+use crate::define_violation;
+use crate::violation::Violation;
+use crate::checkers::ast::Checker;
+
+define_violation!(
+    pub struct %s;
+);
+impl Violation for %s {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        todo!("implement message");
+        format!("TODO: write message")
+    }
+}
+"""
+            % (name, name)
+        )
+        fp.write("\n")
         fp.write(
             f"""
 /// {code}
-pub fn {snake_case(name)}(checker: &mut Checker) {{}}
+pub fn {rule_name_snake}(checker: &mut Checker) {{}}
 """
         )
         fp.write("\n")
 
-    # Add the relevant struct to `src/violations.rs`.
-    with open(os.path.join(ROOT_DIR, "src/violations.rs")) as fp:
-        content = fp.read()
-
-    with open(os.path.join(ROOT_DIR, "src/violations.rs"), "w") as fp:
-        for line in content.splitlines():
-            fp.write(line)
-            fp.write("\n")
-
-            if line.startswith(f"// {origin}"):
-                fp.write(
-                    """define_violation!(
-    pub struct %s;
-);
-impl Violation for %s {
-    fn message(&self) -> String {
-        todo!("Implement message")
-    }
-
-    fn placeholder() -> Self {
-        %s
-    }
-}
-"""
-                    % (name, name, name)
-                )
-                fp.write("\n")
-
     # Add the relevant code-to-violation pair to `src/registry.rs`.
-    with open(os.path.join(ROOT_DIR, "src/registry.rs")) as fp:
-        content = fp.read()
+    content = (ROOT_DIR / "src/registry.rs").read_text()
 
     seen_macro = False
     has_written = False
-    with open(os.path.join(ROOT_DIR, "src/registry.rs"), "w") as fp:
+    with (ROOT_DIR / "src/registry.rs").open("w") as fp:
         for line in content.splitlines():
             fp.write(line)
             fp.write("\n")
@@ -103,24 +107,26 @@ impl Violation for %s {
             if has_written:
                 continue
 
-            if line.startswith("define_rule_mapping!"):
+            if line.startswith("ruff_macros::define_rule_mapping!"):
                 seen_macro = True
                 continue
 
             if not seen_macro:
                 continue
 
-            if line.strip() == f"// {origin}":
-                indent = line.split("//")[0]
-                fp.write(f"{indent}{code} => violations::{name},")
+            if line.strip() == f"// {linter}":
+                indent = get_indent(line)
+                fp.write(f"{indent}{code} => rules::{dir_name(linter)}::rules::{name},")
                 fp.write("\n")
                 has_written = True
+
+    assert has_written
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate boilerplate for a new rule.",
-        epilog="python scripts/add_rule.py --name PreferListBuiltin --code PIE807 --origin flake8-pie",
+        epilog="python scripts/add_rule.py --name PreferListBuiltin --code PIE807 --linter flake8-pie",
     )
     parser.add_argument(
         "--name",
@@ -135,11 +141,11 @@ if __name__ == "__main__":
         help="The code of the check to generate (e.g., 'A001').",
     )
     parser.add_argument(
-        "--origin",
+        "--linter",
         type=str,
         required=True,
         help="The source with which the check originated (e.g., 'flake8-builtins').",
     )
     args = parser.parse_args()
 
-    main(name=args.name, code=args.code, origin=args.origin)
+    main(name=args.name, code=args.code, linter=args.linter)

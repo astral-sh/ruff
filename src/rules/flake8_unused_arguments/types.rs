@@ -1,4 +1,4 @@
-use crate::registry::{DiagnosticKind, RuleCode};
+use crate::registry::{DiagnosticKind, Rule};
 use crate::violations;
 
 /// An AST node that can contain arguments.
@@ -21,13 +21,13 @@ impl Argumentable {
         }
     }
 
-    pub fn rule_code(&self) -> &RuleCode {
+    pub fn rule_code(&self) -> &Rule {
         match self {
-            Argumentable::Function => &RuleCode::ARG001,
-            Argumentable::Method => &RuleCode::ARG002,
-            Argumentable::ClassMethod => &RuleCode::ARG003,
-            Argumentable::StaticMethod => &RuleCode::ARG004,
-            Argumentable::Lambda => &RuleCode::ARG005,
+            Argumentable::Function => &Rule::UnusedFunctionArgument,
+            Argumentable::Method => &Rule::UnusedMethodArgument,
+            Argumentable::ClassMethod => &Rule::UnusedClassMethodArgument,
+            Argumentable::StaticMethod => &Rule::UnusedStaticMethodArgument,
+            Argumentable::Lambda => &Rule::UnusedLambdaArgument,
         }
     }
 }

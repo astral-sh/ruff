@@ -49,15 +49,19 @@ impl<'a> Stylist<'a> {
 }
 
 /// The quotation style used in Python source code.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum Quote {
     Single,
+    #[default]
     Double,
 }
 
-impl Default for Quote {
-    fn default() -> Self {
-        Quote::Double
+impl From<Quote> for char {
+    fn from(val: Quote) -> Self {
+        match val {
+            Quote::Single => '\'',
+            Quote::Double => '"',
+        }
     }
 }
 
@@ -123,7 +127,21 @@ pub enum LineEnding {
 
 impl Default for LineEnding {
     fn default() -> Self {
-        LineEnding::Lf
+        if cfg!(windows) {
+            LineEnding::CrLf
+        } else {
+            LineEnding::Lf
+        }
+    }
+}
+
+impl LineEnding {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LineEnding::CrLf => "\r\n",
+            LineEnding::Lf => "\n",
+            LineEnding::Cr => "\r",
+        }
     }
 }
 
@@ -131,11 +149,7 @@ impl Deref for LineEnding {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        match &self {
-            LineEnding::CrLf => "\r\n",
-            LineEnding::Lf => "\n",
-            LineEnding::Cr => "\r",
-        }
+        self.as_str()
     }
 }
 
@@ -156,7 +170,7 @@ fn detect_quote(contents: &str, locator: &Locator) -> Option<Quote> {
     for (start, tok, end) in lexer::make_tokenizer(contents).flatten() {
         if let Tok::String { .. } = tok {
             let content = locator.slice_source_code_range(&Range::new(start, end));
-            if let Some(pattern) = leading_quote(&content) {
+            if let Some(pattern) = leading_quote(content) {
                 if pattern.contains('\'') {
                     return Some(Quote::Single);
                 } else if pattern.contains('"') {

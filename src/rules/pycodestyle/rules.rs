@@ -78,6 +78,23 @@ pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<D
     }
 }
 
+/// E101
+pub fn mixed_spaces_and_tabs(lineno: usize, line: &str) -> Option<Diagnostic> {
+    let indent = leading_space(line);
+
+    if indent.contains(' ') && indent.contains('\t') {
+        Some(Diagnostic::new(
+            violations::MixedSpacesAndTabs,
+            Range::new(
+                Location::new(lineno + 1, 0),
+                Location::new(lineno + 1, indent.chars().count()),
+            ),
+        ))
+    } else {
+        None
+    }
+}
+
 /// W505
 pub fn doc_line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
     let Some(limit) = settings.pycodestyle.max_doc_length else {
@@ -151,7 +168,7 @@ pub fn literal_comparisons(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
-            if checker.patch(diagnostic.kind.code()) && !helpers::is_constant_non_singleton(next) {
+            if checker.patch(diagnostic.kind.rule()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::Is);
             }
             diagnostics.push(diagnostic);
@@ -161,7 +178,7 @@ pub fn literal_comparisons(
                 violations::NoneComparison(op.into()),
                 Range::from_located(comparator),
             );
-            if checker.patch(diagnostic.kind.code()) && !helpers::is_constant_non_singleton(next) {
+            if checker.patch(diagnostic.kind.rule()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::IsNot);
             }
             diagnostics.push(diagnostic);
@@ -179,7 +196,7 @@ pub fn literal_comparisons(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
-                if checker.patch(diagnostic.kind.code())
+                if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(next)
                 {
                     bad_ops.insert(0, Cmpop::Is);
@@ -191,7 +208,7 @@ pub fn literal_comparisons(
                     violations::TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
-                if checker.patch(diagnostic.kind.code())
+                if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(next)
                 {
                     bad_ops.insert(0, Cmpop::IsNot);
@@ -217,7 +234,7 @@ pub fn literal_comparisons(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
-                if checker.patch(diagnostic.kind.code())
+                if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
                     bad_ops.insert(idx, Cmpop::Is);
@@ -229,7 +246,7 @@ pub fn literal_comparisons(
                     violations::NoneComparison(op.into()),
                     Range::from_located(next),
                 );
-                if checker.patch(diagnostic.kind.code())
+                if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
                     bad_ops.insert(idx, Cmpop::IsNot);
@@ -249,7 +266,7 @@ pub fn literal_comparisons(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch(diagnostic.kind.code())
+                    if checker.patch(diagnostic.kind.rule())
                         && !helpers::is_constant_non_singleton(comparator)
                     {
                         bad_ops.insert(idx, Cmpop::Is);
@@ -261,7 +278,7 @@ pub fn literal_comparisons(
                         violations::TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch(diagnostic.kind.code())
+                    if checker.patch(diagnostic.kind.rule())
                         && !helpers::is_constant_non_singleton(comparator)
                     {
                         bad_ops.insert(idx, Cmpop::IsNot);
@@ -284,7 +301,7 @@ pub fn literal_comparisons(
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .cloned()
             .collect::<Vec<_>>();
-        let content = compare(left, &ops, comparators, checker.style);
+        let content = compare(left, &ops, comparators, checker.stylist);
         for diagnostic in &mut diagnostics {
             diagnostic.amend(Fix::replacement(
                 content.to_string(),
@@ -323,9 +340,9 @@ pub fn not_tests(
                                 violations::NotInTest,
                                 Range::from_located(operand),
                             );
-                            if checker.patch(diagnostic.kind.code()) && should_fix {
+                            if checker.patch(diagnostic.kind.rule()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
-                                    compare(left, &[Cmpop::NotIn], comparators, checker.style),
+                                    compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
@@ -339,9 +356,9 @@ pub fn not_tests(
                                 violations::NotIsTest,
                                 Range::from_located(operand),
                             );
-                            if checker.patch(diagnostic.kind.code()) && should_fix {
+                            if checker.patch(diagnostic.kind.rule()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
-                                    compare(left, &[Cmpop::IsNot], comparators, checker.style),
+                                    compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
                                     expr.location,
                                     expr.end_location.unwrap(),
                                 ));
@@ -455,7 +472,7 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                 violations::DoNotAssignLambda(id.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(diagnostic.kind.code()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)
                 {
@@ -463,9 +480,12 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                         Location::new(stmt.location.row(), 0),
                         Location::new(stmt.location.row() + 1, 0),
                     ));
-                    let indentation = &leading_space(&first_line);
+                    let indentation = &leading_space(first_line);
                     let mut indented = String::new();
-                    for (idx, line) in function(id, args, body, checker.style).lines().enumerate() {
+                    for (idx, line) in function(id, args, body, checker.stylist)
+                        .lines()
+                        .enumerate()
+                    {
                         if idx == 0 {
                             indented.push_str(line);
                         } else {
@@ -583,7 +603,7 @@ pub fn invalid_escape_sequence(
     let text = locator.slice_source_code_range(&Range::new(start, end));
 
     // Determine whether the string is single- or triple-quoted.
-    let quote = extract_quote(&text);
+    let quote = extract_quote(text);
     let quote_pos = text.find(quote).unwrap();
     let prefix = text[..quote_pos].to_lowercase();
     let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];

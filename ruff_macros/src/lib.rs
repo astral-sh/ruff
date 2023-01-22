@@ -13,13 +13,14 @@
 )]
 #![forbid(unsafe_code)]
 
-use proc_macro2::Span;
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Ident};
+use proc_macro::TokenStream;
+use syn::{parse_macro_input, DeriveInput, ItemFn};
 
 mod config;
-mod prefixes;
+mod define_rule_mapping;
+mod derive_message_formats;
 mod rule_code_prefix;
+mod rule_namespace;
 
 #[proc_macro_derive(ConfigurationOptions, attributes(option, doc, option_group))]
 pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -30,31 +31,23 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
         .into()
 }
 
-#[proc_macro_derive(RuleCodePrefix)]
-pub fn derive_rule_code_prefix(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro]
+pub fn define_rule_mapping(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let mapping = parse_macro_input!(item as define_rule_mapping::Mapping);
+    define_rule_mapping::define_rule_mapping(&mapping).into()
+}
+
+#[proc_macro_derive(RuleNamespace, attributes(prefix))]
+pub fn derive_rule_namespace(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    rule_code_prefix::derive_impl(input)
+    rule_namespace::derive_impl(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
 
-#[proc_macro]
-pub fn origin_by_code(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let ident = parse_macro_input!(item as Ident).to_string();
-    let mut iter = prefixes::PREFIX_TO_ORIGIN.iter();
-    let origin = loop {
-        let (prefix, origin) = iter
-            .next()
-            .unwrap_or_else(|| panic!("code doesn't start with any recognized prefix: {ident}"));
-        if ident.starts_with(prefix) {
-            break origin;
-        }
-    };
-    let prefix = Ident::new(origin, Span::call_site());
-
-    quote! {
-        RuleOrigin::#prefix
-    }
-    .into()
+#[proc_macro_attribute]
+pub fn derive_message_formats(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let func = parse_macro_input!(item as ItemFn);
+    derive_message_formats::derive_message_formats(&func).into()
 }

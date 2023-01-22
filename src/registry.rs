@@ -1,121 +1,20 @@
-//! Registry of `RuleCode` to `DiagnosticKind` mappings.
+//! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
 
-use std::fmt;
-
-use itertools::Itertools;
 use once_cell::sync::Lazy;
-use ruff_macros::RuleCodePrefix;
+use ruff_macros::RuleNamespace;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
-use strum_macros::{AsRefStr, Display, EnumIter, EnumString};
+use strum_macros::{AsRefStr, EnumIter};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::violation::Violation;
-use crate::violations;
+use crate::{rules, violations};
 
-macro_rules! define_rule_mapping {
-    ($($code:ident => $mod:ident::$name:ident,)+) => {
-        #[derive(
-            AsRefStr,
-            RuleCodePrefix,
-            EnumIter,
-            EnumString,
-            Debug,
-            Display,
-            PartialEq,
-            Eq,
-            Clone,
-            Serialize,
-            Deserialize,
-            Hash,
-            PartialOrd,
-            Ord,
-        )]
-        pub enum RuleCode {
-            $(
-                $code,
-            )+
-        }
-
-        #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
-        pub enum DiagnosticKind {
-            $(
-                $name($mod::$name),
-            )+
-        }
-
-        impl RuleCode {
-            /// A placeholder representation of the `DiagnosticKind` for the diagnostic.
-            pub fn kind(&self) -> DiagnosticKind {
-                match self {
-                    $(
-                        RuleCode::$code => DiagnosticKind::$name(<$mod::$name as Violation>::placeholder()),
-                    )+
-                }
-            }
-
-            pub fn origin(&self) -> RuleOrigin {
-                match self {
-                    $(
-                        RuleCode::$code => ruff_macros::origin_by_code!($code),
-                    )+
-                }
-            }
-        }
-
-        impl DiagnosticKind {
-            /// A four-letter shorthand code for the diagnostic.
-            pub fn code(&self) -> &'static RuleCode {
-                match self {
-                    $(
-                        DiagnosticKind::$name(..) => &RuleCode::$code,
-                    )+
-                }
-            }
-
-            /// The body text for the diagnostic.
-            pub fn body(&self) -> String {
-                match self {
-                    $(
-                        DiagnosticKind::$name(x) => Violation::message(x),
-                    )+
-                }
-            }
-
-            /// Whether the diagnostic is (potentially) fixable.
-            pub fn fixable(&self) -> bool {
-                match self {
-                    $(
-                        DiagnosticKind::$name(x) => x.autofix_title_formatter().is_some(),
-                    )+
-                }
-            }
-
-            /// The message used to describe the fix action for a given `DiagnosticKind`.
-            pub fn commit(&self) -> Option<String> {
-                match self {
-                    $(
-                        DiagnosticKind::$name(x) => x.autofix_title_formatter().map(|f| f(x)),
-                    )+
-                }
-            }
-        }
-
-        $(
-            impl From<$mod::$name> for DiagnosticKind {
-                fn from(x: $mod::$name) -> Self {
-                    DiagnosticKind::$name(x)
-                }
-            }
-        )+
-
-    };
-}
-
-define_rule_mapping!(
+ruff_macros::define_rule_mapping!(
     // pycodestyle errors
+    E101 => violations::MixedSpacesAndTabs,
     E401 => violations::MultipleImportsOnOneLine,
     E402 => violations::ModuleImportNotAtTopOfFile,
     E501 => violations::LineTooLong,
@@ -181,7 +80,6 @@ define_rule_mapping!(
     F901 => violations::RaiseNotImplemented,
     // pylint
     PLC0414 => violations::UselessImportAlias,
-    PLC2201 => violations::MisplacedComparisonConstant,
     PLC3002 => violations::UnnecessaryDirectLambdaCall,
     PLE0117 => violations::NonlocalWithoutBinding,
     PLE0118 => violations::UsedPriorGlobalDeclaration,
@@ -251,8 +149,8 @@ define_rule_mapping!(
     // mccabe
     C901 => violations::FunctionIsTooComplex,
     // flake8-tidy-imports
-    TID251 => violations::BannedApi,
-    TID252 => violations::BannedRelativeImport,
+    TID251 => rules::flake8_tidy_imports::banned_api::BannedApi,
+    TID252 => rules::flake8_tidy_imports::relative_imports::RelativeImports,
     // flake8-return
     RET501 => violations::UnnecessaryReturnNone,
     RET502 => violations::ImplicitReturnValue,
@@ -333,7 +231,7 @@ define_rule_mapping!(
     UP008 => violations::SuperCallWithParameters,
     UP009 => violations::PEP3120UnnecessaryCodingComment,
     UP010 => violations::UnnecessaryFutureImport,
-    UP011 => violations::UnnecessaryLRUCacheParams,
+    UP011 => violations::LRUCacheWithoutParameters,
     UP012 => violations::UnnecessaryEncodeUTF8,
     UP013 => violations::ConvertTypedDictFunctionalToClass,
     UP014 => violations::ConvertNamedTupleFunctionalToClass,
@@ -353,6 +251,10 @@ define_rule_mapping!(
     UP028 => violations::RewriteYieldFrom,
     UP029 => violations::UnnecessaryBuiltinImport,
     UP030 => violations::FormatLiterals,
+    UP031 => violations::PrintfStringFormatting,
+    UP032 => violations::FString,
+    UP033 => violations::FunctoolsCache,
+    UP034 => violations::ExtraneousParentheses,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,
@@ -381,6 +283,7 @@ define_rule_mapping!(
     D300 => violations::UsesTripleQuotes,
     D301 => violations::UsesRPrefixForBackslashedContent,
     D400 => violations::EndsInPeriod,
+    D401 => crate::rules::pydocstyle::rules::non_imperative_mood::NonImperativeMood,
     D402 => violations::NoSignature,
     D403 => violations::FirstLineCapitalized,
     D404 => violations::NoThisPrefix,
@@ -509,368 +412,217 @@ define_rule_mapping!(
     // flake8-pie
     PIE790 => violations::NoUnnecessaryPass,
     PIE794 => violations::DupeClassFieldDefinitions,
+    PIE796 => violations::PreferUniqueEnums,
     PIE800 => violations::NoUnnecessarySpread,
     PIE807 => violations::PreferListBuiltin,
-    // Ruff
+    // flake8-commas
+    COM812 => violations::TrailingCommaMissing,
+    COM818 => violations::TrailingCommaOnBareTupleProhibited,
+    COM819 => violations::TrailingCommaProhibited,
+    // flake8-no-pep420
+    INP001 => violations::ImplicitNamespacePackage,
+    // flake8-executable
+    EXE003 => rules::flake8_executable::rules::ShebangPython,
+    EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
+    EXE005 => rules::flake8_executable::rules::ShebangNewline,
+    // flake8-type-checking
+    TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
+    // tryceratops
+    TRY004 => rules::tryceratops::rules::PreferTypeError,
+    TRY201 => rules::tryceratops::rules::VerboseRaise,
+    TRY300 => rules::tryceratops::rules::TryConsiderElse,
+    // flake8-use-pathlib
+    PTH100 => rules::flake8_use_pathlib::violations::PathlibAbspath,
+    PTH101 => rules::flake8_use_pathlib::violations::PathlibChmod,
+    PTH102 => rules::flake8_use_pathlib::violations::PathlibMkdir,
+    PTH103 => rules::flake8_use_pathlib::violations::PathlibMakedirs,
+    PTH104 => rules::flake8_use_pathlib::violations::PathlibRename,
+    PTH105 => rules::flake8_use_pathlib::violations::PathlibReplace,
+    PTH106 => rules::flake8_use_pathlib::violations::PathlibRmdir,
+    PTH107 => rules::flake8_use_pathlib::violations::PathlibRemove,
+    PTH108 => rules::flake8_use_pathlib::violations::PathlibUnlink,
+    PTH109 => rules::flake8_use_pathlib::violations::PathlibGetcwd,
+    PTH110 => rules::flake8_use_pathlib::violations::PathlibExists,
+    PTH111 => rules::flake8_use_pathlib::violations::PathlibExpanduser,
+    PTH112 => rules::flake8_use_pathlib::violations::PathlibIsDir,
+    PTH113 => rules::flake8_use_pathlib::violations::PathlibIsFile,
+    PTH114 => rules::flake8_use_pathlib::violations::PathlibIsLink,
+    PTH115 => rules::flake8_use_pathlib::violations::PathlibReadlink,
+    PTH116 => rules::flake8_use_pathlib::violations::PathlibStat,
+    PTH117 => rules::flake8_use_pathlib::violations::PathlibIsAbs,
+    PTH118 => rules::flake8_use_pathlib::violations::PathlibJoin,
+    PTH119 => rules::flake8_use_pathlib::violations::PathlibBasename,
+    PTH120 => rules::flake8_use_pathlib::violations::PathlibDirname,
+    PTH121 => rules::flake8_use_pathlib::violations::PathlibSamefile,
+    PTH122 => rules::flake8_use_pathlib::violations::PathlibSplitext,
+    PTH123 => rules::flake8_use_pathlib::violations::PathlibOpen,
+    PTH124 => rules::flake8_use_pathlib::violations::PathlibPyPath,
+    // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
     RUF003 => violations::AmbiguousUnicodeCharacterComment,
     RUF004 => violations::KeywordArgumentBeforeStarArgument,
+    RUF005 => violations::UnpackInsteadOfConcatenatingToCollectionLiteral,
     RUF100 => violations::UnusedNOQA,
 );
 
-#[derive(EnumIter, Debug, PartialEq, Eq)]
-pub enum RuleOrigin {
+#[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
+pub enum Linter {
+    #[prefix = "F"]
     Pyflakes,
+    #[prefix = "E"]
+    #[prefix = "W"]
     Pycodestyle,
+    #[prefix = "C90"]
     McCabe,
+    #[prefix = "I"]
     Isort,
+    #[prefix = "D"]
     Pydocstyle,
+    #[prefix = "UP"]
     Pyupgrade,
+    #[prefix = "N"]
     PEP8Naming,
+    #[prefix = "YTT"]
     Flake82020,
+    #[prefix = "ANN"]
     Flake8Annotations,
+    #[prefix = "S"]
     Flake8Bandit,
+    #[prefix = "BLE"]
     Flake8BlindExcept,
+    #[prefix = "FBT"]
     Flake8BooleanTrap,
+    #[prefix = "B"]
     Flake8Bugbear,
+    #[prefix = "A"]
     Flake8Builtins,
+    #[prefix = "C4"]
     Flake8Comprehensions,
+    #[prefix = "T10"]
     Flake8Debugger,
+    #[prefix = "EM"]
     Flake8ErrMsg,
+    #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
+    #[prefix = "ICN"]
     Flake8ImportConventions,
+    #[prefix = "T20"]
     Flake8Print,
+    #[prefix = "PT"]
     Flake8PytestStyle,
+    #[prefix = "Q"]
     Flake8Quotes,
+    #[prefix = "RET"]
     Flake8Return,
+    #[prefix = "SIM"]
     Flake8Simplify,
+    #[prefix = "TID"]
     Flake8TidyImports,
+    #[prefix = "ARG"]
     Flake8UnusedArguments,
+    #[prefix = "DTZ"]
     Flake8Datetimez,
+    #[prefix = "ERA"]
     Eradicate,
+    #[prefix = "PD"]
     PandasVet,
+    #[prefix = "PGH"]
     PygrepHooks,
+    #[prefix = "PL"]
     Pylint,
+    #[prefix = "PIE"]
     Flake8Pie,
+    #[prefix = "COM"]
+    Flake8Commas,
+    #[prefix = "INP"]
+    Flake8NoPep420,
+    #[prefix = "EXE"]
+    Flake8Executable,
+    #[prefix = "TYP"]
+    Flake8TypeChecking,
+    #[prefix = "TRY"]
+    Tryceratops,
+    #[prefix = "PTH"]
+    Flake8UsePathlib,
+    #[prefix = "RUF"]
     Ruff,
 }
 
-pub enum Platform {
-    PyPI,
-    GitHub,
+pub trait RuleNamespace: Sized {
+    fn parse_code(code: &str) -> Option<(Self, &str)>;
+
+    fn prefixes(&self) -> &'static [&'static str];
 }
 
-impl fmt::Display for Platform {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Platform::PyPI => fmt.write_str("PyPI"),
-            Platform::GitHub => fmt.write_str("GitHub"),
-        }
-    }
-}
+include!(concat!(env!("OUT_DIR"), "/linter.rs"));
 
-pub enum Prefixes {
-    Single(RuleCodePrefix),
-    Multiple(Vec<(RuleCodePrefix, &'static str)>),
-}
+/// The prefix, name and selector for an upstream linter category.
+pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleSelector);
 
-impl Prefixes {
-    pub fn as_list(&self, separator: &str) -> String {
+impl Linter {
+    pub fn categories(&self) -> Option<&'static [LinterCategory]> {
         match self {
-            Prefixes::Single(prefix) => prefix.as_ref().to_string(),
-            Prefixes::Multiple(entries) => entries
-                .iter()
-                .map(|(prefix, _)| prefix.as_ref())
-                .join(separator),
-        }
-    }
-}
-
-impl RuleOrigin {
-    pub fn title(&self) -> &'static str {
-        match self {
-            RuleOrigin::Eradicate => "eradicate",
-            RuleOrigin::Flake82020 => "flake8-2020",
-            RuleOrigin::Flake8Annotations => "flake8-annotations",
-            RuleOrigin::Flake8Bandit => "flake8-bandit",
-            RuleOrigin::Flake8BlindExcept => "flake8-blind-except",
-            RuleOrigin::Flake8BooleanTrap => "flake8-boolean-trap",
-            RuleOrigin::Flake8Bugbear => "flake8-bugbear",
-            RuleOrigin::Flake8Builtins => "flake8-builtins",
-            RuleOrigin::Flake8Comprehensions => "flake8-comprehensions",
-            RuleOrigin::Flake8Debugger => "flake8-debugger",
-            RuleOrigin::Flake8ErrMsg => "flake8-errmsg",
-            RuleOrigin::Flake8ImplicitStrConcat => "flake8-implicit-str-concat",
-            RuleOrigin::Flake8ImportConventions => "flake8-import-conventions",
-            RuleOrigin::Flake8Print => "flake8-print",
-            RuleOrigin::Flake8PytestStyle => "flake8-pytest-style",
-            RuleOrigin::Flake8Quotes => "flake8-quotes",
-            RuleOrigin::Flake8Return => "flake8-return",
-            RuleOrigin::Flake8TidyImports => "flake8-tidy-imports",
-            RuleOrigin::Flake8Simplify => "flake8-simplify",
-            RuleOrigin::Flake8UnusedArguments => "flake8-unused-arguments",
-            RuleOrigin::Flake8Datetimez => "flake8-datetimez",
-            RuleOrigin::Isort => "isort",
-            RuleOrigin::McCabe => "mccabe",
-            RuleOrigin::PandasVet => "pandas-vet",
-            RuleOrigin::PEP8Naming => "pep8-naming",
-            RuleOrigin::Pycodestyle => "pycodestyle",
-            RuleOrigin::Pydocstyle => "pydocstyle",
-            RuleOrigin::Pyflakes => "Pyflakes",
-            RuleOrigin::PygrepHooks => "pygrep-hooks",
-            RuleOrigin::Pylint => "Pylint",
-            RuleOrigin::Pyupgrade => "pyupgrade",
-            RuleOrigin::Flake8Pie => "flake8-pie",
-            RuleOrigin::Ruff => "Ruff-specific rules",
-        }
-    }
-
-    pub fn prefixes(&self) -> Prefixes {
-        match self {
-            RuleOrigin::Eradicate => Prefixes::Single(RuleCodePrefix::ERA),
-            RuleOrigin::Flake82020 => Prefixes::Single(RuleCodePrefix::YTT),
-            RuleOrigin::Flake8Annotations => Prefixes::Single(RuleCodePrefix::ANN),
-            RuleOrigin::Flake8Bandit => Prefixes::Single(RuleCodePrefix::S),
-            RuleOrigin::Flake8BlindExcept => Prefixes::Single(RuleCodePrefix::BLE),
-            RuleOrigin::Flake8BooleanTrap => Prefixes::Single(RuleCodePrefix::FBT),
-            RuleOrigin::Flake8Bugbear => Prefixes::Single(RuleCodePrefix::B),
-            RuleOrigin::Flake8Builtins => Prefixes::Single(RuleCodePrefix::A),
-            RuleOrigin::Flake8Comprehensions => Prefixes::Single(RuleCodePrefix::C4),
-            RuleOrigin::Flake8Datetimez => Prefixes::Single(RuleCodePrefix::DTZ),
-            RuleOrigin::Flake8Debugger => Prefixes::Single(RuleCodePrefix::T10),
-            RuleOrigin::Flake8ErrMsg => Prefixes::Single(RuleCodePrefix::EM),
-            RuleOrigin::Flake8ImplicitStrConcat => Prefixes::Single(RuleCodePrefix::ISC),
-            RuleOrigin::Flake8ImportConventions => Prefixes::Single(RuleCodePrefix::ICN),
-            RuleOrigin::Flake8Print => Prefixes::Single(RuleCodePrefix::T20),
-            RuleOrigin::Flake8PytestStyle => Prefixes::Single(RuleCodePrefix::PT),
-            RuleOrigin::Flake8Quotes => Prefixes::Single(RuleCodePrefix::Q),
-            RuleOrigin::Flake8Return => Prefixes::Single(RuleCodePrefix::RET),
-            RuleOrigin::Flake8Simplify => Prefixes::Single(RuleCodePrefix::SIM),
-            RuleOrigin::Flake8TidyImports => Prefixes::Single(RuleCodePrefix::TID),
-            RuleOrigin::Flake8UnusedArguments => Prefixes::Single(RuleCodePrefix::ARG),
-            RuleOrigin::Isort => Prefixes::Single(RuleCodePrefix::I),
-            RuleOrigin::McCabe => Prefixes::Single(RuleCodePrefix::C90),
-            RuleOrigin::PEP8Naming => Prefixes::Single(RuleCodePrefix::N),
-            RuleOrigin::PandasVet => Prefixes::Single(RuleCodePrefix::PD),
-            RuleOrigin::Pycodestyle => Prefixes::Multiple(vec![
-                (RuleCodePrefix::E, "Error"),
-                (RuleCodePrefix::W, "Warning"),
+            Linter::Pycodestyle => Some(&[
+                LinterCategory("E", "Error", RuleSelector::E),
+                LinterCategory("W", "Warning", RuleSelector::W),
             ]),
-            RuleOrigin::Pydocstyle => Prefixes::Single(RuleCodePrefix::D),
-            RuleOrigin::Pyflakes => Prefixes::Single(RuleCodePrefix::F),
-            RuleOrigin::PygrepHooks => Prefixes::Single(RuleCodePrefix::PGH),
-            RuleOrigin::Pylint => Prefixes::Multiple(vec![
-                (RuleCodePrefix::PLC, "Convention"),
-                (RuleCodePrefix::PLE, "Error"),
-                (RuleCodePrefix::PLR, "Refactor"),
-                (RuleCodePrefix::PLW, "Warning"),
+            Linter::Pylint => Some(&[
+                LinterCategory("PLC", "Convention", RuleSelector::PLC),
+                LinterCategory("PLE", "Error", RuleSelector::PLE),
+                LinterCategory("PLR", "Refactor", RuleSelector::PLR),
+                LinterCategory("PLW", "Warning", RuleSelector::PLW),
             ]),
-            RuleOrigin::Pyupgrade => Prefixes::Single(RuleCodePrefix::UP),
-            RuleOrigin::Flake8Pie => Prefixes::Single(RuleCodePrefix::PIE),
-            RuleOrigin::Ruff => Prefixes::Single(RuleCodePrefix::RUF),
-        }
-    }
-
-    pub fn url(&self) -> Option<(&'static str, &'static Platform)> {
-        match self {
-            RuleOrigin::Eradicate => {
-                Some(("https://pypi.org/project/eradicate/2.1.0/", &Platform::PyPI))
-            }
-            RuleOrigin::Flake82020 => Some((
-                "https://pypi.org/project/flake8-2020/1.7.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Annotations => Some((
-                "https://pypi.org/project/flake8-annotations/2.9.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Bandit => Some((
-                "https://pypi.org/project/flake8-bandit/4.1.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8BlindExcept => Some((
-                "https://pypi.org/project/flake8-blind-except/0.2.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8BooleanTrap => Some((
-                "https://pypi.org/project/flake8-boolean-trap/0.1.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Bugbear => Some((
-                "https://pypi.org/project/flake8-bugbear/22.10.27/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Builtins => Some((
-                "https://pypi.org/project/flake8-builtins/2.0.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Comprehensions => Some((
-                "https://pypi.org/project/flake8-comprehensions/3.10.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Debugger => Some((
-                "https://pypi.org/project/flake8-debugger/4.1.2/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8ErrMsg => Some((
-                "https://pypi.org/project/flake8-errmsg/0.4.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8ImplicitStrConcat => Some((
-                "https://pypi.org/project/flake8-implicit-str-concat/0.3.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8ImportConventions => None,
-            RuleOrigin::Flake8Print => Some((
-                "https://pypi.org/project/flake8-print/5.0.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8PytestStyle => Some((
-                "https://pypi.org/project/flake8-pytest-style/1.6.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Quotes => Some((
-                "https://pypi.org/project/flake8-quotes/3.3.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Return => Some((
-                "https://pypi.org/project/flake8-return/1.2.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Simplify => Some((
-                "https://pypi.org/project/flake8-simplify/0.19.3/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8TidyImports => Some((
-                "https://pypi.org/project/flake8-tidy-imports/4.8.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8UnusedArguments => Some((
-                "https://pypi.org/project/flake8-unused-arguments/0.0.12/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Flake8Datetimez => Some((
-                "https://pypi.org/project/flake8-datetimez/20.10.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Isort => Some(("https://pypi.org/project/isort/5.10.1/", &Platform::PyPI)),
-            RuleOrigin::McCabe => Some(("https://pypi.org/project/mccabe/0.7.0/", &Platform::PyPI)),
-            RuleOrigin::PandasVet => Some((
-                "https://pypi.org/project/pandas-vet/0.2.3/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::PEP8Naming => Some((
-                "https://pypi.org/project/pep8-naming/0.13.2/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Pycodestyle => Some((
-                "https://pypi.org/project/pycodestyle/2.9.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Pydocstyle => Some((
-                "https://pypi.org/project/pydocstyle/6.1.1/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Pyflakes => {
-                Some(("https://pypi.org/project/pyflakes/2.5.0/", &Platform::PyPI))
-            }
-            RuleOrigin::Pylint => {
-                Some(("https://pypi.org/project/pylint/2.15.7/", &Platform::PyPI))
-            }
-            RuleOrigin::PygrepHooks => Some((
-                "https://github.com/pre-commit/pygrep-hooks",
-                &Platform::GitHub,
-            )),
-            RuleOrigin::Pyupgrade => {
-                Some(("https://pypi.org/project/pyupgrade/3.2.0/", &Platform::PyPI))
-            }
-            RuleOrigin::Flake8Pie => Some((
-                "https://pypi.org/project/flake8-pie/0.16.0/",
-                &Platform::PyPI,
-            )),
-            RuleOrigin::Ruff => None,
+            _ => None,
         }
     }
 }
 
-#[allow(clippy::upper_case_acronyms)]
 pub enum LintSource {
-    AST,
-    FileSystem,
+    Ast,
+    Io,
     Lines,
     Tokens,
     Imports,
-    NoQA,
+    NoQa,
+    Filesystem,
 }
 
-impl RuleCode {
+impl Rule {
     /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
     pub fn lint_source(&self) -> &'static LintSource {
         match self {
-            RuleCode::RUF100 => &LintSource::NoQA,
-            RuleCode::E501
-            | RuleCode::W292
-            | RuleCode::W505
-            | RuleCode::UP009
-            | RuleCode::PGH003
-            | RuleCode::PGH004 => &LintSource::Lines,
-            RuleCode::ERA001
-            | RuleCode::ISC001
-            | RuleCode::ISC002
-            | RuleCode::Q000
-            | RuleCode::Q001
-            | RuleCode::Q002
-            | RuleCode::Q003
-            | RuleCode::W605
-            | RuleCode::RUF001
-            | RuleCode::RUF002
-            | RuleCode::RUF003 => &LintSource::Tokens,
-            RuleCode::E902 => &LintSource::FileSystem,
-            RuleCode::I001 | RuleCode::I002 => &LintSource::Imports,
-            _ => &LintSource::AST,
-        }
-    }
-}
-
-impl DiagnosticKind {
-    /// The summary text for the diagnostic. Typically a truncated form of the
-    /// body text.
-    pub fn summary(&self) -> String {
-        match self {
-            DiagnosticKind::UnaryPrefixIncrement(..) => {
-                "Python does not support the unary prefix increment".to_string()
-            }
-            DiagnosticKind::UnusedLoopControlVariable(violations::UnusedLoopControlVariable(
-                name,
-            )) => {
-                format!("Loop control variable `{name}` not used within the loop body")
-            }
-            DiagnosticKind::NoAssertRaisesException(..) => {
-                "`assertRaises(Exception)` should be considered evil".to_string()
-            }
-            DiagnosticKind::StarArgUnpackingAfterKeywordArg(..) => {
-                "Star-arg unpacking after a keyword argument is strongly discouraged".to_string()
-            }
-
-            // flake8-datetimez
-            DiagnosticKind::CallDatetimeToday(..) => {
-                "The use of `datetime.datetime.today()` is not allowed".to_string()
-            }
-            DiagnosticKind::CallDatetimeUtcnow(..) => {
-                "The use of `datetime.datetime.utcnow()` is not allowed".to_string()
-            }
-            DiagnosticKind::CallDatetimeUtcfromtimestamp(..) => {
-                "The use of `datetime.datetime.utcfromtimestamp()` is not allowed".to_string()
-            }
-            DiagnosticKind::CallDateToday(..) => {
-                "The use of `datetime.date.today()` is not allowed.".to_string()
-            }
-            DiagnosticKind::CallDateFromtimestamp(..) => {
-                "The use of `datetime.date.fromtimestamp()` is not allowed".to_string()
-            }
-            _ => self.body(),
+            Rule::UnusedNOQA => &LintSource::NoQa,
+            Rule::BlanketNOQA
+            | Rule::BlanketTypeIgnore
+            | Rule::DocLineTooLong
+            | Rule::LineTooLong
+            | Rule::MixedSpacesAndTabs
+            | Rule::NoNewLineAtEndOfFile
+            | Rule::PEP3120UnnecessaryCodingComment
+            | Rule::ShebangNewline
+            | Rule::ShebangPython
+            | Rule::ShebangWhitespace => &LintSource::Lines,
+            Rule::AmbiguousUnicodeCharacterComment
+            | Rule::AmbiguousUnicodeCharacterDocstring
+            | Rule::AmbiguousUnicodeCharacterString
+            | Rule::AvoidQuoteEscape
+            | Rule::BadQuotesDocstring
+            | Rule::BadQuotesInlineString
+            | Rule::BadQuotesMultilineString
+            | Rule::CommentedOutCode
+            | Rule::ExtraneousParentheses
+            | Rule::InvalidEscapeSequence
+            | Rule::MultiLineImplicitStringConcatenation
+            | Rule::SingleLineImplicitStringConcatenation
+            | Rule::TrailingCommaMissing
+            | Rule::TrailingCommaOnBareTupleProhibited
+            | Rule::TrailingCommaProhibited => &LintSource::Tokens,
+            Rule::IOError => &LintSource::Io,
+            Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
+            Rule::ImplicitNamespacePackage => &LintSource::Filesystem,
+            _ => &LintSource::Ast,
         }
     }
 }
@@ -907,95 +659,88 @@ impl Diagnostic {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(RuleCode, RuleCode, &str)] = &[(
-    RuleCode::D203,
-    RuleCode::D211,
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[(
+    Rule::OneBlankLineBeforeClass,
+    Rule::NoBlankLineBeforeClass,
     "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
      Consider adding `D203` to `ignore`.",
 )];
 
-/// A hash map from deprecated to latest `RuleCode`.
-pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, RuleCode>> = Lazy::new(|| {
+/// A hash map from deprecated to latest `Rule`.
+pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, Rule>> = Lazy::new(|| {
     FxHashMap::from_iter([
         // TODO(charlie): Remove by 2023-01-01.
-        ("U001", RuleCode::UP001),
-        ("U003", RuleCode::UP003),
-        ("U004", RuleCode::UP004),
-        ("U005", RuleCode::UP005),
-        ("U006", RuleCode::UP006),
-        ("U007", RuleCode::UP007),
-        ("U008", RuleCode::UP008),
-        ("U009", RuleCode::UP009),
-        ("U010", RuleCode::UP010),
-        ("U011", RuleCode::UP011),
-        ("U012", RuleCode::UP012),
-        ("U013", RuleCode::UP013),
-        ("U014", RuleCode::UP014),
-        ("U015", RuleCode::UP015),
-        ("U016", RuleCode::UP016),
-        ("U017", RuleCode::UP017),
-        ("U019", RuleCode::UP019),
+        ("U001", Rule::UselessMetaclassType),
+        ("U003", Rule::TypeOfPrimitive),
+        ("U004", Rule::UselessObjectInheritance),
+        ("U005", Rule::DeprecatedUnittestAlias),
+        ("U006", Rule::UsePEP585Annotation),
+        ("U007", Rule::UsePEP604Annotation),
+        ("U008", Rule::SuperCallWithParameters),
+        ("U009", Rule::PEP3120UnnecessaryCodingComment),
+        ("U010", Rule::UnnecessaryFutureImport),
+        ("U011", Rule::LRUCacheWithoutParameters),
+        ("U012", Rule::UnnecessaryEncodeUTF8),
+        ("U013", Rule::ConvertTypedDictFunctionalToClass),
+        ("U014", Rule::ConvertNamedTupleFunctionalToClass),
+        ("U015", Rule::RedundantOpenModes),
+        ("U016", Rule::RemoveSixCompat),
+        ("U017", Rule::DatetimeTimezoneUTC),
+        ("U019", Rule::TypingTextStrAlias),
         // TODO(charlie): Remove by 2023-02-01.
-        ("I252", RuleCode::TID252),
-        ("M001", RuleCode::RUF100),
+        ("I252", Rule::RelativeImports),
+        ("M001", Rule::UnusedNOQA),
         // TODO(charlie): Remove by 2023-02-01.
-        ("PDV002", RuleCode::PD002),
-        ("PDV003", RuleCode::PD003),
-        ("PDV004", RuleCode::PD004),
-        ("PDV007", RuleCode::PD007),
-        ("PDV008", RuleCode::PD008),
-        ("PDV009", RuleCode::PD009),
-        ("PDV010", RuleCode::PD010),
-        ("PDV011", RuleCode::PD011),
-        ("PDV012", RuleCode::PD012),
-        ("PDV013", RuleCode::PD013),
-        ("PDV015", RuleCode::PD015),
-        ("PDV901", RuleCode::PD901),
+        ("PDV002", Rule::UseOfInplaceArgument),
+        ("PDV003", Rule::UseOfDotIsNull),
+        ("PDV004", Rule::UseOfDotNotNull),
+        ("PDV007", Rule::UseOfDotIx),
+        ("PDV008", Rule::UseOfDotAt),
+        ("PDV009", Rule::UseOfDotIat),
+        ("PDV010", Rule::UseOfDotPivotOrUnstack),
+        ("PDV011", Rule::UseOfDotValues),
+        ("PDV012", Rule::UseOfDotReadTable),
+        ("PDV013", Rule::UseOfDotStack),
+        ("PDV015", Rule::UseOfPdMerge),
+        ("PDV901", Rule::DfIsABadVariableName),
         // TODO(charlie): Remove by 2023-02-01.
-        ("R501", RuleCode::RET501),
-        ("R502", RuleCode::RET502),
-        ("R503", RuleCode::RET503),
-        ("R504", RuleCode::RET504),
-        ("R505", RuleCode::RET505),
-        ("R506", RuleCode::RET506),
-        ("R507", RuleCode::RET507),
-        ("R508", RuleCode::RET508),
+        ("R501", Rule::UnnecessaryReturnNone),
+        ("R502", Rule::ImplicitReturnValue),
+        ("R503", Rule::ImplicitReturn),
+        ("R504", Rule::UnnecessaryAssign),
+        ("R505", Rule::SuperfluousElseReturn),
+        ("R506", Rule::SuperfluousElseRaise),
+        ("R507", Rule::SuperfluousElseContinue),
+        ("R508", Rule::SuperfluousElseBreak),
         // TODO(charlie): Remove by 2023-02-01.
-        ("IC001", RuleCode::ICN001),
-        ("IC002", RuleCode::ICN001),
-        ("IC003", RuleCode::ICN001),
-        ("IC004", RuleCode::ICN001),
+        ("IC001", Rule::ImportAliasIsNotConventional),
+        ("IC002", Rule::ImportAliasIsNotConventional),
+        ("IC003", Rule::ImportAliasIsNotConventional),
+        ("IC004", Rule::ImportAliasIsNotConventional),
     ])
 });
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use strum::IntoEnumIterator;
 
-    use crate::registry::RuleCode;
+    use super::{Linter, Rule, RuleNamespace};
 
     #[test]
     fn check_code_serialization() {
-        for check_code in RuleCode::iter() {
+        for rule in Rule::iter() {
             assert!(
-                RuleCode::from_str(check_code.as_ref()).is_ok(),
-                "{check_code:?} could not be round-trip serialized."
+                Rule::from_code(rule.code()).is_ok(),
+                "{rule:?} could not be round-trip serialized."
             );
         }
     }
 
     #[test]
-    fn fixable_codes() {
-        for check_code in RuleCode::iter() {
-            let kind = check_code.kind();
-            if kind.fixable() {
-                assert!(
-                    kind.commit().is_some(),
-                    "{check_code:?} is fixable but has no commit message."
-                );
-            }
+    fn test_linter_prefixes() {
+        for rule in Rule::iter() {
+            Linter::parse_code(rule.code())
+                .unwrap_or_else(|| panic!("couldn't parse {:?}", rule.code()));
         }
     }
 }

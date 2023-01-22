@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     UnusedImport:
-      - foo
+      - foo1
       - false
       - false
   location:
@@ -12,7 +12,7 @@ expression: diagnostics
     column: 11
   end_location:
     row: 3
-    column: 14
+    column: 15
   fix:
     content: ""
     location:
@@ -20,11 +20,11 @@ expression: diagnostics
       column: 4
     end_location:
       row: 3
-      column: 16
+      column: 17
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo2
       - false
       - false
   location:
@@ -32,7 +32,7 @@ expression: diagnostics
     column: 11
   end_location:
     row: 4
-    column: 14
+    column: 15
   fix:
     content: ""
     location:
@@ -40,11 +40,11 @@ expression: diagnostics
       column: 4
     end_location:
       row: 4
-      column: 20
+      column: 21
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo3
       - false
       - false
   location:
@@ -52,7 +52,7 @@ expression: diagnostics
     column: 11
   end_location:
     row: 7
-    column: 14
+    column: 15
   fix:
     content: ""
     location:
@@ -64,7 +64,7 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo4
       - false
       - false
   location:
@@ -72,7 +72,7 @@ expression: diagnostics
     column: 11
   end_location:
     row: 11
-    column: 14
+    column: 15
   fix:
     content: ""
     location:
@@ -84,7 +84,7 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo5
       - false
       - false
   location:
@@ -92,7 +92,7 @@ expression: diagnostics
     column: 18
   end_location:
     row: 16
-    column: 21
+    column: 22
   fix:
     content: ""
     location:
@@ -100,11 +100,11 @@ expression: diagnostics
       column: 11
     end_location:
       row: 16
-      column: 21
+      column: 22
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo6
       - false
       - false
   location:
@@ -112,7 +112,7 @@ expression: diagnostics
     column: 16
   end_location:
     row: 21
-    column: 19
+    column: 20
   fix:
     content: ""
     location:
@@ -120,11 +120,11 @@ expression: diagnostics
       column: 9
     end_location:
       row: 21
-      column: 19
+      column: 20
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo7
       - false
       - false
   location:
@@ -132,7 +132,7 @@ expression: diagnostics
     column: 17
   end_location:
     row: 26
-    column: 20
+    column: 21
   fix:
     content: ""
     location:
@@ -140,11 +140,11 @@ expression: diagnostics
       column: 10
     end_location:
       row: 26
-      column: 20
+      column: 21
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo8
       - false
       - false
   location:
@@ -152,7 +152,7 @@ expression: diagnostics
     column: 18
   end_location:
     row: 30
-    column: 21
+    column: 22
   fix:
     content: ""
     location:
@@ -160,11 +160,11 @@ expression: diagnostics
       column: 11
     end_location:
       row: 30
-      column: 23
+      column: 24
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo9
       - false
       - false
   location:
@@ -172,7 +172,7 @@ expression: diagnostics
     column: 22
   end_location:
     row: 31
-    column: 25
+    column: 26
   fix:
     content: ""
     location:
@@ -180,11 +180,11 @@ expression: diagnostics
       column: 15
     end_location:
       row: 31
-      column: 31
+      column: 32
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo10
       - false
       - false
   location:
@@ -192,7 +192,7 @@ expression: diagnostics
     column: 15
   end_location:
     row: 35
-    column: 18
+    column: 20
   fix:
     content: ""
     location:
@@ -204,7 +204,7 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo11
       - false
       - false
   location:
@@ -212,7 +212,7 @@ expression: diagnostics
     column: 16
   end_location:
     row: 40
-    column: 19
+    column: 21
   fix:
     content: ""
     location:
@@ -224,7 +224,7 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo12
       - false
       - false
   location:
@@ -232,7 +232,7 @@ expression: diagnostics
     column: 7
   end_location:
     row: 46
-    column: 10
+    column: 12
   fix:
     content: ""
     location:
@@ -240,11 +240,11 @@ expression: diagnostics
       column: 0
     end_location:
       row: 46
-      column: 10
+      column: 12
   parent: ~
 - kind:
     UnusedImport:
-      - foo
+      - foo13
       - false
       - false
   location:
@@ -252,14 +252,14 @@ expression: diagnostics
     column: 7
   end_location:
     row: 51
-    column: 10
+    column: 12
   fix:
-    content: "\n"
+    content: ""
     location:
       row: 51
       column: 0
     end_location:
       row: 51
-      column: 10
+      column: 12
   parent: ~
 

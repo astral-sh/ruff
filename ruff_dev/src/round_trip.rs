@@ -5,8 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Args;
-use ruff::source_code::{Generator, Locator, Stylist};
-use rustpython_parser::parser;
+use ruff::source_code::round_trip;
 
 #[derive(Args)]
 pub struct Cli {
@@ -17,11 +16,6 @@ pub struct Cli {
 
 pub fn main(cli: &Cli) -> Result<()> {
     let contents = fs::read_to_string(&cli.file)?;
-    let python_ast = parser::parse_program(&contents, &cli.file.to_string_lossy())?;
-    let locator = Locator::new(&contents);
-    let stylist = Stylist::from_contents(&contents, &locator);
-    let mut generator: Generator = (&stylist).into();
-    generator.unparse_suite(&python_ast);
-    println!("{}", generator.generate());
+    println!("{}", round_trip(&contents, &cli.file.to_string_lossy())?);
     Ok(())
 }

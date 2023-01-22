@@ -5,71 +5,71 @@ expression: diagnostics
 - kind:
     SuperfluousElseBreak: Elif
   location:
-    row: 6
+    row: 8
     column: 8
   end_location:
-    row: 11
-    column: 17
+    row: 8
+    column: 12
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseBreak: Elif
   location:
-    row: 16
+    row: 22
     column: 8
   end_location:
-    row: 25
-    column: 17
+    row: 22
+    column: 12
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseBreak: Else
   location:
-    row: 31
+    row: 33
     column: 8
   end_location:
-    row: 34
-    column: 17
+    row: 33
+    column: 12
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseBreak: Else
   location:
-    row: 41
+    row: 44
     column: 12
   end_location:
-    row: 46
-    column: 21
+    row: 44
+    column: 16
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseBreak: Else
   location:
-    row: 54
+    row: 60
     column: 8
   end_location:
-    row: 61
-    column: 17
+    row: 60
+    column: 12
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseBreak: Else
   location:
-    row: 68
+    row: 71
     column: 12
   end_location:
-    row: 72
-    column: 21
+    row: 71
+    column: 16
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseBreak: Else
   location:
-    row: 80
+    row: 82
     column: 8
   end_location:
-    row: 86
-    column: 21
+    row: 82
+    column: 12
   fix: ~
   parent: ~
 

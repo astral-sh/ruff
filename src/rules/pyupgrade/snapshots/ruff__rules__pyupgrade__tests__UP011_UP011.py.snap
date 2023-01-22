@@ -1,0 +1,73 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    LRUCacheWithoutParameters: ~
+  location:
+    row: 5
+    column: 20
+  end_location:
+    row: 5
+    column: 22
+  fix:
+    content: functools.lru_cache
+    location:
+      row: 5
+      column: 1
+    end_location:
+      row: 5
+      column: 22
+  parent: ~
+- kind:
+    LRUCacheWithoutParameters: ~
+  location:
+    row: 10
+    column: 10
+  end_location:
+    row: 10
+    column: 12
+  fix:
+    content: lru_cache
+    location:
+      row: 10
+      column: 1
+    end_location:
+      row: 10
+      column: 12
+  parent: ~
+- kind:
+    LRUCacheWithoutParameters: ~
+  location:
+    row: 16
+    column: 20
+  end_location:
+    row: 16
+    column: 22
+  fix:
+    content: functools.lru_cache
+    location:
+      row: 16
+      column: 1
+    end_location:
+      row: 16
+      column: 22
+  parent: ~
+- kind:
+    LRUCacheWithoutParameters: ~
+  location:
+    row: 21
+    column: 20
+  end_location:
+    row: 21
+    column: 22
+  fix:
+    content: functools.lru_cache
+    location:
+      row: 21
+      column: 1
+    end_location:
+      row: 21
+      column: 22
+  parent: ~
+

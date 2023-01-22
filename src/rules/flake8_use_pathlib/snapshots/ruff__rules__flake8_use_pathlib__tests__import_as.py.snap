@@ -1,0 +1,235 @@
+---
+source: src/rules/flake8_use_pathlib/mod.rs
+expression: diagnostics
+---
+- kind:
+    PathlibAbspath: ~
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    PathlibChmod: ~
+  location:
+    row: 7
+    column: 5
+  end_location:
+    row: 7
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    PathlibMkdir: ~
+  location:
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    PathlibMakedirs: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    PathlibRename: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    PathlibReplace: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    PathlibRmdir: ~
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    PathlibRemove: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    PathlibUnlink: ~
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetcwd: ~
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    PathlibExists: ~
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibExpanduser: ~
+  location:
+    row: 17
+    column: 5
+  end_location:
+    row: 17
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    PathlibIsDir: ~
+  location:
+    row: 18
+    column: 6
+  end_location:
+    row: 18
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    PathlibIsFile: ~
+  location:
+    row: 19
+    column: 7
+  end_location:
+    row: 19
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    PathlibIsLink: ~
+  location:
+    row: 20
+    column: 8
+  end_location:
+    row: 20
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    PathlibReadlink: ~
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    PathlibStat: ~
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 22
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    PathlibIsAbs: ~
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 23
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    PathlibJoin: ~
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 24
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    PathlibBasename: ~
+  location:
+    row: 25
+    column: 0
+  end_location:
+    row: 25
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    PathlibDirname: ~
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 26
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    PathlibSamefile: ~
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    PathlibSplitext: ~
+  location:
+    row: 28
+    column: 0
+  end_location:
+    row: 28
+    column: 14
+  fix: ~
+  parent: ~
+

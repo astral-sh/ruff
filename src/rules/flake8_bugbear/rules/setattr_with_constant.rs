@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, Stmt
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::python::identifiers::IDENTIFIER_REGEX;
+use crate::python::identifiers::is_identifier;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code::{Generator, Stylist};
@@ -49,7 +49,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     } = &name.node else {
         return;
     };
-    if !IDENTIFIER_REGEX.is_match(name) {
+    if !is_identifier(name) {
         return;
     }
     if KWLIST.contains(&name.as_str()) {
@@ -62,9 +62,9 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         if expr == child.as_ref() {
             let mut diagnostic =
                 Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
-            if checker.patch(diagnostic.kind.code()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
-                    assignment(obj, name, value, checker.style),
+                    assignment(obj, name, value, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));

@@ -64,7 +64,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         Range::from_located(stmt),
     );
 
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
@@ -82,6 +82,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             defined_in.map(std::convert::Into::into),
             &deleted,
             checker.locator,
+            checker.indexer,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {

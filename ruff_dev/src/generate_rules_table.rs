@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::Args;
-use ruff::registry::{Prefixes, RuleCodePrefix, RuleOrigin};
+use ruff::registry::{Linter, LinterCategory, Rule, RuleNamespace};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -20,19 +20,22 @@ pub struct Cli {
     pub(crate) dry_run: bool,
 }
 
-fn generate_table(table_out: &mut String, prefix: &RuleCodePrefix) {
+fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>) {
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
     table_out.push('\n');
-    for rule_code in prefix.codes() {
-        let kind = rule_code.kind();
-        let fix_token = if kind.fixable() { "🛠" } else { "" };
+    for rule in rules {
+        let fix_token = match rule.autofixable() {
+            None => "",
+            Some(_) => "🛠",
+        };
+
         table_out.push_str(&format!(
             "| {} | {} | {} | {} |",
-            kind.code().as_ref(),
-            kind.as_ref(),
-            kind.summary().replace('|', r"\|"),
+            rule.code(),
+            rule.as_ref(),
+            rule.message_formats()[0].replace('|', r"\|"),
             fix_token
         ));
         table_out.push('\n');
@@ -44,41 +47,52 @@ pub fn main(cli: &Cli) -> Result<()> {
     // Generate the table string.
     let mut table_out = String::new();
     let mut toc_out = String::new();
-    for origin in RuleOrigin::iter() {
-        let prefixes = origin.prefixes();
-        let codes_csv: String = prefixes.as_list(", ");
-        table_out.push_str(&format!("### {} ({codes_csv})", origin.title()));
+    for linter in Linter::iter() {
+        let codes_csv: String = linter.prefixes().join(", ");
+        table_out.push_str(&format!("### {} ({codes_csv})", linter.name()));
         table_out.push('\n');
         table_out.push('\n');
 
         toc_out.push_str(&format!(
             "   1. [{} ({})](#{}-{})\n",
-            origin.title(),
+            linter.name(),
             codes_csv,
-            origin.title().to_lowercase().replace(' ', "-"),
+            linter.name().to_lowercase().replace(' ', "-"),
             codes_csv.to_lowercase().replace(',', "-").replace(' ', "")
         ));
 
-        if let Some((url, platform)) = origin.url() {
+        if let Some(url) = linter.url() {
+            let host = url
+                .trim_start_matches("https://")
+                .split('/')
+                .next()
+                .unwrap();
             table_out.push_str(&format!(
                 "For more, see [{}]({}) on {}.",
-                origin.title(),
+                linter.name(),
                 url,
-                platform
+                match host {
+                    "pypi.org" => "PyPI",
+                    "github.com" => "GitHub",
+                    host => panic!(
+                        "unexpected host in URL of {}, expected pypi.org or github.com but found \
+                         {host}",
+                        linter.name()
+                    ),
+                }
             ));
             table_out.push('\n');
             table_out.push('\n');
         }
 
-        match prefixes {
-            Prefixes::Single(prefix) => generate_table(&mut table_out, &prefix),
-            Prefixes::Multiple(entries) => {
-                for (prefix, category) in entries {
-                    table_out.push_str(&format!("#### {category} ({})", prefix.as_ref()));
-                    table_out.push('\n');
-                    generate_table(&mut table_out, &prefix);
-                }
+        if let Some(categories) = linter.categories() {
+            for LinterCategory(prefix, name, selector) in categories {
+                table_out.push_str(&format!("#### {name} ({prefix})"));
+                table_out.push('\n');
+                generate_table(&mut table_out, selector);
             }
+        } else {
+            generate_table(&mut table_out, &linter);
         }
     }
 

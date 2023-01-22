@@ -1,14 +1,16 @@
+use log::error;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    any_over_expr, contains_call_path, create_expr, create_stmt, has_comments, unparse_expr,
-    unparse_stmt,
+    contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range,
+    has_comments_in, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
+use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violations;
 
 fn is_main_check(expr: &Expr) -> bool {
@@ -35,52 +37,126 @@ fn is_main_check(expr: &Expr) -> bool {
     false
 }
 
+/// Find the last nested if statement and return the test expression and the
+/// first statement.
+///
+/// ```python
+/// if xxx:
+///     if yyy:
+///      # ^^^ returns this expression
+///         z = 1
+///       # ^^^^^ and this statement
+///         ...
+/// ```
+fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
+    let [Stmt { node: StmtKind::If { test, body: inner_body, orelse }, ..}] = body else { return None };
+    if !orelse.is_empty() {
+        return None;
+    }
+    find_last_nested_if(inner_body).or_else(|| {
+        Some((
+            test,
+            inner_body.last().expect("Expected body to be non-empty"),
+        ))
+    })
+}
+
 /// SIM102
-pub fn nested_if_statements(checker: &mut Checker, stmt: &Stmt) {
-    let StmtKind::If { test, body, orelse } = &stmt.node else {
-        return;
-    };
-
-    // if a: <---
-    //     if b: <---
-    //         c
-    let is_nested_if = {
-        if orelse.is_empty() && body.len() == 1 {
-            if let StmtKind::If { orelse, .. } = &body[0].node {
-                orelse.is_empty()
-            } else {
-                false
+pub fn nested_if_statements(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &[Stmt],
+    orelse: &[Stmt],
+    parent: Option<&Stmt>,
+) {
+    // If the parent could contain a nested if-statement, abort.
+    if let Some(parent) = parent {
+        if let StmtKind::If { body, orelse, .. } = &parent.node {
+            if orelse.is_empty() && body.len() == 1 {
+                return;
             }
-        } else {
-            false
         }
-    };
+    }
 
-    if !is_nested_if {
+    // If this if-statement has an else clause, or more than one child, abort.
+    if !(orelse.is_empty() && body.len() == 1) {
         return;
-    };
+    }
 
     if is_main_check(test) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    // Find the deepest nested if-statement, to inform the range.
+    let Some((test, first_stmt)) = find_last_nested_if(body) else {
+        return;
+    };
+    let colon = first_colon_range(
+        Range::new(test.end_location.unwrap(), first_stmt.location),
+        checker.locator,
+    );
+    let mut diagnostic = Diagnostic::new(
         violations::NestedIfStatements,
-        Range::from_located(stmt),
-    ));
+        colon.map_or_else(
+            || Range::from_located(stmt),
+            |colon| Range::new(stmt.location, colon.end_location),
+        ),
+    );
+    if checker.patch(&Rule::NestedIfStatements) {
+        // The fixer preserves comments in the nested body, but removes comments between
+        // the outer and inner if statements.
+        let nested_if = &body[0];
+        if !has_comments_in(
+            Range::new(stmt.location, nested_if.location),
+            checker.locator,
+        ) {
+            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
+                Ok(fix) => {
+                    if fix
+                        .content
+                        .lines()
+                        .all(|line| line.len() <= checker.settings.line_length)
+                    {
+                        diagnostic.amend(fix);
+                    }
+                }
+                Err(err) => error!("Failed to fix nested if: {err}"),
+            }
+        }
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
-fn is_one_line_return_bool(stmts: &[Stmt]) -> bool {
+enum Bool {
+    True,
+    False,
+}
+
+impl From<bool> for Bool {
+    fn from(value: bool) -> Self {
+        if value {
+            Bool::True
+        } else {
+            Bool::False
+        }
+    }
+}
+
+fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
     if stmts.len() != 1 {
-        return false;
+        return None;
     }
     let StmtKind::Return { value } = &stmts[0].node else {
-        return false;
+        return None;
     };
     let Some(ExprKind::Constant { value, .. }) = value.as_ref().map(|value| &value.node) else {
-        return false;
+        return None;
     };
-    matches!(value, Constant::Bool(_))
+    let Constant::Bool(value) = value else {
+        return None;
+    };
+    Some((*value).into())
 }
 
 /// SIM103
@@ -88,20 +164,24 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     let StmtKind::If { test, body, orelse } = &stmt.node else {
         return;
     };
-    if !(is_one_line_return_bool(body) && is_one_line_return_bool(orelse)) {
+    let (Some(if_return), Some(else_return)) = (is_one_line_return_bool(body), is_one_line_return_bool(orelse)) else {
         return;
-    }
-    let condition = unparse_expr(test, checker.style);
+    };
+    let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
         violations::ReturnBoolConditionDirectly(condition),
         Range::from_located(stmt),
     );
-    if checker.patch(&RuleCode::SIM103) {
+    if checker.patch(&Rule::ReturnBoolConditionDirectly)
+        && matches!(if_return, Bool::True)
+        && matches!(else_return, Bool::False)
+        && !has_comments_in(Range::from_located(stmt), checker.locator)
+    {
         let return_stmt = create_stmt(StmtKind::Return {
             value: Some(test.clone()),
         });
         diagnostic.amend(Fix::replacement(
-            unparse_stmt(&return_stmt, checker.style),
+            unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
             stmt.end_location.unwrap(),
         ));
@@ -191,7 +271,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
-    let contents = unparse_stmt(&ternary, checker.style);
+    let contents = unparse_stmt(&ternary, checker.stylist);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if stmt.location.column() + contents.len() > checker.settings.line_length {
@@ -199,7 +279,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     // Don't flag if the statement expression contains any comments.
-    if has_comments(stmt, checker.locator) {
+    if has_comments_in(Range::from_located(stmt), checker.locator) {
         return;
     }
 
@@ -207,7 +287,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         violations::UseTernaryOperator(contents.clone()),
         Range::from_located(stmt),
     );
-    if checker.patch(&RuleCode::SIM108) {
+    if checker.patch(&Rule::UseTernaryOperator) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -228,6 +308,7 @@ pub fn use_dict_get_with_default(
     test: &Expr,
     body: &Vec<Stmt>,
     orelse: &Vec<Stmt>,
+    parent: Option<&Stmt>,
 ) {
     if body.len() != 1 || orelse.len() != 1 {
         return;
@@ -272,20 +353,38 @@ pub fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if any_over_expr(default_val, &|expr| {
-        matches!(
-            expr.node,
-            ExprKind::Call { .. }
-                | ExprKind::Await { .. }
-                | ExprKind::GeneratorExp { .. }
-                | ExprKind::ListComp { .. }
-                | ExprKind::SetComp { .. }
-                | ExprKind::DictComp { .. }
-                | ExprKind::Yield { .. }
-                | ExprKind::YieldFrom { .. }
-        )
-    }) {
+    if contains_effect(checker, default_val) {
         return;
+    }
+
+    // It's part of a bigger if-elif block:
+    // https://github.com/MartinThoma/flake8-simplify/issues/115
+    if let Some(StmtKind::If {
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
+    {
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
+        }
     }
 
     let contents = unparse_stmt(
@@ -305,7 +404,7 @@ pub fn use_dict_get_with_default(
             })),
             type_comment: None,
         }),
-        checker.style,
+        checker.stylist,
     );
 
     // Don't flag if the resulting expression would exceed the maximum line length.
@@ -314,7 +413,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Don't flag if the statement expression contains any comments.
-    if has_comments(stmt, checker.locator) {
+    if has_comments_in(Range::from_located(stmt), checker.locator) {
         return;
     }
 
@@ -322,7 +421,7 @@ pub fn use_dict_get_with_default(
         violations::DictGetWithDefault(contents.clone()),
         Range::from_located(stmt),
     );
-    if checker.patch(&RuleCode::SIM401) {
+    if checker.patch(&Rule::DictGetWithDefault) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

@@ -13,10 +13,9 @@ pub fn call_datetime_without_tzinfo(
     keywords: &[Keyword],
     location: Range,
 ) {
-    if !checker
-        .resolve_call_path(func)
-        .map_or(false, |call_path| call_path == ["datetime", "datetime"])
-    {
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["datetime", "datetime"]
+    }) {
         return;
     }
 
@@ -38,10 +37,15 @@ pub fn call_datetime_without_tzinfo(
     }
 }
 
-/// DTZ002
+/// Checks for `datetime.datetime.today()`. (DTZ002)
+///
+/// ## Why is this bad?
+///
+/// It uses the system local timezone.
+/// Use `datetime.datetime.now(tz=)` instead.
 pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) {
     if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path == ["datetime", "datetime", "today"]
+        call_path.as_slice() == ["datetime", "datetime", "today"]
     }) {
         checker
             .diagnostics
@@ -49,10 +53,17 @@ pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) 
     }
 }
 
-/// DTZ003
+/// Checks for `datetime.datetime.today()`. (DTZ003)
+///
+/// ## Why is this bad?
+///
+/// Because naive `datetime` objects are treated by many `datetime` methods as
+/// local times, it is preferred to use aware datetimes to represent times in
+/// UTC. As such, the recommended way to create an object representing the
+/// current time in UTC is by calling `datetime.now(timezone.utc)`.
 pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range) {
     if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path == ["datetime", "datetime", "utcnow"]
+        call_path.as_slice() == ["datetime", "datetime", "utcnow"]
     }) {
         checker
             .diagnostics
@@ -60,10 +71,18 @@ pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range)
     }
 }
 
-/// DTZ004
+/// Checks for `datetime.datetime.utcfromtimestamp()`. (DTZ004)
+///
+/// ## Why is this bad?
+///
+/// Because naive `datetime` objects are treated by many `datetime` methods as
+/// local times, it is preferred to use aware datetimes to represent times in
+/// UTC. As such, the recommended way to create an object representing a
+/// specific timestamp in UTC is by calling `datetime.fromtimestamp(timestamp,
+/// tz=timezone.utc)`.
 pub fn call_datetime_utcfromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
     if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path == ["datetime", "datetime", "utcfromtimestamp"]
+        call_path.as_slice() == ["datetime", "datetime", "utcfromtimestamp"]
     }) {
         checker.diagnostics.push(Diagnostic::new(
             violations::CallDatetimeUtcfromtimestamp,
@@ -81,7 +100,7 @@ pub fn call_datetime_now_without_tzinfo(
     location: Range,
 ) {
     if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path == ["datetime", "datetime", "now"]
+        call_path.as_slice() == ["datetime", "datetime", "now"]
     }) {
         return;
     }
@@ -122,7 +141,7 @@ pub fn call_datetime_fromtimestamp(
     location: Range,
 ) {
     if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path == ["datetime", "datetime", "fromtimestamp"]
+        call_path.as_slice() == ["datetime", "datetime", "fromtimestamp"]
     }) {
         return;
     }
@@ -162,7 +181,7 @@ pub fn call_datetime_strptime_without_zone(
     location: Range,
 ) {
     if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path == ["datetime", "datetime", "strptime"]
+        call_path.as_slice() == ["datetime", "datetime", "strptime"]
     }) {
         return;
     }
@@ -208,10 +227,15 @@ pub fn call_datetime_strptime_without_zone(
     ));
 }
 
-/// DTZ011
+/// Checks for `datetime.date.today()`. (DTZ011)
+///
+/// ## Why is this bad?
+///
+/// It uses the system local timezone.
+/// Use `datetime.datetime.now(tz=).date()` instead.
 pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
     if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path == ["datetime", "date", "today"]
+        call_path.as_slice() == ["datetime", "date", "today"]
     }) {
         checker
             .diagnostics
@@ -219,10 +243,15 @@ pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
     }
 }
 
-/// DTZ012
+/// Checks for `datetime.date.fromtimestamp()`. (DTZ012)
+///
+/// ## Why is this bad?
+///
+/// It uses the system local timezone.
+/// Use `datetime.datetime.fromtimestamp(, tz=).date()` instead.
 pub fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
     if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path == ["datetime", "date", "fromtimestamp"]
+        call_path.as_slice() == ["datetime", "date", "fromtimestamp"]
     }) {
         checker
             .diagnostics

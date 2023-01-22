@@ -10,8 +10,9 @@ use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
+use super::hashable::HashableHashSet;
 use crate::fs;
-use crate::registry::{RuleCode, RuleCodePrefix};
+use crate::registry::{Rule, RuleSelector};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
@@ -27,12 +28,6 @@ pub enum PythonVersion {
     Py39,
     Py310,
     Py311,
-}
-
-impl Default for PythonVersion {
-    fn default() -> Self {
-        Self::Py310
-    }
 }
 
 impl FromStr for PythonVersion {
@@ -54,7 +49,7 @@ impl FromStr for PythonVersion {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
     User(String, PathBuf),
@@ -92,18 +87,24 @@ impl FromStr for FilePattern {
 
 #[derive(Debug, Clone)]
 pub struct PerFileIgnore {
-    pub basename: String,
-    pub absolute: PathBuf,
-    pub codes: FxHashSet<RuleCode>,
+    pub(crate) basename: String,
+    pub(crate) absolute: PathBuf,
+    pub(crate) rules: HashableHashSet<Rule>,
 }
 
 impl PerFileIgnore {
-    pub fn new(basename: String, absolute: PathBuf, prefixes: &[RuleCodePrefix]) -> Self {
-        let codes = prefixes.iter().flat_map(RuleCodePrefix::codes).collect();
+    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+        let rules: FxHashSet<_> = prefixes.iter().flat_map(IntoIterator::into_iter).collect();
+        let path = Path::new(&pattern);
+        let absolute = match project_root {
+            Some(project_root) => fs::normalize_path_to(path, project_root),
+            None => fs::normalize_path(path),
+        };
+
         Self {
-            basename,
+            basename: pattern,
             absolute,
-            codes,
+            rules: rules.into(),
         }
     }
 }
@@ -111,7 +112,7 @@ impl PerFileIgnore {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PatternPrefixPair {
     pub pattern: String,
-    pub prefix: RuleCodePrefix,
+    pub prefix: RuleSelector,
 }
 
 impl PatternPrefixPair {
@@ -145,12 +146,14 @@ impl FromStr for PatternPrefixPair {
             (tokens[0].trim(), tokens[1].trim())
         };
         let pattern = pattern_str.into();
-        let prefix = RuleCodePrefix::from_str(code_string)?;
+        let prefix = RuleSelector::from_str(code_string)?;
         Ok(Self { pattern, prefix })
     }
 }
 
-#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(
+    Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema, Hash,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum SerializationFormat {
     Text,
@@ -159,6 +162,7 @@ pub enum SerializationFormat {
     Grouped,
     Github,
     Gitlab,
+    Pylint,
 }
 
 impl Default for SerializationFormat {
@@ -167,7 +171,7 @@ impl Default for SerializationFormat {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(try_from = "String")]
 pub struct Version(String);
 

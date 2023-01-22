@@ -1,0 +1,14 @@
+---
+source: src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    TryConsiderElse: ~
+  location:
+    row: 18
+    column: 8
+  end_location:
+    row: 18
+    column: 13
+  fix: ~
+  parent: ~

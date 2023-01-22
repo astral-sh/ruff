@@ -129,12 +129,13 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::registry::RuleCodePrefix;
+    use crate::registry::RuleSelector;
     use crate::rules::flake8_quotes::settings::Quote;
-    use crate::rules::flake8_tidy_imports::settings::{BannedApi, Strictness};
+    use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
+    use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
     use crate::rules::{
-        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
-        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
+        flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_import_conventions,
+        flake8_pytest_style, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
     };
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
@@ -196,6 +197,7 @@ mod tests {
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -207,6 +209,7 @@ mod tests {
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -256,6 +259,7 @@ line-length = 79
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -267,6 +271,7 @@ line-length = 79
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -316,6 +321,7 @@ exclude = ["foo.py"]
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -327,6 +333,7 @@ exclude = ["foo.py"]
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -365,7 +372,7 @@ select = ["E501"]
                     per_file_ignores: None,
                     required_version: None,
                     respect_gitignore: None,
-                    select: Some(vec![RuleCodePrefix::E501]),
+                    select: Some(vec![RuleSelector::E501]),
                     show_source: None,
                     src: None,
                     target_version: None,
@@ -376,6 +383,7 @@ select = ["E501"]
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -387,6 +395,7 @@ select = ["E501"]
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -412,14 +421,14 @@ ignore = ["E501"]
                     extend: None,
                     extend_exclude: None,
                     extend_ignore: None,
-                    extend_select: Some(vec![RuleCodePrefix::RUF100]),
+                    extend_select: Some(vec![RuleSelector::RUF100]),
                     external: None,
                     fix: None,
                     fix_only: None,
                     fixable: None,
                     force_exclude: None,
                     format: None,
-                    ignore: Some(vec![RuleCodePrefix::E501]),
+                    ignore: Some(vec![RuleSelector::E501]),
                     ignore_init_module_imports: None,
                     line_length: None,
                     namespace_packages: None,
@@ -437,6 +446,7 @@ ignore = ["E501"]
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -448,6 +458,7 @@ ignore = ["E501"]
                     pep8_naming: None,
                     pycodestyle: None,
                     pydocstyle: None,
+                    pylint: None,
                     pyupgrade: None,
                 })
             })
@@ -528,7 +539,7 @@ other-attribute = 1
                 cache_dir: None,
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
-                    vec![RuleCodePrefix::F401]
+                    vec![RuleSelector::F401]
                 )])),
                 dummy_variable_rgx: None,
                 respect_gitignore: None,
@@ -544,13 +555,16 @@ other-attribute = 1
                         "fastapi.Query".to_string(),
                     ]),
                 }),
+                flake8_builtins: Some(flake8_builtins::settings::Options {
+                    builtins_ignorelist: Some(vec!["id".to_string(), "dir".to_string(),]),
+                }),
                 flake8_errmsg: Some(flake8_errmsg::settings::Options {
                     max_string_length: Some(20),
                 }),
                 flake8_pytest_style: Some(flake8_pytest_style::settings::Options {
                     fixture_parentheses: Some(false),
                     parametrize_names_type: Some(
-                        flake8_pytest_style::types::ParametrizeNameType::CSV
+                        flake8_pytest_style::types::ParametrizeNameType::Csv
                     ),
                     parametrize_values_type: Some(
                         flake8_pytest_style::types::ParametrizeValuesType::Tuple,
@@ -574,18 +588,18 @@ other-attribute = 1
                     docstring_quotes: Some(Quote::Double),
                     avoid_escape: Some(true),
                 }),
-                flake8_tidy_imports: Some(flake8_tidy_imports::settings::Options {
+                flake8_tidy_imports: Some(flake8_tidy_imports::options::Options {
                     ban_relative_imports: Some(Strictness::Parents),
                     banned_api: Some(FxHashMap::from_iter([
                         (
                             "cgi".to_string(),
-                            BannedApi {
+                            ApiBan {
                                 msg: "The cgi module is deprecated.".to_string()
                             }
                         ),
                         (
                             "typing.TypedDict".to_string(),
-                            BannedApi {
+                            ApiBan {
                                 msg: "Use typing_extensions.TypedDict instead.".to_string()
                             }
                         )
@@ -629,6 +643,7 @@ other-attribute = 1
                 }),
                 pycodestyle: None,
                 pydocstyle: None,
+                pylint: None,
                 pyupgrade: None,
             }
         );

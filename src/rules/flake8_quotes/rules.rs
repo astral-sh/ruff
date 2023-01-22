@@ -3,7 +3,7 @@ use rustpython_ast::Location;
 use super::settings::Quote;
 use crate::ast::types::Range;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 use crate::violations;
@@ -80,7 +80,8 @@ pub fn quotes(
             violations::BadQuotesDocstring(quotes_settings.docstring_quotes.clone()),
             Range::new(start, end),
         );
-        if matches!(autofix, flags::Autofix::Enabled) && settings.fixable.contains(&RuleCode::Q002)
+        if matches!(autofix, flags::Autofix::Enabled)
+            && settings.rules.should_fix(&Rule::BadQuotesDocstring)
         {
             let quote_count = if is_multiline { 3 } else { 1 };
             let string_contents = &raw_text[quote_count..raw_text.len() - quote_count];
@@ -110,7 +111,8 @@ pub fn quotes(
             Range::new(start, end),
         );
 
-        if matches!(autofix, flags::Autofix::Enabled) && settings.fixable.contains(&RuleCode::Q001)
+        if matches!(autofix, flags::Autofix::Enabled)
+            && settings.rules.should_fix(&Rule::BadQuotesMultilineString)
         {
             let string_contents = &raw_text[3..raw_text.len() - 3];
             let quote = good_multiline(&quotes_settings.multiline_quotes);
@@ -137,7 +139,7 @@ pub fn quotes(
                 let mut diagnostic =
                     Diagnostic::new(violations::AvoidQuoteEscape, Range::new(start, end));
                 if matches!(autofix, flags::Autofix::Enabled)
-                    && settings.fixable.contains(&RuleCode::Q003)
+                    && settings.rules.should_fix(&Rule::AvoidQuoteEscape)
                 {
                     let quote = bad_single(&quotes_settings.inline_quotes);
 
@@ -193,7 +195,7 @@ pub fn quotes(
                 Range::new(start, end),
             );
             if matches!(autofix, flags::Autofix::Enabled)
-                && settings.fixable.contains(&RuleCode::Q000)
+                && settings.rules.should_fix(&Rule::BadQuotesInlineString)
             {
                 let quote = good_single(&quotes_settings.inline_quotes);
                 let mut fixed_contents =

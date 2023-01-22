@@ -10,10 +10,11 @@ use rustpython_ast::{
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
+use smallvec::smallvec;
 
-use crate::ast::types::{Binding, BindingKind, Range};
+use crate::ast::types::{Binding, BindingKind, CallPath, Range};
 use crate::checkers::ast::Checker;
-use crate::source_code::{Generator, Locator, Stylist};
+use crate::source_code::{Generator, Indexer, Locator, Stylist};
 
 /// Create an `Expr` with default location from an `ExprKind`.
 pub fn create_expr(node: ExprKind) -> Expr {
@@ -39,7 +40,7 @@ pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
     generator.generate()
 }
 
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
+fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) {
     match &expr.node {
         ExprKind::Call { func, .. } => {
             collect_call_path_inner(func, parts);
@@ -55,9 +56,9 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
     }
 }
 
-/// Convert an `Expr` to its call path segments (like ["typing", "List"]).
-pub fn collect_call_path(expr: &Expr) -> Vec<&str> {
-    let mut segments = vec![];
+/// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
+pub fn collect_call_path(expr: &Expr) -> CallPath {
+    let mut segments = smallvec![];
     collect_call_path_inner(expr, &mut segments);
     segments
 }
@@ -90,7 +91,47 @@ pub fn contains_call_path(checker: &Checker, expr: &Expr, target: &[&str]) -> bo
     any_over_expr(expr, &|expr| {
         checker
             .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path == target)
+            .map_or(false, |call_path| call_path.as_slice() == target)
+    })
+}
+
+/// Return `true` if the `Expr` contains an expression that appears to include a
+/// side-effect (like a function call).
+pub fn contains_effect(checker: &Checker, expr: &Expr) -> bool {
+    any_over_expr(expr, &|expr| {
+        // Accept empty initializers.
+        if let ExprKind::Call {
+            func,
+            args,
+            keywords,
+        } = &expr.node
+        {
+            if args.is_empty() && keywords.is_empty() {
+                if let ExprKind::Name { id, .. } = &func.node {
+                    let is_empty_initializer = (id == "set"
+                        || id == "list"
+                        || id == "tuple"
+                        || id == "dict"
+                        || id == "frozenset")
+                        && checker.is_builtin(id);
+                    return !is_empty_initializer;
+                }
+            }
+        }
+
+        // Otherwise, avoid all complex expressions.
+        matches!(
+            expr.node,
+            ExprKind::Await { .. }
+                | ExprKind::Call { .. }
+                | ExprKind::DictComp { .. }
+                | ExprKind::GeneratorExp { .. }
+                | ExprKind::ListComp { .. }
+                | ExprKind::SetComp { .. }
+                | ExprKind::Subscript { .. }
+                | ExprKind::Yield { .. }
+                | ExprKind::YieldFrom { .. }
+        )
     })
 }
 
@@ -120,7 +161,7 @@ where
         }
         ExprKind::Dict { keys, values } => values
             .iter()
-            .chain(keys.iter())
+            .chain(keys.iter().flatten())
             .any(|expr| any_over_expr(expr, func)),
         ExprKind::Set { elts } | ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
             elts.iter().any(|expr| any_over_expr(expr, func))
@@ -197,7 +238,7 @@ where
 
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
-/// Return `true` if the `Stmt` is an assignment to a dunder (like `__all__`).
+/// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
 pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type
     // annotation. This is what pycodestyle (as of 2.9.1) does.
@@ -219,7 +260,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     }
 }
 
-/// Return `true` if the `Expr` is a singleton (`None`, `True`, `False`, or
+/// Return `true` if the [`Expr`] is a singleton (`None`, `True`, `False`, or
 /// `...`).
 pub fn is_singleton(expr: &Expr) -> bool {
     matches!(
@@ -231,7 +272,7 @@ pub fn is_singleton(expr: &Expr) -> bool {
     )
 }
 
-/// Return `true` if the `Expr` is a constant or tuple of constants.
+/// Return `true` if the [`Expr`] is a constant or tuple of constants.
 pub fn is_constant(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::Constant { .. } => true,
@@ -240,13 +281,13 @@ pub fn is_constant(expr: &Expr) -> bool {
     }
 }
 
-/// Return `true` if the `Expr` is a non-singleton constant.
+/// Return `true` if the [`Expr`] is a non-singleton constant.
 pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Return the `Keyword` with the given name, if it's present in the list of
-/// `Keyword` arguments.
+/// Return the [`Keyword`] with the given name, if it's present in the list of
+/// [`Keyword`] arguments.
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
         let KeywordData { arg, .. } = &keyword.node;
@@ -254,7 +295,7 @@ pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&
     })
 }
 
-/// Return `true` if an `Expr` is `None`.
+/// Return `true` if an [`Expr`] is `None`.
 pub fn is_const_none(expr: &Expr) -> bool {
     matches!(
         &expr.node,
@@ -274,7 +315,9 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
 }
 
 /// Extract the names of all handled exceptions.
-pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<Vec<&str>> {
+pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<CallPath> {
+    // TODO(charlie): Use `resolve_call_path` to avoid false positives for
+    // overridden builtins.
     let mut handler_names = vec![];
     for handler in handlers {
         match &handler.node {
@@ -322,10 +365,9 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 }
 
 /// Returns `true` if a statement or expression includes at least one comment.
-pub fn has_comments<T>(located: &Located<T>, locator: &Locator) -> bool {
-    lexer::make_tokenizer(&locator.slice_source_code_range(&Range::from_located(located)))
-        .flatten()
-        .any(|(_, tok, _)| matches!(tok, Tok::Comment(..)))
+pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
+    lexer::make_tokenizer(locator.slice_source_code_range(&range))
+        .any(|result| result.map_or(false, |(_, tok, _)| matches!(tok, Tok::Comment(..))))
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
@@ -377,11 +419,11 @@ pub fn format_import_from_member(
 }
 
 /// Split a target string (like `typing.List`) into (`typing`, `List`).
-pub fn to_call_path(target: &str) -> Vec<&str> {
+pub fn to_call_path(target: &str) -> CallPath {
     if target.contains('.') {
         target.split('.').collect()
     } else {
-        vec!["", target]
+        smallvec!["", target]
     }
 }
 
@@ -426,7 +468,7 @@ pub fn match_trailing_content(stmt: &Stmt, locator: &Locator) -> bool {
 /// Return the number of trailing empty lines following a statement.
 pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
     let suffix =
-        locator.slice_source_code_at(&Location::new(stmt.end_location.unwrap().row() + 1, 0));
+        locator.slice_source_code_at(Location::new(stmt.end_location.unwrap().row() + 1, 0));
     suffix
         .lines()
         .take_while(|line| line.trim().is_empty())
@@ -444,7 +486,7 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
             | StmtKind::AsyncFunctionDef { .. }
     ) {
         let contents = locator.slice_source_code_range(&Range::from_located(stmt));
-        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt.location).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt.location).flatten() {
             if matches!(tok, Tok::Name { .. }) {
                 return Range::new(start, end);
             }
@@ -473,7 +515,7 @@ pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
 // Return the ranges of `Name` tokens within a specified node.
 pub fn find_names<T>(located: &Located<T>, locator: &Locator) -> Vec<Range> {
     let contents = locator.slice_source_code_range(&Range::from_located(located));
-    lexer::make_tokenizer_located(&contents, located.location)
+    lexer::make_tokenizer_located(contents, located.location)
         .flatten()
         .filter(|(_, tok, _)| matches!(tok, Tok::Name { .. }))
         .map(|(start, _, end)| Range {
@@ -493,7 +535,7 @@ pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> O
             let type_end_location = type_.end_location.unwrap();
             let contents =
                 locator.slice_source_code_range(&Range::new(type_end_location, body[0].location));
-            let range = lexer::make_tokenizer_located(&contents, type_end_location)
+            let range = lexer::make_tokenizer_located(contents, type_end_location)
                 .flatten()
                 .tuple_windows()
                 .find(|(tok, next_tok)| {
@@ -520,7 +562,7 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
         location: handler.location,
         end_location: end,
     });
-    let range = lexer::make_tokenizer_located(&contents, handler.location)
+    let range = lexer::make_tokenizer_located(contents, handler.location)
         .flatten()
         .find(|(_, kind, _)| matches!(kind, Tok::Except { .. }))
         .map(|(location, _, end_location)| Range {
@@ -534,7 +576,7 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
 /// Find f-strings that don't contain any formatted values in a `JoinedStr`.
 pub fn find_useless_f_strings(expr: &Expr, locator: &Locator) -> Vec<(Range, Range)> {
     let contents = locator.slice_source_code_range(&Range::from_located(expr));
-    lexer::make_tokenizer_located(&contents, expr.location)
+    lexer::make_tokenizer_located(contents, expr.location)
         .flatten()
         .filter_map(|(location, tok, end_location)| match tok {
             Tok::String {
@@ -588,7 +630,7 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
                     .expect("Expected orelse to be non-empty")
                     .location,
             });
-            let range = lexer::make_tokenizer_located(&contents, body_end)
+            let range = lexer::make_tokenizer_located(contents, body_end)
                 .flatten()
                 .find(|(_, kind, _)| matches!(kind, Tok::Else))
                 .map(|(location, _, end_location)| Range {
@@ -601,31 +643,10 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
     }
 }
 
-/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
-/// other statements preceding it.
-pub fn preceded_by_continuation(stmt: &Stmt, locator: &Locator) -> bool {
-    // Does the previous line end in a continuation? This will have a specific
-    // false-positive, which is that if the previous line ends in a comment, it
-    // will be treated as a continuation. So we should only use this information to
-    // make conservative choices.
-    // TODO(charlie): Come up with a more robust strategy.
-    if stmt.location.row() > 1 {
-        let range = Range::new(
-            Location::new(stmt.location.row() - 1, 0),
-            Location::new(stmt.location.row(), 0),
-        );
-        let line = locator.slice_source_code_range(&range);
-        if line.trim_end().ends_with('\\') {
-            return true;
-        }
-    }
-    false
-}
-
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
 pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
     let contents = locator.slice_source_code_range(&range);
-    let range = lexer::make_tokenizer_located(&contents, range.location)
+    let range = lexer::make_tokenizer_located(contents, range.location)
         .flatten()
         .find(|(_, kind, _)| matches!(kind, Tok::Colon))
         .map(|(location, _, end_location)| Range {
@@ -635,10 +656,49 @@ pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
     range
 }
 
+/// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
+pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
+    let StmtKind::If { body, orelse, .. } = &stmt.node else {
+        return None;
+    };
+
+    let start = body
+        .last()
+        .expect("Expected body to be non-empty")
+        .end_location
+        .unwrap();
+    let end = match &orelse[..] {
+        [Stmt {
+            node: StmtKind::If { test, .. },
+            ..
+        }] => test.location,
+        [stmt, ..] => stmt.location,
+        _ => return None,
+    };
+    let contents = locator.slice_source_code_range(&Range::new(start, end));
+    let range = lexer::make_tokenizer_located(contents, start)
+        .flatten()
+        .find(|(_, kind, _)| matches!(kind, Tok::Elif | Tok::Else))
+        .map(|(location, _, end_location)| Range {
+            location,
+            end_location,
+        });
+    range
+}
+
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
-pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
-    match_leading_content(stmt, locator) || preceded_by_continuation(stmt, locator)
+pub fn preceded_by_continuation(stmt: &Stmt, indexer: &Indexer) -> bool {
+    stmt.location.row() > 1
+        && indexer
+            .continuation_lines()
+            .contains(&(stmt.location.row() - 1))
+}
+
+/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
+/// other statements preceding it.
+pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator, indexer: &Indexer) -> bool {
+    match_leading_content(stmt, locator) || preceded_by_continuation(stmt, indexer)
 }
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
@@ -709,7 +769,6 @@ impl<'a> SimpleCallArgs<'a> {
     }
 
     /// Get the number of positional and keyword arguments used.
-    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.args.len() + self.kwargs.len()
     }
@@ -722,7 +781,7 @@ mod tests {
     use rustpython_parser::parser;
 
     use crate::ast::helpers::{
-        else_range, first_colon_range, identifier_range, match_trailing_content,
+        elif_else_range, else_range, first_colon_range, identifier_range, match_trailing_content,
     };
     use crate::ast::types::Range;
     use crate::source_code::Locator;
@@ -868,5 +927,40 @@ else:
         assert_eq!(range.location.column(), 6);
         assert_eq!(range.end_location.row(), 1);
         assert_eq!(range.end_location.column(), 7);
+    }
+
+    #[test]
+    fn test_elif_else_range() -> Result<()> {
+        let contents = "
+if a:
+    ...
+elif b:
+    ...
+"
+        .trim_start();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = Locator::new(contents);
+        let range = elif_else_range(stmt, &locator).unwrap();
+        assert_eq!(range.location.row(), 3);
+        assert_eq!(range.location.column(), 0);
+        assert_eq!(range.end_location.row(), 3);
+        assert_eq!(range.end_location.column(), 4);
+        let contents = "
+if a:
+    ...
+else:
+    ...
+"
+        .trim_start();
+        let program = parser::parse_program(contents, "<filename>")?;
+        let stmt = program.first().unwrap();
+        let locator = Locator::new(contents);
+        let range = elif_else_range(stmt, &locator).unwrap();
+        assert_eq!(range.location.row(), 3);
+        assert_eq!(range.location.column(), 0);
+        assert_eq!(range.end_location.row(), 3);
+        assert_eq!(range.end_location.column(), 4);
+        Ok(())
     }
 }

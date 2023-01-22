@@ -6,7 +6,7 @@ use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::python::identifiers::IDENTIFIER_REGEX;
+use crate::python::identifiers::is_identifier;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
@@ -30,10 +30,9 @@ fn match_typed_dict_assign<'a>(
     } = &value.node else {
         return None;
     };
-    if !checker
-        .resolve_call_path(func)
-        .map_or(false, |call_path| call_path == ["typing", "TypedDict"])
-    {
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TypedDict"]
+    }) {
         return None;
     }
     Some((class_name, args, keywords, func))
@@ -79,15 +78,19 @@ fn create_class_def_stmt(
     })
 }
 
-fn properties_from_dict_literal(keys: &[Expr], values: &[Expr]) -> Result<Vec<Stmt>> {
+fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
     keys.iter()
         .zip(values.iter())
-        .map(|(key, value)| match &key.node {
-            ExprKind::Constant {
-                value: Constant::Str(property),
+        .map(|(key, value)| match key {
+            Some(Expr {
+                node:
+                    ExprKind::Constant {
+                        value: Constant::Str(property),
+                        ..
+                    },
                 ..
-            } => {
-                if IDENTIFIER_REGEX.is_match(property) && !KWLIST.contains(&property.as_str()) {
+            }) => {
+                if is_identifier(property) && !KWLIST.contains(&property.as_str()) {
                     Ok(create_property_assignment_stmt(property, &value.node))
                 } else {
                     bail!("Property name is not valid identifier: {}", property)
@@ -201,7 +204,7 @@ pub fn convert_typed_dict_functional_to_class(
         violations::ConvertTypedDictFunctionalToClass(class_name.to_string()),
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match match_properties_and_total(args, keywords) {
             Ok((body, total_keyword)) => {
                 diagnostic.amend(convert_to_class(
@@ -210,7 +213,7 @@ pub fn convert_typed_dict_functional_to_class(
                     body,
                     total_keyword,
                     base_class,
-                    checker.style,
+                    checker.stylist,
                 ));
             }
             Err(err) => debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}"),

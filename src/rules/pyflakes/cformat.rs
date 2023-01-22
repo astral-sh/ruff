@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use rustc_hash::FxHashSet;
 use rustpython_common::cformat::{
-    CFormatError, CFormatPart, CFormatQuantity, CFormatSpec, CFormatString,
+    CFormatError, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatSpec, CFormatString,
 };
 
 pub(crate) struct CFormatSummary {
@@ -13,12 +13,8 @@ pub(crate) struct CFormatSummary {
     pub keywords: FxHashSet<String>,
 }
 
-impl TryFrom<&str> for CFormatSummary {
-    type Error = CFormatError;
-
-    fn try_from(literal: &str) -> Result<Self, Self::Error> {
-        let format_string = CFormatString::from_str(literal)?;
-
+impl From<&CFormatString> for CFormatSummary {
+    fn from(format_string: &CFormatString) -> Self {
         let mut starred = false;
         let mut num_positional = 0;
         let mut keywords = FxHashSet::default();
@@ -45,17 +41,26 @@ impl TryFrom<&str> for CFormatSummary {
                 num_positional += 1;
                 starred = true;
             }
-            if precision == &Some(CFormatQuantity::FromValuesTuple) {
+            if precision == &Some(CFormatPrecision::Quantity(CFormatQuantity::FromValuesTuple)) {
                 num_positional += 1;
                 starred = true;
             }
         }
 
-        Ok(CFormatSummary {
+        Self {
             starred,
             num_positional,
             keywords,
-        })
+        }
+    }
+}
+
+impl TryFrom<&str> for CFormatSummary {
+    type Error = CFormatError;
+
+    fn try_from(literal: &str) -> Result<Self, Self::Error> {
+        let format_string = CFormatString::from_str(literal)?;
+        Ok(Self::from(&format_string))
     }
 }
 

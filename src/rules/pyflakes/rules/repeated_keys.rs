@@ -8,7 +8,7 @@ use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -26,29 +26,36 @@ fn into_dictionary_key(expr: &Expr) -> Option<DictionaryKey> {
 }
 
 /// F601, F602
-pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
+pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<DictionaryKey, FxHashSet<ComparableExpr>> =
         FxHashMap::with_capacity_and_hasher(keys.len(), BuildHasherDefault::default());
 
     // Detect duplicate keys.
     for (i, key) in keys.iter().enumerate() {
-        if let Some(key) = into_dictionary_key(key) {
-            if let Some(seen_values) = seen.get_mut(&key) {
-                match key {
+        let Some(key) = key else {
+            continue;
+        };
+        if let Some(dict_key) = into_dictionary_key(key) {
+            if let Some(seen_values) = seen.get_mut(&dict_key) {
+                match dict_key {
                     DictionaryKey::Constant(..) => {
-                        if checker.settings.enabled.contains(&RuleCode::F601) {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::MultiValueRepeatedKeyLiteral)
+                        {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
                                 violations::MultiValueRepeatedKeyLiteral(
-                                    unparse_expr(&keys[i], checker.style),
+                                    unparse_expr(key, checker.stylist),
                                     is_duplicate_value,
                                 ),
-                                Range::from_located(&keys[i]),
+                                Range::from_located(key),
                             );
                             if is_duplicate_value {
-                                if checker.patch(&RuleCode::F601) {
+                                if checker.patch(&Rule::MultiValueRepeatedKeyLiteral) {
                                     diagnostic.amend(Fix::deletion(
                                         values[i - 1].end_location.unwrap(),
                                         values[i].end_location.unwrap(),
@@ -60,19 +67,23 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                             checker.diagnostics.push(diagnostic);
                         }
                     }
-                    DictionaryKey::Variable(key) => {
-                        if checker.settings.enabled.contains(&RuleCode::F602) {
+                    DictionaryKey::Variable(dict_key) => {
+                        if checker
+                            .settings
+                            .rules
+                            .enabled(&Rule::MultiValueRepeatedKeyVariable)
+                        {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
                                 violations::MultiValueRepeatedKeyVariable(
-                                    key.to_string(),
+                                    dict_key.to_string(),
                                     is_duplicate_value,
                                 ),
-                                Range::from_located(&keys[i]),
+                                Range::from_located(key),
                             );
                             if is_duplicate_value {
-                                if checker.patch(&RuleCode::F602) {
+                                if checker.patch(&Rule::MultiValueRepeatedKeyVariable) {
                                     diagnostic.amend(Fix::deletion(
                                         values[i - 1].end_location.unwrap(),
                                         values[i].end_location.unwrap(),
@@ -86,7 +97,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
                     }
                 }
             } else {
-                seen.insert(key, FxHashSet::from_iter([(&values[i]).into()]));
+                seen.insert(dict_key, FxHashSet::from_iter([(&values[i]).into()]));
             }
         }
     }

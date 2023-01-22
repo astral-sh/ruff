@@ -39,7 +39,7 @@ pub fn relocate_expr(expr: &mut Expr, location: Range) {
             relocate_expr(orelse, location);
         }
         ExprKind::Dict { keys, values } => {
-            for expr in keys {
+            for expr in keys.iter_mut().flatten() {
                 relocate_expr(expr, location);
             }
             for expr in values {

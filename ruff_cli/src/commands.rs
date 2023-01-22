@@ -15,11 +15,11 @@ use ruff::cache::CACHE_DIR_NAME;
 use ruff::linter::add_noqa_to_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
-use ruff::registry::RuleCode;
+use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
-use ruff::{fix, fs, packaging, resolver, violations, warn_user_once};
+use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
 use serde::Serialize;
 use walkdir::WalkDir;
 
@@ -56,19 +56,19 @@ pub fn run(
     if matches!(cache, flags::Cache::Enabled) {
         match &pyproject_strategy {
             PyprojectDiscovery::Fixed(settings) => {
-                if let Err(e) = cache::init(&settings.cache_dir) {
+                if let Err(e) = cache::init(&settings.cli.cache_dir) {
                     error!(
                         "Failed to initialize cache at {}: {e:?}",
-                        settings.cache_dir.to_string_lossy()
+                        settings.cli.cache_dir.to_string_lossy()
                     );
                 }
             }
             PyprojectDiscovery::Hierarchical(default) => {
                 for settings in std::iter::once(default).chain(resolver.iter()) {
-                    if let Err(e) = cache::init(&settings.cache_dir) {
+                    if let Err(e) = cache::init(&settings.cli.cache_dir) {
                         error!(
                             "Failed to initialize cache at {}: {e:?}",
-                            settings.cache_dir.to_string_lossy()
+                            settings.cli.cache_dir.to_string_lossy()
                         );
                     }
                 }
@@ -97,7 +97,7 @@ pub fn run(
                         .parent()
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
-                    let settings = resolver.resolve(path, pyproject_strategy);
+                    let settings = resolver.resolve_all(path, pyproject_strategy);
                     lint_path(path, package, settings, cache, autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -114,9 +114,9 @@ pub fn run(
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    if settings.enabled.contains(&RuleCode::E902) {
+                    if settings.rules.enabled(&Rule::IOError) {
                         Diagnostics::new(vec![Message {
-                            kind: violations::IOError(message).into(),
+                            kind: IOError(message).into(),
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,
@@ -171,9 +171,9 @@ pub fn run_stdin(
     };
     let package_root = filename
         .and_then(Path::parent)
-        .and_then(|path| packaging::detect_package_root(path, &settings.namespace_packages));
+        .and_then(|path| packaging::detect_package_root(path, &settings.lib.namespace_packages));
     let stdin = read_from_stdin()?;
-    let mut diagnostics = lint_stdin(filename, package_root, &stdin, settings, autofix)?;
+    let mut diagnostics = lint_stdin(filename, package_root, &stdin, &settings.lib, autofix)?;
     diagnostics.messages.sort_unstable();
     Ok(diagnostics)
 }
@@ -285,28 +285,39 @@ pub fn show_files(
 #[derive(Serialize)]
 struct Explanation<'a> {
     code: &'a str,
-    origin: &'a str,
+    linter: &'a str,
     summary: &'a str,
 }
 
-/// Explain a `RuleCode` to the user.
-pub fn explain(code: &RuleCode, format: SerializationFormat) -> Result<()> {
+/// Explain a `Rule` to the user.
+pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
+    let (linter, _) = Linter::parse_code(rule.code()).unwrap();
     match format {
         SerializationFormat::Text | SerializationFormat::Grouped => {
-            println!(
-                "{} ({}): {}",
-                code.as_ref(),
-                code.origin().title(),
-                code.kind().summary()
-            );
+            println!("{}\n", rule.as_ref());
+            println!("Code: {} ({})\n", rule.code(), linter.name());
+
+            if let Some(autofix) = rule.autofixable() {
+                println!(
+                    "{}",
+                    match autofix.available {
+                        AutofixAvailability::Sometimes => "Autofix is sometimes available.\n",
+                        AutofixAvailability::Always => "Autofix is always available.\n",
+                    }
+                );
+            }
+            println!("Message formats:\n");
+            for format in rule.message_formats() {
+                println!("* {format}");
+            }
         }
         SerializationFormat::Json => {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
-                    code: code.as_ref(),
-                    origin: code.origin().title(),
-                    summary: &code.kind().summary(),
+                    code: rule.code(),
+                    linter: linter.name(),
+                    summary: rule.message_formats()[0],
                 })?
             );
         }
@@ -318,6 +329,9 @@ pub fn explain(code: &RuleCode, format: SerializationFormat) -> Result<()> {
         }
         SerializationFormat::Gitlab => {
             bail!("`--explain` does not support GitLab format")
+        }
+        SerializationFormat::Pylint => {
+            bail!("`--explain` does not support pylint format")
         }
     };
     Ok(())

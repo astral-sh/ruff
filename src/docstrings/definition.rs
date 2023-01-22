@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use rustpython_ast::{Expr, Stmt};
 
 #[derive(Debug, Clone)]
@@ -23,9 +21,9 @@ pub struct Definition<'a> {
 pub struct Docstring<'a> {
     pub kind: DefinitionKind<'a>,
     pub expr: &'a Expr,
-    pub contents: &'a Cow<'a, str>,
+    pub contents: &'a str,
     pub body: &'a str,
-    pub indentation: &'a Cow<'a, str>,
+    pub indentation: &'a str,
 }
 
 pub enum Documentable {

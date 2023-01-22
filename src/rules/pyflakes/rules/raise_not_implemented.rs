@@ -32,7 +32,7 @@ pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     };
     let mut diagnostic =
         Diagnostic::new(violations::RaiseNotImplemented, Range::from_located(expr));
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             "NotImplementedError".to_string(),
             expr.location,

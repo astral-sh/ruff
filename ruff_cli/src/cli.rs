@@ -1,12 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{command, Parser};
 use regex::Regex;
-use ruff::fs;
 use ruff::logging::LogLevel;
-use ruff::registry::{RuleCode, RuleCodePrefix};
+use ruff::registry::{Rule, RuleSelector};
 use ruff::resolver::ConfigProcessor;
-use ruff::rules::mccabe;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
@@ -67,18 +65,18 @@ pub struct Cli {
     /// Comma-separated list of rule codes to enable (or ALL, to enable all
     /// rules).
     #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub select: Option<Vec<RuleCodePrefix>>,
+    pub select: Option<Vec<RuleSelector>>,
     /// Like --select, but adds additional rule codes on top of the selected
     /// ones.
     #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub extend_select: Option<Vec<RuleCodePrefix>>,
+    pub extend_select: Option<Vec<RuleSelector>>,
     /// Comma-separated list of rule codes to disable.
     #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub ignore: Option<Vec<RuleCodePrefix>>,
+    pub ignore: Option<Vec<RuleSelector>>,
     /// Like --ignore, but adds additional rule codes on top of the ignored
     /// ones.
     #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub extend_ignore: Option<Vec<RuleCodePrefix>>,
+    pub extend_ignore: Option<Vec<RuleSelector>>,
     /// List of paths, used to omit files and/or directories from analysis.
     #[arg(long, value_delimiter = ',', value_name = "FILE_PATTERN")]
     pub exclude: Option<Vec<FilePattern>>,
@@ -89,11 +87,11 @@ pub struct Cli {
     /// List of rule codes to treat as eligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub fixable: Option<Vec<RuleCodePrefix>>,
+    pub fixable: Option<Vec<RuleSelector>>,
     /// List of rule codes to treat as ineligible for autofix. Only applicable
     /// when autofix itself is enabled (e.g., via `--fix`).
     #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub unfixable: Option<Vec<RuleCodePrefix>>,
+    pub unfixable: Option<Vec<RuleSelector>>,
     /// List of mappings from file pattern to code to exclude
     #[arg(long, value_delimiter = ',')]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
@@ -138,9 +136,6 @@ pub struct Cli {
     /// formatting.
     #[arg(long)]
     pub line_length: Option<usize>,
-    /// Maximum McCabe complexity allowed for a given function.
-    #[arg(long)]
-    pub max_complexity: Option<usize>,
     /// Enable automatic additions of `noqa` directives to failing lines.
     #[arg(
         long,
@@ -173,6 +168,7 @@ pub struct Cli {
     /// Explain a rule.
     #[arg(
         long,
+        value_parser=Rule::from_code,
         // Fake subcommands.
         conflicts_with = "add_noqa",
         conflicts_with = "clean",
@@ -184,7 +180,7 @@ pub struct Cli {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
-    pub explain: Option<RuleCode>,
+    pub explain: Option<&'static Rule>,
     /// Generate shell completion
     #[arg(
         long,
@@ -267,7 +263,6 @@ impl Cli {
                 fixable: self.fixable,
                 ignore: self.ignore,
                 line_length: self.line_length,
-                max_complexity: self.max_complexity,
                 per_file_ignores: self.per_file_ignores,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
@@ -307,7 +302,7 @@ pub struct Arguments {
     pub config: Option<PathBuf>,
     pub diff: bool,
     pub exit_zero: bool,
-    pub explain: Option<RuleCode>,
+    pub explain: Option<&'static Rule>,
     pub files: Vec<PathBuf>,
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
     pub isolated: bool,
@@ -328,18 +323,17 @@ pub struct Overrides {
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend_exclude: Option<Vec<FilePattern>>,
-    pub extend_ignore: Option<Vec<RuleCodePrefix>>,
-    pub extend_select: Option<Vec<RuleCodePrefix>>,
-    pub fixable: Option<Vec<RuleCodePrefix>>,
-    pub ignore: Option<Vec<RuleCodePrefix>>,
+    pub extend_ignore: Option<Vec<RuleSelector>>,
+    pub extend_select: Option<Vec<RuleSelector>>,
+    pub fixable: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<usize>,
-    pub max_complexity: Option<usize>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub respect_gitignore: Option<bool>,
-    pub select: Option<Vec<RuleCodePrefix>>,
+    pub select: Option<Vec<RuleSelector>>,
     pub show_source: Option<bool>,
     pub target_version: Option<PythonVersion>,
-    pub unfixable: Option<Vec<RuleCodePrefix>>,
+    pub unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     pub cache_dir: Option<PathBuf>,
     pub fix: Option<bool>,
@@ -383,11 +377,6 @@ impl ConfigProcessor for &Overrides {
         }
         if let Some(line_length) = &self.line_length {
             config.line_length = Some(*line_length);
-        }
-        if let Some(max_complexity) = &self.max_complexity {
-            config.mccabe = Some(mccabe::settings::Options {
-                max_complexity: Some(*max_complexity),
-            });
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
@@ -445,7 +434,7 @@ pub fn extract_log_level(cli: &Arguments) -> LogLevel {
 
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
 pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgnore> {
-    let mut per_file_ignores: FxHashMap<String, Vec<RuleCodePrefix>> = FxHashMap::default();
+    let mut per_file_ignores: FxHashMap<String, Vec<RuleSelector>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
@@ -454,9 +443,6 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     }
     per_file_ignores
         .into_iter()
-        .map(|(pattern, prefixes)| {
-            let absolute = fs::normalize_path(Path::new(&pattern));
-            PerFileIgnore::new(pattern, absolute, &prefixes)
-        })
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes, None))
         .collect()
 }

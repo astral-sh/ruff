@@ -9,7 +9,7 @@ use anyhow::Result;
 use log::debug;
 use ruff::linter::{lint_fix, lint_only};
 use ruff::message::Message;
-use ruff::settings::{flags, Settings};
+use ruff::settings::{flags, AllSettings, Settings};
 use ruff::{fix, fs};
 use similar::TextDiff;
 
@@ -38,12 +38,12 @@ impl AddAssign for Diagnostics {
 pub fn lint_path(
     path: &Path,
     package: Option<&Path>,
-    settings: &Settings,
+    settings: &AllSettings,
     cache: flags::Cache,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Validate the `Settings` and return any errors.
-    settings.validate()?;
+    settings.lib.validate()?;
 
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
@@ -55,7 +55,9 @@ pub fn lint_path(
         && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
     {
         let metadata = path.metadata()?;
-        if let Some(messages) = cache::get(path, &metadata, settings, autofix.into()) {
+        if let Some(messages) =
+            cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
+        {
             debug!("Cache hit for: {}", path.to_string_lossy());
             return Ok(Diagnostics::new(messages));
         }
@@ -69,7 +71,7 @@ pub fn lint_path(
 
     // Lint the file.
     let (messages, fixed) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
-        let (transformed, fixed, messages) = lint_fix(&contents, path, package, settings)?;
+        let (transformed, fixed, messages) = lint_fix(&contents, path, package, &settings.lib)?;
         if fixed > 0 {
             if matches!(autofix, fix::FixMode::Apply) {
                 write(path, transformed)?;
@@ -85,14 +87,21 @@ pub fn lint_path(
         }
         (messages, fixed)
     } else {
-        let messages = lint_only(&contents, path, package, settings, autofix.into())?;
+        let messages = lint_only(&contents, path, package, &settings.lib, autofix.into())?;
         let fixed = 0;
         (messages, fixed)
     };
 
     // Re-populate the cache.
     if let Some(metadata) = metadata {
-        cache::set(path, &metadata, settings, autofix.into(), &messages);
+        cache::set(
+            path,
+            package.as_ref(),
+            &metadata,
+            settings,
+            autofix.into(),
+            &messages,
+        );
     }
 
     Ok(Diagnostics { messages, fixed })

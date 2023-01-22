@@ -1,0 +1,35 @@
+---
+source: src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    EmptyTypeCheckingBlock: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    EmptyTypeCheckingBlock: ~
+  location:
+    row: 9
+    column: 8
+  end_location:
+    row: 9
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    EmptyTypeCheckingBlock: ~
+  location:
+    row: 15
+    column: 8
+  end_location:
+    row: 15
+    column: 12
+  fix: ~
+  parent: ~
+

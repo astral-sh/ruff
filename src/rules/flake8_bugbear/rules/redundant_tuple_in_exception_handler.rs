@@ -23,8 +23,8 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             violations::RedundantTupleInExceptionHandler(elt.to_string()),
             Range::from_located(type_),
         );
-        if checker.patch(diagnostic.kind.code()) {
-            let mut generator: Generator = checker.style.into();
+        if checker.patch(diagnostic.kind.rule()) {
+            let mut generator: Generator = checker.stylist.into();
             generator.unparse_expr(elt, 0);
             diagnostic.amend(Fix::replacement(
                 generator.generate(),

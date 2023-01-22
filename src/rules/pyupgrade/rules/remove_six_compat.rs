@@ -4,11 +4,11 @@ use crate::ast::helpers::{create_expr, create_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::{Generator, Locator, Stylist};
 use crate::violations;
 
-/// Return `true` if the `Expr` is a reference to `${module}.${any}`.
+/// Return `true` if the call path is a reference to `${module}.${any}`.
 fn is_module_member(call_path: &[&str], module: &str) -> bool {
     call_path
         .first()
@@ -398,14 +398,14 @@ fn handle_next_on_six_dict(expr: &Expr, patch: bool, checker: &Checker) -> Optio
         },
         arg,
         patch,
-        checker.style,
+        checker.stylist,
     ))
 }
 
 /// UP016
 pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
     if let Some(diagnostic) =
-        handle_next_on_six_dict(expr, checker.patch(&RuleCode::UP016), checker)
+        handle_next_on_six_dict(expr, checker.patch(&Rule::RemoveSixCompat), checker)
     {
         checker.diagnostics.push(diagnostic);
         return;
@@ -415,7 +415,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
         .resolve_call_path(expr)
         .map_or(false, |call_path| is_module_member(&call_path, "six"))
     {
-        let patch = checker.patch(&RuleCode::UP016);
+        let patch = checker.patch(&Rule::RemoveSixCompat);
         let diagnostic = match &expr.node {
             ExprKind::Call {
                 func,
@@ -427,7 +427,7 @@ pub fn remove_six_compat(checker: &mut Checker, expr: &Expr) {
                 keywords,
                 expr,
                 patch,
-                checker.style,
+                checker.stylist,
                 checker.locator,
             ),
             ExprKind::Attribute { attr, .. } => map_name(attr.as_str(), expr, patch),

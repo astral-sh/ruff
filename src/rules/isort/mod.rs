@@ -1,3 +1,4 @@
+//! Rules from [isort](https://pypi.org/project/isort/).
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -7,7 +8,6 @@ use comments::Comment;
 use helpers::trailing_comma;
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ropey::RopeBuilder;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Stmt, StmtKind};
 use settings::RelatveImportsOrder;
@@ -388,6 +388,8 @@ fn order_imports<'a>(
     order_by_type: bool,
     relative_imports_order: RelatveImportsOrder,
     classes: &'a BTreeSet<String>,
+    constants: &'a BTreeSet<String>,
+    variables: &'a BTreeSet<String>,
 ) -> OrderedImportBlock<'a> {
     let mut ordered = OrderedImportBlock::default();
 
@@ -467,7 +469,14 @@ fn order_imports<'a>(
                     aliases
                         .into_iter()
                         .sorted_by(|(alias1, _), (alias2, _)| {
-                            cmp_members(alias1, alias2, order_by_type, classes)
+                            cmp_members(
+                                alias1,
+                                alias2,
+                                order_by_type,
+                                classes,
+                                constants,
+                                variables,
+                            )
                         })
                         .collect::<Vec<(AliasData, CommentSet)>>(),
                 )
@@ -479,9 +488,14 @@ fn order_imports<'a>(
                             (None, None) => Ordering::Equal,
                             (None, Some(_)) => Ordering::Less,
                             (Some(_), None) => Ordering::Greater,
-                            (Some((alias1, _)), Some((alias2, _))) => {
-                                cmp_members(alias1, alias2, order_by_type, classes)
-                            }
+                            (Some((alias1, _)), Some((alias2, _))) => cmp_members(
+                                alias1,
+                                alias2,
+                                order_by_type,
+                                classes,
+                                constants,
+                                variables,
+                            ),
                         },
                     )
                 },
@@ -558,6 +572,9 @@ pub fn format_imports(
     single_line_exclusions: &BTreeSet<String>,
     split_on_trailing_comma: bool,
     classes: &BTreeSet<String>,
+    constants: &BTreeSet<String>,
+    variables: &BTreeSet<String>,
+    no_lines_before: &BTreeSet<ImportType>,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -575,13 +592,19 @@ pub fn format_imports(
         extra_standard_library,
     );
 
-    let mut output = RopeBuilder::new();
+    let mut output = String::new();
 
     // Generate replacement source code.
     let mut is_first_block = true;
-    for import_block in block_by_type.into_values() {
-        let mut imports =
-            order_imports(import_block, order_by_type, relative_imports_order, classes);
+    for (import_type, import_block) in block_by_type {
+        let mut imports = order_imports(
+            import_block,
+            order_by_type,
+            relative_imports_order,
+            classes,
+            constants,
+            variables,
+        );
 
         if force_single_line {
             imports = force_single_line_imports(imports, single_line_exclusions);
@@ -605,15 +628,15 @@ pub fn format_imports(
         // Add a blank line between every section.
         if is_first_block {
             is_first_block = false;
-        } else {
-            output.append(stylist.line_ending());
+        } else if !no_lines_before.contains(&import_type) {
+            output.push_str(stylist.line_ending());
         }
 
         let mut is_first_statement = true;
         for import in imports {
             match import {
                 Import((alias, comments)) => {
-                    output.append(&format::format_import(
+                    output.push_str(&format::format_import(
                         &alias,
                         &comments,
                         is_first_statement,
@@ -621,7 +644,7 @@ pub fn format_imports(
                     ));
                 }
                 ImportFrom((import_from, comments, trailing_comma, aliases)) => {
-                    output.append(&format::format_import_from(
+                    output.push_str(&format::format_import_from(
                         &import_from,
                         &comments,
                         &aliases,
@@ -639,14 +662,14 @@ pub fn format_imports(
     match trailer {
         None => {}
         Some(Trailer::Sibling) => {
-            output.append(stylist.line_ending());
+            output.push_str(stylist.line_ending());
         }
         Some(Trailer::FunctionDef | Trailer::ClassDef) => {
-            output.append(stylist.line_ending());
-            output.append(stylist.line_ending());
+            output.push_str(stylist.line_ending());
+            output.push_str(stylist.line_ending());
         }
     }
-    output.finish().to_string()
+    output
 }
 
 #[cfg(test)]
@@ -657,9 +680,10 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use super::categorize::ImportType;
     use super::settings::RelatveImportsOrder;
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
@@ -676,7 +700,6 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
-    #[test_case(Path::new("line_ending_cr.py"))]
     #[test_case(Path::new("line_ending_crlf.py"))]
     #[test_case(Path::new("line_ending_lf.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
@@ -701,6 +724,9 @@ mod tests {
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
     #[test_case(Path::new("order_by_type_with_custom_classes.py"))]
+    #[test_case(Path::new("order_by_type_with_custom_constants.py"))]
+    #[test_case(Path::new("order_by_type_with_custom_variables.py"))]
+    #[test_case(Path::new("no_lines_before.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -709,7 +735,7 @@ mod tests {
                 .as_path(),
             &Settings {
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -729,7 +755,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -750,7 +776,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -770,7 +796,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -793,7 +819,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -813,7 +839,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
@@ -843,7 +869,69 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("order_by_type_with_custom_constants.py"))]
+    fn order_by_type_with_custom_constants(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "order_by_type_with_custom_constants_{}",
+            path.to_string_lossy()
+        );
+        let mut diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    order_by_type: true,
+                    constants: BTreeSet::from([
+                        "Const".to_string(),
+                        "constant".to_string(),
+                        "First".to_string(),
+                        "Last".to_string(),
+                        "A_constant".to_string(),
+                        "konst".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("order_by_type_with_custom_variables.py"))]
+    fn order_by_type_with_custom_variables(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "order_by_type_with_custom_variables_{}",
+            path.to_string_lossy()
+        );
+        let mut diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    order_by_type: true,
+                    variables: BTreeSet::from([
+                        "VAR".to_string(),
+                        "Variable".to_string(),
+                        "MyVar".to_string(),
+                        "var_ABC".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
@@ -864,7 +952,7 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
@@ -889,7 +977,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(RuleCode::I002)
+                ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -914,7 +1002,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(RuleCode::I002)
+                ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -938,7 +1026,7 @@ mod tests {
                         .to_string()]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(RuleCode::I002)
+                ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -960,7 +1048,7 @@ mod tests {
                     required_imports: BTreeSet::from(["import os".to_string()]),
                     ..super::settings::Settings::default()
                 },
-                ..Settings::for_rule(RuleCode::I002)
+                ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
@@ -980,9 +1068,36 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
-                ..Settings::for_rule(RuleCode::I001)
+                ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_lines_before.py"))]
+    fn no_lines_before(path: &Path) -> Result<()> {
+        let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
+        let mut diagnostics = test_path(
+            Path::new("./resources/test/fixtures/isort")
+                .join(path)
+                .as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    no_lines_before: BTreeSet::from([
+                        ImportType::Future,
+                        ImportType::StandardLibrary,
+                        ImportType::ThirdParty,
+                        ImportType::FirstParty,
+                        ImportType::LocalFolder,
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }

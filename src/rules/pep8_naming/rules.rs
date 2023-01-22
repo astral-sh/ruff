@@ -126,7 +126,10 @@ pub fn non_lowercase_variable_in_function(
     stmt: &Stmt,
     name: &str,
 ) {
-    if name.to_lowercase() != name && !helpers::is_namedtuple_assignment(checker, stmt) {
+    if name.to_lowercase() != name
+        && !helpers::is_namedtuple_assignment(checker, stmt)
+        && !helpers::is_type_var_assignment(checker, stmt)
+    {
         checker.diagnostics.push(Diagnostic::new(
             violations::NonLowercaseVariableInFunction(name.to_string()),
             Range::from_located(expr),

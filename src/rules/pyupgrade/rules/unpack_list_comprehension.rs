@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 /// Returns `true` if `expr` contains an `ExprKind::Await`.
@@ -18,7 +18,11 @@ fn contains_await(expr: &Expr) -> bool {
         ExprKind::IfExp { test, body, orelse } => {
             contains_await(test) || contains_await(body) || contains_await(orelse)
         }
-        ExprKind::Dict { keys, values } => keys.iter().chain(values.iter()).any(contains_await),
+        ExprKind::Dict { keys, values } => keys
+            .iter()
+            .flatten()
+            .chain(values.iter())
+            .any(contains_await),
         ExprKind::Set { elts } => elts.iter().any(contains_await),
         ExprKind::ListComp { elt, .. } => contains_await(elt),
         ExprKind::SetComp { elt, .. } => contains_await(elt),
@@ -79,7 +83,7 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
                 violations::RewriteListComprehension,
                 Range::from_located(value),
             );
-            if checker.patch(&RuleCode::UP027) {
+            if checker.patch(&Rule::RewriteListComprehension) {
                 let existing = checker
                     .locator
                     .slice_source_code_range(&Range::from_located(value));

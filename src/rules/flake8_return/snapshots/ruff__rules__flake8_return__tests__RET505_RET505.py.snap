@@ -5,81 +5,81 @@ expression: diagnostics
 - kind:
     SuperfluousElseReturn: Elif
   location:
-    row: 5
+    row: 8
     column: 4
   end_location:
-    row: 13
-    column: 16
+    row: 8
+    column: 8
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseReturn: Elif
   location:
-    row: 17
+    row: 23
     column: 4
   end_location:
-    row: 26
-    column: 13
+    row: 23
+    column: 8
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseReturn: Elif
   location:
-    row: 38
+    row: 41
     column: 4
   end_location:
-    row: 46
-    column: 16
+    row: 41
+    column: 8
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
-    row: 50
+    row: 53
     column: 4
   end_location:
-    row: 55
-    column: 16
+    row: 53
+    column: 8
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
-    row: 61
+    row: 64
     column: 8
   end_location:
-    row: 66
-    column: 20
+    row: 64
+    column: 12
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
-    row: 73
+    row: 79
     column: 4
   end_location:
-    row: 80
-    column: 13
+    row: 79
+    column: 8
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
-    row: 86
+    row: 89
     column: 8
   end_location:
-    row: 90
-    column: 17
+    row: 89
+    column: 12
   fix: ~
   parent: ~
 - kind:
     SuperfluousElseReturn: Else
   location:
-    row: 97
+    row: 99
     column: 4
   end_location:
-    row: 103
-    column: 23
+    row: 99
+    column: 8
   fix: ~
   parent: ~
 

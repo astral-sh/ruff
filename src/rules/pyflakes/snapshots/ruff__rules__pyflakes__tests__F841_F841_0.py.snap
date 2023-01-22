@@ -31,10 +31,10 @@ expression: diagnostics
     content: ""
     location:
       row: 16
-      column: 4
+      column: 0
     end_location:
-      row: 16
-      column: 8
+      row: 17
+      column: 0
   parent: ~
 - kind:
     UnusedVariable: foo
