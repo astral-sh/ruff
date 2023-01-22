@@ -152,7 +152,11 @@ impl<'a> Unparser<'a> {
                 let (packed, unpacked) = values.split_at(keys.len());
                 for (k, v) in keys.iter().zip(packed) {
                     self.p_delim(&mut first, ", ")?;
-                    write!(self, "{}: {}", *k, *v)?;
+                    if let Some(k) = k {
+                        write!(self, "{}: {}", *k, *v)?;
+                    } else {
+                        write!(self, "**{}", *v)?;
+                    }
                 }
                 for d in unpacked {
                     self.p_delim(&mut first, ", ")?;

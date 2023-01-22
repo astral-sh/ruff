@@ -1136,44 +1136,11 @@ Atom<Goal>: ast::Expr = {
         }.into())
     },
     <location:@L> "{" <e:DictLiteralValues?> "}" <end_location:@R> => {
-        let pairs = e.unwrap_or_default();
-
-        let (keys, values) = match pairs.iter().position(|(k,_)| k.is_none()) {
-            Some(unpack_idx) => {
-                let mut pairs = pairs;
-                let (keys, mut values): (_, Vec<_>) = pairs.drain(..unpack_idx).map(|(k, v)| (*k.unwrap(), v)).unzip();
-
-                fn build_map(items: &mut Vec<(ast::Expr, ast::Expr)>) -> ast::Expr {
-                    let location = items[0].0.location;
-                    let end_location = items[0].0.end_location;
-                    let (keys, values) = items.drain(..).unzip();
-                    ast::Expr {
-                        location,
-                        end_location,
-                        custom: (),
-                        node: ast::ExprKind::Dict { keys, values }
-                    }
-                }
-
-                let mut items = Vec::new();
-                for (key, value) in pairs.into_iter() {
-                    if let Some(key) = key {
-                        items.push((*key, value));
-                        continue;
-                    }
-                    if !items.is_empty() {
-                        values.push(build_map(&mut items));
-                    }
-                    values.push(value);
-                }
-                if !items.is_empty() {
-                    values.push(build_map(&mut items));
-                }
-                (keys, values)
-            },
-            None => pairs.into_iter().map(|(k, v)| (*k.unwrap(), v)).unzip()
-        };
-
+        let (keys, values) = e
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k.map(|x| *x), v))
+            .unzip();
         ast::Expr {
             location,
             end_location: Some(end_location),

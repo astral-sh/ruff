@@ -227,12 +227,12 @@ class StructVisitor(TypeInfoEmitVisitor):
         if cons.fields:
             self.emit(f"{cons.name} {{", depth)
             for f in cons.fields:
-                self.visit(f, parent, "", depth + 1)
+                self.visit(f, parent, "", depth + 1, cons.name)
             self.emit("},", depth)
         else:
             self.emit(f"{cons.name},", depth)
 
-    def visitField(self, field, parent, vis, depth):
+    def visitField(self, field, parent, vis, depth, constructor=None):
         typ = get_rust_type(field.type)
         fieldtype = self.typeinfo.get(field.type)
         if fieldtype and fieldtype.has_userdata:
@@ -240,7 +240,12 @@ class StructVisitor(TypeInfoEmitVisitor):
         # don't box if we're doing Vec<T>, but do box if we're doing Vec<Option<Box<T>>>
         if fieldtype and fieldtype.boxed and (not (parent.product or field.seq) or field.opt):
             typ = f"Box<{typ}>"
-        if field.opt:
+        if field.opt or (
+            # When a dictionary literal contains dictionary unpacking (e.g., `{**d}`),
+            # the expression to be unpacked goes in `values` with a `None` at the corresponding
+            # position in `keys`. To handle this, the type of `keys` needs to be `Option<Vec<T>>`.
+            constructor == "Dict" and field.name == "keys"
+        ):
             typ = f"Option<{typ}>"
         if field.seq:
             typ = f"Vec<{typ}>"
