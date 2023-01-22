@@ -1042,7 +1042,7 @@ where
                     pyupgrade::rules::import_replacements(self, stmt, names, module);
                 }
                 if self.settings.rules.enabled(&Rule::ImportReplacementsSix) {
-                    pyupgrade::rules::import_replacements_six(self, stmt, module);
+                    pyupgrade::rules::import_replacements_six(self, stmt, module, names);
                 }
                 if self.settings.rules.enabled(&Rule::UnnecessaryBuiltinImport) {
                     if let Some(module) = module.as_deref() {

@@ -1,17 +1,12 @@
-use std::collections::HashMap;
-
-use libcst_native::{
-    AsName, AssignTargetExpression, Codegen, CodegenState, ImportAlias, ImportNames,
-    NameOrAttribute,
-};
 use once_cell::sync::Lazy;
-use rustpython_ast::Stmt;
+use rustpython_ast::{AliasData, Located, Stmt};
+use std::collections::HashMap;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_import_from, match_module};
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
+use crate::rules::pyupgrade::helpers::{clean_indent, get_fromimport_str};
 use crate::source_code::Locator;
 use crate::violations;
 
@@ -75,40 +70,58 @@ static REPLACE_MODS_URLLIB: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     m
 });
 
-fn get_asname(asname: &AsName) -> Option<String> {
-    if let AssignTargetExpression::Name(item) = &asname.name {
-        return Some(item.value.to_string());
+struct Formatting {
+    multi_line: bool,
+    indent: String,
+    short_indent: String,
+    start_indent: String,
+}
+
+impl Formatting {
+    fn new<T>(locator: &Locator, stmt: &Stmt, arg1: &Located<T>) -> Self {
+        let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+        let multi_line = module_text.contains('\n');
+        let start_indent = clean_indent(locator, stmt);
+        let indent = clean_indent(locator, arg1);
+        let short_indent = if indent.len() > 3 {
+            indent[3..].to_string()
+        } else {
+            indent.to_string()
+        };
+        Self {
+            multi_line,
+            indent,
+            short_indent,
+            start_indent,
+        }
     }
-    None
 }
 
 fn refactor_segment(
     locator: &Locator,
     stmt: &Stmt,
     replace: &Lazy<HashMap<&str, &str>>,
+    names: &[Located<AliasData>],
+    module: &str,
 ) -> Option<String> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text).unwrap();
-    let mut import = match_import_from(&mut tree).unwrap();
     let mut new_entries = String::new();
-    let mut keep_names: Vec<ImportAlias<'_>> = vec![];
-    if let ImportNames::Aliases(item_names) = &import.names {
-        for name in item_names {
-            if let NameOrAttribute::N(the_name) = &name.name {
-                match replace.get(the_name.value) {
-                    Some(raw_name) => {
-                        new_entries.push_str(&format!("import {}", raw_name));
-                        if let Some(asname) = &name.asname {
-                            if let Some(final_name) = get_asname(asname) {
-                                new_entries.push_str(&format!(" as {}", final_name));
-                            }
-                        }
-                        new_entries.push('\n');
-                    }
-                    None => keep_names.push(name.clone()),
+    let mut keep_names: Vec<AliasData> = vec![];
+    let mut clean_names: Vec<AliasData> = vec![];
+    for name in names {
+        clean_names.push(name.node.clone());
+    }
+
+    let formatting = Formatting::new(locator, stmt, &names.get(0).unwrap());
+    for name in names {
+        match replace.get(name.node.name.as_str()) {
+            None => keep_names.push(name.node.clone()),
+            Some(item) => {
+                // MAKE SURE TO ADD IF STATEMENTS HERE
+                new_entries.push_str(&format!("{}import {item}", formatting.start_indent));
+                if let Some(final_name) = &name.node.asname {
+                    new_entries.push_str(&format!(" as {}", final_name));
                 }
-            } else {
-                keep_names.push(name.clone());
+                new_entries.push('\n');
             }
         }
     }
@@ -116,10 +129,13 @@ fn refactor_segment(
     if new_entries.is_empty() {
         return None;
     }
-    import.names = ImportNames::Aliases(keep_names);
-    let mut state = CodegenState::default();
-    import.codegen(&mut state);
-    let mut final_str = state.to_string();
+    let mut final_str = get_fromimport_str(
+        &keep_names,
+        module,
+        formatting.multi_line,
+        &formatting.indent,
+        &formatting.short_indent,
+    );
     final_str.push_str(&format!("\n{}", new_entries));
     if final_str.ends_with('\n') {
         final_str.pop();
@@ -128,17 +144,28 @@ fn refactor_segment(
 }
 
 /// UP036
-pub fn import_replacements_six(checker: &mut Checker, stmt: &Stmt, module: &Option<String>) {
+pub fn import_replacements_six(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    module: &Option<String>,
+    names: &Vec<Located<AliasData>>,
+) {
     // Pyupgrade only works with import_from statements, so this linter does that as
     // well
 
-    // This only applies to six.moves libraries
     let final_string: Option<String>;
     if let Some(module_text) = module {
         if module_text == "six.moves" {
-            final_string = refactor_segment(checker.locator, stmt, &REPLACE_MODS);
+            final_string =
+                refactor_segment(checker.locator, stmt, &REPLACE_MODS, &names, module_text);
         } else if module_text == "six.moves.urllib" {
-            final_string = refactor_segment(checker.locator, stmt, &REPLACE_MODS_URLLIB);
+            final_string = refactor_segment(
+                checker.locator,
+                stmt,
+                &REPLACE_MODS_URLLIB,
+                &names,
+                module_text,
+            );
         } else {
             return;
         }

@@ -1,12 +1,11 @@
 use rustpython_ast::{AliasData, Located, Stmt};
 
 use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::types::PythonVersion;
-use crate::source_code::Locator;
+use crate::rules::pyupgrade::helpers::{clean_indent, get_fromimport_str};
 use crate::violations;
 
 const BAD_MODULES: &[&str] = &[
@@ -317,8 +316,20 @@ impl<'a> FixImports<'a> {
     /// Converts the string of imports into new one
     fn create_new_str(&self, matches: &[&str], replace: &str) -> Option<String> {
         let (matching_names, unmatching_names) = self.get_import_lists(matches);
-        let unmatching = self.get_str(&unmatching_names, self.module);
-        let matching = self.get_str(&matching_names, replace);
+        let unmatching = get_fromimport_str(
+            &unmatching_names,
+            self.module,
+            self.multi_line,
+            self.indent,
+            self.short_indent,
+        );
+        let matching = get_fromimport_str(
+            &matching_names,
+            replace,
+            self.multi_line,
+            self.indent,
+            self.short_indent,
+        );
         // We don't replace if there is just an unmatching, because then we don't need
         // to refactor
         if !unmatching.is_empty() && !matching.is_empty() {
@@ -344,43 +355,6 @@ impl<'a> FixImports<'a> {
             }
         }
         (matching_names, unmatching_names)
-    }
-
-    fn get_str(&self, names: &[AliasData], module: &str) -> String {
-        if names.is_empty() {
-            return String::new();
-        }
-        let after_comma = if self.multi_line { '\n' } else { ' ' };
-        let start_imps = if self.multi_line { "(\n" } else { "" };
-        let after_imps = if self.multi_line {
-            format!("\n{})", self.short_indent)
-        } else {
-            String::new()
-        };
-        let mut full_names: Vec<String> = vec![];
-        for name in names {
-            let asname_str = match &name.asname {
-                Some(item) => format!(" as {}", item),
-                None => String::new(),
-            };
-            let final_string = format!("{}{}{}", self.indent, name.name, asname_str);
-            full_names.push(final_string);
-        }
-        format!(
-            "from {} import {}{}{}",
-            module,
-            start_imps,
-            full_names.join(format!(",{}", after_comma).as_str()),
-            after_imps
-        )
-    }
-}
-
-fn clean_indent<T>(locator: &Locator, located: &Located<T>) -> String {
-    match indentation(locator, located) {
-        // This is an opninionated way of formatting import statements
-        None => "    ".to_string(),
-        Some(item) => item.to_string(),
     }
 }
 
