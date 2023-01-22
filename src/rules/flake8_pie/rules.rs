@@ -157,7 +157,8 @@ where
 pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     for item in keys.iter().zip(values.iter()) {
         if let (None, value) = item {
-            // We only care about when the key is None which indicates a spread `**` inside a dict
+            // We only care about when the key is None which indicates a spread `**`
+            // inside a dict
             if let Located {
                 node: ExprKind::Dict { .. },
                 ..
