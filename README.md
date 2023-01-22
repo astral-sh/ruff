@@ -928,7 +928,7 @@ For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-impli
 
 ### flake8-import-conventions (ICN)
 
-For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions/) on GitHub.
+For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions) on GitHub.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1099,7 +1099,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
 
 ### pygrep-hooks (PGH)
 
-For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks/) on GitHub.
+For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitHub.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |

@@ -25,7 +25,7 @@ def main(*, plugin: str, url: str, prefix_code: str) -> None:
     # Create the Plugin rules module.
     plugin_dir = ROOT_DIR / "src/rules" / dir_name(plugin)
     plugin_dir.mkdir(exist_ok=True)
-    
+
     with (plugin_dir / "mod.rs").open("w+") as fp:
         fp.write(f"//! Rules from [{plugin}]({url}).\n")
         fp.write("pub(crate) mod rules;\n")
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         description="Generate boilerplate for a new Flake8 plugin.",
         epilog=(
             "Example usage: python scripts/add_plugin.py flake8-pie "
-            "--url https://pypi.org/project/flake8-pie/0.16.0/"
+            "--url https://pypi.org/project/flake8-pie/"
         ),
     )
     parser.add_argument(

@@ -1,4 +1,4 @@
-//! Rules from [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions/).
+//! Rules from [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions).
 pub(crate) mod rules;
 pub mod settings;
 
