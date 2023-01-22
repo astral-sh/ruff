@@ -295,7 +295,7 @@ pub enum ComparableExpr<'a> {
         orelse: Box<ComparableExpr<'a>>,
     },
     Dict {
-        keys: Vec<ComparableExpr<'a>>,
+        keys: Vec<Option<ComparableExpr<'a>>>,
         values: Vec<ComparableExpr<'a>>,
     },
     Set {
@@ -426,8 +426,7 @@ impl<'a> From<&'a Expr> for ComparableExpr<'a> {
             ExprKind::Dict { keys, values } => Self::Dict {
                 keys: keys
                     .iter()
-                    .flatten()
-                    .map(std::convert::Into::into)
+                    .map(|expr| expr.as_ref().map(std::convert::Into::into))
                     .collect(),
                 values: values.iter().map(std::convert::Into::into).collect(),
             },
