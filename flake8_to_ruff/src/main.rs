@@ -51,15 +51,10 @@ fn main() -> Result<()> {
     let pyproject = cli.pyproject.map(flake8_to_ruff::parse).transpose()?;
     let external_config = pyproject
         .as_ref()
-        .map(|pyproject| {
-            pyproject
-                .tool
-                .as_ref()
-                .map(|tool| ExternalConfig {
-                    black: tool.black.as_ref(),
-                    isort: tool.isort.as_ref(),
-                })
-                .unwrap_or_default()
+        .and_then(|pyproject| pyproject.tool.as_ref())
+        .map(|tool| ExternalConfig {
+            black: tool.black.as_ref(),
+            isort: tool.isort.as_ref(),
         })
         .unwrap_or_default();
 
