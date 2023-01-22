@@ -13,7 +13,7 @@ pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     let contents = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut count: usize = 0;
     let mut trailing_comma = TrailingComma::Absent;
-    for (_, tok, _) in lexer::make_tokenizer(&contents).flatten() {
+    for (_, tok, _) in lexer::make_tokenizer(contents).flatten() {
         if matches!(tok, Tok::Lpar) {
             count += 1;
         }
@@ -110,7 +110,7 @@ pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
 
     // Find the first token that isn't a comment or whitespace.
     let contents = locator.slice_source_code_at(splice);
-    for (.., tok, end) in lexer::make_tokenizer(&contents).flatten() {
+    for (.., tok, end) in lexer::make_tokenizer(contents).flatten() {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
             splice = end;
         } else {

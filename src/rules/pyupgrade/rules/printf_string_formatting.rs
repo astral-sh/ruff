@@ -156,41 +156,47 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
         for (key, value) in keys.iter().zip(values.iter()) {
-            if let ExprKind::Constant {
-                value: Constant::Str(key_string),
-                ..
-            } = &key.node
-            {
-                // If the dictionary key is not a valid variable name, abort.
-                if !is_identifier(key_string) {
-                    return None;
-                }
-                // If the key is a Python keyword, abort.
-                if KWLIST.contains(&key_string.as_str()) {
-                    return None;
-                }
-                // If there are multiple entries of the same key, abort.
-                if seen.contains(&key_string.as_str()) {
-                    return None;
-                }
-                seen.push(key_string);
-                let mut contents = String::new();
-                if is_multi_line {
-                    if indent.is_none() {
-                        indent = indentation(checker.locator, key);
+            match key {
+                Some(key) => {
+                    if let ExprKind::Constant {
+                        value: Constant::Str(key_string),
+                        ..
+                    } = &key.node
+                    {
+                        // If the dictionary key is not a valid variable name, abort.
+                        if !is_identifier(key_string) {
+                            return None;
+                        }
+                        // If the key is a Python keyword, abort.
+                        if KWLIST.contains(&key_string.as_str()) {
+                            return None;
+                        }
+                        // If there are multiple entries of the same key, abort.
+                        if seen.contains(&key_string.as_str()) {
+                            return None;
+                        }
+                        seen.push(key_string);
+                        if is_multi_line {
+                            if indent.is_none() {
+                                indent = indentation(checker.locator, key);
+                            }
+                        }
+
+                        let value_string = checker
+                            .locator
+                            .slice_source_code_range(&Range::from_located(value));
+                        arguments.push(format!("{key_string}={value_string}"));
+                    } else {
+                        // If there are any non-string keys, abort.
+                        return None;
                     }
                 }
-
-                let value_string = checker
-                    .locator
-                    .slice_source_code_range(&Range::from_located(value));
-                contents.push_str(key_string);
-                contents.push('=');
-                contents.push_str(&value_string);
-                arguments.push(contents);
-            } else {
-                // If there are any non-string keys, abort.
-                return None;
+                None => {
+                    let value_string = checker
+                        .locator
+                        .slice_source_code_range(&Range::from_located(value));
+                    arguments.push(format!("**{value_string}"));
+                }
             }
         }
         // If we couldn't parse out key values, abort.
@@ -205,7 +211,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
 
             for item in &arguments {
                 contents.push('\n');
-                contents.push_str(&indent);
+                contents.push_str(indent);
                 contents.push_str(item);
                 contents.push(',');
             }
@@ -217,7 +223,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
             if let Some(ident) = indent.strip_prefix(default_indent) {
                 contents.push_str(ident);
             } else {
-                contents.push_str(&indent);
+                contents.push_str(indent);
             }
         } else {
             contents.push_str(&arguments.join(", "));
@@ -304,7 +310,7 @@ pub(crate) fn printf_string_formatting(
     let mut strings: Vec<(Location, Location)> = vec![];
     let mut extension = None;
     for (start, tok, end) in lexer::make_tokenizer_located(
-        &checker
+        checker
             .locator
             .slice_source_code_range(&Range::from_located(expr)),
         expr.location,
@@ -333,7 +339,7 @@ pub(crate) fn printf_string_formatting(
         let string = checker
             .locator
             .slice_source_code_range(&Range::new(*start, *end));
-        let (Some(leader), Some(trailer)) = (leading_quote(&string), trailing_quote(&string)) else {
+        let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
         let string = &string[leader.len()..string.len() - trailer.len()];
@@ -371,14 +377,14 @@ pub(crate) fn printf_string_formatting(
         match prev {
             None => {
                 contents.push_str(
-                    &checker
+                    checker
                         .locator
                         .slice_source_code_range(&Range::new(expr.location, *start)),
                 );
             }
             Some(prev) => {
                 contents.push_str(
-                    &checker
+                    checker
                         .locator
                         .slice_source_code_range(&Range::new(prev, *start)),
                 );
@@ -391,7 +397,7 @@ pub(crate) fn printf_string_formatting(
 
     if let Some((.., end)) = extension {
         contents.push_str(
-            &checker
+            checker
                 .locator
                 .slice_source_code_range(&Range::new(prev.unwrap(), end)),
         );

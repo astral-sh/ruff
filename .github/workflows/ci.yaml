@@ -96,7 +96,9 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
       - run: cargo check
-      - run: ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/
+      - run: |
+         ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
+         ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
       - run: cargo check
 
 # TODO(charlie): Re-enable the `wasm-pack` tests.

@@ -1,8 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{command, Parser};
 use regex::Regex;
-use ruff::fs;
 use ruff::logging::LogLevel;
 use ruff::registry::{Rule, RuleSelector};
 use ruff::resolver::ConfigProcessor;
@@ -444,9 +443,6 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     }
     per_file_ignores
         .into_iter()
-        .map(|(pattern, prefixes)| {
-            let absolute = fs::normalize_path(Path::new(&pattern));
-            PerFileIgnore::new(pattern, absolute, &prefixes)
-        })
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes, None))
         .collect()
 }

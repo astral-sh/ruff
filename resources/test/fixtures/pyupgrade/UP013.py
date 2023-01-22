@@ -31,3 +31,7 @@ MyType10 = TypedDict("MyType10", {"key": Literal["value"]})
 
 # using namespace TypedDict
 MyType11 = typing.TypedDict("MyType11", {"key": int})
+
+# unpacking
+c = {"c": float}
+MyType12 = TypedDict("MyType1", {"a": int, "b": str, **c})

@@ -87,18 +87,24 @@ impl FromStr for FilePattern {
 
 #[derive(Debug, Clone)]
 pub struct PerFileIgnore {
-    pub basename: String,
-    pub absolute: PathBuf,
-    pub codes: HashableHashSet<Rule>,
+    pub(crate) basename: String,
+    pub(crate) absolute: PathBuf,
+    pub(crate) rules: HashableHashSet<Rule>,
 }
 
 impl PerFileIgnore {
-    pub fn new(basename: String, absolute: PathBuf, prefixes: &[RuleSelector]) -> Self {
-        let codes: FxHashSet<_> = prefixes.iter().flat_map(RuleSelector::codes).collect();
+    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+        let rules: FxHashSet<_> = prefixes.iter().flat_map(IntoIterator::into_iter).collect();
+        let path = Path::new(&pattern);
+        let absolute = match project_root {
+            Some(project_root) => fs::normalize_path_to(path, project_root),
+            None => fs::normalize_path(path),
+        };
+
         Self {
-            basename,
+            basename: pattern,
             absolute,
-            codes: codes.into(),
+            rules: rules.into(),
         }
     }
 }

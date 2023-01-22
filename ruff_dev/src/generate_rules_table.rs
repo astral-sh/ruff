@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::Args;
-use ruff::registry::{Linter, Prefixes, RuleSelector};
+use ruff::registry::{Linter, LinterCategory, Rule, RuleNamespace};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -20,12 +20,12 @@ pub struct Cli {
     pub(crate) dry_run: bool,
 }
 
-fn generate_table(table_out: &mut String, prefix: &RuleSelector) {
+fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>) {
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
     table_out.push('\n');
-    for rule in prefix.codes() {
+    for rule in rules {
         let fix_token = match rule.autofixable() {
             None => "",
             Some(_) => "🛠",
@@ -48,8 +48,7 @@ pub fn main(cli: &Cli) -> Result<()> {
     let mut table_out = String::new();
     let mut toc_out = String::new();
     for linter in Linter::iter() {
-        let prefixes = linter.prefixes();
-        let codes_csv: String = prefixes.as_list(", ");
+        let codes_csv: String = linter.prefixes().join(", ");
         table_out.push_str(&format!("### {} ({codes_csv})", linter.name()));
         table_out.push('\n');
         table_out.push('\n');
@@ -86,15 +85,14 @@ pub fn main(cli: &Cli) -> Result<()> {
             table_out.push('\n');
         }
 
-        match prefixes {
-            Prefixes::Single(prefix) => generate_table(&mut table_out, &prefix),
-            Prefixes::Multiple(entries) => {
-                for (prefix, category) in entries {
-                    table_out.push_str(&format!("#### {category} ({})", prefix.as_ref()));
-                    table_out.push('\n');
-                    generate_table(&mut table_out, &prefix);
-                }
+        if let Some(categories) = linter.categories() {
+            for LinterCategory(prefix, name, selector) in categories {
+                table_out.push_str(&format!("#### {name} ({prefix})"));
+                table_out.push('\n');
+                generate_table(&mut table_out, selector);
             }
+        } else {
+            generate_table(&mut table_out, &linter);
         }
     }
 

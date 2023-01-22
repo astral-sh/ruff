@@ -36,8 +36,8 @@ use crate::rules::{
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pie, flake8_print,
     flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
+    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -273,7 +273,7 @@ impl<'a> Checker<'a> {
             Location::new(*noqa_lineno, 0),
             Location::new(noqa_lineno + 1, 0),
         ));
-        match noqa::extract_noqa_directive(&line) {
+        match noqa::extract_noqa_directive(line) {
             Directive::None => false,
             Directive::All(..) => true,
             Directive::Codes(.., codes) => noqa::includes(code, &codes),
@@ -1230,29 +1230,29 @@ where
                         }
                     }
 
-                    if let Some(asname) = &alias.node.asname {
-                        if self
-                            .settings
-                            .rules
-                            .enabled(&Rule::ImportAliasIsNotConventional)
+                    if self
+                        .settings
+                        .rules
+                        .enabled(&Rule::ImportAliasIsNotConventional)
+                    {
+                        let full_name = helpers::format_import_from_member(
+                            level.as_ref(),
+                            module.as_deref(),
+                            &alias.node.name,
+                        );
+                        if let Some(diagnostic) =
+                            flake8_import_conventions::rules::check_conventional_import(
+                                stmt,
+                                &full_name,
+                                alias.node.asname.as_deref(),
+                                &self.settings.flake8_import_conventions.aliases,
+                            )
                         {
-                            let full_name = helpers::format_import_from_member(
-                                level.as_ref(),
-                                module.as_deref(),
-                                &alias.node.name,
-                            );
-                            if let Some(diagnostic) =
-                                flake8_import_conventions::rules::check_conventional_import(
-                                    stmt,
-                                    &full_name,
-                                    alias.node.asname.as_deref(),
-                                    &self.settings.flake8_import_conventions.aliases,
-                                )
-                            {
-                                self.diagnostics.push(diagnostic);
-                            }
+                            self.diagnostics.push(diagnostic);
                         }
+                    }
 
+                    if let Some(asname) = &alias.node.asname {
                         if self
                             .settings
                             .rules
@@ -2548,6 +2548,35 @@ where
                 {
                     flake8_simplify::rules::open_file_with_context_handler(self, func);
                 }
+
+                // flake8-use-pathlib
+                if self.settings.rules.enabled(&Rule::PathlibAbspath)
+                    || self.settings.rules.enabled(&Rule::PathlibChmod)
+                    || self.settings.rules.enabled(&Rule::PathlibMkdir)
+                    || self.settings.rules.enabled(&Rule::PathlibMakedirs)
+                    || self.settings.rules.enabled(&Rule::PathlibRename)
+                    || self.settings.rules.enabled(&Rule::PathlibReplace)
+                    || self.settings.rules.enabled(&Rule::PathlibRmdir)
+                    || self.settings.rules.enabled(&Rule::PathlibRemove)
+                    || self.settings.rules.enabled(&Rule::PathlibUnlink)
+                    || self.settings.rules.enabled(&Rule::PathlibGetcwd)
+                    || self.settings.rules.enabled(&Rule::PathlibExists)
+                    || self.settings.rules.enabled(&Rule::PathlibExpanduser)
+                    || self.settings.rules.enabled(&Rule::PathlibIsDir)
+                    || self.settings.rules.enabled(&Rule::PathlibIsFile)
+                    || self.settings.rules.enabled(&Rule::PathlibIsLink)
+                    || self.settings.rules.enabled(&Rule::PathlibReadlink)
+                    || self.settings.rules.enabled(&Rule::PathlibStat)
+                    || self.settings.rules.enabled(&Rule::PathlibIsAbs)
+                    || self.settings.rules.enabled(&Rule::PathlibJoin)
+                    || self.settings.rules.enabled(&Rule::PathlibBasename)
+                    || self.settings.rules.enabled(&Rule::PathlibSamefile)
+                    || self.settings.rules.enabled(&Rule::PathlibSplitext)
+                    || self.settings.rules.enabled(&Rule::PathlibOpen)
+                    || self.settings.rules.enabled(&Rule::PathlibPyPath)
+                {
+                    flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self
@@ -3158,7 +3187,7 @@ where
                         // Ex) TypedDict("a", {"a": int})
                         if args.len() > 1 {
                             if let ExprKind::Dict { keys, values } = &args[1].node {
-                                for key in keys {
+                                for key in keys.iter().flatten() {
                                     self.in_type_definition = false;
                                     self.visit_expr(key);
                                     self.in_type_definition = prev_in_type_definition;
@@ -4613,12 +4642,13 @@ impl<'a> Checker<'a> {
                     Location::new(expr.location.row(), 0),
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
-                let body = pydocstyle::helpers::raw_contents(&contents);
+
+                let body = pydocstyle::helpers::raw_contents(contents);
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,
-                    contents: &contents,
-                    indentation: &indentation,
+                    contents,
+                    indentation,
                     body,
                 };
 

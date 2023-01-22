@@ -18,7 +18,7 @@ where
     F: Fn(Tok) -> bool,
 {
     let contents = locator.slice_source_code_range(&Range::from_located(stmt));
-    for ((_, tok, _), (start, ..)) in lexer::make_tokenizer_located(&contents, stmt.location)
+    for ((_, tok, _), (start, ..)) in lexer::make_tokenizer_located(contents, stmt.location)
         .flatten()
         .tuple_windows()
     {

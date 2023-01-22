@@ -1,4 +1,4 @@
-//! Rules from [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.1/).
+//! Rules from [flake8-quotes](https://pypi.org/project/flake8-quotes/).
 pub(crate) mod rules;
 pub mod settings;
 

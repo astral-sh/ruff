@@ -1,8 +1,7 @@
 //! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
 
-use itertools::Itertools;
 use once_cell::sync::Lazy;
-use ruff_macros::ParseCode;
+use ruff_macros::RuleNamespace;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
@@ -431,7 +430,33 @@ ruff_macros::define_rule_mapping!(
     TRY004 => rules::tryceratops::rules::PreferTypeError,
     TRY201 => rules::tryceratops::rules::VerboseRaise,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
-    // Ruff
+    // flake8-use-pathlib
+    PTH100 => rules::flake8_use_pathlib::violations::PathlibAbspath,
+    PTH101 => rules::flake8_use_pathlib::violations::PathlibChmod,
+    PTH102 => rules::flake8_use_pathlib::violations::PathlibMkdir,
+    PTH103 => rules::flake8_use_pathlib::violations::PathlibMakedirs,
+    PTH104 => rules::flake8_use_pathlib::violations::PathlibRename,
+    PTH105 => rules::flake8_use_pathlib::violations::PathlibReplace,
+    PTH106 => rules::flake8_use_pathlib::violations::PathlibRmdir,
+    PTH107 => rules::flake8_use_pathlib::violations::PathlibRemove,
+    PTH108 => rules::flake8_use_pathlib::violations::PathlibUnlink,
+    PTH109 => rules::flake8_use_pathlib::violations::PathlibGetcwd,
+    PTH110 => rules::flake8_use_pathlib::violations::PathlibExists,
+    PTH111 => rules::flake8_use_pathlib::violations::PathlibExpanduser,
+    PTH112 => rules::flake8_use_pathlib::violations::PathlibIsDir,
+    PTH113 => rules::flake8_use_pathlib::violations::PathlibIsFile,
+    PTH114 => rules::flake8_use_pathlib::violations::PathlibIsLink,
+    PTH115 => rules::flake8_use_pathlib::violations::PathlibReadlink,
+    PTH116 => rules::flake8_use_pathlib::violations::PathlibStat,
+    PTH117 => rules::flake8_use_pathlib::violations::PathlibIsAbs,
+    PTH118 => rules::flake8_use_pathlib::violations::PathlibJoin,
+    PTH119 => rules::flake8_use_pathlib::violations::PathlibBasename,
+    PTH120 => rules::flake8_use_pathlib::violations::PathlibDirname,
+    PTH121 => rules::flake8_use_pathlib::violations::PathlibSamefile,
+    PTH122 => rules::flake8_use_pathlib::violations::PathlibSplitext,
+    PTH123 => rules::flake8_use_pathlib::violations::PathlibOpen,
+    PTH124 => rules::flake8_use_pathlib::violations::PathlibPyPath,
+    // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
     RUF003 => violations::AmbiguousUnicodeCharacterComment,
@@ -440,14 +465,14 @@ ruff_macros::define_rule_mapping!(
     RUF100 => violations::UnusedNOQA,
 );
 
-#[derive(EnumIter, Debug, PartialEq, Eq, ParseCode)]
+#[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
 pub enum Linter {
     #[prefix = "F"]
     Pyflakes,
     #[prefix = "E"]
     #[prefix = "W"]
     Pycodestyle,
-    #[prefix = "C9"]
+    #[prefix = "C90"]
     McCabe,
     #[prefix = "I"]
     Isort,
@@ -517,82 +542,37 @@ pub enum Linter {
     Flake8TypeChecking,
     #[prefix = "TRY"]
     Tryceratops,
+    #[prefix = "PTH"]
+    Flake8UsePathlib,
     #[prefix = "RUF"]
     Ruff,
 }
 
-pub trait ParseCode: Sized {
+pub trait RuleNamespace: Sized {
     fn parse_code(code: &str) -> Option<(Self, &str)>;
-}
 
-pub enum Prefixes {
-    Single(RuleSelector),
-    Multiple(Vec<(RuleSelector, &'static str)>),
-}
-
-impl Prefixes {
-    pub fn as_list(&self, separator: &str) -> String {
-        match self {
-            Prefixes::Single(prefix) => prefix.as_ref().to_string(),
-            Prefixes::Multiple(entries) => entries
-                .iter()
-                .map(|(prefix, _)| prefix.as_ref())
-                .join(separator),
-        }
-    }
+    fn prefixes(&self) -> &'static [&'static str];
 }
 
 include!(concat!(env!("OUT_DIR"), "/linter.rs"));
 
+/// The prefix, name and selector for an upstream linter category.
+pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleSelector);
+
 impl Linter {
-    pub fn prefixes(&self) -> Prefixes {
+    pub fn categories(&self) -> Option<&'static [LinterCategory]> {
         match self {
-            Linter::Eradicate => Prefixes::Single(RuleSelector::ERA),
-            Linter::Flake82020 => Prefixes::Single(RuleSelector::YTT),
-            Linter::Flake8Annotations => Prefixes::Single(RuleSelector::ANN),
-            Linter::Flake8Bandit => Prefixes::Single(RuleSelector::S),
-            Linter::Flake8BlindExcept => Prefixes::Single(RuleSelector::BLE),
-            Linter::Flake8BooleanTrap => Prefixes::Single(RuleSelector::FBT),
-            Linter::Flake8Bugbear => Prefixes::Single(RuleSelector::B),
-            Linter::Flake8Builtins => Prefixes::Single(RuleSelector::A),
-            Linter::Flake8Comprehensions => Prefixes::Single(RuleSelector::C4),
-            Linter::Flake8Datetimez => Prefixes::Single(RuleSelector::DTZ),
-            Linter::Flake8Debugger => Prefixes::Single(RuleSelector::T10),
-            Linter::Flake8ErrMsg => Prefixes::Single(RuleSelector::EM),
-            Linter::Flake8ImplicitStrConcat => Prefixes::Single(RuleSelector::ISC),
-            Linter::Flake8ImportConventions => Prefixes::Single(RuleSelector::ICN),
-            Linter::Flake8Print => Prefixes::Single(RuleSelector::T20),
-            Linter::Flake8PytestStyle => Prefixes::Single(RuleSelector::PT),
-            Linter::Flake8Quotes => Prefixes::Single(RuleSelector::Q),
-            Linter::Flake8Return => Prefixes::Single(RuleSelector::RET),
-            Linter::Flake8Simplify => Prefixes::Single(RuleSelector::SIM),
-            Linter::Flake8TidyImports => Prefixes::Single(RuleSelector::TID),
-            Linter::Flake8UnusedArguments => Prefixes::Single(RuleSelector::ARG),
-            Linter::Isort => Prefixes::Single(RuleSelector::I),
-            Linter::McCabe => Prefixes::Single(RuleSelector::C90),
-            Linter::PEP8Naming => Prefixes::Single(RuleSelector::N),
-            Linter::PandasVet => Prefixes::Single(RuleSelector::PD),
-            Linter::Pycodestyle => Prefixes::Multiple(vec![
-                (RuleSelector::E, "Error"),
-                (RuleSelector::W, "Warning"),
+            Linter::Pycodestyle => Some(&[
+                LinterCategory("E", "Error", RuleSelector::E),
+                LinterCategory("W", "Warning", RuleSelector::W),
             ]),
-            Linter::Pydocstyle => Prefixes::Single(RuleSelector::D),
-            Linter::Pyflakes => Prefixes::Single(RuleSelector::F),
-            Linter::PygrepHooks => Prefixes::Single(RuleSelector::PGH),
-            Linter::Pylint => Prefixes::Multiple(vec![
-                (RuleSelector::PLC, "Convention"),
-                (RuleSelector::PLE, "Error"),
-                (RuleSelector::PLR, "Refactor"),
-                (RuleSelector::PLW, "Warning"),
+            Linter::Pylint => Some(&[
+                LinterCategory("PLC", "Convention", RuleSelector::PLC),
+                LinterCategory("PLE", "Error", RuleSelector::PLE),
+                LinterCategory("PLR", "Refactor", RuleSelector::PLR),
+                LinterCategory("PLW", "Warning", RuleSelector::PLW),
             ]),
-            Linter::Pyupgrade => Prefixes::Single(RuleSelector::UP),
-            Linter::Flake8Pie => Prefixes::Single(RuleSelector::PIE),
-            Linter::Flake8Commas => Prefixes::Single(RuleSelector::COM),
-            Linter::Flake8NoPep420 => Prefixes::Single(RuleSelector::INP),
-            Linter::Flake8Executable => Prefixes::Single(RuleSelector::EXE),
-            Linter::Flake8TypeChecking => Prefixes::Single(RuleSelector::TYP),
-            Linter::Tryceratops => Prefixes::Single(RuleSelector::TRY),
-            Linter::Ruff => Prefixes::Single(RuleSelector::RUF),
+            _ => None,
         }
     }
 }
@@ -743,7 +723,7 @@ pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, Rule>> = Lazy::new(|| {
 mod tests {
     use strum::IntoEnumIterator;
 
-    use super::{Linter, ParseCode, Rule};
+    use super::{Linter, Rule, RuleNamespace};
 
     #[test]
     fn check_code_serialization() {

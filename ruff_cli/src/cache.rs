@@ -35,10 +35,19 @@ fn content_dir() -> &'static Path {
     Path::new("content")
 }
 
-fn cache_key<P: AsRef<Path>>(path: P, settings: &Settings, autofix: flags::Autofix) -> u64 {
+fn cache_key<P: AsRef<Path>>(
+    path: P,
+    package: Option<&P>,
+    settings: &Settings,
+    autofix: flags::Autofix,
+) -> u64 {
     let mut hasher = DefaultHasher::new();
     CARGO_PKG_VERSION.hash(&mut hasher);
     path.as_ref().absolutize().unwrap().hash(&mut hasher);
+    package
+        .as_ref()
+        .map(|path| path.as_ref().absolutize().unwrap())
+        .hash(&mut hasher);
     settings.hash(&mut hasher);
     autofix.hash(&mut hasher);
     hasher.finish()
@@ -79,13 +88,14 @@ fn read_sync(cache_dir: &Path, key: u64) -> Result<Vec<u8>, std::io::Error> {
 /// Get a value from the cache.
 pub fn get<P: AsRef<Path>>(
     path: P,
+    package: Option<&P>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
 ) -> Option<Vec<Message>> {
     let encoded = read_sync(
         &settings.cli.cache_dir,
-        cache_key(path, &settings.lib, autofix),
+        cache_key(path, package, &settings.lib, autofix),
     )
     .ok()?;
     let (mtime, messages) = match bincode::deserialize::<CheckResult>(&encoded[..]) {
@@ -107,6 +117,7 @@ pub fn get<P: AsRef<Path>>(
 /// Set a value in the cache.
 pub fn set<P: AsRef<Path>>(
     path: P,
+    package: Option<&P>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
@@ -120,7 +131,7 @@ pub fn set<P: AsRef<Path>>(
     };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
-        cache_key(path, &settings.lib, autofix),
+        cache_key(path, package, &settings.lib, autofix),
         &bincode::serialize(&check_result).unwrap(),
     ) {
         error!("Failed to write to cache: {e:?}");
