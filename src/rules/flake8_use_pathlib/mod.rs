@@ -53,4 +53,18 @@ mod tests {
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Rule::PathlibPyPath, Path::new("py_path_1.py"); "PTH024_1")]
+    #[test_case(Rule::PathlibPyPath, Path::new("py_path_2.py"); "PTH024_2")]
+    fn rules_pypath(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_use_pathlib")
+                .join(path)
+                .as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
 }

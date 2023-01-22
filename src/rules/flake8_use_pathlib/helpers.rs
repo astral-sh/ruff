@@ -6,9 +6,9 @@ use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::rules::flake8_use_pathlib::violations::{
     PathlibAbspath, PathlibBasename, PathlibChmod, PathlibDirname, PathlibExists,
     PathlibExpanduser, PathlibGetcwd, PathlibIsAbs, PathlibIsDir, PathlibIsFile, PathlibIsLink,
-    PathlibJoin, PathlibMakedirs, PathlibMkdir, PathlibOpen, PathlibReadlink, PathlibRemove,
-    PathlibRename, PathlibReplace, PathlibRmdir, PathlibSamefile, PathlibSplitext, PathlibStat,
-    PathlibUnlink,
+    PathlibJoin, PathlibMakedirs, PathlibMkdir, PathlibOpen, PathlibPyPath, PathlibReadlink,
+    PathlibRemove, PathlibRename, PathlibReplace, PathlibRmdir, PathlibSamefile, PathlibSplitext,
+    PathlibStat, PathlibUnlink,
 };
 
 enum OsCall {
@@ -36,6 +36,7 @@ enum OsCall {
     Samefile,
     Splitext,
     Open,
+    PyPath,
 }
 
 pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
@@ -67,6 +68,7 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "path", "samefile"] => Some(OsCall::Samefile),
                 ["os", "path", "splitext"] => Some(OsCall::Splitext),
                 ["", "open"] => Some(OsCall::Open),
+                ["py", "path", "local"] => Some(OsCall::PyPath),
                 _ => None,
             })
     {
@@ -96,6 +98,7 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 OsCall::Samefile => PathlibSamefile.into(),
                 OsCall::Splitext => PathlibSplitext.into(),
                 OsCall::Open => PathlibOpen.into(),
+                OsCall::PyPath => PathlibPyPath.into(),
             },
             Range::from_located(expr),
         );

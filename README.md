@@ -1228,6 +1228,7 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
 | PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
 | PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
+| PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use pathlib instead |  |
 
 ### Ruff-specific rules (RUF)
 

@@ -266,3 +266,14 @@ impl Violation for PathlibOpen {
         format!("`open(\"foo\")` should be replaced by`Path(\"foo\").open()`")
     }
 }
+
+// PTH124
+define_violation!(
+    pub struct PathlibPyPath;
+);
+impl Violation for PathlibPyPath {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`py.path` is in maintenance mode, use pathlib instead")
+    }
+}
