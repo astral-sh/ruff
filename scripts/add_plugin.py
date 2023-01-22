@@ -80,19 +80,13 @@ mod tests {
         for line in content.splitlines():
             indent = get_indent(line)
 
-            if line.strip() == "// Ruff":
+            if line.strip() == "// ruff":
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
             elif line.strip() == '#[prefix = "RUF"]':
                 fp.write(f'{indent}#[prefix = "{prefix_code}"]\n')
                 fp.write(f"{indent}{pascal_case(plugin)},")
-                fp.write("\n")
-
-            elif line.strip() == "Linter::Ruff => Prefixes::Single(RuleSelector::RUF),":
-                fp.write(
-                    f"{indent}Linter::{pascal_case(plugin)} => Prefixes::Single(RuleSelector::{prefix_code}),"
-                )
                 fp.write("\n")
 
             fp.write(line)

@@ -209,7 +209,7 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) -> Result<()> {
         let contents = dedent(contents);
-        let settings = settings::Settings::for_rules(RuleSelector::F.codes());
+        let settings = settings::Settings::for_rules(&RuleSelector::F);
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_contents(&contents, &locator);

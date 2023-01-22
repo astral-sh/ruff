@@ -134,7 +134,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [eradicate (ERA)](#eradicate-era)
    1. [pandas-vet (PD)](#pandas-vet-pd)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
-   1. [Pylint (PLC, PLE, PLR, PLW)](#pylint-plc-ple-plr-plw)
+   1. [Pylint (PL)](#pylint-pl)
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
@@ -1108,7 +1108,7 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks/) on Git
 | PGH003 | blanket-type-ignore | Use specific rule codes when ignoring type issues |  |
 | PGH004 | blanket-noqa | Use specific rule codes when using `noqa` |  |
 
-### Pylint (PLC, PLE, PLR, PLW)
+### Pylint (PL)
 
 For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
