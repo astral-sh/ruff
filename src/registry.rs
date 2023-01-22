@@ -427,6 +427,9 @@ ruff_macros::define_rule_mapping!(
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
     // flake8-type-checking
     TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
+    // tryceratops
+    TRY004 => rules::tryceratops::rules::PreferTypeError,
+    TRY300 => rules::tryceratops::rules::TryConsiderElse,
     // Ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -511,6 +514,8 @@ pub enum Linter {
     Flake8Executable,
     #[prefix = "TYP"]
     Flake8TypeChecking,
+    #[prefix = "TRY"]
+    Tryceratops,
     #[prefix = "RUF"]
     Ruff,
 }
@@ -585,6 +590,7 @@ impl Linter {
             Linter::Flake8NoPep420 => Prefixes::Single(RuleSelector::INP),
             Linter::Flake8Executable => Prefixes::Single(RuleSelector::EXE),
             Linter::Flake8TypeChecking => Prefixes::Single(RuleSelector::TYP),
+            Linter::Tryceratops => Prefixes::Single(RuleSelector::TRY),
             Linter::Ruff => Prefixes::Single(RuleSelector::RUF),
         }
     }

@@ -1170,19 +1170,11 @@ mod tests {
     fn aliased_import() -> Result<()> {
         flakes(
             "import fu as FU, bar as FU",
-            &[
-                Rule::UnusedImport,
-                Rule::RedefinedWhileUnused,
-                Rule::UnusedImport,
-            ],
+            &[Rule::RedefinedWhileUnused, Rule::UnusedImport],
         )?;
         flakes(
             "from moo import fu as FU, bar as FU",
-            &[
-                Rule::UnusedImport,
-                Rule::RedefinedWhileUnused,
-                Rule::UnusedImport,
-            ],
+            &[Rule::RedefinedWhileUnused, Rule::UnusedImport],
         )?;
 
         Ok(())
@@ -1219,18 +1211,9 @@ mod tests {
 
     #[test]
     fn redefined_while_unused() -> Result<()> {
-        flakes(
-            "import fu; fu = 3",
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        )?;
-        flakes(
-            "import fu; fu, bar = 3",
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        )?;
-        flakes(
-            "import fu; [fu, bar] = 3",
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        )?;
+        flakes("import fu; fu = 3", &[Rule::RedefinedWhileUnused])?;
+        flakes("import fu; fu, bar = 3", &[Rule::RedefinedWhileUnused])?;
+        flakes("import fu; [fu, bar] = 3", &[Rule::RedefinedWhileUnused])?;
 
         Ok(())
     }
@@ -1247,7 +1230,7 @@ mod tests {
             import os
         os.path
         "#,
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused],
         )?;
 
         Ok(())
@@ -1285,7 +1268,7 @@ mod tests {
             pass
         os.path
         "#,
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused],
         )?;
 
         Ok(())
@@ -1361,7 +1344,7 @@ mod tests {
             from bb import mixer
         mixer(123)
         "#,
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused],
         )?;
 
         Ok(())
@@ -1433,7 +1416,7 @@ mod tests {
         def fu():
             pass
         "#,
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused],
         )?;
 
         Ok(())
@@ -1511,7 +1494,7 @@ mod tests {
         class fu:
             pass
         "#,
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused],
         )?;
 
         Ok(())
@@ -1775,7 +1758,7 @@ mod tests {
         for fu in range(2):
             pass
         "#,
-            &[Rule::UnusedImport, Rule::ImportShadowedByLoopVar],
+            &[Rule::ImportShadowedByLoopVar],
         )?;
 
         Ok(())
@@ -1932,11 +1915,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[
-                Rule::UnusedImport,
-                Rule::RedefinedWhileUnused,
-                Rule::UnusedVariable,
-            ],
+            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
         )?;
 
         Ok(())
@@ -2246,7 +2225,7 @@ mod tests {
         import fu.bar, fu.bar
         fu.bar
         "#,
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused],
         )?;
         flakes(
             r#"
@@ -2254,7 +2233,7 @@ mod tests {
         import fu.bar
         fu.bar
         "#,
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused],
         )?;
 
         Ok(())
@@ -2410,7 +2389,7 @@ mod tests {
             fu
         fu
         "#,
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused],
         )?;
 
         Ok(())

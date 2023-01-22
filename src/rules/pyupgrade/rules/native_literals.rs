@@ -84,7 +84,7 @@ pub fn native_literals(
         let arg_code = checker
             .locator
             .slice_source_code_range(&Range::from_located(arg));
-        if lexer::make_tokenizer(&arg_code)
+        if lexer::make_tokenizer(arg_code)
             .flatten()
             .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
             .count()

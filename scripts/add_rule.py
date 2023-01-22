@@ -21,47 +21,58 @@ def snake_case(name: str) -> str:
 
 def main(*, name: str, code: str, linter: str) -> None:
     # Create a test fixture.
-    with open(
-        ROOT_DIR / "resources/test/fixtures" / dir_name(linter) / f"{code}.py",
-        "a",
-    ):
+    with (ROOT_DIR / "resources/test/fixtures" / dir_name(linter) / f"{code}.py").open("a"):
         pass
 
+    plugin_module = ROOT_DIR / "src/rules" / dir_name(linter)
+    rule_name_snake = snake_case(name)
+
     # Add the relevant `#testcase` macro.
-    mod_rs = ROOT_DIR / "src/rules" / dir_name(linter) / "mod.rs"
+    mod_rs = plugin_module / "mod.rs"
     content = mod_rs.read_text()
 
-    with open(mod_rs, "w") as fp:
+    with mod_rs.open("w") as fp:
         for line in content.splitlines():
             if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
                 indent = get_indent(line)
-                fp.write(f'{indent}#[test_case(Rule::{code}, Path::new("{code}.py"); "{code}")]')
+                fp.write(f'{indent}#[test_case(Rule::{name}, Path::new("{code}.py"); "{code}")]')
                 fp.write("\n")
 
             fp.write(line)
             fp.write("\n")
 
-    # Add the relevant rule function.
-    with open(ROOT_DIR / "src/rules" / dir_name(linter) / (snake_case(name) + ".rs"), "w") as fp:
-        fp.write(
-            f"""
-/// {code}
-pub fn {snake_case(name)}(checker: &mut Checker) {{}}
-"""
-        )
-        fp.write("\n")
+    # Add the exports 
+    rules_dir = plugin_module / "rules"
+    rules_mod = rules_dir / "mod.rs"
 
-    # Add the relevant struct to `src/violations.rs`.
-    content = (ROOT_DIR / "src/violations.rs").read_text()
-
-    with open(ROOT_DIR / "src/violations.rs", "w") as fp:
-        for line in content.splitlines():
-            fp.write(line)
+    contents = rules_mod.read_text()
+    parts = contents.split("\n\n")
+    if len(parts) == 2:
+        new_contents = parts[0] + "\n"
+        new_contents += f"pub use {rule_name_snake}::{{{rule_name_snake}, {name}}};"
+        new_contents += "\n"
+        new_contents += "\n"
+        new_contents += parts[1]
+        new_contents += f"mod {rule_name_snake};"
+        new_contents += "\n"
+        rules_mod.write_text(new_contents)
+    else:
+        with rules_mod.open("a") as fp:
+            fp.write(f"pub use {rule_name_snake}::{{{rule_name_snake}, {name}}};")
+            fp.write("\n")
+            fp.write(f"mod {rule_name_snake};")
             fp.write("\n")
 
-            if line.startswith(f"// {linter}"):
-                fp.write(
-                    """define_violation!(
+    # Add the relevant rule function.
+    with (rules_dir / f"{rule_name_snake}.rs").open("w") as fp:
+        fp.write(
+            """use ruff_macros::derive_message_formats;
+
+use crate::define_violation;
+use crate::violation::Violation;
+use crate::checkers::ast::Checker;
+
+define_violation!(
     pub struct %s;
 );
 impl Violation for %s {
@@ -72,16 +83,23 @@ impl Violation for %s {
     }
 }
 """
-                    % (name, name)
-                )
-                fp.write("\n")
+            % (name, name)
+        )
+        fp.write("\n")
+        fp.write(
+            f"""
+/// {code}
+pub fn {rule_name_snake}(checker: &mut Checker) {{}}
+"""
+        )
+        fp.write("\n")
 
     # Add the relevant code-to-violation pair to `src/registry.rs`.
     content = (ROOT_DIR / "src/registry.rs").read_text()
 
     seen_macro = False
     has_written = False
-    with open(ROOT_DIR / "src/registry.rs", "w") as fp:
+    with (ROOT_DIR / "src/registry.rs").open("w") as fp:
         for line in content.splitlines():
             fp.write(line)
             fp.write("\n")
@@ -98,7 +116,7 @@ impl Violation for %s {
 
             if line.strip() == f"// {linter}":
                 indent = get_indent(line)
-                fp.write(f"{indent}{code} => violations::{name},")
+                fp.write(f"{indent}{code} => rules::{linter}::rules::{name},")
                 fp.write("\n")
                 has_written = True
 

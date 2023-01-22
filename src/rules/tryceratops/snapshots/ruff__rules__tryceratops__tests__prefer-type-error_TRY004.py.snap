@@ -1,0 +1,583 @@
+---
+source: src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 12
+    column: 8
+  end_location:
+    row: 12
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 12
+      column: 14
+    end_location:
+      row: 12
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 19
+    column: 8
+  end_location:
+    row: 19
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 19
+      column: 14
+    end_location:
+      row: 19
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 30
+    column: 8
+  end_location:
+    row: 30
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 30
+      column: 14
+    end_location:
+      row: 30
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 37
+    column: 8
+  end_location:
+    row: 37
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 37
+      column: 14
+    end_location:
+      row: 37
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 44
+    column: 8
+  end_location:
+    row: 44
+    column: 36
+  fix:
+    content: TypeError
+    location:
+      row: 44
+      column: 14
+    end_location:
+      row: 44
+      column: 29
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 51
+    column: 8
+  end_location:
+    row: 51
+    column: 35
+  fix:
+    content: TypeError
+    location:
+      row: 51
+      column: 14
+    end_location:
+      row: 51
+      column: 28
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 58
+    column: 8
+  end_location:
+    row: 58
+    column: 35
+  fix:
+    content: TypeError
+    location:
+      row: 58
+      column: 14
+    end_location:
+      row: 58
+      column: 28
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 65
+    column: 8
+  end_location:
+    row: 65
+    column: 25
+  fix:
+    content: TypeError
+    location:
+      row: 65
+      column: 14
+    end_location:
+      row: 65
+      column: 25
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 72
+    column: 8
+  end_location:
+    row: 72
+    column: 29
+  fix:
+    content: TypeError
+    location:
+      row: 72
+      column: 14
+    end_location:
+      row: 72
+      column: 22
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 79
+    column: 8
+  end_location:
+    row: 79
+    column: 32
+  fix:
+    content: TypeError
+    location:
+      row: 79
+      column: 14
+    end_location:
+      row: 79
+      column: 25
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 86
+    column: 8
+  end_location:
+    row: 86
+    column: 32
+  fix:
+    content: TypeError
+    location:
+      row: 86
+      column: 14
+    end_location:
+      row: 86
+      column: 25
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 95
+    column: 8
+  end_location:
+    row: 97
+    column: 9
+  fix:
+    content: TypeError
+    location:
+      row: 95
+      column: 14
+    end_location:
+      row: 95
+      column: 25
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 104
+    column: 8
+  end_location:
+    row: 104
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 104
+      column: 14
+    end_location:
+      row: 104
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 111
+    column: 8
+  end_location:
+    row: 111
+    column: 35
+  fix:
+    content: TypeError
+    location:
+      row: 111
+      column: 14
+    end_location:
+      row: 111
+      column: 28
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 118
+    column: 8
+  end_location:
+    row: 118
+    column: 33
+  fix:
+    content: TypeError
+    location:
+      row: 118
+      column: 14
+    end_location:
+      row: 118
+      column: 26
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 125
+    column: 8
+  end_location:
+    row: 125
+    column: 32
+  fix:
+    content: TypeError
+    location:
+      row: 125
+      column: 14
+    end_location:
+      row: 125
+      column: 25
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 132
+    column: 8
+  end_location:
+    row: 132
+    column: 32
+  fix:
+    content: TypeError
+    location:
+      row: 132
+      column: 14
+    end_location:
+      row: 132
+      column: 25
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 139
+    column: 8
+  end_location:
+    row: 139
+    column: 31
+  fix:
+    content: TypeError
+    location:
+      row: 139
+      column: 14
+    end_location:
+      row: 139
+      column: 24
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 146
+    column: 8
+  end_location:
+    row: 146
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 146
+      column: 14
+    end_location:
+      row: 146
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 153
+    column: 8
+  end_location:
+    row: 153
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 153
+      column: 14
+    end_location:
+      row: 153
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 160
+    column: 8
+  end_location:
+    row: 160
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 160
+      column: 14
+    end_location:
+      row: 160
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 167
+    column: 8
+  end_location:
+    row: 167
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 167
+      column: 14
+    end_location:
+      row: 167
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 174
+    column: 8
+  end_location:
+    row: 174
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 174
+      column: 14
+    end_location:
+      row: 174
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 181
+    column: 8
+  end_location:
+    row: 181
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 181
+      column: 14
+    end_location:
+      row: 181
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 188
+    column: 8
+  end_location:
+    row: 188
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 188
+      column: 14
+    end_location:
+      row: 188
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 195
+    column: 8
+  end_location:
+    row: 195
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 195
+      column: 14
+    end_location:
+      row: 195
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 202
+    column: 8
+  end_location:
+    row: 202
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 202
+      column: 14
+    end_location:
+      row: 202
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 209
+    column: 8
+  end_location:
+    row: 209
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 209
+      column: 14
+    end_location:
+      row: 209
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 216
+    column: 8
+  end_location:
+    row: 216
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 216
+      column: 14
+    end_location:
+      row: 216
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 223
+    column: 8
+  end_location:
+    row: 223
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 223
+      column: 14
+    end_location:
+      row: 223
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 230
+    column: 8
+  end_location:
+    row: 230
+    column: 30
+  fix:
+    content: TypeError
+    location:
+      row: 230
+      column: 14
+    end_location:
+      row: 230
+      column: 23
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 267
+    column: 8
+  end_location:
+    row: 267
+    column: 31
+  fix:
+    content: TypeError
+    location:
+      row: 267
+      column: 14
+    end_location:
+      row: 267
+      column: 24
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 277
+    column: 8
+  end_location:
+    row: 277
+    column: 31
+  fix:
+    content: TypeError
+    location:
+      row: 277
+      column: 14
+    end_location:
+      row: 277
+      column: 24
+  parent: ~
+- kind:
+    PreferTypeError: ~
+  location:
+    row: 288
+    column: 8
+  end_location:
+    row: 288
+    column: 31
+  fix:
+    content: TypeError
+    location:
+      row: 288
+      column: 14
+    end_location:
+      row: 288
+      column: 24
+  parent: ~
+

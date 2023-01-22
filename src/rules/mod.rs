@@ -36,3 +36,4 @@ pub mod pygrep_hooks;
 pub mod pylint;
 pub mod pyupgrade;
 pub mod ruff;
+pub mod tryceratops;

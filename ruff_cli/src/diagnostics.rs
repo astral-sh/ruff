@@ -55,7 +55,9 @@ pub fn lint_path(
         && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
     {
         let metadata = path.metadata()?;
-        if let Some(messages) = cache::get(path, &metadata, settings, autofix.into()) {
+        if let Some(messages) =
+            cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
+        {
             debug!("Cache hit for: {}", path.to_string_lossy());
             return Ok(Diagnostics::new(messages));
         }
@@ -92,7 +94,14 @@ pub fn lint_path(
 
     // Re-populate the cache.
     if let Some(metadata) = metadata {
-        cache::set(path, &metadata, settings, autofix.into(), &messages);
+        cache::set(
+            path,
+            package.as_ref(),
+            &metadata,
+            settings,
+            autofix.into(),
+            &messages,
+        );
     }
 
     Ok(Diagnostics { messages, fixed })

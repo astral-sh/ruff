@@ -56,7 +56,7 @@ fn generate_fix(locator: &Locator, stdout: &Keyword, stderr: &Keyword) -> Option
     };
     let mut contents = String::from("capture_output=True");
     if let Some(middle) = extract_middle(
-        &locator.slice_source_code_range(&Range::new(first.end_location.unwrap(), last.location)),
+        locator.slice_source_code_range(&Range::new(first.end_location.unwrap(), last.location)),
     ) {
         if middle.multi_line {
             let Some(indent) = indentation(locator, first) else {
@@ -64,7 +64,7 @@ fn generate_fix(locator: &Locator, stdout: &Keyword, stderr: &Keyword) -> Option
             };
             contents.push(',');
             contents.push('\n');
-            contents.push_str(&indent);
+            contents.push_str(indent);
         } else {
             contents.push(',');
             contents.push(' ');

@@ -102,7 +102,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846
         if let Ok(contents) = generate_call(
-            &checker
+            checker
                 .locator
                 .slice_source_code_range(&Range::from_located(expr)),
             &summary.indexes,

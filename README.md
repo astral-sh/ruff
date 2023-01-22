@@ -140,6 +140,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [flake8-type-checking (TYP)](#flake8-type-checking-typ)
+   1. [tryceratops (TRY)](#tryceratops-try)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -200,7 +201,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.228'
+  rev: 'v0.0.229'
   hooks:
     - id: ruff
 ```
@@ -1187,6 +1188,15 @@ For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checki
 | ---- | ---- | ------- | --- |
 | TYP005 | empty-type-checking-block | Found empty type-checking block |  |
 
+### tryceratops (TRY)
+
+For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
+| TRY300 | try-consider-else | Consider `else` block |  |
+
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
@@ -1529,7 +1539,7 @@ Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements 
 
 Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
 
-Pylint parity is being tracked in [#689](https://github.com/charliermarsh/ruff/issues/689).
+Pylint parity is being tracked in [#970](https://github.com/charliermarsh/ruff/issues/970).
 
 ### Which tools does Ruff replace?
 

@@ -37,7 +37,7 @@ use crate::rules::{
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pie, flake8_print,
     flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pygrep_hooks, pylint, pyupgrade, ruff,
+    pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -273,7 +273,7 @@ impl<'a> Checker<'a> {
             Location::new(*noqa_lineno, 0),
             Location::new(noqa_lineno + 1, 0),
         ));
-        match noqa::extract_noqa_directive(&line) {
+        match noqa::extract_noqa_directive(line) {
             Directive::None => false,
             Directive::All(..) => true,
             Directive::Codes(.., codes) => noqa::includes(code, &codes),
@@ -1230,6 +1230,28 @@ where
                         }
                     }
 
+                    if self
+                        .settings
+                        .rules
+                        .enabled(&Rule::ImportAliasIsNotConventional)
+                    {
+                        let full_name = helpers::format_import_from_member(
+                            level.as_ref(),
+                            module.as_deref(),
+                            &alias.node.name,
+                        );
+                        if let Some(diagnostic) =
+                            flake8_import_conventions::rules::check_conventional_import(
+                                stmt,
+                                &full_name,
+                                alias.node.asname.as_deref(),
+                                &self.settings.flake8_import_conventions.aliases,
+                            )
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
+                    }
+
                     if let Some(asname) = &alias.node.asname {
                         if self
                             .settings
@@ -1391,6 +1413,15 @@ where
                         self.current_stmt_parent().map(std::convert::Into::into),
                     );
                 }
+                if self.settings.rules.enabled(&Rule::PreferTypeError) {
+                    tryceratops::rules::prefer_type_error(
+                        self,
+                        body,
+                        test,
+                        orelse,
+                        self.current_stmt_parent().map(Into::into),
+                    );
+                }
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.rules.enabled(&Rule::AssertTuple) {
@@ -1543,6 +1574,9 @@ where
                     flake8_simplify::rules::return_in_try_except_finally(
                         self, body, handlers, finalbody,
                     );
+                }
+                if self.settings.rules.enabled(&Rule::TryConsiderElse) {
+                    tryceratops::rules::try_consider_else(self, body, orelse);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -3584,7 +3618,6 @@ impl<'a> Checker<'a> {
     {
         let binding_index = self.bindings.len();
 
-        let mut overridden = None;
         if let Some((stack_index, scope_index)) = self
             .scope_stack
             .iter()
@@ -3616,7 +3649,6 @@ impl<'a> Checker<'a> {
                         | BindingKind::FutureImportation
                 );
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
-                    overridden = Some((*scope_index, *existing_binding_index));
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
                             violations::ImportShadowedByLoopVar(
@@ -3636,7 +3668,6 @@ impl<'a> Checker<'a> {
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
-                        overridden = Some((*scope_index, *existing_binding_index));
                         if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
                             self.diagnostics.push(Diagnostic::new(
                                 violations::RedefinedWhileUnused(
@@ -3654,13 +3685,6 @@ impl<'a> Checker<'a> {
                         .push(binding_index);
                 }
             }
-        }
-
-        // If we're about to lose the binding, store it as overridden.
-        if let Some((scope_index, binding_index)) = overridden {
-            self.scopes[scope_index]
-                .overridden
-                .push((name, binding_index));
         }
 
         // Assume the rebound name is used as a global or within a loop.
@@ -4586,12 +4610,13 @@ impl<'a> Checker<'a> {
                     Location::new(expr.location.row(), 0),
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
-                let body = pydocstyle::helpers::raw_contents(&contents);
+
+                let body = pydocstyle::helpers::raw_contents(contents);
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,
-                    contents: &contents,
-                    indentation: &indentation,
+                    contents,
+                    indentation,
                     body,
                 };
 

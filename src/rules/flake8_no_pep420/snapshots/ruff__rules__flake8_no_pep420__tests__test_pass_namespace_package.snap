@@ -1,0 +1,6 @@
+---
+source: src/rules/flake8_no_pep420/mod.rs
+expression: diagnostics
+---
+[]
+

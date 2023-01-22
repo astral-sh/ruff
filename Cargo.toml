@@ -8,7 +8,7 @@ default-members = [".", "ruff_cli"]
 
 [package]
 name = "ruff"
-version = "0.0.228"
+version = "0.0.229"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -46,8 +46,7 @@ num-traits = "0.2.15"
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 regex = { version = "1.6.0" }
-ropey = { version = "1.5.0", features = ["cr_lines", "simd"], default-features = false }
-ruff_macros = { version = "0.0.228", path = "ruff_macros" }
+ruff_macros = { version = "0.0.229", path = "ruff_macros" }
 rustc-hash = { version = "1.1.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "62aa942bf506ea3d41ed0503b947b84141fdaa3c" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "62aa942bf506ea3d41ed0503b947b84141fdaa3c" }
@@ -98,7 +97,3 @@ opt-level = 3
 # https://github.com/bytecodealliance/wasm-tools/blob/b5c3d98e40590512a3b12470ef358d5c7b983b15/crates/wasmparser/src/limits.rs#L29
 [profile.dev.package.rustpython-parser]
 opt-level = 1
-
-[[bench]]
-name = "source_code_locator"
-harness = false

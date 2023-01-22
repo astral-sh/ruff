@@ -24,7 +24,7 @@ pub fn remove_class_def_base(
         let mut fix_start = None;
         let mut fix_end = None;
         let mut count: usize = 0;
-        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt_at).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(start);
@@ -57,7 +57,7 @@ pub fn remove_class_def_base(
         let mut fix_start: Option<Location> = None;
         let mut fix_end: Option<Location> = None;
         let mut seen_comma = false;
-        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt_at).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
             if seen_comma {
                 if matches!(tok, Tok::NonLogicalNewline) {
                     // Also delete any non-logical newlines after the comma.
@@ -87,7 +87,7 @@ pub fn remove_class_def_base(
         // isn't a comma.
         let mut fix_start: Option<Location> = None;
         let mut fix_end: Option<Location> = None;
-        for (start, tok, end) in lexer::make_tokenizer_located(&contents, stmt_at).flatten() {
+        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
             if start == expr_at {
                 fix_end = Some(end);
                 break;
@@ -109,7 +109,7 @@ pub fn remove_super_arguments(locator: &Locator, expr: &Expr) -> Option<Fix> {
     let range = Range::from_located(expr);
     let contents = locator.slice_source_code_range(&range);
 
-    let mut tree = libcst_native::parse_module(&contents, None).ok()?;
+    let mut tree = libcst_native::parse_module(contents, None).ok()?;
 
     let Statement::Simple(body) = tree.body.first_mut()? else {
         return None;
