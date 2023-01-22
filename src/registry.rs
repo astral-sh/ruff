@@ -469,83 +469,122 @@ ruff_macros::define_rule_mapping!(
 
 #[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
 pub enum Linter {
+    /// [Pyflakes](https://pypi.org/project/pyflakes/)
     #[prefix = "F"]
     Pyflakes,
+    /// [pycodestyle](https://pypi.org/project/pycodestyle/)
     #[prefix = "E"]
     #[prefix = "W"]
     Pycodestyle,
+    /// [mccabe](https://pypi.org/project/mccabe/)
     #[prefix = "C90"]
     McCabe,
+    /// [isort](https://pypi.org/project/isort/)
     #[prefix = "I"]
     Isort,
+    /// [pydocstyle](https://pypi.org/project/pydocstyle/)
     #[prefix = "D"]
     Pydocstyle,
+    /// [pyupgrade](https://pypi.org/project/pyupgrade/)
     #[prefix = "UP"]
     Pyupgrade,
+    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
     #[prefix = "N"]
     PEP8Naming,
+    /// [flake8-2020](https://pypi.org/project/flake8-2020/)
     #[prefix = "YTT"]
     Flake82020,
+    /// [flake8-annotations](https://pypi.org/project/flake8-annotations/)
     #[prefix = "ANN"]
     Flake8Annotations,
+    /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,
+    /// [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
     #[prefix = "BLE"]
     Flake8BlindExcept,
+    /// [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
     #[prefix = "FBT"]
     Flake8BooleanTrap,
+    /// [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
     #[prefix = "B"]
     Flake8Bugbear,
+    /// [flake8-builtins](https://pypi.org/project/flake8-builtins/)
     #[prefix = "A"]
     Flake8Builtins,
+    /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
+    /// [flake8-debugger](https://pypi.org/project/flake8-debugger/)
     #[prefix = "T10"]
     Flake8Debugger,
+    /// [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
     #[prefix = "EM"]
     Flake8ErrMsg,
+    /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
+    /// [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
     #[prefix = "ICN"]
     Flake8ImportConventions,
+    /// [flake8-print](https://pypi.org/project/flake8-print/)
     #[prefix = "T20"]
     Flake8Print,
+    /// [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
     #[prefix = "PT"]
     Flake8PytestStyle,
+    /// [flake8-quotes](https://pypi.org/project/flake8-quotes/)
     #[prefix = "Q"]
     Flake8Quotes,
+    /// [flake8-return](https://pypi.org/project/flake8-return/)
     #[prefix = "RET"]
     Flake8Return,
+    /// [flake8-simplify](https://pypi.org/project/flake8-simplify/)
     #[prefix = "SIM"]
     Flake8Simplify,
+    /// [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
     #[prefix = "TID"]
     Flake8TidyImports,
+    /// [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/)
     #[prefix = "ARG"]
     Flake8UnusedArguments,
+    /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
     #[prefix = "DTZ"]
     Flake8Datetimez,
+    /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
+    /// [pandas-vet](https://pypi.org/project/pandas-vet/)
     #[prefix = "PD"]
     PandasVet,
+    /// [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
     #[prefix = "PGH"]
     PygrepHooks,
+    /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
+    /// [flake8-pie](https://pypi.org/project/flake8-pie/)
     #[prefix = "PIE"]
     Flake8Pie,
+    /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
+    /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
     #[prefix = "INP"]
     Flake8NoPep420,
+    /// [flake8-executable](https://pypi.org/project/flake8-executable/)
     #[prefix = "EXE"]
     Flake8Executable,
+    /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
     #[prefix = "TYP"]
     Flake8TypeChecking,
+    /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
+    /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
 }
@@ -554,9 +593,11 @@ pub trait RuleNamespace: Sized {
     fn parse_code(code: &str) -> Option<(Self, &str)>;
 
     fn prefixes(&self) -> &'static [&'static str];
-}
 
-include!(concat!(env!("OUT_DIR"), "/linter.rs"));
+    fn name(&self) -> &'static str;
+
+    fn url(&self) -> Option<&'static str>;
+}
 
 /// The prefix, name and selector for an upstream linter category.
 pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleSelector);
