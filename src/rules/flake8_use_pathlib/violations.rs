@@ -274,6 +274,6 @@ define_violation!(
 impl Violation for PathlibPyPath {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`py.path` is in maintenance mode, use pathlib instead")
+        format!("`py.path` is in maintenance mode, use `pathlib` instead")
     }
 }
