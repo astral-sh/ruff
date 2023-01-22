@@ -429,7 +429,7 @@ ruff_macros::define_rule_mapping!(
     // tryceratops
     TRY004 => rules::tryceratops::rules::PreferTypeError,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
-    // Ruff
+    // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
     RUF003 => violations::AmbiguousUnicodeCharacterComment,
