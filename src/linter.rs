@@ -16,6 +16,8 @@ use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
+#[cfg(test)]
+use crate::packaging::detect_package_root;
 use crate::registry::{Diagnostic, LintSource, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
@@ -69,7 +71,7 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem))
     {
-        diagnostics.extend(check_file_path(path, settings));
+        diagnostics.extend(check_file_path(path, package, settings));
     }
 
     // Run the AST-based rules.
@@ -395,7 +397,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
     let mut diagnostics = check_path(
         path,
-        None,
+        path.parent()
+            .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
         &contents,
         tokens,
         &locator,
