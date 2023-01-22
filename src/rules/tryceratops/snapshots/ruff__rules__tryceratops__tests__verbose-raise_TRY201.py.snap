@@ -12,4 +12,24 @@ expression: diagnostics
     column: 15
   fix: ~
   parent: ~
+- kind:
+    VerboseRaise: ~
+  location:
+    row: 44
+    column: 18
+  end_location:
+    row: 44
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    VerboseRaise: ~
+  location:
+    row: 54
+    column: 22
+  end_location:
+    row: 54
+    column: 23
+  fix: ~
+  parent: ~
 

@@ -33,3 +33,22 @@ def still_good():
     except MyException as e:
         print(e)
         raise
+
+
+def bad_that_needs_recursion():
+    try:
+        process()
+    except MyException as e:
+        logger.exception("process failed")
+        if True:
+            raise e
+
+
+def bad_that_needs_recursion_2():
+    try:
+        process()
+    except MyException as e:
+        logger.exception("process failed")
+        if True:
+            def foo():
+                raise e
