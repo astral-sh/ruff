@@ -80,7 +80,7 @@ mod tests {
         for line in content.splitlines():
             indent = get_indent(line)
 
-            if line.strip() == "// Ruff":
+            if line.strip() == "// ruff":
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 

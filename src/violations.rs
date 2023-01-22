@@ -5051,7 +5051,7 @@ impl Violation for ImplicitNamespacePackage {
     }
 }
 
-// Ruff
+// ruff
 
 define_violation!(
     pub struct AmbiguousUnicodeCharacterString {
