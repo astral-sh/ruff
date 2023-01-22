@@ -453,6 +453,7 @@ ruff_macros::define_rule_mapping!(
     PTH120 => rules::flake8_use_pathlib::violations::PathlibDirname,
     PTH121 => rules::flake8_use_pathlib::violations::PathlibSamefile,
     PTH122 => rules::flake8_use_pathlib::violations::PathlibSplitext,
+    PTH123 => rules::flake8_use_pathlib::violations::PathlibOpen,
     // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,

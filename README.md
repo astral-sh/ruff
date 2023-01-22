@@ -1205,7 +1205,7 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PTH100 | pathlib-abspath | `os.path.abspath` should be replaced by `.resolve()` |  |
-| PTH101 | pathlib-chmod | `os.chmod` should be replaced by `.chmod` |  |
+| PTH101 | pathlib-chmod | `os.chmod` should be replaced by `.chmod()` |  |
 | PTH102 | pathlib-mkdir | `os.mkdir` should be replaced by `.mkdir()` |  |
 | PTH103 | pathlib-makedirs | `os.makedirs` should be replaced by `.mkdir(parents=True)` |  |
 | PTH104 | pathlib-rename | `os.rename` should be replaced by `.rename()` |  |
@@ -1220,13 +1220,14 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
 | PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
 | PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
-| PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group` |  |
+| PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
 | PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
 | PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
 | PTH119 | pathlib-basename | `os.path.basename` should be replaced by `.name` |  |
 | PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
 | PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
 | PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
+| PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
 
 ### Ruff-specific rules (RUF)
 

@@ -21,7 +21,7 @@ define_violation!(
 impl Violation for PathlibChmod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.chmod` should be replaced by `.chmod`")
+        format!("`os.chmod` should be replaced by `.chmod()`")
     }
 }
 
@@ -186,7 +186,7 @@ define_violation!(
 impl Violation for PathlibStat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.stat` should be replaced by `.stat()` or `.owner()` or `.group`")
+        format!("`os.stat` should be replaced by `.stat()` or `.owner()` or `.group()`")
     }
 }
 
@@ -253,5 +253,16 @@ impl Violation for PathlibSplitext {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.splitext` should be replaced by `.suffix`")
+    }
+}
+
+// PTH123
+define_violation!(
+    pub struct PathlibOpen;
+);
+impl Violation for PathlibOpen {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`open(\"foo\")` should be replaced by`Path(\"foo\").open()`")
     }
 }

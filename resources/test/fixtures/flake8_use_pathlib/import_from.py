@@ -28,3 +28,6 @@ basename(p)
 dirname(p)
 samefile(p)
 splitext(p)
+with open(p) as fp:
+    fp.read()
+open(p).close()

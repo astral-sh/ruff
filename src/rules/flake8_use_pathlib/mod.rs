@@ -47,6 +47,7 @@ mod tests {
                 Rule::PathlibDirname,
                 Rule::PathlibSamefile,
                 Rule::PathlibSplitext,
+                Rule::PathlibOpen,
             ]),
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);

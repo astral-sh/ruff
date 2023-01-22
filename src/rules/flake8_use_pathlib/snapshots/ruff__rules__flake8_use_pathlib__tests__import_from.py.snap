@@ -232,4 +232,24 @@ expression: diagnostics
     column: 8
   fix: ~
   parent: ~
+- kind:
+    PathlibOpen: ~
+  location:
+    row: 31
+    column: 5
+  end_location:
+    row: 31
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    PathlibOpen: ~
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 33
+    column: 4
+  fix: ~
+  parent: ~
 

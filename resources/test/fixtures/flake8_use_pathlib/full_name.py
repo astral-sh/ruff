@@ -26,3 +26,6 @@ os.path.basename(p)
 os.path.dirname(p)
 os.path.samefile(p)
 os.path.splitext(p)
+with open(p) as fp:
+    fp.read()
+open(p).close()

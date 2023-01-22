@@ -2569,6 +2569,7 @@ where
                     || self.settings.rules.enabled(&Rule::PathlibBasename)
                     || self.settings.rules.enabled(&Rule::PathlibSamefile)
                     || self.settings.rules.enabled(&Rule::PathlibSplitext)
+                    || self.settings.rules.enabled(&Rule::PathlibOpen)
                 {
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
                 }
