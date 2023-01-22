@@ -346,6 +346,8 @@ Options:
           Enable verbose logging
   -q, --quiet
           Print lint violations, but nothing else
+      --statistics
+          Print counts of violations per rule
   -s, --silent
           Disable all logging (but still exit with status code "1" upon detecting lint violations)
   -e, --exit-zero
