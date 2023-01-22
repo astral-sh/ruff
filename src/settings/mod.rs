@@ -16,9 +16,10 @@ use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
 use crate::registry::{Rule, RuleSelector, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat, Version};
@@ -106,6 +107,7 @@ pub struct Settings {
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bandit: flake8_bandit::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
+    pub flake8_builtins: flake8_builtins::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
@@ -124,15 +126,7 @@ pub struct Settings {
 impl Settings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
-            rules: build_rule_table(
-                config.fixable,
-                config.unfixable,
-                config.select,
-                config.ignore,
-                &config.extend_select,
-                &config.extend_ignore,
-                &config.pydocstyle,
-            ),
+            rules: (&config).into(),
             allowed_confusables: config
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
@@ -178,6 +172,7 @@ impl Settings {
                 .unwrap_or_default(),
             flake8_bandit: config.flake8_bandit.map(Into::into).unwrap_or_default(),
             flake8_bugbear: config.flake8_bugbear.map(Into::into).unwrap_or_default(),
+            flake8_builtins: config.flake8_builtins.map(Into::into).unwrap_or_default(),
             flake8_errmsg: config.flake8_errmsg.map(Into::into).unwrap_or_default(),
             flake8_import_conventions: config
                 .flake8_import_conventions
@@ -215,9 +210,9 @@ impl Settings {
     }
 
     #[cfg(test)]
-    pub fn for_rules(rule_codes: Vec<Rule>) -> Self {
+    pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
-            rules: rule_codes.into(),
+            rules: rules.into(),
             ..Settings::default()
         }
     }
@@ -236,54 +231,50 @@ impl Settings {
     }
 }
 
-fn build_rule_table(
-    fixable: Option<Vec<RuleSelector>>,
-    unfixable: Option<Vec<RuleSelector>>,
-    select: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
-    extend_select: &[Vec<RuleSelector>],
-    extend_ignore: &[Vec<RuleSelector>],
-    pydocstyle: &Option<pydocstyle::settings::Options>,
-) -> RuleTable {
-    let mut rules = RuleTable::empty();
+impl From<&Configuration> for RuleTable {
+    fn from(config: &Configuration) -> Self {
+        let mut rules = RuleTable::empty();
 
-    let fixable = resolve_codes([RuleCodeSpec {
-        select: &fixable.unwrap_or_else(|| CATEGORIES.to_vec()),
-        ignore: &unfixable.unwrap_or_default(),
-    }]);
+        let fixable = resolve_codes([RuleCodeSpec {
+            select: config.fixable.as_deref().unwrap_or(CATEGORIES),
+            ignore: config.unfixable.as_deref().unwrap_or_default(),
+        }]);
 
-    for code in validate_enabled(resolve_codes(
-        [RuleCodeSpec {
-            select: &select.unwrap_or_else(|| defaults::PREFIXES.to_vec()),
-            ignore: &ignore.unwrap_or_default(),
-        }]
-        .into_iter()
-        .chain(
-            extend_select
-                .iter()
-                .zip(extend_ignore.iter())
-                .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
-        )
-        .chain(
-            // If a docstring convention is specified, force-disable any incompatible error
-            // codes.
-            if let Some(convention) = pydocstyle
-                .as_ref()
-                .and_then(|pydocstyle| pydocstyle.convention)
-            {
-                Left(iter::once(RuleCodeSpec {
-                    select: &[],
-                    ignore: convention.codes(),
-                }))
-            } else {
-                Right(iter::empty())
-            },
-        ),
-    )) {
-        let fix = fixable.contains(&code);
-        rules.enable(code, fix);
+        for code in validate_enabled(resolve_codes(
+            [RuleCodeSpec {
+                select: config.select.as_deref().unwrap_or(defaults::PREFIXES),
+                ignore: config.ignore.as_deref().unwrap_or_default(),
+            }]
+            .into_iter()
+            .chain(
+                config
+                    .extend_select
+                    .iter()
+                    .zip(config.extend_ignore.iter())
+                    .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
+            )
+            .chain(
+                // If a docstring convention is specified, force-disable any incompatible error
+                // codes.
+                if let Some(convention) = config
+                    .pydocstyle
+                    .as_ref()
+                    .and_then(|pydocstyle| pydocstyle.convention)
+                {
+                    Left(iter::once(RuleCodeSpec {
+                        select: &[],
+                        ignore: convention.codes(),
+                    }))
+                } else {
+                    Right(iter::empty())
+                },
+            ),
+        )) {
+            let fix = fixable.contains(&code);
+            rules.enable(code, fix);
+        }
+        rules
     }
-    rules
 }
 
 /// Given a list of patterns, create a `GlobSet`.
@@ -306,7 +297,7 @@ pub fn resolve_per_file_ignores(
             // Construct basename matcher.
             let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-            Ok((absolute.into(), basename.into(), per_file_ignore.codes))
+            Ok((absolute.into(), basename.into(), per_file_ignore.rules))
         })
         .collect()
 }
@@ -320,7 +311,7 @@ struct RuleCodeSpec<'a> {
 /// Given a set of selected and ignored prefixes, resolve the set of enabled
 /// rule codes.
 fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<Rule> {
-    let mut codes: FxHashSet<Rule> = FxHashSet::default();
+    let mut rules: FxHashSet<Rule> = FxHashSet::default();
     for spec in specs {
         for specificity in [
             SuffixLength::None,
@@ -329,22 +320,23 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
             SuffixLength::Two,
             SuffixLength::Three,
             SuffixLength::Four,
+            SuffixLength::Five,
         ] {
-            for prefix in spec.select {
-                if prefix.specificity() == specificity {
-                    codes.extend(prefix.codes());
+            for selector in spec.select {
+                if selector.specificity() == specificity {
+                    rules.extend(selector);
                 }
             }
-            for prefix in spec.ignore {
-                if prefix.specificity() == specificity {
-                    for code in prefix.codes() {
-                        codes.remove(&code);
+            for selector in spec.ignore {
+                if selector.specificity() == specificity {
+                    for rule in selector {
+                        rules.remove(&rule);
                     }
                 }
             }
         }
     }
-    codes
+    rules
 }
 
 /// Warn if the set of enabled codes contains any incompatibilities.

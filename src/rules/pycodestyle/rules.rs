@@ -480,7 +480,7 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                         Location::new(stmt.location.row(), 0),
                         Location::new(stmt.location.row() + 1, 0),
                     ));
-                    let indentation = &leading_space(&first_line);
+                    let indentation = &leading_space(first_line);
                     let mut indented = String::new();
                     for (idx, line) in function(id, args, body, checker.stylist)
                         .lines()
@@ -603,7 +603,7 @@ pub fn invalid_escape_sequence(
     let text = locator.slice_source_code_range(&Range::new(start, end));
 
     // Determine whether the string is single- or triple-quoted.
-    let quote = extract_quote(&text);
+    let quote = extract_quote(text);
     let quote_pos = text.find(quote).unwrap();
     let prefix = text[..quote_pos].to_lowercase();
     let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];

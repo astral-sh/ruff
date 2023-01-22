@@ -31,13 +31,13 @@ impl Pyproject {
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
     let contents = fs::read_file(path)?;
-    toml::from_str(&contents).map_err(Into::into)
+    toml_edit::easy::from_str(&contents).map_err(Into::into)
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    toml::from_str(&contents).map_err(Into::into)
+    toml_edit::easy::from_str(&contents).map_err(Into::into)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -134,8 +134,8 @@ mod tests {
     use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
     use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
     use crate::rules::{
-        flake8_bugbear, flake8_errmsg, flake8_import_conventions, flake8_pytest_style,
-        flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
+        flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_import_conventions,
+        flake8_pytest_style, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
     };
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
@@ -144,17 +144,17 @@ mod tests {
 
     #[test]
     fn deserialize() -> Result<()> {
-        let pyproject: Pyproject = toml::from_str(r#""#)?;
+        let pyproject: Pyproject = toml_edit::easy::from_str(r#""#)?;
         assert_eq!(pyproject.tool, None);
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 "#,
         )?;
         assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -197,6 +197,7 @@ mod tests {
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -214,7 +215,7 @@ mod tests {
             })
         );
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -258,6 +259,7 @@ line-length = 79
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -275,7 +277,7 @@ line-length = 79
             })
         );
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -319,6 +321,7 @@ exclude = ["foo.py"]
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -336,7 +339,7 @@ exclude = ["foo.py"]
             })
         );
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -380,6 +383,7 @@ select = ["E501"]
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -397,7 +401,7 @@ select = ["E501"]
             })
         );
 
-        let pyproject: Pyproject = toml::from_str(
+        let pyproject: Pyproject = toml_edit::easy::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -442,6 +446,7 @@ ignore = ["E501"]
                     flake8_annotations: None,
                     flake8_bandit: None,
                     flake8_bugbear: None,
+                    flake8_builtins: None,
                     flake8_errmsg: None,
                     flake8_pytest_style: None,
                     flake8_quotes: None,
@@ -459,7 +464,7 @@ ignore = ["E501"]
             })
         );
 
-        assert!(toml::from_str::<Pyproject>(
+        assert!(toml_edit::easy::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -468,7 +473,7 @@ line_length = 79
         )
         .is_err());
 
-        assert!(toml::from_str::<Pyproject>(
+        assert!(toml_edit::easy::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -477,7 +482,7 @@ select = ["E123"]
         )
         .is_err());
 
-        assert!(toml::from_str::<Pyproject>(
+        assert!(toml_edit::easy::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -549,6 +554,9 @@ other-attribute = 1
                         "fastapi.Depends".to_string(),
                         "fastapi.Query".to_string(),
                     ]),
+                }),
+                flake8_builtins: Some(flake8_builtins::settings::Options {
+                    builtins_ignorelist: Some(vec!["id".to_string(), "dir".to_string(),]),
                 }),
                 flake8_errmsg: Some(flake8_errmsg::settings::Options {
                     max_string_length: Some(20),

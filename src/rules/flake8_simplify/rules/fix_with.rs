@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
 use rustpython_ast::Location;
@@ -30,9 +28,9 @@ pub(crate) fn fix_multiple_with_statements(
     // indentation while retaining valid source code. (We'll strip the prefix later
     // on.)
     let module_text = if outer_indent.is_empty() {
-        contents
+        contents.to_string()
     } else {
-        Cow::Owned(format!("def f():\n{contents}"))
+        format!("def f():\n{contents}")
     };
 
     // Parse the CST.
@@ -48,7 +46,7 @@ pub(crate) fn fix_multiple_with_statements(
         let Suite::IndentedBlock(indented_block) = &mut embedding.body else {
             bail!("Expected indented block")
         };
-        indented_block.indent = Some(&outer_indent);
+        indented_block.indent = Some(outer_indent);
 
         &mut *indented_block.body
     };

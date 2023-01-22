@@ -719,7 +719,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.228"
+version = "0.0.229"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
@@ -733,7 +733,7 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
- "toml",
+ "toml_edit",
 ]
 
 [[package]]
@@ -1267,6 +1267,15 @@ checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
 dependencies = [
  "memchr",
  "version_check",
+]
+
+[[package]]
+name = "nom8"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae01545c9c7fc4486ab7debaf2aad7003ac19431791868fb2e8066df97fad2f8"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -1818,18 +1827,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "ropey"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd22239fafefc42138ca5da064f3c17726a80d2379d817a3521240e78dd0064"
-dependencies = [
- "smallvec",
- "str_indices",
-]
-
-[[package]]
 name = "ruff"
-version = "0.0.228"
+version = "0.0.229"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -1859,7 +1858,6 @@ dependencies = [
  "once_cell",
  "path-absolutize",
  "regex",
- "ropey",
  "ruff_macros",
  "rustc-hash",
  "rustpython-ast",
@@ -1877,14 +1875,14 @@ dependencies = [
  "textwrap",
  "thiserror",
  "titlecase",
- "toml",
+ "toml_edit",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.228"
+version = "0.0.229"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1921,7 +1919,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.228"
+version = "0.0.229"
 dependencies = [
  "anyhow",
  "clap 4.0.32",
@@ -1942,7 +1940,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.228"
+version = "0.0.229"
 dependencies = [
  "once_cell",
  "proc-macro2",
@@ -1996,7 +1994,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa#ff90fe52eea578c8ebdd9d95e078cc041a5959fa"
+source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
 dependencies = [
  "num-bigint",
  "rustpython-common",
@@ -2006,7 +2004,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa#ff90fe52eea578c8ebdd9d95e078cc041a5959fa"
+source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2031,7 +2029,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa#ff90fe52eea578c8ebdd9d95e078cc041a5959fa"
+source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2048,7 +2046,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=ff90fe52eea578c8ebdd9d95e078cc041a5959fa#ff90fe52eea578c8ebdd9d95e078cc041a5959fa"
+source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2246,12 +2244,6 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "str_indices"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f026164926842ec52deb1938fae44f83dfdb82d0a5b0270c5bd5935ab74d6dd"
 
 [[package]]
 name = "string_cache"
@@ -2488,11 +2480,33 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.5.11"
+version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f7f0dd8d50a853a531c426359045b1998f04219d88799810762cd4ad314234"
+checksum = "1333c76748e868a4d9d1017b5ab53171dfd095f70c712fdb4653a406547f598f"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "toml_datetime"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "808b51e57d0ef8f71115d8f3a01e7d3750d01c79cac4b3eda910f4389fdf92fd"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a34cc558345efd7e88b9eda9626df2138b80bb46a7606f695e751c892bc7dac6"
+dependencies = [
+ "indexmap",
+ "itertools",
+ "nom8",
+ "serde",
+ "toml_datetime",
 ]
 
 [[package]]

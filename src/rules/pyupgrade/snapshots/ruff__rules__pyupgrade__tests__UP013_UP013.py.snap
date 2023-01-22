@@ -182,4 +182,14 @@ expression: diagnostics
       row: 33
       column: 53
   parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass: MyType12
+  location:
+    row: 37
+    column: 0
+  end_location:
+    row: 37
+    column: 58
+  fix: ~
+  parent: ~
 

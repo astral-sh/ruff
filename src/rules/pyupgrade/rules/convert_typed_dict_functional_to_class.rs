@@ -6,7 +6,7 @@ use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::python::identifiers::IDENTIFIER_REGEX;
+use crate::python::identifiers::is_identifier;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
@@ -78,15 +78,19 @@ fn create_class_def_stmt(
     })
 }
 
-fn properties_from_dict_literal(keys: &[Expr], values: &[Expr]) -> Result<Vec<Stmt>> {
+fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
     keys.iter()
         .zip(values.iter())
-        .map(|(key, value)| match &key.node {
-            ExprKind::Constant {
-                value: Constant::Str(property),
+        .map(|(key, value)| match key {
+            Some(Expr {
+                node:
+                    ExprKind::Constant {
+                        value: Constant::Str(property),
+                        ..
+                    },
                 ..
-            } => {
-                if IDENTIFIER_REGEX.is_match(property) && !KWLIST.contains(&property.as_str()) {
+            }) => {
+                if is_identifier(property) && !KWLIST.contains(&property.as_str()) {
                     Ok(create_property_assignment_stmt(property, &value.node))
                 } else {
                     bail!("Property name is not valid identifier: {}", property)

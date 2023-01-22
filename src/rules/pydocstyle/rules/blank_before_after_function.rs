@@ -74,7 +74,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             .count();
 
         // Avoid D202 violations for blank lines followed by inner functions or classes.
-        if blank_lines_after == 1 && INNER_FUNCTION_OR_CLASS_REGEX.is_match(&after) {
+        if blank_lines_after == 1 && INNER_FUNCTION_OR_CLASS_REGEX.is_match(after) {
             return;
         }
 

@@ -31,6 +31,16 @@ pub fn is_namedtuple_assignment(checker: &Checker, stmt: &Stmt) -> bool {
     })
 }
 
+pub fn is_type_var_assignment(checker: &Checker, stmt: &Stmt) -> bool {
+    let StmtKind::Assign { value, .. } = &stmt.node else {
+        return false;
+    };
+    checker.resolve_call_path(value).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TypeVar"]
+            || call_path.as_slice() == ["typing", "NewType"]
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{is_acronym, is_camelcase, is_mixed_case};

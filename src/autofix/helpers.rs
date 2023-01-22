@@ -80,7 +80,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
 /// of a multi-statement line.
 fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
     let contents = locator.slice_source_code_at(stmt.end_location.unwrap());
-    for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
+    for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         if trimmed.starts_with(';') {
             let column = line
@@ -103,7 +103,7 @@ fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
 fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
     let contents = locator.slice_source_code_at(start_location);
-    for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
+    for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         // Skip past any continuations.
         if trimmed.starts_with('\\') {
@@ -202,7 +202,7 @@ pub fn remove_unused_imports<'a>(
     indexer: &Indexer,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text)?;
+    let mut tree = match_module(module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
         bail!("Expected Statement::Simple");

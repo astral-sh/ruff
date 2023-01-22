@@ -1,4 +1,4 @@
-//! Rules from [pep8-naming](https://pypi.org/project/pep8-naming/0.13.2/).
+//! Rules from [pep8-naming](https://pypi.org/project/pep8-naming/).
 mod helpers;
 pub(crate) mod rules;
 pub mod settings;

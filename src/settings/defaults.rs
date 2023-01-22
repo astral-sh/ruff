@@ -8,9 +8,10 @@ use super::types::{FilePattern, PythonVersion};
 use super::Settings;
 use crate::registry::RuleSelector;
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    pyupgrade,
 };
 
 pub const PREFIXES: &[RuleSelector] = &[RuleSelector::E, RuleSelector::F];
@@ -51,7 +52,7 @@ pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            rules: PREFIXES.iter().flat_map(RuleSelector::codes).into(),
+            rules: PREFIXES.iter().flat_map(IntoIterator::into_iter).into(),
             allowed_confusables: FxHashSet::from_iter([]).into(),
             builtins: vec![],
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone().into(),
@@ -73,6 +74,7 @@ impl Default for Settings {
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
+            flake8_builtins: flake8_builtins::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),

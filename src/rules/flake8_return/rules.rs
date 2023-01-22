@@ -109,7 +109,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
             if checker.patch(&Rule::ImplicitReturn) {
                 if let Some(indent) = indentation(checker.locator, last_stmt) {
                     let mut content = String::new();
-                    content.push_str(&indent);
+                    content.push_str(indent);
                     content.push_str("return None");
                     content.push('\n');
                     diagnostic.amend(Fix::insertion(

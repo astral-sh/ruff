@@ -1,5 +1,6 @@
-//! Rules from [pyupgrade](https://pypi.org/project/pyupgrade/3.2.0/).
+//! Rules from [pyupgrade](https://pypi.org/project/pyupgrade/).
 mod fixes;
+mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 pub(crate) mod types;
@@ -52,6 +53,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"); "UP029")]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_0.py"); "UP030_0")]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_1.py"); "UP030_1")]
+    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"); "UP031_0")]
+    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"); "UP031_1")]
     #[test_case(Rule::FString, Path::new("UP032.py"); "UP032")]
     #[test_case(Rule::FunctoolsCache, Path::new("UP033.py"); "UP033")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]

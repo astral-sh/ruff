@@ -20,3 +20,20 @@ astonishment = ("we all feel", ) + Fun.words
 chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
 
 baz = () + zoob
+
+first = [
+    # The order
+    1,  # here
+    2,  # is
+    # extremely
+    3,  # critical
+    # to preserve
+]
+second = first + [
+    # please
+    4,
+    # don't
+    5,
+    # touch
+    6,
+]

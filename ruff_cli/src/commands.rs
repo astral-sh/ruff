@@ -15,7 +15,7 @@ use ruff::cache::CACHE_DIR_NAME;
 use ruff::linter::add_noqa_to_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
-use ruff::registry::{Linter, ParseCode, Rule};
+use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;

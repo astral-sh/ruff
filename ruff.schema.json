@@ -153,6 +153,17 @@
         }
       ]
     },
+    "flake8-builtins": {
+      "description": "Options for the `flake8-builtins` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8BuiltinsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
       "anyOf": [
@@ -573,6 +584,22 @@
       "properties": {
         "extend-immutable-calls": {
           "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8BuiltinsOptions": {
+      "type": "object",
+      "properties": {
+        "builtins-ignorelist": {
+          "description": "Ignore list of builtins.",
           "type": [
             "array",
             "null"
@@ -1527,6 +1554,7 @@
         "PIE8",
         "PIE80",
         "PIE807",
+        "PL",
         "PLC",
         "PLC0",
         "PLC04",
@@ -1720,6 +1748,17 @@
         "TID25",
         "TID251",
         "TID252",
+        "TRY",
+        "TRY0",
+        "TRY00",
+        "TRY004",
+        "TRY3",
+        "TRY30",
+        "TRY300",
+        "TYP",
+        "TYP0",
+        "TYP00",
+        "TYP005",
         "U",
         "U0",
         "U00",
@@ -1776,6 +1815,7 @@
         "UP029",
         "UP03",
         "UP030",
+        "UP031",
         "UP032",
         "UP033",
         "UP034",

@@ -5,7 +5,8 @@ Example usage:
 
     python scripts/add_plugin.py \
         flake8-pie \
-        --url https://pypi.org/project/flake8-pie/0.16.0/
+        --url https://pypi.org/project/flake8-pie/
+        --prefix PIE
 """
 
 import argparse
@@ -14,19 +15,18 @@ import os
 from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
 
 
-def main(*, plugin: str, url: str) -> None:
+def main(*, plugin: str, url: str, prefix_code: str) -> None:
     # Create the test fixture folder.
     os.makedirs(
         ROOT_DIR / "resources/test/fixtures" / dir_name(plugin),
         exist_ok=True,
     )
 
-    # Create the Rust module.
-    rust_module = ROOT_DIR / "src/rules" / dir_name(plugin)
-    os.makedirs(rust_module, exist_ok=True)
-    with open(rust_module / "rules.rs", "w+") as fp:
-        fp.write("use crate::checkers::ast::Checker;\n")
-    with open(rust_module / "mod.rs", "w+") as fp:
+    # Create the Plugin rules module.
+    plugin_dir = ROOT_DIR / "src/rules" / dir_name(plugin)
+    plugin_dir.mkdir(exist_ok=True)
+
+    with (plugin_dir / "mod.rs").open("w+") as fp:
         fp.write(f"//! Rules from [{plugin}]({url}).\n")
         fp.write("pub(crate) mod rules;\n")
         fp.write("\n")
@@ -59,44 +59,34 @@ mod tests {
             % dir_name(plugin)
         )
 
+    # Create a subdirectory for rules and create a `mod.rs` placeholder
+    rules_dir = plugin_dir / "rules"
+    rules_dir.mkdir(exist_ok=True)
+
+    with (rules_dir / "mod.rs").open("w+") as fp:
+        fp.write("\n\n")
+
+    # Create the snapshots subdirectory
+    (plugin_dir / "snapshots").mkdir(exist_ok=True)
+
     # Add the plugin to `rules/mod.rs`.
-    with open(ROOT_DIR / "src/rules/mod.rs", "a") as fp:
+    with (ROOT_DIR / "src/rules/mod.rs").open("a") as fp:
         fp.write(f"pub mod {dir_name(plugin)};")
 
     # Add the relevant sections to `src/registry.rs`.
     content = (ROOT_DIR / "src/registry.rs").read_text()
 
-    with open(ROOT_DIR / "src/registry.rs", "w") as fp:
+    with (ROOT_DIR / "src/registry.rs").open("w") as fp:
         for line in content.splitlines():
             indent = get_indent(line)
 
-            if line.strip() == "// Ruff":
+            if line.strip() == "// ruff":
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
             elif line.strip() == '#[prefix = "RUF"]':
-                fp.write(f'{indent}#[prefix = "TODO"]\n')
+                fp.write(f'{indent}#[prefix = "{prefix_code}"]\n')
                 fp.write(f"{indent}{pascal_case(plugin)},")
-                fp.write("\n")
-
-            elif line.strip() == "Linter::Ruff => Prefixes::Single(RuleSelector::RUF),":
-                prefix = 'todo!("Fill-in prefix after generating codes")'
-                fp.write(
-                    f"{indent}Linter::{pascal_case(plugin)} => Prefixes::Single({prefix}),"
-                )
-                fp.write("\n")
-
-            fp.write(line)
-            fp.write("\n")
-
-    # Add the relevant section to `src/violations.rs`.
-    content = (ROOT_DIR / "src/violations.rs").read_text()
-
-    with open(ROOT_DIR / "src/violations.rs", "w") as fp:
-        for line in content.splitlines():
-            if line.strip() == "// Ruff":
-                indent = get_indent(line)
-                fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
             fp.write(line)
@@ -108,7 +98,7 @@ if __name__ == "__main__":
         description="Generate boilerplate for a new Flake8 plugin.",
         epilog=(
             "Example usage: python scripts/add_plugin.py flake8-pie "
-            "--url https://pypi.org/project/flake8-pie/0.16.0/"
+            "--url https://pypi.org/project/flake8-pie/"
         ),
     )
     parser.add_argument(
@@ -122,6 +112,13 @@ if __name__ == "__main__":
         type=str,
         help="The URL of the latest release in PyPI.",
     )
+    parser.add_argument(
+        "--prefix",
+        required=False,
+        default="TODO",
+        type=str,
+        help="Prefix code for the plugin. Leave empty to manually fill.",
+    )
     args = parser.parse_args()
 
-    main(plugin=args.plugin, url=args.url)
+    main(plugin=args.plugin, url=args.url, prefix_code=args.prefix)

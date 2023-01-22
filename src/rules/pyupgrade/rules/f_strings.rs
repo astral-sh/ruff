@@ -33,7 +33,7 @@ impl<'a> FormatSummaryValues<'a> {
                 let arg = checker
                     .locator
                     .slice_source_code_range(&Range::from_located(arg));
-                if contains_invalids(&arg) {
+                if contains_invalids(arg) {
                     return None;
                 }
                 extracted_args.push(arg.to_string());
@@ -44,7 +44,7 @@ impl<'a> FormatSummaryValues<'a> {
                     let kwarg = checker
                         .locator
                         .slice_source_code_range(&Range::from_located(value));
-                    if contains_invalids(&kwarg) {
+                    if contains_invalids(kwarg) {
                         return None;
                     }
                     extracted_kwargs.insert(key, kwarg.to_string());
@@ -119,7 +119,7 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         .slice_source_code_range(&Range::from_located(value));
 
     // Tokenize: we need to avoid trying to fix implicit string concatenations.
-    if lexer::make_tokenizer(&contents)
+    if lexer::make_tokenizer(contents)
         .flatten()
         .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
         .count()
@@ -133,7 +133,7 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
     let contents = if contents.starts_with('U') || contents.starts_with('u') {
         &contents[1..]
     } else {
-        &contents
+        contents
     };
     if contents.is_empty() {
         return None;
