@@ -24,7 +24,7 @@ doctest = false
 doc = false
 
 [dependencies]
-ruff = { path = ".." }
+ruff = { path = "../ruff" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { version = "1.0.66" }
