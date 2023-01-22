@@ -171,7 +171,7 @@ pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], value
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            (_, _) => {}
+            (..) => {}
         }
     }
 }
