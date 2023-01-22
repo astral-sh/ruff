@@ -147,7 +147,7 @@ expression: diagnostics
     row: 20
     column: 38
   fix:
-    content: "from six.moves import StringIO\nfrom os import getcwd"
+    content: "from six.moves import getcwd\nfrom io import StringIO"
     location:
       row: 20
       column: 0

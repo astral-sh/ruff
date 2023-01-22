@@ -54,7 +54,7 @@ const SIX_TO_IO: &[&str] = &["BytesIO", "StringIO"];
 
 const SIX_TO_FUNCTOOLS: &[&str] = &["wraps"];
 
-const SIXMOVES_TO_IO: &[&str] = &["io"];
+const SIXMOVES_TO_IO: &[&str] = &["StringIO"];
 
 const SIXMOVES_TO_COLLECTIONS: &[&str] = &["UserDict", "UserList", "UserString"];
 
@@ -227,7 +227,15 @@ impl<'a> FixImports<'a> {
         match self.module {
             "collections" => self.create_new_str(COLLECTIONS_TO_ABC, "collections.abc"),
             "pipes" => self.create_new_str(PIPES_TO_SHLEX, "shlex"),
-            "six" => self.create_new_str(SIX_TO_IO, "io"),
+            "six" => {
+                if has_match(SIX_TO_IO, self.names) {
+                    self.create_new_str(SIX_TO_IO, "io")
+                } else if has_match(SIX_TO_FUNCTOOLS, self.names) {
+                    self.create_new_str(SIX_TO_FUNCTOOLS, "functools")
+                } else {
+                    None
+                }
+            }
             "six.moves" => {
                 if has_match(SIXMOVES_TO_IO, self.names) {
                     self.create_new_str(SIXMOVES_TO_IO, "io")
