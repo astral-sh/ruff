@@ -5,21 +5,13 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+use super::pyproject::Pyproject;
+
 /// The [isort configuration](https://pycqa.github.io/isort/docs/configuration/config_files.html).
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Isort {
     #[serde(alias = "src-paths", alias = "src_paths")]
     pub src_paths: Option<Vec<String>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Tools {
-    isort: Option<Isort>,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Pyproject {
-    tool: Option<Tools>,
 }
 
 pub fn parse_isort_options<P: AsRef<Path>>(path: P) -> Result<Option<Isort>> {

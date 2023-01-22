@@ -4,6 +4,7 @@ mod external_config;
 mod isort;
 mod parser;
 mod plugin;
+mod pyproject;
 
 pub use black::parse_black_options;
 pub use converter::convert;
