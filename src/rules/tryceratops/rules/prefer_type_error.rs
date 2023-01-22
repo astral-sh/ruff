@@ -6,15 +6,19 @@ use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct PreferTypeError;
 );
-impl Violation for PreferTypeError {
+impl AlwaysAutofixableViolation for PreferTypeError {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `TypeError` exception for invalid type")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Use `TypeError` exception type".to_string()
     }
 }
 
