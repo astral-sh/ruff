@@ -99,6 +99,11 @@ pub fn is_call(name: &str) -> bool {
     name == "__call__"
 }
 
+/// Returns `true` if a function is a test one.
+pub fn is_test(name: &str) -> bool {
+    name == "runTest" || name.starts_with("test")
+}
+
 /// Returns `true` if a module name indicates public visibility.
 fn is_public_module(module_name: &str) -> bool {
     !module_name.starts_with('_') || (module_name.starts_with("__") && module_name.ends_with("__"))

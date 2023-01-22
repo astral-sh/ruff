@@ -1,8 +1,8 @@
 use imperative::Mood;
 use once_cell::sync::Lazy;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::StmtKind;
 
+use crate::ast::cast;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
@@ -10,7 +10,7 @@ use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::violation::Violation;
-use crate::visibility::is_property;
+use crate::visibility::{is_property, is_test};
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
@@ -23,25 +23,8 @@ pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
     ) = &docstring.kind else {
         return;
     };
-    match &parent.node {
-        StmtKind::FunctionDef {
-            name,
-            decorator_list,
-            ..
-        }
-        | StmtKind::AsyncFunctionDef {
-            name,
-            decorator_list,
-            ..
-        } => {
-            if name.starts_with("test")
-                || name.eq("runTest")
-                || is_property(checker, decorator_list)
-            {
-                return;
-            }
-        }
-        _ => {}
+    if is_test(cast::name(parent)) || is_property(checker, cast::decorator_list(parent)) {
+        return;
     }
 
     let body = docstring.body;
