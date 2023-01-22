@@ -70,6 +70,15 @@ pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
     })
 }
 
+/// Returns `true` if a function definition is a `@property`.
+pub fn is_property(checker: &Checker, decorator_list: &[Expr]) -> bool {
+    decorator_list.iter().any(|expr| {
+        checker.resolve_call_path(expr).map_or(false, |call_path| {
+            call_path.as_slice() == ["", "property"]
+                || call_path.as_slice() == ["functools", "cached_property"]
+        })
+    })
+}
 /// Returns `true` if a function is a "magic method".
 pub fn is_magic(name: &str) -> bool {
     name.starts_with("__") && name.ends_with("__")

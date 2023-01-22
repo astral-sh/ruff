@@ -1,5 +1,7 @@
 """This module docstring does not need to be written in imperative mood."""
 
+from functools import cached_property
+
 # Bad examples
 
 def bad_liouiwnlkjl():
@@ -73,6 +75,11 @@ class Thingy:
     def good_property(self):
         """This property method docstring does not need to be written in imperative mood."""
         return self._beep
+
+    @cached_property
+    def good_cached_property(self):
+        """This property method docstring does not need to be written in imperative mood."""
+        return 42 * 42
 
     class NestedThingy:
         """This nested class docstring does not need to be written in imperative mood."""

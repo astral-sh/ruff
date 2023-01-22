@@ -5,70 +5,71 @@ expression: diagnostics
 - kind:
     NonImperativeMood: Returns foo.
   location:
-    row: 6
+    row: 8
     column: 4
   end_location:
-    row: 6
+    row: 8
     column: 22
   fix: ~
   parent: ~
 - kind:
     NonImperativeMood: Constructor for a foo.
   location:
-    row: 10
+    row: 12
     column: 4
   end_location:
-    row: 10
+    row: 12
     column: 32
   fix: ~
   parent: ~
 - kind:
     NonImperativeMood: Constructor for a boa.
   location:
-    row: 14
+    row: 16
     column: 4
   end_location:
-    row: 18
+    row: 20
     column: 7
   fix: ~
   parent: ~
 - kind:
     NonImperativeMood: Runs something
   location:
-    row: 22
+    row: 24
     column: 4
   end_location:
-    row: 22
+    row: 24
     column: 24
   fix: ~
   parent: ~
 - kind:
     NonImperativeMood: "Runs other things, nested"
   location:
-    row: 25
+    row: 27
     column: 8
   end_location:
-    row: 25
+    row: 27
     column: 39
   fix: ~
   parent: ~
 - kind:
     NonImperativeMood: Writes a logical line that
   location:
-    row: 31
+    row: 33
     column: 4
   end_location:
-    row: 33
+    row: 35
     column: 7
   fix: ~
   parent: ~
 - kind:
     NonImperativeMood: This method docstring should be written in imperative mood.
   location:
-    row: 70
+    row: 72
     column: 8
   end_location:
-    row: 70
+    row: 72
     column: 73
   fix: ~
   parent: ~
+

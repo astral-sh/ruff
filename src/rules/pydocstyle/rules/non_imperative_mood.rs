@@ -1,7 +1,7 @@
 use imperative::Mood;
 use once_cell::sync::Lazy;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{ExprKind, StmtKind};
+use rustpython_ast::StmtKind;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -10,6 +10,7 @@ use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::violation::Violation;
+use crate::visibility::is_property;
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
@@ -33,15 +34,11 @@ pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
             decorator_list,
             ..
         } => {
-            if name.starts_with("test") || name.eq("runTest") {
+            if name.starts_with("test")
+                || name.eq("runTest")
+                || is_property(checker, decorator_list)
+            {
                 return;
-            }
-            for expr in decorator_list.iter() {
-                if let ExprKind::Name { id, .. } = &expr.node {
-                    if id.eq("property") {
-                        return;
-                    }
-                }
             }
         }
         _ => {}
