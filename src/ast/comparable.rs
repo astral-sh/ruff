@@ -424,7 +424,11 @@ impl<'a> From<&'a Expr> for ComparableExpr<'a> {
                 orelse: orelse.into(),
             },
             ExprKind::Dict { keys, values } => Self::Dict {
-                keys: keys.iter().map(std::convert::Into::into).collect(),
+                keys: keys
+                    .iter()
+                    .flatten()
+                    .map(std::convert::Into::into)
+                    .collect(),
                 values: values.iter().map(std::convert::Into::into).collect(),
             },
             ExprKind::Set { elts } => Self::Set {

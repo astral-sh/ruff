@@ -678,17 +678,16 @@ impl<'a> Generator<'a> {
             ExprKind::Dict { keys, values } => {
                 self.p("{");
                 let mut first = true;
-                let (packed, unpacked) = values.split_at(keys.len());
-                for (k, v) in keys.iter().zip(packed) {
+                for (k, v) in keys.iter().zip(values) {
                     self.p_delim(&mut first, ", ");
-                    self.unparse_expr(k, precedence::TEST);
-                    self.p(": ");
-                    self.unparse_expr(v, precedence::TEST);
-                }
-                for d in unpacked {
-                    self.p_delim(&mut first, ", ");
-                    self.p("**");
-                    self.unparse_expr(d, precedence::EXPR);
+                    if let Some(k) = k {
+                        self.unparse_expr(k, precedence::TEST);
+                        self.p(": ");
+                        self.unparse_expr(v, precedence::TEST);
+                    } else {
+                        self.p("**");
+                        self.unparse_expr(v, precedence::EXPR);
+                    }
                 }
                 self.p("}");
             }

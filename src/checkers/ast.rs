@@ -3155,7 +3155,7 @@ where
                         // Ex) TypedDict("a", {"a": int})
                         if args.len() > 1 {
                             if let ExprKind::Dict { keys, values } = &args[1].node {
-                                for key in keys {
+                                for key in keys.iter().flatten() {
                                     self.in_type_definition = false;
                                     self.visit_expr(key);
                                     self.in_type_definition = prev_in_type_definition;
