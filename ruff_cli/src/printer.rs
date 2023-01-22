@@ -148,7 +148,7 @@ impl<'a> Printer<'a> {
             }
             return Ok(());
         }
-        // Prints a count of the number of violations for each rule if staitistics are
+        // Prints a count of the number of violations for each rule if statistics are
         // enabled.
         if matches!(self.log_level, LogLevel::Statistics) {
             let mut stdout = BufWriter::new(io::stdout().lock());
