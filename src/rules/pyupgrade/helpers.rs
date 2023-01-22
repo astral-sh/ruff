@@ -41,24 +41,24 @@ pub fn get_fromimport_str(
     let after_comma = if multi_line { '\n' } else { ' ' };
     let start_imps = if multi_line { "(\n" } else { "" };
     let after_imps = if multi_line {
-        format!("\n{})", short_indent)
+        format!("\n{short_indent})")
     } else {
         String::new()
     };
     let mut full_names: Vec<String> = vec![];
     for name in names {
         let asname_str = match &name.asname {
-            Some(item) => format!(" as {}", item),
+            Some(item) => format!(" as {item}"),
             None => String::new(),
         };
-        let final_string = format!("{}{}{}", indent, name.name, asname_str);
+        let final_string = format!("{indent}{}{asname_str}", name.name);
         full_names.push(final_string);
     }
     format!(
         "from {} import {}{}{}",
         module,
         start_imps,
-        full_names.join(format!(",{}", after_comma).as_str()),
+        full_names.join(format!(",{after_comma}").as_str()),
         after_imps
     )
 }

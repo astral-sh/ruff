@@ -96,7 +96,7 @@ fn refactor_segment(
                 if name.node.asname.is_some() || import_name == new_name {
                     new_entries.push_str(&format!("{}import {item}", formatting.start_indent));
                     if let Some(final_name) = &name.node.asname {
-                        new_entries.push_str(&format!(" as {}", final_name));
+                        new_entries.push_str(&format!(" as {final_name}"));
                     }
                     new_entries.push('\n');
                 }
@@ -114,7 +114,7 @@ fn refactor_segment(
         &formatting.indent,
         &formatting.short_indent,
     );
-    final_str.push_str(&format!("\n{}", new_entries));
+    final_str.push_str(&format!("\n{new_entries}"));
     if final_str.ends_with('\n') {
         final_str.pop();
     }
@@ -130,7 +130,7 @@ fn replace_from_only(
     replace: &Lazy<HashMap<&str, &str>>,
     replace_str: &str,
 ) -> Option<String> {
-    let new_moudle_text = module.replace(&format!("{}.", replace_str), "");
+    let new_moudle_text = module.replace(&format!("{replace_str}."), "");
     if let Some(item) = replace.get(new_moudle_text.as_str()) {
         let original = locator.slice_source_code_range(&Range::from_located(stmt));
         let new_str = original.replace(module, item);
