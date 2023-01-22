@@ -6,7 +6,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::rules::pyupgrade::helpers::{clean_indent, get_fromimport_str};
+use crate::rules::pyupgrade::helpers::{get_fromimport_str, ImportFormatting};
 use crate::source_code::Locator;
 use crate::violations;
 
@@ -70,33 +70,6 @@ static REPLACE_MODS_URLLIB: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     m
 });
 
-struct Formatting {
-    multi_line: bool,
-    indent: String,
-    short_indent: String,
-    start_indent: String,
-}
-
-impl Formatting {
-    fn new<T>(locator: &Locator, stmt: &Stmt, arg1: &Located<T>) -> Self {
-        let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-        let multi_line = module_text.contains('\n');
-        let start_indent = clean_indent(locator, stmt);
-        let indent = clean_indent(locator, arg1);
-        let short_indent = if indent.len() > 3 {
-            indent[3..].to_string()
-        } else {
-            indent.to_string()
-        };
-        Self {
-            multi_line,
-            indent,
-            short_indent,
-            start_indent,
-        }
-    }
-}
-
 fn refactor_segment(
     locator: &Locator,
     stmt: &Stmt,
@@ -111,17 +84,21 @@ fn refactor_segment(
         clean_names.push(name.node.clone());
     }
 
-    let formatting = Formatting::new(locator, stmt, &names.get(0).unwrap());
+    let formatting = ImportFormatting::new(locator, stmt, &names);
     for name in names {
-        match replace.get(name.node.name.as_str()) {
+        let import_name = name.node.name.as_str();
+        match replace.get(import_name) {
             None => keep_names.push(name.node.clone()),
             Some(item) => {
-                // MAKE SURE TO ADD IF STATEMENTS HERE
-                new_entries.push_str(&format!("{}import {item}", formatting.start_indent));
-                if let Some(final_name) = &name.node.asname {
-                    new_entries.push_str(&format!(" as {}", final_name));
+                // Only replace if the name remains the name, or if there is an as on the import
+                let new_name = item.split(".").last().unwrap_or_default();
+                if name.node.asname.is_some() || import_name == new_name {
+                    new_entries.push_str(&format!("{}import {item}", formatting.start_indent));
+                    if let Some(final_name) = &name.node.asname {
+                        new_entries.push_str(&format!(" as {}", final_name));
+                    }
+                    new_entries.push('\n');
                 }
-                new_entries.push('\n');
             }
         }
     }
@@ -152,7 +129,6 @@ pub fn import_replacements_six(
 ) {
     // Pyupgrade only works with import_from statements, so this linter does that as
     // well
-
     let final_string: Option<String>;
     if let Some(module_text) = module {
         if module_text == "six.moves" {

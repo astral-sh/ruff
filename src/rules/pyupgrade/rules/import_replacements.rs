@@ -4,8 +4,8 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
+use crate::rules::pyupgrade::helpers::{get_fromimport_str, ImportFormatting};
 use crate::settings::types::PythonVersion;
-use crate::rules::pyupgrade::helpers::{clean_indent, get_fromimport_str};
 use crate::violations;
 
 const BAD_MODULES: &[&str] = &[
@@ -381,20 +381,14 @@ pub fn import_replacements(
     let module_text = checker
         .locator
         .slice_source_code_range(&Range::from_located(stmt));
-    let is_multi_line = module_text.contains('\n');
-    let indent = match names.get(0) {
-        None => return,
-        Some(item) if is_multi_line => clean_indent(checker.locator, item),
-        Some(_) => String::new(),
-    };
-    let starting_indent = clean_indent(checker.locator, stmt);
+    let formatting = ImportFormatting::new(checker.locator, stmt, &names);
     let fixer = FixImports::new(
         clean_mod,
-        is_multi_line,
+        formatting.multi_line,
         &clean_names,
-        &indent,
+        &formatting.indent,
         checker.settings.target_version,
-        &starting_indent,
+        &formatting.start_indent,
     );
     let clean_result = match fixer.check_replacement() {
         None => return,

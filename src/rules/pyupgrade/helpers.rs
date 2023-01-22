@@ -1,4 +1,5 @@
 use rustpython_ast::{AliasData, Located};
+use crate::ast::types::Range;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use crate::source_code::Locator;
@@ -65,5 +66,36 @@ pub fn clean_indent<T>(locator: &Locator, located: &Located<T>) -> String {
         // This is an opninionated way of formatting import statements
         None => "    ".to_string(),
         Some(item) => item.to_string(),
+    }
+}
+
+pub struct ImportFormatting {
+    pub multi_line: bool,
+    pub indent: String,
+    pub short_indent: String,
+    pub start_indent: String,
+}
+
+impl ImportFormatting {
+    pub fn new<T>(locator: &Locator, stmt: &Located<T>, args: &[Located<AliasData>]) -> Self {
+        let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+        let multi_line = module_text.contains('\n');
+        let start_indent = clean_indent(locator, stmt);
+        let indent = match args.get(0) {
+            None => panic!("No args for import"),
+            Some(item) if multi_line => clean_indent(locator, item),
+            Some(_) => String::new(),
+        };
+        let short_indent = if indent.len() > 3 {
+            indent[3..].to_string()
+        } else {
+            indent.to_string()
+        };
+        Self {
+            multi_line,
+            indent,
+            short_indent,
+            start_indent,
+        }
     }
 }
