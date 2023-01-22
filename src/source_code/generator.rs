@@ -142,11 +142,18 @@ impl<'a> Generator<'a> {
                 args,
                 body,
                 returns,
+                decorator_list,
                 ..
             } => {
-                // TODO(charlie): Handle decorators.
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
+                    for decorator in decorator_list {
+                        statement!({
+                            self.p("@");
+                            self.unparse_expr(decorator, precedence::EXPR);
+                        });
+                    }
+                    self.newline();
                     self.p("def ");
                     self.p(name);
                     self.p("(");
@@ -168,11 +175,17 @@ impl<'a> Generator<'a> {
                 args,
                 body,
                 returns,
+                decorator_list,
                 ..
             } => {
-                // TODO(charlie): Handle decorators.
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
+                    for decorator in decorator_list {
+                        statement!({
+                            self.unparse_expr(decorator, precedence::EXPR);
+                        });
+                    }
+                    self.newline();
                     self.p("async def ");
                     self.p(name);
                     self.p("(");
@@ -194,11 +207,17 @@ impl<'a> Generator<'a> {
                 bases,
                 keywords,
                 body,
+                decorator_list,
                 ..
             } => {
-                // TODO(charlie): Handle decorators.
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
+                    for decorator in decorator_list {
+                        statement!({
+                            self.unparse_expr(decorator, precedence::EXPR);
+                        });
+                    }
+                    self.newline();
                     self.p("class ");
                     self.p(name);
                     let mut first = true;
@@ -1140,7 +1159,11 @@ mod tests {
             r#"def call(*popenargs, timeout=None, **kwargs):
     pass"#
         );
-
+        assert_round_trip!(
+            r#"@functools.lru_cache(maxsize=None)
+def f(x: int, y: int) -> int:
+    return x + y"#
+        );
         assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
         assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);
     }
