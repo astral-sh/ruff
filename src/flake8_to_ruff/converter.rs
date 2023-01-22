@@ -23,7 +23,7 @@ use crate::warn_user;
 
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
-    external_config: Option<&ExternalConfig>,
+    external_config: ExternalConfig,
     plugins: Option<Vec<Plugin>>,
 ) -> Result<Pyproject> {
     // Extract the Flake8 section.
@@ -377,28 +377,26 @@ pub fn convert(
     }
 
     // Extract any settings from the existing `pyproject.toml`.
-    if let Some(external_config) = external_config {
-        if let Some(black) = &external_config.black {
-            if let Some(line_length) = &black.line_length {
-                options.line_length = Some(*line_length);
-            }
-
-            if let Some(target_version) = &black.target_version {
-                if let Some(target_version) = target_version.iter().min() {
-                    options.target_version = Some(*target_version);
-                }
-            }
+    if let Some(black) = &external_config.black {
+        if let Some(line_length) = &black.line_length {
+            options.line_length = Some(*line_length);
         }
 
-        if let Some(isort) = &external_config.isort {
-            if let Some(src_paths) = &isort.src_paths {
-                match options.src.as_mut() {
-                    Some(src) => {
-                        src.extend(src_paths.clone());
-                    }
-                    None => {
-                        options.src = Some(src_paths.clone());
-                    }
+        if let Some(target_version) = &black.target_version {
+            if let Some(target_version) = target_version.iter().min() {
+                options.target_version = Some(*target_version);
+            }
+        }
+    }
+
+    if let Some(isort) = &external_config.isort {
+        if let Some(src_paths) = &isort.src_paths {
+            match options.src.as_mut() {
+                Some(src) => {
+                    src.extend(src_paths.clone());
+                }
+                None => {
+                    options.src = Some(src_paths.clone());
                 }
             }
         }
@@ -416,7 +414,7 @@ mod tests {
 
     use super::super::plugin::Plugin;
     use super::convert;
-    use super::ExternalConfig;
+    use crate::flake8_to_ruff::ExternalConfig;
     use crate::registry::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
@@ -427,7 +425,7 @@ mod tests {
     fn it_converts_empty() -> Result<()> {
         let actual = convert(
             &HashMap::from([("flake8".to_string(), HashMap::default())]),
-            None,
+            ExternalConfig::default(),
             None,
         )?;
         let expected = Pyproject::new(Options {
@@ -491,7 +489,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
             )]),
-            None,
+            ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -555,7 +553,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
             )]),
-            None,
+            ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -619,7 +617,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
             )]),
-            None,
+            ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -683,7 +681,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
             )]),
-            None,
+            ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -755,7 +753,7 @@ mod tests {
                     Some("numpy".to_string()),
                 )]),
             )]),
-            None,
+            ExternalConfig::default(),
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
@@ -826,7 +824,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
             )]),
-            None,
+            ExternalConfig::default(),
             None,
         )?;
         let expected = Pyproject::new(Options {
