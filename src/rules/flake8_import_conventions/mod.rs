@@ -1,3 +1,4 @@
+//! Rules from [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions).
 pub(crate) mod rules;
 pub mod settings;
 
@@ -9,14 +10,14 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
-            &Settings::for_rule(RuleCode::ICN001),
+            &Settings::for_rule(Rule::ImportAliasIsNotConventional),
         )?;
         insta::assert_yaml_snapshot!("defaults", diagnostics);
         Ok(())
@@ -35,7 +36,7 @@ mod tests {
                     ])),
                 }
                 .into(),
-                ..Settings::for_rule(RuleCode::ICN001)
+                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
         insta::assert_yaml_snapshot!("custom", diagnostics);
@@ -57,7 +58,7 @@ mod tests {
                     extend_aliases: None,
                 }
                 .into(),
-                ..Settings::for_rule(RuleCode::ICN001)
+                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
         insta::assert_yaml_snapshot!("remove_default", diagnostics);
@@ -77,10 +78,33 @@ mod tests {
                     )])),
                 }
                 .into(),
-                ..Settings::for_rule(RuleCode::ICN001)
+                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
         insta::assert_yaml_snapshot!("override_default", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn from_imports() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_import_conventions/from_imports.py"),
+            &Settings {
+                flake8_import_conventions: super::settings::Options {
+                    aliases: None,
+                    extend_aliases: Some(FxHashMap::from_iter([
+                        ("xml.dom.minidom".to_string(), "md".to_string()),
+                        (
+                            "xml.dom.minidom.parseString".to_string(),
+                            "pstr".to_string(),
+                        ),
+                    ])),
+                }
+                .into(),
+                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
+            },
+        )?;
+        insta::assert_yaml_snapshot!("from_imports", diagnostics);
         Ok(())
     }
 }

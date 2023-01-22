@@ -86,4 +86,52 @@ expression: diagnostics
     column: 14
   fix: ~
   parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 60
+    column: 4
+  end_location:
+    row: 63
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 61
+    column: 8
+  end_location:
+    row: 61
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 62
+    column: 8
+  end_location:
+    row: 62
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      - tuple
+      - tuple
+  location:
+    row: 71
+    column: 4
+  end_location:
+    row: 74
+    column: 5
+  fix: ~
+  parent: ~
 

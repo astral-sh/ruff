@@ -1,0 +1,76 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    FitsOnOneLine: ~
+  location:
+    row: 129
+    column: 4
+  end_location:
+    row: 131
+    column: 7
+  fix:
+    content: "\"\"\"Wrong.\"\"\""
+    location:
+      row: 129
+      column: 4
+    end_location:
+      row: 131
+      column: 7
+  parent: ~
+- kind:
+    FitsOnOneLine: ~
+  location:
+    row: 597
+    column: 4
+  end_location:
+    row: 599
+    column: 13
+  fix:
+    content: "\"\"\"Wrong.\"\"\""
+    location:
+      row: 597
+      column: 4
+    end_location:
+      row: 599
+      column: 13
+  parent: ~
+- kind:
+    FitsOnOneLine: ~
+  location:
+    row: 606
+    column: 4
+  end_location:
+    row: 608
+    column: 7
+  fix:
+    content: "r\"\"\"Wrong.\"\"\""
+    location:
+      row: 606
+      column: 4
+    end_location:
+      row: 608
+      column: 7
+  parent: ~
+- kind:
+    FitsOnOneLine: ~
+  location:
+    row: 615
+    column: 4
+  end_location:
+    row: 617
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    FitsOnOneLine: ~
+  location:
+    row: 624
+    column: 4
+  end_location:
+    row: 626
+    column: 14
+  fix: ~
+  parent: ~
+

@@ -8,7 +8,7 @@ use super::super::track::Block;
 use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 use crate::violations;
@@ -125,7 +125,9 @@ fn add_required_import(
         violations::MissingRequiredImport(required_import.clone()),
         Range::new(Location::default(), Location::default()),
     );
-    if matches!(autofix, flags::Autofix::Enabled) && settings.fixable.contains(&RuleCode::I002) {
+    if matches!(autofix, flags::Autofix::Enabled)
+        && settings.rules.should_fix(&Rule::MissingRequiredImport)
+    {
         // Determine the location at which the import should be inserted.
         let splice = helpers::find_splice_location(python_ast, locator);
 

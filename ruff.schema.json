@@ -73,7 +73,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "extend-select": {
@@ -83,7 +83,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "external": {
@@ -117,7 +117,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "flake8-annotations": {
@@ -147,6 +147,17 @@
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8BugbearOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-builtins": {
+      "description": "Options for the `flake8-builtins` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8BuiltinsOptions"
         },
         {
           "type": "null"
@@ -227,7 +238,7 @@
       ]
     },
     "format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations) or `\"gitlab\"` (GitLab CI code quality report).",
+      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), or `\"pylint\"` (Pylint text format).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -244,7 +255,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "ignore-init-module-imports": {
@@ -315,7 +326,7 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "$ref": "#/definitions/RuleCodePrefix"
+          "$ref": "#/definitions/RuleSelector"
         }
       }
     },
@@ -335,6 +346,17 @@
       "anyOf": [
         {
           "$ref": "#/definitions/Pydocstyle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pylint": {
+      "description": "Options for the `pylint` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PylintOptions"
         },
         {
           "type": "null"
@@ -377,7 +399,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "show-source": {
@@ -435,7 +457,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/RuleCodePrefix"
+        "$ref": "#/definitions/RuleSelector"
       }
     },
     "update-check": {
@@ -448,7 +470,7 @@
   },
   "additionalProperties": false,
   "definitions": {
-    "BannedApi": {
+    "ApiBan": {
       "type": "object",
       "required": [
         "msg"
@@ -460,6 +482,17 @@
         }
       },
       "additionalProperties": false
+    },
+    "ConstantType": {
+      "type": "string",
+      "enum": [
+        "bytes",
+        "complex",
+        "float",
+        "int",
+        "str",
+        "tuple"
+      ]
     },
     "Convention": {
       "oneOf": [
@@ -551,6 +584,22 @@
       "properties": {
         "extend-immutable-calls": {
           "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8BuiltinsOptions": {
+      "type": "object",
+      "properties": {
+        "builtins-ignorelist": {
+          "description": "Ignore list of builtins.",
           "type": [
             "array",
             "null"
@@ -743,7 +792,7 @@
             "null"
           ],
           "additionalProperties": {
-            "$ref": "#/definitions/BannedApi"
+            "$ref": "#/definitions/ApiBan"
           }
         }
       },
@@ -761,6 +810,16 @@
         }
       },
       "additionalProperties": false
+    },
+    "ImportType": {
+      "type": "string",
+      "enum": [
+        "future",
+        "standard-library",
+        "third-party",
+        "first-party",
+        "local-folder"
+      ]
     },
     "IsortOptions": {
       "type": "object",
@@ -781,6 +840,16 @@
             "boolean",
             "null"
           ]
+        },
+        "constants": {
+          "description": "An override list of tokens to always recognize as a CONSTANT for `order-by-type` regardless of casing.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         },
         "extra-standard-library": {
           "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.",
@@ -833,6 +902,16 @@
             "type": "string"
           }
         },
+        "no-lines-before": {
+          "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ImportType"
+          }
+        },
         "order-by-type": {
           "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
           "type": [
@@ -877,6 +956,16 @@
             "boolean",
             "null"
           ]
+        },
+        "variables": {
+          "description": "An override list of tokens to always recognize as a var for `order-by-type` regardless of casing.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -1006,6 +1095,22 @@
       },
       "additionalProperties": false
     },
+    "PylintOptions": {
+      "type": "object",
+      "properties": {
+        "allow-magic-value-types": {
+          "description": "Constant types to ignore when used as \"magic values\".",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ConstantType"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "PythonVersion": {
       "type": "string",
       "enum": [
@@ -1056,7 +1161,7 @@
         }
       ]
     },
-    "RuleCodePrefix": {
+    "RuleSelector": {
       "type": "string",
       "enum": [
         "A",
@@ -1156,6 +1261,12 @@
         "C9",
         "C90",
         "C901",
+        "COM",
+        "COM8",
+        "COM81",
+        "COM812",
+        "COM818",
+        "COM819",
         "D",
         "D1",
         "D10",
@@ -1193,6 +1304,7 @@
         "D4",
         "D40",
         "D400",
+        "D401",
         "D402",
         "D403",
         "D404",
@@ -1226,6 +1338,9 @@
         "DTZ011",
         "DTZ012",
         "E",
+        "E1",
+        "E10",
+        "E101",
         "E4",
         "E40",
         "E401",
@@ -1263,6 +1378,12 @@
         "ERA0",
         "ERA00",
         "ERA001",
+        "EXE",
+        "EXE0",
+        "EXE00",
+        "EXE003",
+        "EXE004",
+        "EXE005",
         "F",
         "F4",
         "F40",
@@ -1350,6 +1471,10 @@
         "ICN0",
         "ICN00",
         "ICN001",
+        "INP",
+        "INP0",
+        "INP00",
+        "INP001",
         "ISC",
         "ISC0",
         "ISC00",
@@ -1425,19 +1550,17 @@
         "PIE79",
         "PIE790",
         "PIE794",
+        "PIE796",
         "PIE8",
         "PIE80",
         "PIE804",
         "PIE807",
+        "PL",
         "PLC",
         "PLC0",
         "PLC04",
         "PLC041",
         "PLC0414",
-        "PLC2",
-        "PLC22",
-        "PLC220",
-        "PLC2201",
         "PLC3",
         "PLC30",
         "PLC300",
@@ -1511,6 +1634,36 @@
         "PT024",
         "PT025",
         "PT026",
+        "PTH",
+        "PTH1",
+        "PTH10",
+        "PTH100",
+        "PTH101",
+        "PTH102",
+        "PTH103",
+        "PTH104",
+        "PTH105",
+        "PTH106",
+        "PTH107",
+        "PTH108",
+        "PTH109",
+        "PTH11",
+        "PTH110",
+        "PTH111",
+        "PTH112",
+        "PTH113",
+        "PTH114",
+        "PTH115",
+        "PTH116",
+        "PTH117",
+        "PTH118",
+        "PTH119",
+        "PTH12",
+        "PTH120",
+        "PTH121",
+        "PTH122",
+        "PTH123",
+        "PTH124",
         "Q",
         "Q0",
         "Q00",
@@ -1547,6 +1700,7 @@
         "RUF002",
         "RUF003",
         "RUF004",
+        "RUF005",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -1625,6 +1779,20 @@
         "TID25",
         "TID251",
         "TID252",
+        "TRY",
+        "TRY0",
+        "TRY00",
+        "TRY004",
+        "TRY2",
+        "TRY20",
+        "TRY201",
+        "TRY3",
+        "TRY30",
+        "TRY300",
+        "TYP",
+        "TYP0",
+        "TYP00",
+        "TYP005",
         "U",
         "U0",
         "U00",
@@ -1681,6 +1849,10 @@
         "UP029",
         "UP03",
         "UP030",
+        "UP031",
+        "UP032",
+        "UP033",
+        "UP034",
         "W",
         "W2",
         "W29",
@@ -1718,7 +1890,8 @@
         "junit",
         "grouped",
         "github",
-        "gitlab"
+        "gitlab",
+        "pylint"
       ]
     },
     "Strictness": {

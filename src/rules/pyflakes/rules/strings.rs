@@ -81,21 +81,24 @@ pub(crate) fn percent_format_extra_named_arguments(
     if summary.num_positional > 0 {
         return;
     }
-    let ExprKind::Dict { keys, values } = &right.node else {
+    let ExprKind::Dict { keys, .. } = &right.node else {
         return;
     };
-    if values.len() > keys.len() {
+    if keys.iter().any(std::option::Option::is_none) {
         return; // contains **x splat
     }
 
     let missing: Vec<&str> = keys
         .iter()
-        .filter_map(|k| match &k.node {
-            // We can only check that string literals exist
-            ExprKind::Constant {
-                value: Constant::Str(value),
+        .filter_map(|k| match k {
+            Some(Expr {
+                node:
+                    ExprKind::Constant {
+                        value: Constant::Str(value),
+                        ..
+                    },
                 ..
-            } => {
+            }) => {
                 if summary.keywords.contains(value) {
                     None
                 } else {
@@ -116,7 +119,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         ),
         location,
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match remove_unused_format_arguments_from_dict(&missing, right, checker.locator) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -138,13 +141,13 @@ pub(crate) fn percent_format_missing_arguments(
         return;
     }
 
-    if let ExprKind::Dict { keys, values } = &right.node {
-        if values.len() > keys.len() {
+    if let ExprKind::Dict { keys, .. } = &right.node {
+        if keys.iter().any(std::option::Option::is_none) {
             return; // contains **x splat
         }
 
         let mut keywords = FxHashSet::default();
-        for key in keys {
+        for key in keys.iter().flatten() {
             match &key.node {
                 ExprKind::Constant {
                     value: Constant::Str(value),
@@ -274,7 +277,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         ),
         location,
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match remove_unused_keyword_arguments_from_format_call(&missing, location, checker.locator)
         {
             Ok(fix) => {

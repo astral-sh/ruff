@@ -1,3 +1,23 @@
+//! Checks for unused loop variables.
+//!
+//! ## Why is this bad?
+//!
+//! Unused variables may signal a mistake or unfinished code.
+//!
+//! ## Example
+//!
+//! ```python
+//! for x in range(10):
+//!     method()
+//! ```
+//!
+//! Prefix the variable with an underscore:
+//!
+//! ```python
+//! for _x in range(10):
+//!     method()
+//! ```
+
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
@@ -66,7 +86,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
             violations::UnusedLoopControlVariable(name.to_string()),
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.code()) {
+        if checker.patch(diagnostic.kind.rule()) {
             // Prefix the variable name with an underscore.
             diagnostic.amend(Fix::replacement(
                 format!("_{name}"),

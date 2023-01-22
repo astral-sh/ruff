@@ -2,11 +2,13 @@ use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Located, Stmt, StmtKind};
 
+use crate::ast::comparable::ComparableExpr;
+use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 /// PIE790
@@ -31,8 +33,8 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                     violations::NoUnnecessaryPass,
                     Range::from_located(pass_stmt),
                 );
-                if checker.patch(&RuleCode::PIE790) {
-                    match delete_stmt(pass_stmt, None, &[], checker.locator) {
+                if checker.patch(&Rule::NoUnnecessaryPass) {
+                    match delete_stmt(pass_stmt, None, &[], checker.locator, checker.indexer) {
                         Ok(fix) => {
                             diagnostic.amend(fix);
                         }
@@ -84,14 +86,14 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                 violations::DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(&RuleCode::PIE794) {
+            if checker.patch(&Rule::DupeClassFieldDefinitions) {
                 let deleted: Vec<&Stmt> = checker
                     .deletions
                     .iter()
                     .map(std::convert::Into::into)
                     .collect();
                 let locator = checker.locator;
-                match delete_stmt(stmt, Some(parent), &deleted, locator) {
+                match delete_stmt(stmt, Some(parent), &deleted, locator, checker.indexer) {
                     Ok(fix) => {
                         checker.deletions.insert(RefEquality(stmt));
                         diagnostic.amend(fix);
@@ -101,6 +103,50 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                     }
                 }
             }
+            checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
+/// PIE796
+pub fn prefer_unique_enums<'a, 'b>(checker: &mut Checker<'a>, parent: &'b Stmt, body: &'b [Stmt])
+where
+    'b: 'a,
+{
+    let StmtKind::ClassDef { bases, .. } = &parent.node else {
+        return;
+    };
+
+    if !bases.iter().any(|expr| {
+        checker
+            .resolve_call_path(expr)
+            .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
+    }) {
+        return;
+    }
+
+    let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
+    for stmt in body {
+        let StmtKind::Assign { value, .. } = &stmt.node else {
+            continue;
+        };
+
+        if let ExprKind::Call { func, .. } = &value.node {
+            if checker
+                .resolve_call_path(func)
+                .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
+            {
+                continue;
+            }
+        }
+
+        if !seen_targets.insert(ComparableExpr::from(value)) {
+            let diagnostic = Diagnostic::new(
+                violations::PreferUniqueEnums {
+                    value: unparse_expr(value, checker.stylist),
+                },
+                Range::from_located(stmt),
+            );
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -180,7 +226,7 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
             if elts.is_empty() {
                 let mut diagnostic =
                     Diagnostic::new(violations::PreferListBuiltin, Range::from_located(expr));
-                if checker.patch(&RuleCode::PIE807) {
+                if checker.patch(&Rule::PreferListBuiltin) {
                     diagnostic.amend(Fix::replacement(
                         "list".to_string(),
                         expr.location,

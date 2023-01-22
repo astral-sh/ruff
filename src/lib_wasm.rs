@@ -7,18 +7,18 @@ use wasm_bindgen::prelude::*;
 
 use crate::directives;
 use crate::linter::check_path;
-use crate::registry::{RuleCode, RuleCodePrefix};
+use crate::registry::Rule;
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    pyupgrade,
 };
 use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
-use crate::settings::types::PythonVersion;
-use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::settings::{defaults, flags, Settings};
+use crate::source_code::{Indexer, Locator, Stylist};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -52,11 +52,28 @@ export interface Diagnostic {
 
 #[derive(Serialize)]
 struct ExpandedMessage {
-    code: RuleCode,
+    code: SerializeRuleAsCode,
     message: String,
     location: Location,
     end_location: Location,
     fix: Option<ExpandedFix>,
+}
+
+struct SerializeRuleAsCode(Rule);
+
+impl Serialize for SerializeRuleAsCode {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.code())
+    }
+}
+
+impl From<Rule> for SerializeRuleAsCode {
+    fn from(rule: Rule) -> Self {
+        Self(rule)
+    }
 }
 
 #[derive(Serialize)]
@@ -87,14 +104,14 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         // Propagate defaults.
         allowed_confusables: Some(Vec::default()),
         builtins: Some(Vec::default()),
-        dummy_variable_rgx: Some("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$".to_string()),
+        dummy_variable_rgx: Some(defaults::DUMMY_VARIABLE_RGX.as_str().to_string()),
         extend_ignore: Some(Vec::default()),
         extend_select: Some(Vec::default()),
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
-        line_length: Some(88),
-        select: Some(vec![RuleCodePrefix::E, RuleCodePrefix::F]),
-        target_version: Some(PythonVersion::default()),
+        line_length: Some(defaults::LINE_LENGTH),
+        select: Some(defaults::PREFIXES.to_vec()),
+        target_version: Some(defaults::TARGET_VERSION),
         // Ignore a bunch of options that don't make sense in a single-file editor.
         cache_dir: None,
         exclude: None,
@@ -120,10 +137,11 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
         flake8_bandit: Some(flake8_bandit::settings::Settings::default().into()),
         flake8_bugbear: Some(flake8_bugbear::settings::Settings::default().into()),
+        flake8_builtins: Some(flake8_builtins::settings::Settings::default().into()),
         flake8_errmsg: Some(flake8_errmsg::settings::Settings::default().into()),
         flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
         flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
-        flake8_tidy_imports: Some(flake8_tidy_imports::settings::Settings::default().into()),
+        flake8_tidy_imports: Some(flake8_tidy_imports::Settings::default().into()),
         flake8_import_conventions: Some(
             flake8_import_conventions::settings::Settings::default().into(),
         ),
@@ -135,6 +153,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         pep8_naming: Some(pep8_naming::settings::Settings::default().into()),
         pycodestyle: Some(pycodestyle::settings::Settings::default().into()),
         pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
+        pylint: Some(pylint::settings::Settings::default().into()),
         pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
     })?)
 }
@@ -157,6 +176,9 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     // Detect the current code style (lazily).
     let stylist = Stylist::from_contents(contents, &locator);
 
+    // Extra indices from the code.
+    let indexer: Indexer = tokens.as_slice().into();
+
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(&tokens, directives::Flags::empty());
 
@@ -168,6 +190,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         &settings,
         flags::Autofix::Enabled,
@@ -178,7 +201,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
         .map(|diagnostic| ExpandedMessage {
-            code: diagnostic.kind.code().clone(),
+            code: diagnostic.kind.rule().clone().into(),
             message: diagnostic.kind.body(),
             location: diagnostic.location,
             end_location: diagnostic.end_location,
@@ -220,7 +243,7 @@ mod test {
             "if (1, 2): pass",
             r#"{}"#,
             [ExpandedMessage {
-                code: RuleCode::F634,
+                code: Rule::IfTuple.into(),
                 message: "If test is a tuple, which is always `True`".to_string(),
                 location: Location::new(1, 0),
                 end_location: Location::new(1, 15),

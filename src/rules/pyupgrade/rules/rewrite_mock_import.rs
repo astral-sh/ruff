@@ -12,7 +12,7 @@ use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::{Locator, Stylist};
 use crate::violations;
 use crate::violations::MockReference;
@@ -117,7 +117,7 @@ fn format_import(
     stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text)?;
+    let mut tree = match_module(module_text)?;
     let mut import = match_import(&mut tree)?;
 
     let Import { names, .. } = import.clone();
@@ -147,7 +147,7 @@ fn format_import_from(
     stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text).unwrap();
+    let mut tree = match_module(module_text).unwrap();
     let mut import = match_import_from(&mut tree)?;
 
     let ImportFrom {
@@ -199,12 +199,12 @@ fn format_import_from(
 /// UP026
 pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
-        if collect_call_path(value) == ["mock", "mock"] {
+        if collect_call_path(value).as_slice() == ["mock", "mock"] {
             let mut diagnostic = Diagnostic::new(
                 violations::RewriteMockImport(MockReference::Attribute),
                 Range::from_located(value),
             );
-            if checker.patch(&RuleCode::UP026) {
+            if checker.patch(&Rule::RewriteMockImport) {
                 diagnostic.amend(Fix::replacement(
                     "mock".to_string(),
                     value.location,
@@ -226,14 +226,17 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| name.node.name == "mock" || name.node.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(&RuleCode::UP026) {
-                    let indent = indentation(checker, stmt);
-                    match format_import(stmt, &indent, checker.locator, checker.style) {
-                        Ok(content) => Some(content),
-                        Err(e) => {
-                            error!("Failed to rewrite `mock` import: {e}");
-                            None
+                let content = if checker.patch(&Rule::RewriteMockImport) {
+                    if let Some(indent) = indentation(checker.locator, stmt) {
+                        match format_import(stmt, indent, checker.locator, checker.stylist) {
+                            Ok(content) => Some(content),
+                            Err(e) => {
+                                error!("Failed to rewrite `mock` import: {e}");
+                                None
+                            }
                         }
+                    } else {
+                        None
                     }
                 } else {
                     None
@@ -272,17 +275,18 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     violations::RewriteMockImport(MockReference::Import),
                     Range::from_located(stmt),
                 );
-                if checker.patch(&RuleCode::UP026) {
-                    let indent = indentation(checker, stmt);
-                    match format_import_from(stmt, &indent, checker.locator, checker.style) {
-                        Ok(content) => {
-                            diagnostic.amend(Fix::replacement(
-                                content,
-                                stmt.location,
-                                stmt.end_location.unwrap(),
-                            ));
+                if checker.patch(&Rule::RewriteMockImport) {
+                    if let Some(indent) = indentation(checker.locator, stmt) {
+                        match format_import_from(stmt, indent, checker.locator, checker.stylist) {
+                            Ok(content) => {
+                                diagnostic.amend(Fix::replacement(
+                                    content,
+                                    stmt.location,
+                                    stmt.end_location.unwrap(),
+                                ));
+                            }
+                            Err(e) => error!("Failed to rewrite `mock` import: {e}"),
                         }
-                        Err(e) => error!("Failed to rewrite `mock` import: {e}"),
                     }
                 }
                 checker.diagnostics.push(diagnostic);

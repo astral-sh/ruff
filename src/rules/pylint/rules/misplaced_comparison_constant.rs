@@ -45,7 +45,7 @@ pub fn misplaced_comparison_constant(
         violations::MisplacedComparisonConstant(suggestion.clone()),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             suggestion,
             expr.location,

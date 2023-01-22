@@ -10,7 +10,7 @@ use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 use crate::violations;
 
@@ -112,7 +112,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
     let mut fix_end: Option<Location> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (start, tok, end) in lexer::make_tokenizer_located(&content, expr.location).flatten() {
+    for (start, tok, end) in lexer::make_tokenizer_located(content, expr.location).flatten() {
         if start == mode_param.location {
             if is_first_arg {
                 delete_first_arg = true;
@@ -164,7 +164,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         &keyword.node.value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&RuleCode::UP015),
+                        checker.patch(&Rule::RedundantOpenModes),
                     ));
                 }
             }
@@ -181,7 +181,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&RuleCode::UP015),
+                    checker.patch(&Rule::RedundantOpenModes),
                 ));
             }
         }

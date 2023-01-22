@@ -7,6 +7,7 @@ use rustpython_parser::lexer::LexResult;
 use crate::ast::types::Range;
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
+use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::lines::check_lines;
 use crate::checkers::noqa::check_noqa;
@@ -15,9 +16,11 @@ use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
-use crate::registry::{Diagnostic, LintSource, RuleCode};
+#[cfg(test)]
+use crate::packaging::detect_package_root;
+use crate::registry::{Diagnostic, LintSource, Rule};
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
+use crate::source_code::{Indexer, Locator, Stylist};
 use crate::{directives, fs, rustpython_helpers, violations};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -33,6 +36,7 @@ pub fn check_path(
     tokens: Vec<LexResult>,
     locator: &Locator,
     stylist: &Stylist,
+    indexer: &Indexer,
     directives: &Directives,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -46,7 +50,7 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = settings.enabled.contains(&RuleCode::W505);
+    let use_doc_lines = settings.rules.enabled(&Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(&tokens));
@@ -54,22 +58,31 @@ pub fn check_path(
 
     // Run the token-based rules.
     if settings
-        .enabled
-        .iter()
+        .rules
+        .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Tokens))
     {
         diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
     }
 
+    // Run the filesystem-based rules.
+    if settings
+        .rules
+        .iter_enabled()
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem))
+    {
+        diagnostics.extend(check_file_path(path, package, settings));
+    }
+
     // Run the AST-based rules.
     let use_ast = settings
-        .enabled
-        .iter()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::AST));
+        .rules
+        .iter_enabled()
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Ast));
     let use_imports = !directives.isort.skip_file
         && settings
-            .enabled
-            .iter()
+            .rules
+            .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports || use_doc_lines {
         match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
@@ -79,6 +92,7 @@ pub fn check_path(
                         &python_ast,
                         locator,
                         stylist,
+                        indexer,
                         &directives.noqa_line_for,
                         settings,
                         autofix,
@@ -90,6 +104,7 @@ pub fn check_path(
                     diagnostics.extend(check_imports(
                         &python_ast,
                         locator,
+                        indexer,
                         &directives.isort,
                         settings,
                         stylist,
@@ -103,7 +118,7 @@ pub fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.enabled.contains(&RuleCode::E999) {
+                if settings.rules.enabled(&Rule::SyntaxError) {
                     diagnostics.push(Diagnostic::new(
                         violations::SyntaxError(parse_error.error.to_string()),
                         Range::new(parse_error.location, parse_error.location),
@@ -121,13 +136,13 @@ pub fn check_path(
 
     // Run the lines-based rules.
     if settings
-        .enabled
-        .iter()
+        .rules
+        .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
     {
         diagnostics.extend(check_lines(
             contents,
-            &directives.commented_lines,
+            indexer.commented_lines(),
             &doc_lines,
             settings,
             autofix,
@@ -135,16 +150,16 @@ pub fn check_path(
     }
 
     // Enforce `noqa` directives.
-    if matches!(noqa, flags::Noqa::Enabled)
+    if (matches!(noqa, flags::Noqa::Enabled) && !diagnostics.is_empty())
         || settings
-            .enabled
-            .iter()
-            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQA))
+            .rules
+            .iter_enabled()
+            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQa))
     {
         check_noqa(
             &mut diagnostics,
             contents,
-            &directives.commented_lines,
+            indexer.commented_lines(),
             &directives.noqa_line_for,
             settings,
             autofix,
@@ -157,7 +172,7 @@ pub fn check_path(
         if !ignores.is_empty() {
             return Ok(diagnostics
                 .into_iter()
-                .filter(|diagnostic| !ignores.contains(&diagnostic.kind.code()))
+                .filter(|diagnostic| !ignores.contains(&diagnostic.kind.rule()))
                 .collect());
         }
     }
@@ -184,6 +199,9 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     // Detect the current code style (lazily).
     let stylist = Stylist::from_contents(&contents, &locator);
 
+    // Extra indices from the code.
+    let indexer: Indexer = tokens.as_slice().into();
+
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
@@ -196,6 +214,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         settings,
         flags::Autofix::Disabled,
@@ -230,6 +249,9 @@ pub fn lint_only(
     // Detect the current code style (lazily).
     let stylist = Stylist::from_contents(contents, &locator);
 
+    // Extra indices from the code.
+    let indexer: Indexer = tokens.as_slice().into();
+
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
@@ -242,6 +264,7 @@ pub fn lint_only(
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         settings,
         autofix,
@@ -290,6 +313,9 @@ pub fn lint_fix(
         // Detect the current code style (lazily).
         let stylist = Stylist::from_contents(&contents, &locator);
 
+        // Extra indices from the code.
+        let indexer: Indexer = tokens.as_slice().into();
+
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
@@ -302,6 +328,7 @@ pub fn lint_fix(
             tokens,
             &locator,
             &stylist,
+            &indexer,
             &directives,
             settings,
             flags::Autofix::Enabled,
@@ -325,16 +352,15 @@ pub fn lint_fix(
             }
 
             eprintln!(
-                "
+                r#"
 {}: Failed to converge after {} iterations.
 
 This likely indicates a bug in `{}`. If you could open an issue at:
 
-{}/issues
+{}/issues/new?title=%5BInfinite%20loop%5D
 
-quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd \
-                 be very appreciative!
-",
+quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+"#,
                 "warning".yellow().bold(),
                 MAX_ITERATIONS,
                 CARGO_PKG_NAME,
@@ -366,15 +392,18 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_contents(&contents, &locator);
+    let indexer: Indexer = tokens.as_slice().into();
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
     let mut diagnostics = check_path(
         path,
-        None,
+        path.parent()
+            .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
         &contents,
         tokens,
         &locator,
         &stylist,
+        &indexer,
         &directives,
         settings,
         flags::Autofix::Enabled,
@@ -395,6 +424,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
             let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
             let locator = Locator::new(&contents);
             let stylist = Stylist::from_contents(&contents, &locator);
+            let indexer: Indexer = tokens.as_slice().into();
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
             let diagnostics = check_path(
@@ -404,6 +434,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
                 tokens,
                 &locator,
                 &stylist,
+                &indexer,
                 &directives,
                 settings,
                 flags::Autofix::Enabled,

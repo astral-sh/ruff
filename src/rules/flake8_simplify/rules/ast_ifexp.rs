@@ -29,10 +29,10 @@ pub fn explicit_true_false_in_ifexpr(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::IfExprWithTrueFalse(unparse_expr(test, checker.style)),
+        violations::IfExprWithTrueFalse(unparse_expr(test, checker.stylist)),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::Call {
@@ -43,7 +43,7 @@ pub fn explicit_true_false_in_ifexpr(
                     args: vec![create_expr(test.node.clone())],
                     keywords: vec![],
                 }),
-                checker.style,
+                checker.stylist,
             ),
             expr.location,
             expr.end_location.unwrap(),
@@ -74,17 +74,17 @@ pub fn explicit_false_true_in_ifexpr(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::IfExprWithFalseTrue(unparse_expr(test, checker.style)),
+        violations::IfExprWithFalseTrue(unparse_expr(test, checker.stylist)),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::UnaryOp {
                     op: Unaryop::Not,
                     operand: Box::new(create_expr(test.node.clone())),
                 }),
-                checker.style,
+                checker.stylist,
             ),
             expr.location,
             expr.end_location.unwrap(),
@@ -121,12 +121,12 @@ pub fn twisted_arms_in_ifexpr(
 
     let mut diagnostic = Diagnostic::new(
         violations::IfExprWithTwistedArms(
-            unparse_expr(body, checker.style),
-            unparse_expr(orelse, checker.style),
+            unparse_expr(body, checker.stylist),
+            unparse_expr(orelse, checker.stylist),
         ),
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(
                 &create_expr(ExprKind::IfExp {
@@ -134,7 +134,7 @@ pub fn twisted_arms_in_ifexpr(
                     body: Box::new(create_expr(orelse.node.clone())),
                     orelse: Box::new(create_expr(body.node.clone())),
                 }),
-                checker.style,
+                checker.stylist,
             ),
             expr.location,
             expr.end_location.unwrap(),

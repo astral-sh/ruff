@@ -16,7 +16,7 @@ pub fn add_return_none_annotation(locator: &Locator, stmt: &Stmt) -> Result<Fix>
     let mut seen_lpar = false;
     let mut seen_rpar = false;
     let mut count: usize = 0;
-    for (start, tok, ..) in lexer::make_tokenizer_located(&contents, range.location).flatten() {
+    for (start, tok, ..) in lexer::make_tokenizer_located(contents, range.location).flatten() {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
                 return Ok(Fix::insertion(" -> None".to_string(), start));

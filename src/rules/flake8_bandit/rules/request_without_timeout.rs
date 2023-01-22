@@ -19,7 +19,7 @@ pub fn request_without_timeout(
     if checker.resolve_call_path(func).map_or(false, |call_path| {
         HTTP_VERBS
             .iter()
-            .any(|func_name| call_path == ["requests", func_name])
+            .any(|func_name| call_path.as_slice() == ["requests", func_name])
     }) {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(timeout_arg) = call_args.get_argument("timeout", None) {

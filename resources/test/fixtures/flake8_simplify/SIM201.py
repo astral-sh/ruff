@@ -1,17 +1,27 @@
-if not a == b:  # SIM201
+# SIM201
+if not a == b:
     pass
 
-if not a == (b + c):  # SIM201
+# SIM201
+if not a == (b + c):
     pass
 
-if not (a + b) == c:  # SIM201
+# SIM201
+if not (a + b) == c:
     pass
 
-if not a != b:  # OK
+# OK
+if not a != b:
     pass
 
-if a == b:  # OK
+# OK
+if a == b:
     pass
 
-if not a == b:  # OK
+# OK
+if not a == b:
     raise ValueError()
+
+# OK
+def __ne__(self, other):
+    return not self == other

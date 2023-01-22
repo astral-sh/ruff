@@ -1,46 +1,32 @@
+use itertools::Itertools;
 use log::error;
-use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{ExprKind, Location, Stmt, StmtKind};
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
+use crate::ast::helpers::contains_effect;
 use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
+use crate::source_code::Locator;
 use crate::violations;
 
-fn is_literal_or_name(expr: &Expr, checker: &Checker) -> bool {
-    // Accept any obvious literals or names.
-    if matches!(
-        expr.node,
-        ExprKind::Constant { .. }
-            | ExprKind::Name { .. }
-            | ExprKind::List { .. }
-            | ExprKind::Tuple { .. }
-            | ExprKind::Set { .. }
-    ) {
-        return true;
-    }
-
-    // Accept empty initializers.
-    if let ExprKind::Call {
-        func,
-        args,
-        keywords,
-    } = &expr.node
+fn match_token_after<F>(stmt: &Stmt, locator: &Locator, f: F) -> Location
+where
+    F: Fn(Tok) -> bool,
+{
+    let contents = locator.slice_source_code_range(&Range::from_located(stmt));
+    for ((_, tok, _), (start, ..)) in lexer::make_tokenizer_located(contents, stmt.location)
+        .flatten()
+        .tuple_windows()
     {
-        if args.is_empty() && keywords.is_empty() {
-            if let ExprKind::Name { id, .. } = &func.node {
-                return (id == "set"
-                    || id == "list"
-                    || id == "tuple"
-                    || id == "dict"
-                    || id == "frozenset")
-                    && checker.is_builtin(id);
-            }
+        if f(tok) {
+            return start;
         }
     }
-
-    false
+    unreachable!("No token after matched");
 }
 
 enum DeletionKind {
@@ -48,8 +34,8 @@ enum DeletionKind {
     Partial,
 }
 
-/// Generate a `Fix` to remove an unused variable assignment, given the
-/// enclosing `Stmt` and the `Range` of the variable binding.
+/// Generate a [`Fix`] to remove an unused variable assignment, given the
+/// enclosing [`Stmt`] and the [`Range`] of the variable binding.
 fn remove_unused_variable(
     stmt: &Stmt,
     range: &Range,
@@ -58,8 +44,18 @@ fn remove_unused_variable(
     // First case: simple assignment (`x = 1`)
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
         if targets.len() == 1 && matches!(targets[0].node, ExprKind::Name { .. }) {
-            return if is_literal_or_name(value, checker) {
-                // If assigning to a constant (`x = 1`), delete the entire statement.
+            return if contains_effect(checker, value) {
+                // If the expression is complex (`x = foo()`), remove the assignment,
+                // but preserve the right-hand side.
+                Some((
+                    DeletionKind::Partial,
+                    Fix::deletion(
+                        stmt.location,
+                        match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal),
+                    ),
+                ))
+            } else {
+                // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                 let parent = checker
                     .child_to_parent
                     .get(&RefEquality(stmt))
@@ -70,20 +66,14 @@ fn remove_unused_variable(
                     .map(std::convert::Into::into)
                     .collect();
                 let locator = checker.locator;
-                match delete_stmt(stmt, parent, &deleted, locator) {
+                let indexer = checker.indexer;
+                match delete_stmt(stmt, parent, &deleted, locator, indexer) {
                     Ok(fix) => Some((DeletionKind::Whole, fix)),
                     Err(err) => {
                         error!("Failed to delete unused variable: {}", err);
                         None
                     }
                 }
-            } else {
-                // If the expression is more complex (`x = foo()`), remove the assignment,
-                // but preserve the right-hand side.
-                Some((
-                    DeletionKind::Partial,
-                    Fix::deletion(stmt.location, value.location),
-                ))
             };
         }
     }
@@ -96,7 +86,17 @@ fn remove_unused_variable(
     } = &stmt.node
     {
         if matches!(target.node, ExprKind::Name { .. }) {
-            return if is_literal_or_name(value, checker) {
+            return if contains_effect(checker, value) {
+                // If the expression is complex (`x = foo()`), remove the assignment,
+                // but preserve the right-hand side.
+                Some((
+                    DeletionKind::Partial,
+                    Fix::deletion(
+                        stmt.location,
+                        match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal),
+                    ),
+                ))
+            } else {
                 // If assigning to a constant (`x = 1`), delete the entire statement.
                 let parent = checker
                     .child_to_parent
@@ -108,20 +108,14 @@ fn remove_unused_variable(
                     .map(std::convert::Into::into)
                     .collect();
                 let locator = checker.locator;
-                match delete_stmt(stmt, parent, &deleted, locator) {
+                let indexer = checker.indexer;
+                match delete_stmt(stmt, parent, &deleted, locator, indexer) {
                     Ok(fix) => Some((DeletionKind::Whole, fix)),
                     Err(err) => {
                         error!("Failed to delete unused variable: {}", err);
                         None
                     }
                 }
-            } else {
-                // If the expression is more complex (`x = foo()`), remove the assignment,
-                // but preserve the right-hand side.
-                Some((
-                    DeletionKind::Partial,
-                    Fix::deletion(stmt.location, value.location),
-                ))
             };
         }
     }
@@ -173,7 +167,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
                 violations::UnusedVariable((*name).to_string()),
                 binding.range,
             );
-            if checker.patch(&RuleCode::F841) {
+            if checker.patch(&Rule::UnusedVariable) {
                 if let Some(stmt) = binding.source.as_ref().map(std::convert::Into::into) {
                     if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
                     {

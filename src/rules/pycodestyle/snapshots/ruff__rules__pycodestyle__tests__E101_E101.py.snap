@@ -1,0 +1,35 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    MixedSpacesAndTabs: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    MixedSpacesAndTabs: ~
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    MixedSpacesAndTabs: ~
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 4
+  fix: ~
+  parent: ~
+

@@ -1,3 +1,4 @@
+//! Rules from [flake8-annotations](https://pypi.org/project/flake8-annotations/).
 mod fixes;
 pub(crate) mod helpers;
 pub(crate) mod rules;
@@ -10,7 +11,7 @@ mod tests {
     use anyhow::Result;
 
     use crate::linter::test_path;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::Settings;
 
     #[test]
@@ -19,17 +20,17 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_annotations/annotation_presence.py"),
             &Settings {
                 ..Settings::for_rules(vec![
-                    RuleCode::ANN001,
-                    RuleCode::ANN002,
-                    RuleCode::ANN003,
-                    RuleCode::ANN101,
-                    RuleCode::ANN102,
-                    RuleCode::ANN201,
-                    RuleCode::ANN202,
-                    RuleCode::ANN204,
-                    RuleCode::ANN205,
-                    RuleCode::ANN206,
-                    RuleCode::ANN401,
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingTypeArgs,
+                    Rule::MissingTypeKwargs,
+                    Rule::MissingTypeSelf,
+                    Rule::MissingTypeCls,
+                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
+                    Rule::DynamicallyTypedExpression,
                 ])
             },
         )?;
@@ -49,11 +50,11 @@ mod tests {
                     allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
-                    RuleCode::ANN001,
-                    RuleCode::ANN002,
-                    RuleCode::ANN003,
-                    RuleCode::ANN101,
-                    RuleCode::ANN102,
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingTypeArgs,
+                    Rule::MissingTypeKwargs,
+                    Rule::MissingTypeSelf,
+                    Rule::MissingTypeCls,
                 ])
             },
         )?;
@@ -73,11 +74,11 @@ mod tests {
                     allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
-                    RuleCode::ANN201,
-                    RuleCode::ANN202,
-                    RuleCode::ANN204,
-                    RuleCode::ANN205,
-                    RuleCode::ANN206,
+                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
                 ])
             },
         )?;
@@ -97,11 +98,11 @@ mod tests {
                     allow_star_arg_any: false,
                 },
                 ..Settings::for_rules(vec![
-                    RuleCode::ANN201,
-                    RuleCode::ANN202,
-                    RuleCode::ANN204,
-                    RuleCode::ANN205,
-                    RuleCode::ANN206,
+                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
                 ])
             },
         )?;
@@ -120,7 +121,7 @@ mod tests {
                     suppress_none_returning: false,
                     allow_star_arg_any: true,
                 },
-                ..Settings::for_rules(vec![RuleCode::ANN401])
+                ..Settings::for_rules(vec![Rule::DynamicallyTypedExpression])
             },
         )?;
         insta::assert_yaml_snapshot!(diagnostics);
@@ -133,11 +134,11 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_annotations/allow_overload.py"),
             &Settings {
                 ..Settings::for_rules(vec![
-                    RuleCode::ANN201,
-                    RuleCode::ANN202,
-                    RuleCode::ANN204,
-                    RuleCode::ANN205,
-                    RuleCode::ANN206,
+                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
                 ])
             },
         )?;
@@ -151,11 +152,11 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_annotations/allow_nested_overload.py"),
             &Settings {
                 ..Settings::for_rules(vec![
-                    RuleCode::ANN201,
-                    RuleCode::ANN202,
-                    RuleCode::ANN204,
-                    RuleCode::ANN205,
-                    RuleCode::ANN206,
+                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
                 ])
             },
         )?;

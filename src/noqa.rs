@@ -8,7 +8,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::registry::{Diagnostic, RuleCode, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, Rule, CODE_REDIRECTS};
+use crate::settings::hashable::HashableHashSet;
 use crate::source_code::LineEnding;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -68,11 +69,11 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
-pub fn includes(needle: &RuleCode, haystack: &[&str]) -> bool {
-    let needle: &str = needle.as_ref();
+pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
+    let needle: &str = needle.code();
     haystack.iter().any(|candidate| {
         if let Some(candidate) = CODE_REDIRECTS.get(candidate) {
-            needle == candidate.as_ref()
+            needle == candidate.code()
         } else {
             &needle == candidate
         }
@@ -84,7 +85,7 @@ pub fn add_noqa(
     diagnostics: &[Diagnostic],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
-    external: &FxHashSet<String>,
+    external: &HashableHashSet<String>,
     line_ending: &LineEnding,
 ) -> Result<usize> {
     let (count, output) =
@@ -97,24 +98,24 @@ fn add_noqa_inner(
     diagnostics: &[Diagnostic],
     contents: &str,
     noqa_line_for: &IntMap<usize, usize>,
-    external: &FxHashSet<String>,
+    external: &HashableHashSet<String>,
     line_ending: &LineEnding,
 ) -> (usize, String) {
-    let mut matches_by_line: FxHashMap<usize, FxHashSet<&RuleCode>> = FxHashMap::default();
+    let mut matches_by_line: FxHashMap<usize, FxHashSet<&Rule>> = FxHashMap::default();
     for (lineno, line) in contents.lines().enumerate() {
         // If we hit an exemption for the entire file, bail.
         if is_file_exempt(line) {
             return (0, contents.to_string());
         }
 
-        let mut codes: FxHashSet<&RuleCode> = FxHashSet::default();
+        let mut codes: FxHashSet<&Rule> = FxHashSet::default();
         for diagnostic in diagnostics {
             // TODO(charlie): Consider respecting parent `noqa` directives. For now, we'll
             // add a `noqa` for every diagnostic, on its own line. This could lead to
             // duplication, whereby some parent `noqa` directives become
             // redundant.
             if diagnostic.location.row() == lineno + 1 {
-                codes.insert(diagnostic.kind.code());
+                codes.insert(diagnostic.kind.rule());
             }
         }
 
@@ -137,7 +138,7 @@ fn add_noqa_inner(
                 output.push_str(line);
                 output.push_str(line_ending);
             }
-            Some(codes) => {
+            Some(rules) => {
                 match extract_noqa_directive(line) {
                     Directive::None => {
                         // Add existing content.
@@ -147,7 +148,7 @@ fn add_noqa_inner(
                         output.push_str("  # noqa: ");
 
                         // Add codes.
-                        let codes: Vec<&str> = codes.iter().map(AsRef::as_ref).collect();
+                        let codes: Vec<&str> = rules.iter().map(|r| r.code()).collect();
                         let suffix = codes.join(", ");
                         output.push_str(&suffix);
                         output.push_str(line_ending);
@@ -162,7 +163,7 @@ fn add_noqa_inner(
 
                         // Add codes.
                         let codes: Vec<&str> =
-                            codes.iter().map(AsRef::as_ref).sorted_unstable().collect();
+                            rules.iter().map(|r| r.code()).sorted_unstable().collect();
                         let suffix = codes.join(", ");
                         output.push_str(&suffix);
                         output.push_str(line_ending);
@@ -180,9 +181,9 @@ fn add_noqa_inner(
                         formatted.push_str("  # noqa: ");
 
                         // Add codes.
-                        let codes: Vec<&str> = codes
+                        let codes: Vec<&str> = rules
                             .iter()
-                            .map(AsRef::as_ref)
+                            .map(|r| r.code())
                             .chain(existing.into_iter().filter(|code| external.contains(*code)))
                             .sorted_unstable()
                             .collect();
@@ -208,12 +209,12 @@ fn add_noqa_inner(
 #[cfg(test)]
 mod tests {
     use nohash_hasher::IntMap;
-    use rustc_hash::FxHashSet;
     use rustpython_parser::ast::Location;
 
     use crate::ast::types::Range;
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::Diagnostic;
+    use crate::settings::hashable::HashableHashSet;
     use crate::source_code::LineEnding;
     use crate::violations;
 
@@ -236,7 +237,7 @@ mod tests {
         let diagnostics = vec![];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
-        let external = FxHashSet::default();
+        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
@@ -253,7 +254,7 @@ mod tests {
         )];
         let contents = "x = 1";
         let noqa_line_for = IntMap::default();
-        let external = FxHashSet::default();
+        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
@@ -276,7 +277,7 @@ mod tests {
         ];
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = IntMap::default();
-        let external = FxHashSet::default();
+        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
@@ -299,7 +300,7 @@ mod tests {
         ];
         let contents = "x = 1  # noqa";
         let noqa_line_for = IntMap::default();
-        let external = FxHashSet::default();
+        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,

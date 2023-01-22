@@ -32,7 +32,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         rule(targets, value, Range::from_located(stmt)) else {
             return;
         };
-    if checker.patch(diagnostic.kind.code()) {
+    if checker.patch(diagnostic.kind.rule()) {
         let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
@@ -45,6 +45,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
             defined_in.map(std::convert::Into::into),
             &deleted,
             checker.locator,
+            checker.indexer,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {

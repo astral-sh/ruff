@@ -12,7 +12,7 @@ use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;
 use crate::fix::Fix;
-use crate::source_code::Locator;
+use crate::source_code::{Indexer, Locator};
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -79,8 +79,8 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
 /// Return the location of a trailing semicolon following a `Stmt`, if it's part
 /// of a multi-statement line.
 fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
-    let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
-    for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
+    let contents = locator.slice_source_code_at(stmt.end_location.unwrap());
+    for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         if trimmed.starts_with(';') {
             let column = line
@@ -102,8 +102,8 @@ fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
 /// Find the next valid break for a `Stmt` after a semicolon.
 fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
-    let contents = locator.slice_source_code_at(&start_location);
-    for (row, line) in LinesWithTrailingNewline::from(&contents).enumerate() {
+    let contents = locator.slice_source_code_at(start_location);
+    for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         // Skip past any continuations.
         if trimmed.starts_with('\\') {
@@ -134,7 +134,7 @@ fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
 
 /// Return `true` if a `Stmt` occurs at the end of a file.
 fn is_end_of_file(stmt: &Stmt, locator: &Locator) -> bool {
-    let contents = locator.slice_source_code_at(&stmt.end_location.unwrap());
+    let contents = locator.slice_source_code_at(stmt.end_location.unwrap());
     contents.is_empty()
 }
 
@@ -156,6 +156,7 @@ pub fn delete_stmt(
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
     locator: &Locator,
+    indexer: &Indexer,
 ) -> Result<Fix> {
     if parent
         .map(|parent| is_lone_child(stmt, parent, deleted))
@@ -175,7 +176,7 @@ pub fn delete_stmt(
             Fix::deletion(stmt.location, next)
         } else if helpers::match_leading_content(stmt, locator) {
             Fix::deletion(stmt.location, stmt.end_location.unwrap())
-        } else if helpers::preceded_by_continuation(stmt, locator) {
+        } else if helpers::preceded_by_continuation(stmt, indexer) {
             if is_end_of_file(stmt, locator) && stmt.location.column() == 0 {
                 // Special-case: a file can't end in a continuation.
                 Fix::replacement("\n".to_string(), stmt.location, stmt.end_location.unwrap())
@@ -198,9 +199,10 @@ pub fn remove_unused_imports<'a>(
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
     locator: &Locator,
+    indexer: &Indexer,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-    let mut tree = match_module(&module_text)?;
+    let mut tree = match_module(module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
         bail!("Expected Statement::Simple");
@@ -235,7 +237,7 @@ pub fn remove_unused_imports<'a>(
                 if !found_star {
                     bail!("Expected \'*\' for unused import");
                 }
-                return delete_stmt(stmt, parent, deleted, locator);
+                return delete_stmt(stmt, parent, deleted, locator, indexer);
             } else {
                 bail!("Expected: ImportNames::Aliases | ImportNames::Star");
             }
@@ -296,7 +298,7 @@ pub fn remove_unused_imports<'a>(
     }
 
     if aliases.is_empty() {
-        delete_stmt(stmt, parent, deleted, locator)
+        delete_stmt(stmt, parent, deleted, locator, indexer)
     } else {
         let mut state = CodegenState::default();
         tree.codegen(&mut state);

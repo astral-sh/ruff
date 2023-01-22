@@ -16,8 +16,8 @@ use ::ruff::resolver::{
     resolve_settings_with_processor, ConfigProcessor, FileDiscovery, PyprojectDiscovery, Relativity,
 };
 use ::ruff::settings::configuration::Configuration;
+use ::ruff::settings::pyproject;
 use ::ruff::settings::types::SerializationFormat;
-use ::ruff::settings::{pyproject, Settings};
 use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
@@ -26,6 +26,7 @@ use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
 use printer::{Printer, Violations};
+use ruff::settings::{AllSettings, CliSettings};
 
 mod cache;
 mod cli;
@@ -48,7 +49,7 @@ fn resolve(
         // First priority: if we're running in isolated mode, use the default settings.
         let mut config = Configuration::default();
         overrides.process_config(&mut config);
-        let settings = Settings::from_configuration(config, &path_dedot::CWD)?;
+        let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
         Ok(PyprojectDiscovery::Fixed(settings))
     } else if let Some(pyproject) = config {
         // Second priority: the user specified a `pyproject.toml` file. Use that
@@ -82,7 +83,7 @@ fn resolve(
         // as the "default" settings.)
         let mut config = Configuration::default();
         overrides.process_config(&mut config);
-        let settings = Settings::from_configuration(config, &path_dedot::CWD)?;
+        let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
         Ok(PyprojectDiscovery::Hierarchical(settings))
     }
 }
@@ -90,6 +91,22 @@ fn resolve(
 pub fn main() -> Result<ExitCode> {
     // Extract command-line arguments.
     let (cli, overrides) = Cli::parse().partition();
+
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        eprintln!(
+            r#"
+{}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
+
+https://github.com/charliermarsh/ruff/issues/new?title=%5BPanic%5D
+
+quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
+"#,
+            "error".red().bold(),
+        );
+        default_panic_hook(info);
+    }));
+
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
 
@@ -113,39 +130,35 @@ pub fn main() -> Result<ExitCode> {
 
     // Validate the `Settings` and return any errors.
     match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => settings.validate()?,
-        PyprojectDiscovery::Hierarchical(settings) => settings.validate()?,
+        PyprojectDiscovery::Fixed(settings) => settings.lib.validate()?,
+        PyprojectDiscovery::Hierarchical(settings) => settings.lib.validate()?,
     };
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
     let file_strategy = FileDiscovery {
         force_exclude: match &pyproject_strategy {
-            PyprojectDiscovery::Fixed(settings) => settings.force_exclude,
-            PyprojectDiscovery::Hierarchical(settings) => settings.force_exclude,
+            PyprojectDiscovery::Fixed(settings) => settings.lib.force_exclude,
+            PyprojectDiscovery::Hierarchical(settings) => settings.lib.force_exclude,
         },
         respect_gitignore: match &pyproject_strategy {
-            PyprojectDiscovery::Fixed(settings) => settings.respect_gitignore,
-            PyprojectDiscovery::Hierarchical(settings) => settings.respect_gitignore,
+            PyprojectDiscovery::Fixed(settings) => settings.lib.respect_gitignore,
+            PyprojectDiscovery::Hierarchical(settings) => settings.lib.respect_gitignore,
         },
     };
-    let (fix, fix_only, format, update_check) = match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => (
-            settings.fix,
-            settings.fix_only,
-            settings.format,
-            settings.update_check,
-        ),
-        PyprojectDiscovery::Hierarchical(settings) => (
-            settings.fix,
-            settings.fix_only,
-            settings.format,
-            settings.update_check,
-        ),
+    let CliSettings {
+        fix,
+        fix_only,
+        format,
+        update_check,
+        ..
+    } = match &pyproject_strategy {
+        PyprojectDiscovery::Fixed(settings) => settings.cli.clone(),
+        PyprojectDiscovery::Hierarchical(settings) => settings.cli.clone(),
     };
 
-    if let Some(code) = cli.explain {
-        commands::explain(&code, format)?;
+    if let Some(rule) = cli.explain {
+        commands::explain(rule, format)?;
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_settings {
@@ -200,7 +213,7 @@ pub fn main() -> Result<ExitCode> {
         }
 
         // Perform an initial run instantly.
-        printer.clear_screen()?;
+        Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
         let messages = commands::run(
@@ -211,7 +224,7 @@ pub fn main() -> Result<ExitCode> {
             cache.into(),
             fix::FixMode::None,
         )?;
-        printer.write_continuously(&messages);
+        printer.write_continuously(&messages)?;
 
         // Configure the file watcher.
         let (tx, rx) = channel();
@@ -230,7 +243,7 @@ pub fn main() -> Result<ExitCode> {
                             .unwrap_or_default()
                     });
                     if py_changed {
-                        printer.clear_screen()?;
+                        Printer::clear_screen()?;
                         printer.write_to_user("File change detected...\n");
 
                         let messages = commands::run(
@@ -241,7 +254,7 @@ pub fn main() -> Result<ExitCode> {
                             cache.into(),
                             fix::FixMode::None,
                         )?;
-                        printer.write_continuously(&messages);
+                        printer.write_continuously(&messages)?;
                     }
                 }
                 Err(err) => return Err(err.into()),

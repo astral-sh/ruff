@@ -12,4 +12,24 @@ expression: diagnostics
     column: 7
   fix: ~
   parent: ~
+- kind:
+    MultiLineSummaryFirstLine: ~
+  location:
+    row: 597
+    column: 4
+  end_location:
+    row: 599
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    MultiLineSummaryFirstLine: ~
+  location:
+    row: 624
+    column: 4
+  end_location:
+    row: 626
+    column: 14
+  fix: ~
+  parent: ~
 

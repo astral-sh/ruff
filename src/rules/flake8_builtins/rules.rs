@@ -11,8 +11,9 @@ pub fn builtin_shadowing<T>(
     name: &str,
     located: &Located<T>,
     node_type: ShadowingType,
+    ignorelist: &[String],
 ) -> Option<Diagnostic> {
-    if BUILTINS.contains(&name) {
+    if BUILTINS.contains(&name) && !ignorelist.contains(&name.to_string()) {
         Some(Diagnostic::new::<DiagnosticKind>(
             match node_type {
                 ShadowingType::Variable => {

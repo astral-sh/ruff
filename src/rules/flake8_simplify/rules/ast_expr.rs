@@ -4,7 +4,7 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
 /// SIM112
@@ -17,7 +17,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
 
     // check `os.environ.get('foo')` and `os.getenv('foo')``
     if !checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path == ["os", "environ", "get"] || call_path == ["os", "getenv"]
+        call_path.as_slice() == ["os", "environ", "get"] || call_path.as_slice() == ["os", "getenv"]
     }) {
         return;
     }
@@ -40,13 +40,13 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
         violations::UseCapitalEnvironmentVariables(capital_env_var.clone(), env_var.clone()),
         Range::from_located(arg),
     );
-    if checker.patch(&RuleCode::SIM112) {
+    if checker.patch(&Rule::UseCapitalEnvironmentVariables) {
         let new_env_var = create_expr(ExprKind::Constant {
             value: capital_env_var.into(),
             kind: kind.clone(),
         });
         diagnostic.amend(Fix::replacement(
-            unparse_expr(&new_env_var, checker.style),
+            unparse_expr(&new_env_var, checker.stylist),
             arg.location,
             arg.end_location.unwrap(),
         ));
@@ -79,13 +79,13 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         violations::UseCapitalEnvironmentVariables(capital_env_var.clone(), env_var.clone()),
         Range::from_located(slice),
     );
-    if checker.patch(&RuleCode::SIM112) {
+    if checker.patch(&Rule::UseCapitalEnvironmentVariables) {
         let new_env_var = create_expr(ExprKind::Constant {
             value: capital_env_var.into(),
             kind: kind.clone(),
         });
         diagnostic.amend(Fix::replacement(
-            unparse_expr(&new_env_var, checker.style),
+            unparse_expr(&new_env_var, checker.stylist),
             slice.location,
             slice.end_location.unwrap(),
         ));

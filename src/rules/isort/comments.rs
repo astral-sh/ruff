@@ -17,7 +17,7 @@ pub struct Comment<'a> {
 /// Collect all comments in an import block.
 pub fn collect_comments<'a>(range: &Range, locator: &'a Locator) -> Vec<Comment<'a>> {
     let contents = locator.slice_source_code_range(range);
-    lexer::make_tokenizer_located(&contents, range.location)
+    lexer::make_tokenizer_located(contents, range.location)
         .flatten()
         .filter_map(|(start, tok, end)| {
             if let Tok::Comment(value) = tok {

@@ -13,11 +13,12 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::fs;
-use crate::registry::RuleCodePrefix;
+use crate::registry::RuleSelector;
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_errmsg, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_tidy_imports, flake8_unused_arguments, isort,
-    mccabe, pep8_naming, pycodestyle, pydocstyle, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
@@ -27,6 +28,14 @@ use crate::settings::types::{
 
 #[derive(Debug, Default)]
 pub struct Configuration {
+    pub select: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<RuleSelector>>,
+    pub extend_select: Vec<Vec<RuleSelector>>,
+    pub extend_ignore: Vec<Vec<RuleSelector>>,
+    pub fixable: Option<Vec<RuleSelector>>,
+    pub unfixable: Option<Vec<RuleSelector>>,
+    pub per_file_ignores: Option<Vec<PerFileIgnore>>,
+
     pub allowed_confusables: Option<Vec<char>>,
     pub builtins: Option<Vec<String>>,
     pub cache_dir: Option<PathBuf>,
@@ -34,44 +43,39 @@ pub struct Configuration {
     pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
     pub extend_exclude: Vec<FilePattern>,
-    pub extend_ignore: Vec<Vec<RuleCodePrefix>>,
-    pub extend_select: Vec<Vec<RuleCodePrefix>>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
-    pub fixable: Option<Vec<RuleCodePrefix>>,
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
-    pub ignore: Option<Vec<RuleCodePrefix>>,
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
-    pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
-    pub select: Option<Vec<RuleCodePrefix>>,
     pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
-    pub unfixable: Option<Vec<RuleCodePrefix>>,
     pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     pub flake8_bandit: Option<flake8_bandit::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    pub flake8_builtins: Option<flake8_builtins::settings::Options>,
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
     pub flake8_pytest_style: Option<flake8_pytest_style::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
-    pub flake8_tidy_imports: Option<flake8_tidy_imports::settings::Options>,
+    pub flake8_tidy_imports: Option<flake8_tidy_imports::options::Options>,
     pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
     pub isort: Option<isort::settings::Options>,
     pub mccabe: Option<mccabe::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
     pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
+    pub pylint: Option<pylint::settings::Options>,
     pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
 
@@ -145,8 +149,7 @@ impl Configuration {
                 per_file_ignores
                     .into_iter()
                     .map(|(pattern, prefixes)| {
-                        let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
-                        PerFileIgnore::new(pattern, absolute, &prefixes)
+                        PerFileIgnore::new(pattern, &prefixes, Some(project_root))
                     })
                     .collect()
             }),
@@ -167,6 +170,7 @@ impl Configuration {
             flake8_annotations: options.flake8_annotations,
             flake8_bandit: options.flake8_bandit,
             flake8_bugbear: options.flake8_bugbear,
+            flake8_builtins: options.flake8_builtins,
             flake8_errmsg: options.flake8_errmsg,
             flake8_import_conventions: options.flake8_import_conventions,
             flake8_pytest_style: options.flake8_pytest_style,
@@ -178,6 +182,7 @@ impl Configuration {
             pep8_naming: options.pep8_naming,
             pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
+            pylint: options.pylint,
             pyupgrade: options.pyupgrade,
         })
     }
@@ -233,6 +238,7 @@ impl Configuration {
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
             flake8_bandit: self.flake8_bandit.or(config.flake8_bandit),
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
+            flake8_builtins: self.flake8_builtins.or(config.flake8_builtins),
             flake8_errmsg: self.flake8_errmsg.or(config.flake8_errmsg),
             flake8_import_conventions: self
                 .flake8_import_conventions
@@ -248,6 +254,7 @@ impl Configuration {
             pep8_naming: self.pep8_naming.or(config.pep8_naming),
             pycodestyle: self.pycodestyle.or(config.pycodestyle),
             pydocstyle: self.pydocstyle.or(config.pydocstyle),
+            pylint: self.pylint.or(config.pylint),
             pyupgrade: self.pyupgrade.or(config.pyupgrade),
         }
     }

@@ -5,7 +5,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 use crate::violations::LiteralType;
 
@@ -30,18 +30,18 @@ pub fn native_literals(
             } else {
                 LiteralType::Bytes
             }), Range::from_located(expr));
-            if checker.patch(&RuleCode::UP018) {
+            if checker.patch(&Rule::NativeLiterals) {
                 diagnostic.amend(Fix::replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
                         content.push('b');
-                        content.push(checker.style.quote().into());
-                        content.push(checker.style.quote().into());
+                        content.push(checker.stylist.quote().into());
+                        content.push(checker.stylist.quote().into());
                         content
                     } else {
                         let mut content = String::with_capacity(2);
-                        content.push(checker.style.quote().into());
-                        content.push(checker.style.quote().into());
+                        content.push(checker.stylist.quote().into());
+                        content.push(checker.stylist.quote().into());
                         content
                     },
                     expr.location,
@@ -84,7 +84,7 @@ pub fn native_literals(
         let arg_code = checker
             .locator
             .slice_source_code_range(&Range::from_located(arg));
-        if lexer::make_tokenizer(&arg_code)
+        if lexer::make_tokenizer(arg_code)
             .flatten()
             .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
             .count()
@@ -101,7 +101,7 @@ pub fn native_literals(
             }),
             Range::from_located(expr),
         );
-        if checker.patch(&RuleCode::UP018) {
+        if checker.patch(&Rule::NativeLiterals) {
             diagnostic.amend(Fix::replacement(
                 arg_code.to_string(),
                 expr.location,

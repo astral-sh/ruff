@@ -3,7 +3,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 use crate::violations;
 
@@ -130,7 +130,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         variable,
                         checker.locator,
-                        checker.patch(&RuleCode::UP012),
+                        checker.patch(&Rule::UnnecessaryEncodeUTF8),
                     ));
                 } else {
                     // "unicode text©".encode("utf-8")
@@ -138,7 +138,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         args,
                         kwargs,
-                        checker.patch(&RuleCode::UP012),
+                        checker.patch(&Rule::UnnecessaryEncodeUTF8),
                     ) {
                         checker.diagnostics.push(diagnostic);
                     }
@@ -152,7 +152,7 @@ pub fn unnecessary_encode_utf8(
                     expr,
                     args,
                     kwargs,
-                    checker.patch(&RuleCode::UP012),
+                    checker.patch(&Rule::UnnecessaryEncodeUTF8),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }

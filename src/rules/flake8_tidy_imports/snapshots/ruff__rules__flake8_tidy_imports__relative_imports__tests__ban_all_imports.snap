@@ -1,0 +1,65 @@
+---
+source: src/rules/flake8_tidy_imports/relative_imports.rs
+expression: diagnostics
+---
+- kind:
+    RelativeImports: all
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports: all
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports: all
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports: all
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports: all
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports: all
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 34
+  fix: ~
+  parent: ~
+

@@ -1,12 +1,12 @@
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 use super::super::types;
-use super::helpers::is_pytest_parametrize;
+use super::helpers::{is_pytest_parametrize, split_names};
 use crate::ast::helpers::create_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Generator;
 use crate::violations;
 
@@ -31,7 +31,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         return None;
     }
 
-    let mut generator: Generator = checker.style.into();
+    let mut generator: Generator = checker.stylist.into();
     generator.unparse_expr(
         &create_expr(ExprKind::Constant {
             value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
@@ -63,20 +63,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
             value: Constant::Str(string),
             ..
         } => {
-            // Match the following pytest code:
-            //    [x.strip() for x in argnames.split(",") if x.strip()]
-            let names = string
-                .split(',')
-                .filter_map(|s| {
-                    let trimmed = s.trim();
-                    if trimmed.is_empty() {
-                        None
-                    } else {
-                        Some(trimmed)
-                    }
-                })
-                .collect::<Vec<&str>>();
-
+            let names = split_names(string);
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
@@ -84,8 +71,8 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: Generator = checker.style.into();
+                        if checker.patch(diagnostic.kind.rule()) {
+                            let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: names
@@ -114,8 +101,8 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: Generator = checker.style.into();
+                        if checker.patch(diagnostic.kind.rule()) {
+                            let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: names
@@ -139,7 +126,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {}
+                    types::ParametrizeNameType::Csv => {}
                 }
             }
         }
@@ -156,8 +143,8 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: Generator = checker.style.into();
+                        if checker.patch(diagnostic.kind.rule()) {
+                            let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::List {
                                     elts: elts.clone(),
@@ -173,12 +160,12 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {
+                    types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
                                 diagnostic.amend(Fix::replacement(
                                     content,
@@ -205,8 +192,8 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
-                            let mut generator: Generator = checker.style.into();
+                        if checker.patch(diagnostic.kind.rule()) {
+                            let mut generator: Generator = checker.stylist.into();
                             generator.unparse_expr(
                                 &create_expr(ExprKind::Tuple {
                                     elts: elts.clone(),
@@ -222,12 +209,12 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                    types::ParametrizeNameType::CSV => {
+                    types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             violations::ParametrizeNamesWrongType(names_type),
                             Range::from_located(expr),
                         );
-                        if checker.patch(diagnostic.kind.code()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
                                 diagnostic.amend(Fix::replacement(
                                     content,
@@ -246,7 +233,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
 }
 
 /// PT007
-fn check_values(checker: &mut Checker, expr: &Expr) {
+fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     let values_type = checker.settings.flake8_pytest_style.parametrize_values_type;
 
     let values_row_type = checker
@@ -254,24 +241,38 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    match &expr.node {
+    let is_multi_named = if let ExprKind::Constant {
+        value: Constant::Str(string),
+        ..
+    } = &names.node
+    {
+        split_names(string).len() > 1
+    } else {
+        true
+    };
+
+    match &values.node {
         ExprKind::List { elts, .. } => {
             if values_type != types::ParametrizeValuesType::List {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::ParametrizeValuesWrongType(values_type, values_row_type),
-                    Range::from_located(expr),
+                    Range::from_located(values),
                 ));
             }
-            handle_value_rows(checker, elts, values_type, values_row_type);
+            if is_multi_named {
+                handle_value_rows(checker, elts, values_type, values_row_type);
+            }
         }
         ExprKind::Tuple { elts, .. } => {
             if values_type != types::ParametrizeValuesType::Tuple {
                 checker.diagnostics.push(Diagnostic::new(
                     violations::ParametrizeValuesWrongType(values_type, values_row_type),
-                    Range::from_located(expr),
+                    Range::from_located(values),
                 ));
             }
-            handle_value_rows(checker, elts, values_type, values_row_type);
+            if is_multi_named {
+                handle_value_rows(checker, elts, values_type, values_row_type);
+            }
         }
         _ => {}
     }
@@ -279,12 +280,12 @@ fn check_values(checker: &mut Checker, expr: &Expr) {
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     let mut diagnostic = Diagnostic::new(
-        violations::ParametrizeNamesWrongType(types::ParametrizeNameType::CSV),
+        violations::ParametrizeNamesWrongType(types::ParametrizeNameType::Csv),
         Range::from_located(expr),
     );
 
-    if checker.patch(diagnostic.kind.code()) {
-        let mut generator: Generator = checker.style.into();
+    if checker.patch(diagnostic.kind.rule()) {
+        let mut generator: Generator = checker.stylist.into();
         generator.unparse_expr(&create_expr(value.node.clone()), 0);
         diagnostic.amend(Fix::replacement(
             generator.generate(),
@@ -328,14 +329,24 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     let decorator = get_parametrize_decorator(checker, decorators);
     if let Some(decorator) = decorator {
         if let ExprKind::Call { args, .. } = &decorator.node {
-            if checker.settings.enabled.contains(&RuleCode::PT006) {
-                if let Some(arg) = args.get(0) {
-                    check_names(checker, arg);
+            if checker
+                .settings
+                .rules
+                .enabled(&Rule::ParametrizeNamesWrongType)
+            {
+                if let Some(names) = args.get(0) {
+                    check_names(checker, names);
                 }
             }
-            if checker.settings.enabled.contains(&RuleCode::PT007) {
-                if let Some(arg) = args.get(1) {
-                    check_values(checker, arg);
+            if checker
+                .settings
+                .rules
+                .enabled(&Rule::ParametrizeValuesWrongType)
+            {
+                if let Some(names) = args.get(0) {
+                    if let Some(values) = args.get(1) {
+                        check_values(checker, names, values);
+                    }
                 }
             }
         }

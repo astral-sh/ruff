@@ -1,8 +1,10 @@
 mod generator;
+mod indexer;
 mod locator;
 mod stylist;
 
 pub(crate) use generator::Generator;
+pub(crate) use indexer::Indexer;
 pub(crate) use locator::Locator;
 use rustpython_parser::error::ParseError;
 use rustpython_parser::parser;

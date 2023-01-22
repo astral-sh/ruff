@@ -3,28 +3,27 @@ use std::collections::{BTreeSet, HashMap};
 use anyhow::Result;
 use colored::Colorize;
 
-use super::black::Black;
+use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
 use super::{parser, plugin};
-use crate::registry::RuleCodePrefix;
+use crate::registry::RuleSelector;
 use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
 use crate::rules::flake8_quotes::settings::Quote;
-use crate::rules::flake8_tidy_imports::settings::Strictness;
+use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
 use crate::rules::pydocstyle::settings::Convention;
 use crate::rules::{
-    flake8_annotations, flake8_bugbear, flake8_errmsg, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
+    flake8_annotations, flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_pytest_style,
+    flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
 use crate::warn_user;
 
-#[allow(clippy::unnecessary_wraps)]
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
-    black: Option<&Black>,
+    external_config: &ExternalConfig,
     plugins: Option<Vec<Plugin>>,
 ) -> Result<Pyproject> {
     // Extract the Flake8 section.
@@ -33,7 +32,7 @@ pub fn convert(
         .expect("Unable to find flake8 section in INI file");
 
     // Extract all referenced rule code prefixes, to power plugin inference.
-    let mut referenced_codes: BTreeSet<RuleCodePrefix> = BTreeSet::default();
+    let mut referenced_codes: BTreeSet<RuleSelector> = BTreeSet::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
             match key.as_str() {
@@ -91,10 +90,11 @@ pub fn convert(
     let mut options = Options::default();
     let mut flake8_annotations = flake8_annotations::settings::Options::default();
     let mut flake8_bugbear = flake8_bugbear::settings::Options::default();
+    let mut flake8_builtins = flake8_builtins::settings::Options::default();
     let mut flake8_errmsg = flake8_errmsg::settings::Options::default();
     let mut flake8_pytest_style = flake8_pytest_style::settings::Options::default();
     let mut flake8_quotes = flake8_quotes::settings::Options::default();
-    let mut flake8_tidy_imports = flake8_tidy_imports::settings::Options::default();
+    let mut flake8_tidy_imports = flake8_tidy_imports::options::Options::default();
     let mut mccabe = mccabe::settings::Options::default();
     let mut pep8_naming = pep8_naming::settings::Options::default();
     let mut pydocstyle = pydocstyle::settings::Options::default();
@@ -105,7 +105,7 @@ pub fn convert(
                 "builtins" => {
                     options.builtins = Some(parser::parse_strings(value.as_ref()));
                 }
-                "max-line-length" | "max_line_length" => match value.clone().parse::<usize>() {
+                "max-line-length" | "max_line_length" => match value.parse::<usize>() {
                     Ok(line_length) => options.line_length = Some(line_length),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
@@ -146,6 +146,11 @@ pub fn convert(
                 // flake8-bugbear
                 "extend-immutable-calls" | "extend_immutable_calls" => {
                     flake8_bugbear.extend_immutable_calls =
+                        Some(parser::parse_strings(value.as_ref()));
+                }
+                // flake8-builtins
+                "builtins-ignorelist" | "builtins_ignorelist" => {
+                    flake8_builtins.builtins_ignorelist =
                         Some(parser::parse_strings(value.as_ref()));
                 }
                 // flake8-annotations
@@ -242,7 +247,7 @@ pub fn convert(
                     }
                 },
                 // mccabe
-                "max-complexity" | "max_complexity" => match value.clone().parse::<usize>() {
+                "max-complexity" | "max_complexity" => match value.parse::<usize>() {
                     Ok(max_complexity) => mccabe.max_complexity = Some(max_complexity),
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
@@ -250,7 +255,7 @@ pub fn convert(
                 },
                 // flake8-errmsg
                 "errmsg-max-string-length" | "errmsg_max_string_length" => {
-                    match value.clone().parse::<usize>() {
+                    match value.parse::<usize>() {
                         Ok(max_string_length) => {
                             flake8_errmsg.max_string_length = Some(max_string_length);
                         }
@@ -272,7 +277,7 @@ pub fn convert(
                     match value.trim() {
                         "csv" => {
                             flake8_pytest_style.parametrize_names_type =
-                                Some(ParametrizeNameType::CSV);
+                                Some(ParametrizeNameType::Csv);
                         }
                         "tuple" => {
                             flake8_pytest_style.parametrize_names_type =
@@ -346,6 +351,9 @@ pub fn convert(
     if flake8_bugbear != flake8_bugbear::settings::Options::default() {
         options.flake8_bugbear = Some(flake8_bugbear);
     }
+    if flake8_builtins != flake8_builtins::settings::Options::default() {
+        options.flake8_builtins = Some(flake8_builtins);
+    }
     if flake8_errmsg != flake8_errmsg::settings::Options::default() {
         options.flake8_errmsg = Some(flake8_errmsg);
     }
@@ -355,7 +363,7 @@ pub fn convert(
     if flake8_quotes != flake8_quotes::settings::Options::default() {
         options.flake8_quotes = Some(flake8_quotes);
     }
-    if flake8_tidy_imports != flake8_tidy_imports::settings::Options::default() {
+    if flake8_tidy_imports != flake8_tidy_imports::options::Options::default() {
         options.flake8_tidy_imports = Some(flake8_tidy_imports);
     }
     if mccabe != mccabe::settings::Options::default() {
@@ -369,7 +377,7 @@ pub fn convert(
     }
 
     // Extract any settings from the existing `pyproject.toml`.
-    if let Some(black) = black {
+    if let Some(black) = &external_config.black {
         if let Some(line_length) = &black.line_length {
             options.line_length = Some(*line_length);
         }
@@ -377,6 +385,19 @@ pub fn convert(
         if let Some(target_version) = &black.target_version {
             if let Some(target_version) = target_version.iter().min() {
                 options.target_version = Some(*target_version);
+            }
+        }
+    }
+
+    if let Some(isort) = &external_config.isort {
+        if let Some(src_paths) = &isort.src_paths {
+            match options.src.as_mut() {
+                Some(src) => {
+                    src.extend(src_paths.clone());
+                }
+                None => {
+                    options.src = Some(src_paths.clone());
+                }
             }
         }
     }
@@ -393,7 +414,8 @@ mod tests {
 
     use super::super::plugin::Plugin;
     use super::convert;
-    use crate::registry::RuleCodePrefix;
+    use crate::flake8_to_ruff::ExternalConfig;
+    use crate::registry::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
     use crate::settings::options::Options;
@@ -403,7 +425,7 @@ mod tests {
     fn it_converts_empty() -> Result<()> {
         let actual = convert(
             &HashMap::from([("flake8".to_string(), HashMap::default())]),
-            None,
+            &ExternalConfig::default(),
             None,
         )?;
         let expected = Pyproject::new(Options {
@@ -429,11 +451,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -444,6 +462,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -455,6 +474,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -469,7 +489,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
             )]),
-            None,
+            &ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -495,11 +515,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -510,6 +526,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -521,6 +538,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -535,7 +553,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
             )]),
-            None,
+            &ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -561,11 +579,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -576,6 +590,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -587,6 +602,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -601,7 +617,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
             )]),
-            None,
+            &ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -627,11 +643,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -642,6 +654,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -653,6 +666,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -667,7 +681,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
             )]),
-            None,
+            &ExternalConfig::default(),
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -693,11 +707,7 @@ mod tests {
             per_file_ignores: None,
             required_version: None,
             respect_gitignore: None,
-            select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
-            ]),
+            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             show_source: None,
             src: None,
             target_version: None,
@@ -708,6 +718,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
@@ -724,6 +735,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -741,7 +753,7 @@ mod tests {
                     Some("numpy".to_string()),
                 )]),
             )]),
-            None,
+            &ExternalConfig::default(),
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
@@ -768,10 +780,10 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                RuleCodePrefix::D,
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::W,
+                RuleSelector::D,
+                RuleSelector::E,
+                RuleSelector::F,
+                RuleSelector::W,
             ]),
             show_source: None,
             src: None,
@@ -783,6 +795,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: None,
@@ -796,6 +809,7 @@ mod tests {
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);
@@ -810,7 +824,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
             )]),
-            None,
+            &ExternalConfig::default(),
             None,
         )?;
         let expected = Pyproject::new(Options {
@@ -837,10 +851,10 @@ mod tests {
             required_version: None,
             respect_gitignore: None,
             select: Some(vec![
-                RuleCodePrefix::E,
-                RuleCodePrefix::F,
-                RuleCodePrefix::Q,
-                RuleCodePrefix::W,
+                RuleSelector::E,
+                RuleSelector::F,
+                RuleSelector::Q,
+                RuleSelector::W,
             ]),
             show_source: None,
             src: None,
@@ -852,6 +866,7 @@ mod tests {
             flake8_annotations: None,
             flake8_bandit: None,
             flake8_bugbear: None,
+            flake8_builtins: None,
             flake8_errmsg: None,
             flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
@@ -868,6 +883,7 @@ mod tests {
             pep8_naming: None,
             pycodestyle: None,
             pydocstyle: None,
+            pylint: None,
             pyupgrade: None,
         });
         assert_eq!(actual, expected);

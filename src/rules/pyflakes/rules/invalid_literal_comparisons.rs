@@ -18,7 +18,7 @@ pub fn invalid_literal_comparison(
     comparators: &[Expr],
     location: Range,
 ) {
-    let located = Lazy::new(|| locate_cmpops(&checker.locator.slice_source_code_range(&location)));
+    let located = Lazy::new(|| locate_cmpops(checker.locator.slice_source_code_range(&location)));
     let mut left = left;
     for (index, (op, right)) in izip!(ops, comparators).enumerate() {
         if matches!(op, Cmpop::Is | Cmpop::IsNot)
@@ -26,7 +26,7 @@ pub fn invalid_literal_comparison(
                 || helpers::is_constant_non_singleton(right))
         {
             let mut diagnostic = Diagnostic::new(violations::IsLiteral(op.into()), location);
-            if checker.patch(diagnostic.kind.code()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(&located_op.node, op);
                     if let Some(content) = match &located_op.node {

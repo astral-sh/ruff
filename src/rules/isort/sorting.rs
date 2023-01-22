@@ -14,10 +14,21 @@ pub enum Prefix {
     Variables,
 }
 
-fn prefix(name: &str, classes: &BTreeSet<String>) -> Prefix {
-    if classes.contains(name) {
+fn prefix(
+    name: &str,
+    classes: &BTreeSet<String>,
+    constants: &BTreeSet<String>,
+    variables: &BTreeSet<String>,
+) -> Prefix {
+    if constants.contains(name) {
+        // Ex) `CONSTANT`
+        Prefix::Constants
+    } else if classes.contains(name) {
         // Ex) `CLASS`
         Prefix::Classes
+    } else if variables.contains(name) {
+        // Ex) `variable`
+        Prefix::Variables
     } else if name.len() > 1 && string::is_upper(name) {
         // Ex) `CONSTANT`
         Prefix::Constants
@@ -48,10 +59,12 @@ pub fn cmp_members(
     alias2: &AliasData,
     order_by_type: bool,
     classes: &BTreeSet<String>,
+    constants: &BTreeSet<String>,
+    variables: &BTreeSet<String>,
 ) -> Ordering {
     if order_by_type {
-        prefix(alias1.name, classes)
-            .cmp(&prefix(alias2.name, classes))
+        prefix(alias1.name, classes, constants, variables)
+            .cmp(&prefix(alias2.name, classes, constants, variables))
             .then_with(|| cmp_modules(alias1, alias2))
     } else {
         cmp_modules(alias1, alias2)
@@ -95,7 +108,7 @@ pub fn cmp_import_from(
     })
 }
 
-/// Compare two `EitherImport` enums which may be `Import` or `ImportFrom`
+/// Compare two [`EitherImport`] enums which may be [`Import`] or [`ImportFrom`]
 /// structs.
 pub fn cmp_either_import(
     a: &EitherImport,

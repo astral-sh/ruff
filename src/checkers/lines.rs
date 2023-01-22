@@ -1,8 +1,10 @@
 //! Lint rules based on checking raw physical lines.
 
-use crate::registry::{Diagnostic, RuleCode};
+use crate::registry::{Diagnostic, Rule};
+use crate::rules::flake8_executable::helpers::extract_shebang;
+use crate::rules::flake8_executable::rules::{shebang_newline, shebang_python, shebang_whitespace};
 use crate::rules::pycodestyle::rules::{
-    doc_line_too_long, line_too_long, no_newline_at_end_of_file,
+    doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
@@ -17,12 +19,25 @@ pub fn check_lines(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_blanket_noqa = settings.enabled.contains(&RuleCode::PGH004);
-    let enforce_blanket_type_ignore = settings.enabled.contains(&RuleCode::PGH003);
-    let enforce_doc_line_too_long = settings.enabled.contains(&RuleCode::W505);
-    let enforce_line_too_long = settings.enabled.contains(&RuleCode::E501);
-    let enforce_no_newline_at_end_of_file = settings.enabled.contains(&RuleCode::W292);
-    let enforce_unnecessary_coding_comment = settings.enabled.contains(&RuleCode::UP009);
+    let enforce_blanket_noqa = settings.rules.enabled(&Rule::BlanketNOQA);
+    let enforce_shebang_whitespace = settings.rules.enabled(&Rule::ShebangWhitespace);
+    let enforce_shebang_newline = settings.rules.enabled(&Rule::ShebangNewline);
+    let enforce_shebang_python = settings.rules.enabled(&Rule::ShebangPython);
+    let enforce_blanket_type_ignore = settings.rules.enabled(&Rule::BlanketTypeIgnore);
+    let enforce_doc_line_too_long = settings.rules.enabled(&Rule::DocLineTooLong);
+    let enforce_line_too_long = settings.rules.enabled(&Rule::LineTooLong);
+    let enforce_no_newline_at_end_of_file = settings.rules.enabled(&Rule::NoNewLineAtEndOfFile);
+    let enforce_unnecessary_coding_comment = settings
+        .rules
+        .enabled(&Rule::PEP3120UnnecessaryCodingComment);
+    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(&Rule::MixedSpacesAndTabs);
+
+    let fix_unnecessary_coding_comment = matches!(autofix, flags::Autofix::Enabled)
+        && settings
+            .rules
+            .should_fix(&Rule::PEP3120UnnecessaryCodingComment);
+    let fix_shebang_whitespace = matches!(autofix, flags::Autofix::Enabled)
+        && settings.rules.should_fix(&Rule::ShebangWhitespace);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
@@ -33,12 +48,9 @@ pub fn check_lines(
         {
             if enforce_unnecessary_coding_comment {
                 if index < 2 {
-                    if let Some(diagnostic) = unnecessary_coding_comment(
-                        index,
-                        line,
-                        matches!(autofix, flags::Autofix::Enabled)
-                            && settings.fixable.contains(&RuleCode::UP009),
-                    ) {
+                    if let Some(diagnostic) =
+                        unnecessary_coding_comment(index, line, fix_unnecessary_coding_comment)
+                    {
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -55,6 +67,27 @@ pub fn check_lines(
                     diagnostics.push(diagnostic);
                 }
             }
+
+            if enforce_shebang_whitespace || enforce_shebang_newline || enforce_shebang_python {
+                let shebang = extract_shebang(line);
+                if enforce_shebang_whitespace {
+                    if let Some(diagnostic) =
+                        shebang_whitespace(index, &shebang, fix_shebang_whitespace)
+                    {
+                        diagnostics.push(diagnostic);
+                    }
+                }
+                if enforce_shebang_newline {
+                    if let Some(diagnostic) = shebang_newline(index, &shebang) {
+                        diagnostics.push(diagnostic);
+                    }
+                }
+                if enforce_shebang_python {
+                    if let Some(diagnostic) = shebang_python(index, &shebang) {
+                        diagnostics.push(diagnostic);
+                    }
+                }
+            }
         }
 
         while doc_lines_iter
@@ -65,6 +98,12 @@ pub fn check_lines(
                 if let Some(diagnostic) = doc_line_too_long(index, line, settings) {
                     diagnostics.push(diagnostic);
                 }
+            }
+        }
+
+        if enforce_mixed_spaces_and_tabs {
+            if let Some(diagnostic) = mixed_spaces_and_tabs(index, line) {
+                diagnostics.push(diagnostic);
             }
         }
 
@@ -79,7 +118,7 @@ pub fn check_lines(
         if let Some(diagnostic) = no_newline_at_end_of_file(
             contents,
             matches!(autofix, flags::Autofix::Enabled)
-                && settings.fixable.contains(&RuleCode::W292),
+                && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
         ) {
             diagnostics.push(diagnostic);
         }
@@ -92,7 +131,7 @@ pub fn check_lines(
 mod tests {
 
     use super::check_lines;
-    use crate::registry::RuleCode;
+    use crate::registry::Rule;
     use crate::settings::{flags, Settings};
 
     #[test]
@@ -105,7 +144,7 @@ mod tests {
                 &[],
                 &Settings {
                     line_length,
-                    ..Settings::for_rule(RuleCode::E501)
+                    ..Settings::for_rule(Rule::LineTooLong)
                 },
                 flags::Autofix::Enabled,
             )

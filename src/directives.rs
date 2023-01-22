@@ -18,8 +18,8 @@ bitflags! {
 impl Flags {
     pub fn from_settings(settings: &Settings) -> Self {
         if settings
-            .enabled
-            .iter()
+            .rules
+            .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports))
         {
             Flags::NOQA | Flags::ISORT
@@ -37,14 +37,12 @@ pub struct IsortDirectives {
 }
 
 pub struct Directives {
-    pub commented_lines: Vec<usize>,
     pub noqa_line_for: IntMap<usize, usize>,
     pub isort: IsortDirectives,
 }
 
 pub fn extract_directives(lxr: &[LexResult], flags: Flags) -> Directives {
     Directives {
-        commented_lines: extract_commented_lines(lxr),
         noqa_line_for: if flags.contains(Flags::NOQA) {
             extract_noqa_line_for(lxr)
         } else {
@@ -56,16 +54,6 @@ pub fn extract_directives(lxr: &[LexResult], flags: Flags) -> Directives {
             IsortDirectives::default()
         },
     }
-}
-
-pub fn extract_commented_lines(lxr: &[LexResult]) -> Vec<usize> {
-    let mut commented_lines = Vec::new();
-    for (start, tok, ..) in lxr.iter().flatten() {
-        if matches!(tok, Tok::Comment(_)) {
-            commented_lines.push(start.row());
-        }
-    }
-    commented_lines
 }
 
 /// Extract a mapping from logical line to noqa line.
