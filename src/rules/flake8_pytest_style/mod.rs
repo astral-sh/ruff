@@ -1,4 +1,4 @@
-//! Rules from [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/1.6.0/).
+//! Rules from [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/).
 pub(crate) mod rules;
 pub mod settings;
 pub mod types;

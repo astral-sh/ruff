@@ -1,4 +1,4 @@
-//! Rules from [pydocstyle](https://pypi.org/project/pydocstyle/6.1.1/).
+//! Rules from [pydocstyle](https://pypi.org/project/pydocstyle/).
 pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;

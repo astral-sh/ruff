@@ -5,7 +5,7 @@ Example usage:
 
     python scripts/add_plugin.py \
         flake8-pie \
-        --url https://pypi.org/project/flake8-pie/0.16.0/
+        --url https://pypi.org/project/flake8-pie/
         --prefix PIE
 """
 
@@ -25,7 +25,7 @@ def main(*, plugin: str, url: str, prefix_code: str) -> None:
     # Create the Plugin rules module.
     plugin_dir = ROOT_DIR / "src/rules" / dir_name(plugin)
     plugin_dir.mkdir(exist_ok=True)
-    
+
     with (plugin_dir / "mod.rs").open("w+") as fp:
         fp.write(f"//! Rules from [{plugin}]({url}).\n")
         fp.write("pub(crate) mod rules;\n")
@@ -80,19 +80,13 @@ mod tests {
         for line in content.splitlines():
             indent = get_indent(line)
 
-            if line.strip() == "// Ruff":
+            if line.strip() == "// ruff":
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
             elif line.strip() == '#[prefix = "RUF"]':
                 fp.write(f'{indent}#[prefix = "{prefix_code}"]\n')
                 fp.write(f"{indent}{pascal_case(plugin)},")
-                fp.write("\n")
-
-            elif line.strip() == "Linter::Ruff => Prefixes::Single(RuleSelector::RUF),":
-                fp.write(
-                    f"{indent}Linter::{pascal_case(plugin)} => Prefixes::Single(RuleSelector::{prefix_code}),"
-                )
                 fp.write("\n")
 
             fp.write(line)
@@ -104,7 +98,7 @@ if __name__ == "__main__":
         description="Generate boilerplate for a new Flake8 plugin.",
         epilog=(
             "Example usage: python scripts/add_plugin.py flake8-pie "
-            "--url https://pypi.org/project/flake8-pie/0.16.0/"
+            "--url https://pypi.org/project/flake8-pie/"
         ),
     )
     parser.add_argument(

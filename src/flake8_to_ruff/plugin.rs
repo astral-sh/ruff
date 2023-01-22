@@ -98,7 +98,7 @@ impl fmt::Debug for Plugin {
 }
 
 impl Plugin {
-    pub fn prefix(&self) -> RuleSelector {
+    pub fn selector(&self) -> RuleSelector {
         match self {
             Plugin::Flake8Annotations => RuleSelector::ANN,
             Plugin::Flake8Bandit => RuleSelector::S,
@@ -249,7 +249,7 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
 ///
 /// For example, if the user ignores `ANN101`, we should infer that
 /// `flake8-annotations` is active.
-pub fn infer_plugins_from_codes(codes: &BTreeSet<RuleSelector>) -> Vec<Plugin> {
+pub fn infer_plugins_from_codes(selectors: &BTreeSet<RuleSelector>) -> Vec<Plugin> {
     [
         Plugin::Flake8Annotations,
         Plugin::Flake8Bandit,
@@ -273,11 +273,10 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<RuleSelector>) -> Vec<Plugin> {
     ]
     .into_iter()
     .filter(|plugin| {
-        for prefix in codes {
-            if prefix
-                .codes()
-                .iter()
-                .any(|code| plugin.prefix().codes().contains(code))
+        for selector in selectors {
+            if selector
+                .into_iter()
+                .any(|rule| plugin.selector().into_iter().any(|r| r == rule))
             {
                 return true;
             }
@@ -291,7 +290,7 @@ pub fn infer_plugins_from_codes(codes: &BTreeSet<RuleSelector>) -> Vec<Plugin> {
 /// plugins.
 pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleSelector> {
     let mut select = BTreeSet::from([RuleSelector::F, RuleSelector::E, RuleSelector::W]);
-    select.extend(plugins.iter().map(Plugin::prefix));
+    select.extend(plugins.iter().map(Plugin::selector));
     select
 }
 

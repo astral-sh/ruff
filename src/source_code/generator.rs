@@ -142,11 +142,18 @@ impl<'a> Generator<'a> {
                 args,
                 body,
                 returns,
+                decorator_list,
                 ..
             } => {
-                // TODO(charlie): Handle decorators.
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
+                    for decorator in decorator_list {
+                        statement!({
+                            self.p("@");
+                            self.unparse_expr(decorator, precedence::EXPR);
+                        });
+                    }
+                    self.newline();
                     self.p("def ");
                     self.p(name);
                     self.p("(");
@@ -154,7 +161,7 @@ impl<'a> Generator<'a> {
                     self.p(")");
                     if let Some(returns) = returns {
                         self.p(" -> ");
-                        self.unparse_expr(returns, precedence::EXPR);
+                        self.unparse_expr(returns, precedence::TEST);
                     }
                     self.p(":");
                 });
@@ -168,11 +175,17 @@ impl<'a> Generator<'a> {
                 args,
                 body,
                 returns,
+                decorator_list,
                 ..
             } => {
-                // TODO(charlie): Handle decorators.
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
+                    for decorator in decorator_list {
+                        statement!({
+                            self.unparse_expr(decorator, precedence::EXPR);
+                        });
+                    }
+                    self.newline();
                     self.p("async def ");
                     self.p(name);
                     self.p("(");
@@ -180,7 +193,7 @@ impl<'a> Generator<'a> {
                     self.p(")");
                     if let Some(returns) = returns {
                         self.p(" -> ");
-                        self.unparse_expr(returns, precedence::EXPR);
+                        self.unparse_expr(returns, precedence::TEST);
                     }
                     self.p(":");
                 });
@@ -194,11 +207,17 @@ impl<'a> Generator<'a> {
                 bases,
                 keywords,
                 body,
+                decorator_list,
                 ..
             } => {
-                // TODO(charlie): Handle decorators.
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 statement!({
+                    for decorator in decorator_list {
+                        statement!({
+                            self.unparse_expr(decorator, precedence::EXPR);
+                        });
+                    }
+                    self.newline();
                     self.p("class ");
                     self.p(name);
                     let mut first = true;
@@ -227,13 +246,10 @@ impl<'a> Generator<'a> {
                 }
             }
             StmtKind::Return { value } => {
-                // TODO(charlie): Revisit precedence. In particular, look at how Astor handles
-                // precedence.
-                // See: https://github.com/berkerpeksag/astor/blob/8342d6aa5dcdcf20f89a19057527510c245c7a2e/astor/code_gen.py#L86
                 statement!({
                     if let Some(expr) = value {
                         self.p("return ");
-                        self.unparse_expr(expr, 1);
+                        self.unparse_expr(expr, precedence::TUPLE);
                     } else {
                         self.p("return");
                     }
@@ -245,25 +261,22 @@ impl<'a> Generator<'a> {
                     let mut first = true;
                     for expr in targets {
                         self.p_delim(&mut first, ", ");
-                        self.unparse_expr(expr, precedence::ATOM);
+                        self.unparse_expr(expr, precedence::TEST);
                     }
                 });
             }
             StmtKind::Assign { targets, value, .. } => {
-                // TODO(charlie): Revisit precedence. In particular, look at how Astor handles
-                // precedence.
-                // See: https://github.com/berkerpeksag/astor/blob/8342d6aa5dcdcf20f89a19057527510c245c7a2e/astor/code_gen.py#L86
                 statement!({
                     for target in targets {
-                        self.unparse_expr(target, 1);
+                        self.unparse_expr(target, precedence::TUPLE);
                         self.p(" = ");
                     }
-                    self.unparse_expr(value, 1);
+                    self.unparse_expr(value, precedence::TUPLE);
                 });
             }
             StmtKind::AugAssign { target, op, value } => {
                 statement!({
-                    self.unparse_expr(target, 0);
+                    self.unparse_expr(target, precedence::TUPLE);
                     self.p(" ");
                     self.p(match op {
                         Operator::Add => "+",
@@ -281,7 +294,7 @@ impl<'a> Generator<'a> {
                         Operator::FloorDiv => "//",
                     });
                     self.p("= ");
-                    self.unparse_expr(value, 0);
+                    self.unparse_expr(value, precedence::TUPLE);
                 });
             }
             StmtKind::AnnAssign {
@@ -293,13 +306,13 @@ impl<'a> Generator<'a> {
                 statement!({
                     let need_parens = matches!(target.node, ExprKind::Name { .. }) && simple == &0;
                     self.p_if(need_parens, "(");
-                    self.unparse_expr(target, 1);
+                    self.unparse_expr(target, precedence::TUPLE);
                     self.p_if(need_parens, ")");
                     self.p(": ");
-                    self.unparse_expr(annotation, 1);
+                    self.unparse_expr(annotation, precedence::TEST);
                     if let Some(value) = value {
                         self.p(" = ");
-                        self.unparse_expr(value, 1);
+                        self.unparse_expr(value, precedence::TUPLE);
                     }
                 });
             }
@@ -312,9 +325,9 @@ impl<'a> Generator<'a> {
             } => {
                 statement!({
                     self.p("for ");
-                    self.unparse_expr(target, precedence::TEST);
+                    self.unparse_expr(target, precedence::TUPLE);
                     self.p(" in ");
-                    self.unparse_expr(iter, precedence::TEST);
+                    self.unparse_expr(iter, precedence::TUPLE);
                     self.p(":");
                 });
                 self.body(body);
@@ -334,9 +347,9 @@ impl<'a> Generator<'a> {
             } => {
                 statement!({
                     self.p("async for ");
-                    self.unparse_expr(target, precedence::TEST);
+                    self.unparse_expr(target, precedence::TUPLE);
                     self.p(" in ");
-                    self.unparse_expr(iter, precedence::TEST);
+                    self.unparse_expr(iter, precedence::TUPLE);
                     self.p(":");
                 });
                 self.body(body);
@@ -350,7 +363,7 @@ impl<'a> Generator<'a> {
             StmtKind::While { test, body, orelse } => {
                 statement!({
                     self.p("while ");
-                    self.unparse_expr(test, precedence::TEST);
+                    self.unparse_expr(test, precedence::TUPLE);
                     self.p(":");
                 });
                 self.body(body);
@@ -364,7 +377,7 @@ impl<'a> Generator<'a> {
             StmtKind::If { test, body, orelse } => {
                 statement!({
                     self.p("if ");
-                    self.unparse_expr(test, precedence::TEST);
+                    self.unparse_expr(test, precedence::TUPLE);
                     self.p(":");
                 });
                 self.body(body);
@@ -375,7 +388,7 @@ impl<'a> Generator<'a> {
                         if let StmtKind::If { body, test, orelse } = &orelse_[0].node {
                             statement!({
                                 self.p("elif ");
-                                self.unparse_expr(test, precedence::TEST);
+                                self.unparse_expr(test, precedence::TUPLE);
                                 self.p(":");
                             });
                             self.body(body);
@@ -422,11 +435,11 @@ impl<'a> Generator<'a> {
                     self.p("raise");
                     if let Some(exc) = exc {
                         self.p(" ");
-                        self.unparse_expr(exc, precedence::EXPR);
+                        self.unparse_expr(exc, precedence::TEST);
                     }
                     if let Some(cause) = cause {
                         self.p(" from ");
-                        self.unparse_expr(cause, precedence::EXPR);
+                        self.unparse_expr(cause, precedence::TEST);
                     }
                 });
             }
@@ -649,7 +662,8 @@ impl<'a> Generator<'a> {
                     let npos = args.args.len() + args.posonlyargs.len();
                     self.p(if npos > 0 { "lambda " } else { "lambda" });
                     self.unparse_args(args);
-                    write!(self, ": {}", **body);
+                    self.p(": ");
+                    self.unparse_expr(body, precedence::TEST);
                 });
             }
             ExprKind::IfExp { test, body, orelse } => {
@@ -667,11 +681,14 @@ impl<'a> Generator<'a> {
                 let (packed, unpacked) = values.split_at(keys.len());
                 for (k, v) in keys.iter().zip(packed) {
                     self.p_delim(&mut first, ", ");
-                    write!(self, "{}: {}", *k, *v);
+                    self.unparse_expr(k, precedence::TEST);
+                    self.p(": ");
+                    self.unparse_expr(v, precedence::TEST);
                 }
                 for d in unpacked {
                     self.p_delim(&mut first, ", ");
-                    write!(self, "**{}", *d);
+                    self.p("**");
+                    self.unparse_expr(d, precedence::EXPR);
                 }
                 self.p("}");
             }
@@ -725,14 +742,19 @@ impl<'a> Generator<'a> {
                 });
             }
             ExprKind::Yield { value } => {
-                if let Some(value) = value {
-                    write!(self, "(yield {})", **value);
-                } else {
-                    self.p("(yield)");
-                }
+                group_if!(precedence::AWAIT, {
+                    self.p("yield");
+                    if let Some(value) = value {
+                        self.p(" ");
+                        self.unparse_expr(value, precedence::ATOM);
+                    }
+                });
             }
             ExprKind::YieldFrom { value } => {
-                write!(self, "(yield from {})", **value);
+                group_if!(precedence::AWAIT, {
+                    self.p("yield from ");
+                    self.unparse_expr(value, precedence::ATOM);
+                });
             }
             ExprKind::Compare {
                 left,
@@ -789,10 +811,11 @@ impl<'a> Generator<'a> {
                         if let Some(arg) = &kw.node.arg {
                             self.p(arg);
                             self.p("=");
+                            self.unparse_expr(&kw.node.value, precedence::TEST);
                         } else {
                             self.p("**");
+                            self.unparse_expr(&kw.node.value, precedence::EXPR);
                         }
-                        self.unparse_expr(&kw.node.value, precedence::TEST);
                     }
                 }
                 self.p(")");
@@ -826,17 +849,18 @@ impl<'a> Generator<'a> {
                 }
             }
             ExprKind::Attribute { value, attr, .. } => {
-                self.unparse_expr(value, precedence::ATOM);
-                let period = if let ExprKind::Constant {
+                if let ExprKind::Constant {
                     value: Constant::Int(_),
                     ..
                 } = &value.node
                 {
-                    " ."
+                    self.p("(");
+                    self.unparse_expr(value, precedence::ATOM);
+                    self.p(").");
                 } else {
-                    "."
+                    self.unparse_expr(value, precedence::ATOM);
+                    self.p(".");
                 };
-                self.p(period);
                 self.p(attr);
             }
             ExprKind::Subscript { value, slice, .. } => {
@@ -1019,7 +1043,14 @@ impl<'a> Generator<'a> {
             self.unparse_fstring_body(values, is_spec);
         } else {
             self.p("f");
-            let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
+            let mut generator = Generator::new(
+                self.indent,
+                match self.quote {
+                    Quote::Single => &Quote::Double,
+                    Quote::Double => &Quote::Single,
+                },
+                self.line_ending,
+            );
             generator.unparse_fstring_body(values, is_spec);
             let body = &generator.buffer;
             self.p(&format!("{}", str::repr(body, self.quote.into())));
@@ -1045,7 +1076,6 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-
     use rustpython_parser::parser;
 
     use crate::source_code::stylist::{Indentation, LineEnding, Quote};
@@ -1075,6 +1105,69 @@ mod tests {
         generator.generate()
     }
 
+    macro_rules! assert_round_trip {
+        ($contents:expr) => {
+            assert_eq!(round_trip($contents), $contents);
+        };
+    }
+
+    #[test]
+    fn unparse() {
+        assert_round_trip!("x.foo");
+        assert_round_trip!("(5).foo");
+        assert_round_trip!("a @ b");
+        assert_round_trip!("a @= b");
+        assert_round_trip!("[1, 2, 3]");
+        assert_round_trip!("foo(1)");
+        assert_round_trip!("foo(1, 2)");
+        assert_round_trip!("foo(x for x in y)");
+        assert_round_trip!("x = yield 1");
+        assert_round_trip!("lambda: (1, 2, 3)");
+        assert_round_trip!("return 3 and 4");
+        assert_round_trip!("return 3 or 4");
+        assert_round_trip!("yield from some()");
+        assert_round_trip!(r#"assert (1, 2, 3), "msg""#);
+        assert_round_trip!("import ast");
+        assert_round_trip!("import operator as op");
+        assert_round_trip!("from math import floor");
+        assert_round_trip!("from .. import foobar");
+        assert_round_trip!("from ..aaa import foo, bar as bar2");
+        assert_round_trip!(r#"return f"functools.{qualname}({', '.join(args)})""#);
+        assert_round_trip!(r#"my_function(*[1], *[2], **{"three": 3}, **{"four": "four"})"#);
+        assert_round_trip!(r#"our_dict = {"a": 1, **{"b": 2, "c": 3}}"#);
+        assert_round_trip!("f(**x)");
+        assert_round_trip!("{**x}");
+        assert_round_trip!("f(**([] or 5))");
+        assert_round_trip!("{**([] or 5)}");
+        assert_round_trip!(
+            r#"def f() -> (int, int):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test(a, b, /, c, *, d, **kwargs):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test(a=3, b=4, /, c=7):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test(a, b=4, /, c=8, d=9):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def call(*popenargs, timeout=None, **kwargs):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"@functools.lru_cache(maxsize=None)
+def f(x: int, y: int) -> int:
+    return x + y"#
+        );
+        assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
+        assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);
+    }
+
     #[test]
     fn quote() {
         assert_eq!(round_trip(r#""hello""#), r#""hello""#);
@@ -1084,8 +1177,8 @@ mod tests {
         assert_eq!(round_trip(r#"b'hello'"#), r#"b"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abcdefghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
-        assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f'abc{"def"}{1}'"#);
-        assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f'abc{"def"}{1}'"#);
+        assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
+        assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f"abc{'def'}{1}""#);
     }
 
     #[test]
