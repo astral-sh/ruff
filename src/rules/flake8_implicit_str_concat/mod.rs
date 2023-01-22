@@ -1,4 +1,4 @@
-//! Rules from [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat).
+//! Rules from [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/).
 pub(crate) mod rules;
 
 #[cfg(test)]

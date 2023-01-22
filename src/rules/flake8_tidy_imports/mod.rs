@@ -1,4 +1,4 @@
-//! Rules from [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports).
+//! Rules from [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/).
 pub mod options;
 
 pub mod banned_api;

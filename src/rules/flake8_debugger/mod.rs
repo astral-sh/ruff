@@ -1,4 +1,4 @@
-//! Rules from [flake8-debugger](https://pypi.org/project/flake8-debugger).
+//! Rules from [flake8-debugger](https://pypi.org/project/flake8-debugger/).
 pub(crate) mod rules;
 pub(crate) mod types;
 

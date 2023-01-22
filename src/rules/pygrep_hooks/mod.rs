@@ -1,4 +1,4 @@
-//! Rules from [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks).
+//! Rules from [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks/).
 pub(crate) mod rules;
 
 #[cfg(test)]

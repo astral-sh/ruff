@@ -1,4 +1,4 @@
-//! Rules from [flake8-type-checking](https://pypi.org/project/flake8-type-checking).
+//! Rules from [flake8-type-checking](https://pypi.org/project/flake8-type-checking/).
 pub(crate) mod rules;
 
 #[cfg(test)]

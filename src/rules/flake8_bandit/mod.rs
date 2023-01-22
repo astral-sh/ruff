@@ -1,4 +1,4 @@
-//! Rules from [flake8-bandit](https://pypi.org/project/flake8-bandit).
+//! Rules from [flake8-bandit](https://pypi.org/project/flake8-bandit/).
 mod helpers;
 pub(crate) mod rules;
 pub mod settings;

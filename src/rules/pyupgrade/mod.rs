@@ -1,4 +1,4 @@
-//! Rules from [pyupgrade](https://pypi.org/project/pyupgrade).
+//! Rules from [pyupgrade](https://pypi.org/project/pyupgrade/).
 mod fixes;
 mod helpers;
 pub(crate) mod rules;

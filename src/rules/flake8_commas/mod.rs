@@ -1,4 +1,4 @@
-//! Rules from [flake8-commas](https://pypi.org/project/flake8-commas).
+//! Rules from [flake8-commas](https://pypi.org/project/flake8-commas/).
 pub(crate) mod rules;
 
 #[cfg(test)]

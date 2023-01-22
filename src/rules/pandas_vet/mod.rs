@@ -1,4 +1,4 @@
-//! Rules from [pandas-vet](https://pypi.org/project/pandas-vet).
+//! Rules from [pandas-vet](https://pypi.org/project/pandas-vet/).
 pub(crate) mod helpers;
 pub(crate) mod rules;
 

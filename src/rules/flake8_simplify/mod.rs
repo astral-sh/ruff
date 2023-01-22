@@ -1,4 +1,4 @@
-//! Rules from [flake8-simplify](https://pypi.org/project/flake8-simplify).
+//! Rules from [flake8-simplify](https://pypi.org/project/flake8-simplify/).
 pub(crate) mod rules;
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-//! Rules from [Pylint](https://pypi.org/project/pylint).
+//! Rules from [Pylint](https://pypi.org/project/pylint/).
 pub(crate) mod rules;
 pub mod settings;
 

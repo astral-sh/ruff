@@ -1,4 +1,4 @@
-//! Rules from [flake8-executable](https://pypi.org/project/flake8-executable).
+//! Rules from [flake8-executable](https://pypi.org/project/flake8-executable/).
 pub(crate) mod helpers;
 pub(crate) mod rules;
 

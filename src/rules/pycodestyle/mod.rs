@@ -1,4 +1,4 @@
-//! Rules from [pycodestyle](https://pypi.org/project/pycodestyle).
+//! Rules from [pycodestyle](https://pypi.org/project/pycodestyle/).
 pub(crate) mod rules;
 pub mod settings;
 
