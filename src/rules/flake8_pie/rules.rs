@@ -156,22 +156,17 @@ where
 /// PIE800
 pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     for item in keys.iter().zip(values.iter()) {
-        match item {
+        if let (None, value) = item {
             // We only care about when the key is None which indicates a spread `**` inside a dict
-            (None, value) => {
-                if let Located {
-                    node: ExprKind::Dict { .. },
-                    ..
-                } = value
-                {
-                    let diagnostic = Diagnostic::new(
-                        violations::NoUnnecessarySpread,
-                        Range::from_located(value),
-                    );
-                    checker.diagnostics.push(diagnostic);
-                }
+            if let Located {
+                node: ExprKind::Dict { .. },
+                ..
+            } = value
+            {
+                let diagnostic =
+                    Diagnostic::new(violations::NoUnnecessarySpread, Range::from_located(value));
+                checker.diagnostics.push(diagnostic);
             }
-            (..) => {}
         }
     }
 }
