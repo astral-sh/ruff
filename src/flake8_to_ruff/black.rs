@@ -5,9 +5,8 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::settings::types::PythonVersion;
-
 use super::pyproject::Pyproject;
+use crate::settings::types::PythonVersion;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Black {

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use super::{black::Black, isort::Isort};
+use super::black::Black;
+use super::isort::Isort;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tools {

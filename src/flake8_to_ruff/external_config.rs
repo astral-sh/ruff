@@ -1,4 +1,5 @@
-use super::{black::Black, isort::Isort};
+use super::black::Black;
+use super::isort::Isort;
 
 #[derive(Default)]
 pub struct ExternalConfig<'a> {
