@@ -1,4 +1,4 @@
-//! Rules from [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0/).
+//! Rules from [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/).
 pub(crate) mod rules;
 
 #[cfg(test)]

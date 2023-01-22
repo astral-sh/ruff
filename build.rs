@@ -12,7 +12,7 @@ const RULES_SUBMODULE_DOC_PREFIX: &str = "//! Rules from ";
 /// The `src/rules/*/mod.rs` files are expected to have a first line such as the
 /// following:
 ///
-///     //! Rules from [Pyflakes](https://pypi.org/project/pyflakes/2.5.0/).
+///     //! Rules from [Pyflakes](https://pypi.org/project/pyflakes/).
 ///
 /// This function extracts the link label and url from these comments and
 /// generates the `name` and `url` functions for the `Linter` enum

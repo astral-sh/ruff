@@ -1,4 +1,4 @@
-//! Rules from [mccabe](https://pypi.org/project/mccabe/0.7.0/).
+//! Rules from [mccabe](https://pypi.org/project/mccabe/).
 pub(crate) mod rules;
 pub mod settings;
 
