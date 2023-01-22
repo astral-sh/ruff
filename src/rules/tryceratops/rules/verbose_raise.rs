@@ -39,27 +39,27 @@ where
 /// TRY201
 pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
-        // if the handler assigned a name to the exception
+        // If the handler assigned a name to the exception...
         if let ExcepthandlerKind::ExceptHandler {
             name: Some(exception_name),
             body,
             ..
         } = &handler.node
         {
-            let mut visitor = RaiseStatementVisitor::default();
-            for stmt in body {
-                visitor.visit_stmt(stmt);
-            }
-            for expr in visitor.raises.into_iter().flatten() {
-                {
-                    // if the the raised object is a name - check if its the same name that was
-                    // assigned to the exception
-                    if let ExprKind::Name { id, .. } = &expr.node {
-                        if id == exception_name {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(VerboseRaise, Range::from_located(expr)));
-                        }
+            let raises = {
+                let mut visitor = RaiseStatementVisitor::default();
+                for stmt in body {
+                    visitor.visit_stmt(stmt);
+                }
+                visitor.raises
+            };
+            for expr in raises.into_iter().flatten() {
+                // ...and the raised object is bound to the same name...
+                if let ExprKind::Name { id, .. } = &expr.node {
+                    if id == exception_name {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(VerboseRaise, Range::from_located(expr)));
                     }
                 }
             }
