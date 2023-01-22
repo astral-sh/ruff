@@ -165,7 +165,7 @@ impl<'a> Printer<'a> {
                     .iter()
                     .filter(|message| message.kind.rule() == rule)
                     .count();
-                writeln!(stdout, "Rule {} has {} violation(s).", rule.code(), count)?;
+                writeln!(stdout, "Rule {} has {count} violation(s).", rule.code())?;
             }
             return Ok(());
         }
