@@ -667,8 +667,8 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D209 | new-line-after-last-paragraph | Multi-line docstring closing quotes should be on a separate line | 🛠 |
 | D210 | no-surrounding-whitespace | No whitespaces allowed surrounding docstring text | 🛠 |
 | D211 | no-blank-line-before-class | No blank lines allowed before class docstring | 🛠 |
-| D212 | multi-line-summary-first-line | Multi-line docstring summary should start at the first line |  |
-| D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line |  |
+| D212 | multi-line-summary-first-line | Multi-line docstring summary should start at the first line | 🛠 |
+| D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
 | D300 | uses-triple-quotes | Use """triple double quotes""" |  |
