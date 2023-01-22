@@ -50,12 +50,19 @@ fn main() -> Result<()> {
     // Read the pyproject.toml file.
     let black = cli
         .pyproject
+        .clone()
         .map(flake8_to_ruff::parse_black_options)
         .transpose()?
         .flatten();
 
+    let isort = cli
+        .pyproject
+        .map(flake8_to_ruff::parse_isort_options)
+        .transpose()?
+        .flatten();
+
     // Create Ruff's pyproject.toml section.
-    let pyproject = flake8_to_ruff::convert(&config, black.as_ref(), cli.plugin)?;
+    let pyproject = flake8_to_ruff::convert(&config, black.as_ref(), isort.as_ref(), cli.plugin)?;
     println!("{}", toml_edit::easy::to_string_pretty(&pyproject)?);
 
     Ok(())

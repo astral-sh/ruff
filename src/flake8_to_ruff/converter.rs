@@ -4,6 +4,7 @@ use anyhow::Result;
 use colored::Colorize;
 
 use super::black::Black;
+use super::isort::ISort;
 use super::plugin::Plugin;
 use super::{parser, plugin};
 use crate::registry::RuleSelector;
@@ -24,6 +25,7 @@ use crate::warn_user;
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
     black: Option<&Black>,
+    isort: Option<&ISort>,
     plugins: Option<Vec<Plugin>>,
 ) -> Result<Pyproject> {
     // Extract the Flake8 section.
@@ -389,6 +391,19 @@ pub fn convert(
         }
     }
 
+    if let Some(isort) = isort {
+        if let Some(src_paths) = &isort.src_paths {
+            match options.src.as_mut() {
+                Some(src) => {
+                    src.extend(src_paths.clone());
+                }
+                None => {
+                    options.src = Some(src_paths.clone());
+                }
+            }
+        }
+    }
+
     // Create the pyproject.toml.
     Ok(Pyproject::new(options))
 }
@@ -411,6 +426,7 @@ mod tests {
     fn it_converts_empty() -> Result<()> {
         let actual = convert(
             &HashMap::from([("flake8".to_string(), HashMap::default())]),
+            None,
             None,
             None,
         )?;
@@ -476,6 +492,7 @@ mod tests {
                 HashMap::from([("max-line-length".to_string(), Some("100".to_string()))]),
             )]),
             None,
+            None,
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -539,6 +556,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("max_line_length".to_string(), Some("100".to_string()))]),
             )]),
+            None,
             None,
             Some(vec![]),
         )?;
@@ -604,6 +622,7 @@ mod tests {
                 HashMap::from([("max_line_length".to_string(), Some("abc".to_string()))]),
             )]),
             None,
+            None,
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
@@ -667,6 +686,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
             )]),
+            None,
             None,
             Some(vec![]),
         )?;
@@ -740,6 +760,7 @@ mod tests {
                 )]),
             )]),
             None,
+            None,
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
@@ -810,6 +831,7 @@ mod tests {
                 "flake8".to_string(),
                 HashMap::from([("inline-quotes".to_string(), Some("single".to_string()))]),
             )]),
+            None,
             None,
             None,
         )?;
