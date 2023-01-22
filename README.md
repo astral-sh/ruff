@@ -543,7 +543,7 @@ The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` com
 <!-- Begin auto-generated sections. -->
 ### Pyflakes (F)
 
-For more, see [Pyflakes](https://pypi.org/project/pyflakes/3.0.1/) on PyPI.
+For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -593,7 +593,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/3.0.1/) on PyPI.
 
 ### pycodestyle (E, W)
 
-For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.10.0/) on PyPI.
+For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 
 #### Error (E)
 | Code | Name | Message | Fix |
@@ -624,7 +624,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/2.10.0/) on PyP
 
 ### mccabe (C90)
 
-For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
+For more, see [mccabe](https://pypi.org/project/mccabe/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -632,7 +632,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/0.7.0/) on PyPI.
 
 ### isort (I)
 
-For more, see [isort](https://pypi.org/project/isort/5.11.4/) on PyPI.
+For more, see [isort](https://pypi.org/project/isort/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -641,7 +641,7 @@ For more, see [isort](https://pypi.org/project/isort/5.11.4/) on PyPI.
 
 ### pydocstyle (D)
 
-For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.3.0/) on PyPI.
+For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -694,7 +694,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/6.3.0/) on PyPI.
 
 ### pyupgrade (UP)
 
-For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.3.1/) on PyPI.
+For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -734,7 +734,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/3.3.1/) on PyPI.
 
 ### pep8-naming (N)
 
-For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.3/) on PyPI.
+For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -756,7 +756,7 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/0.13.3/) on PyP
 
 ### flake8-2020 (YTT)
 
-For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI.
+For more, see [flake8-2020](https://pypi.org/project/flake8-2020/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -773,7 +773,7 @@ For more, see [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/) on PyPI
 
 ### flake8-annotations (ANN)
 
-For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2.9.1/) on PyPI.
+For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -791,7 +791,7 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/2
 
 ### flake8-bandit (S)
 
-For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on PyPI.
+For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -813,7 +813,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/) on 
 
 ### flake8-blind-except (BLE)
 
-For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/0.2.1/) on PyPI.
+For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -821,7 +821,7 @@ For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except
 
 ### flake8-boolean-trap (FBT)
 
-For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/0.1.0/) on PyPI.
+For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -831,7 +831,7 @@ For more, see [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap
 
 ### flake8-bugbear (B)
 
-For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/23.1.20/) on PyPI.
+For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -866,7 +866,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/23.1.20/)
 
 ### flake8-builtins (A)
 
-For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.1.0/) on PyPI.
+For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -876,7 +876,7 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/2.1.0/)
 
 ### flake8-comprehensions (C4)
 
-For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/) on PyPI.
+For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -899,7 +899,7 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 
 ### flake8-debugger (T10)
 
-For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/) on PyPI.
+For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -907,7 +907,7 @@ For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/4.1.2/)
 
 ### flake8-errmsg (EM)
 
-For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/0.4.0/) on PyPI.
+For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -917,7 +917,7 @@ For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/0.4.0/) on 
 
 ### flake8-implicit-str-concat (ISC)
 
-For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/0.3.0/) on PyPI.
+For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -927,7 +927,7 @@ For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-impli
 
 ### flake8-import-conventions (ICN)
 
-For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions) on GitHub.
+For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions/) on GitHub.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -935,7 +935,7 @@ For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8
 
 ### flake8-print (T20)
 
-For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on PyPI.
+For more, see [flake8-print](https://pypi.org/project/flake8-print/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -944,7 +944,7 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/5.0.0/) on Py
 
 ### flake8-pytest-style (PT)
 
-For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/1.6.0/) on PyPI.
+For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -976,7 +976,7 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 
 ### flake8-quotes (Q)
 
-For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.2/) on PyPI.
+For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -987,7 +987,7 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/3.3.2/) on 
 
 ### flake8-return (RET)
 
-For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on PyPI.
+For more, see [flake8-return](https://pypi.org/project/flake8-return/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1002,7 +1002,7 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/1.2.0/) on 
 
 ### flake8-simplify (SIM)
 
-For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/) on PyPI.
+For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1034,7 +1034,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/0.19.3/
 
 ### flake8-tidy-imports (TID)
 
-For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/4.8.0/) on PyPI.
+For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1043,7 +1043,7 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 
 ### flake8-unused-arguments (ARG)
 
-For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/0.0.12/) on PyPI.
+For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1055,7 +1055,7 @@ For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-a
 
 ### flake8-datetimez (DTZ)
 
-For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/20.10.0/) on PyPI.
+For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1071,7 +1071,7 @@ For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/20.10
 
 ### eradicate (ERA)
 
-For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
+For more, see [eradicate](https://pypi.org/project/eradicate/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1079,7 +1079,7 @@ For more, see [eradicate](https://pypi.org/project/eradicate/2.1.0/) on PyPI.
 
 ### pandas-vet (PD)
 
-For more, see [pandas-vet](https://pypi.org/project/pandas-vet/0.2.3/) on PyPI.
+For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1098,7 +1098,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/0.2.3/) on PyPI.
 
 ### pygrep-hooks (PGH)
 
-For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitHub.
+For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks/) on GitHub.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1109,7 +1109,7 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 
 ### Pylint (PLC, PLE, PLR, PLW)
 
-For more, see [Pylint](https://pypi.org/project/pylint/2.15.10/) on PyPI.
+For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 #### Convention (PLC)
 | Code | Name | Message | Fix |
@@ -1142,7 +1142,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/2.15.10/) on PyPI.
 
 ### flake8-pie (PIE)
 
-For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
+For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1153,7 +1153,7 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/0.16.0/) on PyPI.
 
 ### flake8-commas (COM)
 
-For more, see [flake8-commas](https://pypi.org/project/flake8-commas/2.1.0/) on PyPI.
+For more, see [flake8-commas](https://pypi.org/project/flake8-commas/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1163,7 +1163,7 @@ For more, see [flake8-commas](https://pypi.org/project/flake8-commas/2.1.0/) on 
 
 ### flake8-no-pep420 (INP)
 
-For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0/) on PyPI.
+For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1171,7 +1171,7 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/2.3.0
 
 ### flake8-executable (EXE)
 
-For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1.2/) on PyPI.
+For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
@@ -1181,7 +1181,7 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/2.1
 
 ### flake8-type-checking (TYP)
 
-For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/2.3.0/) on PyPI.
+For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
