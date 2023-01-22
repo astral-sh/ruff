@@ -428,6 +428,7 @@ ruff_macros::define_rule_mapping!(
     TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // tryceratops
     TRY004 => rules::tryceratops::rules::PreferTypeError,
+    TRY201 => rules::tryceratops::rules::VerboseRaise,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
     // flake8-use-pathlib
     PTH100 => rules::flake8_use_pathlib::violations::PathlibAbspath,

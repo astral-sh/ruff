@@ -1196,6 +1196,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
+| TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
 | TRY300 | try-consider-else | Consider `else` block |  |
 
 ### flake8-use-pathlib (PTH)

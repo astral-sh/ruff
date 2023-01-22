@@ -1578,6 +1578,9 @@ where
                 if self.settings.rules.enabled(&Rule::TryConsiderElse) {
                     tryceratops::rules::try_consider_else(self, body, orelse);
                 }
+                if self.settings.rules.enabled(&Rule::VerboseRaise) {
+                    tryceratops::rules::verbose_raise(self, handlers);
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.rules.enabled(&Rule::DoNotAssignLambda) {
