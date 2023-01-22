@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -146,6 +145,27 @@ impl<'a> Printer<'a> {
                 SerializationFormat::Text | SerializationFormat::Grouped
             ) {
                 self.post_text(&mut stdout, diagnostics)?;
+            }
+            return Ok(());
+        }
+        // Prints a count of the number of violations for each rule if staitistics are
+        // enabled.
+        if matches!(self.log_level, LogLevel::Statistics) {
+            let mut stdout = BufWriter::new(io::stdout().lock());
+            let mut violations = diagnostics
+                .messages
+                .iter()
+                .map(|message| message.kind.rule())
+                .collect::<Vec<_>>();
+            violations.sort();
+            violations.dedup();
+            for rule in violations {
+                let count = diagnostics
+                    .messages
+                    .iter()
+                    .filter(|message| message.kind.rule() == rule)
+                    .count();
+                writeln!(stdout, "Rule {} has {} violation(s).", rule.code(), count)?;
             }
             return Ok(());
         }
@@ -507,17 +527,4 @@ fn print_grouped_message<T: Write>(
         writeln!(stdout, "{message}")?;
     }
     Ok(())
-}
-
-/// Prints a count of the number of violations for each rule.
-pub fn write_statistics(diagnostics: &Diagnostics) {
-    let mut statistics = HashMap::new();
-    for message in &diagnostics.messages {
-        let rule = message.kind.rule();
-        let count = statistics.entry(rule).or_insert(0);
-        *count += 1;
-    }
-    for (rule, count) in statistics {
-        println!("Rule '{}' has {} violations", rule.name(), count);
-    }
 }

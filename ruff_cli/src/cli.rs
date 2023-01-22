@@ -32,6 +32,9 @@ pub struct Cli {
     /// Print lint violations, but nothing else.
     #[arg(short, long, group = "verbosity")]
     pub quiet: bool,
+    /// Print counts of violations per rule.
+    #[arg(long, group = "verbosity")]
+    pub statistics: bool,
     /// Disable all logging (but still exit with status code "1" upon detecting
     /// lint violations).
     #[arg(short, long, group = "verbosity")]
@@ -251,6 +254,7 @@ impl Cli {
                 show_files: self.show_files,
                 show_settings: self.show_settings,
                 silent: self.silent,
+                statistics: self.statistics,
                 stdin_filename: self.stdin_filename,
                 verbose: self.verbose,
                 watch: self.watch,
@@ -312,6 +316,7 @@ pub struct Arguments {
     pub show_files: bool,
     pub show_settings: bool,
     pub silent: bool,
+    pub statistics: bool,
     pub stdin_filename: Option<PathBuf>,
     pub verbose: bool,
     pub watch: bool,
@@ -428,6 +433,8 @@ pub fn extract_log_level(cli: &Arguments) -> LogLevel {
         LogLevel::Quiet
     } else if cli.verbose {
         LogLevel::Verbose
+    } else if cli.statistics {
+        LogLevel::Statistics
     } else {
         LogLevel::Default
     }

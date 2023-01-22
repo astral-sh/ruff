@@ -225,9 +225,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
             fix::FixMode::None,
         )?;
         printer.write_continuously(&messages)?;
-        if !messages.is_empty() && cli.statistics {
-            printer.write_statistics(&messages)?;
-        }
         // Configure the file watcher.
         let (tx, rx) = channel();
         let mut watcher = recommended_watcher(tx)?;
@@ -257,9 +254,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
                             fix::FixMode::None,
                         )?;
                         printer.write_continuously(&messages)?;
-                        if !messages.is_empty() && cli.statistics {
-                            printer.write_statistics(&messages)?;
-                        }
                     }
                 }
                 Err(err) => return Err(err.into()),

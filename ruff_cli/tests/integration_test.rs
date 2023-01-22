@@ -160,3 +160,18 @@ fn explain_status_codes() -> Result<()> {
     cmd.args(["-", "--explain", "RUF404"]).assert().failure();
     Ok(())
 }
+
+#[test]
+fn show_statistics() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let output = cmd
+        .args(["-", "--format", "text", "--statistics"])
+        .write_stdin("import os\nimport sys\n\nprint(sys.version)\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "Rule F401 has 1 violation(s).\n"
+    );
+    Ok(())
+}

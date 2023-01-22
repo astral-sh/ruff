@@ -55,6 +55,8 @@ pub enum LogLevel {
     Default,
     // All user-facing output (+ `log::LevelFilter::Debug`).
     Verbose,
+    // Only show statistics (+ `log::LevelFilter::Info`).
+    Statistics,
 }
 
 impl LogLevel {
@@ -64,6 +66,7 @@ impl LogLevel {
             LogLevel::Verbose => log::LevelFilter::Debug,
             LogLevel::Quiet => log::LevelFilter::Off,
             LogLevel::Silent => log::LevelFilter::Off,
+            LogLevel::Statistics => log::LevelFilter::Info,
         }
     }
 }
@@ -96,5 +99,7 @@ mod tests {
         assert!(LogLevel::Quiet > LogLevel::Silent);
         assert!(LogLevel::Verbose > LogLevel::Default);
         assert!(LogLevel::Verbose > LogLevel::Silent);
+        assert!(LogLevel::Statistics > LogLevel::Silent);
+        assert!(LogLevel::Statistics > LogLevel::Default);
     }
 }
