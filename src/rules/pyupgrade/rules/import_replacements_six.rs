@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use once_cell::sync::Lazy;
 use rustpython_ast::{AliasData, Located, Stmt};
-use std::collections::HashMap;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -120,6 +121,24 @@ fn refactor_segment(
     Some(final_str)
 }
 
+/// If the entire replace is before the import, we can use this to quickly make
+/// the change
+fn replace_from_only(
+    module: &str,
+    locator: &Locator,
+    stmt: &Stmt,
+    replace: &Lazy<HashMap<&str, &str>>,
+    replace_str: &str,
+) -> Option<String> {
+    let new_moudle_text = module.replace(&format!("{}.", replace_str), "");
+    if let Some(item) = replace.get(new_moudle_text.as_str()) {
+        let original = locator.slice_source_code_range(&Range::from_located(stmt));
+        let new_str = original.replace(module, item);
+        return Some(new_str.to_string());
+    }
+    None
+}
+
 /// UP036
 pub fn import_replacements_six(
     checker: &mut Checker,
@@ -141,6 +160,22 @@ pub fn import_replacements_six(
                 &REPLACE_MODS_URLLIB,
                 &names,
                 module_text,
+            );
+        } else if module_text.contains("six.moves.urllib") {
+            final_string = replace_from_only(
+                &module_text,
+                checker.locator,
+                stmt,
+                &REPLACE_MODS_URLLIB,
+                "six.moves.urllib",
+            );
+        } else if module_text.contains("six.moves") {
+            final_string = replace_from_only(
+                &module_text,
+                checker.locator,
+                stmt,
+                &REPLACE_MODS,
+                "six.moves",
             );
         } else {
             return;

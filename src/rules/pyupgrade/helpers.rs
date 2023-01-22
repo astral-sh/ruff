@@ -1,9 +1,10 @@
-use rustpython_ast::{AliasData, Located};
-use crate::ast::types::Range;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
-use crate::source_code::Locator;
+use rustpython_ast::{AliasData, Located};
+
+use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
+use crate::source_code::Locator;
 
 static CURLY_ESCAPE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\\N\{[^}]+})|([{}])").unwrap());
 
@@ -24,8 +25,9 @@ pub fn curly_escape(text: &str) -> String {
         .to_string()
 }
 
-/// Converts a list of names and a module into a from import string. I do not love this and would
-/// MUCH rather use libcst, so if you have any better ideas feel free to let me know.
+/// Converts a list of names and a module into a from import string. I do not
+/// love this and would MUCH rather use libcst, so if you have any better ideas
+/// feel free to let me know.
 pub fn get_fromimport_str(
     names: &[AliasData],
     module: &str,
