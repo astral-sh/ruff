@@ -3,10 +3,8 @@ use std::collections::{BTreeSet, HashMap};
 use anyhow::Result;
 use colored::Colorize;
 
-use super::black::Black;
-use super::isort::Isort;
+use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
-use super::tool_configs::ToolConfigs;
 use super::{parser, plugin};
 use crate::registry::RuleSelector;
 use crate::rules::flake8_pytest_style::types::{
@@ -25,7 +23,7 @@ use crate::warn_user;
 
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
-    tool_configs: Option<&ToolConfigs>,
+    external_config: Option<&ExternalConfig>,
     plugins: Option<Vec<Plugin>>,
 ) -> Result<Pyproject> {
     // Extract the Flake8 section.
@@ -379,8 +377,8 @@ pub fn convert(
     }
 
     // Extract any settings from the existing `pyproject.toml`.
-    if let Some(configs) = tool_configs {
-        if let Some(black) = &configs.black {
+    if let Some(external_config) = external_config {
+        if let Some(black) = &external_config.black {
             if let Some(line_length) = &black.line_length {
                 options.line_length = Some(*line_length);
             }
@@ -392,7 +390,7 @@ pub fn convert(
             }
         }
 
-        if let Some(isort) = &configs.isort {
+        if let Some(isort) = &external_config.isort {
             if let Some(src_paths) = &isort.src_paths {
                 match options.src.as_mut() {
                     Some(src) => {
@@ -418,7 +416,7 @@ mod tests {
 
     use super::super::plugin::Plugin;
     use super::convert;
-    use super::ToolConfigs;
+    use super::ExternalConfig;
     use crate::registry::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};

@@ -48,13 +48,13 @@ fn main() -> Result<()> {
     let config = ini.load(cli.file).map_err(|msg| anyhow::anyhow!(msg))?;
 
     // Read the pyproject.toml file.
-    let tool_configs = cli
+    let external_config = cli
         .pyproject
-        .map(flake8_to_ruff::parse_tool_configs)
+        .map(flake8_to_ruff::parse_external_config)
         .transpose()?;
 
     // Create Ruff's pyproject.toml section.
-    let pyproject = flake8_to_ruff::convert(&config, tool_configs.as_ref(), cli.plugin)?;
+    let pyproject = flake8_to_ruff::convert(&config, external_config.as_ref(), cli.plugin)?;
     println!("{}", toml_edit::easy::to_string_pretty(&pyproject)?);
 
     Ok(())
