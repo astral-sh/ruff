@@ -1,5 +1,3 @@
-use itertools::EitherOrBoth;
-use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_ast::Located;
@@ -155,33 +153,25 @@ where
     }
 }
 
-
 /// PIE800
-pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Expr], values: &[Expr]) {
-    for item in keys.iter().zip_longest(values.iter()) {
+pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
+    for item in keys.iter().zip(values.iter()) {
         match item {
-            EitherOrBoth::Both(_, _) => {}
-            EitherOrBoth::Left(_) => {}
-            EitherOrBoth::Right(value) => {
+            // We only care about when the key is None which indicates a spread `**` inside a dict
+            (None, value) => {
                 if let Located {
                     node: ExprKind::Dict { .. },
                     ..
                 } = value
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let diagnostic = Diagnostic::new(
                         violations::NoUnnecessarySpread,
                         Range::from_located(value),
                     );
-                    // if checker.patch(&RuleCode::PIE807) {
-                    //     diagnostic.amend(Fix::replacement(
-                    //         "pooooooooooooooooo".to_string(),
-                    //         value.location,
-                    //         value.end_location.unwrap(),
-                    //     ));
-                    // }
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            (_, _) => {}
         }
     }
 }

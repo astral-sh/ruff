@@ -4987,17 +4987,10 @@ impl Violation for PreferUniqueEnums {
 define_violation!(
     pub struct NoUnnecessarySpread;
 );
-impl AlwaysAutofixableViolation for NoUnnecessarySpread {
+impl Violation for NoUnnecessarySpread {
+    #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary spread `**`")
-    }
-
-    fn autofix_title(&self) -> String {
-        format!("Remove unnecessary spread `**`")
-    }
-
-    fn placeholder() -> Self {
-        NoUnnecessarySpread
     }
 }
 

@@ -1,4 +1,4 @@
-{**foo,    "bar": True  }
+{**foo,    "bar": True  }  # okay
 {"foo": 1, **{"bar": 1}}  # PIE800
 
 foo({**foo, **{"bar": True}})  # PIE800
