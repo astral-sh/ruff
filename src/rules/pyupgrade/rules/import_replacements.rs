@@ -191,7 +191,7 @@ struct FixImports<'a> {
     names: &'a [AliasData],
     // This is the indent level of the first named import
     indent: &'a str,
-    // This is the indent for the parenthese at the end of a multi-line statement
+    // This is the indent for the parentheses at the end of a multi-line statement
     short_indent: &'a str,
     // This is the indent of the actual import statement
     starting_indent: &'a str,

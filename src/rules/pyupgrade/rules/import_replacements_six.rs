@@ -130,8 +130,8 @@ fn replace_from_only(
     replace: &Lazy<HashMap<&str, &str>>,
     replace_str: &str,
 ) -> Option<String> {
-    let new_moudle_text = module.replace(&format!("{replace_str}."), "");
-    if let Some(item) = replace.get(new_moudle_text.as_str()) {
+    let new_module_text = module.replace(&format!("{replace_str}."), "");
+    if let Some(item) = replace.get(new_module_text.as_str()) {
         let original = locator.slice_source_code_range(&Range::from_located(stmt));
         let new_str = original.replace(module, item);
         return Some(new_str);
