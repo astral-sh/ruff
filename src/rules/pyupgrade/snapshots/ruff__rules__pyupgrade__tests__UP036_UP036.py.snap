@@ -1,0 +1,124 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 45
+  fix:
+    content: "from six.moves import lololol\nimport tkinter\nimport queue"
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 45
+  parent: ~
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 54
+  fix:
+    content: "from six.moves import lololol\nimport tkinter as hello\nimport queue"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 54
+  parent: ~
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 37
+  fix:
+    content: "\nimport dbm.gnu as gnud"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 37
+  parent: ~
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 47
+  fix:
+    content: "from six.moves import urllib_request\n    import queue"
+    location:
+      row: 9
+      column: 4
+    end_location:
+      row: 9
+      column: 47
+  parent: ~
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 33
+  fix:
+    content: from queue import Queue
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 33
+  parent: ~
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 27
+  fix:
+    content: "\nimport queue"
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 27
+  parent: ~
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 40
+  fix:
+    content: "from six.moves import map, getcwd\nimport queue"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 40
+  parent: ~
+
