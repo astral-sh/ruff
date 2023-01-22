@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 use configparser::ini::Ini;
-use ruff::flake8_to_ruff;
+use ruff::flake8_to_ruff::{self, ExternalConfig};
 
 #[derive(Parser)]
 #[command(
@@ -48,19 +48,20 @@ fn main() -> Result<()> {
     let config = ini.load(cli.file).map_err(|msg| anyhow::anyhow!(msg))?;
 
     // Read the pyproject.toml file.
-    let (black, isort) = match cli.pyproject {
-        Some(path) => {
-            let black = flake8_to_ruff::parse_black_options(&path)?;
-            let isort = flake8_to_ruff::parse_isort_options(&path)?;
-            (black, isort)
-        }
-        None => (None, None),
-    };
-
-    let external_config = flake8_to_ruff::ExternalConfig {
-        black: black.as_ref(),
-        isort: isort.as_ref(),
-    };
+    let pyproject = cli.pyproject.map(flake8_to_ruff::parse).transpose()?;
+    let external_config = pyproject
+        .as_ref()
+        .map(|pyproject| {
+            pyproject
+                .tool
+                .as_ref()
+                .map(|tool| ExternalConfig {
+                    black: tool.black.as_ref(),
+                    isort: tool.isort.as_ref(),
+                })
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
 
     // Create Ruff's pyproject.toml section.
     let pyproject = flake8_to_ruff::convert(&config, &external_config, cli.plugin)?;
