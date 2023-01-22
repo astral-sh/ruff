@@ -1,4 +1,4 @@
-//! Rules from [flake8-print](https://pypi.org/project/flake8-print/5.0.0/).
+//! Rules from [flake8-print](https://pypi.org/project/flake8-print).
 pub(crate) mod rules;
 
 #[cfg(test)]

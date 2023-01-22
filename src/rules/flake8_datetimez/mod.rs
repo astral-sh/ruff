@@ -1,4 +1,4 @@
-//! Rules from [flake8-datetimez](https://pypi.org/project/flake8-datetimez/20.10.0/).
+//! Rules from [flake8-datetimez](https://pypi.org/project/flake8-datetimez).
 pub(crate) mod rules;
 
 #[cfg(test)]

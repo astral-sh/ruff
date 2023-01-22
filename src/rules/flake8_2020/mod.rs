@@ -1,4 +1,4 @@
-//! Rules from [flake8-2020](https://pypi.org/project/flake8-2020/1.7.0/).
+//! Rules from [flake8-2020](https://pypi.org/project/flake8-2020).
 pub(crate) mod rules;
 
 #[cfg(test)]
