@@ -2,7 +2,7 @@ use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticKind, Rule};
+use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::rules::flake8_use_pathlib::violations::{
     PathlibAbspath, PathlibBasename, PathlibChmod, PathlibDirname, PathlibExists,
     PathlibExpanduser, PathlibGetcwd, PathlibIsAbs, PathlibIsDir, PathlibIsFile, PathlibIsLink,
@@ -41,167 +41,29 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
         checker
             .resolve_call_path(expr)
             .and_then(|call_path| match call_path.as_slice() {
-                ["os", "path", "abspath"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibAbspath) {
-                        Some(OsCall::Abspath)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "chmod"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibChmod) {
-                        Some(OsCall::Chmod)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "mkdir"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibMkdir) {
-                        Some(OsCall::Mkdir)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "makedirs"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibMakedirs) {
-                        Some(OsCall::Makedirs)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "rename"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibRename) {
-                        Some(OsCall::Rename)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "replace"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibReplace) {
-                        Some(OsCall::Replace)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "rmdir"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibRmdir) {
-                        Some(OsCall::Rmdir)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "remove"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibRemove) {
-                        Some(OsCall::Remove)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "unlink"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibUnlink) {
-                        Some(OsCall::Unlink)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "getcwd"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibGetcwd) {
-                        Some(OsCall::Getcwd)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "exists"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibExists) {
-                        Some(OsCall::Exists)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "expanduser"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibExpanduser) {
-                        Some(OsCall::Expanduser)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "isdir"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibIsDir) {
-                        Some(OsCall::IsDir)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "isfile"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibIsFile) {
-                        Some(OsCall::IsFile)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "islink"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibIsLink) {
-                        Some(OsCall::IsLink)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "readlink"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibReadlink) {
-                        Some(OsCall::Readlink)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "stat"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibStat) {
-                        Some(OsCall::Stat)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "isabs"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibIsAbs) {
-                        Some(OsCall::IsAbs)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "join"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibJoin) {
-                        Some(OsCall::Join)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "basename"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibBasename) {
-                        Some(OsCall::Basename)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "dirname"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibDirname) {
-                        Some(OsCall::Dirname)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "samefile"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibSamefile) {
-                        Some(OsCall::Samefile)
-                    } else {
-                        None
-                    }
-                }
-                ["os", "path", "splitext"] => {
-                    if checker.settings.rules.enabled(&Rule::PathlibSplitext) {
-                        Some(OsCall::Splitext)
-                    } else {
-                        None
-                    }
-                }
+                ["os", "path", "abspath"] => Some(OsCall::Abspath),
+                ["os", "chmod"] => Some(OsCall::Chmod),
+                ["os", "mkdir"] => Some(OsCall::Mkdir),
+                ["os", "makedirs"] => Some(OsCall::Makedirs),
+                ["os", "rename"] => Some(OsCall::Rename),
+                ["os", "replace"] => Some(OsCall::Replace),
+                ["os", "rmdir"] => Some(OsCall::Rmdir),
+                ["os", "remove"] => Some(OsCall::Remove),
+                ["os", "unlink"] => Some(OsCall::Unlink),
+                ["os", "getcwd"] => Some(OsCall::Getcwd),
+                ["os", "path", "exists"] => Some(OsCall::Exists),
+                ["os", "path", "expanduser"] => Some(OsCall::Expanduser),
+                ["os", "path", "isdir"] => Some(OsCall::IsDir),
+                ["os", "path", "isfile"] => Some(OsCall::IsFile),
+                ["os", "path", "islink"] => Some(OsCall::IsLink),
+                ["os", "readlink"] => Some(OsCall::Readlink),
+                ["os", "stat"] => Some(OsCall::Stat),
+                ["os", "path", "isabs"] => Some(OsCall::IsAbs),
+                ["os", "path", "join"] => Some(OsCall::Join),
+                ["os", "path", "basename"] => Some(OsCall::Basename),
+                ["os", "path", "dirname"] => Some(OsCall::Dirname),
+                ["os", "path", "samefile"] => Some(OsCall::Samefile),
+                ["os", "path", "splitext"] => Some(OsCall::Splitext),
                 _ => None,
             })
     {
@@ -233,6 +95,9 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
             },
             Range::from_located(expr),
         );
-        checker.diagnostics.push(diagnostic);
+
+        if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+            checker.diagnostics.push(diagnostic);
+        }
     }
 }
