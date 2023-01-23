@@ -359,4 +359,21 @@ expression: diagnostics
       row: 45
       column: 14
   parent: ~
+- kind:
+    FString: ~
+  location:
+    row: 47
+    column: 0
+  end_location:
+    row: 47
+    column: 24
+  fix:
+    content: "f'({a}={{0!e}})'"
+    location:
+      row: 47
+      column: 0
+    end_location:
+      row: 47
+      column: 24
+  parent: ~
 
