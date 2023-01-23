@@ -324,6 +324,7 @@ ruff_macros::define_rule_mapping!(
     // eradicate
     ERA001 => violations::CommentedOutCode,
     // flake8-bandit
+    S612 => rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     S101 => violations::AssertUsed,
     S102 => violations::ExecUsed,
     S103 => violations::BadFilePermissions,
