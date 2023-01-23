@@ -5,40 +5,40 @@ expression: diagnostics
 - kind:
     NoUnnecessarySpread: ~
   location:
-    row: 2
+    row: 1
     column: 13
   end_location:
-    row: 2
+    row: 1
     column: 23
   fix: ~
   parent: ~
 - kind:
     NoUnnecessarySpread: ~
   location:
-    row: 4
+    row: 3
     column: 14
   end_location:
-    row: 4
+    row: 3
     column: 27
   fix: ~
   parent: ~
 - kind:
     NoUnnecessarySpread: ~
   location:
-    row: 6
+    row: 5
     column: 10
   end_location:
-    row: 6
+    row: 5
     column: 21
   fix: ~
   parent: ~
 - kind:
     NoUnnecessarySpread: ~
   location:
-    row: 8
+    row: 7
     column: 18
   end_location:
-    row: 8
+    row: 7
     column: 27
   fix: ~
   parent: ~

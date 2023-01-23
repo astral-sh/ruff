@@ -1,4 +1,3 @@
-{**foo,    "bar": True  }  # okay
 {"foo": 1, **{"bar": 1}}  # PIE800
 
 foo({**foo, **{"bar": True}})  # PIE800
@@ -7,10 +6,12 @@ foo({**foo, **{"bar": True}})  # PIE800
 
 {**foo, **buzz, **{bar: 10}}  # PIE800
 
-{"foo": 1, "buzz": {"bar": 1}} # okay
+{**foo,    "bar": True  }  # OK
 
-{**foo,    "bar": True  } # okay
+{"foo": 1, "buzz": {"bar": 1}}  # OK
 
-Table.objects.filter(inst=inst, **{f"foo__{bar}__exists": True}) # okay
+{**foo,    "bar": True  }  # OK
 
-buzz = {**foo, "bar": { 1: 2 }} # okay
+Table.objects.filter(inst=inst, **{f"foo__{bar}__exists": True})  # OK
+
+buzz = {**foo, "bar": { 1: 2 }}  # OK

@@ -158,7 +158,7 @@ pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], value
     for item in keys.iter().zip(values.iter()) {
         if let (None, value) = item {
             // We only care about when the key is None which indicates a spread `**`
-            // inside a dict
+            // inside a dict.
             if let ExprKind::Dict { .. } = value.node {
                 let diagnostic =
                     Diagnostic::new(violations::NoUnnecessarySpread, Range::from_located(value));
