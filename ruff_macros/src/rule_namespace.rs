@@ -15,13 +15,15 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
     let mut parsed = Vec::new();
 
-    let mut prefix_match_arms = quote!();
+    let mut common_prefix_match_arms = quote!();
     let mut name_match_arms = quote!(Self::Ruff => "Ruff-specific rules",);
     let mut url_match_arms = quote!(Self::Ruff => None,);
+    let mut into_iter_match_arms = quote!();
 
     let mut all_prefixes = HashSet::new();
 
     for variant in variants {
+        let mut first_chars = HashSet::new();
         let prefixes: Result<Vec<_>, _> = variant
             .attrs
             .iter()
@@ -33,7 +35,9 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let str = lit.value();
                 match str.chars().next() {
                     None => return Err(Error::new(lit.span(), "expected prefix string to be non-empty")),
-                    Some(_) => {},
+                    Some(c) => if !first_chars.insert(c) {
+                        return Err(Error::new(lit.span(), format!("this variant already has another prefix starting with the character '{c}'")))
+                    }
                 }
                 if !all_prefixes.insert(str.clone()) {
                     return Err(Error::new(lit.span(), "prefix has already been defined before"));
@@ -63,31 +67,43 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         }
 
         for lit in &prefixes {
-            parsed.push((lit.clone(), variant_ident.clone()));
+            parsed.push((
+                lit.clone(),
+                variant_ident.clone(),
+                match prefixes.len() {
+                    1 => ParseStrategy::SinglePrefix,
+                    _ => ParseStrategy::MultiplePrefixes,
+                },
+            ));
         }
 
-        prefix_match_arms.extend(quote! {
-            Self::#variant_ident => &[#(#prefixes),*],
-        });
+        if let [prefix] = &prefixes[..] {
+            common_prefix_match_arms.extend(quote! { Self::#variant_ident => #prefix, });
+
+            let prefix_ident = Ident::new(prefix, Span::call_site());
+            into_iter_match_arms.extend(quote! {
+                #ident::#variant_ident => RuleCodePrefix::#prefix_ident.into_iter(),
+            });
+        } else {
+            // There is more than one prefix. We already previously asserted
+            // that prefixes of the same variant don't start with the same character
+            // so the common prefix for this variant is the empty string.
+            common_prefix_match_arms.extend(quote! { Self::#variant_ident => "", });
+        }
     }
 
-    parsed.sort_by_key(|(prefix, _)| Reverse(prefix.len()));
+    parsed.sort_by_key(|(prefix, ..)| Reverse(prefix.len()));
 
     let mut if_statements = quote!();
-    let mut into_iter_match_arms = quote!();
 
-    for (prefix, field) in parsed {
+    for (prefix, field, strategy) in parsed {
+        let ret_str = match strategy {
+            ParseStrategy::SinglePrefix => quote!(rest),
+            ParseStrategy::MultiplePrefixes => quote!(code),
+        };
         if_statements.extend(quote! {if let Some(rest) = code.strip_prefix(#prefix) {
-            return Some((#ident::#field, rest));
+            return Some((#ident::#field, #ret_str));
         }});
-
-        let prefix_ident = Ident::new(&prefix, Span::call_site());
-
-        if field != "Pycodestyle" {
-            into_iter_match_arms.extend(quote! {
-                #ident::#field => RuleCodePrefix::#prefix_ident.into_iter(),
-            });
-        }
     }
 
     into_iter_match_arms.extend(quote! {
@@ -104,9 +120,8 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 None
             }
 
-
-            fn prefixes(&self) -> &'static [&'static str] {
-                match self { #prefix_match_arms }
+            fn common_prefix(&self) -> &'static str {
+                match self { #common_prefix_match_arms }
             }
 
             fn name(&self) -> &'static str {
@@ -151,4 +166,9 @@ fn parse_doc_attr(doc_attr: &Attribute) -> syn::Result<(String, String)> {
 
 fn parse_markdown_link(link: &str) -> Option<(&str, &str)> {
     link.strip_prefix('[')?.strip_suffix(')')?.split_once("](")
+}
+
+enum ParseStrategy {
+    SinglePrefix,
+    MultiplePrefixes,
 }
