@@ -181,9 +181,6 @@ fn is_valid_kwarg_name(key: &Option<Located<ExprKind>>) -> bool {
                 return true;
             }
 
-            // TODO: add check for spread to allow: foo(**{**bar, "buzz": 1})
-            // see: https://github.com/RustPython/RustPython/pull/4449
-
             return false;
         }
         _ => return false,
