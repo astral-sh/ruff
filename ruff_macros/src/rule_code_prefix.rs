@@ -270,8 +270,6 @@ fn generate_impls<'a>(
             type IntoIter = ::std::vec::IntoIter<Self::Item>;
 
             fn into_iter(self) -> Self::IntoIter {
-                use colored::Colorize;
-
                 #[allow(clippy::match_same_arms)]
                 match self {
                     #(#into_iter_match_arms)*

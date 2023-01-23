@@ -1,7 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
-use colored::Colorize;
 
 use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
