@@ -181,9 +181,9 @@ fn is_valid_kwarg_name(key: &Option<Located<ExprKind>>) -> bool {
                 return true;
             }
 
-            return false;
+            false
         }
-        _ => return false,
+        _ => false,
     }
 }
 
