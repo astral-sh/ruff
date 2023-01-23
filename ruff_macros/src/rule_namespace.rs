@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::spanned::Spanned;
@@ -16,6 +18,8 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut name_match_arms = quote!(Self::Ruff => "Ruff-specific rules",);
     let mut url_match_arms = quote!(Self::Ruff => None,);
 
+    let mut all_prefixes = HashSet::new();
+
     for variant in variants {
         let prefixes: Result<Vec<_>, _> = variant
             .attrs
@@ -25,7 +29,15 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let Ok(Meta::NameValue(MetaNameValue{lit: Lit::Str(lit), ..})) = attr.parse_meta() else {
                     return Err(Error::new(attr.span(), r#"expected attribute to be in the form of [#prefix = "..."]"#));
                 };
-                Ok(lit.value())
+                let str = lit.value();
+                match str.chars().next() {
+                    None => return Err(Error::new(lit.span(), "expected prefix string to be non-empty")),
+                    Some(_) => {},
+                }
+                if !all_prefixes.insert(str.clone()) {
+                    return Err(Error::new(lit.span(), "prefix has already been defined before"));
+                }
+                Ok(str)
             })
             .collect();
         let prefixes = prefixes?;
