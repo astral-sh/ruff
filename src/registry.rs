@@ -324,7 +324,6 @@ ruff_macros::define_rule_mapping!(
     // eradicate
     ERA001 => violations::CommentedOutCode,
     // flake8-bandit
-    S612 => rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     S101 => violations::AssertUsed,
     S102 => violations::ExecUsed,
     S103 => violations::BadFilePermissions,
@@ -339,6 +338,7 @@ ruff_macros::define_rule_mapping!(
     S506 => violations::UnsafeYAMLLoad,
     S508 => violations::SnmpInsecureVersion,
     S509 => violations::SnmpWeakCryptography,
+    S612 => rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     S701 => violations::Jinja2AutoescapeFalse,
     // flake8-boolean-trap
     FBT001 => violations::BooleanPositionalArgInFunctionDefinition,
