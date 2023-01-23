@@ -3357,6 +3357,9 @@ where
                         body,
                     );
                 }
+                if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
+                    tryceratops::rules::reraise_no_cause(self, body);
+                }
                 match name {
                     Some(name) => {
                         if self.settings.rules.enabled(&Rule::AmbiguousVariableName) {
