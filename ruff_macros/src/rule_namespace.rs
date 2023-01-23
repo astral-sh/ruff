@@ -17,16 +17,23 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut url_match_arms = quote!(Self::Ruff => None,);
 
     for variant in variants {
-        let prefix_attrs: Vec<_> = variant
+        let prefixes: Result<Vec<_>, _> = variant
             .attrs
             .iter()
             .filter(|a| a.path.is_ident("prefix"))
+            .map(|attr| {
+                let Ok(Meta::NameValue(MetaNameValue{lit: Lit::Str(lit), ..})) = attr.parse_meta() else {
+                    return Err(Error::new(attr.span(), r#"expected attribute to be in the form of [#prefix = "..."]"#));
+                };
+                Ok(lit.value())
+            })
             .collect();
+        let prefixes = prefixes?;
 
-        if prefix_attrs.is_empty() {
+        if prefixes.is_empty() {
             return Err(Error::new(
                 variant.span(),
-                r#"Missing [#prefix = "..."] attribute"#,
+                r#"Missing #[prefix = "..."] attribute"#,
             ));
         }
 
@@ -42,22 +49,16 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             url_match_arms.extend(quote! {Self::#variant_ident => Some(#url),});
         }
 
-        let mut prefix_literals = Vec::new();
-
-        for attr in prefix_attrs {
-            let Ok(Meta::NameValue(MetaNameValue{lit: Lit::Str(lit), ..})) = attr.parse_meta() else {
-                return Err(Error::new(attr.span(), r#"expected attribute to be in the form of [#prefix = "..."]"#))
-            };
+        for lit in &prefixes {
             parsed.push((lit.clone(), variant_ident.clone()));
-            prefix_literals.push(lit);
         }
 
         prefix_match_arms.extend(quote! {
-            Self::#variant_ident => &[#(#prefix_literals),*],
+            Self::#variant_ident => &[#(#prefixes),*],
         });
     }
 
-    parsed.sort_by_key(|(prefix, _)| prefix.value().len());
+    parsed.sort_by_key(|(prefix, _)| prefix.len());
 
     let mut if_statements = quote!();
     let mut into_iter_match_arms = quote!();
@@ -67,7 +68,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             return Some((#ident::#field, rest));
         }});
 
-        let prefix_ident = Ident::new(&prefix.value(), Span::call_site());
+        let prefix_ident = Ident::new(&prefix, Span::call_site());
 
         if field != "Pycodestyle" {
             into_iter_match_arms.extend(quote! {
