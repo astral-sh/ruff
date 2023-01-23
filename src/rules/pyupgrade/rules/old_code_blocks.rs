@@ -2,10 +2,10 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, Unaryop, Constant};
-use num_bigint::Sign;
 use crate::settings::types::PythonVersion;
+use crate::violations;
+use num_bigint::Sign;
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, Unaryop};
 
 /// Checks whether the give attribute is from the given path
 fn check_path(checker: &Checker, expr: &Expr, path: &[&str]) -> bool {
@@ -18,13 +18,17 @@ fn check_path(checker: &Checker, expr: &Expr, path: &[&str]) -> bool {
 fn compare_version(elts: &[Expr], py_version: PythonVersion) -> bool {
     let mut version: Vec<u32> = vec![];
     for elt in elts {
-        if let ExprKind::Constant { value: Constant::Int(item), .. } = &elt.node {
+        if let ExprKind::Constant {
+            value: Constant::Int(item),
+            ..
+        } = &elt.node
+        {
             let the_number = item.to_u32_digits();
             match the_number.0 {
                 // We do not have a way of handling these values
                 Sign::Minus | Sign::NoSign => {
                     return false;
-                },
+                }
                 Sign::Plus => {
                     // Assuming that the version will never be above a 32 bit
                     version.push(*the_number.1.get(0).unwrap())
@@ -52,8 +56,7 @@ fn compare_version(elts: &[Expr], py_version: PythonVersion) -> bool {
 }
 
 /// Converts an if statement that has the py2 block on top
-fn fix_py2_block() {
-}
+fn fix_py2_block() {}
 
 /// UP037
 pub fn old_code_blocks(checker: &Checker, test: &Expr, body: &[Stmt], orelse: &[Stmt]) {

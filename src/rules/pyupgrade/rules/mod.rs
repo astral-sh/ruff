@@ -8,6 +8,7 @@ pub(crate) use format_literals::format_literals;
 pub(crate) use functools_cache::functools_cache;
 pub(crate) use lru_cache_without_parameters::lru_cache_without_parameters;
 pub(crate) use native_literals::native_literals;
+pub(crate) use old_code_blocks::old_code_blocks;
 use once_cell::sync::Lazy;
 pub(crate) use open_alias::open_alias;
 pub(crate) use os_error_alias::os_error_alias;
@@ -34,7 +35,6 @@ pub(crate) use use_pep585_annotation::use_pep585_annotation;
 pub(crate) use use_pep604_annotation::use_pep604_annotation;
 pub(crate) use useless_metaclass_type::useless_metaclass_type;
 pub(crate) use useless_object_inheritance::useless_object_inheritance;
-pub(crate) use old_code_blocks::old_code_blocks;
 
 use crate::ast::helpers;
 use crate::ast::types::{Range, Scope, ScopeKind};
@@ -52,6 +52,7 @@ mod format_literals;
 mod functools_cache;
 mod lru_cache_without_parameters;
 mod native_literals;
+mod old_code_blocks;
 mod open_alias;
 mod os_error_alias;
 mod printf_string_formatting;
@@ -74,7 +75,6 @@ mod use_pep585_annotation;
 mod use_pep604_annotation;
 mod useless_metaclass_type;
 mod useless_object_inheritance;
-mod old_code_blocks;
 
 /// UP008
 pub fn super_args(
