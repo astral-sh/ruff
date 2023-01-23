@@ -9,15 +9,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 2
-    column: 45
+    column: 44
   fix:
-    content: "from six.moves import lololol\nimport tkinter\nimport queue"
+    content: "from six.moves import badlib\nimport tkinter\nimport queue"
     location:
       row: 2
       column: 0
     end_location:
       row: 2
-      column: 45
+      column: 44
   parent: ~
 - kind:
     ImportReplacementsSix: ~
@@ -26,15 +26,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 4
-    column: 54
+    column: 53
   fix:
-    content: "from six.moves import lololol\nimport tkinter as hello\nimport queue"
+    content: "from six.moves import badlib\nimport tkinter as hello\nimport queue"
     location:
       row: 4
       column: 0
     end_location:
       row: 4
-      column: 54
+      column: 53
   parent: ~
 - kind:
     ImportReplacementsSix: ~
@@ -120,5 +120,39 @@ expression: diagnostics
     end_location:
       row: 15
       column: 40
+  parent: ~
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 19
+    column: 8
+  end_location:
+    row: 19
+    column: 52
+  fix:
+    content: "from six.moves import badlib\n        import tkinter\n        import queue"
+    location:
+      row: 19
+      column: 8
+    end_location:
+      row: 19
+      column: 52
+  parent: ~
+- kind:
+    ImportReplacementsSix: ~
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 48
+  fix:
+    content: "from six.moves import badlib\n    import tkinter\n    import queue"
+    location:
+      row: 24
+      column: 4
+    end_location:
+      row: 24
+      column: 48
   parent: ~
 
