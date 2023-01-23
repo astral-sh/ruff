@@ -169,12 +169,7 @@ fn is_valid_kwarg_name(key: &Option<Located<ExprKind>>) -> bool {
             }
 
             // can't start with digit
-            if key_str
-                .chars()
-                .next()
-                .map(char::is_numeric)
-                .unwrap_or(false)
-            {
+            if key_str.chars().next().map_or(false, char::is_numeric) {
                 return false;
             }
 
