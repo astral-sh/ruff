@@ -16,7 +16,8 @@ existing Python plugins, which can be used as a reference implementation.
 
 As a concrete example: consider taking on one of the rules from the [`tryceratops`](https://github.com/charliermarsh/ruff/issues/2056)
 plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
-for guidance.
+for guidance. [`flake8-simplify`](https://github.com/charliermarsh/ruff/issues/998) has a few rules
+left too.
 
 ### Prerequisites
 
