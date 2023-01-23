@@ -1642,8 +1642,9 @@ Ruff's import sorting is intended to be nearly equivalent to `isort` when used `
 
 Like `isort`, Ruff's import sorting is compatible with Black.
 
-Ruff does not yet support all configuration options of `isort`. You can find the supported settings
-in [Options](#options). For example, you can set `known-first-party` like so:
+Ruff does not yet support all of `isort`'s configuration options, though it does support many of
+them. You can find the supported settings in the [API reference](#isort). For example, you can set
+`known-first-party` like so:
 
 ```toml
 [tool.ruff]
