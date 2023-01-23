@@ -1,7 +1,7 @@
 use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{Data, DataEnum, DeriveInput, Error, Lit, Meta, MetaNameValue};
+use syn::{Attribute, Data, DataEnum, DeriveInput, Error, Lit, Meta, MetaNameValue};
 
 pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let DeriveInput { ident, data: Data::Enum(DataEnum {
@@ -37,13 +37,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let variant_ident = variant.ident;
 
         if variant_ident != "Ruff" {
-            let Ok(Meta::NameValue(MetaNameValue{lit: Lit::Str(doc_lit), ..})) = doc_attr.parse_meta() else {
-                return Err(Error::new(doc_attr.span(), r#"expected doc attribute to be in the form of [#doc = "..."]"#))
-            };
-            let doc_lit = doc_lit.value();
-            let Some((name, url)) = parse_markdown_link(doc_lit.trim()) else {
-                return Err(Error::new(doc_attr.span(), r#"expected doc comment to be in the form of `/// [name](https://example.com/)`"#))
-            };
+            let (name, url) = parse_doc_attr(doc_attr)?;
             name_match_arms.extend(quote! {Self::#variant_ident => #name,});
             url_match_arms.extend(quote! {Self::#variant_ident => Some(#url),});
         }
@@ -123,6 +117,22 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             }
         }
     })
+}
+
+/// Parses an attribute in the form of `#[doc = " [name](https://example.com/)"]`
+/// into a tuple of link label and URL.
+fn parse_doc_attr(doc_attr: &Attribute) -> syn::Result<(String, String)> {
+    let Ok(Meta::NameValue(MetaNameValue{lit: Lit::Str(doc_lit), ..})) = doc_attr.parse_meta() else {
+        return Err(Error::new(doc_attr.span(), r#"expected doc attribute to be in the form of #[doc = "..."]"#))
+    };
+    parse_markdown_link(doc_lit.value().trim())
+        .map(|(name, url)| (name.to_string(), url.to_string()))
+        .ok_or_else(|| {
+            Error::new(
+                doc_lit.span(),
+                r#"expected doc comment to be in the form of `/// [name](https://example.com/)`"#,
+            )
+        })
 }
 
 fn parse_markdown_link(link: &str) -> Option<(&str, &str)> {
