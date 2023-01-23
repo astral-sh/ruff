@@ -2221,10 +2221,9 @@ ignore = ["F841"]
 #### [`ignore-init-module-imports`](#ignore-init-module-imports)
 
 Avoid automatically removing unused imports in `__init__.py` files. Such
-imports will still be +flagged, but with a dedicated message
-suggesting that the import is either added to the module' +`__all__`
-symbol, or re-exported with a redundant alias (e.g., `import os as
-os`).
+imports will still be flagged, but with a dedicated message suggesting
+that the import is either added to the module's `__all__` symbol, or
+re-exported with a redundant alias (e.g., `import os as os`).
 
 **Default value**: `false`
 
