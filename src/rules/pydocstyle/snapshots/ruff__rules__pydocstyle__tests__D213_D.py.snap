@@ -231,7 +231,14 @@ expression: diagnostics
   end_location:
     row: 441
     column: 7
-  fix: ~
+  fix:
+    content: "\n    First Line."
+    location:
+      row: 438
+      column: 39
+    end_location:
+      row: 438
+      column: 50
   parent: ~
 - kind:
     MultiLineSummarySecondLine: ~

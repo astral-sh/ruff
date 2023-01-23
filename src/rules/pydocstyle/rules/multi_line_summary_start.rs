@@ -2,7 +2,7 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
 use crate::docstrings::constants;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
@@ -60,26 +60,45 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 violations::MultiLineSummarySecondLine,
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) &&
-                // Skip cases where leading quote is preceded by non-whitespace for now,
-                // e.g. `def foo(): """...`. Figuring out correct indentation after the newline
-                // we'd add would require some work.
-                docstring.indentation.chars().all(char::is_whitespace)
-            {
-                let loc = docstring.expr.location;
-                let prefix = leading_quote(contents).unwrap();
-                // Use replacement instead of insert to trim possible whitespace between leading
-                // quote and text.
-                let repl = format!(
-                    "\n{}{}",
-                    docstring.indentation,
-                    first_line.strip_prefix(prefix).unwrap().trim_start()
-                );
-                diagnostic.amend(Fix::replacement(
-                    repl,
-                    Location::new(loc.row(), loc.column() + prefix.len()),
-                    Location::new(loc.row(), loc.column() + first_line.len()),
-                ));
+            if checker.patch(diagnostic.kind.rule()) {
+                let mut indentation = String::from(docstring.indentation);
+                let mut fix = true;
+                if !indentation.chars().all(char::is_whitespace) {
+                    fix = false;
+                    if let DefinitionKind::Class(parent)
+                    | DefinitionKind::NestedClass(parent)
+                    | DefinitionKind::Function(parent)
+                    | DefinitionKind::NestedFunction(parent)
+                    | DefinitionKind::Method(parent) = &docstring.kind
+                    {
+                        let pindentation = checker.locator.slice_source_code_range(&Range::new(
+                            Location::new(parent.location.row(), 0),
+                            Location::new(parent.location.row(), parent.location.column()),
+                        ));
+                        if pindentation.chars().all(char::is_whitespace) {
+                            indentation.clear();
+                            indentation.push_str(pindentation);
+                            indentation.push_str(checker.stylist.indentation());
+                            fix = true;
+                        }
+                    };
+                }
+                if fix {
+                    let loc = docstring.expr.location;
+                    let prefix = leading_quote(contents).unwrap();
+                    // Use replacement instead of insert to trim possible whitespace between leading
+                    // quote and text.
+                    let repl = format!(
+                        "\n{}{}",
+                        indentation,
+                        first_line.strip_prefix(prefix).unwrap().trim_start()
+                    );
+                    diagnostic.amend(Fix::replacement(
+                        repl,
+                        Location::new(loc.row(), loc.column() + prefix.len()),
+                        Location::new(loc.row(), loc.column() + first_line.len()),
+                    ));
+                }
             }
             checker.diagnostics.push(diagnostic);
         }
