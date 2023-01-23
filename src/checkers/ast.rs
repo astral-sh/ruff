@@ -2258,6 +2258,15 @@ where
                 if self.settings.rules.enabled(&Rule::RequestWithoutTimeout) {
                     flake8_bandit::rules::request_without_timeout(self, func, args, keywords);
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::LoggingConfigInsecureListen)
+                {
+                    flake8_bandit::rules::logging_config_insecure_listen(
+                        self, func, args, keywords,
+                    );
+                }
 
                 // flake8-comprehensions
                 if self.settings.rules.enabled(&Rule::UnnecessaryGeneratorList) {
