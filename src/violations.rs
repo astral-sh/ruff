@@ -4990,7 +4990,7 @@ define_violation!(
 impl Violation for NoUnnecessaryDictKwargs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary dict kwargs")
+        format!("Unnecessary `dict` kwargs")
     }
 }
 
@@ -5000,7 +5000,7 @@ define_violation!(
 impl AlwaysAutofixableViolation for PreferListBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `list()` over useless lambda")
+        format!("Prefer `list` over useless lambda")
     }
 
     fn autofix_title(&self) -> String {

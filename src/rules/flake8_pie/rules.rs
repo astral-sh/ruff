@@ -1,6 +1,6 @@
 use log::error;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Located, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::unparse_expr;
@@ -8,6 +8,7 @@ use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
+use crate::python::identifiers::is_identifier;
 use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
@@ -152,38 +153,16 @@ where
     }
 }
 
-fn is_valid_kwarg_name(key: &Option<Located<ExprKind>>) -> bool {
-    match key {
-        // ensure all string keys would be valid kwarg names
-        Some(Located {
-            node:
-                ExprKind::Constant {
-                    value: Constant::Str(key_str),
-                    ..
-                },
-            ..
-        }) => {
-            // can't have empty keyword args
-            if key_str.is_empty() {
-                return false;
-            }
-
-            // can't start with digit
-            if key_str.chars().next().map_or(false, char::is_numeric) {
-                return false;
-            }
-
-            // only ascii digits, letters, and underscore are allowed in kwargs
-            if key_str
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_')
-            {
-                return true;
-            }
-
-            false
-        }
-        _ => false,
+/// Return `true` if a key is a valid keyword argument name.
+fn is_valid_kwarg_name(key: &Expr) -> bool {
+    if let ExprKind::Constant {
+        value: Constant::Str(value),
+        ..
+    } = &key.node
+    {
+        is_identifier(value)
+    } else {
+        false
     }
 }
 
@@ -194,9 +173,9 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
         if kw.node.arg.is_none() {
             if let ExprKind::Dict { keys, .. } = &kw.node.value.node {
                 // ensure foo(**{"bar-bar": 1}) doesn't error
-                if keys.iter().all(is_valid_kwarg_name) ||
-                // handle case of foo(**{**bar})
-                (keys.len() == 1 && keys[0].is_none())
+                if keys.iter().all(|expr| expr.as_ref().map_or(false, is_valid_kwarg_name)) ||
+                    // handle case of foo(**{**bar})
+                    (keys.len() == 1 && keys[0].is_none())
                 {
                     let diagnostic = Diagnostic::new(
                         violations::NoUnnecessaryDictKwargs,
