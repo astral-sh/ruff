@@ -196,19 +196,16 @@ fn is_valid_kwarg_name(key: &Option<Located<ExprKind>>) -> bool {
 }
 
 /// PIE804
-pub fn no_unnecessary_dict_kwargs(
-    checker: &mut Checker,
-    expr: &Expr,
-    kwargs: &[Keyword],
-) {
+pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     for kw in kwargs {
         // keyword is a spread operator (indicated by None)
         if kw.node.arg.is_none() {
-            if let ExprKind::Dict { keys, ..} = &kw.node.value.node {
+            if let ExprKind::Dict { keys, .. } = &kw.node.value.node {
                 // ensure foo(**{"bar-bar": 1}) doesn't error
-                if keys.iter().all(is_valid_kwarg_name) || 
+                if keys.iter().all(is_valid_kwarg_name) ||
                 // handle case of foo(**{**bar})
-                (keys.len() == 1 && keys[0].is_none()) {
+                (keys.len() == 1 && keys[0].is_none())
+                {
                     let diagnostic = Diagnostic::new(
                         violations::NoUnnecessaryDictKwargs,
                         Range::from_located(expr),
