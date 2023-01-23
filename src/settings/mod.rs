@@ -6,7 +6,6 @@ use std::iter;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use colored::Colorize;
 use globset::Glob;
 use itertools::Either::{Left, Right};
 use rustc_hash::FxHashSet;
