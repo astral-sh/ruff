@@ -615,9 +615,16 @@ pub enum Linter {
 }
 
 pub trait RuleNamespace: Sized {
-    fn parse_code(code: &str) -> Option<(Self, &str)>;
+    /// Returns the prefix that every single code that ruff uses to identify
+    /// rules from this linter starts with.  In the case that multiple
+    /// `#[prefix]`es are configured for the variant in the `Linter` enum
+    /// definition this is the empty string.
+    fn common_prefix(&self) -> &'static str;
 
-    fn prefixes(&self) -> &'static [&'static str];
+    /// Attempts to parse the given rule code. If the prefix is recognized
+    /// returns the respective variant along with the code with the common
+    /// prefix stripped.
+    fn parse_code(code: &str) -> Option<(Self, &str)>;
 
     fn name(&self) -> &'static str;
 
@@ -766,10 +773,12 @@ mod tests {
     }
 
     #[test]
-    fn test_linter_prefixes() {
+    fn test_linter_parse_code() {
         for rule in Rule::iter() {
-            Linter::parse_code(rule.code())
-                .unwrap_or_else(|| panic!("couldn't parse {:?}", rule.code()));
+            let code = rule.code();
+            let (linter, rest) =
+                Linter::parse_code(code).unwrap_or_else(|| panic!("couldn't parse {:?}", code));
+            assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
         }
     }
 }
