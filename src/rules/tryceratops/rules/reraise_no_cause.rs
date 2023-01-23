@@ -29,7 +29,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt.node {
-            StmtKind::Raise {..} => self.raises.push(stmt),
+            StmtKind::Raise { .. } => self.raises.push(stmt),
             _ => visitor::walk_stmt(self, stmt),
         }
     }
@@ -46,12 +46,11 @@ pub fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
     };
 
     for stmt in raises {
-        if let StmtKind::Raise {cause, .. } = &stmt.node {
+        if let StmtKind::Raise { cause, .. } = &stmt.node {
             if cause.is_none() {
-                checker.diagnostics.push(Diagnostic::new(
-                    ReraiseNoCause,
-                    Range::from_located(stmt),
-                ));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(ReraiseNoCause, Range::from_located(stmt)));
             }
         }
     }

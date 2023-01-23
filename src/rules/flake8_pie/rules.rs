@@ -1,6 +1,6 @@
 use log::error;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::unparse_expr;
@@ -8,6 +8,7 @@ use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
+use crate::python::identifiers::is_identifier;
 use crate::registry::{Diagnostic, Rule};
 use crate::violations;
 
@@ -148,6 +149,56 @@ where
                 Range::from_located(stmt),
             );
             checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
+/// PIE800
+pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
+    for item in keys.iter().zip(values.iter()) {
+        if let (None, value) = item {
+            // We only care about when the key is None which indicates a spread `**`
+            // inside a dict.
+            if let ExprKind::Dict { .. } = value.node {
+                let diagnostic =
+                    Diagnostic::new(violations::NoUnnecessarySpread, Range::from_located(value));
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+    }
+}
+
+/// Return `true` if a key is a valid keyword argument name.
+fn is_valid_kwarg_name(key: &Expr) -> bool {
+    if let ExprKind::Constant {
+        value: Constant::Str(value),
+        ..
+    } = &key.node
+    {
+        is_identifier(value)
+    } else {
+        false
+    }
+}
+
+/// PIE804
+pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
+    for kw in kwargs {
+        // keyword is a spread operator (indicated by None)
+        if kw.node.arg.is_none() {
+            if let ExprKind::Dict { keys, .. } = &kw.node.value.node {
+                // ensure foo(**{"bar-bar": 1}) doesn't error
+                if keys.iter().all(|expr| expr.as_ref().map_or(false, is_valid_kwarg_name)) ||
+                    // handle case of foo(**{**bar})
+                    (keys.len() == 1 && keys[0].is_none())
+                {
+                    let diagnostic = Diagnostic::new(
+                        violations::NoUnnecessaryDictKwargs,
+                        Range::from_located(expr),
+                    );
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
         }
     }
 }

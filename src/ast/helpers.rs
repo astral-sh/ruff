@@ -161,7 +161,7 @@ where
         }
         ExprKind::Dict { keys, values } => values
             .iter()
-            .chain(keys.iter())
+            .chain(keys.iter().flatten())
             .any(|expr| any_over_expr(expr, func)),
         ExprKind::Set { elts } | ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
             elts.iter().any(|expr| any_over_expr(expr, func))

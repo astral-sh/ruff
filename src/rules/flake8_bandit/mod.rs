@@ -1,4 +1,4 @@
-//! Rules from [flake8-bandit](https://pypi.org/project/flake8-bandit/4.1.1/).
+//! Rules from [flake8-bandit](https://pypi.org/project/flake8-bandit/).
 mod helpers;
 pub(crate) mod rules;
 pub mod settings;
@@ -28,6 +28,7 @@ mod tests {
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"); "S506")]
     #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"); "S508")]
     #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"); "S509")]
+    #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"); "S612")]
     #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"); "S701")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());

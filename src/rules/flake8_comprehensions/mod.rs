@@ -1,4 +1,4 @@
-//! Rules from [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/3.10.1/).
+//! Rules from [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/).
 mod fixes;
 pub(crate) mod rules;
 

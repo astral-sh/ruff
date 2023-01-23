@@ -28,6 +28,14 @@ use crate::settings::types::{
 
 #[derive(Debug, Default)]
 pub struct Configuration {
+    pub select: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<RuleSelector>>,
+    pub extend_select: Vec<Vec<RuleSelector>>,
+    pub extend_ignore: Vec<Vec<RuleSelector>>,
+    pub fixable: Option<Vec<RuleSelector>>,
+    pub unfixable: Option<Vec<RuleSelector>>,
+    pub per_file_ignores: Option<Vec<PerFileIgnore>>,
+
     pub allowed_confusables: Option<Vec<char>>,
     pub builtins: Option<Vec<String>>,
     pub cache_dir: Option<PathBuf>,
@@ -35,28 +43,21 @@ pub struct Configuration {
     pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
     pub extend_exclude: Vec<FilePattern>,
-    pub extend_ignore: Vec<Vec<RuleSelector>>,
-    pub extend_select: Vec<Vec<RuleSelector>>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
-    pub fixable: Option<Vec<RuleSelector>>,
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
-    pub ignore: Option<Vec<RuleSelector>>,
     pub ignore_init_module_imports: Option<bool>,
     pub line_length: Option<usize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
-    pub per_file_ignores: Option<Vec<PerFileIgnore>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
-    pub select: Option<Vec<RuleSelector>>,
     pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
-    pub unfixable: Option<Vec<RuleSelector>>,
     pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
@@ -148,8 +149,7 @@ impl Configuration {
                 per_file_ignores
                     .into_iter()
                     .map(|(pattern, prefixes)| {
-                        let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
-                        PerFileIgnore::new(pattern, absolute, &prefixes)
+                        PerFileIgnore::new(pattern, &prefixes, Some(project_root))
                     })
                     .collect()
             }),

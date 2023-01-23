@@ -78,14 +78,18 @@ fn create_class_def_stmt(
     })
 }
 
-fn properties_from_dict_literal(keys: &[Expr], values: &[Expr]) -> Result<Vec<Stmt>> {
+fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
     keys.iter()
         .zip(values.iter())
-        .map(|(key, value)| match &key.node {
-            ExprKind::Constant {
-                value: Constant::Str(property),
+        .map(|(key, value)| match key {
+            Some(Expr {
+                node:
+                    ExprKind::Constant {
+                        value: Constant::Str(property),
+                        ..
+                    },
                 ..
-            } => {
+            }) => {
                 if is_identifier(property) && !KWLIST.contains(&property.as_str()) {
                     Ok(create_property_assignment_stmt(property, &value.node))
                 } else {

@@ -1,6 +1,5 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use std::fmt::{self, Write};
 use std::ops::Deref;
 
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Suite, Withitem};
@@ -114,10 +113,6 @@ impl<'a> Generator<'a> {
 
     fn p_delim(&mut self, first: &mut bool, s: &str) {
         self.p_if(!std::mem::take(first), s);
-    }
-
-    fn write_fmt(&mut self, f: fmt::Arguments<'_>) {
-        self.buffer.write_fmt(f).unwrap();
     }
 
     pub fn unparse_suite<U>(&mut self, suite: &Suite<U>) {
@@ -678,17 +673,16 @@ impl<'a> Generator<'a> {
             ExprKind::Dict { keys, values } => {
                 self.p("{");
                 let mut first = true;
-                let (packed, unpacked) = values.split_at(keys.len());
-                for (k, v) in keys.iter().zip(packed) {
+                for (k, v) in keys.iter().zip(values) {
                     self.p_delim(&mut first, ", ");
-                    self.unparse_expr(k, precedence::TEST);
-                    self.p(": ");
-                    self.unparse_expr(v, precedence::TEST);
-                }
-                for d in unpacked {
-                    self.p_delim(&mut first, ", ");
-                    self.p("**");
-                    self.unparse_expr(d, precedence::EXPR);
+                    if let Some(k) = k {
+                        self.unparse_expr(k, precedence::TEST);
+                        self.p(": ");
+                        self.unparse_expr(v, precedence::TEST);
+                    } else {
+                        self.p("**");
+                        self.unparse_expr(v, precedence::EXPR);
+                    }
                 }
                 self.p("}");
             }
@@ -929,7 +923,8 @@ impl<'a> Generator<'a> {
             self.p_delim(&mut first, ", ");
             self.unparse_arg(arg);
             if let Some(i) = i.checked_sub(defaults_start) {
-                write!(self, "={}", &args.defaults[i]);
+                self.p("=");
+                self.unparse_expr(&args.defaults[i], precedence::TEST);
             }
             self.p_if(i + 1 == args.posonlyargs.len(), ", /");
         }
@@ -948,7 +943,8 @@ impl<'a> Generator<'a> {
                 .checked_sub(defaults_start)
                 .and_then(|i| args.kw_defaults.get(i))
             {
-                write!(self, "={default}");
+                self.p("=");
+                self.unparse_expr(default, precedence::TEST);
             }
         }
         if let Some(kwarg) = &args.kwarg {
@@ -961,7 +957,8 @@ impl<'a> Generator<'a> {
     fn unparse_arg<U>(&mut self, arg: &Arg<U>) {
         self.p(&arg.node.arg);
         if let Some(ann) = &arg.node.annotation {
-            write!(self, ": {}", **ann);
+            self.p(": ");
+            self.unparse_expr(ann, precedence::TEST);
         }
     }
 

@@ -36,8 +36,8 @@ use crate::rules::{
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pie, flake8_print,
     flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
+    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -1386,6 +1386,7 @@ where
                         stmt,
                         test,
                         body,
+                        orelse,
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
@@ -1577,6 +1578,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::TryConsiderElse) {
                     tryceratops::rules::try_consider_else(self, body, orelse);
+                }
+                if self.settings.rules.enabled(&Rule::VerboseRaise) {
+                    tryceratops::rules::verbose_raise(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -2203,6 +2207,11 @@ where
                     flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
                 }
 
+                // flake8-pie
+                if self.settings.rules.enabled(&Rule::NoUnnecessaryDictKwargs) {
+                    flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
+                }
+
                 // flake8-bandit
                 if self.settings.rules.enabled(&Rule::ExecUsed) {
                     if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {
@@ -2248,6 +2257,15 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::RequestWithoutTimeout) {
                     flake8_bandit::rules::request_without_timeout(self, func, args, keywords);
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::LoggingConfigInsecureListen)
+                {
+                    flake8_bandit::rules::logging_config_insecure_listen(
+                        self, func, args, keywords,
+                    );
                 }
 
                 // flake8-comprehensions
@@ -2545,6 +2563,35 @@ where
                 {
                     flake8_simplify::rules::open_file_with_context_handler(self, func);
                 }
+
+                // flake8-use-pathlib
+                if self.settings.rules.enabled(&Rule::PathlibAbspath)
+                    || self.settings.rules.enabled(&Rule::PathlibChmod)
+                    || self.settings.rules.enabled(&Rule::PathlibMkdir)
+                    || self.settings.rules.enabled(&Rule::PathlibMakedirs)
+                    || self.settings.rules.enabled(&Rule::PathlibRename)
+                    || self.settings.rules.enabled(&Rule::PathlibReplace)
+                    || self.settings.rules.enabled(&Rule::PathlibRmdir)
+                    || self.settings.rules.enabled(&Rule::PathlibRemove)
+                    || self.settings.rules.enabled(&Rule::PathlibUnlink)
+                    || self.settings.rules.enabled(&Rule::PathlibGetcwd)
+                    || self.settings.rules.enabled(&Rule::PathlibExists)
+                    || self.settings.rules.enabled(&Rule::PathlibExpanduser)
+                    || self.settings.rules.enabled(&Rule::PathlibIsDir)
+                    || self.settings.rules.enabled(&Rule::PathlibIsFile)
+                    || self.settings.rules.enabled(&Rule::PathlibIsLink)
+                    || self.settings.rules.enabled(&Rule::PathlibReadlink)
+                    || self.settings.rules.enabled(&Rule::PathlibStat)
+                    || self.settings.rules.enabled(&Rule::PathlibIsAbs)
+                    || self.settings.rules.enabled(&Rule::PathlibJoin)
+                    || self.settings.rules.enabled(&Rule::PathlibBasename)
+                    || self.settings.rules.enabled(&Rule::PathlibSamefile)
+                    || self.settings.rules.enabled(&Rule::PathlibSplitext)
+                    || self.settings.rules.enabled(&Rule::PathlibOpen)
+                    || self.settings.rules.enabled(&Rule::PathlibPyPath)
+                {
+                    flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self
@@ -2557,6 +2604,10 @@ where
                         .enabled(&Rule::MultiValueRepeatedKeyVariable)
                 {
                     pyflakes::rules::repeated_keys(self, keys, values);
+                }
+
+                if self.settings.rules.enabled(&Rule::NoUnnecessarySpread) {
+                    flake8_pie::rules::no_unnecessary_spread(self, keys, values);
                 }
             }
             ExprKind::Yield { .. } => {
@@ -3155,7 +3206,7 @@ where
                         // Ex) TypedDict("a", {"a": int})
                         if args.len() > 1 {
                             if let ExprKind::Dict { keys, values } = &args[1].node {
-                                for key in keys {
+                                for key in keys.iter().flatten() {
                                     self.in_type_definition = false;
                                     self.visit_expr(key);
                                     self.in_type_definition = prev_in_type_definition;

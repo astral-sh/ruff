@@ -1,4 +1,4 @@
-//! Rules from [eradicate](https://pypi.org/project/eradicate/2.1.0/).
+//! Rules from [eradicate](https://pypi.org/project/eradicate/).
 pub(crate) mod detection;
 pub(crate) mod rules;
 

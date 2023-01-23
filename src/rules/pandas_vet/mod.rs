@@ -1,4 +1,4 @@
-//! Rules from [pandas-vet](https://pypi.org/project/pandas-vet/0.2.3/).
+//! Rules from [pandas-vet](https://pypi.org/project/pandas-vet/).
 pub(crate) mod helpers;
 pub(crate) mod rules;
 
@@ -19,7 +19,7 @@ mod tests {
 
     fn rule_code(contents: &str, expected: &[Rule]) -> Result<()> {
         let contents = dedent(contents);
-        let settings = settings::Settings::for_rules(RuleSelector::PD.codes());
+        let settings = settings::Settings::for_rules(&RuleSelector::PD);
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_contents(&contents, &locator);
