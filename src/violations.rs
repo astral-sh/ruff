@@ -4985,6 +4985,16 @@ impl Violation for PreferUniqueEnums {
 }
 
 define_violation!(
+    pub struct NoUnnecessarySpread;
+);
+impl Violation for NoUnnecessarySpread {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary spread `**`")
+    }
+}
+
+define_violation!(
     pub struct NoUnnecessaryDictKwargs;
 );
 impl Violation for NoUnnecessaryDictKwargs {

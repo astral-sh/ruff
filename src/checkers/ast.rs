@@ -2596,6 +2596,10 @@ where
                 {
                     pyflakes::rules::repeated_keys(self, keys, values);
                 }
+
+                if self.settings.rules.enabled(&Rule::NoUnnecessarySpread) {
+                    flake8_pie::rules::no_unnecessary_spread(self, keys, values);
+                }
             }
             ExprKind::Yield { .. } => {
                 if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
