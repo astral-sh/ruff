@@ -51,6 +51,10 @@ fn compare_version(elts: &[Expr], py_version: PythonVersion) -> bool {
     false
 }
 
+/// Converts an if statement that has the py2 block on top
+fn fix_py2_block() {
+}
+
 /// UP037
 pub fn old_code_blocks(checker: &Checker, test: &Expr, body: &[Stmt], orelse: &[Stmt]) {
     // NOTE: Pyupgrade ONLY works if `sys.version_info` is on the left
