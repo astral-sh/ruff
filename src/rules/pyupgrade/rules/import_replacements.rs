@@ -251,8 +251,6 @@ impl<'a> FixImports<'a> {
                     self.create_new_str(SIXMOVES_TO_SYS, "sys")
                 } else if has_match(SIXMOVES_TO_URLLIB, self.names) {
                     self.create_new_str(SIXMOVES_TO_URLLIB, "urllib")
-                } else if has_match(SIX_TO_FUNCTOOLS, self.names) {
-                    self.create_new_str(SIX_TO_FUNCTOOLS, "functools")
                 } else {
                     None
                 }
