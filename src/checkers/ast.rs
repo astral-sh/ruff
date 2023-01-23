@@ -2207,6 +2207,11 @@ where
                     flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
                 }
 
+                // flake8-pie
+                if self.settings.rules.enabled(&Rule::NoUnnecessaryDictKwargs) {
+                    flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
+                }
+
                 // flake8-bandit
                 if self.settings.rules.enabled(&Rule::ExecUsed) {
                     if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {

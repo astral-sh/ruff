@@ -413,6 +413,7 @@ ruff_macros::define_rule_mapping!(
     PIE790 => violations::NoUnnecessaryPass,
     PIE794 => violations::DupeClassFieldDefinitions,
     PIE796 => violations::PreferUniqueEnums,
+    PIE804 => violations::NoUnnecessaryDictKwargs,
     PIE807 => violations::PreferListBuiltin,
     // flake8-commas
     COM812 => violations::TrailingCommaMissing,

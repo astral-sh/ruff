@@ -1,0 +1,55 @@
+---
+source: src/rules/flake8_pie/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoUnnecessaryDictKwargs: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    NoUnnecessaryDictKwargs: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    NoUnnecessaryDictKwargs: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 35
+  fix: ~
+  parent: ~
+- kind:
+    NoUnnecessaryDictKwargs: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    NoUnnecessaryDictKwargs: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 29
+  fix: ~
+  parent: ~
+
