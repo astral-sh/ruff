@@ -52,14 +52,4 @@ expression: diagnostics
     column: 29
   fix: ~
   parent: ~
-- kind:
-    NoUnnecessaryDictKwargs: ~
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 30
-  fix: ~
-  parent: ~
 

@@ -153,64 +153,68 @@ where
 }
 
 fn is_valid_kwarg_name(key: &Option<Located<ExprKind>>) -> bool {
-    if key.is_none() {
-        return true;
-    }
-    if let Some(Located {
-        node:
-            ExprKind::Constant {
-                value: Constant::Str(key_str),
-                ..
-            },
-        ..
-    }) = &key
-    {
-        // can't have empty keyword args
-        if key_str.is_empty() {
+    match key {
+        // ensure all string keys would be valid kwarg names
+        Some(Located {
+            node:
+                ExprKind::Constant {
+                    value: Constant::Str(key_str),
+                    ..
+                },
+            ..
+        }) => {
+            // can't have empty keyword args
+            if key_str.is_empty() {
+                return false;
+            }
+
+            // can't start with digit
+            if key_str
+                .chars()
+                .next()
+                .map(char::is_numeric)
+                .unwrap_or(false)
+            {
+                return false;
+            }
+
+            // only ascii digits, letters, and underscore are allowed in kwargs
+            if key_str
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_')
+            {
+                return true;
+            }
+
+            // TODO: add check for spread to allow: foo(**{**bar, "buzz": 1})
+            // see: https://github.com/RustPython/RustPython/pull/4449
+
             return false;
         }
-
-        // can't start with digit
-        if key_str
-            .chars()
-            .next()
-            .map(char::is_numeric)
-            .unwrap_or(false)
-        {
-            return false;
-        }
-
-        // only ascii digits, letters, and underscore are allowed in kwargs
-        if key_str
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
-        {
-            return true;
-        }
-
-        // TODO: add check for spread to allow: foo(**{**bar, "buzz": 1})
-        // see: https://github.com/RustPython/RustPython/pull/4449
-
-        return false;
+        _ => return false,
     }
-    return false;
 }
 
 /// PIE804
 pub fn no_unnecessary_dict_kwargs(
     checker: &mut Checker,
     expr: &Expr,
-    func: &Expr,
     kwargs: &[Keyword],
 ) {
     for kw in kwargs {
-        if let ExprKind::Dict { keys, values } = &kw.node.value.node {
-            if keys.iter().all(is_valid_kwarg_name) {
-                let mut diagnostic = Diagnostic::new(
-                    violations::NoUnnecessaryDictKwargs,
-                    Range::from_located(expr),
-                );
-                checker.diagnostics.push(diagnostic);
+        // keyword is a spread operator (indicated by None)
+        if kw.node.arg.is_none() {
+            if let ExprKind::Dict { keys, ..} = &kw.node.value.node {
+                // ensure foo(**{"bar-bar": 1}) doesn't error
+                if keys.iter().all(is_valid_kwarg_name) || 
+                // handle case of foo(**{**bar})
+                (keys.len() == 1 && keys[0].is_none()) {
+                    let diagnostic = Diagnostic::new(
+                        violations::NoUnnecessaryDictKwargs,
+                        Range::from_located(expr),
+                    );
+                    checker.diagnostics.push(diagnostic);
+                }
             }
         }
     }

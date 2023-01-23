@@ -15,7 +15,7 @@ mod tests {
     #[test_case(Rule::NoUnnecessaryPass, Path::new("PIE790.py"); "PIE790")]
     #[test_case(Rule::DupeClassFieldDefinitions, Path::new("PIE794.py"); "PIE794")]
     #[test_case(Rule::PreferUniqueEnums, Path::new("PIE796.py"); "PIE796")]
-    #[test_case(RuleCode::PIE804, Path::new("PIE804.py"); "PIE804")]    
+    #[test_case(Rule::NoUnnecessaryDictKwargs, Path::new("PIE804.py"); "PIE804")]
     #[test_case(Rule::PreferListBuiltin, Path::new("PIE807.py"); "PIE807")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
