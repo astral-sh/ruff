@@ -1152,7 +1152,8 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 | PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
 | PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
 | PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
-| PIE807 | prefer-list-builtin | Prefer `list()` over useless lambda | 🛠 |
+| PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
+| PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
 
 ### flake8-commas (COM)
 
@@ -2222,10 +2223,9 @@ ignore = ["F841"]
 #### [`ignore-init-module-imports`](#ignore-init-module-imports)
 
 Avoid automatically removing unused imports in `__init__.py` files. Such
-imports will still be +flagged, but with a dedicated message
-suggesting that the import is either added to the module' +`__all__`
-symbol, or re-exported with a redundant alias (e.g., `import os as
-os`).
+imports will still be flagged, but with a dedicated message suggesting
+that the import is either added to the module's `__all__` symbol, or
+re-exported with a redundant alias (e.g., `import os as os`).
 
 **Default value**: `false`
 

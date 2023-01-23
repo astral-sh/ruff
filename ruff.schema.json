@@ -259,7 +259,7 @@
       }
     },
     "ignore-init-module-imports": {
-      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be +flagged, but with a dedicated message suggesting that the import is either added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
       "type": [
         "boolean",
         "null"
@@ -1554,6 +1554,7 @@
         "PIE8",
         "PIE80",
         "PIE800",
+        "PIE804",
         "PIE807",
         "PL",
         "PLC",
