@@ -37,6 +37,7 @@ mod noqa;
 mod python;
 pub mod registry;
 pub mod resolver;
+mod rule_redirects;
 mod rule_selector;
 mod rules;
 mod rustpython_helpers;

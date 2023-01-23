@@ -5,7 +5,6 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use crate::registry::PREFIX_REDIRECTS;
 use crate::rule_selector::RuleSelector;
 use crate::settings::types::PatternPrefixPair;
 use crate::warn_user;
@@ -21,9 +20,7 @@ pub fn parse_prefix_codes(value: &str) -> Vec<RuleSelector> {
         if code.is_empty() {
             continue;
         }
-        if let Some(code) = PREFIX_REDIRECTS.get(code) {
-            codes.push(code.clone().into());
-        } else if let Ok(code) = RuleSelector::from_str(code) {
+        if let Ok(code) = RuleSelector::from_str(code) {
             codes.push(code);
         } else {
             warn_user!("Unsupported prefix code: {code}");
@@ -89,14 +86,7 @@ impl State {
     fn parse(&self) -> Vec<PatternPrefixPair> {
         let mut codes: Vec<PatternPrefixPair> = vec![];
         for code in &self.codes {
-            if let Some(code) = PREFIX_REDIRECTS.get(code.as_str()) {
-                for filename in &self.filenames {
-                    codes.push(PatternPrefixPair {
-                        pattern: filename.clone(),
-                        prefix: code.clone().into(),
-                    });
-                }
-            } else if let Ok(code) = RuleSelector::from_str(code) {
+            if let Ok(code) = RuleSelector::from_str(code) {
                 for filename in &self.filenames {
                     codes.push(PatternPrefixPair {
                         pattern: filename.clone(),

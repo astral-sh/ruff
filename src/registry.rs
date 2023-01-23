@@ -1,8 +1,6 @@
 //! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
 
-use once_cell::sync::Lazy;
 use ruff_macros::RuleNamespace;
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter};
@@ -721,60 +719,6 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[(
     "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
      Consider adding `D203` to `ignore`.",
 )];
-
-/// A hash map from deprecated to latest `Rule`.
-pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, Rule>> = Lazy::new(|| {
-    FxHashMap::from_iter([
-        // TODO(charlie): Remove by 2023-01-01.
-        ("U001", Rule::UselessMetaclassType),
-        ("U003", Rule::TypeOfPrimitive),
-        ("U004", Rule::UselessObjectInheritance),
-        ("U005", Rule::DeprecatedUnittestAlias),
-        ("U006", Rule::UsePEP585Annotation),
-        ("U007", Rule::UsePEP604Annotation),
-        ("U008", Rule::SuperCallWithParameters),
-        ("U009", Rule::PEP3120UnnecessaryCodingComment),
-        ("U010", Rule::UnnecessaryFutureImport),
-        ("U011", Rule::LRUCacheWithoutParameters),
-        ("U012", Rule::UnnecessaryEncodeUTF8),
-        ("U013", Rule::ConvertTypedDictFunctionalToClass),
-        ("U014", Rule::ConvertNamedTupleFunctionalToClass),
-        ("U015", Rule::RedundantOpenModes),
-        ("U016", Rule::RemoveSixCompat),
-        ("U017", Rule::DatetimeTimezoneUTC),
-        ("U019", Rule::TypingTextStrAlias),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("I252", Rule::RelativeImports),
-        ("M001", Rule::UnusedNOQA),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("PDV002", Rule::UseOfInplaceArgument),
-        ("PDV003", Rule::UseOfDotIsNull),
-        ("PDV004", Rule::UseOfDotNotNull),
-        ("PDV007", Rule::UseOfDotIx),
-        ("PDV008", Rule::UseOfDotAt),
-        ("PDV009", Rule::UseOfDotIat),
-        ("PDV010", Rule::UseOfDotPivotOrUnstack),
-        ("PDV011", Rule::UseOfDotValues),
-        ("PDV012", Rule::UseOfDotReadTable),
-        ("PDV013", Rule::UseOfDotStack),
-        ("PDV015", Rule::UseOfPdMerge),
-        ("PDV901", Rule::DfIsABadVariableName),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("R501", Rule::UnnecessaryReturnNone),
-        ("R502", Rule::ImplicitReturnValue),
-        ("R503", Rule::ImplicitReturn),
-        ("R504", Rule::UnnecessaryAssign),
-        ("R505", Rule::SuperfluousElseReturn),
-        ("R506", Rule::SuperfluousElseRaise),
-        ("R507", Rule::SuperfluousElseContinue),
-        ("R508", Rule::SuperfluousElseBreak),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("IC001", Rule::ImportAliasIsNotConventional),
-        ("IC002", Rule::ImportAliasIsNotConventional),
-        ("IC003", Rule::ImportAliasIsNotConventional),
-        ("IC004", Rule::ImportAliasIsNotConventional),
-    ])
-});
 
 #[cfg(test)]
 mod tests {

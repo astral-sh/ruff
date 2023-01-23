@@ -8,12 +8,16 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::registry::{Rule, RuleCodePrefix, RuleIter};
+use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RuleSelector {
     /// All rules
     All,
-    Prefix(RuleCodePrefix),
+    Prefix {
+        prefix: RuleCodePrefix,
+        redirected_from: Option<&'static str>,
+    },
 }
 
 impl FromStr for RuleSelector {
@@ -23,9 +27,15 @@ impl FromStr for RuleSelector {
         if s == "ALL" {
             Ok(Self::All)
         } else {
-            Ok(Self::Prefix(
-                RuleCodePrefix::from_str(s).map_err(|_| ParseError::Unknown(s.to_string()))?,
-            ))
+            let (s, redirected_from) = match get_redirect(s) {
+                Some((from, target)) => (target, Some(from)),
+                None => (s, None),
+            };
+            Ok(Self::Prefix {
+                prefix: RuleCodePrefix::from_str(s)
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?,
+                redirected_from,
+            })
         }
     }
 }
@@ -45,7 +55,7 @@ impl Serialize for RuleSelector {
     {
         match self {
             RuleSelector::All => serializer.serialize_str("ALL"),
-            RuleSelector::Prefix(prefix) => prefix.serialize(serializer),
+            RuleSelector::Prefix { prefix, .. } => prefix.serialize(serializer),
         }
     }
 }
@@ -86,7 +96,10 @@ impl Visitor<'_> for SelectorVisitor {
 
 impl From<RuleCodePrefix> for RuleSelector {
     fn from(prefix: RuleCodePrefix) -> Self {
-        Self::Prefix(prefix)
+        Self::Prefix {
+            prefix,
+            redirected_from: None,
+        }
     }
 }
 
@@ -97,7 +110,7 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-            RuleSelector::Prefix(prefix) => RuleSelectorIter::Prefix(prefix.into_iter()),
+            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Prefix(prefix.into_iter()),
         }
     }
 }
@@ -124,7 +137,10 @@ impl Iterator for RuleSelectorIter {
 // RuleSelector` (see https://github.com/rust-lang/rust/issues/67792).
 // TODO(martin): Remove once RuleSelector is an enum with Linter & Rule variants
 pub(crate) const fn prefix_to_selector(prefix: RuleCodePrefix) -> RuleSelector {
-    RuleSelector::Prefix(prefix)
+    RuleSelector::Prefix {
+        prefix,
+        redirected_from: None,
+    }
 }
 
 impl JsonSchema for RuleSelector {
@@ -150,7 +166,7 @@ impl RuleSelector {
     pub(crate) fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
-            RuleSelector::Prefix(prefix) => prefix.specificity(),
+            RuleSelector::Prefix { prefix, .. } => prefix.specificity(),
         }
     }
 }
