@@ -434,6 +434,7 @@ ruff_macros::define_rule_mapping!(
     TRY200 => rules::tryceratops::rules::ReraiseNoCause,
     TRY201 => rules::tryceratops::rules::VerboseRaise,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
+    TRY301 => rules::tryceratops::rules::RaiseWithinTry,
     // flake8-use-pathlib
     PTH100 => rules::flake8_use_pathlib::violations::PathlibAbspath,
     PTH101 => rules::flake8_use_pathlib::violations::PathlibChmod,
