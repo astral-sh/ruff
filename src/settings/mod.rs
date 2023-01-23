@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use globset::Glob;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
@@ -312,6 +312,9 @@ struct RuleCodeSpec<'a> {
 /// rule codes.
 fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<Rule> {
     let mut rules: FxHashSet<Rule> = FxHashSet::default();
+
+    let mut redirects = FxHashMap::default();
+
     for spec in specs {
         for specificity in [
             Specificity::All,
@@ -326,6 +329,14 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
                 if selector.specificity() == specificity {
                     rules.extend(selector);
                 }
+
+                if let RuleSelector::Prefix {
+                    prefix,
+                    redirected_from: Some(redirect_from),
+                } = selector
+                {
+                    redirects.insert(redirect_from, prefix);
+                }
             }
             for selector in spec.ignore {
                 if selector.specificity() == specificity {
@@ -333,9 +344,23 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
                         rules.remove(&rule);
                     }
                 }
+
+                if let RuleSelector::Prefix {
+                    prefix,
+                    redirected_from: Some(redirect_from),
+                } = selector
+                {
+                    redirects.insert(redirect_from, prefix);
+                }
             }
         }
     }
+
+    for (from, target) in redirects {
+        // TODO(martin): This belongs into the ruff_cli crate.
+        crate::warn_user!("`{from}` has been remapped to `{}`", target.as_ref());
+    }
+
     rules
 }
 
