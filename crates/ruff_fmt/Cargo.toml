@@ -1,0 +1,17 @@
+[package]
+name = "ruff_fmt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.68"
+clap = { version = "4.0.1", features = ["derive"] }
+insta = { version = "1.19.1", features = ["yaml"] }
+once_cell = "1.17.0"
+rome_formatter = { path = "../../../tools/crates/rome_formatter" }
+rome_rowan = { path = "../../../tools/crates/rome_rowan" }
+rustc-hash = "1.1.0"
+rustpython-ast = { git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
+test-case = { version = "2.2.2" }

@@ -7,7 +7,6 @@ rustflags = [
   # This is a workaround to configure lints for the entire workspace, pending the ability to configure this via TOML.
   # See: `https://github.com/rust-lang/cargo/issues/5034`
   #      `https://github.com/EmbarkStudios/rust-ecosystem/issues/22#issuecomment-947011395`
-  "-Dunsafe_code",
   "-Wclippy::pedantic",
   # Allowed pedantic lints
   "-Wclippy::char_lit_as_u8",
