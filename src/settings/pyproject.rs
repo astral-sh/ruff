@@ -31,13 +31,13 @@ impl Pyproject {
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
     let contents = fs::read_file(path)?;
-    toml_edit::easy::from_str(&contents).map_err(Into::into)
+    toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    toml_edit::easy::from_str(&contents).map_err(Into::into)
+    toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -144,17 +144,17 @@ mod tests {
 
     #[test]
     fn deserialize() -> Result<()> {
-        let pyproject: Pyproject = toml_edit::easy::from_str(r#""#)?;
+        let pyproject: Pyproject = toml::from_str(r#""#)?;
         assert_eq!(pyproject.tool, None);
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 "#,
         )?;
         assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -215,7 +215,7 @@ mod tests {
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -277,7 +277,7 @@ line-length = 79
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -339,7 +339,7 @@ exclude = ["foo.py"]
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -401,7 +401,7 @@ select = ["E501"]
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -464,7 +464,7 @@ ignore = ["E501"]
             })
         );
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -473,7 +473,7 @@ line_length = 79
         )
         .is_err());
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -482,7 +482,7 @@ select = ["E123"]
         )
         .is_err());
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
