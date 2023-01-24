@@ -3485,20 +3485,28 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeClass {
 define_violation!(
     pub struct MultiLineSummaryFirstLine;
 );
-impl Violation for MultiLineSummaryFirstLine {
+impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multi-line docstring summary should start at the first line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove whitespace after opening quotes".to_string()
     }
 }
 
 define_violation!(
     pub struct MultiLineSummarySecondLine;
 );
-impl Violation for MultiLineSummarySecondLine {
+impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multi-line docstring summary should start at the second line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Insert line break and indentation after opening quotes".to_string()
     }
 }
 
