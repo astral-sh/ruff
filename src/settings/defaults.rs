@@ -6,7 +6,8 @@ use rustc_hash::FxHashSet;
 use super::hashable::{HashableGlobSet, HashableHashSet};
 use super::types::{FilePattern, PythonVersion};
 use super::Settings;
-use crate::registry::RuleSelector;
+use crate::registry::RuleCodePrefix;
+use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
@@ -14,7 +15,10 @@ use crate::rules::{
     pydocstyle, pylint, pyupgrade,
 };
 
-pub const PREFIXES: &[RuleSelector] = &[RuleSelector::E, RuleSelector::F];
+pub const PREFIXES: &[RuleSelector] = &[
+    prefix_to_selector(RuleCodePrefix::E),
+    prefix_to_selector(RuleCodePrefix::F),
+];
 
 pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
 

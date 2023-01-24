@@ -11,7 +11,8 @@ use rustc_hash::FxHashSet;
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{Rule, RuleSelector, Specificity, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, INCOMPATIBLE_CODES};
+use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
@@ -238,7 +239,10 @@ impl From<&Configuration> for RuleTable {
         let mut rules = RuleTable::empty();
 
         let fixable = resolve_codes([RuleCodeSpec {
-            select: config.fixable.as_deref().unwrap_or(&[RuleSelector::ALL]),
+            select: config
+                .fixable
+                .as_deref()
+                .unwrap_or(&[crate::registry::RuleCodePrefix::ALL.into()]),
             ignore: config.unfixable.as_deref().unwrap_or_default(),
         }]);
 
@@ -352,13 +356,13 @@ fn validate_enabled(enabled: FxHashSet<Rule>) -> FxHashSet<Rule> {
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::registry::{Rule, RuleSelector};
+    use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::{resolve_codes, RuleCodeSpec};
 
     #[test]
     fn rule_codes() {
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleSelector::W],
+            select: &[RuleCodePrefix::W.into()],
             ignore: &[],
         }]);
         let expected = FxHashSet::from_iter([
@@ -369,33 +373,33 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleSelector::W6],
+            select: &[RuleCodePrefix::W6.into()],
             ignore: &[],
         }]);
         let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleSelector::W],
-            ignore: &[RuleSelector::W292],
+            select: &[RuleCodePrefix::W.into()],
+            ignore: &[RuleCodePrefix::W292.into()],
         }]);
         let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleSelector::W605],
-            ignore: &[RuleSelector::W605],
+            select: &[RuleCodePrefix::W605.into()],
+            ignore: &[RuleCodePrefix::W605.into()],
         }]);
         let expected = FxHashSet::from_iter([]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([
             RuleCodeSpec {
-                select: &[RuleSelector::W],
-                ignore: &[RuleSelector::W292],
+                select: &[RuleCodePrefix::W.into()],
+                ignore: &[RuleCodePrefix::W292.into()],
             },
             RuleCodeSpec {
-                select: &[RuleSelector::W292],
+                select: &[RuleCodePrefix::W292.into()],
                 ignore: &[],
             },
         ]);
@@ -408,12 +412,12 @@ mod tests {
 
         let actual = resolve_codes([
             RuleCodeSpec {
-                select: &[RuleSelector::W],
-                ignore: &[RuleSelector::W292],
+                select: &[RuleCodePrefix::W.into()],
+                ignore: &[RuleCodePrefix::W292.into()],
             },
             RuleCodeSpec {
-                select: &[RuleSelector::W292],
-                ignore: &[RuleSelector::W],
+                select: &[RuleCodePrefix::W292.into()],
+                ignore: &[RuleCodePrefix::W.into()],
             },
         ]);
         let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);

@@ -37,6 +37,7 @@ mod noqa;
 mod python;
 pub mod registry;
 pub mod resolver;
+mod rule_selector;
 mod rules;
 mod rustpython_helpers;
 pub mod settings;
@@ -47,6 +48,7 @@ mod violations;
 mod visibility;
 
 use cfg_if::cfg_if;
+pub use rule_selector::RuleSelector;
 pub use violation::{AutofixKind, Availability as AutofixAvailability};
 pub use violations::IOError;
 
