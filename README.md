@@ -2684,6 +2684,28 @@ max-string-length = 20
 
 ---
 
+### `flake8-implicit-str-concat`
+
+#### [`allow-multiline`](#allow-multiline)
+
+Whether to allow implicit string concatenations for multiline strings.
+By default, implicit concatenations of multiline strings are
+allowed (but continuation lines, delimited with a backslash, are
+prohibited).
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-implicit-str-concat]
+allow-multiline = false
+```
+
+---
+
 ### `flake8-import-conventions`
 
 #### [`aliases`](#aliases)
