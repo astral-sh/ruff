@@ -3,9 +3,9 @@
 use std::path::Path;
 
 use crate::registry::{Diagnostic, Rule};
-use crate::rules::flake8_executable::helpers::extract_shebang;
+use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
 use crate::rules::flake8_executable::rules::{
-    shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
+    shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
 use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
@@ -23,9 +23,11 @@ pub fn check_lines(
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
+    let mut has_any_shebang = false;
 
     let enforce_blanket_noqa = settings.rules.enabled(&Rule::BlanketNOQA);
     let enforce_shebang_not_executable = settings.rules.enabled(&Rule::ShebangNotExecutable);
+    let enforce_shebang_missing = settings.rules.enabled(&Rule::ShebangMissingExecutableFile);
     let enforce_shebang_whitespace = settings.rules.enabled(&Rule::ShebangWhitespace);
     let enforce_shebang_newline = settings.rules.enabled(&Rule::ShebangNewline);
     let enforce_shebang_python = settings.rules.enabled(&Rule::ShebangPython);
@@ -74,7 +76,8 @@ pub fn check_lines(
                 }
             }
 
-            if enforce_shebang_not_executable
+            if enforce_shebang_missing
+                || enforce_shebang_not_executable
                 || enforce_shebang_whitespace
                 || enforce_shebang_newline
                 || enforce_shebang_python
@@ -85,7 +88,11 @@ pub fn check_lines(
                         diagnostics.push(diagnostic);
                     }
                 }
-
+                if enforce_shebang_missing {
+                    if !has_any_shebang && matches!(shebang, ShebangDirective::Match(_, _, _, _)) {
+                        has_any_shebang = true;
+                    }
+                }
                 if enforce_shebang_whitespace {
                     if let Some(diagnostic) =
                         shebang_whitespace(index, &shebang, fix_shebang_whitespace)
@@ -136,6 +143,12 @@ pub fn check_lines(
             matches!(autofix, flags::Autofix::Enabled)
                 && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
         ) {
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    if enforce_shebang_missing && !has_any_shebang {
+        if let Some(diagnostic) = shebang_missing(path) {
             diagnostics.push(diagnostic);
         }
     }

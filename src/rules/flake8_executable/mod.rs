@@ -16,6 +16,9 @@ mod tests {
     #[test_case(Path::new("EXE001_1.py"); "EXE001_1")]
     #[test_case(Path::new("EXE001_2.py"); "EXE001_2")]
     #[test_case(Path::new("EXE001_3.py"); "EXE001_3")]
+    #[test_case(Path::new("EXE002_1.py"); "EXE002_1")]
+    #[test_case(Path::new("EXE002_2.py"); "EXE002_2")]
+    #[test_case(Path::new("EXE002_3.py"); "EXE002_3")]
     #[test_case(Path::new("EXE003.py"); "EXE003")]
     #[test_case(Path::new("EXE004_1.py"); "EXE004_1")]
     #[test_case(Path::new("EXE004_2.py"); "EXE004_2")]
@@ -31,6 +34,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rules(vec![
                 Rule::ShebangNotExecutable,
+                Rule::ShebangMissingExecutableFile,
                 Rule::ShebangWhitespace,
                 Rule::ShebangNewline,
                 Rule::ShebangPython,

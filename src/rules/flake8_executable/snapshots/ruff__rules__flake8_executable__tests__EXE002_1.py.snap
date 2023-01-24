@@ -1,0 +1,15 @@
+---
+source: src/rules/flake8_executable/mod.rs
+expression: diagnostics
+---
+- kind:
+    ShebangMissingExecutableFile: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 0
+  fix: ~
+  parent: ~
+

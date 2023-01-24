@@ -425,6 +425,7 @@ ruff_macros::define_rule_mapping!(
     INP001 => violations::ImplicitNamespacePackage,
     // flake8-executable
     EXE001 => rules::flake8_executable::rules::ShebangNotExecutable,
+    EXE002 => rules::flake8_executable::rules::ShebangMissingExecutableFile,
     EXE003 => rules::flake8_executable::rules::ShebangPython,
     EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
