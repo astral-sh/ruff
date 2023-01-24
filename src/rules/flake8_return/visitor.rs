@@ -7,6 +7,7 @@ use crate::ast::visitor::Visitor;
 #[derive(Default)]
 pub struct Stack<'a> {
     pub returns: Vec<(&'a Stmt, Option<&'a Expr>)>,
+    pub yields: Vec<&'a Expr>,
     pub ifs: Vec<&'a Stmt>,
     pub elifs: Vec<&'a Stmt>,
     pub refs: FxHashMap<&'a str, Vec<Location>>,
@@ -116,7 +117,6 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .push((stmt.location, stmt.end_location.unwrap()));
                 visitor::walk_stmt(self, stmt);
             }
-
             _ => {
                 visitor::walk_stmt(self, stmt);
             }
@@ -143,8 +143,8 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .or_insert_with(Vec::new)
                     .push(expr.location);
             }
-            ExprKind::JoinedStr { .. } => {
-                visitor::walk_expr(self, expr);
+            ExprKind::YieldFrom { .. } | ExprKind::Yield { .. } => {
+                self.stack.yields.push(expr);
             }
             _ => visitor::walk_expr(self, expr),
         }
