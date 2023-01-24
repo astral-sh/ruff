@@ -4,7 +4,8 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 
-use crate::registry::RuleSelector;
+use crate::registry::RuleCodePrefix;
+use crate::rule_selector::RuleSelector;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
@@ -130,42 +131,43 @@ impl fmt::Debug for Plugin {
     }
 }
 
+// TODO(martin): Convert into `impl From<Plugin> for Linter`
 impl Plugin {
     pub fn selector(&self) -> RuleSelector {
         match self {
-            Plugin::Flake82020 => RuleSelector::YTT,
-            Plugin::Flake8Annotations => RuleSelector::ANN,
-            Plugin::Flake8Bandit => RuleSelector::S,
-            Plugin::Flake8BlindExcept => RuleSelector::BLE,
-            Plugin::Flake8BooleanTrap => RuleSelector::FBT,
-            Plugin::Flake8Bugbear => RuleSelector::B,
-            Plugin::Flake8Builtins => RuleSelector::A,
-            Plugin::Flake8Commas => RuleSelector::COM,
-            Plugin::Flake8Comprehensions => RuleSelector::C4,
-            Plugin::Flake8Datetimez => RuleSelector::DTZ,
-            Plugin::Flake8Debugger => RuleSelector::T1,
-            Plugin::Flake8Docstrings => RuleSelector::D,
-            Plugin::Flake8Eradicate => RuleSelector::ERA,
-            Plugin::Flake8ErrMsg => RuleSelector::EM,
-            Plugin::Flake8Executable => RuleSelector::EXE,
-            Plugin::Flake8ImplicitStrConcat => RuleSelector::ISC,
-            Plugin::Flake8ImportConventions => RuleSelector::ICN,
-            Plugin::Flake8NoPep420 => RuleSelector::INP,
-            Plugin::Flake8Pie => RuleSelector::PIE,
-            Plugin::Flake8Print => RuleSelector::T2,
-            Plugin::Flake8PytestStyle => RuleSelector::PT,
-            Plugin::Flake8Quotes => RuleSelector::Q,
-            Plugin::Flake8Return => RuleSelector::RET,
-            Plugin::Flake8Simplify => RuleSelector::SIM,
-            Plugin::Flake8TidyImports => RuleSelector::TID,
-            Plugin::Flake8TypeChecking => RuleSelector::TYP,
-            Plugin::Flake8UnusedArguments => RuleSelector::ARG,
-            Plugin::Flake8UsePathlib => RuleSelector::PTH,
-            Plugin::McCabe => RuleSelector::C9,
-            Plugin::PEP8Naming => RuleSelector::N,
-            Plugin::PandasVet => RuleSelector::PD,
-            Plugin::Pyupgrade => RuleSelector::UP,
-            Plugin::Tryceratops => RuleSelector::TRY,
+            Plugin::Flake82020 => RuleCodePrefix::YTT.into(),
+            Plugin::Flake8Annotations => RuleCodePrefix::ANN.into(),
+            Plugin::Flake8Bandit => RuleCodePrefix::S.into(),
+            Plugin::Flake8BlindExcept => RuleCodePrefix::BLE.into(),
+            Plugin::Flake8BooleanTrap => RuleCodePrefix::FBT.into(),
+            Plugin::Flake8Bugbear => RuleCodePrefix::B.into(),
+            Plugin::Flake8Builtins => RuleCodePrefix::A.into(),
+            Plugin::Flake8Commas => RuleCodePrefix::COM.into(),
+            Plugin::Flake8Comprehensions => RuleCodePrefix::C4.into(),
+            Plugin::Flake8Datetimez => RuleCodePrefix::DTZ.into(),
+            Plugin::Flake8Debugger => RuleCodePrefix::T1.into(),
+            Plugin::Flake8Docstrings => RuleCodePrefix::D.into(),
+            Plugin::Flake8Eradicate => RuleCodePrefix::ERA.into(),
+            Plugin::Flake8ErrMsg => RuleCodePrefix::EM.into(),
+            Plugin::Flake8Executable => RuleCodePrefix::EXE.into(),
+            Plugin::Flake8ImplicitStrConcat => RuleCodePrefix::ISC.into(),
+            Plugin::Flake8ImportConventions => RuleCodePrefix::ICN.into(),
+            Plugin::Flake8NoPep420 => RuleCodePrefix::INP.into(),
+            Plugin::Flake8Pie => RuleCodePrefix::PIE.into(),
+            Plugin::Flake8Print => RuleCodePrefix::T2.into(),
+            Plugin::Flake8PytestStyle => RuleCodePrefix::PT.into(),
+            Plugin::Flake8Quotes => RuleCodePrefix::Q.into(),
+            Plugin::Flake8Return => RuleCodePrefix::RET.into(),
+            Plugin::Flake8Simplify => RuleCodePrefix::SIM.into(),
+            Plugin::Flake8TidyImports => RuleCodePrefix::TID.into(),
+            Plugin::Flake8TypeChecking => RuleCodePrefix::TYP.into(),
+            Plugin::Flake8UnusedArguments => RuleCodePrefix::ARG.into(),
+            Plugin::Flake8UsePathlib => RuleCodePrefix::PTH.into(),
+            Plugin::McCabe => RuleCodePrefix::C9.into(),
+            Plugin::PEP8Naming => RuleCodePrefix::N.into(),
+            Plugin::PandasVet => RuleCodePrefix::PD.into(),
+            Plugin::Pyupgrade => RuleCodePrefix::UP.into(),
+            Plugin::Tryceratops => RuleCodePrefix::TRY.into(),
         }
     }
 }

@@ -12,7 +12,8 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 
 use super::hashable::HashableHashSet;
 use crate::fs;
-use crate::registry::{Rule, RuleSelector};
+use crate::registry::Rule;
+use crate::rule_selector::RuleSelector;
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,

@@ -5,7 +5,8 @@ use anyhow::Result;
 use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
 use super::{parser, plugin};
-use crate::registry::RuleSelector;
+use crate::registry::RuleCodePrefix;
+use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
@@ -20,7 +21,11 @@ use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
 use crate::warn_user;
 
-const DEFAULT_SELECTORS: &[RuleSelector] = &[RuleSelector::F, RuleSelector::E, RuleSelector::W];
+const DEFAULT_SELECTORS: &[RuleSelector] = &[
+    prefix_to_selector(RuleCodePrefix::F),
+    prefix_to_selector(RuleCodePrefix::E),
+    prefix_to_selector(RuleCodePrefix::W),
+];
 
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
@@ -426,7 +431,8 @@ mod tests {
     use super::convert;
     use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
     use crate::flake8_to_ruff::ExternalConfig;
-    use crate::registry::RuleSelector;
+    use crate::registry::RuleCodePrefix;
+    use crate::rule_selector::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
     use crate::settings::options::Options;
@@ -555,7 +561,7 @@ mod tests {
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
-            ..default_options([RuleSelector::D])
+            ..default_options([RuleCodePrefix::D.into()])
         });
         assert_eq!(actual, expected);
 
@@ -579,7 +585,7 @@ mod tests {
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
-            ..default_options([RuleSelector::Q])
+            ..default_options([RuleCodePrefix::Q.into()])
         });
         assert_eq!(actual, expected);
 

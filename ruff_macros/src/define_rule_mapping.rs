@@ -53,7 +53,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
     let rulecodeprefix = super::rule_code_prefix::expand(
         &Ident::new("Rule", Span::call_site()),
-        &Ident::new("RuleSelector", Span::call_site()),
+        &Ident::new("RuleCodePrefix", Span::call_site()),
         mapping.entries.iter().map(|(code, ..)| code),
         |code| code_to_name[code],
     );

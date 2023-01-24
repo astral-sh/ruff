@@ -147,17 +147,6 @@ pub fn expand<'a>(
     });
 
     quote! {
-        #[derive(PartialEq, Eq, PartialOrd, Ord)]
-        pub enum Specificity {
-            All,
-            Linter,
-            Code1Char,
-            Code2Chars,
-            Code3Chars,
-            Code4Chars,
-            Code5Chars,
-        }
-
         #[derive(
             ::strum_macros::EnumString,
             ::strum_macros::AsRefStr,
@@ -244,7 +233,9 @@ fn generate_impls<'a>(
 
     quote! {
         impl #prefix_ident {
-            pub fn specificity(&self) -> Specificity {
+            pub(crate) fn specificity(&self) -> crate::rule_selector::Specificity {
+                use crate::rule_selector::Specificity;
+
                 #[allow(clippy::match_same_arms)]
                 match self {
                     #(#specificity_match_arms)*

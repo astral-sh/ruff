@@ -13,7 +13,7 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::fs;
-use crate::registry::RuleSelector;
+use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,

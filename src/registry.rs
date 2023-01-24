@@ -9,6 +9,7 @@ use strum_macros::{AsRefStr, EnumIter};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
+use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::violation::Violation;
 use crate::{rules, violations};
 
@@ -607,19 +608,25 @@ pub trait RuleNamespace: Sized {
 /// The prefix, name and selector for an upstream linter category.
 pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleSelector);
 
+// TODO(martin): Move these constant definitions back to Linter::categories impl
+// once RuleSelector is an enum with a Linter variant
+const PYCODESTYLE_CATEGORIES: &[LinterCategory] = &[
+    LinterCategory("E", "Error", prefix_to_selector(RuleCodePrefix::E)),
+    LinterCategory("W", "Warning", prefix_to_selector(RuleCodePrefix::W)),
+];
+
+const PYLINT_CATEGORIES: &[LinterCategory] = &[
+    LinterCategory("PLC", "Convention", prefix_to_selector(RuleCodePrefix::PLC)),
+    LinterCategory("PLE", "Error", prefix_to_selector(RuleCodePrefix::PLE)),
+    LinterCategory("PLR", "Refactor", prefix_to_selector(RuleCodePrefix::PLR)),
+    LinterCategory("PLW", "Warning", prefix_to_selector(RuleCodePrefix::PLW)),
+];
+
 impl Linter {
     pub fn categories(&self) -> Option<&'static [LinterCategory]> {
         match self {
-            Linter::Pycodestyle => Some(&[
-                LinterCategory("E", "Error", RuleSelector::E),
-                LinterCategory("W", "Warning", RuleSelector::W),
-            ]),
-            Linter::Pylint => Some(&[
-                LinterCategory("PLC", "Convention", RuleSelector::PLC),
-                LinterCategory("PLE", "Error", RuleSelector::PLE),
-                LinterCategory("PLR", "Refactor", RuleSelector::PLR),
-                LinterCategory("PLW", "Warning", RuleSelector::PLW),
-            ]),
+            Linter::Pycodestyle => Some(PYCODESTYLE_CATEGORIES),
+            Linter::Pylint => Some(PYLINT_CATEGORIES),
             _ => None,
         }
     }
