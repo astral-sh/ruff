@@ -435,6 +435,7 @@ ruff_macros::define_rule_mapping!(
     TYP004 => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
     TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // tryceratops
+    TRY002 => rules::tryceratops::rules::RaiseVanillaClass,
     TRY004 => rules::tryceratops::rules::PreferTypeError,
     TRY200 => rules::tryceratops::rules::ReraiseNoCause,
     TRY201 => rules::tryceratops::rules::VerboseRaise,
