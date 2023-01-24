@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 use crate::registry::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle,
+    pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -439,6 +439,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `flake8-tidy-imports` plugin.
     pub flake8_tidy_imports: Option<flake8_tidy_imports::options::Options>,
+    #[option_group]
+    /// Options for the `flake8-implicit-str-concat` plugin.
+    pub flake8_implicit_str_concat: Option<flake8_implicit_str_concat::settings::Options>,
     #[option_group]
     /// Options for the `flake8-import-conventions` plugin.
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,

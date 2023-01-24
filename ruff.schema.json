@@ -175,6 +175,17 @@
         }
       ]
     },
+    "flake8-implicit-str-concat": {
+      "description": "Options for the `flake8-implicit-str-concat` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-import-conventions": {
       "description": "Options for the `flake8-import-conventions` plugin.",
       "anyOf": [
@@ -622,6 +633,19 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8ImplicitStrConcatOptions": {
+      "type": "object",
+      "properties": {
+        "allow-multiline": {
+          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

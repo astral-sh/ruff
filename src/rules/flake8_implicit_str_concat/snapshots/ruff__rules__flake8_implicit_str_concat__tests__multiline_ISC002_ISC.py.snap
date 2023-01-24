@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_implicit_str_concat/mod.rs
+expression: diagnostics
+---
+- kind:
+    MultiLineImplicitStringConcatenation: ~
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 6
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    MultiLineImplicitStringConcatenation: ~
+  location:
+    row: 24
+    column: 2
+  end_location:
+    row: 25
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiLineImplicitStringConcatenation: ~
+  location:
+    row: 29
+    column: 2
+  end_location:
+    row: 30
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiLineImplicitStringConcatenation: ~
+  location:
+    row: 34
+    column: 2
+  end_location:
+    row: 35
+    column: 8
+  fix: ~
+  parent: ~
+

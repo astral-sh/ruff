@@ -660,9 +660,9 @@ impl Rule {
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
             | Rule::CommentedOutCode
+            | Rule::MultiLineImplicitStringConcatenation
             | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
-            | Rule::MultiLineImplicitStringConcatenation
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TrailingCommaMissing
             | Rule::TrailingCommaOnBareTupleProhibited
