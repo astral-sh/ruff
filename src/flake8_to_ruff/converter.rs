@@ -21,6 +21,8 @@ use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
 use crate::warn_user;
 
+const DEFAULT_SELECTORS: &[RuleSelector] = &[RuleSelector::F, RuleSelector::E, RuleSelector::W];
+
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
     external_config: &ExternalConfig,
@@ -409,7 +411,7 @@ pub fn convert(
 /// Resolve the set of enabled `RuleSelector` values for the given
 /// plugins.
 fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleSelector> {
-    let mut select = BTreeSet::from([RuleSelector::F, RuleSelector::E, RuleSelector::W]);
+    let mut select: BTreeSet<_> = DEFAULT_SELECTORS.iter().cloned().collect();
     select.extend(plugins.iter().map(Plugin::selector));
     select
 }
@@ -419,15 +421,32 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
+    use itertools::Itertools;
 
     use super::super::plugin::Plugin;
     use super::convert;
+    use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
     use crate::flake8_to_ruff::ExternalConfig;
     use crate::registry::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
     use crate::settings::options::Options;
     use crate::settings::pyproject::Pyproject;
+
+    fn default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> Options {
+        Options {
+            ignore: Some(vec![]),
+            select: Some(
+                DEFAULT_SELECTORS
+                    .iter()
+                    .cloned()
+                    .chain(plugins)
+                    .sorted()
+                    .collect(),
+            ),
+            ..Options::default()
+        }
+    }
 
     #[test]
     fn it_converts_empty() -> Result<()> {
@@ -436,11 +455,7 @@ mod tests {
             &ExternalConfig::default(),
             None,
         )?;
-        let expected = Pyproject::new(Options {
-            ignore: Some(vec![]),
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            ..Options::default()
-        });
+        let expected = Pyproject::new(default_options([]));
         assert_eq!(actual, expected);
 
         Ok(())
@@ -457,10 +472,8 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            ignore: Some(vec![]),
             line_length: Some(100),
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            ..Options::default()
+            ..default_options([])
         });
         assert_eq!(actual, expected);
 
@@ -478,10 +491,8 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            ignore: Some(vec![]),
             line_length: Some(100),
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            ..Options::default()
+            ..default_options([])
         });
         assert_eq!(actual, expected);
 
@@ -498,11 +509,7 @@ mod tests {
             &ExternalConfig::default(),
             Some(vec![]),
         )?;
-        let expected = Pyproject::new(Options {
-            ignore: Some(vec![]),
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            ..Options::default()
-        });
+        let expected = Pyproject::new(default_options([]));
         assert_eq!(actual, expected);
 
         Ok(())
@@ -519,15 +526,13 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            ignore: Some(vec![]),
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
-            ..Options::default()
+            ..default_options([])
         });
         assert_eq!(actual, expected);
 
@@ -548,17 +553,10 @@ mod tests {
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
-            ignore: Some(vec![]),
-            select: Some(vec![
-                RuleSelector::D,
-                RuleSelector::E,
-                RuleSelector::F,
-                RuleSelector::W,
-            ]),
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
-            ..Options::default()
+            ..default_options([RuleSelector::D])
         });
         assert_eq!(actual, expected);
 
@@ -576,20 +574,13 @@ mod tests {
             None,
         )?;
         let expected = Pyproject::new(Options {
-            ignore: Some(vec![]),
-            select: Some(vec![
-                RuleSelector::E,
-                RuleSelector::F,
-                RuleSelector::Q,
-                RuleSelector::W,
-            ]),
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
-            ..Options::default()
+            ..default_options([RuleSelector::Q])
         });
         assert_eq!(actual, expected);
 
