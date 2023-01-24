@@ -40,6 +40,11 @@ impl RuleTable {
     pub fn enable(&mut self, code: Rule, should_fix: bool) {
         self.enabled.insert(code, should_fix);
     }
+
+    /// Disables the given rule.
+    pub fn disable(&mut self, rule: &Rule) {
+        self.enabled.remove(rule);
+    }
 }
 
 impl<I: IntoIterator<Item = Rule>> From<I> for RuleTable {

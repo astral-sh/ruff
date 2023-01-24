@@ -2,12 +2,10 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::iter;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use globset::Glob;
-use itertools::Either::{Left, Right};
 use rustc_hash::FxHashSet;
 
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
@@ -256,27 +254,24 @@ impl From<&Configuration> for RuleTable {
                     .iter()
                     .zip(config.extend_ignore.iter())
                     .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
-            )
-            .chain(
-                // If a docstring convention is specified, force-disable any incompatible error
-                // codes.
-                if let Some(convention) = config
-                    .pydocstyle
-                    .as_ref()
-                    .and_then(|pydocstyle| pydocstyle.convention)
-                {
-                    Left(iter::once(RuleCodeSpec {
-                        select: &[],
-                        ignore: convention.codes(),
-                    }))
-                } else {
-                    Right(iter::empty())
-                },
             ),
         )) {
             let fix = fixable.contains(&code);
             rules.enable(code, fix);
         }
+
+        // If a docstring convention is specified, force-disable any incompatible error
+        // codes.
+        if let Some(convention) = config
+            .pydocstyle
+            .as_ref()
+            .and_then(|pydocstyle| pydocstyle.convention)
+        {
+            for rule in convention.rules_to_be_ignored() {
+                rules.disable(rule);
+            }
+        }
+
         rules
     }
 }
