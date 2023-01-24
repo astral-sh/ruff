@@ -1,7 +1,7 @@
-#[cfg(not(target_family = "wasm"))]
-use std::os::unix::prelude::MetadataExt;
 use std::path::Path;
 
+#[cfg(not(target_family = "wasm"))]
+use is_executable::IsExecutable;
 use ruff_macros::derive_message_formats;
 #[cfg(not(target_family = "wasm"))]
 use rustpython_ast::Location;
@@ -31,22 +31,17 @@ pub fn shebang_not_executable(
     shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
     if let ShebangDirective::Match(_, start, end, _) = shebang {
-        if let Ok(metadata) = filepath.metadata() {
-            // Check if file is executable by anyone
-            if metadata.mode() & 0o111 == 0 {
-                let diagnostic = Diagnostic::new(
-                    ShebangNotExecutable,
-                    Range::new(
-                        Location::new(lineno + 1, *start),
-                        Location::new(lineno + 1, *end),
-                    ),
-                );
-                Some(diagnostic)
-            } else {
-                None
-            }
-        } else {
+        if filepath.is_executable() {
             None
+        } else {
+            let diagnostic = Diagnostic::new(
+                ShebangNotExecutable,
+                Range::new(
+                    Location::new(lineno + 1, *start),
+                    Location::new(lineno + 1, *end),
+                ),
+            );
+            Some(diagnostic)
         }
     } else {
         None

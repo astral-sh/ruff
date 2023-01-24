@@ -61,7 +61,7 @@ strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 thiserror = { version = "1.0" }
 titlecase = { version = "2.2.1" }
-toml = { version = "0.6.0", features= ["parse"] }
+toml = { version = "0.6.0" }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support
@@ -72,6 +72,9 @@ console_log = { version = "0.2.0" }
 serde-wasm-bindgen = { version = "0.4" }
 js-sys = { version = "0.3.60" }
 wasm-bindgen = { version = "0.2.83" }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+is_executable = "1.0.1"
 
 [dev-dependencies]
 insta = { version = "1.19.1", features = ["yaml"] }
