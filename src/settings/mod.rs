@@ -239,10 +239,7 @@ impl From<&Configuration> for RuleTable {
         let mut rules = RuleTable::empty();
 
         let fixable = resolve_codes([RuleCodeSpec {
-            select: config
-                .fixable
-                .as_deref()
-                .unwrap_or(&[crate::registry::RuleCodePrefix::ALL.into()]),
+            select: config.fixable.as_deref().unwrap_or(&[RuleSelector::All]),
             ignore: config.unfixable.as_deref().unwrap_or_default(),
         }]);
 
