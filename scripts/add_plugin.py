@@ -10,15 +10,14 @@ Example usage:
 """
 
 import argparse
-import os
 
 from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
 
 
 def main(*, plugin: str, url: str, prefix_code: str) -> None:
+    """Generate boilerplate for a new plugin."""
     # Create the test fixture folder.
-    os.makedirs(
-        ROOT_DIR / "resources/test/fixtures" / dir_name(plugin),
+    (ROOT_DIR / "resources/test/fixtures" / dir_name(plugin)).mkdir(
         exist_ok=True,
     )
 
@@ -56,7 +55,7 @@ mod tests {
     }
 }
 """
-            % dir_name(plugin)
+            % dir_name(plugin),
         )
 
     # Create a subdirectory for rules and create a `mod.rs` placeholder
@@ -84,7 +83,7 @@ mod tests {
                 fp.write(f"{indent}// {plugin}")
                 fp.write("\n")
 
-            elif line.strip() == '/// Ruff-specific rules':
+            elif line.strip() == "/// Ruff-specific rules":
                 fp.write(f"/// [{plugin}]({url})\n")
                 fp.write(f'{indent}#[prefix = "{prefix_code}"]\n')
                 fp.write(f"{indent}{pascal_case(plugin)},")
