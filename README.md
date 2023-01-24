@@ -64,6 +64,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
 - [cibuildwheel](https://github.com/pypa/cibuildwheel)
+- [Home Assistant](https://github.com/home-assistant/core)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
