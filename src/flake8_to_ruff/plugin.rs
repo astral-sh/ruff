@@ -40,6 +40,7 @@ pub enum Plugin {
     PEP8Naming,
     PandasVet,
     Pyupgrade,
+    Tryceratops,
 }
 
 impl FromStr for Plugin {
@@ -79,6 +80,7 @@ impl FromStr for Plugin {
             "pep8-naming" => Ok(Plugin::PEP8Naming),
             "pandas-vet" => Ok(Plugin::PandasVet),
             "pyupgrade" => Ok(Plugin::Pyupgrade),
+            "tryceratops" => Ok(Plugin::Tryceratops),
             _ => Err(anyhow!("Unknown plugin: {string}")),
         }
     }
@@ -122,6 +124,7 @@ impl fmt::Debug for Plugin {
                 Plugin::PEP8Naming => "pep8-naming",
                 Plugin::PandasVet => "pandas-vet",
                 Plugin::Pyupgrade => "pyupgrade",
+                Plugin::Tryceratops => "tryceratops",
             }
         )
     }
@@ -154,7 +157,7 @@ impl Plugin {
             Plugin::Flake8Quotes => RuleSelector::Q,
             Plugin::Flake8Return => RuleSelector::RET,
             Plugin::Flake8Simplify => RuleSelector::SIM,
-            Plugin::Flake8TidyImports => RuleSelector::TID25,
+            Plugin::Flake8TidyImports => RuleSelector::TID,
             Plugin::Flake8TypeChecking => RuleSelector::TYP,
             Plugin::Flake8UnusedArguments => RuleSelector::ARG,
             Plugin::Flake8UsePathlib => RuleSelector::PTH,
@@ -162,6 +165,7 @@ impl Plugin {
             Plugin::PEP8Naming => RuleSelector::N,
             Plugin::PandasVet => RuleSelector::PD,
             Plugin::Pyupgrade => RuleSelector::UP,
+            Plugin::Tryceratops => RuleSelector::TRY,
         }
     }
 }
@@ -314,13 +318,14 @@ pub fn infer_plugins_from_codes(selectors: &BTreeSet<RuleSelector>) -> Vec<Plugi
         Plugin::Flake8Quotes,
         Plugin::Flake8Return,
         Plugin::Flake8Simplify,
-        Plugin::Flake8TidyImports,
+        // Plugin::Flake8TidyImports,
         // Plugin::Flake8TypeChecking,
         Plugin::Flake8UnusedArguments,
         // Plugin::Flake8UsePathlib,
         Plugin::McCabe,
         Plugin::PEP8Naming,
         Plugin::PandasVet,
+        Plugin::Tryceratops,
     ]
     .into_iter()
     .filter(|plugin| {
