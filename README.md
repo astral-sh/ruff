@@ -1203,6 +1203,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
 | TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
 | TRY300 | try-consider-else | Consider `else` block |  |
+| TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 
 ### flake8-use-pathlib (PTH)
 
