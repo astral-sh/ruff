@@ -286,14 +286,6 @@ pub fn infer_plugins_from_codes(selectors: &BTreeSet<RuleSelector>) -> Vec<Plugi
     .collect()
 }
 
-/// Resolve the set of enabled `RuleSelector` values for the given
-/// plugins.
-pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleSelector> {
-    let mut select = BTreeSet::from([RuleSelector::F, RuleSelector::E, RuleSelector::W]);
-    select.extend(plugins.iter().map(Plugin::selector));
-    select
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

@@ -76,7 +76,7 @@ pub fn convert(
                 .as_ref()
                 .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
         })
-        .unwrap_or_else(|| plugin::resolve_select(&plugins));
+        .unwrap_or_else(|| resolve_select(&plugins));
     let mut ignore = flake8
         .get("ignore")
         .and_then(|value| {
@@ -404,6 +404,14 @@ pub fn convert(
 
     // Create the pyproject.toml.
     Ok(Pyproject::new(options))
+}
+
+/// Resolve the set of enabled `RuleSelector` values for the given
+/// plugins.
+fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleSelector> {
+    let mut select = BTreeSet::from([RuleSelector::F, RuleSelector::E, RuleSelector::W]);
+    select.extend(plugins.iter().map(Plugin::selector));
+    select
 }
 
 #[cfg(test)]
