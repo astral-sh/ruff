@@ -1424,7 +1424,7 @@ where
                     );
                 }
                 if self.settings.rules.enabled(&Rule::OldCodeBlocks) {
-                    pyupgrade::rules::old_code_blocks(self, test, body, orelse);
+                    pyupgrade::rules::old_code_blocks(self, stmt, test, body, orelse);
                 }
             }
             StmtKind::Assert { test, msg } => {
