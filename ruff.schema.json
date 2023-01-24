@@ -1188,13 +1188,13 @@
     "RuleSelector": {
       "type": "string",
       "enum": [
+        "ALL",
         "A",
         "A0",
         "A00",
         "A001",
         "A002",
         "A003",
-        "ALL",
         "ANN",
         "ANN0",
         "ANN00",

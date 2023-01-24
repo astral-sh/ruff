@@ -5,8 +5,6 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::Ident;
 
-const ALL: &str = "ALL";
-
 /// A hash map from deprecated `RuleSelector` to latest
 /// `RuleSelector`.
 pub static PREFIX_REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
@@ -116,7 +114,6 @@ pub fn expand<'a>(
         all_codes.insert(code_str);
     }
 
-    prefix_to_codes.insert(ALL.to_string(), all_codes);
     prefix_to_codes.insert("PL".to_string(), pl_codes);
 
     // Add any prefix aliases (e.g., "U" to "UP").
@@ -148,6 +145,7 @@ pub fn expand<'a>(
 
     quote! {
         #[derive(
+            ::strum_macros::EnumIter,
             ::strum_macros::EnumString,
             ::strum_macros::AsRefStr,
             Debug,
@@ -158,7 +156,6 @@ pub fn expand<'a>(
             Clone,
             ::serde::Serialize,
             ::serde::Deserialize,
-            ::schemars::JsonSchema,
         )]
         pub enum #prefix_ident {
             #(#prefix_variants,)*
@@ -207,27 +204,21 @@ fn generate_impls<'a>(
 
     let specificity_match_arms = prefix_to_codes.keys().map(|prefix_str| {
         let prefix = Ident::new(prefix_str, Span::call_site());
-        if prefix_str == ALL {
-            quote! {
-                #prefix_ident::#prefix => Specificity::All,
-            }
-        } else {
-            let mut num_numeric = prefix_str.chars().filter(|char| char.is_numeric()).count();
-            if prefix_str != "PL" && prefix_str.starts_with("PL") {
-                num_numeric += 1;
-            }
-            let suffix_len = match num_numeric {
-                0 => quote! { Specificity::Linter },
-                1 => quote! { Specificity::Code1Char },
-                2 => quote! { Specificity::Code2Chars },
-                3 => quote! { Specificity::Code3Chars },
-                4 => quote! { Specificity::Code4Chars },
-                5 => quote! { Specificity::Code5Chars },
-                _ => panic!("Invalid prefix: {prefix}"),
-            };
-            quote! {
-                #prefix_ident::#prefix => #suffix_len,
-            }
+        let mut num_numeric = prefix_str.chars().filter(|char| char.is_numeric()).count();
+        if prefix_str != "PL" && prefix_str.starts_with("PL") {
+            num_numeric += 1;
+        }
+        let suffix_len = match num_numeric {
+            0 => quote! { Specificity::Linter },
+            1 => quote! { Specificity::Code1Char },
+            2 => quote! { Specificity::Code2Chars },
+            3 => quote! { Specificity::Code3Chars },
+            4 => quote! { Specificity::Code4Chars },
+            5 => quote! { Specificity::Code5Chars },
+            _ => panic!("Invalid prefix: {prefix}"),
+        };
+        quote! {
+            #prefix_ident::#prefix => #suffix_len,
         }
     });
 
