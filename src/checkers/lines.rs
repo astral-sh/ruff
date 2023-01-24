@@ -1,8 +1,12 @@
 //! Lint rules based on checking raw physical lines.
 
+use std::path::Path;
+
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::flake8_executable::helpers::extract_shebang;
-use crate::rules::flake8_executable::rules::{shebang_newline, shebang_python, shebang_whitespace};
+use crate::rules::flake8_executable::rules::{
+    shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
+};
 use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
 };
@@ -11,6 +15,7 @@ use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
 
 pub fn check_lines(
+    path: &Path,
     contents: &str,
     commented_lines: &[usize],
     doc_lines: &[usize],
@@ -20,6 +25,7 @@ pub fn check_lines(
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     let enforce_blanket_noqa = settings.rules.enabled(&Rule::BlanketNOQA);
+    let enforce_shebang_not_executable = settings.rules.enabled(&Rule::ShebangNotExecutable);
     let enforce_shebang_whitespace = settings.rules.enabled(&Rule::ShebangWhitespace);
     let enforce_shebang_newline = settings.rules.enabled(&Rule::ShebangNewline);
     let enforce_shebang_python = settings.rules.enabled(&Rule::ShebangPython);
@@ -68,8 +74,18 @@ pub fn check_lines(
                 }
             }
 
-            if enforce_shebang_whitespace || enforce_shebang_newline || enforce_shebang_python {
+            if enforce_shebang_not_executable
+                || enforce_shebang_whitespace
+                || enforce_shebang_newline
+                || enforce_shebang_python
+            {
                 let shebang = extract_shebang(line);
+                if enforce_shebang_not_executable {
+                    if let Some(diagnostic) = shebang_not_executable(path, index, &shebang) {
+                        diagnostics.push(diagnostic);
+                    }
+                }
+
                 if enforce_shebang_whitespace {
                     if let Some(diagnostic) =
                         shebang_whitespace(index, &shebang, fix_shebang_whitespace)
@@ -130,6 +146,8 @@ pub fn check_lines(
 #[cfg(test)]
 mod tests {
 
+    use std::path::Path;
+
     use super::check_lines;
     use crate::registry::Rule;
     use crate::settings::{flags, Settings};
@@ -139,6 +157,7 @@ mod tests {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let check_with_max_line_length = |line_length: usize| {
             check_lines(
+                Path::new("foo.py"),
                 line,
                 &[],
                 &[],
