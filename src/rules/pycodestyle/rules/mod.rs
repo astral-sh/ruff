@@ -1,4 +1,6 @@
-pub use ambiguous_names::{ambiguous_class_name, ambiguous_function_name, ambiguous_variable_name};
+pub use ambiguous_class_name::ambiguous_class_name;
+pub use ambiguous_function_name::ambiguous_function_name;
+pub use ambiguous_variable_name::ambiguous_variable_name;
 pub use do_not_assign_lambda::do_not_assign_lambda;
 pub use do_not_use_bare_except::do_not_use_bare_except;
 pub use doc_line_too_long::doc_line_too_long;
@@ -11,7 +13,9 @@ pub use no_newline_at_end_of_file::no_newline_at_end_of_file;
 pub use not_tests::not_tests;
 pub use type_comparison::type_comparison;
 
-mod ambiguous_names;
+mod ambiguous_class_name;
+mod ambiguous_function_name;
+mod ambiguous_variable_name;
 mod do_not_assign_lambda;
 mod do_not_use_bare_except;
 mod doc_line_too_long;

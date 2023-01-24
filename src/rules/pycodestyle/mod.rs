@@ -2,6 +2,8 @@
 pub(crate) mod rules;
 pub mod settings;
 
+pub mod helpers;
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
