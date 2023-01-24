@@ -1,9 +1,12 @@
+#[cfg(not(target_family = "wasm"))]
 use std::os::unix::prelude::MetadataExt;
 use std::path::Path;
 
 use ruff_macros::derive_message_formats;
+#[cfg(not(target_family = "wasm"))]
 use rustpython_ast::Location;
 
+#[cfg(not(target_family = "wasm"))]
 use crate::ast::types::Range;
 use crate::define_violation;
 use crate::registry::Diagnostic;
@@ -21,6 +24,7 @@ impl Violation for ShebangNotExecutable {
 }
 
 /// EXE001
+#[cfg(not(target_family = "wasm"))]
 pub fn shebang_not_executable(
     filepath: &Path,
     lineno: usize,
@@ -47,4 +51,13 @@ pub fn shebang_not_executable(
     } else {
         None
     }
+}
+
+#[cfg(target_family = "wasm")]
+pub fn shebang_not_executable(
+    _filepath: &Path,
+    _lineno: usize,
+    _shebang: &ShebangDirective,
+) -> Option<Diagnostic> {
+    None
 }
