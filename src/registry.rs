@@ -424,6 +424,8 @@ ruff_macros::define_rule_mapping!(
     // flake8-no-pep420
     INP001 => violations::ImplicitNamespacePackage,
     // flake8-executable
+    EXE001 => rules::flake8_executable::rules::ShebangNotExecutable,
+    EXE002 => rules::flake8_executable::rules::ShebangMissingExecutableFile,
     EXE003 => rules::flake8_executable::rules::ShebangPython,
     EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
@@ -646,6 +648,8 @@ impl Rule {
             | Rule::MixedSpacesAndTabs
             | Rule::NoNewLineAtEndOfFile
             | Rule::PEP3120UnnecessaryCodingComment
+            | Rule::ShebangMissingExecutableFile
+            | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
             | Rule::ShebangPython
             | Rule::ShebangWhitespace => &LintSource::Lines,
