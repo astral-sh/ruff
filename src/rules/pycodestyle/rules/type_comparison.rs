@@ -1,10 +1,22 @@
 use itertools::izip;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Constant;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+
+define_violation!(
+    pub struct TypeComparison;
+);
+impl Violation for TypeComparison {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Do not compare types, use `isinstance()`")
+    }
+}
 
 /// E721
 pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Diagnostic> {
@@ -29,8 +41,7 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                                         kind: None
                                     }
                             ) {
-                                diagnostics
-                                    .push(Diagnostic::new(violations::TypeComparison, location));
+                                diagnostics.push(Diagnostic::new(TypeComparison, location));
                             }
                         }
                     }
@@ -40,7 +51,7 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                 if let ExprKind::Name { id, .. } = &value.node {
                     // Ex) types.IntType
                     if id == "types" {
-                        diagnostics.push(Diagnostic::new(violations::TypeComparison, location));
+                        diagnostics.push(Diagnostic::new(TypeComparison, location));
                     }
                 }
             }

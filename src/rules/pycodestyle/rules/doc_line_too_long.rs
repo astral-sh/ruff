@@ -1,10 +1,23 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
-use crate::violations;
+use crate::violation::Violation;
+
+define_violation!(
+    pub struct DocLineTooLong(pub usize, pub usize);
+);
+impl Violation for DocLineTooLong {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DocLineTooLong(length, limit) = self;
+        format!("Doc line too long ({length} > {limit} characters)")
+    }
+}
 
 /// W505
 pub fn doc_line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
@@ -21,7 +34,7 @@ pub fn doc_line_too_long(lineno: usize, line: &str, settings: &Settings) -> Opti
         &settings.task_tags,
     ) {
         Some(Diagnostic::new(
-            violations::DocLineTooLong(line_length, limit),
+            DocLineTooLong(line_length, limit),
             Range::new(
                 Location::new(lineno + 1, limit),
                 Location::new(lineno + 1, line_length),
