@@ -325,6 +325,11 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
         visitor.stack
     };
 
+    // Avoid false positives for generators.
+    if !stack.yields.is_empty() {
+        return;
+    }
+
     if checker.settings.rules.enabled(&Rule::SuperfluousElseReturn)
         || checker.settings.rules.enabled(&Rule::SuperfluousElseRaise)
         || checker
