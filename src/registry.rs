@@ -647,6 +647,8 @@ impl Rule {
             | Rule::MixedSpacesAndTabs
             | Rule::NoNewLineAtEndOfFile
             | Rule::PEP3120UnnecessaryCodingComment
+            | Rule::ShebangMissingExecutableFile
+            | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
             | Rule::ShebangPython
             | Rule::ShebangWhitespace => &LintSource::Lines,
