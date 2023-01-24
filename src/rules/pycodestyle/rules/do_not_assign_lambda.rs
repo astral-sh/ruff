@@ -1,13 +1,13 @@
 use rustpython_ast::{Arguments, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::helpers::{match_leading_content, match_trailing_content};
+use crate::ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::{Generator, Stylist};
+use crate::source_code::Stylist;
 use crate::violations;
 
 /// E731
@@ -72,7 +72,5 @@ fn function(name: &str, args: &Arguments, body: &Expr, stylist: &Stylist) -> Str
             type_comment: None,
         },
     );
-    let mut generator: Generator = stylist.into();
-    generator.unparse_stmt(&func);
-    generator.generate()
+    unparse_stmt(&func, stylist)
 }

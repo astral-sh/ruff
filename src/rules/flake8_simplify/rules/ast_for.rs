@@ -2,12 +2,12 @@ use rustpython_ast::{
     Comprehension, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop,
 };
 
-use crate::ast::helpers::{create_expr, create_stmt};
+use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::source_code::{Generator, Stylist};
+use crate::source_code::Stylist;
 use crate::violations;
 
 struct Loop<'a> {
@@ -147,26 +147,27 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
 fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Stylist) -> String {
-    let mut generator: Generator = stylist.into();
-    generator.unparse_stmt(&create_stmt(StmtKind::Return {
-        value: Some(Box::new(create_expr(ExprKind::Call {
-            func: Box::new(create_expr(ExprKind::Name {
-                id: id.to_string(),
-                ctx: ExprContext::Load,
-            })),
-            args: vec![create_expr(ExprKind::GeneratorExp {
-                elt: Box::new(test.clone()),
-                generators: vec![Comprehension {
-                    target: target.clone(),
-                    iter: iter.clone(),
-                    ifs: vec![],
-                    is_async: 0,
-                }],
-            })],
-            keywords: vec![],
-        }))),
-    }));
-    generator.generate()
+    unparse_stmt(
+        &create_stmt(StmtKind::Return {
+            value: Some(Box::new(create_expr(ExprKind::Call {
+                func: Box::new(create_expr(ExprKind::Name {
+                    id: id.to_string(),
+                    ctx: ExprContext::Load,
+                })),
+                args: vec![create_expr(ExprKind::GeneratorExp {
+                    elt: Box::new(test.clone()),
+                    generators: vec![Comprehension {
+                        target: target.clone(),
+                        iter: iter.clone(),
+                        ifs: vec![],
+                        is_async: 0,
+                    }],
+                })],
+                keywords: vec![],
+            }))),
+        }),
+        stylist,
+    )
 }
 
 /// SIM110, SIM111
