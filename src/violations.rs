@@ -289,10 +289,14 @@ impl Violation for DocLineTooLong {
 // pyflakes
 
 define_violation!(
-    pub struct UnusedImport(pub String, pub bool, pub bool);
+    pub struct UnusedImport {
+        pub name: string,
+        pub ignore_init: bool ,
+        pub multiple: bool,
+    };
 );
 fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
-    let UnusedImport(name, _, multiple) = unused_import;
+    let UnusedImport{name, ignore_init:_, multiple} = unused_import;
     if *multiple {
         "Remove unused import".to_string()
     } else {
@@ -304,7 +308,7 @@ impl Violation for UnusedImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedImport(name, ignore_init, ..) = self;
+        let UnusedImport{name, ignore_init, ..} = self;
         if *ignore_init {
             format!(
                 "`{name}` imported but unused; consider adding to `__all__` or using a redundant \
@@ -316,7 +320,7 @@ impl Violation for UnusedImport {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedImport(_, ignore_init, _) = self;
+        let UnusedImport{name:_, ignore_init, multiple:_} = self;
         if *ignore_init {
             None
         } else {

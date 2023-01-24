@@ -4472,7 +4472,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
+                            violations::UnusedImport{full_name.to_string(), ignore_init, multiple, name: todo!() },
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -4494,7 +4494,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
+                            violations::UnusedImport{full_name.to_string(), ignore_init, multiple, name: todo!() },
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
