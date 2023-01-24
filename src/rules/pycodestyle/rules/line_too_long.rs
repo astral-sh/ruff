@@ -2,7 +2,7 @@ use rustpython_ast::Location;
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
-use crate::rules::pycodestyle::rules::is_overlong;
+use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
 use crate::violations;
 
