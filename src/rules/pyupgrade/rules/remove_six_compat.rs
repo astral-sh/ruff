@@ -1,11 +1,11 @@
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, StmtKind};
 
-use crate::ast::helpers::{create_expr, create_stmt};
+use crate::ast::helpers::{create_expr, create_stmt, unparse_expr, unparse_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::source_code::{Generator, Locator, Stylist};
+use crate::source_code::{Locator, Stylist};
 use crate::violations;
 
 /// Return `true` if the call path is a reference to `${module}.${any}`.
@@ -130,10 +130,8 @@ fn replace_call_on_arg_by_arg_method_call(
 fn replace_by_expr_kind(node: ExprKind, expr: &Expr, patch: bool, stylist: &Stylist) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
-        let mut generator: Generator = stylist.into();
-        generator.unparse_expr(&create_expr(node), 0);
         diagnostic.amend(Fix::replacement(
-            generator.generate(),
+            unparse_expr(&create_expr(node), stylist),
             expr.location,
             expr.end_location.unwrap(),
         ));
@@ -144,10 +142,8 @@ fn replace_by_expr_kind(node: ExprKind, expr: &Expr, patch: bool, stylist: &Styl
 fn replace_by_stmt_kind(node: StmtKind, expr: &Expr, patch: bool, stylist: &Stylist) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(violations::RemoveSixCompat, Range::from_located(expr));
     if patch {
-        let mut generator: Generator = stylist.into();
-        generator.unparse_stmt(&create_stmt(node));
         diagnostic.amend(Fix::replacement(
-            generator.generate(),
+            unparse_stmt(&create_stmt(node), stylist),
             expr.location,
             expr.end_location.unwrap(),
         ));
