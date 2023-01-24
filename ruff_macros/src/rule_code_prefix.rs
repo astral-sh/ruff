@@ -242,19 +242,6 @@ fn generate_impls<'a>(
         }
     });
 
-    let categories = prefix_to_codes.keys().map(|prefix_str| {
-        if prefix_str.chars().all(char::is_alphabetic)
-            && !PREFIX_REDIRECTS.contains_key(&prefix_str.as_str())
-        {
-            let prefix = Ident::new(prefix_str, Span::call_site());
-            quote! {
-                #prefix_ident::#prefix,
-            }
-        } else {
-            quote! {}
-        }
-    });
-
     quote! {
         impl #prefix_ident {
             pub fn specificity(&self) -> Specificity {
@@ -276,7 +263,5 @@ fn generate_impls<'a>(
                 }
             }
         }
-
-        pub const CATEGORIES: &[#prefix_ident] = &[#(#categories)*];
     }
 }

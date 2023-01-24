@@ -13,7 +13,7 @@ use rustc_hash::FxHashSet;
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{Rule, RuleSelector, Specificity, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, RuleSelector, Specificity, INCOMPATIBLE_CODES};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
@@ -240,7 +240,7 @@ impl From<&Configuration> for RuleTable {
         let mut rules = RuleTable::empty();
 
         let fixable = resolve_codes([RuleCodeSpec {
-            select: config.fixable.as_deref().unwrap_or(CATEGORIES),
+            select: config.fixable.as_deref().unwrap_or(&[RuleSelector::ALL]),
             ignore: config.unfixable.as_deref().unwrap_or_default(),
         }]);
 
