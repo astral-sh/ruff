@@ -180,6 +180,12 @@ For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.o
 pacman -S ruff
 ```
 
+For **Alpine** users, Ruff is also available as [`ruff`](https://pkgs.alpinelinux.org/package/edge/testing/x86_64/ruff) on the testing repositories:
+
+```shell
+apk add ruff
+```
+
 [![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
 
 ### Usage
