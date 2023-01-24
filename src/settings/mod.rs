@@ -13,7 +13,7 @@ use rustc_hash::FxHashSet;
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{Rule, RuleSelector, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, RuleSelector, Specificity, CATEGORIES, INCOMPATIBLE_CODES};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
@@ -318,13 +318,13 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
     let mut rules: FxHashSet<Rule> = FxHashSet::default();
     for spec in specs {
         for specificity in [
-            SuffixLength::None,
-            SuffixLength::Zero,
-            SuffixLength::One,
-            SuffixLength::Two,
-            SuffixLength::Three,
-            SuffixLength::Four,
-            SuffixLength::Five,
+            Specificity::All,
+            Specificity::Linter,
+            Specificity::Code1Char,
+            Specificity::Code2Chars,
+            Specificity::Code3Chars,
+            Specificity::Code4Chars,
+            Specificity::Code5Chars,
         ] {
             for selector in spec.select {
                 if selector.specificity() == specificity {
