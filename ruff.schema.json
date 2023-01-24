@@ -175,6 +175,17 @@
         }
       ]
     },
+    "flake8-implicit-str-concat": {
+      "description": "Options for the `flake8-implicit-str-concat` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-import-conventions": {
       "description": "Options for the `flake8-import-conventions` plugin.",
       "anyOf": [
@@ -259,7 +270,7 @@
       }
     },
     "ignore-init-module-imports": {
-      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be +flagged, but with a dedicated message suggesting that the import is either added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
       "type": [
         "boolean",
         "null"
@@ -622,6 +633,19 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8ImplicitStrConcatOptions": {
+      "type": "object",
+      "properties": {
+        "allow-multiline": {
+          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -1381,6 +1405,8 @@
         "EXE",
         "EXE0",
         "EXE00",
+        "EXE001",
+        "EXE002",
         "EXE003",
         "EXE004",
         "EXE005",
@@ -1553,6 +1579,8 @@
         "PIE796",
         "PIE8",
         "PIE80",
+        "PIE800",
+        "PIE804",
         "PIE807",
         "PL",
         "PLC",
@@ -1725,6 +1753,9 @@
         "S506",
         "S508",
         "S509",
+        "S6",
+        "S61",
+        "S612",
         "S7",
         "S70",
         "S701",
@@ -1782,9 +1813,14 @@
         "TRY0",
         "TRY00",
         "TRY004",
+        "TRY2",
+        "TRY20",
+        "TRY200",
+        "TRY201",
         "TRY3",
         "TRY30",
         "TRY300",
+        "TRY301",
         "TYP",
         "TYP0",
         "TYP00",

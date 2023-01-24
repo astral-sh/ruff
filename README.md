@@ -63,6 +63,8 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
+- [cibuildwheel](https://github.com/pypa/cibuildwheel)
+- [Home Assistant](https://github.com/home-assistant/core)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -179,6 +181,12 @@ For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.o
 pacman -S ruff
 ```
 
+For **Alpine** users, Ruff is also available as [`ruff`](https://pkgs.alpinelinux.org/package/edge/testing/x86_64/ruff) on the testing repositories:
+
+```shell
+apk add ruff
+```
+
 [![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
 
 ### Usage
@@ -202,7 +210,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.230'
+  rev: 'v0.0.231'
   hooks:
     - id: ruff
 ```
@@ -811,6 +819,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
 | S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
+| S612 | logging-config-insecure-listen | Use of insecure `logging.config.listen` detected |  |
 | S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
 
 ### flake8-blind-except (BLE)
@@ -1151,7 +1160,9 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 | PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
 | PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
 | PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
-| PIE807 | prefer-list-builtin | Prefer `list()` over useless lambda | 🛠 |
+| PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
+| PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
+| PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
 
 ### flake8-commas (COM)
 
@@ -1177,6 +1188,8 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) o
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
+| EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
 | EXE003 | shebang-python | Shebang should contain "python" |  |
 | EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
 | EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
@@ -1196,7 +1209,10 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
+| TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
+| TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
 | TRY300 | try-consider-else | Consider `else` block |  |
+| TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 
 ### flake8-use-pathlib (PTH)
 
@@ -1635,12 +1651,15 @@ project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
 ### How does Ruff's import sorting compare to [`isort`](https://pypi.org/project/isort/)?
 
 Ruff's import sorting is intended to be nearly equivalent to `isort` when used `profile = "black"`.
-(There are some minor differences in how Ruff and isort break ties between similar imports.)
+There are a few known, minor differences in how Ruff and isort break ties between similar imports,
+and in how Ruff and isort treat inline comments in some cases (see: [#1381](https://github.com/charliermarsh/ruff/issues/1381),
+[#2104](https://github.com/charliermarsh/ruff/issues/2104)).
 
 Like `isort`, Ruff's import sorting is compatible with Black.
 
-Ruff is less configurable than `isort`, but supports the `known-first-party`, `known-third-party`,
-`extra-standard-library`, and `src` settings, like so:
+Ruff does not yet support all of `isort`'s configuration options, though it does support many of
+them. You can find the supported settings in the [API reference](#isort). For example, you can set
+`known-first-party` like so:
 
 ```toml
 [tool.ruff]
@@ -2220,10 +2239,9 @@ ignore = ["F841"]
 #### [`ignore-init-module-imports`](#ignore-init-module-imports)
 
 Avoid automatically removing unused imports in `__init__.py` files. Such
-imports will still be +flagged, but with a dedicated message
-suggesting that the import is either added to the module' +`__all__`
-symbol, or re-exported with a redundant alias (e.g., `import os as
-os`).
+imports will still be flagged, but with a dedicated message suggesting
+that the import is either added to the module's `__all__` symbol, or
+re-exported with a redundant alias (e.g., `import os as os`).
 
 **Default value**: `false`
 
@@ -2672,6 +2690,28 @@ Maximum string length for string literals in exception messages.
 ```toml
 [tool.ruff.flake8-errmsg]
 max-string-length = 20
+```
+
+---
+
+### `flake8-implicit-str-concat`
+
+#### [`allow-multiline`](#allow-multiline)
+
+Whether to allow implicit string concatenations for multiline strings.
+By default, implicit concatenations of multiline strings are
+allowed (but continuation lines, delimited with a backslash, are
+prohibited).
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-implicit-str-concat]
+allow-multiline = false
 ```
 
 ---

@@ -148,14 +148,14 @@ pub fn expand<'a>(
 
     quote! {
         #[derive(PartialEq, Eq, PartialOrd, Ord)]
-        pub enum SuffixLength {
-            None,
-            Zero,
-            One,
-            Two,
-            Three,
-            Four,
-            Five,
+        pub enum Specificity {
+            All,
+            Linter,
+            Code1Char,
+            Code2Chars,
+            Code3Chars,
+            Code4Chars,
+            Code5Chars,
         }
 
         #[derive(
@@ -220,7 +220,7 @@ fn generate_impls<'a>(
         let prefix = Ident::new(prefix_str, Span::call_site());
         if prefix_str == ALL {
             quote! {
-                #prefix_ident::#prefix => SuffixLength::None,
+                #prefix_ident::#prefix => Specificity::All,
             }
         } else {
             let mut num_numeric = prefix_str.chars().filter(|char| char.is_numeric()).count();
@@ -228,12 +228,12 @@ fn generate_impls<'a>(
                 num_numeric += 1;
             }
             let suffix_len = match num_numeric {
-                0 => quote! { SuffixLength::Zero },
-                1 => quote! { SuffixLength::One },
-                2 => quote! { SuffixLength::Two },
-                3 => quote! { SuffixLength::Three },
-                4 => quote! { SuffixLength::Four },
-                5 => quote! { SuffixLength::Five },
+                0 => quote! { Specificity::Linter },
+                1 => quote! { Specificity::Code1Char },
+                2 => quote! { Specificity::Code2Chars },
+                3 => quote! { Specificity::Code3Chars },
+                4 => quote! { Specificity::Code4Chars },
+                5 => quote! { Specificity::Code5Chars },
                 _ => panic!("Invalid prefix: {prefix}"),
             };
             quote! {
@@ -242,22 +242,9 @@ fn generate_impls<'a>(
         }
     });
 
-    let categories = prefix_to_codes.keys().map(|prefix_str| {
-        if prefix_str.chars().all(char::is_alphabetic)
-            && !PREFIX_REDIRECTS.contains_key(&prefix_str.as_str())
-        {
-            let prefix = Ident::new(prefix_str, Span::call_site());
-            quote! {
-                #prefix_ident::#prefix,
-            }
-        } else {
-            quote! {}
-        }
-    });
-
     quote! {
         impl #prefix_ident {
-            pub fn specificity(&self) -> SuffixLength {
+            pub fn specificity(&self) -> Specificity {
                 #[allow(clippy::match_same_arms)]
                 match self {
                     #(#specificity_match_arms)*
@@ -270,15 +257,11 @@ fn generate_impls<'a>(
             type IntoIter = ::std::vec::IntoIter<Self::Item>;
 
             fn into_iter(self) -> Self::IntoIter {
-                use colored::Colorize;
-
                 #[allow(clippy::match_same_arms)]
                 match self {
                     #(#into_iter_match_arms)*
                 }
             }
         }
-
-        pub const CATEGORIES: &[#prefix_ident] = &[#(#categories)*];
     }
 }

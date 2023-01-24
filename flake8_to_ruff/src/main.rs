@@ -60,7 +60,7 @@ fn main() -> Result<()> {
 
     // Create Ruff's pyproject.toml section.
     let pyproject = flake8_to_ruff::convert(&config, &external_config, cli.plugin)?;
-    println!("{}", toml_edit::easy::to_string_pretty(&pyproject)?);
+    println!("{}", toml::to_string_pretty(&pyproject)?);
 
     Ok(())
 }

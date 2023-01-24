@@ -141,6 +141,7 @@ pub fn check_path(
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
     {
         diagnostics.extend(check_lines(
+            path,
             contents,
             indexer.commented_lines(),
             &doc_lines,

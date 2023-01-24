@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
-use colored::Colorize;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashMap;

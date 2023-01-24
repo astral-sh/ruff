@@ -2,24 +2,21 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::iter;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use colored::Colorize;
 use globset::Glob;
-use itertools::Either::{Left, Right};
 use rustc_hash::FxHashSet;
 
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{Rule, RuleSelector, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, RuleSelector, Specificity, INCOMPATIBLE_CODES};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle,
+    pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat, Version};
@@ -109,6 +106,7 @@ pub struct Settings {
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_builtins: flake8_builtins::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
+    pub flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
@@ -174,6 +172,10 @@ impl Settings {
             flake8_bugbear: config.flake8_bugbear.map(Into::into).unwrap_or_default(),
             flake8_builtins: config.flake8_builtins.map(Into::into).unwrap_or_default(),
             flake8_errmsg: config.flake8_errmsg.map(Into::into).unwrap_or_default(),
+            flake8_implicit_str_concat: config
+                .flake8_implicit_str_concat
+                .map(Into::into)
+                .unwrap_or_default(),
             flake8_import_conventions: config
                 .flake8_import_conventions
                 .map(Into::into)
@@ -236,7 +238,7 @@ impl From<&Configuration> for RuleTable {
         let mut rules = RuleTable::empty();
 
         let fixable = resolve_codes([RuleCodeSpec {
-            select: config.fixable.as_deref().unwrap_or(CATEGORIES),
+            select: config.fixable.as_deref().unwrap_or(&[RuleSelector::ALL]),
             ignore: config.unfixable.as_deref().unwrap_or_default(),
         }]);
 
@@ -252,27 +254,24 @@ impl From<&Configuration> for RuleTable {
                     .iter()
                     .zip(config.extend_ignore.iter())
                     .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
-            )
-            .chain(
-                // If a docstring convention is specified, force-disable any incompatible error
-                // codes.
-                if let Some(convention) = config
-                    .pydocstyle
-                    .as_ref()
-                    .and_then(|pydocstyle| pydocstyle.convention)
-                {
-                    Left(iter::once(RuleCodeSpec {
-                        select: &[],
-                        ignore: convention.codes(),
-                    }))
-                } else {
-                    Right(iter::empty())
-                },
             ),
         )) {
             let fix = fixable.contains(&code);
             rules.enable(code, fix);
         }
+
+        // If a docstring convention is specified, force-disable any incompatible error
+        // codes.
+        if let Some(convention) = config
+            .pydocstyle
+            .as_ref()
+            .and_then(|pydocstyle| pydocstyle.convention)
+        {
+            for rule in convention.rules_to_be_ignored() {
+                rules.disable(rule);
+            }
+        }
+
         rules
     }
 }
@@ -314,13 +313,13 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
     let mut rules: FxHashSet<Rule> = FxHashSet::default();
     for spec in specs {
         for specificity in [
-            SuffixLength::None,
-            SuffixLength::Zero,
-            SuffixLength::One,
-            SuffixLength::Two,
-            SuffixLength::Three,
-            SuffixLength::Four,
-            SuffixLength::Five,
+            Specificity::All,
+            Specificity::Linter,
+            Specificity::Code1Char,
+            Specificity::Code2Chars,
+            Specificity::Code3Chars,
+            Specificity::Code4Chars,
+            Specificity::Code5Chars,
         ] {
             for selector in spec.select {
                 if selector.specificity() == specificity {

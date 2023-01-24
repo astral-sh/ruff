@@ -148,4 +148,21 @@ expression: diagnostics
       row: 95
       column: 0
   parent: ~
+- kind:
+    NestedIfStatements: ~
+  location:
+    row: 117
+    column: 4
+  end_location:
+    row: 118
+    column: 13
+  fix:
+    content: "    if b and c:\n        print(\"foo\")\n"
+    location:
+      row: 117
+      column: 0
+    end_location:
+      row: 120
+      column: 0
+  parent: ~
 

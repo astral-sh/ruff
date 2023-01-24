@@ -1386,6 +1386,7 @@ where
                         stmt,
                         test,
                         body,
+                        orelse,
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
@@ -1577,6 +1578,12 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::TryConsiderElse) {
                     tryceratops::rules::try_consider_else(self, body, orelse);
+                }
+                if self.settings.rules.enabled(&Rule::VerboseRaise) {
+                    tryceratops::rules::verbose_raise(self, handlers);
+                }
+                if self.settings.rules.enabled(&Rule::RaiseWithinTry) {
+                    tryceratops::rules::raise_within_try(self, body);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -2203,6 +2210,11 @@ where
                     flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
                 }
 
+                // flake8-pie
+                if self.settings.rules.enabled(&Rule::NoUnnecessaryDictKwargs) {
+                    flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
+                }
+
                 // flake8-bandit
                 if self.settings.rules.enabled(&Rule::ExecUsed) {
                     if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {
@@ -2248,6 +2260,15 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::RequestWithoutTimeout) {
                     flake8_bandit::rules::request_without_timeout(self, func, args, keywords);
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::LoggingConfigInsecureListen)
+                {
+                    flake8_bandit::rules::logging_config_insecure_listen(
+                        self, func, args, keywords,
+                    );
                 }
 
                 // flake8-comprehensions
@@ -2586,6 +2607,10 @@ where
                         .enabled(&Rule::MultiValueRepeatedKeyVariable)
                 {
                     pyflakes::rules::repeated_keys(self, keys, values);
+                }
+
+                if self.settings.rules.enabled(&Rule::NoUnnecessarySpread) {
+                    flake8_pie::rules::no_unnecessary_spread(self, keys, values);
                 }
             }
             ExprKind::Yield { .. } => {
@@ -3334,6 +3359,9 @@ where
                         name.as_deref(),
                         body,
                     );
+                }
+                if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
+                    tryceratops::rules::reraise_no_cause(self, body);
                 }
                 match name {
                     Some(name) => {

@@ -92,3 +92,40 @@ if node.module:
         "multiprocessing."
     ):
         print("Bad module!")
+
+
+# OK
+if a:
+    if b:
+        print("foo")
+else:
+    print("bar")
+
+# OK
+if a:
+    if b:
+        if c:
+            print("foo")
+        else:
+            print("bar")
+else:
+    print("bar")
+
+# OK
+if a:
+    # SIM 102
+    if b:
+        if c:
+            print("foo")
+else:
+    print("bar")
+
+
+# OK
+if a:
+    if b:
+        if c:
+            print("foo")
+        print("baz")
+else:
+    print("bar")
