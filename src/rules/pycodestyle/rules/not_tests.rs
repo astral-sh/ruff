@@ -1,12 +1,11 @@
 use rustpython_ast::Unaryop;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
-use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
+use crate::rules::pycodestyle::helpers::compare;
 use crate::violations;
 
 /// E713, E714
@@ -66,15 +65,4 @@ pub fn not_tests(
             }
         }
     }
-}
-
-pub fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr], stylist: &Stylist) -> String {
-    unparse_expr(
-        &create_expr(ExprKind::Compare {
-            left: Box::new(left.clone()),
-            ops: ops.to_vec(),
-            comparators: comparators.to_vec(),
-        }),
-        stylist,
-    )
 }
