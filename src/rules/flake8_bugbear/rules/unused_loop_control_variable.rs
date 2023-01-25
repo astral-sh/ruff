@@ -22,8 +22,8 @@ use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
-use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::ast::{helpers, visitor};
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
@@ -57,6 +57,10 @@ where
 
 /// B007
 pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+    if helpers::uses_locals(body) {
+        return;
+    }
+
     let control_names = {
         let mut finder = NameFinder::new();
         finder.visit_expr(target);
@@ -73,7 +77,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
 
     for (name, expr) in control_names {
         // Ignore names that are already underscore-prefixed.
-        if name.starts_with('_') {
+        if checker.settings.dummy_variable_rgx.is_match(name) {
             continue;
         }
 
