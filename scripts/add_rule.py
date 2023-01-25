@@ -16,12 +16,17 @@ from _utils import ROOT_DIR, dir_name, get_indent
 
 def snake_case(name: str) -> str:
     """Convert from PascalCase to snake_case."""
-    return "".join(f"_{word.lower()}" if word.isupper() else word for word in name).lstrip("_")
+    return "".join(
+        f"_{word.lower()}" if word.isupper() else word for word in name
+    ).lstrip("_")
 
 
 def main(*, name: str, code: str, linter: str) -> None:
+    """Generate boilerplate for a new rule."""
     # Create a test fixture.
-    with (ROOT_DIR / "resources/test/fixtures" / dir_name(linter) / f"{code}.py").open("a"):
+    with (ROOT_DIR / "resources/test/fixtures" / dir_name(linter) / f"{code}.py").open(
+        "a",
+    ):
         pass
 
     plugin_module = ROOT_DIR / "src/rules" / dir_name(linter)
@@ -35,13 +40,15 @@ def main(*, name: str, code: str, linter: str) -> None:
         for line in content.splitlines():
             if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
                 indent = get_indent(line)
-                fp.write(f'{indent}#[test_case(Rule::{name}, Path::new("{code}.py"); "{code}")]')
+                fp.write(
+                    f'{indent}#[test_case(Rule::{name}, Path::new("{code}.py"); "{code}")]',
+                )
                 fp.write("\n")
 
             fp.write(line)
             fp.write("\n")
 
-    # Add the exports 
+    # Add the exports
     rules_dir = plugin_module / "rules"
     rules_mod = rules_dir / "mod.rs"
 
@@ -83,14 +90,14 @@ impl Violation for %s {
     }
 }
 """
-            % (name, name)
+            % (name, name),
         )
         fp.write("\n")
         fp.write(
             f"""
 /// {code}
 pub fn {rule_name_snake}(checker: &mut Checker) {{}}
-"""
+""",
         )
         fp.write("\n")
 

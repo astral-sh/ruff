@@ -1,8 +1,7 @@
-import os
 import re
 from pathlib import Path
 
-ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
 def dir_name(linter_name: str) -> str:
@@ -15,4 +14,4 @@ def pascal_case(linter_name: str) -> str:
 
 
 def get_indent(line: str) -> str:
-    return re.match(r"^\s*", line).group()  # pyright: ignore[reportOptionalMemberAccess]
+    return re.match(r"^\s*", line).group()  # type: ignore[union-attr]
