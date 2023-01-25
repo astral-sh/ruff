@@ -63,6 +63,7 @@ const RESERVER_ATTRS: &[&str; 22] = &[
     "threadName",
 ];
 
+/// Check logging messages for violations
 fn check_msg(checker: &mut Checker, msg: &Expr) {
     match &msg.node {
         // Check for string concatenation and percent format
@@ -110,6 +111,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
     }
 }
 
+/// Check contents of the `extra` argument to logging calls
 fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     match &extra.node.value.node {
         ExprKind::Dict { keys, .. } => {
@@ -150,7 +152,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     }
 }
 
-/// G001
+/// Check logging calls for violations
 pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
         if let ExprKind::Name { id, .. } = &value.node {
