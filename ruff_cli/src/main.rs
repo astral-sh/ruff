@@ -76,12 +76,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
         cli.stdin_filename.as_deref(),
     )?;
 
-    // Validate the `Settings` and return any errors.
-    match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => settings.lib.validate()?,
-        PyprojectDiscovery::Hierarchical(settings) => settings.lib.validate()?,
-    };
-
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
     let file_strategy = FileDiscovery {

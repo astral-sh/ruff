@@ -20,7 +20,7 @@ use crate::rules::{
     pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat, Version};
+use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once;
 
 pub mod configuration;
@@ -88,7 +88,6 @@ pub struct Settings {
     pub extend_exclude: HashableGlobSet,
     pub force_exclude: bool,
     pub respect_gitignore: bool,
-    pub required_version: Option<Version>,
 
     // Rule-specific settings
     pub allowed_confusables: HashableHashSet<char>,
@@ -124,6 +123,16 @@ pub struct Settings {
 
 impl Settings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
+        if let Some(required_version) = &config.required_version {
+            if &**required_version != CARGO_PKG_VERSION {
+                return Err(anyhow!(
+                    "Required version `{}` does not match the running version `{}`",
+                    &**required_version,
+                    CARGO_PKG_VERSION
+                ));
+            }
+        }
+
         Ok(Self {
             rules: (&config).into(),
             allowed_confusables: config
@@ -151,7 +160,6 @@ impl Settings {
                 config.per_file_ignores.unwrap_or_default(),
             )?,
             respect_gitignore: config.respect_gitignore.unwrap_or(true),
-            required_version: config.required_version,
             show_source: config.show_source.unwrap_or_default(),
             src: config
                 .src
@@ -218,19 +226,6 @@ impl Settings {
             rules: rules.into(),
             ..Settings::default()
         }
-    }
-
-    pub fn validate(&self) -> Result<()> {
-        if let Some(required_version) = &self.required_version {
-            if &**required_version != CARGO_PKG_VERSION {
-                return Err(anyhow!(
-                    "Required version `{}` does not match the running version `{}`",
-                    &**required_version,
-                    CARGO_PKG_VERSION
-                ));
-            }
-        }
-        Ok(())
     }
 }
 

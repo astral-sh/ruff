@@ -42,9 +42,6 @@ pub fn check_path(
     autofix: flags::Autofix,
     noqa: flags::Noqa,
 ) -> Result<Vec<Diagnostic>> {
-    // Validate the `Settings` and return any errors.
-    settings.validate()?;
-
     // Aggregate all diagnostics.
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -187,9 +184,6 @@ const MAX_ITERATIONS: usize = 100;
 
 /// Add any missing `#noqa` pragmas to the source code at the given `Path`.
 pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
-    // Validate the `Settings` and return any errors.
-    settings.validate()?;
-
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 

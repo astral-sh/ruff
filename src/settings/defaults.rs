@@ -68,7 +68,6 @@ impl Default for Settings {
             line_length: LINE_LENGTH,
             namespace_packages: vec![],
             per_file_ignores: vec![],
-            required_version: None,
             respect_gitignore: true,
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
