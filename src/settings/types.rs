@@ -44,7 +44,7 @@ impl FromStr for PythonVersion {
             "py39" => Ok(PythonVersion::Py39),
             "py310" => Ok(PythonVersion::Py310),
             "py311" => Ok(PythonVersion::Py311),
-            _ => Err(anyhow!("Unknown version: {string}")),
+            _ => Err(anyhow!("Unknown version: {string} (try: \"py37\")")),
         }
     }
 }
