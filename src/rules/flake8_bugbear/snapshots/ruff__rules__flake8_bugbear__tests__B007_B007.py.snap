@@ -3,7 +3,9 @@ source: src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedLoopControlVariable: i
+    UnusedLoopControlVariable:
+      name: i
+      safe: true
   location:
     row: 6
     column: 4
@@ -20,7 +22,9 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    UnusedLoopControlVariable: k
+    UnusedLoopControlVariable:
+      name: k
+      safe: true
   location:
     row: 18
     column: 12
@@ -37,7 +41,9 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnusedLoopControlVariable: i
+    UnusedLoopControlVariable:
+      name: i
+      safe: true
   location:
     row: 30
     column: 4
@@ -54,7 +60,9 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    UnusedLoopControlVariable: k
+    UnusedLoopControlVariable:
+      name: k
+      safe: true
   location:
     row: 30
     column: 12
@@ -69,5 +77,53 @@ expression: diagnostics
     end_location:
       row: 30
       column: 13
+  parent: ~
+- kind:
+    UnusedLoopControlVariable:
+      name: bar
+      safe: false
+  location:
+    row: 34
+    column: 9
+  end_location:
+    row: 34
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnusedLoopControlVariable:
+      name: bar
+      safe: false
+  location:
+    row: 38
+    column: 9
+  end_location:
+    row: 38
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnusedLoopControlVariable:
+      name: bar
+      safe: false
+  location:
+    row: 42
+    column: 9
+  end_location:
+    row: 42
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnusedLoopControlVariable:
+      name: bar
+      safe: false
+  location:
+    row: 46
+    column: 9
+  end_location:
+    row: 46
+    column: 12
+  fix: ~
   parent: ~
 
