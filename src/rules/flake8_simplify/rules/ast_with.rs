@@ -55,7 +55,11 @@ pub fn multiple_with_statements(
                 Range::new(with_stmt.location, nested_with.location),
                 checker.locator,
             ) {
-                match fix_with::fix_multiple_with_statements(checker.locator, with_stmt) {
+                match fix_with::fix_multiple_with_statements(
+                    checker.locator,
+                    checker.stylist,
+                    with_stmt,
+                ) {
                     Ok(fix) => {
                         if fix
                             .content

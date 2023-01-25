@@ -701,8 +701,6 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
-    #[test_case(Path::new("line_ending_crlf.py"))]
-    #[test_case(Path::new("line_ending_lf.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
     #[test_case(Path::new("natural_order.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
@@ -742,6 +740,25 @@ mod tests {
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
+
+    // Test currently disabled as line endings are automatically converted to
+    // platform-appropriate ones in CI/CD #[test_case(Path::new("
+    // line_ending_crlf.py"))] #[test_case(Path::new("line_ending_lf.py"))]
+    // fn source_code_style(path: &Path) -> Result<()> {
+    //     let snapshot = format!("{}", path.to_string_lossy());
+    //     let diagnostics = test_path(
+    //         Path::new("./resources/test/fixtures/isort")
+    //             .join(path)
+    //             .as_path(),
+    //         &Settings {
+    //             src:
+    // vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+    //             ..Settings::for_rule(Rule::UnsortedImports)
+    //         },
+    //     )?;
+    //     insta::assert_yaml_snapshot!(snapshot, diagnostics);
+    //     Ok(())
+    // }
 
     #[test_case(Path::new("combine_as_imports.py"))]
     fn combine_as_imports(path: &Path) -> Result<()> {

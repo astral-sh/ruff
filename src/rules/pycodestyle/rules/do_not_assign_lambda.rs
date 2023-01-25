@@ -35,7 +35,7 @@ pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, 
                         if idx == 0 {
                             indented.push_str(line);
                         } else {
-                            indented.push('\n');
+                            indented.push_str(checker.stylist.line_ending().as_str());
                             indented.push_str(indentation);
                             indented.push_str(line);
                         }
