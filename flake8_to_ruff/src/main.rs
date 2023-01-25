@@ -26,7 +26,7 @@ use ruff::flake8_to_ruff::{self, ExternalConfig};
     about = "Convert existing Flake8 configuration to Ruff.",
     long_about = None
 )]
-struct Cli {
+struct Args {
     /// Path to the Flake8 configuration file (e.g., `setup.cfg`, `tox.ini`, or
     /// `.flake8`).
     #[arg(required = true)]
@@ -41,15 +41,15 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let args = Args::parse();
 
     // Read the INI file.
     let mut ini = Ini::new_cs();
     ini.set_multiline(true);
-    let config = ini.load(cli.file).map_err(|msg| anyhow::anyhow!(msg))?;
+    let config = ini.load(args.file).map_err(|msg| anyhow::anyhow!(msg))?;
 
     // Read the pyproject.toml file.
-    let pyproject = cli.pyproject.map(flake8_to_ruff::parse).transpose()?;
+    let pyproject = args.pyproject.map(flake8_to_ruff::parse).transpose()?;
     let external_config = pyproject
         .as_ref()
         .and_then(|pyproject| pyproject.tool.as_ref())
@@ -60,7 +60,7 @@ fn main() -> Result<()> {
         .unwrap_or_default();
 
     // Create Ruff's pyproject.toml section.
-    let pyproject = flake8_to_ruff::convert(&config, &external_config, cli.plugin)?;
+    let pyproject = flake8_to_ruff::convert(&config, &external_config, args.plugin)?;
     println!("{}", toml::to_string_pretty(&pyproject)?);
 
     Ok(())

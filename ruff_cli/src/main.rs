@@ -21,16 +21,16 @@ use ::ruff::settings::pyproject;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
+use args::{extract_log_level, Args, Overrides};
 use clap::{CommandFactory, Parser};
-use cli::{extract_log_level, Cli, Overrides};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use path_absolutize::path_dedot;
 use printer::{Printer, Violations};
 use ruff::settings::{AllSettings, CliSettings};
 
+mod args;
 mod cache;
-mod cli;
 mod commands;
 mod diagnostics;
 mod iterators;
@@ -91,7 +91,7 @@ fn resolve(
 
 fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
-    let (cli, overrides) = Cli::parse().partition();
+    let (cli, overrides) = Args::parse().partition();
 
     let default_panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -112,7 +112,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     if let Some(shell) = cli.generate_shell_completion {
-        shell.generate(&mut Cli::command(), &mut io::stdout());
+        shell.generate(&mut Args::command(), &mut io::stdout());
         return Ok(ExitCode::SUCCESS);
     }
     if cli.clean {

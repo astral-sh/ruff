@@ -4,19 +4,18 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Args;
 use rustpython_parser::parser;
 
-#[derive(Args)]
-pub struct Cli {
+#[derive(clap::Args)]
+pub struct Args {
     /// Python file for which to generate the AST.
     #[arg(required = true)]
     file: PathBuf,
 }
 
-pub fn main(cli: &Cli) -> Result<()> {
-    let contents = fs::read_to_string(&cli.file)?;
-    let python_ast = parser::parse_program(&contents, &cli.file.to_string_lossy())?;
+pub fn main(args: &Args) -> Result<()> {
+    let contents = fs::read_to_string(&args.file)?;
+    let python_ast = parser::parse_program(&contents, &args.file.to_string_lossy())?;
     println!("{python_ast:#?}");
     Ok(())
 }
