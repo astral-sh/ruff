@@ -146,6 +146,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-type-checking (TYP)](#flake8-type-checking-typ)
    1. [tryceratops (TRY)](#tryceratops-try)
    1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
+   1. [flake8-logging-format (G)](#flake8-logging-format-g)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1251,6 +1252,20 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
 | PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
 | PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
+
+### flake8-logging-format (G)
+
+For more, see [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| G001 | logging-string-format | Logging statement uses `string.format()` |  |
+| G002 | logging-percent-format | Logging statement uses `%` |  |
+| G003 | logging-string-concat | Logging statement uses `+` |  |
+| G004 | logging-f-string | Logging statement uses f-string |  |
+| G010 | logging-warn | Logging statement uses `warn` instead of `warning` | 🛠 |
+| G201 | logging-exc-info | Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)` |  |
+| G202 | logging-redundant-exc-info | Logging statement has redundant `exc_info` |  |
 
 ### Ruff-specific rules (RUF)
 
