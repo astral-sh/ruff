@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind};
+use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -17,24 +17,15 @@ impl Violation for RaiseVanillaClass {
     }
 }
 
-fn get_name_expr(expr: &Expr) -> Option<&Expr> {
-    match &expr.node {
-        ExprKind::Call { func, .. } => get_name_expr(func),
-        ExprKind::Name { .. } => Some(expr),
-        _ => None,
-    }
-}
-
 /// TRY002
 pub fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
-    if let Some(func) = get_name_expr(expr) {
-        if let ExprKind::Name { id, .. } = &func.node {
-            if id == "Exception" {
-                checker.diagnostics.push(Diagnostic::new(
-                    RaiseVanillaClass,
-                    Range::from_located(expr),
-                ));
-            }
-        }
+    if checker
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| call_path.as_slice() == ["", "Exception"])
+    {
+        checker.diagnostics.push(Diagnostic::new(
+            RaiseVanillaClass,
+            Range::from_located(expr),
+        ));
     }
 }

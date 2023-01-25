@@ -5,30 +5,40 @@ expression: diagnostics
 - kind:
     RaiseVanillaArgs: ~
   location:
-    row: 12
+    row: 8
     column: 14
   end_location:
-    row: 12
+    row: 8
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    RaiseVanillaArgs: ~
+  location:
+    row: 34
+    column: 14
+  end_location:
+    row: 34
     column: 68
   fix: ~
   parent: ~
 - kind:
     RaiseVanillaArgs: ~
   location:
-    row: 17
+    row: 39
     column: 14
   end_location:
-    row: 17
+    row: 39
     column: 70
   fix: ~
   parent: ~
 - kind:
     RaiseVanillaArgs: ~
   location:
-    row: 22
+    row: 44
     column: 14
   end_location:
-    row: 22
+    row: 44
     column: 69
   fix: ~
   parent: ~
