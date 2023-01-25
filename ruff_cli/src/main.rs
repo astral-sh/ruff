@@ -1,10 +1,10 @@
+#![forbid(unsafe_code)]
 #![allow(
     clippy::match_same_arms,
     clippy::missing_errors_doc,
     clippy::module_name_repetitions,
     clippy::too_many_lines
 )]
-#![forbid(unsafe_code)]
 
 use std::io::{self};
 use std::path::{Path, PathBuf};
