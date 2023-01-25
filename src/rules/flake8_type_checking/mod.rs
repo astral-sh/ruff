@@ -14,6 +14,9 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings;
 
+    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TYP001.py"); "TYP001")]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TYP002.py"); "TYP002")]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TYP003.py"); "TYP003")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_1.py"); "TYP004_1")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_2.py"); "TYP004_2")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_3.py"); "TYP004_3")]

@@ -54,6 +54,7 @@ type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 pub struct Checker<'a> {
     // Input data.
     path: &'a Path,
+    package: Option<&'a Path>,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     pub(crate) settings: &'a Settings,
@@ -110,6 +111,7 @@ impl<'a> Checker<'a> {
         autofix: flags::Autofix,
         noqa: flags::Noqa,
         path: &'a Path,
+        package: Option<&'a Path>,
         locator: &'a Locator,
         style: &'a Stylist,
         indexer: &'a Indexer,
@@ -120,6 +122,7 @@ impl<'a> Checker<'a> {
             autofix,
             noqa,
             path,
+            package,
             locator,
             stylist: style,
             indexer,
@@ -319,8 +322,6 @@ where
                 }
             }
         }
-
-        let prev_in_type_checking_block = self.in_type_checking_block;
 
         // Pre-visit.
         match &stmt.node {
@@ -1396,13 +1397,6 @@ where
                 self.handle_node_load(target);
             }
             StmtKind::If { test, body, orelse } => {
-                if flake8_type_checking::helpers::is_type_checking_block(self, test) {
-                    if self.settings.rules.enabled(&Rule::EmptyTypeCheckingBlock) {
-                        flake8_type_checking::rules::empty_type_checking_block(self, test, body);
-                    }
-                    self.in_type_checking_block = true;
-                    self.type_checking_blocks.push(stmt);
-                }
                 if self.settings.rules.enabled(&Rule::IfTuple) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
@@ -1859,9 +1853,27 @@ where
                 }
                 self.visit_expr(target);
             }
+            StmtKind::If { test, body, orelse } => {
+                self.visit_expr(test);
+
+                if flake8_type_checking::helpers::is_type_checking_block(self, test) {
+                    if self.settings.rules.enabled(&Rule::EmptyTypeCheckingBlock) {
+                        flake8_type_checking::rules::empty_type_checking_block(self, test, body);
+                    }
+                    self.type_checking_blocks.push(stmt);
+
+                    let prev_in_type_checking_block = self.in_type_checking_block;
+                    self.in_type_checking_block = true;
+                    self.visit_body(body);
+                    self.in_type_checking_block = prev_in_type_checking_block;
+                } else {
+                    self.visit_body(body);
+                }
+
+                self.visit_body(orelse);
+            }
             _ => visitor::walk_stmt(self, stmt),
         };
-        self.in_type_checking_block = prev_in_type_checking_block;
         self.visible_scope = prev_visible_scope;
 
         // Post-visit.
@@ -3823,7 +3835,11 @@ impl<'a> Checker<'a> {
                 }
 
                 if let Some(index) = scope.values.get(&id.as_str()) {
-                    let context = if self.in_type_definition || self.in_type_checking_block {
+                    let context = if self.in_type_checking_block
+                        || self.in_annotation
+                        || self.in_deferred_string_type_definition
+                        || self.in_deferred_type_definition
+                    {
                         UsageContext::Typing
                     } else {
                         UsageContext::Runtime
@@ -4290,18 +4306,30 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
-        if !self.settings.rules.enabled(&Rule::UnusedImport)
-            && !self.settings.rules.enabled(&Rule::ImportStarUsage)
-            && !self.settings.rules.enabled(&Rule::RedefinedWhileUnused)
-            && !self.settings.rules.enabled(&Rule::UndefinedExport)
-            && !self
+        if !(self.settings.rules.enabled(&Rule::UnusedImport)
+            || self.settings.rules.enabled(&Rule::ImportStarUsage)
+            || self.settings.rules.enabled(&Rule::RedefinedWhileUnused)
+            || self.settings.rules.enabled(&Rule::UndefinedExport)
+            || self
                 .settings
                 .rules
                 .enabled(&Rule::GlobalVariableNotAssigned)
-            && !self
+            || self
                 .settings
                 .rules
                 .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
+            || self
+                .settings
+                .rules
+                .enabled(&Rule::TypingOnlyFirstPartyImport)
+            || self
+                .settings
+                .rules
+                .enabled(&Rule::TypingOnlyThirdPartyImport)
+            || self
+                .settings
+                .rules
+                .enabled(&Rule::TypingOnlyStandardLibraryImport))
         {
             return;
         }
@@ -4434,21 +4462,50 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            // TYP001
-            for (_name, index) in scope
-                .values
-                .iter()
-                .chain(scope.overridden.iter().map(|(a, b)| (a, b)))
+            if self
+                .settings
+                .rules
+                .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyFirstPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyThirdPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyStandardLibraryImport)
             {
-                let binding = &self.bindings[*index];
-
-                if let Some(diagnostic) =
-                    flake8_type_checking::rules::runtime_import_in_type_checking_block(
-                        binding,
-                        &self.type_checking_blocks,
-                    )
+                for (.., index) in scope
+                    .values
+                    .iter()
+                    .chain(scope.overridden.iter().map(|(a, b)| (a, b)))
                 {
-                    diagnostics.push(diagnostic);
+                    let binding = &self.bindings[*index];
+
+                    if let Some(diagnostic) =
+                        flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                            binding,
+                            &self.type_checking_blocks,
+                        )
+                    {
+                        diagnostics.push(diagnostic);
+                    }
+                    if let Some(diagnostic) =
+                        flake8_type_checking::rules::typing_only_runtime_import(
+                            binding,
+                            &self.type_checking_blocks,
+                            self.package,
+                            self.settings,
+                        )
+                    {
+                        if self.settings.rules.enabled(diagnostic.kind.rule()) {
+                            diagnostics.push(diagnostic);
+                        }
+                    }
                 }
             }
 
@@ -4944,6 +5001,7 @@ pub fn check_ast(
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     path: &Path,
+    package: Option<&Path>,
 ) -> Vec<Diagnostic> {
     let mut checker = Checker::new(
         settings,
@@ -4951,6 +5009,7 @@ pub fn check_ast(
         autofix,
         noqa,
         path,
+        package,
         locator,
         stylist,
         indexer,

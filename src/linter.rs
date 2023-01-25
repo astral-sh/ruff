@@ -98,6 +98,7 @@ pub fn check_path(
                         autofix,
                         noqa,
                         path,
+                        package,
                     ));
                 }
                 if use_imports {

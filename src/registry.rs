@@ -429,6 +429,9 @@ ruff_macros::define_rule_mapping!(
     EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
     // flake8-type-checking
+    TYP001 => rules::flake8_type_checking::rules::TypingOnlyFirstPartyImport,
+    TYP002 => rules::flake8_type_checking::rules::TypingOnlyThirdPartyImport,
+    TYP003 => rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport,
     TYP004 => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
     TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // tryceratops
