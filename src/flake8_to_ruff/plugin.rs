@@ -160,7 +160,7 @@ impl Plugin {
             Plugin::Flake8Return => RuleCodePrefix::RET.into(),
             Plugin::Flake8Simplify => RuleCodePrefix::SIM.into(),
             Plugin::Flake8TidyImports => RuleCodePrefix::TID.into(),
-            Plugin::Flake8TypeChecking => RuleCodePrefix::TYC.into(),
+            Plugin::Flake8TypeChecking => RuleCodePrefix::TCH.into(),
             Plugin::Flake8UnusedArguments => RuleCodePrefix::ARG.into(),
             Plugin::Flake8UsePathlib => RuleCodePrefix::PTH.into(),
             Plugin::McCabe => RuleCodePrefix::C9.into(),

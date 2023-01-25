@@ -2,43 +2,43 @@
 
 
 def f():
-    import pandas as pd  # TYC002
+    import pandas as pd  # TCH002
 
     x: pd.DataFrame
 
 
 def f():
-    from pandas import DataFrame  # TYC002
+    from pandas import DataFrame  # TCH002
 
     x: DataFrame
 
 
 def f():
-    from pandas import DataFrame as df  # TYC002
+    from pandas import DataFrame as df  # TCH002
 
     x: df
 
 
 def f():
-    import pandas as pd  # TYC002
+    import pandas as pd  # TCH002
 
     x: pd.DataFrame = 1
 
 
 def f():
-    from pandas import DataFrame  # TYC002
+    from pandas import DataFrame  # TCH002
 
     x: DataFrame = 2
 
 
 def f():
-    from pandas import DataFrame as df  # TYC002
+    from pandas import DataFrame as df  # TCH002
 
     x: df = 3
 
 
 def f():
-    import pandas as pd  # TYC002
+    import pandas as pd  # TCH002
 
     x: "pd.DataFrame" = 1
 
@@ -46,7 +46,7 @@ def f():
 def f():
     import pandas as pd
 
-    x = dict["pd.DataFrame", "pd.DataFrame"]  # TYC002
+    x = dict["pd.DataFrame", "pd.DataFrame"]  # TCH002
 
 
 def f():
