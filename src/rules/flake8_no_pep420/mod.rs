@@ -21,11 +21,13 @@ mod tests {
     #[test_case(Path::new("test_pass_namespace_package"); "INP001_5")]
     fn test_flake8_no_pep420(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
+        // Platform-independent paths
+        let p = PathBuf::from(format!(
+            "./resources/test/fixtures/flake8_no_pep420/{}/example.py",
+            path.display()
+        ));
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_no_pep420")
-                .join(path)
-                .join("example.py")
-                .as_path(),
+            p.as_path(),
             &Settings {
                 namespace_packages: vec![PathBuf::from(
                     "./resources/test/fixtures/flake8_no_pep420/test_pass_namespace_package",
