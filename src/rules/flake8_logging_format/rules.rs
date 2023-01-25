@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, ExprKind, Keyword, Operator};
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Operator};
 use rustpython_parser::ast::Location;
 
 use crate::ast::helpers::{find_keyword, SimpleCallArgs};
@@ -7,8 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::flake8_logging_format::violations::{
-    LoggingExcInfo, LoggingFString, LoggingPercentFormat, LoggingRedundantExcInfo,
-    LoggingStringConcat, LoggingStringFormat, LoggingWarn,
+    LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
+    LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
 
 enum LoggingLevel {
@@ -37,6 +37,31 @@ impl LoggingLevel {
 }
 
 const ALLOWLIST: &[&str; 2] = &["parser", "warnings"];
+
+const RESERVER_ATTRS: &[&str; 22] = &[
+    "args",
+    "asctime",
+    "created",
+    "exc_info",
+    "exc_text",
+    "filename",
+    "funcName",
+    "levelname",
+    "levelno",
+    "lineno",
+    "module",
+    "msecs",
+    "message",
+    "msg",
+    "name",
+    "pathname",
+    "process",
+    "processName",
+    "relativeCreated",
+    "stack_info",
+    "thread",
+    "threadName",
+];
 
 fn check_msg(checker: &mut Checker, msg: &Expr) {
     match &msg.node {
@@ -124,6 +149,47 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                         ));
                     }
                     checker.diagnostics.push(diagnostic);
+                }
+
+                // G101
+                if let Some(extra) = find_keyword(keywords, "extra") {
+                    match &extra.node.value.node {
+                        ExprKind::Dict { keys, .. } => {
+                            for key in keys {
+                                if let Some(key) = &key {
+                                    if let ExprKind::Constant {
+                                        value: Constant::Str(string),
+                                        ..
+                                    } = &key.node
+                                    {
+                                        if RESERVER_ATTRS.contains(&string.as_str()) {
+                                            checker.diagnostics.push(Diagnostic::new(
+                                                LoggingExtraAttrClash(string.to_string()),
+                                                Range::from_located(key),
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        ExprKind::Call { func, keywords, .. } => {
+                            if let ExprKind::Name { id, .. } = &func.node {
+                                if id == "dict" {
+                                    for keyword in keywords {
+                                        if let Some(key) = &keyword.node.arg {
+                                            if RESERVER_ATTRS.contains(&key.as_str()) {
+                                                checker.diagnostics.push(Diagnostic::new(
+                                                    LoggingExtraAttrClash(key.to_string()),
+                                                    Range::from_located(keyword),
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
                 }
 
                 // G201, G202

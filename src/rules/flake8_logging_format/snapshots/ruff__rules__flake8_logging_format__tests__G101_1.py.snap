@@ -1,0 +1,15 @@
+---
+source: src/rules/flake8_logging_format/mod.rs
+expression: diagnostics
+---
+- kind:
+    LoggingExtraAttrClash: name
+  location:
+    row: 6
+    column: 8
+  end_location:
+    row: 6
+    column: 14
+  fix: ~
+  parent: ~
+

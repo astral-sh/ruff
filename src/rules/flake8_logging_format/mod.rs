@@ -23,6 +23,8 @@ mod tests {
     #[test_case(Path::new("G003.py"); "G003")]
     #[test_case(Path::new("G004.py"); "G004")]
     #[test_case(Path::new("G010.py"); "G010")]
+    #[test_case(Path::new("G101_1.py"); "G101_1")]
+    #[test_case(Path::new("G101_2.py"); "G101_2")]
     #[test_case(Path::new("G201.py"); "G201")]
     #[test_case(Path::new("G202.py"); "G202")]
     fn rules(path: &Path) -> Result<()> {

@@ -472,6 +472,7 @@ ruff_macros::define_rule_mapping!(
     G003 => rules::flake8_logging_format::violations::LoggingStringConcat,
     G004 => rules::flake8_logging_format::violations::LoggingFString,
     G010 => rules::flake8_logging_format::violations::LoggingWarn,
+    G101 => rules::flake8_logging_format::violations::LoggingExtraAttrClash,
     G201 => rules::flake8_logging_format::violations::LoggingExcInfo,
     G202 => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
     // ruff
