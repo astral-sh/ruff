@@ -3,6 +3,7 @@
 //!
 //! For the actual Ruff library, see [`ruff`].
 #![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(clippy::must_use_candidate, dead_code)]
 
 mod cli;

@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::match_same_arms,
     clippy::missing_errors_doc,

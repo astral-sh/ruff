@@ -5,6 +5,7 @@
 //!
 //! [Ruff]: https://github.com/charliermarsh/ruff
 #![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
