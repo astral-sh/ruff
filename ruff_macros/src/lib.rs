@@ -1,5 +1,6 @@
 //! This crate implements internal macros for the `ruff` library.
 #![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
