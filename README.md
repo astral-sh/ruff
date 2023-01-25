@@ -2701,6 +2701,25 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 ---
 
+### `flake8-builtins`
+
+#### [`builtins-ignorelist`](#builtins-ignorelist)
+
+Ignore list of builtins.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-builtins]
+builtins-ignorelist = ["id"]
+```
+
+---
+
 ### `flake8-errmsg`
 
 #### [`max-string-length`](#max-string-length)
