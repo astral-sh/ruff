@@ -11,7 +11,8 @@ expression: diagnostics
     row: 3
     column: 20
   fix:
-    content: ValueError
+    content:
+      - ValueError
     location:
       row: 3
       column: 7

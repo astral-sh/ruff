@@ -11,7 +11,8 @@ expression: diagnostics
     row: 6
     column: 23
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 6
       column: 7
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 11
     column: 14
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 11
       column: 7
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 16
     column: 19
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 16
       column: 7
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 21
     column: 17
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 21
       column: 7
@@ -79,7 +83,8 @@ expression: diagnostics
     row: 26
     column: 19
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 26
       column: 7
@@ -96,7 +101,8 @@ expression: diagnostics
     row: 31
     column: 19
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 31
       column: 7
@@ -113,7 +119,8 @@ expression: diagnostics
     row: 36
     column: 12
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 36
       column: 7
@@ -130,7 +137,8 @@ expression: diagnostics
     row: 43
     column: 17
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 43
       column: 7
@@ -147,7 +155,8 @@ expression: diagnostics
     row: 47
     column: 20
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 47
       column: 7
@@ -164,7 +173,8 @@ expression: diagnostics
     row: 51
     column: 57
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 51
       column: 7
@@ -181,7 +191,8 @@ expression: diagnostics
     row: 58
     column: 35
   fix:
-    content: "(OSError, KeyError)"
+    content:
+      - "(OSError, KeyError)"
     location:
       row: 58
       column: 7
@@ -198,7 +209,8 @@ expression: diagnostics
     row: 65
     column: 23
   fix:
-    content: "(OSError, error)"
+    content:
+      - "(OSError, error)"
     location:
       row: 65
       column: 7
@@ -215,7 +227,8 @@ expression: diagnostics
     row: 87
     column: 19
   fix:
-    content: OSError
+    content:
+      - OSError
     location:
       row: 87
       column: 7

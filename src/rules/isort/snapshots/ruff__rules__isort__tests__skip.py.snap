@@ -11,7 +11,10 @@ expression: diagnostics
     row: 14
     column: 0
   fix:
-    content: "    import abc\n    import collections\n"
+    content:
+      - "    import abc"
+      - "    import collections"
+      - ""
     location:
       row: 12
       column: 0
@@ -28,7 +31,10 @@ expression: diagnostics
     row: 21
     column: 0
   fix:
-    content: "    import abc\n    import collections\n"
+    content:
+      - "    import abc"
+      - "    import collections"
+      - ""
     location:
       row: 19
       column: 0

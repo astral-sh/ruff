@@ -11,7 +11,8 @@ expression: diagnostics
     row: 11
     column: 23
   fix:
-    content: assert expr is True
+    content:
+      - assert expr is True
     location:
       row: 11
       column: 8
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 12
     column: 23
   fix:
-    content: assert expr is True
+    content:
+      - assert expr is True
     location:
       row: 12
       column: 8
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 13
     column: 23
   fix:
-    content: assert expr is True
+    content:
+      - assert expr is True
     location:
       row: 13
       column: 8
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 14
     column: 23
   fix:
-    content: "assert expr is True, msg"
+    content:
+      - "assert expr is True, msg"
     location:
       row: 14
       column: 8
@@ -79,7 +83,8 @@ expression: diagnostics
     row: 15
     column: 23
   fix:
-    content: "assert expr is True, msg"
+    content:
+      - "assert expr is True, msg"
     location:
       row: 15
       column: 8
@@ -136,7 +141,8 @@ expression: diagnostics
     row: 22
     column: 24
   fix:
-    content: assert True is False
+    content:
+      - assert True is False
     location:
       row: 22
       column: 8
@@ -153,7 +159,8 @@ expression: diagnostics
     row: 25
     column: 24
   fix:
-    content: assert 1 == 2
+    content:
+      - assert 1 == 2
     location:
       row: 25
       column: 8
@@ -170,7 +177,8 @@ expression: diagnostics
     row: 28
     column: 27
   fix:
-    content: assert 1 != 1
+    content:
+      - assert 1 != 1
     location:
       row: 28
       column: 8
@@ -187,7 +195,8 @@ expression: diagnostics
     row: 31
     column: 26
   fix:
-    content: assert 1 > 2
+    content:
+      - assert 1 > 2
     location:
       row: 31
       column: 8
@@ -204,7 +213,8 @@ expression: diagnostics
     row: 34
     column: 31
   fix:
-    content: assert 1 >= 2
+    content:
+      - assert 1 >= 2
     location:
       row: 34
       column: 8
@@ -221,7 +231,8 @@ expression: diagnostics
     row: 37
     column: 23
   fix:
-    content: assert 2 < 1
+    content:
+      - assert 2 < 1
     location:
       row: 37
       column: 8
@@ -238,7 +249,8 @@ expression: diagnostics
     row: 40
     column: 28
   fix:
-    content: assert 1 <= 2
+    content:
+      - assert 1 <= 2
     location:
       row: 40
       column: 8
@@ -255,7 +267,8 @@ expression: diagnostics
     row: 43
     column: 21
   fix:
-    content: "assert 1 in [2, 3]"
+    content:
+      - "assert 1 in [2, 3]"
     location:
       row: 43
       column: 8
@@ -272,7 +285,8 @@ expression: diagnostics
     row: 46
     column: 24
   fix:
-    content: "assert 2 not in [2, 3]"
+    content:
+      - "assert 2 not in [2, 3]"
     location:
       row: 46
       column: 8
@@ -289,7 +303,8 @@ expression: diagnostics
     row: 49
     column: 25
   fix:
-    content: assert 0 is None
+    content:
+      - assert 0 is None
     location:
       row: 49
       column: 8
@@ -306,7 +321,8 @@ expression: diagnostics
     row: 52
     column: 28
   fix:
-    content: assert 0 is not None
+    content:
+      - assert 0 is not None
     location:
       row: 52
       column: 8
@@ -323,7 +339,8 @@ expression: diagnostics
     row: 55
     column: 21
   fix:
-    content: "assert [] is []"
+    content:
+      - "assert [] is []"
     location:
       row: 55
       column: 8
@@ -340,7 +357,8 @@ expression: diagnostics
     row: 58
     column: 24
   fix:
-    content: assert 1 is not 1
+    content:
+      - assert 1 is not 1
     location:
       row: 58
       column: 8
@@ -357,7 +375,8 @@ expression: diagnostics
     row: 61
     column: 29
   fix:
-    content: "assert isinstance(1, str)"
+    content:
+      - "assert isinstance(1, str)"
     location:
       row: 61
       column: 8
@@ -374,7 +393,8 @@ expression: diagnostics
     row: 64
     column: 32
   fix:
-    content: "assert not isinstance(1, int)"
+    content:
+      - "assert not isinstance(1, int)"
     location:
       row: 64
       column: 8
@@ -391,7 +411,8 @@ expression: diagnostics
     row: 67
     column: 24
   fix:
-    content: "assert re.search(\"def\", \"abc\")"
+    content:
+      - "assert re.search(\"def\", \"abc\")"
     location:
       row: 67
       column: 8
@@ -408,7 +429,8 @@ expression: diagnostics
     row: 70
     column: 27
   fix:
-    content: "assert not re.search(\"abc\", \"abc\")"
+    content:
+      - "assert not re.search(\"abc\", \"abc\")"
     location:
       row: 70
       column: 8
@@ -425,7 +447,8 @@ expression: diagnostics
     row: 73
     column: 32
   fix:
-    content: "assert re.search(\"def\", \"abc\")"
+    content:
+      - "assert re.search(\"def\", \"abc\")"
     location:
       row: 73
       column: 8
@@ -442,7 +465,8 @@ expression: diagnostics
     row: 76
     column: 27
   fix:
-    content: "assert not re.search(\"abc\", \"abc\")"
+    content:
+      - "assert not re.search(\"abc\", \"abc\")"
     location:
       row: 76
       column: 8

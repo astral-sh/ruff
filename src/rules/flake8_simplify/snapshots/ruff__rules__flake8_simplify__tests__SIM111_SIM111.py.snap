@@ -11,7 +11,8 @@ expression: diagnostics
     row: 27
     column: 24
   fix:
-    content: return all(not check(x) for x in iterable)
+    content:
+      - return all(not check(x) for x in iterable)
     location:
       row: 25
       column: 4
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 35
     column: 24
   fix:
-    content: return all(x.is_empty() for x in iterable)
+    content:
+      - return all(x.is_empty() for x in iterable)
     location:
       row: 33
       column: 4
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 68
     column: 19
   fix:
-    content: return all(not check(x) for x in iterable)
+    content:
+      - return all(not check(x) for x in iterable)
     location:
       row: 64
       column: 4
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 87
     column: 19
   fix:
-    content: return all(not check(x) for x in iterable)
+    content:
+      - return all(not check(x) for x in iterable)
     location:
       row: 83
       column: 4

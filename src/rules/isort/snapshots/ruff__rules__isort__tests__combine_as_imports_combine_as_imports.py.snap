@@ -11,7 +11,9 @@ expression: diagnostics
     row: 5
     column: 0
   fix:
-    content: "from module import CONSTANT, Class as C, function, function as f\n"
+    content:
+      - "from module import CONSTANT, Class as C, function, function as f"
+      - ""
     location:
       row: 1
       column: 0

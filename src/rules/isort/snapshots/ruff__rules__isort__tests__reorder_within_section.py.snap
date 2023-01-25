@@ -11,7 +11,10 @@ expression: diagnostics
     row: 3
     column: 0
   fix:
-    content: "import os\nimport sys\n"
+    content:
+      - import os
+      - import sys
+      - ""
     location:
       row: 1
       column: 0

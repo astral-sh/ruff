@@ -11,7 +11,8 @@ expression: diagnostics
     row: 24
     column: 45
   fix:
-    content: "\"param1,param2\""
+    content:
+      - "\"param1,param2\""
     location:
       row: 24
       column: 25
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 29
     column: 36
   fix:
-    content: "\"param1\""
+    content:
+      - "\"param1\""
     location:
       row: 29
       column: 25
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 34
     column: 45
   fix:
-    content: "\"param1,param2\""
+    content:
+      - "\"param1,param2\""
     location:
       row: 34
       column: 25
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 39
     column: 35
   fix:
-    content: "\"param1\""
+    content:
+      - "\"param1\""
     location:
       row: 39
       column: 25

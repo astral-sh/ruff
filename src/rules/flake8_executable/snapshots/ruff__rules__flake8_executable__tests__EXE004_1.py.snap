@@ -11,7 +11,8 @@ expression: diagnostics
     row: 1
     column: 4
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 1
       column: 0
@@ -19,3 +20,4 @@ expression: diagnostics
       row: 1
       column: 4
   parent: ~
+
