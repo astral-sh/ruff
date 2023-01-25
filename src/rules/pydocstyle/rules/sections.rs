@@ -84,9 +84,10 @@ fn blanks_and_section_underline(
             if checker.patch(diagnostic.kind.rule()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
-                    "{}{}\n",
+                    "{}{}{}",
                     whitespace::clean(docstring.indentation),
-                    "-".repeat(context.section_name.len())
+                    "-".repeat(context.section_name.len()),
+                    checker.stylist.line_ending().as_str()
                 );
                 diagnostic.amend(Fix::insertion(
                     content,
@@ -164,9 +165,10 @@ fn blanks_and_section_underline(
                 if checker.patch(diagnostic.kind.rule()) {
                     // Replace the existing underline with a line of the appropriate length.
                     let content = format!(
-                        "{}{}\n",
+                        "{}{}{}",
                         whitespace::clean(docstring.indentation),
-                        "-".repeat(context.section_name.len())
+                        "-".repeat(context.section_name.len()),
+                        checker.stylist.line_ending().as_str()
                     );
                     diagnostic.amend(Fix::replacement(
                         content,
@@ -300,9 +302,10 @@ fn blanks_and_section_underline(
             if checker.patch(diagnostic.kind.rule()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
-                    "{}{}\n",
+                    "{}{}{}",
                     whitespace::clean(docstring.indentation),
-                    "-".repeat(context.section_name.len())
+                    "-".repeat(context.section_name.len()),
+                    checker.stylist.line_ending().as_str()
                 );
                 diagnostic.amend(Fix::insertion(
                     content,
@@ -416,6 +419,7 @@ fn common_section(
         }
     }
 
+    let line_end = checker.stylist.line_ending().as_str();
     if context
         .following_lines
         .last()
@@ -434,7 +438,7 @@ fn common_section(
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
                     diagnostic.amend(Fix::insertion(
-                        "\n".to_string(),
+                        line_end.to_string(),
                         Location::new(
                             docstring.expr.location.row()
                                 + context.original_index
@@ -455,7 +459,7 @@ fn common_section(
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
                     diagnostic.amend(Fix::insertion(
-                        "\n".to_string(),
+                        line_end.to_string(),
                         Location::new(
                             docstring.expr.location.row()
                                 + context.original_index
@@ -483,7 +487,7 @@ fn common_section(
             if checker.patch(diagnostic.kind.rule()) {
                 // Add a blank line before the section.
                 diagnostic.amend(Fix::insertion(
-                    "\n".to_string(),
+                    line_end.to_string(),
                     Location::new(docstring.expr.location.row() + context.original_index, 0),
                 ));
             }
@@ -568,7 +572,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
 static GOOGLE_ARGS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:\n?\s*.+").unwrap());
+    Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
 
 fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     if context.following_lines.is_empty() {

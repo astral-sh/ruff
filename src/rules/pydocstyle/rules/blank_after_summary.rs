@@ -39,7 +39,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
 
                 // Insert one blank line after the summary (replacing any existing lines).
                 diagnostic.amend(Fix::replacement(
-                    "\n".to_string(),
+                    checker.stylist.line_ending().to_string(),
                     Location::new(docstring.expr.location.row() + summary_line + 1, 0),
                     Location::new(
                         docstring.expr.location.row() + summary_line + 1 + blanks_count,
