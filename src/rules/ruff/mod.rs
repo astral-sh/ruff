@@ -12,7 +12,8 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
+
     #[test_case(Rule::KeywordArgumentBeforeStarArgument, Path::new("RUF004.py"); "RUF004")]
     #[test_case(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral, Path::new("RUF005.py"); "RUF005")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -23,7 +24,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -40,7 +41,7 @@ mod tests {
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -55,7 +56,7 @@ mod tests {
                 Rule::UnusedVariable,
             ]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -65,7 +66,7 @@ mod tests {
             Path::new("./resources/test/fixtures/ruff/RUF100_1.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -75,7 +76,7 @@ mod tests {
             Path::new("./resources/test/fixtures/ruff/flake8_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -85,7 +86,7 @@ mod tests {
             Path::new("./resources/test/fixtures/ruff/ruff_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -95,7 +96,7 @@ mod tests {
             Path::new("./resources/test/fixtures/ruff/redirects.py"),
             &settings::Settings::for_rules(vec![Rule::UsePEP604Annotation]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

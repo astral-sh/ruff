@@ -11,7 +11,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Path::new("EXE001_1.py"); "EXE001_1")]
     #[test_case(Path::new("EXE001_2.py"); "EXE001_2")]
@@ -40,7 +40,7 @@ mod tests {
                 Rule::ShebangPython,
             ]),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }
