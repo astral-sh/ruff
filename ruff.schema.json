@@ -175,6 +175,17 @@
         }
       ]
     },
+    "flake8-implicit-str-concat": {
+      "description": "Options for the `flake8-implicit-str-concat` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-import-conventions": {
       "description": "Options for the `flake8-import-conventions` plugin.",
       "anyOf": [
@@ -259,7 +270,7 @@
       }
     },
     "ignore-init-module-imports": {
-      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be +flagged, but with a dedicated message suggesting that the import is either added to the module' +`__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
       "type": [
         "boolean",
         "null"
@@ -622,6 +633,19 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8ImplicitStrConcatOptions": {
+      "type": "object",
+      "properties": {
+        "allow-multiline": {
+          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -1114,10 +1138,6 @@
     "PythonVersion": {
       "type": "string",
       "enum": [
-        "py33",
-        "py34",
-        "py35",
-        "py36",
         "py37",
         "py38",
         "py39",
@@ -1164,13 +1184,13 @@
     "RuleSelector": {
       "type": "string",
       "enum": [
+        "ALL",
         "A",
         "A0",
         "A00",
         "A001",
         "A002",
         "A003",
-        "ALL",
         "ANN",
         "ANN0",
         "ANN00",
@@ -1381,6 +1401,8 @@
         "EXE",
         "EXE0",
         "EXE00",
+        "EXE001",
+        "EXE002",
         "EXE003",
         "EXE004",
         "EXE005",
@@ -1458,15 +1480,6 @@
         "I00",
         "I001",
         "I002",
-        "I2",
-        "I25",
-        "I252",
-        "IC",
-        "IC0",
-        "IC001",
-        "IC002",
-        "IC003",
-        "IC004",
         "ICN",
         "ICN0",
         "ICN00",
@@ -1481,9 +1494,6 @@
         "ISC001",
         "ISC002",
         "ISC003",
-        "M",
-        "M0",
-        "M001",
         "N",
         "N8",
         "N80",
@@ -1521,23 +1531,6 @@
         "PD9",
         "PD90",
         "PD901",
-        "PDV",
-        "PDV0",
-        "PDV002",
-        "PDV003",
-        "PDV004",
-        "PDV007",
-        "PDV008",
-        "PDV009",
-        "PDV01",
-        "PDV010",
-        "PDV011",
-        "PDV012",
-        "PDV013",
-        "PDV015",
-        "PDV9",
-        "PDV90",
-        "PDV901",
         "PGH",
         "PGH0",
         "PGH00",
@@ -1553,6 +1546,8 @@
         "PIE796",
         "PIE8",
         "PIE80",
+        "PIE800",
+        "PIE804",
         "PIE807",
         "PL",
         "PLC",
@@ -1670,17 +1665,6 @@
         "Q001",
         "Q002",
         "Q003",
-        "R",
-        "R5",
-        "R50",
-        "R501",
-        "R502",
-        "R503",
-        "R504",
-        "R505",
-        "R506",
-        "R507",
-        "R508",
         "RET",
         "RET5",
         "RET50",
@@ -1725,6 +1709,9 @@
         "S506",
         "S508",
         "S509",
+        "S6",
+        "S61",
+        "S612",
         "S7",
         "S70",
         "S701",
@@ -1773,6 +1760,14 @@
         "T20",
         "T201",
         "T203",
+        "TCH",
+        "TCH0",
+        "TCH00",
+        "TCH001",
+        "TCH002",
+        "TCH003",
+        "TCH004",
+        "TCH005",
         "TID",
         "TID2",
         "TID25",
@@ -1784,35 +1779,12 @@
         "TRY004",
         "TRY2",
         "TRY20",
+        "TRY200",
         "TRY201",
         "TRY3",
         "TRY30",
         "TRY300",
-        "TYP",
-        "TYP0",
-        "TYP00",
-        "TYP005",
-        "U",
-        "U0",
-        "U00",
-        "U001",
-        "U003",
-        "U004",
-        "U005",
-        "U006",
-        "U007",
-        "U008",
-        "U009",
-        "U01",
-        "U010",
-        "U011",
-        "U012",
-        "U013",
-        "U014",
-        "U015",
-        "U016",
-        "U017",
-        "U019",
+        "TRY301",
         "UP",
         "UP0",
         "UP00",

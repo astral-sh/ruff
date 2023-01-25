@@ -14,9 +14,10 @@ If you're looking for a place to start, we recommend implementing a new lint rul
 pattern-match against the examples in the existing codebase. Many lint rules are inspired by
 existing Python plugins, which can be used as a reference implementation.
 
-As a concrete example: consider taking on one of the rules in [`flake8-simplify`](https://github.com/charliermarsh/ruff/issues/998),
-and looking to the originating [Python source](https://github.com/MartinThoma/flake8-simplify) for
-guidance.
+As a concrete example: consider taking on one of the rules from the [`tryceratops`](https://github.com/charliermarsh/ruff/issues/2056)
+plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
+for guidance. [`flake8-simplify`](https://github.com/charliermarsh/ruff/issues/998) has a few rules
+left too.
 
 ### Prerequisites
 
@@ -45,7 +46,7 @@ For rustfmt and Clippy, we use [nightly Rust][nightly], as it is stricter than s
 
 ```shell
 cargo +nightly fmt --all     # Auto-formatting...
-cargo +nightly clippy --fix --workspace --all-targets --all-features -- -W clippy::pedantic  # Linting...
+cargo +nightly clippy --fix --workspace --all-targets --all-features  # Linting...
 cargo test --all    # Testing...
 ```
 

@@ -10,6 +10,9 @@ pub use hardcoded_password_string::{
 pub use hardcoded_tmp_directory::hardcoded_tmp_directory;
 pub use hashlib_insecure_hash_functions::hashlib_insecure_hash_functions;
 pub use jinja2_autoescape_false::jinja2_autoescape_false;
+pub use logging_config_insecure_listen::{
+    logging_config_insecure_listen, LoggingConfigInsecureListen,
+};
 pub use request_with_no_cert_validation::request_with_no_cert_validation;
 pub use request_without_timeout::request_without_timeout;
 pub use snmp_insecure_version::snmp_insecure_version;
@@ -26,6 +29,7 @@ mod hardcoded_password_string;
 mod hardcoded_tmp_directory;
 mod hashlib_insecure_hash_functions;
 mod jinja2_autoescape_false;
+mod logging_config_insecure_listen;
 mod request_with_no_cert_validation;
 mod request_without_timeout;
 mod snmp_insecure_version;

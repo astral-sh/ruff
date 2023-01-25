@@ -11,7 +11,8 @@ expression: diagnostics
     row: 37
     column: 25
   fix:
-    content: foo.bar = None
+    content:
+      - foo.bar = None
     location:
       row: 37
       column: 0
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 38
     column: 29
   fix:
-    content: foo._123abc = None
+    content:
+      - foo._123abc = None
     location:
       row: 38
       column: 0
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 39
     column: 28
   fix:
-    content: foo.abc123 = None
+    content:
+      - foo.abc123 = None
     location:
       row: 39
       column: 0
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 40
     column: 29
   fix:
-    content: foo.abc123 = None
+    content:
+      - foo.abc123 = None
     location:
       row: 40
       column: 0
@@ -79,7 +83,8 @@ expression: diagnostics
     row: 41
     column: 30
   fix:
-    content: foo.bar.baz = None
+    content:
+      - foo.bar.baz = None
     location:
       row: 41
       column: 0

@@ -98,6 +98,7 @@ pub fn check_path(
                         autofix,
                         noqa,
                         path,
+                        package,
                     ));
                 }
                 if use_imports {
@@ -141,6 +142,8 @@ pub fn check_path(
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
     {
         diagnostics.extend(check_lines(
+            path,
+            stylist,
             contents,
             indexer.commented_lines(),
             &doc_lines,

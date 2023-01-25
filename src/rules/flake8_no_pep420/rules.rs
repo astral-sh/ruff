@@ -8,7 +8,7 @@ use crate::{fs, violations};
 pub fn implicit_namespace_package(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
     if package.is_none() {
         Some(Diagnostic::new(
-            violations::ImplicitNamespacePackage(fs::relativize_path(path).to_string()),
+            violations::ImplicitNamespacePackage(fs::relativize_path(path)),
             Range::default(),
         ))
     } else {

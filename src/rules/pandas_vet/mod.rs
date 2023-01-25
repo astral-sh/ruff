@@ -12,14 +12,14 @@ mod tests {
     use textwrap::dedent;
 
     use crate::linter::check_path;
-    use crate::registry::{Rule, RuleSelector};
+    use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
     use crate::{directives, rustpython_helpers, settings};
 
     fn rule_code(contents: &str, expected: &[Rule]) -> Result<()> {
         let contents = dedent(contents);
-        let settings = settings::Settings::for_rules(&RuleSelector::PD);
+        let settings = settings::Settings::for_rules(&RuleCodePrefix::PD);
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_contents(&contents, &locator);

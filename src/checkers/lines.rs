@@ -1,16 +1,23 @@
 //! Lint rules based on checking raw physical lines.
 
+use std::path::Path;
+
 use crate::registry::{Diagnostic, Rule};
-use crate::rules::flake8_executable::helpers::extract_shebang;
-use crate::rules::flake8_executable::rules::{shebang_newline, shebang_python, shebang_whitespace};
+use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
+use crate::rules::flake8_executable::rules::{
+    shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
+};
 use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
+use crate::source_code::Stylist;
 
 pub fn check_lines(
+    path: &Path,
+    stylist: &Stylist,
     contents: &str,
     commented_lines: &[usize],
     doc_lines: &[usize],
@@ -18,8 +25,11 @@ pub fn check_lines(
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
+    let mut has_any_shebang = false;
 
     let enforce_blanket_noqa = settings.rules.enabled(&Rule::BlanketNOQA);
+    let enforce_shebang_not_executable = settings.rules.enabled(&Rule::ShebangNotExecutable);
+    let enforce_shebang_missing = settings.rules.enabled(&Rule::ShebangMissingExecutableFile);
     let enforce_shebang_whitespace = settings.rules.enabled(&Rule::ShebangWhitespace);
     let enforce_shebang_newline = settings.rules.enabled(&Rule::ShebangNewline);
     let enforce_shebang_python = settings.rules.enabled(&Rule::ShebangPython);
@@ -68,8 +78,23 @@ pub fn check_lines(
                 }
             }
 
-            if enforce_shebang_whitespace || enforce_shebang_newline || enforce_shebang_python {
+            if enforce_shebang_missing
+                || enforce_shebang_not_executable
+                || enforce_shebang_whitespace
+                || enforce_shebang_newline
+                || enforce_shebang_python
+            {
                 let shebang = extract_shebang(line);
+                if enforce_shebang_not_executable {
+                    if let Some(diagnostic) = shebang_not_executable(path, index, &shebang) {
+                        diagnostics.push(diagnostic);
+                    }
+                }
+                if enforce_shebang_missing {
+                    if !has_any_shebang && matches!(shebang, ShebangDirective::Match(_, _, _, _)) {
+                        has_any_shebang = true;
+                    }
+                }
                 if enforce_shebang_whitespace {
                     if let Some(diagnostic) =
                         shebang_whitespace(index, &shebang, fix_shebang_whitespace)
@@ -116,10 +141,17 @@ pub fn check_lines(
 
     if enforce_no_newline_at_end_of_file {
         if let Some(diagnostic) = no_newline_at_end_of_file(
+            stylist,
             contents,
             matches!(autofix, flags::Autofix::Enabled)
                 && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
         ) {
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    if enforce_shebang_missing && !has_any_shebang {
+        if let Some(diagnostic) = shebang_missing(path) {
             diagnostics.push(diagnostic);
         }
     }
@@ -130,15 +162,23 @@ pub fn check_lines(
 #[cfg(test)]
 mod tests {
 
+    use std::path::Path;
+
     use super::check_lines;
     use crate::registry::Rule;
     use crate::settings::{flags, Settings};
+    use crate::source_code::{Locator, Stylist};
 
     #[test]
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
+        let locator = Locator::new(line);
+        let stylist = Stylist::from_contents(line, &locator);
+
         let check_with_max_line_length = |line_length: usize| {
             check_lines(
+                Path::new("foo.py"),
+                &stylist,
                 line,
                 &[],
                 &[],

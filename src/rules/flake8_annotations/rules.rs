@@ -74,8 +74,12 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
         DefinitionKind::Package => {}
         DefinitionKind::Class(_) => {}
         DefinitionKind::NestedClass(_) => {}
-        DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
+        DefinitionKind::Function(stmt)
+        | DefinitionKind::NestedFunction(stmt)
+        | DefinitionKind::Method(stmt) => {
+            let is_method = matches!(definition.kind, DefinitionKind::Method(_));
             let (name, args, returns, body) = match_function_def(stmt);
+            let mut has_any_typed_arg = false;
 
             // ANN001, ANN401
             for arg in args
@@ -83,149 +87,12 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 .iter()
                 .chain(args.posonlyargs.iter())
                 .chain(args.kwonlyargs.iter())
-            {
-                if let Some(expr) = &arg.node.annotation {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(&Rule::DynamicallyTypedExpression)
-                    {
-                        check_dynamically_typed(checker, expr, || arg.node.arg.to_string());
-                    };
-                } else {
-                    if !(checker.settings.flake8_annotations.suppress_dummy_args
-                        && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
-                    {
-                        if checker
-                            .settings
-                            .rules
-                            .enabled(&Rule::MissingTypeFunctionArgument)
-                        {
-                            checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeFunctionArgument(arg.node.arg.to_string()),
-                                Range::from_located(arg),
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // ANN002, ANN401
-            if let Some(arg) = &args.vararg {
-                if let Some(expr) = &arg.node.annotation {
-                    if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker
-                            .settings
-                            .rules
-                            .enabled(&Rule::DynamicallyTypedExpression)
-                        {
-                            let name = &arg.node.arg;
-                            check_dynamically_typed(checker, expr, || format!("*{name}"));
-                        }
-                    }
-                } else {
-                    if !(checker.settings.flake8_annotations.suppress_dummy_args
-                        && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
-                    {
-                        if checker.settings.rules.enabled(&Rule::MissingTypeArgs) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeArgs(arg.node.arg.to_string()),
-                                Range::from_located(arg),
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // ANN003, ANN401
-            if let Some(arg) = &args.kwarg {
-                if let Some(expr) = &arg.node.annotation {
-                    if !checker.settings.flake8_annotations.allow_star_arg_any {
-                        if checker
-                            .settings
-                            .rules
-                            .enabled(&Rule::DynamicallyTypedExpression)
-                        {
-                            let name = &arg.node.arg;
-                            check_dynamically_typed(checker, expr, || format!("**{name}"));
-                        }
-                    }
-                } else {
-                    if !(checker.settings.flake8_annotations.suppress_dummy_args
-                        && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
-                    {
-                        if checker.settings.rules.enabled(&Rule::MissingTypeKwargs) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeKwargs(arg.node.arg.to_string()),
-                                Range::from_located(arg),
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // ANN201, ANN202, ANN401
-            if let Some(expr) = &returns {
-                if checker
-                    .settings
-                    .rules
-                    .enabled(&Rule::DynamicallyTypedExpression)
-                {
-                    check_dynamically_typed(checker, expr, || name.to_string());
-                };
-            } else {
-                // Allow omission of return annotation in `__init__` functions, if the function
-                // only returns `None` (explicitly or implicitly).
-                if checker.settings.flake8_annotations.suppress_none_returning
-                    && is_none_returning(body)
-                {
-                    return;
-                }
-
-                match visibility {
-                    Visibility::Public => {
-                        if checker
-                            .settings
-                            .rules
-                            .enabled(&Rule::MissingReturnTypePublicFunction)
-                        {
-                            checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingReturnTypePublicFunction(name.to_string()),
-                                helpers::identifier_range(stmt, checker.locator),
-                            ));
-                        }
-                    }
-                    Visibility::Private => {
-                        if checker
-                            .settings
-                            .rules
-                            .enabled(&Rule::MissingReturnTypePrivateFunction)
-                        {
-                            checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingReturnTypePrivateFunction(name.to_string()),
-                                helpers::identifier_range(stmt, checker.locator),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-        DefinitionKind::Method(stmt) => {
-            let (name, args, returns, body) = match_function_def(stmt);
-            let mut has_any_typed_arg = false;
-
-            // ANN001
-            for arg in args
-                .args
-                .iter()
-                .chain(args.posonlyargs.iter())
-                .chain(args.kwonlyargs.iter())
                 .skip(
                     // If this is a non-static method, skip `cls` or `self`.
-                    usize::from(!visibility::is_staticmethod(
-                        checker,
-                        cast::decorator_list(stmt),
-                    )),
+                    usize::from(
+                        is_method
+                            && !visibility::is_staticmethod(checker, cast::decorator_list(stmt)),
+                    ),
                 )
             {
                 // ANN401 for dynamically typed arguments
@@ -313,7 +180,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
             }
 
             // ANN101, ANN102
-            if !visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
+            if is_method && !visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
                 if let Some(arg) = args.args.first() {
                     if arg.node.annotation.is_none() {
                         if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
@@ -335,7 +202,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                 }
             }
 
-            // ANN201, ANN202
+            // ANN201, ANN202, ANN401
             if let Some(expr) = &returns {
                 if checker
                     .settings
@@ -353,7 +220,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     return;
                 }
 
-                if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
+                if is_method && visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                     if checker
                         .settings
                         .rules
@@ -364,7 +231,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
-                } else if visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
+                } else if is_method
+                    && visibility::is_staticmethod(checker, cast::decorator_list(stmt))
+                {
                     if checker
                         .settings
                         .rules
@@ -375,7 +244,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
-                } else if visibility::is_init(cast::name(stmt)) {
+                } else if is_method && visibility::is_init(cast::name(stmt)) {
                     // Allow omission of return annotation in `__init__` functions, as long as at
                     // least one argument is typed.
                     if checker
@@ -401,7 +270,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             checker.diagnostics.push(diagnostic);
                         }
                     }
-                } else if visibility::is_magic(cast::name(stmt)) {
+                } else if is_method && visibility::is_magic(cast::name(stmt)) {
                     if checker
                         .settings
                         .rules

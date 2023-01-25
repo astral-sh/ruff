@@ -11,7 +11,14 @@ expression: diagnostics
     row: 4
     column: 0
   fix:
-    content: "from .a import (\n    a1 as a1,\n    a2 as a2,\n)\nfrom .b import b1 as b1\nfrom .c import c1\n"
+    content:
+      - from .a import (
+      - "    a1 as a1,"
+      - "    a2 as a2,"
+      - )
+      - from .b import b1 as b1
+      - from .c import c1
+      - ""
     location:
       row: 1
       column: 0

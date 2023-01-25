@@ -11,7 +11,10 @@ expression: diagnostics
     row: 3
     column: 0
   fix:
-    content: "import os\nfrom collections import Collection\n"
+    content:
+      - import os
+      - from collections import Collection
+      - ""
     location:
       row: 1
       column: 0

@@ -13,12 +13,12 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::fs;
-use crate::registry::RuleSelector;
+use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle,
+    pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::load_options;
@@ -65,6 +65,7 @@ pub struct Configuration {
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
     pub flake8_builtins: Option<flake8_builtins::settings::Options>,
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
+    pub flake8_implicit_str_concat: Option<flake8_implicit_str_concat::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
     pub flake8_pytest_style: Option<flake8_pytest_style::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
@@ -172,6 +173,7 @@ impl Configuration {
             flake8_bugbear: options.flake8_bugbear,
             flake8_builtins: options.flake8_builtins,
             flake8_errmsg: options.flake8_errmsg,
+            flake8_implicit_str_concat: options.flake8_implicit_str_concat,
             flake8_import_conventions: options.flake8_import_conventions,
             flake8_pytest_style: options.flake8_pytest_style,
             flake8_quotes: options.flake8_quotes,
@@ -240,6 +242,9 @@ impl Configuration {
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
             flake8_builtins: self.flake8_builtins.or(config.flake8_builtins),
             flake8_errmsg: self.flake8_errmsg.or(config.flake8_errmsg),
+            flake8_implicit_str_concat: self
+                .flake8_implicit_str_concat
+                .or(config.flake8_implicit_str_concat),
             flake8_import_conventions: self
                 .flake8_import_conventions
                 .or(config.flake8_import_conventions),

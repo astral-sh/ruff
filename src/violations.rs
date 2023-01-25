@@ -1181,18 +1181,35 @@ impl Violation for MutableArgumentDefault {
 }
 
 define_violation!(
-    pub struct UnusedLoopControlVariable(pub String);
+    pub struct UnusedLoopControlVariable {
+        /// The name of the loop control variable.
+        pub name: String,
+        /// Whether the variable is safe to rename. A variable is unsafe to
+        /// rename if it _might_ be used by magic control flow (e.g.,
+        /// `locals()`).
+        pub safe: bool,
+    }
 );
-impl AlwaysAutofixableViolation for UnusedLoopControlVariable {
+impl Violation for UnusedLoopControlVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedLoopControlVariable(name) = self;
-        format!("Loop control variable `{name}` not used within the loop body")
+        let UnusedLoopControlVariable { name, safe } = self;
+        if *safe {
+            format!("Loop control variable `{name}` not used within loop body")
+        } else {
+            format!("Loop control variable `{name}` may not be used within loop body")
+        }
     }
 
-    fn autofix_title(&self) -> String {
-        let UnusedLoopControlVariable(name) = self;
-        format!("Rename unused `{name}` to `_{name}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let UnusedLoopControlVariable { safe, .. } = self;
+        if *safe {
+            Some(|UnusedLoopControlVariable { name, .. }| {
+                format!("Rename unused `{name}` to `_{name}`")
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -3498,20 +3515,28 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeClass {
 define_violation!(
     pub struct MultiLineSummaryFirstLine;
 );
-impl Violation for MultiLineSummaryFirstLine {
+impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multi-line docstring summary should start at the first line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove whitespace after opening quotes".to_string()
     }
 }
 
 define_violation!(
     pub struct MultiLineSummarySecondLine;
 );
-impl Violation for MultiLineSummarySecondLine {
+impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multi-line docstring summary should start at the second line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Insert line break and indentation after opening quotes".to_string()
     }
 }
 
@@ -4998,12 +5023,32 @@ impl Violation for PreferUniqueEnums {
 }
 
 define_violation!(
+    pub struct NoUnnecessarySpread;
+);
+impl Violation for NoUnnecessarySpread {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary spread `**`")
+    }
+}
+
+define_violation!(
+    pub struct NoUnnecessaryDictKwargs;
+);
+impl Violation for NoUnnecessaryDictKwargs {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary `dict` kwargs")
+    }
+}
+
+define_violation!(
     pub struct PreferListBuiltin;
 );
 impl AlwaysAutofixableViolation for PreferListBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `list()` over useless lambda")
+        format!("Prefer `list` over useless lambda")
     }
 
     fn autofix_title(&self) -> String {

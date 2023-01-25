@@ -1,12 +1,13 @@
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
+use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::python::identifiers::is_identifier;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
-use crate::source_code::{Generator, Stylist};
+use crate::source_code::Stylist;
 use crate::violations;
 
 fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String {
@@ -27,9 +28,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String
             type_comment: None,
         },
     );
-    let mut generator: Generator = stylist.into();
-    generator.unparse_stmt(&stmt);
-    generator.generate()
+    unparse_stmt(&stmt, stylist)
 }
 
 /// B010

@@ -1,10 +1,10 @@
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 
+use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Generator;
 use crate::violations;
 
 fn optional(expr: &Expr) -> Expr {
@@ -83,10 +83,8 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             let mut diagnostic =
                 Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
             if checker.patch(diagnostic.kind.rule()) {
-                let mut generator: Generator = checker.stylist.into();
-                generator.unparse_expr(&optional(slice), 0);
                 diagnostic.amend(Fix::replacement(
-                    generator.generate(),
+                    unparse_expr(&optional(slice), checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
                 ));
@@ -102,20 +100,16 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                         // Invalid type annotation.
                     }
                     ExprKind::Tuple { elts, .. } => {
-                        let mut generator: Generator = checker.stylist.into();
-                        generator.unparse_expr(&union(elts), 0);
                         diagnostic.amend(Fix::replacement(
-                            generator.generate(),
+                            unparse_expr(&union(elts), checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),
                         ));
                     }
                     _ => {
                         // Single argument.
-                        let mut generator: Generator = checker.stylist.into();
-                        generator.unparse_expr(slice, 0);
                         diagnostic.amend(Fix::replacement(
-                            generator.generate(),
+                            unparse_expr(slice, checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),
                         ));

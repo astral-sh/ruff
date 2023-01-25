@@ -1,14 +1,13 @@
 //! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
 
-use once_cell::sync::Lazy;
 use ruff_macros::RuleNamespace;
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
+use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::violation::Violation;
 use crate::{rules, violations};
 
@@ -339,6 +338,7 @@ ruff_macros::define_rule_mapping!(
     S506 => violations::UnsafeYAMLLoad,
     S508 => violations::SnmpInsecureVersion,
     S509 => violations::SnmpWeakCryptography,
+    S612 => rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     S701 => violations::Jinja2AutoescapeFalse,
     // flake8-boolean-trap
     FBT001 => violations::BooleanPositionalArgInFunctionDefinition,
@@ -414,6 +414,8 @@ ruff_macros::define_rule_mapping!(
     PIE790 => violations::NoUnnecessaryPass,
     PIE794 => violations::DupeClassFieldDefinitions,
     PIE796 => violations::PreferUniqueEnums,
+    PIE800 => violations::NoUnnecessarySpread,
+    PIE804 => violations::NoUnnecessaryDictKwargs,
     PIE807 => violations::PreferListBuiltin,
     // flake8-commas
     COM812 => violations::TrailingCommaMissing,
@@ -422,15 +424,23 @@ ruff_macros::define_rule_mapping!(
     // flake8-no-pep420
     INP001 => violations::ImplicitNamespacePackage,
     // flake8-executable
+    EXE001 => rules::flake8_executable::rules::ShebangNotExecutable,
+    EXE002 => rules::flake8_executable::rules::ShebangMissingExecutableFile,
     EXE003 => rules::flake8_executable::rules::ShebangPython,
     EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
     // flake8-type-checking
-    TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
+    TCH001 => rules::flake8_type_checking::rules::TypingOnlyFirstPartyImport,
+    TCH002 => rules::flake8_type_checking::rules::TypingOnlyThirdPartyImport,
+    TCH003 => rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport,
+    TCH004 => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
+    TCH005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // tryceratops
     TRY004 => rules::tryceratops::rules::PreferTypeError,
+    TRY200 => rules::tryceratops::rules::ReraiseNoCause,
     TRY201 => rules::tryceratops::rules::VerboseRaise,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
+    TRY301 => rules::tryceratops::rules::RaiseWithinTry,
     // flake8-use-pathlib
     PTH100 => rules::flake8_use_pathlib::violations::PathlibAbspath,
     PTH101 => rules::flake8_use_pathlib::violations::PathlibChmod,
@@ -468,83 +478,122 @@ ruff_macros::define_rule_mapping!(
 
 #[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
 pub enum Linter {
+    /// [Pyflakes](https://pypi.org/project/pyflakes/)
     #[prefix = "F"]
     Pyflakes,
+    /// [pycodestyle](https://pypi.org/project/pycodestyle/)
     #[prefix = "E"]
     #[prefix = "W"]
     Pycodestyle,
+    /// [mccabe](https://pypi.org/project/mccabe/)
     #[prefix = "C90"]
     McCabe,
+    /// [isort](https://pypi.org/project/isort/)
     #[prefix = "I"]
     Isort,
+    /// [pydocstyle](https://pypi.org/project/pydocstyle/)
     #[prefix = "D"]
     Pydocstyle,
+    /// [pyupgrade](https://pypi.org/project/pyupgrade/)
     #[prefix = "UP"]
     Pyupgrade,
+    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
     #[prefix = "N"]
     PEP8Naming,
+    /// [flake8-2020](https://pypi.org/project/flake8-2020/)
     #[prefix = "YTT"]
     Flake82020,
+    /// [flake8-annotations](https://pypi.org/project/flake8-annotations/)
     #[prefix = "ANN"]
     Flake8Annotations,
+    /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,
+    /// [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
     #[prefix = "BLE"]
     Flake8BlindExcept,
+    /// [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
     #[prefix = "FBT"]
     Flake8BooleanTrap,
+    /// [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
     #[prefix = "B"]
     Flake8Bugbear,
+    /// [flake8-builtins](https://pypi.org/project/flake8-builtins/)
     #[prefix = "A"]
     Flake8Builtins,
+    /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
+    /// [flake8-debugger](https://pypi.org/project/flake8-debugger/)
     #[prefix = "T10"]
     Flake8Debugger,
+    /// [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
     #[prefix = "EM"]
     Flake8ErrMsg,
+    /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
+    /// [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
     #[prefix = "ICN"]
     Flake8ImportConventions,
+    /// [flake8-print](https://pypi.org/project/flake8-print/)
     #[prefix = "T20"]
     Flake8Print,
+    /// [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
     #[prefix = "PT"]
     Flake8PytestStyle,
+    /// [flake8-quotes](https://pypi.org/project/flake8-quotes/)
     #[prefix = "Q"]
     Flake8Quotes,
+    /// [flake8-return](https://pypi.org/project/flake8-return/)
     #[prefix = "RET"]
     Flake8Return,
+    /// [flake8-simplify](https://pypi.org/project/flake8-simplify/)
     #[prefix = "SIM"]
     Flake8Simplify,
+    /// [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
     #[prefix = "TID"]
     Flake8TidyImports,
+    /// [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/)
     #[prefix = "ARG"]
     Flake8UnusedArguments,
+    /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
     #[prefix = "DTZ"]
     Flake8Datetimez,
+    /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
+    /// [pandas-vet](https://pypi.org/project/pandas-vet/)
     #[prefix = "PD"]
     PandasVet,
+    /// [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
     #[prefix = "PGH"]
     PygrepHooks,
+    /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
+    /// [flake8-pie](https://pypi.org/project/flake8-pie/)
     #[prefix = "PIE"]
     Flake8Pie,
+    /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
+    /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
     #[prefix = "INP"]
     Flake8NoPep420,
+    /// [flake8-executable](https://pypi.org/project/flake8-executable/)
     #[prefix = "EXE"]
     Flake8Executable,
-    #[prefix = "TYP"]
+    /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+    #[prefix = "TCH"]
     Flake8TypeChecking,
+    /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
+    /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
 }
@@ -553,26 +602,34 @@ pub trait RuleNamespace: Sized {
     fn parse_code(code: &str) -> Option<(Self, &str)>;
 
     fn prefixes(&self) -> &'static [&'static str];
-}
 
-include!(concat!(env!("OUT_DIR"), "/linter.rs"));
+    fn name(&self) -> &'static str;
+
+    fn url(&self) -> Option<&'static str>;
+}
 
 /// The prefix, name and selector for an upstream linter category.
 pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleSelector);
 
+// TODO(martin): Move these constant definitions back to Linter::categories impl
+// once RuleSelector is an enum with a Linter variant
+const PYCODESTYLE_CATEGORIES: &[LinterCategory] = &[
+    LinterCategory("E", "Error", prefix_to_selector(RuleCodePrefix::E)),
+    LinterCategory("W", "Warning", prefix_to_selector(RuleCodePrefix::W)),
+];
+
+const PYLINT_CATEGORIES: &[LinterCategory] = &[
+    LinterCategory("PLC", "Convention", prefix_to_selector(RuleCodePrefix::PLC)),
+    LinterCategory("PLE", "Error", prefix_to_selector(RuleCodePrefix::PLE)),
+    LinterCategory("PLR", "Refactor", prefix_to_selector(RuleCodePrefix::PLR)),
+    LinterCategory("PLW", "Warning", prefix_to_selector(RuleCodePrefix::PLW)),
+];
+
 impl Linter {
     pub fn categories(&self) -> Option<&'static [LinterCategory]> {
         match self {
-            Linter::Pycodestyle => Some(&[
-                LinterCategory("E", "Error", RuleSelector::E),
-                LinterCategory("W", "Warning", RuleSelector::W),
-            ]),
-            Linter::Pylint => Some(&[
-                LinterCategory("PLC", "Convention", RuleSelector::PLC),
-                LinterCategory("PLE", "Error", RuleSelector::PLE),
-                LinterCategory("PLR", "Refactor", RuleSelector::PLR),
-                LinterCategory("PLW", "Warning", RuleSelector::PLW),
-            ]),
+            Linter::Pycodestyle => Some(PYCODESTYLE_CATEGORIES),
+            Linter::Pylint => Some(PYLINT_CATEGORIES),
             _ => None,
         }
     }
@@ -601,6 +658,8 @@ impl Rule {
             | Rule::MixedSpacesAndTabs
             | Rule::NoNewLineAtEndOfFile
             | Rule::PEP3120UnnecessaryCodingComment
+            | Rule::ShebangMissingExecutableFile
+            | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
             | Rule::ShebangPython
             | Rule::ShebangWhitespace => &LintSource::Lines,
@@ -612,9 +671,9 @@ impl Rule {
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
             | Rule::CommentedOutCode
+            | Rule::MultiLineImplicitStringConcatenation
             | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
-            | Rule::MultiLineImplicitStringConcatenation
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TrailingCommaMissing
             | Rule::TrailingCommaOnBareTupleProhibited
@@ -665,60 +724,6 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[(
     "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
      Consider adding `D203` to `ignore`.",
 )];
-
-/// A hash map from deprecated to latest `Rule`.
-pub static CODE_REDIRECTS: Lazy<FxHashMap<&'static str, Rule>> = Lazy::new(|| {
-    FxHashMap::from_iter([
-        // TODO(charlie): Remove by 2023-01-01.
-        ("U001", Rule::UselessMetaclassType),
-        ("U003", Rule::TypeOfPrimitive),
-        ("U004", Rule::UselessObjectInheritance),
-        ("U005", Rule::DeprecatedUnittestAlias),
-        ("U006", Rule::UsePEP585Annotation),
-        ("U007", Rule::UsePEP604Annotation),
-        ("U008", Rule::SuperCallWithParameters),
-        ("U009", Rule::PEP3120UnnecessaryCodingComment),
-        ("U010", Rule::UnnecessaryFutureImport),
-        ("U011", Rule::LRUCacheWithoutParameters),
-        ("U012", Rule::UnnecessaryEncodeUTF8),
-        ("U013", Rule::ConvertTypedDictFunctionalToClass),
-        ("U014", Rule::ConvertNamedTupleFunctionalToClass),
-        ("U015", Rule::RedundantOpenModes),
-        ("U016", Rule::RemoveSixCompat),
-        ("U017", Rule::DatetimeTimezoneUTC),
-        ("U019", Rule::TypingTextStrAlias),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("I252", Rule::RelativeImports),
-        ("M001", Rule::UnusedNOQA),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("PDV002", Rule::UseOfInplaceArgument),
-        ("PDV003", Rule::UseOfDotIsNull),
-        ("PDV004", Rule::UseOfDotNotNull),
-        ("PDV007", Rule::UseOfDotIx),
-        ("PDV008", Rule::UseOfDotAt),
-        ("PDV009", Rule::UseOfDotIat),
-        ("PDV010", Rule::UseOfDotPivotOrUnstack),
-        ("PDV011", Rule::UseOfDotValues),
-        ("PDV012", Rule::UseOfDotReadTable),
-        ("PDV013", Rule::UseOfDotStack),
-        ("PDV015", Rule::UseOfPdMerge),
-        ("PDV901", Rule::DfIsABadVariableName),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("R501", Rule::UnnecessaryReturnNone),
-        ("R502", Rule::ImplicitReturnValue),
-        ("R503", Rule::ImplicitReturn),
-        ("R504", Rule::UnnecessaryAssign),
-        ("R505", Rule::SuperfluousElseReturn),
-        ("R506", Rule::SuperfluousElseRaise),
-        ("R507", Rule::SuperfluousElseContinue),
-        ("R508", Rule::SuperfluousElseBreak),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("IC001", Rule::ImportAliasIsNotConventional),
-        ("IC002", Rule::ImportAliasIsNotConventional),
-        ("IC003", Rule::ImportAliasIsNotConventional),
-        ("IC004", Rule::ImportAliasIsNotConventional),
-    ])
-});
 
 #[cfg(test)]
 mod tests {

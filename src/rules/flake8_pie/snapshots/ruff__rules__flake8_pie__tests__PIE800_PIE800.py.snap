@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_pie/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoUnnecessarySpread: ~
+  location:
+    row: 1
+    column: 13
+  end_location:
+    row: 1
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    NoUnnecessarySpread: ~
+  location:
+    row: 3
+    column: 14
+  end_location:
+    row: 3
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    NoUnnecessarySpread: ~
+  location:
+    row: 5
+    column: 10
+  end_location:
+    row: 5
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    NoUnnecessarySpread: ~
+  location:
+    row: 7
+    column: 18
+  end_location:
+    row: 7
+    column: 27
+  fix: ~
+  parent: ~
+

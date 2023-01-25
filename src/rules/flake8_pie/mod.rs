@@ -10,12 +10,14 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
-    #[test_case(Rule::NoUnnecessaryPass, Path::new("PIE790.py"); "PIE790")]
     #[test_case(Rule::DupeClassFieldDefinitions, Path::new("PIE794.py"); "PIE794")]
-    #[test_case(Rule::PreferUniqueEnums, Path::new("PIE796.py"); "PIE796")]
+    #[test_case(Rule::NoUnnecessaryDictKwargs, Path::new("PIE804.py"); "PIE804")]
+    #[test_case(Rule::NoUnnecessaryPass, Path::new("PIE790.py"); "PIE790")]
+    #[test_case(Rule::NoUnnecessarySpread, Path::new("PIE800.py"); "PIE800")]
     #[test_case(Rule::PreferListBuiltin, Path::new("PIE807.py"); "PIE807")]
+    #[test_case(Rule::PreferUniqueEnums, Path::new("PIE796.py"); "PIE796")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -24,7 +26,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

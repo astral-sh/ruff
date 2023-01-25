@@ -1,12 +1,12 @@
 use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
-use colored::Colorize;
 
 use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
 use super::{parser, plugin};
-use crate::registry::RuleSelector;
+use crate::registry::RuleCodePrefix;
+use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
@@ -20,6 +20,12 @@ use crate::rules::{
 use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
 use crate::warn_user;
+
+const DEFAULT_SELECTORS: &[RuleSelector] = &[
+    prefix_to_selector(RuleCodePrefix::F),
+    prefix_to_selector(RuleCodePrefix::E),
+    prefix_to_selector(RuleCodePrefix::W),
+];
 
 pub fn convert(
     config: &HashMap<String, HashMap<String, Option<String>>>,
@@ -76,7 +82,7 @@ pub fn convert(
                 .as_ref()
                 .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
         })
-        .unwrap_or_else(|| plugin::resolve_select(&plugins));
+        .unwrap_or_else(|| resolve_select(&plugins));
     let mut ignore = flake8
         .get("ignore")
         .and_then(|value| {
@@ -406,20 +412,46 @@ pub fn convert(
     Ok(Pyproject::new(options))
 }
 
+/// Resolve the set of enabled `RuleSelector` values for the given
+/// plugins.
+fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleSelector> {
+    let mut select: BTreeSet<_> = DEFAULT_SELECTORS.iter().cloned().collect();
+    select.extend(plugins.iter().map(Plugin::selector));
+    select
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
+    use itertools::Itertools;
 
     use super::super::plugin::Plugin;
     use super::convert;
+    use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
     use crate::flake8_to_ruff::ExternalConfig;
-    use crate::registry::RuleSelector;
+    use crate::registry::RuleCodePrefix;
+    use crate::rule_selector::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
     use crate::settings::options::Options;
     use crate::settings::pyproject::Pyproject;
+
+    fn default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> Options {
+        Options {
+            ignore: Some(vec![]),
+            select: Some(
+                DEFAULT_SELECTORS
+                    .iter()
+                    .cloned()
+                    .chain(plugins)
+                    .sorted()
+                    .collect(),
+            ),
+            ..Options::default()
+        }
+    }
 
     #[test]
     fn it_converts_empty() -> Result<()> {
@@ -428,55 +460,7 @@ mod tests {
             &ExternalConfig::default(),
             None,
         )?;
-        let expected = Pyproject::new(Options {
-            allowed_confusables: None,
-            builtins: None,
-            cache_dir: None,
-            dummy_variable_rgx: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_ignore: None,
-            extend_select: None,
-            external: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            format: None,
-            force_exclude: None,
-            ignore: Some(vec![]),
-            ignore_init_module_imports: None,
-            line_length: None,
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            show_source: None,
-            src: None,
-            target_version: None,
-            unfixable: None,
-            typing_modules: None,
-            task_tags: None,
-            update_check: None,
-            flake8_annotations: None,
-            flake8_bandit: None,
-            flake8_bugbear: None,
-            flake8_builtins: None,
-            flake8_errmsg: None,
-            flake8_pytest_style: None,
-            flake8_quotes: None,
-            flake8_tidy_imports: None,
-            flake8_import_conventions: None,
-            flake8_unused_arguments: None,
-            isort: None,
-            mccabe: None,
-            pep8_naming: None,
-            pycodestyle: None,
-            pydocstyle: None,
-            pylint: None,
-            pyupgrade: None,
-        });
+        let expected = Pyproject::new(default_options([]));
         assert_eq!(actual, expected);
 
         Ok(())
@@ -493,53 +477,8 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            allowed_confusables: None,
-            builtins: None,
-            cache_dir: None,
-            dummy_variable_rgx: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_ignore: None,
-            extend_select: None,
-            external: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            format: None,
-            force_exclude: None,
-            ignore: Some(vec![]),
-            ignore_init_module_imports: None,
             line_length: Some(100),
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            show_source: None,
-            src: None,
-            target_version: None,
-            unfixable: None,
-            typing_modules: None,
-            task_tags: None,
-            update_check: None,
-            flake8_annotations: None,
-            flake8_bandit: None,
-            flake8_bugbear: None,
-            flake8_builtins: None,
-            flake8_errmsg: None,
-            flake8_pytest_style: None,
-            flake8_quotes: None,
-            flake8_tidy_imports: None,
-            flake8_import_conventions: None,
-            flake8_unused_arguments: None,
-            isort: None,
-            mccabe: None,
-            pep8_naming: None,
-            pycodestyle: None,
-            pydocstyle: None,
-            pylint: None,
-            pyupgrade: None,
+            ..default_options([])
         });
         assert_eq!(actual, expected);
 
@@ -557,53 +496,8 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            allowed_confusables: None,
-            builtins: None,
-            cache_dir: None,
-            dummy_variable_rgx: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_ignore: None,
-            extend_select: None,
-            external: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            format: None,
-            force_exclude: None,
-            ignore: Some(vec![]),
-            ignore_init_module_imports: None,
             line_length: Some(100),
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            show_source: None,
-            src: None,
-            target_version: None,
-            unfixable: None,
-            typing_modules: None,
-            task_tags: None,
-            update_check: None,
-            flake8_annotations: None,
-            flake8_bandit: None,
-            flake8_bugbear: None,
-            flake8_builtins: None,
-            flake8_errmsg: None,
-            flake8_pytest_style: None,
-            flake8_quotes: None,
-            flake8_tidy_imports: None,
-            flake8_import_conventions: None,
-            flake8_unused_arguments: None,
-            isort: None,
-            mccabe: None,
-            pep8_naming: None,
-            pycodestyle: None,
-            pydocstyle: None,
-            pylint: None,
-            pyupgrade: None,
+            ..default_options([])
         });
         assert_eq!(actual, expected);
 
@@ -620,55 +514,7 @@ mod tests {
             &ExternalConfig::default(),
             Some(vec![]),
         )?;
-        let expected = Pyproject::new(Options {
-            allowed_confusables: None,
-            builtins: None,
-            cache_dir: None,
-            dummy_variable_rgx: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_ignore: None,
-            extend_select: None,
-            external: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            format: None,
-            force_exclude: None,
-            ignore: Some(vec![]),
-            ignore_init_module_imports: None,
-            line_length: None,
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            show_source: None,
-            src: None,
-            target_version: None,
-            unfixable: None,
-            typing_modules: None,
-            task_tags: None,
-            update_check: None,
-            flake8_annotations: None,
-            flake8_bandit: None,
-            flake8_bugbear: None,
-            flake8_builtins: None,
-            flake8_errmsg: None,
-            flake8_pytest_style: None,
-            flake8_quotes: None,
-            flake8_tidy_imports: None,
-            flake8_import_conventions: None,
-            flake8_unused_arguments: None,
-            isort: None,
-            mccabe: None,
-            pep8_naming: None,
-            pycodestyle: None,
-            pydocstyle: None,
-            pylint: None,
-            pyupgrade: None,
-        });
+        let expected = Pyproject::new(default_options([]));
         assert_eq!(actual, expected);
 
         Ok(())
@@ -685,58 +531,13 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            allowed_confusables: None,
-            builtins: None,
-            cache_dir: None,
-            dummy_variable_rgx: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_ignore: None,
-            extend_select: None,
-            external: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            format: None,
-            force_exclude: None,
-            ignore: Some(vec![]),
-            ignore_init_module_imports: None,
-            line_length: None,
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            select: Some(vec![RuleSelector::E, RuleSelector::F, RuleSelector::W]),
-            show_source: None,
-            src: None,
-            target_version: None,
-            unfixable: None,
-            typing_modules: None,
-            task_tags: None,
-            update_check: None,
-            flake8_annotations: None,
-            flake8_bandit: None,
-            flake8_bugbear: None,
-            flake8_builtins: None,
-            flake8_errmsg: None,
-            flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
-            flake8_tidy_imports: None,
-            flake8_import_conventions: None,
-            flake8_unused_arguments: None,
-            isort: None,
-            mccabe: None,
-            pep8_naming: None,
-            pycodestyle: None,
-            pydocstyle: None,
-            pylint: None,
-            pyupgrade: None,
+            ..default_options([])
         });
         assert_eq!(actual, expected);
 
@@ -757,60 +558,10 @@ mod tests {
             Some(vec![Plugin::Flake8Docstrings]),
         )?;
         let expected = Pyproject::new(Options {
-            allowed_confusables: None,
-            builtins: None,
-            cache_dir: None,
-            dummy_variable_rgx: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_ignore: None,
-            extend_select: None,
-            external: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            format: None,
-            force_exclude: None,
-            ignore: Some(vec![]),
-            ignore_init_module_imports: None,
-            line_length: None,
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            select: Some(vec![
-                RuleSelector::D,
-                RuleSelector::E,
-                RuleSelector::F,
-                RuleSelector::W,
-            ]),
-            show_source: None,
-            src: None,
-            target_version: None,
-            unfixable: None,
-            typing_modules: None,
-            task_tags: None,
-            update_check: None,
-            flake8_annotations: None,
-            flake8_bandit: None,
-            flake8_bugbear: None,
-            flake8_builtins: None,
-            flake8_errmsg: None,
-            flake8_pytest_style: None,
-            flake8_quotes: None,
-            flake8_tidy_imports: None,
-            flake8_import_conventions: None,
-            flake8_unused_arguments: None,
-            isort: None,
-            mccabe: None,
-            pep8_naming: None,
-            pycodestyle: None,
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
-            pylint: None,
-            pyupgrade: None,
+            ..default_options([RuleCodePrefix::D.into()])
         });
         assert_eq!(actual, expected);
 
@@ -828,63 +579,13 @@ mod tests {
             None,
         )?;
         let expected = Pyproject::new(Options {
-            allowed_confusables: None,
-            builtins: None,
-            cache_dir: None,
-            dummy_variable_rgx: None,
-            exclude: None,
-            extend: None,
-            extend_exclude: None,
-            extend_ignore: None,
-            extend_select: None,
-            external: None,
-            fix: None,
-            fix_only: None,
-            fixable: None,
-            format: None,
-            force_exclude: None,
-            ignore: Some(vec![]),
-            ignore_init_module_imports: None,
-            line_length: None,
-            namespace_packages: None,
-            per_file_ignores: None,
-            required_version: None,
-            respect_gitignore: None,
-            select: Some(vec![
-                RuleSelector::E,
-                RuleSelector::F,
-                RuleSelector::Q,
-                RuleSelector::W,
-            ]),
-            show_source: None,
-            src: None,
-            target_version: None,
-            unfixable: None,
-            typing_modules: None,
-            task_tags: None,
-            update_check: None,
-            flake8_annotations: None,
-            flake8_bandit: None,
-            flake8_bugbear: None,
-            flake8_builtins: None,
-            flake8_errmsg: None,
-            flake8_pytest_style: None,
             flake8_quotes: Some(flake8_quotes::settings::Options {
                 inline_quotes: Some(flake8_quotes::settings::Quote::Single),
                 multiline_quotes: None,
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
-            flake8_tidy_imports: None,
-            flake8_import_conventions: None,
-            flake8_unused_arguments: None,
-            isort: None,
-            mccabe: None,
-            pep8_naming: None,
-            pycodestyle: None,
-            pydocstyle: None,
-            pylint: None,
-            pyupgrade: None,
+            ..default_options([RuleCodePrefix::Q.into()])
         });
         assert_eq!(actual, expected);
 

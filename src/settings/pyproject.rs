@@ -31,13 +31,13 @@ impl Pyproject {
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
     let contents = fs::read_file(path)?;
-    toml_edit::easy::from_str(&contents).map_err(Into::into)
+    toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = fs::read_file(path)?;
-    toml_edit::easy::from_str(&contents).map_err(Into::into)
+    toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -129,7 +129,7 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::registry::RuleSelector;
+    use crate::registry::RuleCodePrefix;
     use crate::rules::flake8_quotes::settings::Quote;
     use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
     use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
@@ -144,17 +144,17 @@ mod tests {
 
     #[test]
     fn deserialize() -> Result<()> {
-        let pyproject: Pyproject = toml_edit::easy::from_str(r#""#)?;
+        let pyproject: Pyproject = toml::from_str(r#""#)?;
         assert_eq!(pyproject.tool, None);
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 "#,
         )?;
         assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -163,59 +163,11 @@ mod tests {
         assert_eq!(
             pyproject.tool,
             Some(Tools {
-                ruff: Some(Options {
-                    allowed_confusables: None,
-                    builtins: None,
-                    cache_dir: None,
-                    dummy_variable_rgx: None,
-                    exclude: None,
-                    extend: None,
-                    extend_exclude: None,
-                    extend_ignore: None,
-                    extend_select: None,
-                    external: None,
-                    fix: None,
-                    fix_only: None,
-                    fixable: None,
-                    force_exclude: None,
-                    format: None,
-                    ignore: None,
-                    ignore_init_module_imports: None,
-                    line_length: None,
-                    namespace_packages: None,
-                    per_file_ignores: None,
-                    required_version: None,
-                    respect_gitignore: None,
-                    select: None,
-                    show_source: None,
-                    src: None,
-                    target_version: None,
-                    unfixable: None,
-                    typing_modules: None,
-                    task_tags: None,
-                    update_check: None,
-                    flake8_annotations: None,
-                    flake8_bandit: None,
-                    flake8_bugbear: None,
-                    flake8_builtins: None,
-                    flake8_errmsg: None,
-                    flake8_pytest_style: None,
-                    flake8_quotes: None,
-                    flake8_tidy_imports: None,
-                    flake8_import_conventions: None,
-                    flake8_unused_arguments: None,
-                    isort: None,
-                    mccabe: None,
-                    pep8_naming: None,
-                    pycodestyle: None,
-                    pydocstyle: None,
-                    pylint: None,
-                    pyupgrade: None,
-                })
+                ruff: Some(Options::default())
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -226,58 +178,13 @@ line-length = 79
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    allowed_confusables: None,
-                    builtins: None,
-                    dummy_variable_rgx: None,
-                    exclude: None,
-                    extend: None,
-                    extend_exclude: None,
-                    extend_ignore: None,
-                    extend_select: None,
-                    external: None,
-                    fix: None,
-                    fix_only: None,
-                    fixable: None,
-                    force_exclude: None,
-                    format: None,
-                    ignore: None,
-                    ignore_init_module_imports: None,
                     line_length: Some(79),
-                    namespace_packages: None,
-                    per_file_ignores: None,
-                    respect_gitignore: None,
-                    required_version: None,
-                    select: None,
-                    show_source: None,
-                    src: None,
-                    target_version: None,
-                    unfixable: None,
-                    typing_modules: None,
-                    task_tags: None,
-                    update_check: None,
-                    cache_dir: None,
-                    flake8_annotations: None,
-                    flake8_bandit: None,
-                    flake8_bugbear: None,
-                    flake8_builtins: None,
-                    flake8_errmsg: None,
-                    flake8_pytest_style: None,
-                    flake8_quotes: None,
-                    flake8_tidy_imports: None,
-                    flake8_import_conventions: None,
-                    flake8_unused_arguments: None,
-                    isort: None,
-                    mccabe: None,
-                    pep8_naming: None,
-                    pycodestyle: None,
-                    pydocstyle: None,
-                    pylint: None,
-                    pyupgrade: None,
+                    ..Options::default()
                 })
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -288,58 +195,13 @@ exclude = ["foo.py"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    allowed_confusables: None,
-                    builtins: None,
-                    cache_dir: None,
-                    dummy_variable_rgx: None,
                     exclude: Some(vec!["foo.py".to_string()]),
-                    extend: None,
-                    extend_exclude: None,
-                    extend_ignore: None,
-                    extend_select: None,
-                    external: None,
-                    fix: None,
-                    fix_only: None,
-                    fixable: None,
-                    force_exclude: None,
-                    format: None,
-                    ignore: None,
-                    ignore_init_module_imports: None,
-                    line_length: None,
-                    namespace_packages: None,
-                    per_file_ignores: None,
-                    required_version: None,
-                    respect_gitignore: None,
-                    select: None,
-                    show_source: None,
-                    src: None,
-                    target_version: None,
-                    unfixable: None,
-                    typing_modules: None,
-                    task_tags: None,
-                    update_check: None,
-                    flake8_annotations: None,
-                    flake8_bandit: None,
-                    flake8_bugbear: None,
-                    flake8_builtins: None,
-                    flake8_errmsg: None,
-                    flake8_pytest_style: None,
-                    flake8_quotes: None,
-                    flake8_tidy_imports: None,
-                    flake8_import_conventions: None,
-                    flake8_unused_arguments: None,
-                    isort: None,
-                    mccabe: None,
-                    pep8_naming: None,
-                    pycodestyle: None,
-                    pydocstyle: None,
-                    pylint: None,
-                    pyupgrade: None,
+                    ..Options::default()
                 })
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -350,58 +212,13 @@ select = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    allowed_confusables: None,
-                    builtins: None,
-                    cache_dir: None,
-                    dummy_variable_rgx: None,
-                    exclude: None,
-                    extend: None,
-                    extend_exclude: None,
-                    extend_ignore: None,
-                    extend_select: None,
-                    external: None,
-                    fix: None,
-                    fix_only: None,
-                    fixable: None,
-                    force_exclude: None,
-                    format: None,
-                    ignore: None,
-                    ignore_init_module_imports: None,
-                    line_length: None,
-                    namespace_packages: None,
-                    per_file_ignores: None,
-                    required_version: None,
-                    respect_gitignore: None,
-                    select: Some(vec![RuleSelector::E501]),
-                    show_source: None,
-                    src: None,
-                    target_version: None,
-                    unfixable: None,
-                    typing_modules: None,
-                    task_tags: None,
-                    update_check: None,
-                    flake8_annotations: None,
-                    flake8_bandit: None,
-                    flake8_bugbear: None,
-                    flake8_builtins: None,
-                    flake8_errmsg: None,
-                    flake8_pytest_style: None,
-                    flake8_quotes: None,
-                    flake8_tidy_imports: None,
-                    flake8_import_conventions: None,
-                    flake8_unused_arguments: None,
-                    isort: None,
-                    mccabe: None,
-                    pep8_naming: None,
-                    pycodestyle: None,
-                    pydocstyle: None,
-                    pylint: None,
-                    pyupgrade: None,
+                    select: Some(vec![RuleCodePrefix::E501.into()]),
+                    ..Options::default()
                 })
             })
         );
 
-        let pyproject: Pyproject = toml_edit::easy::from_str(
+        let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
 [tool.ruff]
@@ -413,58 +230,14 @@ ignore = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    allowed_confusables: None,
-                    builtins: None,
-                    cache_dir: None,
-                    dummy_variable_rgx: None,
-                    exclude: None,
-                    extend: None,
-                    extend_exclude: None,
-                    extend_ignore: None,
-                    extend_select: Some(vec![RuleSelector::RUF100]),
-                    external: None,
-                    fix: None,
-                    fix_only: None,
-                    fixable: None,
-                    force_exclude: None,
-                    format: None,
-                    ignore: Some(vec![RuleSelector::E501]),
-                    ignore_init_module_imports: None,
-                    line_length: None,
-                    namespace_packages: None,
-                    per_file_ignores: None,
-                    required_version: None,
-                    respect_gitignore: None,
-                    select: None,
-                    show_source: None,
-                    src: None,
-                    target_version: None,
-                    unfixable: None,
-                    typing_modules: None,
-                    task_tags: None,
-                    update_check: None,
-                    flake8_annotations: None,
-                    flake8_bandit: None,
-                    flake8_bugbear: None,
-                    flake8_builtins: None,
-                    flake8_errmsg: None,
-                    flake8_pytest_style: None,
-                    flake8_quotes: None,
-                    flake8_tidy_imports: None,
-                    flake8_import_conventions: None,
-                    flake8_unused_arguments: None,
-                    isort: None,
-                    mccabe: None,
-                    pep8_naming: None,
-                    pycodestyle: None,
-                    pydocstyle: None,
-                    pylint: None,
-                    pyupgrade: None,
+                    extend_select: Some(vec![RuleCodePrefix::RUF100.into()]),
+                    ignore: Some(vec![RuleCodePrefix::E501.into()]),
+                    ..Options::default()
                 })
             })
         );
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -473,7 +246,7 @@ line_length = 79
         )
         .is_err());
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -482,7 +255,7 @@ select = ["E123"]
         )
         .is_err());
 
-        assert!(toml_edit::easy::from_str::<Pyproject>(
+        assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
 [tool.ruff]
@@ -511,44 +284,17 @@ other-attribute = 1
             config,
             Options {
                 allowed_confusables: Some(vec!['−', 'ρ', '∗']),
-                builtins: None,
                 line_length: Some(88),
-                fix: None,
-                fix_only: None,
-                exclude: None,
-                extend: None,
                 extend_exclude: Some(vec![
                     "excluded_file.py".to_string(),
                     "migrations".to_string(),
                     "with_excluded_file/other_excluded_file.py".to_string(),
                 ]),
-                select: None,
-                extend_select: None,
                 external: Some(vec!["V101".to_string()]),
-                ignore: None,
-                ignore_init_module_imports: None,
-                extend_ignore: None,
-                fixable: None,
-                format: None,
-                force_exclude: None,
-                namespace_packages: None,
-                unfixable: None,
-                typing_modules: None,
-                task_tags: None,
-                update_check: None,
-                cache_dir: None,
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
-                    vec![RuleSelector::F401]
+                    vec![RuleCodePrefix::F401.into()]
                 )])),
-                dummy_variable_rgx: None,
-                respect_gitignore: None,
-                required_version: None,
-                src: None,
-                target_version: None,
-                show_source: None,
-                flake8_annotations: None,
-                flake8_bandit: None,
                 flake8_bugbear: Some(flake8_bugbear::settings::Options {
                     extend_immutable_calls: Some(vec![
                         "fastapi.Depends".to_string(),
@@ -582,6 +328,7 @@ other-attribute = 1
                     ]),
                     mark_parentheses: Some(false),
                 }),
+                flake8_implicit_str_concat: None,
                 flake8_quotes: Some(flake8_quotes::settings::Options {
                     inline_quotes: Some(Quote::Single),
                     multiline_quotes: Some(Quote::Double),
@@ -615,8 +362,6 @@ other-attribute = 1
                         "dd".to_string(),
                     )])),
                 }),
-                flake8_unused_arguments: None,
-                isort: None,
                 mccabe: Some(mccabe::settings::Options {
                     max_complexity: Some(10),
                 }),
@@ -641,10 +386,7 @@ other-attribute = 1
                     ]),
                     staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
                 }),
-                pycodestyle: None,
-                pydocstyle: None,
-                pylint: None,
-                pyupgrade: None,
+                ..Options::default()
             }
         );
 

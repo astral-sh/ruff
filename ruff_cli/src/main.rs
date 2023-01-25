@@ -1,10 +1,11 @@
+#![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::match_same_arms,
     clippy::missing_errors_doc,
     clippy::module_name_repetitions,
     clippy::too_many_lines
 )]
-#![forbid(unsafe_code)]
 
 use std::io::{self};
 use std::path::{Path, PathBuf};
@@ -88,7 +89,7 @@ fn resolve(
     }
 }
 
-pub fn main() -> Result<ExitCode> {
+fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
     let (cli, overrides) = Cli::parse().partition();
 
@@ -200,7 +201,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     if cache {
         // `--no-cache` doesn't respect code changes, and so is often confusing during
         // development.
-        warn_user_once!("debug build without --no-cache.");
+        warn_user_once!("Detected debug build without --no-cache.");
     }
 
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
@@ -318,4 +319,15 @@ quoting the executed command, along with the relevant file contents and `pyproje
     }
 
     Ok(ExitCode::SUCCESS)
+}
+
+#[must_use]
+pub fn main() -> ExitCode {
+    match inner_main() {
+        Ok(code) => code,
+        Err(err) => {
+            eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
+            ExitCode::FAILURE
+        }
+    }
 }

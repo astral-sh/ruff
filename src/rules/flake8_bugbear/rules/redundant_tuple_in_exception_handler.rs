@@ -1,10 +1,10 @@
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
+use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Generator;
 use crate::violations;
 
 /// B013
@@ -20,14 +20,12 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             continue;
         };
         let mut diagnostic = Diagnostic::new(
-            violations::RedundantTupleInExceptionHandler(elt.to_string()),
+            violations::RedundantTupleInExceptionHandler(unparse_expr(elt, checker.stylist)),
             Range::from_located(type_),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            let mut generator: Generator = checker.stylist.into();
-            generator.unparse_expr(elt, 0);
             diagnostic.amend(Fix::replacement(
-                generator.generate(),
+                unparse_expr(elt, checker.stylist),
                 type_.location,
                 type_.end_location.unwrap(),
             ));

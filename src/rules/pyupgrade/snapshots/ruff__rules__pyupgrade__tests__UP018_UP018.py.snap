@@ -11,7 +11,8 @@ expression: diagnostics
     row: 20
     column: 5
   fix:
-    content: "\"\""
+    content:
+      - "\"\""
     location:
       row: 20
       column: 0
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 21
     column: 10
   fix:
-    content: "\"foo\""
+    content:
+      - "\"foo\""
     location:
       row: 21
       column: 0
@@ -45,7 +47,9 @@ expression: diagnostics
     row: 23
     column: 7
   fix:
-    content: "\"\"\"\nfoo\"\"\""
+    content:
+      - "\"\"\""
+      - "foo\"\"\""
     location:
       row: 22
       column: 0
@@ -62,7 +66,8 @@ expression: diagnostics
     row: 24
     column: 7
   fix:
-    content: "b\"\""
+    content:
+      - "b\"\""
     location:
       row: 24
       column: 0
@@ -79,7 +84,8 @@ expression: diagnostics
     row: 25
     column: 13
   fix:
-    content: "b\"foo\""
+    content:
+      - "b\"foo\""
     location:
       row: 25
       column: 0
@@ -96,7 +102,9 @@ expression: diagnostics
     row: 27
     column: 7
   fix:
-    content: "b\"\"\"\nfoo\"\"\""
+    content:
+      - "b\"\"\""
+      - "foo\"\"\""
     location:
       row: 26
       column: 0

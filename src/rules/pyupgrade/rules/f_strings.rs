@@ -12,6 +12,7 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyflakes::format::FormatSummary;
+use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violations;
 
 /// Like [`FormatSummary`], but maps positional and keyword arguments to their
@@ -217,13 +218,7 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
                 converted.push('}');
             }
             FormatPart::Literal(value) => {
-                if value.starts_with('{') {
-                    converted.push('{');
-                }
-                converted.push_str(&value);
-                if value.ends_with('}') {
-                    converted.push('}');
-                }
+                converted.push_str(&curly_escape(&value));
             }
         }
     }

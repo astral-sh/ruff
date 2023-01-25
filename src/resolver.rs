@@ -240,13 +240,16 @@ pub fn python_files_in_path(
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
+    let mut seen = FxHashSet::default();
     if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
         for path in &paths {
             for ancestor in path.ancestors() {
-                if let Some(pyproject) = settings_toml(ancestor)? {
-                    let (root, settings) =
-                        resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
-                    resolver.add(root, settings);
+                if seen.insert(ancestor) {
+                    if let Some(pyproject) = settings_toml(ancestor)? {
+                        let (root, settings) =
+                            resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
+                        resolver.add(root, settings);
+                    }
                 }
             }
         }
