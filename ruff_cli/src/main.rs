@@ -136,7 +136,13 @@ quoting the executed command, along with the relevant file contents and `pyproje
     }
 
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
-    if cli.watch {
+
+    if cli.add_noqa {
+        let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
+        if modifications > 0 && log_level >= LogLevel::Default {
+            println!("Added {modifications} noqa directives.");
+        }
+    } else if cli.watch {
         if !matches!(autofix, fix::FixMode::None) {
             warn_user_once!("--fix is not enabled in watch mode.");
         }
@@ -189,11 +195,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
                 }
                 Err(err) => return Err(err.into()),
             }
-        }
-    } else if cli.add_noqa {
-        let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
-        if modifications > 0 && log_level >= LogLevel::Default {
-            println!("Added {modifications} noqa directives.");
         }
     } else {
         let is_stdin = cli.files == vec![PathBuf::from("-")];
