@@ -1732,6 +1732,25 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 
 Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
+### Ruff tried to fix something, but it broke my code. What should I do?
+
+Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
+have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
+
+In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
+
+In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
+per-category basis using the [`unfixable`](#unfixable) mechanic. For example, to disable autofix
+for some possibly-unsafe rules, you could add the following to your `pyproject.toml`:
+
+```toml
+[tool.ruff]
+unfixable = ["B", "SIM", "TRY", "RUF"]
+```
+
+If you find a case where Ruff's autofix breaks your code, please file an Issue!
+
+
 ## Contributing
 
 Contributions are welcome and hugely appreciated. To get started, check out the
