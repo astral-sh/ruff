@@ -163,8 +163,8 @@ fn test_show_source() -> Result<()> {
 #[test]
 fn explain_status_codes() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    cmd.args(["-", "--explain", "F401"]).assert().success();
+    cmd.args(["--explain", "F401"]).assert().success();
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    cmd.args(["-", "--explain", "RUF404"]).assert().failure();
+    cmd.args(["--explain", "RUF404"]).assert().failure();
     Ok(())
 }
