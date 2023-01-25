@@ -19,6 +19,7 @@
     clippy::too_many_lines
 )]
 
+mod assert_yaml_snapshot;
 mod ast;
 mod autofix;
 pub mod cache;
