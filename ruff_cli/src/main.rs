@@ -36,7 +36,7 @@ pub mod updates;
 
 fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
-    let (cli, overrides) = Args::parse().partition();
+    let args = Args::parse();
 
     let default_panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -52,6 +52,8 @@ quoting the executed command, along with the relevant file contents and `pyproje
         );
         default_panic_hook(info);
     }));
+
+    let (cli, overrides) = args.partition();
 
     let log_level = extract_log_level(&cli);
     set_up_logging(&log_level)?;
