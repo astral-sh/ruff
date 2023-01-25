@@ -6,7 +6,6 @@ use rustpython_parser::ast::Stmt;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::settings::types::PythonVersion;
 use crate::{autofix, violations};
 
 const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
@@ -34,17 +33,13 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
 
 /// UP010
 pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Located<AliasData>]) {
-    let target_version = checker.settings.target_version;
-
     let mut unused_imports: Vec<&Alias> = vec![];
     for alias in names {
         if alias.node.asname.is_some() {
             continue;
         }
-        if (target_version >= PythonVersion::Py33
-            && PY33_PLUS_REMOVE_FUTURES.contains(&alias.node.name.as_str()))
-            || (target_version >= PythonVersion::Py37
-                && PY37_PLUS_REMOVE_FUTURES.contains(&alias.node.name.as_str()))
+        if PY33_PLUS_REMOVE_FUTURES.contains(&alias.node.name.as_str())
+            || PY37_PLUS_REMOVE_FUTURES.contains(&alias.node.name.as_str())
         {
             unused_imports.push(alias);
         }

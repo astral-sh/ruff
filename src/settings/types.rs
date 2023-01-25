@@ -11,19 +11,15 @@ use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 use super::hashable::HashableHashSet;
-use crate::fs;
 use crate::registry::Rule;
 use crate::rule_selector::RuleSelector;
+use crate::{fs, warn_user_once};
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum PythonVersion {
-    Py33,
-    Py34,
-    Py35,
-    Py36,
     Py37,
     Py38,
     Py39,
@@ -36,10 +32,13 @@ impl FromStr for PythonVersion {
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         match string {
-            "py33" => Ok(PythonVersion::Py33),
-            "py34" => Ok(PythonVersion::Py34),
-            "py35" => Ok(PythonVersion::Py35),
-            "py36" => Ok(PythonVersion::Py36),
+            "py33" | "py34" | "py35" | "py36" => {
+                warn_user_once!(
+                    "Specified a version below the minimum supported Python version. Defaulting \
+                     to Python 3.7."
+                );
+                Ok(PythonVersion::Py37)
+            }
             "py37" => Ok(PythonVersion::Py37),
             "py38" => Ok(PythonVersion::Py38),
             "py39" => Ok(PythonVersion::Py39),
