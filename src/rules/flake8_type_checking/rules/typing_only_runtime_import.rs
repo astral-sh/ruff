@@ -55,7 +55,7 @@ impl Violation for TypingOnlyStandardLibraryImport {
     }
 }
 
-/// TYC001
+/// TCH001
 pub fn typing_only_runtime_import(
     binding: &Binding,
     blocks: &[&Stmt],

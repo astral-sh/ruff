@@ -82,7 +82,7 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("PDV90", "PD90"),
         ("PDV901", "PD901"),
         // TODO(charlie): Remove by 2023-04-01.
-        ("TYP", "TYC"),
-        ("TYP001", "TYC001"),
+        ("TYP", "TCH"),
+        ("TYP001", "TCH001"),
     ])
 });

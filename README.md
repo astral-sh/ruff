@@ -144,7 +144,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-executable (EXE)](#flake8-executable-exe)
-   1. [flake8-type-checking (TYC)](#flake8-type-checking-tyc)
+   1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [tryceratops (TRY)](#tryceratops-try)
    1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
@@ -1197,17 +1197,17 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) o
 | EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
 | EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
 
-### flake8-type-checking (TYC)
+### flake8-type-checking (TCH)
 
 For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TYC001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
-| TYC002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
-| TYC003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
-| TYC004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
-| TYC005 | empty-type-checking-block | Found empty type-checking block |  |
+| TCH001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
+| TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
+| TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
+| TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
+| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
 
 ### tryceratops (TRY)
 
