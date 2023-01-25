@@ -4,8 +4,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{
-    Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Keyword,
-    KeywordData, Located, Location, Stmt, StmtKind,
+    Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
+    Located, Location, Stmt, StmtKind,
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -563,15 +563,16 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 }
 
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
-pub fn uses_magic_variable_access(body: &[Stmt]) -> bool {
+pub fn uses_magic_variable_access(checker: &Checker, body: &[Stmt]) -> bool {
     any_over_body(body, &|expr| {
         if let ExprKind::Call { func, .. } = &expr.node {
-            if let ExprKind::Name { id, ctx } = &func.node {
-                ["locals", "globals", "vars", "eval"].contains(&id.as_str())
-                    && matches!(ctx, ExprContext::Load)
-            } else {
-                false
-            }
+            checker.resolve_call_path(func).map_or(false, |call_path| {
+                call_path.as_slice() == ["", "locals"]
+                    || call_path.as_slice() == ["", "globals"]
+                    || call_path.as_slice() == ["", "vars"]
+                    || call_path.as_slice() == ["", "eval"]
+                    || call_path.as_slice() == ["", "exec"]
+            })
         } else {
             false
         }

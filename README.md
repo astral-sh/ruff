@@ -853,7 +853,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B004 | unreliable-callable-check |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
 | B005 | strip-with-multi-characters | Using `.strip()` with multi-character strings is misleading the reader |  |
 | B006 | mutable-argument-default | Do not use mutable data structures for argument defaults |  |
-| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within the loop body | 🛠 |
+| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body |  |
 | B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
 | B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
