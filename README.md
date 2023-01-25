@@ -1264,6 +1264,7 @@ For more, see [flake8-logging-format](https://pypi.org/project/flake8-logging-fo
 | G003 | logging-string-concat | Logging statement uses `+` |  |
 | G004 | logging-f-string | Logging statement uses f-string |  |
 | G010 | logging-warn | Logging statement uses `warn` instead of `warning` | 🛠 |
+| G101 | logging-extra-attr-clash | Logging statement uses an extra field that clashes with a LogRecord field: `{key}` |  |
 | G201 | logging-exc-info | Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)` |  |
 | G202 | logging-redundant-exc-info | Logging statement has redundant `exc_info` |  |
 
