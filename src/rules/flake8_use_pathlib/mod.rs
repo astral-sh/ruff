@@ -17,6 +17,7 @@ mod tests {
     #[test_case(Path::new("import_as.py"); "PTH1_2")]
     #[test_case(Path::new("import_from_as.py"); "PTH1_3")]
     #[test_case(Path::new("import_from.py"); "PTH1_4")]
+    #[test_case(Path::new("use_pathlib.py"); "PTH1_5")]
     fn rules(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(

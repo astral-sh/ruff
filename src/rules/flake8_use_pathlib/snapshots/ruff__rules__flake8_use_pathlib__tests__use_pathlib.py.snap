@@ -1,0 +1,6 @@
+---
+source: src/rules/flake8_use_pathlib/mod.rs
+expression: diagnostics
+---
+[]
+
