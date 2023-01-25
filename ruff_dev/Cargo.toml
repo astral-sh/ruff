@@ -1,6 +1,6 @@
 [package]
 name = "ruff_dev"
-version = "0.0.234"
+version = "0.0.235"
 edition = "2021"
 
 [dependencies]
