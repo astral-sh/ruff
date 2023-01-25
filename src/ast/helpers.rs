@@ -40,19 +40,22 @@ pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
     generator.generate()
 }
 
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) {
+fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
     match &expr.node {
-        ExprKind::Call { func, .. } => {
-            collect_call_path_inner(func, parts);
-        }
+        ExprKind::Call { func, .. } => collect_call_path_inner(func, parts),
         ExprKind::Attribute { value, attr, .. } => {
-            collect_call_path_inner(value, parts);
-            parts.push(attr);
+            if collect_call_path_inner(value, parts) {
+                parts.push(attr);
+                true
+            } else {
+                false
+            }
         }
         ExprKind::Name { id, .. } => {
             parts.push(id);
+            true
         }
-        _ => {}
+        _ => false,
     }
 }
 
