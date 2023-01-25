@@ -14,18 +14,18 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings;
 
-    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TYP001.py"); "TYP001")]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TYP002.py"); "TYP002")]
-    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TYP003.py"); "TYP003")]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_1.py"); "TYP004_1")]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_2.py"); "TYP004_2")]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_3.py"); "TYP004_3")]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_4.py"); "TYP004_4")]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_5.py"); "TYP004_5")]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_6.py"); "TYP004_6")]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_7.py"); "TYP004_7")]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_8.py"); "TYP004_8")]
-    #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TYP005.py"); "TYP005")]
+    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TYC001.py"); "TYC001")]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TYC002.py"); "TYC002")]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TYC003.py"); "TYC003")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYC004_1.py"); "TYC004_1")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYC004_2.py"); "TYC004_2")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYC004_3.py"); "TYC004_3")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYC004_4.py"); "TYC004_4")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYC004_5.py"); "TYC004_5")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYC004_6.py"); "TYC004_6")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYC004_7.py"); "TYC004_7")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYC004_8.py"); "TYC004_8")]
+    #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TYC005.py"); "TYC005")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

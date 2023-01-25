@@ -22,7 +22,7 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
     }
 }
 
-/// TYP004
+/// TYC004
 pub fn runtime_import_in_type_checking_block(
     binding: &Binding,
     blocks: &[&Stmt],

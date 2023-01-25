@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    pass  # TYP005
+    pass  # TYC005
 
 
 def example():
