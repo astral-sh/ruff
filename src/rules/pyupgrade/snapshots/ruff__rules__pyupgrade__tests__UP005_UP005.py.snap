@@ -13,7 +13,8 @@ expression: diagnostics
     row: 6
     column: 25
   fix:
-    content: self.assertEqual
+    content:
+      - self.assertEqual
     location:
       row: 6
       column: 8
@@ -32,7 +33,8 @@ expression: diagnostics
     row: 7
     column: 25
   fix:
-    content: self.assertEqual
+    content:
+      - self.assertEqual
     location:
       row: 7
       column: 8
@@ -51,7 +53,8 @@ expression: diagnostics
     row: 9
     column: 34
   fix:
-    content: self.assertAlmostEqual
+    content:
+      - self.assertAlmostEqual
     location:
       row: 9
       column: 8
@@ -70,7 +73,8 @@ expression: diagnostics
     row: 10
     column: 35
   fix:
-    content: self.assertNotRegex
+    content:
+      - self.assertNotRegex
     location:
       row: 10
       column: 8

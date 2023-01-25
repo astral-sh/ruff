@@ -31,9 +31,9 @@ fn extract_indentation_range(body: &[&Stmt]) -> Range {
 pub fn organize_imports(
     block: &Block,
     locator: &Locator,
+    stylist: &Stylist,
     indexer: &Indexer,
     settings: &Settings,
-    stylist: &Stylist,
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {

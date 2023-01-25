@@ -16,7 +16,7 @@ resources/test/project/examples/docs/docs/file.py:1:1: I001 Import block is un-s
 resources/test/project/examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 resources/test/project/project/file.py:1:8: F401 `os` imported but unused
 resources/test/project/project/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
-Found 7 error(s).
+Found 7 errors.
 7 potentially fixable with the --fix option.
 ```
 
@@ -31,7 +31,7 @@ examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 project/file.py:1:8: F401 `os` imported but unused
 project/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
-Found 7 error(s).
+Found 7 errors.
 7 potentially fixable with the --fix option.
 ```
 
@@ -42,7 +42,7 @@ files:
 ∴ (cd resources/test/project/examples/docs && cargo run .)
 docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
-Found 2 error(s).
+Found 2 errors.
 2 potentially fixable with the --fix option.
 ```
 
@@ -60,7 +60,7 @@ resources/test/project/examples/docs/docs/file.py:3:8: F401 `numpy` imported but
 resources/test/project/examples/docs/docs/file.py:4:27: F401 `docs.concepts.file` imported but unused
 resources/test/project/examples/excluded/script.py:1:8: F401 `os` imported but unused
 resources/test/project/project/file.py:1:8: F401 `os` imported but unused
-Found 9 error(s).
+Found 9 errors.
 9 potentially fixable with the --fix option.
 ```
 
@@ -73,7 +73,7 @@ docs/docs/concepts/file.py:5:5: F841 Local variable `x` is assigned to but never
 docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 excluded/script.py:5:5: F841 Local variable `x` is assigned to but never used
-Found 4 error(s).
+Found 4 errors.
 4 potentially fixable with the --fix option.
 ```
 
@@ -82,7 +82,7 @@ Passing an excluded directory directly should report errors in the contained fil
 ```
 ∴ cargo run resources/test/project/examples/excluded/
 resources/test/project/examples/excluded/script.py:1:8: F401 `os` imported but unused
-Found 1 error(s).
+Found 1 error.
 1 potentially fixable with the --fix option.
 ```
 

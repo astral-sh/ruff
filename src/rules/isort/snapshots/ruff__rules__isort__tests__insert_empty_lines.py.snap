@@ -11,7 +11,11 @@ expression: diagnostics
     row: 3
     column: 0
   fix:
-    content: "import a\nimport b\n\n"
+    content:
+      - import a
+      - import b
+      - ""
+      - ""
     location:
       row: 1
       column: 0
@@ -28,7 +32,12 @@ expression: diagnostics
     row: 6
     column: 0
   fix:
-    content: "import os\nimport sys\n\n\n"
+    content:
+      - import os
+      - import sys
+      - ""
+      - ""
+      - ""
     location:
       row: 4
       column: 0
@@ -45,7 +54,11 @@ expression: diagnostics
     row: 16
     column: 0
   fix:
-    content: "import os\nimport sys\n\n"
+    content:
+      - import os
+      - import sys
+      - ""
+      - ""
     location:
       row: 14
       column: 0
@@ -62,7 +75,11 @@ expression: diagnostics
     row: 54
     column: 0
   fix:
-    content: "import os\n\n\n"
+    content:
+      - import os
+      - ""
+      - ""
+      - ""
     location:
       row: 52
       column: 0

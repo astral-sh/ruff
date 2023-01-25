@@ -1104,7 +1104,10 @@ mod tests {
 
     macro_rules! assert_round_trip {
         ($contents:expr) => {
-            assert_eq!(round_trip($contents), $contents);
+            assert_eq!(
+                round_trip($contents),
+                $contents.replace('\n', LineEnding::default().as_str())
+            );
         };
     }
 
@@ -1193,6 +1196,7 @@ if True:
     pass
 "#
             .trim()
+            .replace('\n', LineEnding::default().as_str())
         );
     }
 
@@ -1254,6 +1258,7 @@ if True:
     pass
 "#
             .trim()
+            .replace('\n', LineEnding::default().as_str())
         );
         assert_eq!(
             round_trip_with(
@@ -1271,6 +1276,7 @@ if True:
   pass
 "#
             .trim()
+            .replace('\n', LineEnding::default().as_str())
         );
         assert_eq!(
             round_trip_with(
@@ -1288,6 +1294,7 @@ if True:
 	pass
 "#
             .trim()
+            .replace('\n', LineEnding::default().as_str())
         );
     }
 

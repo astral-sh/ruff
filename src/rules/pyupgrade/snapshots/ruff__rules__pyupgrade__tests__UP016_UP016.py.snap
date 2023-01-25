@@ -11,7 +11,8 @@ expression: diagnostics
     row: 7
     column: 13
   fix:
-    content: str
+    content:
+      - str
     location:
       row: 7
       column: 0
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 8
     column: 15
   fix:
-    content: bytes
+    content:
+      - bytes
     location:
       row: 8
       column: 0
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 9
     column: 15
   fix:
-    content: "(type,)"
+    content:
+      - "(type,)"
     location:
       row: 9
       column: 0
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 10
     column: 16
   fix:
-    content: "(str,)"
+    content:
+      - "(str,)"
     location:
       row: 10
       column: 0
@@ -79,7 +83,8 @@ expression: diagnostics
     row: 11
     column: 17
   fix:
-    content: "(int,)"
+    content:
+      - "(int,)"
     location:
       row: 11
       column: 0
@@ -96,7 +101,8 @@ expression: diagnostics
     row: 12
     column: 10
   fix:
-    content: chr
+    content:
+      - chr
     location:
       row: 12
       column: 0
@@ -113,7 +119,8 @@ expression: diagnostics
     row: 13
     column: 13
   fix:
-    content: iter
+    content:
+      - iter
     location:
       row: 13
       column: 0
@@ -130,7 +137,8 @@ expression: diagnostics
     row: 14
     column: 10
   fix:
-    content: print
+    content:
+      - print
     location:
       row: 14
       column: 0
@@ -147,7 +155,8 @@ expression: diagnostics
     row: 15
     column: 9
   fix:
-    content: exec
+    content:
+      - exec
     location:
       row: 15
       column: 0
@@ -164,7 +173,8 @@ expression: diagnostics
     row: 16
     column: 20
   fix:
-    content: next
+    content:
+      - next
     location:
       row: 16
       column: 0
@@ -181,7 +191,8 @@ expression: diagnostics
     row: 17
     column: 8
   fix:
-    content: next
+    content:
+      - next
     location:
       row: 17
       column: 0
@@ -198,7 +209,8 @@ expression: diagnostics
     row: 18
     column: 12
   fix:
-    content: callable
+    content:
+      - callable
     location:
       row: 18
       column: 0
@@ -215,7 +227,8 @@ expression: diagnostics
     row: 19
     column: 15
   fix:
-    content: range
+    content:
+      - range
     location:
       row: 19
       column: 0
@@ -232,7 +245,8 @@ expression: diagnostics
     row: 20
     column: 16
   fix:
-    content: range
+    content:
+      - range
     location:
       row: 20
       column: 0
@@ -249,7 +263,8 @@ expression: diagnostics
     row: 21
     column: 31
   fix:
-    content: "(type,)"
+    content:
+      - "(type,)"
     location:
       row: 21
       column: 16
@@ -266,7 +281,8 @@ expression: diagnostics
     row: 22
     column: 33
   fix:
-    content: "(int,)"
+    content:
+      - "(int,)"
     location:
       row: 22
       column: 16
@@ -283,7 +299,8 @@ expression: diagnostics
     row: 23
     column: 32
   fix:
-    content: "(str,)"
+    content:
+      - "(str,)"
     location:
       row: 23
       column: 16
@@ -300,7 +317,8 @@ expression: diagnostics
     row: 26
     column: 18
   fix:
-    content: dct.items()
+    content:
+      - dct.items()
     location:
       row: 26
       column: 0
@@ -317,7 +335,8 @@ expression: diagnostics
     row: 27
     column: 17
   fix:
-    content: dct.keys()
+    content:
+      - dct.keys()
     location:
       row: 27
       column: 0
@@ -334,7 +353,8 @@ expression: diagnostics
     row: 28
     column: 19
   fix:
-    content: dct.values()
+    content:
+      - dct.values()
     location:
       row: 28
       column: 0
@@ -351,7 +371,8 @@ expression: diagnostics
     row: 29
     column: 18
   fix:
-    content: dct.items()
+    content:
+      - dct.items()
     location:
       row: 29
       column: 0
@@ -368,7 +389,8 @@ expression: diagnostics
     row: 30
     column: 17
   fix:
-    content: dct.keys()
+    content:
+      - dct.keys()
     location:
       row: 30
       column: 0
@@ -385,7 +407,8 @@ expression: diagnostics
     row: 31
     column: 19
   fix:
-    content: dct.values()
+    content:
+      - dct.values()
     location:
       row: 31
       column: 0
@@ -402,7 +425,8 @@ expression: diagnostics
     row: 32
     column: 34
   fix:
-    content: "self.assertCountEqual(a1, a2)"
+    content:
+      - "self.assertCountEqual(a1, a2)"
     location:
       row: 32
       column: 0
@@ -419,7 +443,8 @@ expression: diagnostics
     row: 33
     column: 37
   fix:
-    content: "self.assertRaisesRegex(e, r, fn)"
+    content:
+      - "self.assertRaisesRegex(e, r, fn)"
     location:
       row: 33
       column: 0
@@ -436,7 +461,8 @@ expression: diagnostics
     row: 34
     column: 27
   fix:
-    content: "self.assertRegex(s, r)"
+    content:
+      - "self.assertRegex(s, r)"
     location:
       row: 34
       column: 0
@@ -453,7 +479,8 @@ expression: diagnostics
     row: 37
     column: 29
   fix:
-    content: meth.__func__
+    content:
+      - meth.__func__
     location:
       row: 37
       column: 0
@@ -470,7 +497,8 @@ expression: diagnostics
     row: 38
     column: 25
   fix:
-    content: meth.__self__
+    content:
+      - meth.__self__
     location:
       row: 38
       column: 0
@@ -487,7 +515,8 @@ expression: diagnostics
     row: 39
     column: 28
   fix:
-    content: fn.__closure__
+    content:
+      - fn.__closure__
     location:
       row: 39
       column: 0
@@ -504,7 +533,8 @@ expression: diagnostics
     row: 40
     column: 25
   fix:
-    content: fn.__code__
+    content:
+      - fn.__code__
     location:
       row: 40
       column: 0
@@ -521,7 +551,8 @@ expression: diagnostics
     row: 41
     column: 29
   fix:
-    content: fn.__defaults__
+    content:
+      - fn.__defaults__
     location:
       row: 41
       column: 0
@@ -538,7 +569,8 @@ expression: diagnostics
     row: 42
     column: 28
   fix:
-    content: fn.__globals__
+    content:
+      - fn.__globals__
     location:
       row: 42
       column: 0
@@ -555,7 +587,8 @@ expression: diagnostics
     row: 45
     column: 12
   fix:
-    content: "b\"...\""
+    content:
+      - "b\"...\""
     location:
       row: 45
       column: 0
@@ -572,7 +605,8 @@ expression: diagnostics
     row: 46
     column: 12
   fix:
-    content: "\"...\""
+    content:
+      - "\"...\""
     location:
       row: 46
       column: 0
@@ -589,7 +623,8 @@ expression: diagnostics
     row: 47
     column: 24
   fix:
-    content: "b\"...\""
+    content:
+      - "b\"...\""
     location:
       row: 47
       column: 0
@@ -606,7 +641,8 @@ expression: diagnostics
     row: 48
     column: 21
   fix:
-    content: "\"...\""
+    content:
+      - "\"...\""
     location:
       row: 48
       column: 0
@@ -623,7 +659,8 @@ expression: diagnostics
     row: 49
     column: 22
   fix:
-    content: "\"...\""
+    content:
+      - "\"...\""
     location:
       row: 49
       column: 0
@@ -640,7 +677,8 @@ expression: diagnostics
     row: 53
     column: 30
   fix:
-    content: meth
+    content:
+      - meth
     location:
       row: 53
       column: 0
@@ -657,7 +695,8 @@ expression: diagnostics
     row: 54
     column: 34
   fix:
-    content: fn
+    content:
+      - fn
     location:
       row: 54
       column: 0
@@ -674,7 +713,8 @@ expression: diagnostics
     row: 57
     column: 29
   fix:
-    content: raise exc from exc_from
+    content:
+      - raise exc from exc_from
     location:
       row: 57
       column: 0
@@ -691,7 +731,8 @@ expression: diagnostics
     row: 58
     column: 24
   fix:
-    content: raise exc.with_traceback(tb)
+    content:
+      - raise exc.with_traceback(tb)
     location:
       row: 58
       column: 0
@@ -708,7 +749,8 @@ expression: diagnostics
     row: 59
     column: 28
   fix:
-    content: raise
+    content:
+      - raise
     location:
       row: 59
       column: 0
@@ -725,7 +767,8 @@ expression: diagnostics
     row: 62
     column: 16
   fix:
-    content: "bs[0]"
+    content:
+      - "bs[0]"
     location:
       row: 62
       column: 0
@@ -742,7 +785,8 @@ expression: diagnostics
     row: 63
     column: 21
   fix:
-    content: "bs[i]"
+    content:
+      - "bs[i]"
     location:
       row: 63
       column: 0
@@ -759,7 +803,8 @@ expression: diagnostics
     row: 64
     column: 15
   fix:
-    content: "bytes((i,))"
+    content:
+      - "bytes((i,))"
     location:
       row: 64
       column: 0
@@ -776,7 +821,8 @@ expression: diagnostics
     row: 67
     column: 23
   fix:
-    content: iter(dct.items())
+    content:
+      - iter(dct.items())
     location:
       row: 67
       column: 5
@@ -793,7 +839,8 @@ expression: diagnostics
     row: 67
     column: 23
   fix:
-    content: dct.items()
+    content:
+      - dct.items()
     location:
       row: 67
       column: 5
@@ -810,7 +857,8 @@ expression: diagnostics
     row: 68
     column: 22
   fix:
-    content: iter(dct.keys())
+    content:
+      - iter(dct.keys())
     location:
       row: 68
       column: 5
@@ -827,7 +875,8 @@ expression: diagnostics
     row: 68
     column: 22
   fix:
-    content: dct.keys()
+    content:
+      - dct.keys()
     location:
       row: 68
       column: 5
@@ -844,7 +893,8 @@ expression: diagnostics
     row: 69
     column: 24
   fix:
-    content: iter(dct.values())
+    content:
+      - iter(dct.values())
     location:
       row: 69
       column: 5
@@ -861,7 +911,8 @@ expression: diagnostics
     row: 69
     column: 24
   fix:
-    content: dct.values()
+    content:
+      - dct.values()
     location:
       row: 69
       column: 5

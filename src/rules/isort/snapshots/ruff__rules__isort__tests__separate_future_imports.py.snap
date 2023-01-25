@@ -11,7 +11,12 @@ expression: diagnostics
     row: 4
     column: 0
   fix:
-    content: "from __future__ import annotations\n\nimport os\nimport sys\n"
+    content:
+      - from __future__ import annotations
+      - ""
+      - import os
+      - import sys
+      - ""
     location:
       row: 1
       column: 0

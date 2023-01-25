@@ -11,7 +11,8 @@ expression: diagnostics
     row: 1
     column: 11
   fix:
-    content: ()
+    content:
+      - ()
     location:
       row: 1
       column: 4
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 2
     column: 10
   fix:
-    content: "[]"
+    content:
+      - "[]"
     location:
       row: 2
       column: 4
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 3
     column: 11
   fix:
-    content: "{}"
+    content:
+      - "{}"
     location:
       row: 3
       column: 5
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 4
     column: 14
   fix:
-    content: "{\"a\": 1}"
+    content:
+      - "{\"a\": 1}"
     location:
       row: 4
       column: 5

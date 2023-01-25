@@ -14,7 +14,7 @@ mod tests {
     use super::types;
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::IncorrectFixtureParenthesesStyle, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]
     #[test_case(
@@ -256,7 +256,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        insta::assert_yaml_snapshot!(name, diagnostics);
+        assert_yaml_snapshot!(name, diagnostics);
         Ok(())
     }
 }

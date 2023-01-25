@@ -57,10 +57,6 @@ where
 
 /// B007
 pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
-    if helpers::uses_locals(body) {
-        return;
-    }
-
     let control_names = {
         let mut finder = NameFinder::new();
         finder.visit_expr(target);
@@ -86,11 +82,15 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
             continue;
         }
 
+        let safe = !helpers::uses_magic_variable_access(checker, body);
         let mut diagnostic = Diagnostic::new(
-            violations::UnusedLoopControlVariable(name.to_string()),
+            violations::UnusedLoopControlVariable {
+                name: name.to_string(),
+                safe,
+            },
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if safe && checker.patch(diagnostic.kind.rule()) {
             // Prefix the variable name with an underscore.
             diagnostic.amend(Fix::replacement(
                 format!("_{name}"),

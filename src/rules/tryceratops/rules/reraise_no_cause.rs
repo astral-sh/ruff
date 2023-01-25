@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Stmt, StmtKind};
+use rustpython_ast::{ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::visitor::{self, Visitor};
@@ -46,8 +46,12 @@ pub fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
     };
 
     for stmt in raises {
-        if let StmtKind::Raise { cause, .. } = &stmt.node {
-            if cause.is_none() {
+        if let StmtKind::Raise { exc, cause, .. } = &stmt.node {
+            if exc
+                .as_ref()
+                .map_or(false, |expr| matches!(expr.node, ExprKind::Call { .. }))
+                && cause.is_none()
+            {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(ReraiseNoCause, Range::from_located(stmt)));

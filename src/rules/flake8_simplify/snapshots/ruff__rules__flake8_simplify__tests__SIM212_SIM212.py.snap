@@ -13,7 +13,8 @@ expression: diagnostics
     row: 1
     column: 21
   fix:
-    content: a if a else b
+    content:
+      - a if a else b
     location:
       row: 1
       column: 4
@@ -32,7 +33,8 @@ expression: diagnostics
     row: 3
     column: 25
   fix:
-    content: a if a else b + c
+    content:
+      - a if a else b + c
     location:
       row: 3
       column: 4

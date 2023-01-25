@@ -11,7 +11,10 @@ expression: diagnostics
     row: 3
     column: 3
   fix:
-    content: "'''\nDouble quotes multiline module docstring\n'''"
+    content:
+      - "'''"
+      - Double quotes multiline module docstring
+      - "'''"
     location:
       row: 1
       column: 0
@@ -28,7 +31,10 @@ expression: diagnostics
     row: 14
     column: 7
   fix:
-    content: "'''\n    Double quotes multiline class docstring\n    '''"
+    content:
+      - "'''"
+      - "    Double quotes multiline class docstring"
+      - "    '''"
     location:
       row: 12
       column: 4
@@ -45,7 +51,10 @@ expression: diagnostics
     row: 26
     column: 11
   fix:
-    content: "'''\n        Double quotes multiline function docstring\n        '''"
+    content:
+      - "'''"
+      - "        Double quotes multiline function docstring"
+      - "        '''"
     location:
       row: 24
       column: 8

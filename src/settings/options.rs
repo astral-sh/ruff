@@ -428,6 +428,7 @@ pub struct Options {
     #[option_group]
     /// Options for the `flake8-bugbear` plugin.
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    #[option_group]
     /// Options for the `flake8-builtins` plugin.
     pub flake8_builtins: Option<flake8_builtins::settings::Options>,
     #[option_group]

@@ -13,9 +13,11 @@ use crate::rules::pycodestyle::rules::{
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
+use crate::source_code::Stylist;
 
 pub fn check_lines(
     path: &Path,
+    stylist: &Stylist,
     contents: &str,
     commented_lines: &[usize],
     doc_lines: &[usize],
@@ -139,6 +141,7 @@ pub fn check_lines(
 
     if enforce_no_newline_at_end_of_file {
         if let Some(diagnostic) = no_newline_at_end_of_file(
+            stylist,
             contents,
             matches!(autofix, flags::Autofix::Enabled)
                 && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
@@ -164,13 +167,18 @@ mod tests {
     use super::check_lines;
     use crate::registry::Rule;
     use crate::settings::{flags, Settings};
+    use crate::source_code::{Locator, Stylist};
 
     #[test]
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
+        let locator = Locator::new(line);
+        let stylist = Stylist::from_contents(line, &locator);
+
         let check_with_max_line_length = |line_length: usize| {
             check_lines(
                 Path::new("foo.py"),
+                &stylist,
                 line,
                 &[],
                 &[],
