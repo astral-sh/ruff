@@ -1138,10 +1138,6 @@
     "PythonVersion": {
       "type": "string",
       "enum": [
-        "py33",
-        "py34",
-        "py35",
-        "py36",
         "py37",
         "py38",
         "py39",

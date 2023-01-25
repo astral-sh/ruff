@@ -1044,7 +1044,9 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport) {
+                if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport)
+                    && self.settings.target_version >= PythonVersion::Py37
+                {
                     if let Some("__future__") = module.as_deref() {
                         pyupgrade::rules::unnecessary_future_import(self, stmt, names);
                     }
