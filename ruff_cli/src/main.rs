@@ -89,7 +89,7 @@ fn resolve(
     }
 }
 
-pub fn main() -> Result<ExitCode> {
+fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
     let (cli, overrides) = Cli::parse().partition();
 
@@ -319,4 +319,15 @@ quoting the executed command, along with the relevant file contents and `pyproje
     }
 
     Ok(ExitCode::SUCCESS)
+}
+
+#[must_use]
+pub fn main() -> ExitCode {
+    match inner_main() {
+        Ok(code) => code,
+        Err(err) => {
+            eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
+            ExitCode::FAILURE
+        }
+    }
 }
