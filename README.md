@@ -67,6 +67,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Home Assistant](https://github.com/home-assistant/core)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+- [Babel](https://github.com/python-babel/babel)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
