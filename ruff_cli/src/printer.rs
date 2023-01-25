@@ -96,12 +96,14 @@ impl<'a> Printer<'a> {
                     let remaining = diagnostics.messages.len();
                     let total = fixed + remaining;
                     if fixed > 0 {
+                        let s = if total == 1 { "" } else { "s" };
                         writeln!(
                             stdout,
-                            "Found {total} error(s) ({fixed} fixed, {remaining} remaining)."
+                            "Found {total} error{s}) ({fixed} fixed, {remaining} remaining)."
                         )?;
                     } else if remaining > 0 {
-                        writeln!(stdout, "Found {remaining} error(s).")?;
+                        let s = if remaining == 1 { "" } else { "s" };
+                        writeln!(stdout, "Found {remaining} error{s}.")?;
                     }
 
                     if !matches!(self.autofix, fix::FixMode::Apply) {
@@ -121,10 +123,11 @@ impl<'a> Printer<'a> {
                 Violations::Hide => {
                     let fixed = diagnostics.fixed;
                     if fixed > 0 {
+                        let s = if fixed == 1 { "" } else { "s" };
                         if matches!(self.autofix, fix::FixMode::Apply) {
-                            writeln!(stdout, "Fixed {fixed} error(s).")?;
+                            writeln!(stdout, "Fixed {fixed} error{s}.")?;
                         } else if matches!(self.autofix, fix::FixMode::Diff) {
-                            writeln!(stdout, "Would fix {fixed} error(s).")?;
+                            writeln!(stdout, "Would fix {fixed} error{s}.")?;
                         }
                     }
                 }
@@ -339,8 +342,13 @@ impl<'a> Printer<'a> {
         }
 
         if self.log_level >= &LogLevel::Default {
+            let s = if diagnostics.messages.len() == 1 {
+                ""
+            } else {
+                "s"
+            };
             notify_user!(
-                "Found {} error(s). Watching for file changes.",
+                "Found {} error{s}. Watching for file changes.",
                 diagnostics.messages.len()
             );
         }
