@@ -8,6 +8,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::assert_yaml_snapshot;
     use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -32,7 +33,7 @@ mod tests {
                 ..Settings::for_rule(Rule::ImplicitNamespacePackage)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }
