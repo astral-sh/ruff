@@ -99,7 +99,7 @@ impl<'a> Printer<'a> {
                         let s = if total == 1 { "" } else { "s" };
                         writeln!(
                             stdout,
-                            "Found {total} error{s}) ({fixed} fixed, {remaining} remaining)."
+                            "Found {total} error{s} ({fixed} fixed, {remaining} remaining)."
                         )?;
                     } else if remaining > 0 {
                         let s = if remaining == 1 { "" } else { "s" };
