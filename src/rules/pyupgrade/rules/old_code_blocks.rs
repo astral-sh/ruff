@@ -17,9 +17,7 @@ fn check_path(checker: &Checker, expr: &Expr, path: &[&str]) -> bool {
         .map_or(false, |call_path| call_path.as_slice() == path)
 }
 
-/// Returns true if the user's linting version is greater than the version
-/// specified in the tuple
-fn compare_version(elts: &[Expr], py_version: PythonVersion, or_equal: bool) -> bool {
+fn extract_version(elts: &[Expr]) -> Vec<u32> {
     let mut version: Vec<u32> = vec![];
     for elt in elts {
         if let ExprKind::Constant {
@@ -29,9 +27,9 @@ fn compare_version(elts: &[Expr], py_version: PythonVersion, or_equal: bool) -> 
         {
             let the_number = item.to_u32_digits();
             match the_number.0 {
-                // We do not have a way of handling these values
+                // We do not have a way of handling these values, so return what was gathered
                 Sign::Minus | Sign::NoSign => {
-                    return false;
+                    return version;
                 }
                 Sign::Plus => {
                     // Assuming that the version will never be above a 32 bit
@@ -39,9 +37,15 @@ fn compare_version(elts: &[Expr], py_version: PythonVersion, or_equal: bool) -> 
                 }
             }
         } else {
-            return false;
+            return version;
         }
     }
+    version
+}
+
+/// Returns true if the user's linting version is greater than the version
+/// specified in the tuple
+fn compare_version(version: Vec<u32>, py_version: PythonVersion, or_equal: bool) -> bool {
     let mut ver_iter = version.iter();
     // Check the first number (the major version)
     if let Some(first) = ver_iter.next() {
@@ -115,13 +119,14 @@ pub fn old_code_blocks(
                         let op = ops.get(0).unwrap();
                         // Here we check for the correct operator, and also adjust the desired
                         // target based on whether we are accepting equal to
-                        if op == &Cmpop::Lt {
-                            if compare_version(elts, checker.settings.target_version, false) {
-                                fix_py2_block(checker, stmt, orelse);
-                            }
-                        }
-                        if op == &Cmpop::LtE {
-                            if compare_version(elts, checker.settings.target_version, true) {
+                        if op == &Cmpop::Lt || op == &Cmpop::LtE {
+                            let version = extract_version(elts);
+                            println!("{:?}", version);
+                            if compare_version(
+                                version,
+                                checker.settings.target_version,
+                                op == &Cmpop::LtE,
+                            ) {
                                 fix_py2_block(checker, stmt, orelse);
                             }
                         }
@@ -138,5 +143,26 @@ pub fn old_code_blocks(
             if check_path(checker, test, &["six", "PY3"]) && op == &Unaryop::Not {}
         }
         _ => (),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case(PythonVersion::Py36, vec![2], true, true; "compare-2.0")]
+    #[test_case(PythonVersion::Py36, vec![2, 0], true, true; "compare-2.0-whole")]
+    #[test_case(PythonVersion::Py36, vec![3], true, true; "compare-3.0")]
+    #[test_case(PythonVersion::Py36, vec![3, 0], true, true; "compare-3.0-whole")]
+    #[test_case(PythonVersion::Py36, vec![3, 1], true, true; "compare-3.1")]
+    #[test_case(PythonVersion::Py36, vec![3, 5], true, true; "compare-3.5")]
+    #[test_case(PythonVersion::Py36, vec![3, 6], true, true; "compare-3.6")]
+    #[test_case(PythonVersion::Py36, vec![3, 6], false, false; "compare-3.6-not-equal")]
+    #[test_case(PythonVersion::Py36, vec![3, 7], false , false; "compare-3.7")]
+    #[test_case(PythonVersion::Py310, vec![3,9], true, true; "compare-3.9")]
+    #[test_case(PythonVersion::Py310, vec![3, 11], true, false; "compare-3.11")]
+    fn test_compare_version(version: PythonVersion, version_vec: Vec<u32>, or_equal: bool, expected: bool) {
+        assert_eq!(compare_version(version_vec, version, or_equal), expected);
     }
 }

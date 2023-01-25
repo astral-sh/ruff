@@ -5,6 +5,8 @@ if sys.version_info < (2,0):
     print("This script requires Python 2.0 or greater.")
 elif sys.version_info < (2,6):
     print("This script requires Python 2.6 or greater.")
+elif sys.version_info < (3,):
+    print("This script requires Python 3.0 or greater.")
 elif sys.version_info < (3,0):
     print("This script requires Python 3.0 or greater.")
 elif sys.version_info < (3,12):
