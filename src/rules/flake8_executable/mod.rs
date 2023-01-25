@@ -2,6 +2,7 @@
 pub(crate) mod helpers;
 pub(crate) mod rules;
 
+#[cfg(unix)]
 #[cfg(test)]
 mod tests {
     use std::path::Path;

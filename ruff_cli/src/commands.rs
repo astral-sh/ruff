@@ -120,7 +120,7 @@ pub fn run(
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,
-                            filename: path.to_string_lossy().to_string(),
+                            filename: format!("{}", path.display()),
                             source: None,
                         }])
                     } else {

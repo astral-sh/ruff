@@ -1,9 +1,12 @@
 #![cfg(not(target_family = "wasm"))]
 
+#[cfg(unix)]
+use std::path::Path;
 use std::str;
 
 use anyhow::Result;
 use assert_cmd::Command;
+#[cfg(unix)]
 use path_absolutize::path_dedot;
 
 const BIN_NAME: &str = "ruff";
@@ -50,6 +53,7 @@ fn test_stdin_filename() -> Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
 #[test]
 fn test_stdin_json() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
@@ -58,6 +62,11 @@ fn test_stdin_json() -> Result<()> {
         .write_stdin("import os\n")
         .assert()
         .failure();
+
+    let directory = path_dedot::CWD.to_str().unwrap();
+    let binding = Path::new(directory).join("F401.py");
+    let file_path = binding.display();
+
     assert_eq!(
         str::from_utf8(&output.get_output().stdout)?,
         format!(
@@ -85,11 +94,10 @@ fn test_stdin_json() -> Result<()> {
       "row": 1,
       "column": 10
     }},
-    "filename": "{}/F401.py"
+    "filename": "{file_path}"
   }}
 ]
-"#,
-            path_dedot::CWD.to_str().unwrap()
+"#
         )
     );
     Ok(())
