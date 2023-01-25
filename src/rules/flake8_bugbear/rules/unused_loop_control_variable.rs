@@ -57,7 +57,7 @@ where
 
 /// B007
 pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
-    if helpers::uses_locals(body) {
+    if helpers::uses_magic_variable_access(body) {
         return;
     }
 

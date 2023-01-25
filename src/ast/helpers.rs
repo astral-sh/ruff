@@ -562,12 +562,13 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
     }
 }
 
-/// Return `true` if the body uses `locals()`.
-pub fn uses_locals(body: &[Stmt]) -> bool {
+/// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
+pub fn uses_magic_variable_access(body: &[Stmt]) -> bool {
     any_over_body(body, &|expr| {
         if let ExprKind::Call { func, .. } = &expr.node {
             if let ExprKind::Name { id, ctx } = &func.node {
-                id == "locals" && matches!(ctx, ExprContext::Load)
+                ["locals", "globals", "vars", "eval"].contains(&id.as_str())
+                    && matches!(ctx, ExprContext::Load)
             } else {
                 false
             }
