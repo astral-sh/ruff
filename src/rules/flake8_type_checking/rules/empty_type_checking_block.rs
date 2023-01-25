@@ -17,7 +17,7 @@ impl Violation for EmptyTypeCheckingBlock {
     }
 }
 
-/// TYP005
+/// TYC005
 pub fn empty_type_checking_block(checker: &mut Checker, test: &Expr, body: &[Stmt]) {
     if checker.resolve_call_path(test).map_or(false, |call_path| {
         call_path.as_slice() == ["typing", "TYPE_CHECKING"]

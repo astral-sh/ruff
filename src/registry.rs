@@ -429,11 +429,11 @@ ruff_macros::define_rule_mapping!(
     EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
     // flake8-type-checking
-    TYP001 => rules::flake8_type_checking::rules::TypingOnlyFirstPartyImport,
-    TYP002 => rules::flake8_type_checking::rules::TypingOnlyThirdPartyImport,
-    TYP003 => rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport,
-    TYP004 => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
-    TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
+    TYC001 => rules::flake8_type_checking::rules::TypingOnlyFirstPartyImport,
+    TYC002 => rules::flake8_type_checking::rules::TypingOnlyThirdPartyImport,
+    TYC003 => rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport,
+    TYC004 => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
+    TYC005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // tryceratops
     TRY004 => rules::tryceratops::rules::PreferTypeError,
     TRY200 => rules::tryceratops::rules::ReraiseNoCause,
@@ -584,7 +584,7 @@ pub enum Linter {
     #[prefix = "EXE"]
     Flake8Executable,
     /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
-    #[prefix = "TYP"]
+    #[prefix = "TYC"]
     Flake8TypeChecking,
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
