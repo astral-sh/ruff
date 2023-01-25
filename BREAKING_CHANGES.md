@@ -1,5 +1,40 @@
 # Breaking Changes
 
+## Unreleased
+
+`--explain`, `--clean` and `--generate-shell-completion` are now
+implemented as subcommands:
+
+    ruff .         # still works and will always work
+    ruff check .   # now also works
+
+    ruff --explain E402   # still works
+    ruff explain E402     # now also works
+
+    ruff --format json --explain E402   # no longer works
+    # the command has to come first:
+    ruff --explain E402 --format json   # or using the new syntax:
+    ruff explain E402   --format json
+
+Please also note that:
+
+* the subcommands will now fail when invoked with unsupported arguments
+  instead of silently ignoring them, e.g. the following will now fail:
+
+      ruff --explain E402 --respect-gitignore
+
+  Since the `explain` command doesn't support `--respect-gitignore`.
+
+* The semantics of `ruff <arg>` has changed when `<arg>` is a
+  subcommand, e.g. before `ruff explain` would look for a file or
+  directory `explain` in the current directory but now it just invokes
+  the explain command. Note that scripts invoking ruff should supply
+  `--` anyway before any positional arguments and the semantics of
+  `ruff -- <arg>` have not changed.
+
+* `--explain` previously treated `--format grouped` just like `--format text`
+  (this is no longer supported, use `--format text` instead)
+
 ## 0.0.226
 
 ### `misplaced-comparison-constant` (`PLC2201`) was deprecated in favor of `SIM300` ([#1980](https://github.com/charliermarsh/ruff/pull/1980))
