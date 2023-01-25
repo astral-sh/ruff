@@ -11,7 +11,8 @@ expression: diagnostics
     row: 12
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 12
       column: 14
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 19
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 19
       column: 14
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 30
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 30
       column: 14
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 37
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 37
       column: 14
@@ -79,7 +83,8 @@ expression: diagnostics
     row: 44
     column: 36
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 44
       column: 14
@@ -96,7 +101,8 @@ expression: diagnostics
     row: 51
     column: 35
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 51
       column: 14
@@ -113,7 +119,8 @@ expression: diagnostics
     row: 58
     column: 35
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 58
       column: 14
@@ -130,7 +137,8 @@ expression: diagnostics
     row: 65
     column: 25
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 65
       column: 14
@@ -147,7 +155,8 @@ expression: diagnostics
     row: 72
     column: 29
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 72
       column: 14
@@ -164,7 +173,8 @@ expression: diagnostics
     row: 79
     column: 32
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 79
       column: 14
@@ -181,7 +191,8 @@ expression: diagnostics
     row: 86
     column: 32
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 86
       column: 14
@@ -198,7 +209,8 @@ expression: diagnostics
     row: 97
     column: 9
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 95
       column: 14
@@ -215,7 +227,8 @@ expression: diagnostics
     row: 104
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 104
       column: 14
@@ -232,7 +245,8 @@ expression: diagnostics
     row: 111
     column: 35
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 111
       column: 14
@@ -249,7 +263,8 @@ expression: diagnostics
     row: 118
     column: 33
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 118
       column: 14
@@ -266,7 +281,8 @@ expression: diagnostics
     row: 125
     column: 32
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 125
       column: 14
@@ -283,7 +299,8 @@ expression: diagnostics
     row: 132
     column: 32
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 132
       column: 14
@@ -300,7 +317,8 @@ expression: diagnostics
     row: 139
     column: 31
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 139
       column: 14
@@ -317,7 +335,8 @@ expression: diagnostics
     row: 146
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 146
       column: 14
@@ -334,7 +353,8 @@ expression: diagnostics
     row: 153
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 153
       column: 14
@@ -351,7 +371,8 @@ expression: diagnostics
     row: 160
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 160
       column: 14
@@ -368,7 +389,8 @@ expression: diagnostics
     row: 167
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 167
       column: 14
@@ -385,7 +407,8 @@ expression: diagnostics
     row: 174
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 174
       column: 14
@@ -402,7 +425,8 @@ expression: diagnostics
     row: 181
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 181
       column: 14
@@ -419,7 +443,8 @@ expression: diagnostics
     row: 188
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 188
       column: 14
@@ -436,7 +461,8 @@ expression: diagnostics
     row: 195
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 195
       column: 14
@@ -453,7 +479,8 @@ expression: diagnostics
     row: 202
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 202
       column: 14
@@ -470,7 +497,8 @@ expression: diagnostics
     row: 209
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 209
       column: 14
@@ -487,7 +515,8 @@ expression: diagnostics
     row: 216
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 216
       column: 14
@@ -504,7 +533,8 @@ expression: diagnostics
     row: 223
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 223
       column: 14
@@ -521,7 +551,8 @@ expression: diagnostics
     row: 230
     column: 30
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 230
       column: 14
@@ -538,7 +569,8 @@ expression: diagnostics
     row: 267
     column: 31
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 267
       column: 14
@@ -555,7 +587,8 @@ expression: diagnostics
     row: 277
     column: 31
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 277
       column: 14
@@ -572,7 +605,8 @@ expression: diagnostics
     row: 288
     column: 31
   fix:
-    content: TypeError
+    content:
+      - TypeError
     location:
       row: 288
       column: 14

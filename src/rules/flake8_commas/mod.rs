@@ -10,7 +10,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Path::new("COM81.py"); "COM81")]
     fn rules(path: &Path) -> Result<()> {
@@ -25,7 +25,7 @@ mod tests {
                 Rule::TrailingCommaProhibited,
             ]),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

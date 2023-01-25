@@ -10,6 +10,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::assert_yaml_snapshot;
     use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -25,7 +26,7 @@ mod tests {
                 .as_path(),
             &Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -51,7 +52,7 @@ mod tests {
             },
         )?;
 
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

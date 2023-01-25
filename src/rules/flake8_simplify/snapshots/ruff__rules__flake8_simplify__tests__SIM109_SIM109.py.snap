@@ -12,7 +12,8 @@ expression: diagnostics
     row: 2
     column: 19
   fix:
-    content: "a in (b, c)"
+    content:
+      - "a in (b, c)"
     location:
       row: 2
       column: 3
@@ -30,7 +31,8 @@ expression: diagnostics
     row: 6
     column: 20
   fix:
-    content: "a in (b, c)"
+    content:
+      - "a in (b, c)"
     location:
       row: 6
       column: 4
@@ -48,7 +50,8 @@ expression: diagnostics
     row: 10
     column: 27
   fix:
-    content: "a in (b, c) or None"
+    content:
+      - "a in (b, c) or None"
     location:
       row: 10
       column: 3
@@ -66,7 +69,8 @@ expression: diagnostics
     row: 14
     column: 27
   fix:
-    content: "a in (b, c) or None"
+    content:
+      - "a in (b, c) or None"
     location:
       row: 14
       column: 3

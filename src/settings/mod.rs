@@ -358,7 +358,7 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
 
     for (from, target) in redirects {
         // TODO(martin): This belongs into the ruff_cli crate.
-        crate::warn_user!("`{from}` has been remapped to `{}`", target.as_ref());
+        crate::warn_user!("`{from}` has been remapped to `{}`.", target.as_ref());
     }
 
     rules

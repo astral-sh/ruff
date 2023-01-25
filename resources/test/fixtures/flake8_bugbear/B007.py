@@ -29,3 +29,19 @@ def strange_generator():
 
 for i, (j, (k, l)) in strange_generator():  # i, k not used
     print(j, l)
+
+FMT = "{foo} {bar}"
+for foo, bar in [(1, 2)]:
+    if foo:
+        print(FMT.format(**locals()))
+
+for foo, bar in [(1, 2)]:
+    if foo:
+        print(FMT.format(**globals()))
+
+for foo, bar in [(1, 2)]:
+    if foo:
+        print(FMT.format(**vars()))
+
+for foo, bar in [(1, 2)]:
+    print(FMT.format(foo=foo, bar=eval('bar')))

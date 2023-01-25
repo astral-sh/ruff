@@ -67,6 +67,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Home Assistant](https://github.com/home-assistant/core)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+- [Babel](https://github.com/python-babel/babel)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -143,7 +144,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-executable (EXE)](#flake8-executable-exe)
-   1. [flake8-type-checking (TYP)](#flake8-type-checking-typ)
+   1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [tryceratops (TRY)](#tryceratops-try)
    1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
@@ -212,7 +213,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.233'
+  rev: 'v0.0.234'
   hooks:
     - id: ruff
 ```
@@ -853,7 +854,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B004 | unreliable-callable-check |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
 | B005 | strip-with-multi-characters | Using `.strip()` with multi-character strings is misleading the reader |  |
 | B006 | mutable-argument-default | Do not use mutable data structures for argument defaults |  |
-| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within the loop body | 🛠 |
+| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body |  |
 | B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
 | B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
@@ -1196,13 +1197,17 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) o
 | EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
 | EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
 
-### flake8-type-checking (TYP)
+### flake8-type-checking (TCH)
 
 For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TYP005 | empty-type-checking-block | Found empty type-checking block |  |
+| TCH001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
+| TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
+| TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
+| TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
+| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
 
 ### tryceratops (TRY)
 
@@ -1693,7 +1698,7 @@ After installing `ruff` and `nbqa`, you can run Ruff over a notebook like so:
 Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
 Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
 Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused
-Found 3 error(s).
+Found 3 errors.
 1 potentially fixable with the --fix option.
 ```
 
@@ -1728,6 +1733,25 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 ### How can I tell what settings Ruff is using to check my code?
 
 Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
+
+### Ruff tried to fix something, but it broke my code. What should I do?
+
+Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
+have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
+
+In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
+
+In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
+per-category basis using the [`unfixable`](#unfixable) mechanic. For example, to disable autofix
+for some possibly-unsafe rules, you could add the following to your `pyproject.toml`:
+
+```toml
+[tool.ruff]
+unfixable = ["B", "SIM", "TRY", "RUF"]
+```
+
+If you find a case where Ruff's autofix breaks your code, please file an Issue!
+
 
 ## Contributing
 
@@ -2674,6 +2698,25 @@ e.g., the `no-mutable-default-argument` rule (`B006`).
 [tool.ruff.flake8-bugbear]
 # Allow default arguments like, e.g., `data: List[str] = fastapi.Query(None)`.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+```
+
+---
+
+### `flake8-builtins`
+
+#### [`builtins-ignorelist`](#builtins-ignorelist)
+
+Ignore list of builtins.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-builtins]
+builtins-ignorelist = ["id"]
 ```
 
 ---

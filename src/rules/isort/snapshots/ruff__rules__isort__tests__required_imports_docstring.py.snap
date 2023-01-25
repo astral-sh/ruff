@@ -11,7 +11,9 @@ expression: diagnostics
     row: 1
     column: 0
   fix:
-    content: "\nfrom __future__ import annotations"
+    content:
+      - ""
+      - from __future__ import annotations
     location:
       row: 1
       column: 19
@@ -28,7 +30,9 @@ expression: diagnostics
     row: 1
     column: 0
   fix:
-    content: "\nfrom __future__ import generator_stop"
+    content:
+      - ""
+      - from __future__ import generator_stop
     location:
       row: 1
       column: 19

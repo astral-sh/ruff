@@ -1,27 +1,32 @@
+"""
+Violation:
+Reraise without using 'from'
+"""
+
+
 class MyException(Exception):
     pass
 
 
-class MainFunctionFailed(Exception):
-    pass
-
-
-def process():
-    raise MyException
-
-
-def bad():
+def func():
     try:
-        process()
-    except MyException:
-        raise MainFunctionFailed()
+        a = 1
+    except Exception:
+        raise MyException()
 
+
+def func():
+    try:
+        a = 1
+    except Exception:
         if True:
-            raise MainFunctionFailed()
+            raise MyException()
 
 
 def good():
     try:
-        process()
-    except MyException as ex:
-        raise MainFunctionFailed() from ex
+        a = 1
+    except MyException as e:
+        raise e  # This is verbose violation, shouldn't trigger no cause
+    except Exception:
+        raise  # Just re-raising don't need 'from'

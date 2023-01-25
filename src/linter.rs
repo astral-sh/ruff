@@ -98,6 +98,7 @@ pub fn check_path(
                         autofix,
                         noqa,
                         path,
+                        package,
                     ));
                 }
                 if use_imports {
@@ -142,6 +143,7 @@ pub fn check_path(
     {
         diagnostics.extend(check_lines(
             path,
+            stylist,
             contents,
             indexer.commented_lines(),
             &doc_lines,

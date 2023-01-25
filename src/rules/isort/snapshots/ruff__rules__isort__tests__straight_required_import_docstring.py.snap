@@ -11,7 +11,9 @@ expression: diagnostics
     row: 1
     column: 0
   fix:
-    content: "\nimport os"
+    content:
+      - ""
+      - import os
     location:
       row: 1
       column: 19

@@ -2,6 +2,8 @@ use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
+use crate::ast::visitor;
+use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
@@ -20,6 +22,51 @@ impl AlwaysAutofixableViolation for PreferTypeError {
     fn autofix_title(&self) -> String {
         "Use `TypeError` exception type".to_string()
     }
+}
+
+#[derive(Default)]
+struct ControlFlowVisitor<'a> {
+    returns: Vec<&'a Stmt>,
+    breaks: Vec<&'a Stmt>,
+    continues: Vec<&'a Stmt>,
+}
+
+impl<'a, 'b> Visitor<'b> for ControlFlowVisitor<'a>
+where
+    'b: 'a,
+{
+    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        match &stmt.node {
+            StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::ClassDef { .. } => {
+                // Don't recurse.
+            }
+            StmtKind::Return { .. } => self.returns.push(stmt),
+            StmtKind::Break => self.breaks.push(stmt),
+            StmtKind::Continue => self.continues.push(stmt),
+            _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'b Expr) {
+        match &expr.node {
+            ExprKind::ListComp { .. }
+            | ExprKind::DictComp { .. }
+            | ExprKind::SetComp { .. }
+            | ExprKind::GeneratorExp { .. } => {
+                // Don't recurse.
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
+}
+
+/// Returns `true` if a [`Stmt`] contains a `return`, `break`, or `continue`.
+fn has_control_flow(stmt: &Stmt) -> bool {
+    let mut visitor = ControlFlowVisitor::default();
+    visitor.visit_stmt(stmt);
+    !visitor.returns.is_empty() || !visitor.breaks.is_empty() || !visitor.continues.is_empty()
 }
 
 /// Returns `true` if an [`Expr`] is a call to check types.
@@ -117,8 +164,11 @@ fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
 }
 
 /// Search the body of an if-condition for raises.
-fn check_body(checker: &mut Checker, func: &[Stmt]) {
-    for item in func {
+fn check_body(checker: &mut Checker, body: &[Stmt]) {
+    for item in body {
+        if has_control_flow(item) {
+            return;
+        }
         if let StmtKind::Raise { exc: Some(exc), .. } = &item.node {
             check_raise(checker, exc, item);
         }
@@ -126,8 +176,11 @@ fn check_body(checker: &mut Checker, func: &[Stmt]) {
 }
 
 /// Search the orelse of an if-condition for raises.
-fn check_orelse(checker: &mut Checker, func: &[Stmt]) {
-    for item in func {
+fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
+    for item in body {
+        if has_control_flow(item) {
+            return;
+        }
         match &item.node {
             StmtKind::If { test, .. } => {
                 if !check_type_check_test(checker, test) {

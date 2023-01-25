@@ -11,7 +11,8 @@ expression: diagnostics
     row: 6
     column: 33
   fix:
-    content: collections
+    content:
+      - collections
     location:
       row: 6
       column: 7
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 7
     column: 50
   fix:
-    content: OrderedDict
+    content:
+      - OrderedDict
     location:
       row: 7
       column: 24
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 15
     column: 24
   fix:
-    content: bar
+    content:
+      - bar
     location:
       row: 15
       column: 14
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 18
     column: 28
   fix:
-    content: bar
+    content:
+      - bar
     location:
       row: 18
       column: 18
@@ -79,7 +83,8 @@ expression: diagnostics
     row: 19
     column: 38
   fix:
-    content: foobar
+    content:
+      - foobar
     location:
       row: 19
       column: 22
@@ -96,7 +101,8 @@ expression: diagnostics
     row: 21
     column: 24
   fix:
-    content: foo
+    content:
+      - foo
     location:
       row: 21
       column: 14
@@ -113,7 +119,8 @@ expression: diagnostics
     row: 22
     column: 38
   fix:
-    content: foo2
+    content:
+      - foo2
     location:
       row: 22
       column: 26
@@ -130,7 +137,8 @@ expression: diagnostics
     row: 24
     column: 36
   fix:
-    content: foobar
+    content:
+      - foobar
     location:
       row: 24
       column: 20

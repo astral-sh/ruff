@@ -11,7 +11,8 @@ expression: diagnostics
     row: 10
     column: 21
   fix:
-    content: "[1, 2, 3, *foo]"
+    content:
+      - "[1, 2, 3, *foo]"
     location:
       row: 10
       column: 6
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 12
     column: 23
   fix:
-    content: "(7, 8, 9, *zoob)"
+    content:
+      - "(7, 8, 9, *zoob)"
     location:
       row: 12
       column: 7
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 13
     column: 26
   fix:
-    content: "(*quux, 10, 11, 12)"
+    content:
+      - "(*quux, 10, 11, 12)"
     location:
       row: 13
       column: 7
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 15
     column: 26
   fix:
-    content: "[*spom, 13, 14, 15]"
+    content:
+      - "[*spom, 13, 14, 15]"
     location:
       row: 15
       column: 7
@@ -79,7 +83,8 @@ expression: diagnostics
     row: 16
     column: 36
   fix:
-    content: "(\"we all say\", *yay())"
+    content:
+      - "(\"we all say\", *yay())"
     location:
       row: 16
       column: 12
@@ -96,7 +101,8 @@ expression: diagnostics
     row: 17
     column: 45
   fix:
-    content: "(\"we all think\", *Fun().yay())"
+    content:
+      - "(\"we all think\", *Fun().yay())"
     location:
       row: 17
       column: 13
@@ -113,7 +119,8 @@ expression: diagnostics
     row: 18
     column: 44
   fix:
-    content: "(\"we all feel\", *Fun.words)"
+    content:
+      - "(\"we all feel\", *Fun.words)"
     location:
       row: 18
       column: 15
@@ -130,7 +137,8 @@ expression: diagnostics
     row: 20
     column: 30
   fix:
-    content: "[\"a\", \"b\", \"c\", *eggs]"
+    content:
+      - "[\"a\", \"b\", \"c\", *eggs]"
     location:
       row: 20
       column: 8
@@ -147,7 +155,8 @@ expression: diagnostics
     row: 20
     column: 67
   fix:
-    content: "(\"yes\", \"no\", \"pants\", *zoob)"
+    content:
+      - "(\"yes\", \"no\", \"pants\", *zoob)"
     location:
       row: 20
       column: 38
@@ -164,7 +173,8 @@ expression: diagnostics
     row: 22
     column: 15
   fix:
-    content: "(*zoob,)"
+    content:
+      - "(*zoob,)"
     location:
       row: 22
       column: 6

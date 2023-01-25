@@ -2,6 +2,8 @@
 //! to automatically update the `ruff --help` output in the `README.md`.
 //!
 //! For the actual Ruff library, see [`ruff`].
+#![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(clippy::must_use_candidate, dead_code)]
 
 mod cli;

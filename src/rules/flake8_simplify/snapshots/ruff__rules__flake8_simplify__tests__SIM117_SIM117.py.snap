@@ -11,7 +11,10 @@ expression: diagnostics
     row: 3
     column: 18
   fix:
-    content: "with A() as a, B() as b:\n    print(\"hello\")\n"
+    content:
+      - "with A() as a, B() as b:"
+      - "    print(\"hello\")"
+      - ""
     location:
       row: 2
       column: 0
@@ -28,7 +31,11 @@ expression: diagnostics
     row: 9
     column: 17
   fix:
-    content: "with A(), B():\n    with C():\n        print(\"hello\")\n"
+    content:
+      - "with A(), B():"
+      - "    with C():"
+      - "        print(\"hello\")"
+      - ""
     location:
       row: 7
       column: 0
@@ -55,7 +62,11 @@ expression: diagnostics
     row: 20
     column: 18
   fix:
-    content: "with A() as a, B() as b:\n    # Fixable due to placement of this comment.\n    print(\"hello\")\n"
+    content:
+      - "with A() as a, B() as b:"
+      - "    # Fixable due to placement of this comment."
+      - "    print(\"hello\")"
+      - ""
     location:
       row: 19
       column: 0
@@ -72,7 +83,20 @@ expression: diagnostics
     row: 54
     column: 22
   fix:
-    content: "    with A() as a, B() as b:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
+    content:
+      - "    with A() as a, B() as b:"
+      - "        \"\"\"this"
+      - "is valid\"\"\""
+      - ""
+      - "        \"\"\"the indentation on"
+      - "            this line is significant\"\"\""
+      - ""
+      - "        \"this is\" \\"
+      - "\"allowed too\""
+      - ""
+      - "        (\"so is\""
+      - "\"this for some reason\")"
+      - ""
     location:
       row: 53
       column: 0
@@ -89,7 +113,13 @@ expression: diagnostics
     row: 72
     column: 18
   fix:
-    content: "with (\n    A() as a,\n    B() as b,C() as c\n):\n    print(\"hello\")\n"
+    content:
+      - with (
+      - "    A() as a,"
+      - "    B() as b,C() as c"
+      - "):"
+      - "    print(\"hello\")"
+      - ""
     location:
       row: 68
       column: 0
@@ -106,7 +136,13 @@ expression: diagnostics
     row: 80
     column: 6
   fix:
-    content: "with (\n    A() as a, B() as b,\n    C() as c,\n):\n    print(\"hello\")\n"
+    content:
+      - with (
+      - "    A() as a, B() as b,"
+      - "    C() as c,"
+      - "):"
+      - "    print(\"hello\")"
+      - ""
     location:
       row: 76
       column: 0
@@ -123,7 +159,14 @@ expression: diagnostics
     row: 91
     column: 6
   fix:
-    content: "with (\n    A() as a,\n    B() as b,C() as c,\n    D() as d,\n):\n    print(\"hello\")\n"
+    content:
+      - with (
+      - "    A() as a,"
+      - "    B() as b,C() as c,"
+      - "    D() as d,"
+      - "):"
+      - "    print(\"hello\")"
+      - ""
     location:
       row: 84
       column: 0

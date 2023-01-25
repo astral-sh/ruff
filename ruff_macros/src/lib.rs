@@ -1,4 +1,6 @@
 //! This crate implements internal macros for the `ruff` library.
+#![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
@@ -11,7 +13,6 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
-#![forbid(unsafe_code)]
 
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput, ItemFn};

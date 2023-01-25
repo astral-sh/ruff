@@ -10,7 +10,7 @@ use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 use crate::violations;
 
 struct Alias<'a> {
@@ -102,6 +102,7 @@ fn add_required_import(
     blocks: &[&Block],
     python_ast: &Suite,
     locator: &Locator,
+    stylist: &Stylist,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Diagnostic> {
@@ -134,19 +135,22 @@ fn add_required_import(
         // Generate the edit.
         let mut contents = String::with_capacity(required_import.len() + 1);
 
+        // Newline (LF/CRLF)
+        let line_sep = stylist.line_ending().as_str();
+
         // If we're inserting beyond the start of the file, we add
         // a newline _before_, since the splice represents the _end_ of the last
         // irrelevant token (e.g., the end of a comment or the end of
         // docstring). This ensures that we properly handle awkward cases like
         // docstrings that are followed by semicolons.
         if splice > Location::default() {
-            contents.push('\n');
+            contents.push_str(line_sep);
         }
         contents.push_str(&required_import);
 
         // If we're inserting at the start of the file, add a trailing newline instead.
         if splice == Location::default() {
-            contents.push('\n');
+            contents.push_str(line_sep);
         }
 
         // Construct the fix.
@@ -160,6 +164,7 @@ pub fn add_required_imports(
     blocks: &[&Block],
     python_ast: &Suite,
     locator: &Locator,
+    stylist: &Stylist,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
@@ -192,6 +197,7 @@ pub fn add_required_imports(
                             blocks,
                             python_ast,
                             locator,
+                            stylist,
                             settings,
                             autofix,
                         )
@@ -208,7 +214,8 @@ pub fn add_required_imports(
                             }),
                             blocks,
                             python_ast,
-    locator,
+                            locator,
+                            stylist,
                             settings,
                             autofix,
                         )

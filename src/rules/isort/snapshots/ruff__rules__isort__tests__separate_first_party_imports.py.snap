@@ -11,7 +11,15 @@ expression: diagnostics
     row: 6
     column: 0
   fix:
-    content: "import os\nimport sys\n\nimport numpy as np\n\nimport leading_prefix\nfrom leading_prefix import Class\n"
+    content:
+      - import os
+      - import sys
+      - ""
+      - import numpy as np
+      - ""
+      - import leading_prefix
+      - from leading_prefix import Class
+      - ""
     location:
       row: 1
       column: 0

@@ -21,7 +21,9 @@ expression: diagnostics
     row: 14
     column: 15
   fix:
-    content: "        return None\n"
+    content:
+      - "        return None"
+      - ""
     location:
       row: 15
       column: 0
@@ -38,7 +40,9 @@ expression: diagnostics
     row: 23
     column: 11
   fix:
-    content: "    return None\n"
+    content:
+      - "    return None"
+      - ""
     location:
       row: 24
       column: 0
@@ -65,7 +69,9 @@ expression: diagnostics
     row: 39
     column: 15
   fix:
-    content: "        return None\n"
+    content:
+      - "        return None"
+      - ""
     location:
       row: 40
       column: 0

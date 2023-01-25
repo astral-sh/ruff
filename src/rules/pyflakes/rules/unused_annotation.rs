@@ -11,7 +11,7 @@ pub fn unused_annotation(checker: &mut Checker, scope: usize) {
         .iter()
         .map(|(name, index)| (name, &checker.bindings[*index]))
     {
-        if binding.used.is_none()
+        if !binding.used()
             && matches!(binding.kind, BindingKind::Annotation)
             && !checker.settings.dummy_variable_rgx.is_match(name)
         {

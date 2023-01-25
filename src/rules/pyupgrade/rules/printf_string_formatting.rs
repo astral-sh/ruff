@@ -210,13 +210,13 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
             };
 
             for item in &arguments {
-                contents.push('\n');
+                contents.push_str(checker.stylist.line_ending().as_str());
                 contents.push_str(indent);
                 contents.push_str(item);
                 contents.push(',');
             }
 
-            contents.push('\n');
+            contents.push_str(checker.stylist.line_ending().as_str());
 
             // For the ending parentheses, go back one indent.
             let default_indent: &str = checker.stylist.indentation();

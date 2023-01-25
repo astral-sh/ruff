@@ -11,7 +11,19 @@ expression: diagnostics
     row: 12
     column: 0
   fix:
-    content: "import a  # import\nimport b as b1  # import_as\nimport c.d\nfrom a import a1  # import_from\nfrom c import *  # import_from_star\n\nfrom ...grandparent import fn3\nfrom ..parent import *\nfrom . import my\nfrom .my import fn\nfrom .my.nested import fn2\n"
+    content:
+      - "import a  # import"
+      - "import b as b1  # import_as"
+      - import c.d
+      - "from a import a1  # import_from"
+      - "from c import *  # import_from_star"
+      - ""
+      - from ...grandparent import fn3
+      - from ..parent import *
+      - from . import my
+      - from .my import fn
+      - from .my.nested import fn2
+      - ""
     location:
       row: 1
       column: 0

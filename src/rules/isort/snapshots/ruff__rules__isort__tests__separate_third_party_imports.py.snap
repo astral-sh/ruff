@@ -11,7 +11,13 @@ expression: diagnostics
     row: 5
     column: 0
   fix:
-    content: "import os\nimport sys\n\nimport numpy as np\nimport pandas as pd\n"
+    content:
+      - import os
+      - import sys
+      - ""
+      - import numpy as np
+      - import pandas as pd
+      - ""
     location:
       row: 1
       column: 0

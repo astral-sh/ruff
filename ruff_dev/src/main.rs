@@ -1,6 +1,8 @@
 //! This crate implements an internal CLI for developers of Ruff.
 //!
 //! Within the ruff repository you can run it with `cargo dev`.
+#![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
@@ -13,7 +15,6 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
-#![forbid(unsafe_code)]
 
 mod generate_all;
 mod generate_cli_help;
