@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    TypingOnlyStandardLibraryImport:
+      full_name: os
+  location:
+    row: 8
+    column: 11
+  end_location:
+    row: 8
+    column: 13
+  fix: ~
+  parent: ~
+

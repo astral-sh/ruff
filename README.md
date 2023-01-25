@@ -1202,6 +1202,9 @@ For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checki
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| TYP001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
+| TYP002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
+| TYP003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
 | TYP004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
 | TYP005 | empty-type-checking-block | Found empty type-checking block |  |
 

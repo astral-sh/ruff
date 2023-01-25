@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use categorize::{categorize, ImportType};
+pub use categorize::{categorize, ImportType};
 use comments::Comment;
 use helpers::trailing_comma;
 use itertools::Either::{Left, Right};
