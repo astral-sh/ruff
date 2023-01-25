@@ -19,7 +19,7 @@ use rustc_hash::FxHashMap;
 )]
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct Cli {
+pub struct Args {
     #[arg(required_unless_present_any = ["clean", "explain", "generate_shell_completion"])]
     pub files: Vec<PathBuf>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for
@@ -231,7 +231,7 @@ pub struct Cli {
     pub show_settings: bool,
 }
 
-impl Cli {
+impl Args {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
     pub fn partition(self) -> (Arguments, Overrides) {
@@ -421,12 +421,12 @@ impl ConfigProcessor for &Overrides {
 }
 
 /// Map the CLI settings to a `LogLevel`.
-pub fn extract_log_level(cli: &Arguments) -> LogLevel {
-    if cli.silent {
+pub fn extract_log_level(args: &Arguments) -> LogLevel {
+    if args.silent {
         LogLevel::Silent
-    } else if cli.quiet {
+    } else if args.quiet {
         LogLevel::Quiet
-    } else if cli.verbose {
+    } else if args.verbose {
         LogLevel::Verbose
     } else {
         LogLevel::Default
