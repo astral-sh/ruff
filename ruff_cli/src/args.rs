@@ -26,16 +26,8 @@ pub struct Args {
     /// configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
-    /// Enable verbose logging.
-    #[arg(short, long, group = "verbosity")]
-    pub verbose: bool,
-    /// Print lint violations, but nothing else.
-    #[arg(short, long, group = "verbosity")]
-    pub quiet: bool,
-    /// Disable all logging (but still exit with status code "1" upon detecting
-    /// lint violations).
-    #[arg(short, long, group = "verbosity")]
-    pub silent: bool,
+    #[clap(flatten)]
+    pub log_level_args: LogLevelArgs,
     /// Exit with status code "0", even upon detecting lint violations.
     #[arg(short, long)]
     pub exit_zero: bool,
@@ -231,6 +223,35 @@ pub struct Args {
     pub show_settings: bool,
 }
 
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug, clap::Args)]
+pub struct LogLevelArgs {
+    /// Enable verbose logging.
+    #[arg(short, long, group = "verbosity")]
+    pub verbose: bool,
+    /// Print lint violations, but nothing else.
+    #[arg(short, long, group = "verbosity")]
+    pub quiet: bool,
+    /// Disable all logging (but still exit with status code "1" upon detecting
+    /// lint violations).
+    #[arg(short, long, group = "verbosity")]
+    pub silent: bool,
+}
+
+impl From<&LogLevelArgs> for LogLevel {
+    fn from(args: &LogLevelArgs) -> Self {
+        if args.silent {
+            LogLevel::Silent
+        } else if args.quiet {
+            LogLevel::Quiet
+        } else if args.verbose {
+            LogLevel::Verbose
+        } else {
+            LogLevel::Default
+        }
+    }
+}
+
 impl Args {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
@@ -247,12 +268,9 @@ impl Args {
                 generate_shell_completion: self.generate_shell_completion,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
-                quiet: self.quiet,
                 show_files: self.show_files,
                 show_settings: self.show_settings,
-                silent: self.silent,
                 stdin_filename: self.stdin_filename,
-                verbose: self.verbose,
                 watch: self.watch,
             },
             Overrides {
@@ -308,12 +326,9 @@ pub struct Arguments {
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
     pub isolated: bool,
     pub no_cache: bool,
-    pub quiet: bool,
     pub show_files: bool,
     pub show_settings: bool,
-    pub silent: bool,
     pub stdin_filename: Option<PathBuf>,
-    pub verbose: bool,
     pub watch: bool,
 }
 
@@ -417,19 +432,6 @@ impl ConfigProcessor for &Overrides {
             }
             (None, None) => {}
         }
-    }
-}
-
-/// Map the CLI settings to a `LogLevel`.
-pub fn extract_log_level(args: &Arguments) -> LogLevel {
-    if args.silent {
-        LogLevel::Silent
-    } else if args.quiet {
-        LogLevel::Quiet
-    } else if args.verbose {
-        LogLevel::Verbose
-    } else {
-        LogLevel::Default
     }
 }
 

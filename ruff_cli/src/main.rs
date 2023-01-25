@@ -17,7 +17,7 @@ use ::ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
-use args::{extract_log_level, Args};
+use args::Args;
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
@@ -53,10 +53,10 @@ quoting the executed command, along with the relevant file contents and `pyproje
         default_panic_hook(info);
     }));
 
-    let (cli, overrides) = args.partition();
-
-    let log_level = extract_log_level(&cli);
+    let log_level: LogLevel = (&args.log_level_args).into();
     set_up_logging(&log_level)?;
+
+    let (cli, overrides) = args.partition();
 
     if let Some(shell) = cli.generate_shell_completion {
         shell.generate(&mut Args::command(), &mut io::stdout());
