@@ -39,6 +39,7 @@ mod tests {
                 Rule::LoggingStringConcat,
                 Rule::LoggingFString,
                 Rule::LoggingWarn,
+                Rule::LoggingExtraAttrClash,
                 Rule::LoggingExcInfo,
                 Rule::LoggingRedundantExcInfo,
             ]),

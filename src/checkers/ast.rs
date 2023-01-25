@@ -2648,6 +2648,7 @@ where
                     || self.settings.rules.enabled(&Rule::LoggingStringConcat)
                     || self.settings.rules.enabled(&Rule::LoggingFString)
                     || self.settings.rules.enabled(&Rule::LoggingWarn)
+                    || self.settings.rules.enabled(&Rule::LoggingExtraAttrClash)
                     || self.settings.rules.enabled(&Rule::LoggingExcInfo)
                     || self.settings.rules.enabled(&Rule::LoggingRedundantExcInfo)
                 {
