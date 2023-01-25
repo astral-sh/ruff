@@ -33,6 +33,10 @@ impl Range {
     pub fn from_located<T>(located: &Located<T>) -> Self {
         Range::new(located.location, located.end_location.unwrap())
     }
+
+    pub fn contains(&self, other: &Range) -> bool {
+        self.location <= other.location && self.end_location >= other.end_location
+    }
 }
 
 #[derive(Debug)]
@@ -130,8 +134,22 @@ pub struct Binding<'a> {
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<RefEquality<'a, Stmt>>,
     /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used.
-    pub used: Option<(usize, Range)>,
+    /// the binding was last used in a runtime context.
+    pub runtime_usage: Option<(usize, Range)>,
+    /// Tuple of (scope index, range) indicating the scope and range at which
+    /// the binding was last used in a typing-time context.
+    pub typing_usage: Option<(usize, Range)>,
+    /// Tuple of (scope index, range) indicating the scope and range at which
+    /// the binding was last used in a synthetic context. This is used for
+    /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
+    /// that should be considered used even if they're never referenced.
+    pub synthetic_usage: Option<(usize, Range)>,
+}
+
+#[derive(Copy, Clone)]
+pub enum UsageContext {
+    Runtime,
+    Typing,
 }
 
 // Pyflakes defines the following binding hierarchy (via inheritance):
@@ -152,6 +170,19 @@ pub struct Binding<'a> {
 //        FutureImportation
 
 impl<'a> Binding<'a> {
+    pub fn mark_used(&mut self, scope: usize, range: Range, context: UsageContext) {
+        match context {
+            UsageContext::Runtime => self.runtime_usage = Some((scope, range)),
+            UsageContext::Typing => self.typing_usage = Some((scope, range)),
+        }
+    }
+
+    pub fn used(&self) -> bool {
+        self.runtime_usage.is_some()
+            || self.synthetic_usage.is_some()
+            || self.typing_usage.is_some()
+    }
+
     pub fn is_definition(&self) -> bool {
         matches!(
             self.kind,

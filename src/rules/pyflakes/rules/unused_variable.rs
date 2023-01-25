@@ -156,7 +156,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
         .iter()
         .map(|(name, index)| (name, &checker.bindings[*index]))
     {
-        if binding.used.is_none()
+        if !binding.used()
             && matches!(binding.kind, BindingKind::Assignment)
             && !checker.settings.dummy_variable_rgx.is_match(name)
             && name != &"__tracebackhide__"
