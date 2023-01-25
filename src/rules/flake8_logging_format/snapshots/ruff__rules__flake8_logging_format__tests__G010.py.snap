@@ -1,0 +1,22 @@
+---
+source: src/rules/flake8_logging_format/mod.rs
+expression: diagnostics
+---
+- kind:
+    LoggingWarn: ~
+  location:
+    row: 3
+    column: 8
+  end_location:
+    row: 3
+    column: 12
+  fix:
+    content: warning
+    location:
+      row: 3
+      column: 8
+    end_location:
+      row: 3
+      column: 12
+  parent: ~
+

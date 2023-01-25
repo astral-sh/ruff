@@ -1,0 +1,164 @@
+use rustpython_ast::{Expr, ExprKind, Keyword, Operator};
+use rustpython_parser::ast::Location;
+
+use crate::ast::helpers::{find_keyword, SimpleCallArgs};
+use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
+use crate::fix::Fix;
+use crate::registry::{Diagnostic, Rule};
+use crate::rules::flake8_logging_format::violations::{
+    LoggingExcInfo, LoggingFString, LoggingPercentFormat, LoggingRedundantExcInfo,
+    LoggingStringConcat, LoggingStringFormat, LoggingWarn,
+};
+
+enum LoggingLevel {
+    Debug,
+    Critical,
+    Error,
+    Exception,
+    Info,
+    Warn,
+    Warning,
+}
+
+impl LoggingLevel {
+    fn from_str(level: &str) -> Option<Self> {
+        match level {
+            "debug" => Some(LoggingLevel::Debug),
+            "critical" => Some(LoggingLevel::Critical),
+            "error" => Some(LoggingLevel::Error),
+            "exception" => Some(LoggingLevel::Exception),
+            "info" => Some(LoggingLevel::Info),
+            "warn" => Some(LoggingLevel::Warn),
+            "warning" => Some(LoggingLevel::Warning),
+            _ => None,
+        }
+    }
+}
+
+const ALLOWLIST: &[&str; 2] = &["parser", "warnings"];
+
+fn check_msg(checker: &mut Checker, msg: &Expr) {
+    match &msg.node {
+        // Check for string concatenation and percent format
+        ExprKind::BinOp { op, .. } => match op {
+            Operator::Add => {
+                if checker.settings.rules.enabled(&Rule::LoggingStringConcat) {
+                    checker.diagnostics.push(Diagnostic::new(
+                        LoggingStringConcat,
+                        Range::from_located(msg),
+                    ));
+                }
+            }
+            Operator::Mod => {
+                if checker.settings.rules.enabled(&Rule::LoggingPercentFormat) {
+                    checker.diagnostics.push(Diagnostic::new(
+                        LoggingPercentFormat,
+                        Range::from_located(msg),
+                    ));
+                }
+            }
+            _ => {}
+        },
+        // Check for f-strings
+        ExprKind::JoinedStr { .. } => {
+            if checker.settings.rules.enabled(&Rule::LoggingFString) {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(LoggingFString, Range::from_located(msg)));
+            }
+        }
+        // Check for .format() calls
+        ExprKind::Call { func, .. } => {
+            if checker.settings.rules.enabled(&Rule::LoggingStringFormat) {
+                if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                    if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            LoggingStringFormat,
+                            Range::from_located(msg),
+                        ));
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// G001
+pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+        if let ExprKind::Name { id, .. } = &value.node {
+            if ALLOWLIST.contains(&id.as_str()) {
+                return;
+            }
+
+            if let Some(logging_level) = LoggingLevel::from_str(attr.as_str()) {
+                let call_args = SimpleCallArgs::new(args, keywords);
+                let level_call_range = Range::new(
+                    Location::new(
+                        func.location.row(),
+                        value.end_location.unwrap().column() + 1,
+                    ),
+                    Location::new(
+                        func.end_location.unwrap().row(),
+                        func.end_location.unwrap().column(),
+                    ),
+                );
+
+                // G001 - G004
+                if let Some(format_arg) = call_args.get_argument("msg", Some(0)) {
+                    check_msg(checker, format_arg);
+                }
+
+                // G010
+                if checker.settings.rules.enabled(&Rule::LoggingWarn)
+                    && matches!(logging_level, LoggingLevel::Warn)
+                {
+                    let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
+                    if checker.patch(diagnostic.kind.rule()) {
+                        diagnostic.amend(Fix::replacement(
+                            "warning".to_string(),
+                            level_call_range.location,
+                            level_call_range.end_location,
+                        ));
+                    }
+                    checker.diagnostics.push(diagnostic);
+                }
+
+                // G201, G202
+                if checker.settings.rules.enabled(&Rule::LoggingExcInfo)
+                    || checker
+                        .settings
+                        .rules
+                        .enabled(&Rule::LoggingRedundantExcInfo)
+                {
+                    if let Some(exc_info) = find_keyword(keywords, "exc_info") {
+                        match logging_level {
+                            LoggingLevel::Error => {
+                                if checker.settings.rules.enabled(&Rule::LoggingExcInfo) {
+                                    checker
+                                        .diagnostics
+                                        .push(Diagnostic::new(LoggingExcInfo, level_call_range));
+                                }
+                            }
+                            LoggingLevel::Exception => {
+                                if checker
+                                    .settings
+                                    .rules
+                                    .enabled(&Rule::LoggingRedundantExcInfo)
+                                {
+                                    checker.diagnostics.push(Diagnostic::new(
+                                        LoggingRedundantExcInfo,
+                                        Range::from_located(exc_info),
+                                    ));
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
