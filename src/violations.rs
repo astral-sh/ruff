@@ -1181,18 +1181,35 @@ impl Violation for MutableArgumentDefault {
 }
 
 define_violation!(
-    pub struct UnusedLoopControlVariable(pub String);
+    pub struct UnusedLoopControlVariable {
+        /// The name of the loop control variable.
+        pub name: String,
+        /// Whether the variable is safe to rename. A variable is unsafe to
+        /// rename if it _might_ be used by magic control flow (e.g.,
+        /// `locals()`).
+        pub safe: bool,
+    }
 );
-impl AlwaysAutofixableViolation for UnusedLoopControlVariable {
+impl Violation for UnusedLoopControlVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedLoopControlVariable(name) = self;
-        format!("Loop control variable `{name}` not used within the loop body")
+        let UnusedLoopControlVariable { name, safe } = self;
+        if *safe {
+            format!("Loop control variable `{name}` not used within loop body")
+        } else {
+            format!("Loop control variable `{name}` may not be used within loop body")
+        }
     }
 
-    fn autofix_title(&self) -> String {
-        let UnusedLoopControlVariable(name) = self;
-        format!("Rename unused `{name}` to `_{name}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let UnusedLoopControlVariable { safe, .. } = self;
+        if *safe {
+            Some(|UnusedLoopControlVariable { name, .. }| {
+                format!("Rename unused `{name}` to `_{name}`")
+            })
+        } else {
+            None
+        }
     }
 }
 
