@@ -13,7 +13,7 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::resolver::{FileDiscovery, PyprojectDiscovery};
+use ::ruff::resolver::PyprojectDiscovery;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
@@ -78,16 +78,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
-    let file_strategy = FileDiscovery {
-        force_exclude: match &pyproject_strategy {
-            PyprojectDiscovery::Fixed(settings) => settings.lib.force_exclude,
-            PyprojectDiscovery::Hierarchical(settings) => settings.lib.force_exclude,
-        },
-        respect_gitignore: match &pyproject_strategy {
-            PyprojectDiscovery::Fixed(settings) => settings.lib.respect_gitignore,
-            PyprojectDiscovery::Hierarchical(settings) => settings.lib.respect_gitignore,
-        },
-    };
     let CliSettings {
         fix,
         fix_only,
@@ -104,11 +94,11 @@ quoting the executed command, along with the relevant file contents and `pyproje
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_settings {
-        commands::show_settings(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
+        commands::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_files {
-        commands::show_files(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
+        commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -161,7 +151,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
         let messages = commands::run(
             &cli.files,
             &pyproject_strategy,
-            &file_strategy,
             &overrides,
             cache.into(),
             fix::FixMode::None,
@@ -191,7 +180,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
                         let messages = commands::run(
                             &cli.files,
                             &pyproject_strategy,
-                            &file_strategy,
                             &overrides,
                             cache.into(),
                             fix::FixMode::None,
@@ -203,8 +191,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
             }
         }
     } else if cli.add_noqa {
-        let modifications =
-            commands::add_noqa(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
+        let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
@@ -216,7 +203,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
             commands::run_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_strategy,
-                &file_strategy,
                 &overrides,
                 autofix,
             )?
@@ -224,7 +210,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
             commands::run(
                 &cli.files,
                 &pyproject_strategy,
-                &file_strategy,
                 &overrides,
                 cache.into(),
                 autofix,
