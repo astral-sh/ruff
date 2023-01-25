@@ -49,9 +49,6 @@ pub fn run(
         return Ok(Diagnostics::default());
     }
 
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
-
     // Initialize the cache.
     if matches!(cache, flags::Cache::Enabled) {
         match &pyproject_strategy {
@@ -197,9 +194,6 @@ pub fn add_noqa(
         return Ok(0);
     }
 
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
-
     let start = Instant::now();
     let modifications: usize = par_iter(&paths)
         .flatten()
@@ -233,9 +227,6 @@ pub fn show_settings(
     let (paths, resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
 
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
-
     // Print the list of files.
     let Some(entry) = paths
         .iter()
@@ -259,16 +250,13 @@ pub fn show_files(
     overrides: &Overrides,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) =
+    let (paths, _resolver) =
         resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(());
     }
-
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
 
     // Print the list of files.
     for entry in paths
