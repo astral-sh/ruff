@@ -11,7 +11,9 @@ expression: diagnostics
     row: 203
     column: 7
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 200
       column: 7
@@ -28,7 +30,9 @@ expression: diagnostics
     row: 215
     column: 7
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 210
       column: 7
@@ -45,7 +49,9 @@ expression: diagnostics
     row: 224
     column: 7
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 220
       column: 7
@@ -62,7 +68,9 @@ expression: diagnostics
     row: 234
     column: 7
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 230
       column: 7
@@ -79,7 +87,9 @@ expression: diagnostics
     row: 244
     column: 3
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 240
       column: 7
@@ -96,7 +106,9 @@ expression: diagnostics
     row: 254
     column: 7
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 250
       column: 7
@@ -113,7 +125,9 @@ expression: diagnostics
     row: 264
     column: 11
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 260
       column: 7
@@ -130,7 +144,9 @@ expression: diagnostics
     row: 274
     column: 7
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 270
       column: 7
@@ -147,7 +163,9 @@ expression: diagnostics
     row: 283
     column: 19
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 281
       column: 7
@@ -164,7 +182,9 @@ expression: diagnostics
     row: 302
     column: 7
   fix:
-    content: "\n    Whitespace at the beginning."
+    content:
+      - ""
+      - "    Whitespace at the beginning."
     location:
       row: 299
       column: 7
@@ -181,7 +201,9 @@ expression: diagnostics
     row: 348
     column: 7
   fix:
-    content: "\n    Exclude some backslashes from D301."
+    content:
+      - ""
+      - "    Exclude some backslashes from D301."
     location:
       row: 343
       column: 7
@@ -198,7 +220,9 @@ expression: diagnostics
     row: 386
     column: 7
   fix:
-    content: "\n    First line."
+    content:
+      - ""
+      - "    First line."
     location:
       row: 383
       column: 7
@@ -215,7 +239,9 @@ expression: diagnostics
     row: 396
     column: 7
   fix:
-    content: "\n    One liner."
+    content:
+      - ""
+      - "    One liner."
     location:
       row: 392
       column: 7
@@ -232,7 +258,9 @@ expression: diagnostics
     row: 441
     column: 7
   fix:
-    content: "\n    First Line."
+    content:
+      - ""
+      - "    First Line."
     location:
       row: 438
       column: 39
@@ -249,7 +277,9 @@ expression: diagnostics
     row: 454
     column: 7
   fix:
-    content: "\n    Check for a bug where the previous function caused an assertion."
+    content:
+      - ""
+      - "    Check for a bug where the previous function caused an assertion."
     location:
       row: 450
       column: 7
@@ -266,7 +296,9 @@ expression: diagnostics
     row: 532
     column: 7
   fix:
-    content: "\n    A Blah."
+    content:
+      - ""
+      - "    A Blah."
     location:
       row: 526
       column: 7
@@ -283,7 +315,9 @@ expression: diagnostics
     row: 549
     column: 7
   fix:
-    content: "\n    Leading space."
+    content:
+      - ""
+      - "    Leading space."
     location:
       row: 546
       column: 7
@@ -300,7 +334,9 @@ expression: diagnostics
     row: 558
     column: 7
   fix:
-    content: "\n    Leading space."
+    content:
+      - ""
+      - "    Leading space."
     location:
       row: 555
       column: 7
@@ -317,7 +353,9 @@ expression: diagnostics
     row: 571
     column: 7
   fix:
-    content: "\n    Trailing and leading space."
+    content:
+      - ""
+      - "    Trailing and leading space."
     location:
       row: 568
       column: 7
@@ -334,7 +372,9 @@ expression: diagnostics
     row: 590
     column: 21
   fix:
-    content: "\n    Summary."
+    content:
+      - ""
+      - "    Summary."
     location:
       row: 588
       column: 7
@@ -351,7 +391,9 @@ expression: diagnostics
     row: 608
     column: 7
   fix:
-    content: "\n    Wrong."
+    content:
+      - ""
+      - "    Wrong."
     location:
       row: 606
       column: 8
@@ -368,7 +410,9 @@ expression: diagnostics
     row: 617
     column: 7
   fix:
-    content: "\n    Wrong.\""
+    content:
+      - ""
+      - "    Wrong.\""
     location:
       row: 615
       column: 7

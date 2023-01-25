@@ -11,7 +11,11 @@ expression: diagnostics
     row: 5
     column: 0
   fix:
-    content: "import os\nimport os as os1\nimport os as os2\n"
+    content:
+      - import os
+      - import os as os1
+      - import os as os2
+      - ""
     location:
       row: 1
       column: 0

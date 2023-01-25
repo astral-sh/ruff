@@ -11,7 +11,8 @@ expression: diagnostics
     row: 1
     column: 14
   fix:
-    content: "False"
+    content:
+      - "False"
     location:
       row: 1
       column: 3
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 4
     column: 21
   fix:
-    content: "False"
+    content:
+      - "False"
     location:
       row: 4
       column: 3
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 7
     column: 20
   fix:
-    content: "False"
+    content:
+      - "False"
     location:
       row: 7
       column: 9

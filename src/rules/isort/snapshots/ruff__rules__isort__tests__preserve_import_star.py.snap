@@ -11,7 +11,15 @@ expression: diagnostics
     row: 7
     column: 0
   fix:
-    content: "# Above\nfrom some_module import *  # Aside\n\n# Above\nfrom some_module import some_class  # Aside\nfrom some_other_module import *\nfrom some_other_module import some_class\n"
+    content:
+      - "# Above"
+      - "from some_module import *  # Aside"
+      - ""
+      - "# Above"
+      - "from some_module import some_class  # Aside"
+      - from some_other_module import *
+      - from some_other_module import some_class
+      - ""
     location:
       row: 1
       column: 0

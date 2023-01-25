@@ -21,7 +21,9 @@ expression: diagnostics
     row: 215
     column: 7
   fix:
-    content: "\n"
+    content:
+      - ""
+      - ""
     location:
       row: 211
       column: 0

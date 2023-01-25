@@ -11,7 +11,10 @@ expression: diagnostics
     row: 7
     column: 3
   fix:
-    content: "\"\"\"\nthis is not a docstring\n\"\"\""
+    content:
+      - "\"\"\""
+      - this is not a docstring
+      - "\"\"\""
     location:
       row: 5
       column: 0
@@ -28,7 +31,10 @@ expression: diagnostics
     row: 13
     column: 3
   fix:
-    content: "\"\"\"\n    class params \\t not a docstring\n\"\"\""
+    content:
+      - "\"\"\""
+      - "    class params \\t not a docstring"
+      - "\"\"\""
     location:
       row: 11
       column: 20
@@ -45,7 +51,10 @@ expression: diagnostics
     row: 20
     column: 7
   fix:
-    content: "\"\"\"\n    this is not a docstring\n    \"\"\""
+    content:
+      - "\"\"\""
+      - "    this is not a docstring"
+      - "    \"\"\""
     location:
       row: 18
       column: 4
@@ -62,7 +71,9 @@ expression: diagnostics
     row: 24
     column: 37
   fix:
-    content: "\"\"\"\n        definitely not a docstring\"\"\""
+    content:
+      - "\"\"\""
+      - "        definitely not a docstring\"\"\""
     location:
       row: 23
       column: 20
@@ -79,7 +90,10 @@ expression: diagnostics
     row: 34
     column: 11
   fix:
-    content: "\"\"\"\n        this is not a docstring\n        \"\"\""
+    content:
+      - "\"\"\""
+      - "        this is not a docstring"
+      - "        \"\"\""
     location:
       row: 32
       column: 8
@@ -96,7 +110,10 @@ expression: diagnostics
     row: 39
     column: 15
   fix:
-    content: "\"\"\"\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            \"\"\""
+    content:
+      - "\"\"\""
+      - "            Looks like a docstring, but in reality it isn't - only modules, classes and functions"
+      - "            \"\"\""
     location:
       row: 37
       column: 12

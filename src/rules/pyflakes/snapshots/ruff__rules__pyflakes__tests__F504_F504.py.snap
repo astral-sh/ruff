@@ -12,7 +12,8 @@ expression: diagnostics
     row: 3
     column: 34
   fix:
-    content: "{a: \"?\", }"
+    content:
+      - "{a: \"?\", }"
     location:
       row: 3
       column: 16
@@ -30,7 +31,8 @@ expression: diagnostics
     row: 8
     column: 29
   fix:
-    content: "{\"a\": 1, }"
+    content:
+      - "{\"a\": 1, }"
     location:
       row: 8
       column: 10
@@ -48,7 +50,8 @@ expression: diagnostics
     row: 9
     column: 29
   fix:
-    content: "{'a': 1, }"
+    content:
+      - "{'a': 1, }"
     location:
       row: 9
       column: 10
