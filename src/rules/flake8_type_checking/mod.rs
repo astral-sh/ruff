@@ -1,4 +1,5 @@
 //! Rules from [flake8-type-checking](https://pypi.org/project/flake8-type-checking/).
+pub(crate) mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -13,6 +14,14 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings;
 
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_1.py"); "TYP004_1")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_2.py"); "TYP004_2")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_3.py"); "TYP004_3")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_4.py"); "TYP004_4")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_5.py"); "TYP004_5")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_6.py"); "TYP004_6")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_7.py"); "TYP004_7")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TYP004_8.py"); "TYP004_8")]
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TYP005.py"); "TYP005")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());

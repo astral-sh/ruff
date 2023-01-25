@@ -1202,6 +1202,7 @@ For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checki
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| TYP004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
 | TYP005 | empty-type-checking-block | Found empty type-checking block |  |
 
 ### tryceratops (TRY)

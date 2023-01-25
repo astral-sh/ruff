@@ -44,7 +44,7 @@ pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &[Binding]) -> O
         for scope in scopes.iter().rev().skip(1) {
             if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
                 if let Some(binding) = scope.values.get(name).map(|index| &bindings[*index]) {
-                    if let Some((scope_id, location)) = binding.used {
+                    if let Some((scope_id, location)) = binding.runtime_usage {
                         if scope_id == current.id {
                             return Some(Diagnostic::new(
                                 violations::UndefinedLocal(name.to_string()),
