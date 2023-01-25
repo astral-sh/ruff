@@ -64,8 +64,11 @@ jobs:
       - run: cargo clippy -p ruff --target wasm32-unknown-unknown --all-features -- -D warnings -W clippy::pedantic
 
   cargo-test:
-    name: "cargo test"
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    name: "cargo test | ${{ matrix.os }}"
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -76,14 +79,23 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - run: cargo install cargo-insta
       - run: pip install black[d]==22.12.0
-      - name: Run tests
+      - name: Run tests (Ubuntu)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           cargo insta test --all --delete-unreferenced-snapshots
           git diff --exit-code
+      - name: Run tests (Windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: bash
+        run: |
+          cargo insta test --all
+          git diff --exit-code
       - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
       # Check for broken links in the documentation.
-      # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
-      - run: RUSTDOCFLAGS="-D warnings" cargo doc --all --no-deps
+      - run: cargo doc --all --no-deps
+        env:
+          # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
+          RUSTDOCFLAGS: "-D warnings"
 
   scripts:
     name: "test scripts"
