@@ -28,7 +28,7 @@ fn test_stdin_error() -> Result<()> {
         .failure();
     assert_eq!(
         str::from_utf8(&output.get_output().stdout)?,
-        "-:1:8: F401 `os` imported but unused\nFound 1 error(s).\n1 potentially fixable with the \
+        "-:1:8: F401 `os` imported but unused\nFound 1 error.\n1 potentially fixable with the \
          --fix option.\n"
     );
     Ok(())
@@ -44,8 +44,8 @@ fn test_stdin_filename() -> Result<()> {
         .failure();
     assert_eq!(
         str::from_utf8(&output.get_output().stdout)?,
-        "F401.py:1:8: F401 `os` imported but unused\nFound 1 error(s).\n1 potentially fixable \
-         with the --fix option.\n"
+        "F401.py:1:8: F401 `os` imported but unused\nFound 1 error.\n1 potentially fixable with \
+         the --fix option.\n"
     );
     Ok(())
 }
