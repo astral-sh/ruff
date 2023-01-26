@@ -1274,7 +1274,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
 | TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
 | TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
-| TRY300 | try-consider-else | Consider `else` block |  |
+| TRY300 | try-consider-else | Consider moving this statement to an `else` block |  |
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 | TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
 
