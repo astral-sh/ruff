@@ -47,7 +47,28 @@ mod tests {
                 .join(path)
                 .as_path(),
             &settings::Settings {
-                flake8_type_checking: super::settings::Settings { strict: true },
+                flake8_type_checking: super::settings::Settings {
+                    strict: true,
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("exempt_modules.py"); "exempt_modules")]
+    fn exempt_modules(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_type_checking")
+                .join(path)
+                .as_path(),
+            &settings::Settings {
+                flake8_type_checking: super::settings::Settings {
+                    exempt_modules: vec!["pandas".to_string()],
+                    ..Default::default()
+                },
                 ..settings::Settings::for_rule(rule_code)
             },
         )?;

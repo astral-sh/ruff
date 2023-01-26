@@ -3108,6 +3108,24 @@ and can be circumvented via `eval` or `importlib`.
 
 ### `flake8-type-checking`
 
+#### [`exempt-modules`](#exempt-modules)
+
+Exempt certain modules from needing to be moved into type-checking
+blocks.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-type-checking]
+exempt-modules = ["typing_extensions"]
+```
+
+---
+
 #### [`strict`](#strict)
 
 Enforce TC001, TC002, and TC003 rules even when valid runtime imports
