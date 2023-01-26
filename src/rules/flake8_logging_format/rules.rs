@@ -36,7 +36,7 @@ impl LoggingLevel {
     }
 }
 
-const RESERVER_ATTRS: &[&str; 22] = &[
+const RESERVED_ATTRS: &[&str; 22] = &[
     "args",
     "asctime",
     "created",
@@ -61,10 +61,10 @@ const RESERVER_ATTRS: &[&str; 22] = &[
     "threadName",
 ];
 
-/// Check logging messages for violations
+/// Check logging messages for violations.
 fn check_msg(checker: &mut Checker, msg: &Expr) {
     match &msg.node {
-        // Check for string concatenation and percent format
+        // Check for string concatenation and percent format.
         ExprKind::BinOp { op, .. } => match op {
             Operator::Add => {
                 if checker.settings.rules.enabled(&Rule::LoggingStringConcat) {
@@ -84,7 +84,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
             }
             _ => {}
         },
-        // Check for f-strings
+        // Check for f-strings.
         ExprKind::JoinedStr { .. } => {
             if checker.settings.rules.enabled(&Rule::LoggingFString) {
                 checker
@@ -92,7 +92,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
                     .push(Diagnostic::new(LoggingFString, Range::from_located(msg)));
             }
         }
-        // Check for .format() calls
+        // Check for .format() calls.
         ExprKind::Call { func, .. } => {
             if checker.settings.rules.enabled(&Rule::LoggingStringFormat) {
                 if let ExprKind::Attribute { value, attr, .. } = &func.node {
@@ -109,7 +109,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
     }
 }
 
-/// Check contents of the `extra` argument to logging calls
+/// Check contents of the `extra` argument to logging calls.
 fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     match &extra.node.value.node {
         ExprKind::Dict { keys, .. } => {
@@ -120,7 +120,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                         ..
                     } = &key.node
                     {
-                        if RESERVER_ATTRS.contains(&string.as_str()) {
+                        if RESERVED_ATTRS.contains(&string.as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
                                 LoggingExtraAttrClash(string.to_string()),
                                 Range::from_located(key),
@@ -137,7 +137,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
             {
                 for keyword in keywords {
                     if let Some(key) = &keyword.node.arg {
-                        if RESERVER_ATTRS.contains(&key.as_str()) {
+                        if RESERVED_ATTRS.contains(&key.as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
                                 LoggingExtraAttrClash(key.to_string()),
                                 Range::from_located(keyword),
@@ -151,13 +151,13 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     }
 }
 
-/// Check logging calls for violations
+/// Check logging calls for violations.
 pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if let ExprKind::Attribute { value, attr, .. } = &func.node {
-        if !is_logger_candidate(func, None) {
-            return;
-        }
+    if !is_logger_candidate(func) {
+        return;
+    }
 
+    if let ExprKind::Attribute { value, attr, .. } = &func.node {
         if let Some(logging_level) = LoggingLevel::from_str(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
             let level_call_range = Range::new(
