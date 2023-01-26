@@ -34,11 +34,19 @@ pub struct Options {
     /// A list of directories to consider temporary, in addition to those
     /// specified by `hardcoded-tmp-directory`.
     pub hardcoded_tmp_directory_extend: Option<Vec<String>>,
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = "check-typed-exception = true"
+    )]
+    /// A list of directories to consider temporary.
+    pub check_typed_exception: Option<bool>,
 }
 
 #[derive(Debug, Hash)]
 pub struct Settings {
     pub hardcoded_tmp_directory: Vec<String>,
+    pub check_typed_exception: bool,
 }
 
 impl From<Options> for Settings {
@@ -55,6 +63,7 @@ impl From<Options> for Settings {
                         .into_iter(),
                 )
                 .collect(),
+            check_typed_exception: options.check_typed_exception.unwrap_or(false),
         }
     }
 }
@@ -64,6 +73,7 @@ impl From<Settings> for Options {
         Self {
             hardcoded_tmp_directory: Some(settings.hardcoded_tmp_directory),
             hardcoded_tmp_directory_extend: None,
+            check_typed_exception: Some(settings.check_typed_exception),
         }
     }
 }
@@ -72,6 +82,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             hardcoded_tmp_directory: default_tmp_dirs(),
+            check_typed_exception: false,
         }
     }
 }
