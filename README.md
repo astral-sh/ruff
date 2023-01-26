@@ -354,80 +354,71 @@ Arguments:
   [FILES]...
 
 Options:
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-  -v, --verbose
-          Enable verbose logging
-  -q, --quiet
-          Print lint violations, but nothing else
-  -s, --silent
-          Disable all logging (but still exit with status code "1" upon detecting lint violations)
-  -e, --exit-zero
-          Exit with status code "0", even upon detecting lint violations
-  -w, --watch
-          Run in watch mode by re-running whenever files change
-      --fix
-          Attempt to automatically fix lint violations
-      --fix-only
-          Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
-      --diff
-          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
-  -n, --no-cache
-          Disable cache reads
-      --isolated
-          Ignore all configuration files
+      --fix              Attempt to automatically fix lint violations
+      --show-source      Show violations with source code
+      --diff             Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
+  -w, --watch            Run in watch mode by re-running whenever files change
+      --fix-only         Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
+      --format <FORMAT>  Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
+      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --add-noqa         Enable automatic additions of `noqa` directives to failing lines
+      --show-files       See the files Ruff will be run against with the current settings
+      --show-settings    See the settings Ruff will use to lint a given Python file
+  -h, --help             Print help
+  -V, --version          Print version
+
+Rule selection:
       --select <RULE_CODE>
           Comma-separated list of rule codes to enable (or ALL, to enable all rules)
-      --extend-select <RULE_CODE>
-          Like --select, but adds additional rule codes on top of the selected ones
       --ignore <RULE_CODE>
           Comma-separated list of rule codes to disable
+      --extend-select <RULE_CODE>
+          Like --select, but adds additional rule codes on top of the selected ones
       --extend-ignore <RULE_CODE>
           Like --ignore, but adds additional rule codes on top of the ignored ones
-      --exclude <FILE_PATTERN>
-          List of paths, used to omit files and/or directories from analysis
-      --extend-exclude <FILE_PATTERN>
-          Like --exclude, but adds additional files and directories on top of those already excluded
+      --per-file-ignores <PER_FILE_IGNORES>
+          List of mappings from file pattern to code to exclude
       --fixable <RULE_CODE>
           List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --unfixable <RULE_CODE>
           List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
-      --per-file-ignores <PER_FILE_IGNORES>
-          List of mappings from file pattern to code to exclude
-      --format <FORMAT>
-          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
-      --stdin-filename <STDIN_FILENAME>
-          The name of the file when passing it through stdin
-      --cache-dir <CACHE_DIR>
-          Path to the cache directory [env: RUFF_CACHE_DIR=]
-      --show-source
-          Show violations with source code
-      --respect-gitignore
-          Respect file exclusions via `.gitignore` and other standard ignore files
-      --force-exclude
-          Enforce exclusions, even for paths passed to Ruff directly on the command-line
-      --update-check
-          Enable or disable automatic update checks
-      --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
-          Regular expression matching the name of dummy variables
+
+File selection:
+      --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis
+      --extend-exclude <FILE_PATTERN>  Like --exclude, but adds additional files and directories on top of those already excluded
+      --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files
+      --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line
+
+Rule configuration:
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated rules and automatic formatting
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
-      --clean
-          Clear any caches in the current directory or any subdirectories
-      --explain <EXPLAIN>
-          Explain a rule
-      --show-files
-          See the files Ruff will be run against with the current settings
-      --show-settings
-          See the settings Ruff will use to lint a given Python file
-  -h, --help
-          Print help
-  -V, --version
-          Print version
+      --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
+          Regular expression matching the name of dummy variables
+
+Miscellaneous:
+  -n, --no-cache
+          Disable cache reads
+      --isolated
+          Ignore all configuration files
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory [env: RUFF_CACHE_DIR=]
+      --stdin-filename <STDIN_FILENAME>
+          The name of the file when passing it through stdin
+  -e, --exit-zero
+          Exit with status code "0", even upon detecting lint violations
+      --update-check
+          Enable or disable automatic update checks
+
+Subcommands:
+      --explain <EXPLAIN>  Explain a rule
+      --clean              Clear any caches in the current directory or any subdirectories
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print lint violations, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
 ```
 <!-- End auto-generated cli help. -->
 
