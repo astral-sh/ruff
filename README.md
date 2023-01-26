@@ -556,7 +556,9 @@ add `noqa` directives to all failing lines, with the appropriate rule codes.
 
 Regardless of the rule's origin, Ruff re-implements every rule in Rust as a first-party feature.
 
-By default, Ruff enables all `E` and `F` rule codes, which correspond to those built-in to Flake8.
+By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules from the `F` category,
+and a [subset](#error-e) of the `E` category, omitting those stylistic rules made obsolete by the
+use of an autoformatter, like [Black](https://github.com/psf/black).
 
 The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` command-line option.
 
@@ -1550,7 +1552,9 @@ automatically convert your existing configuration.)
 Ruff can be used as a drop-in replacement for Flake8 when used (1) without or with a small number of
 plugins, (2) alongside Black, and (3) on Python 3 code.
 
-Under those conditions, Ruff implements every rule in Flake8.
+Under those conditions, Ruff implements every rule in Flake8. In practice, that means Ruff
+implements all of the `F` rules (which originate from Pyflakes), along with a subset of the `E` and
+`W` rules (which originate from pycodestyle).
 
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:
