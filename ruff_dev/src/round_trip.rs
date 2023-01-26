@@ -4,18 +4,17 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Args;
 use ruff::source_code::round_trip;
 
-#[derive(Args)]
-pub struct Cli {
+#[derive(clap::Args)]
+pub struct Args {
     /// Python file to round-trip.
     #[arg(required = true)]
     file: PathBuf,
 }
 
-pub fn main(cli: &Cli) -> Result<()> {
-    let contents = fs::read_to_string(&cli.file)?;
-    println!("{}", round_trip(&contents, &cli.file.to_string_lossy())?);
+pub fn main(args: &Args) -> Result<()> {
+    let contents = fs::read_to_string(&args.file)?;
+    println!("{}", round_trip(&contents, &args.file.to_string_lossy())?);
     Ok(())
 }

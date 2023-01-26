@@ -211,6 +211,7 @@ mod tests {
     use crate::ast::types::Range;
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::Diagnostic;
+    use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::settings::hashable::HashableHashSet;
     use crate::source_code::LineEnding;
     use crate::violations;
@@ -264,7 +265,7 @@ mod tests {
 
         let diagnostics = vec![
             Diagnostic::new(
-                violations::AmbiguousVariableName("x".to_string()),
+                AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Diagnostic::new(
@@ -287,7 +288,7 @@ mod tests {
 
         let diagnostics = vec![
             Diagnostic::new(
-                violations::AmbiguousVariableName("x".to_string()),
+                AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Diagnostic::new(

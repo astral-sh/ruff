@@ -8,90 +8,35 @@
 )]
 
 use std::io::{self};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::resolver::{
-    resolve_settings_with_processor, ConfigProcessor, FileDiscovery, PyprojectDiscovery, Relativity,
-};
-use ::ruff::settings::configuration::Configuration;
-use ::ruff::settings::pyproject;
+use ::ruff::resolver::{FileDiscovery, PyprojectDiscovery};
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
+use args::{extract_log_level, Args};
 use clap::{CommandFactory, Parser};
-use cli::{extract_log_level, Cli, Overrides};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use path_absolutize::path_dedot;
 use printer::{Printer, Violations};
-use ruff::settings::{AllSettings, CliSettings};
+use ruff::settings::CliSettings;
 
+pub(crate) mod args;
 mod cache;
-mod cli;
 mod commands;
 mod diagnostics;
 mod iterators;
 mod printer;
+mod resolve;
 #[cfg(all(feature = "update-informer"))]
 pub mod updates;
 
-/// Resolve the relevant settings strategy and defaults for the current
-/// invocation.
-fn resolve(
-    isolated: bool,
-    config: Option<&Path>,
-    overrides: &Overrides,
-    stdin_filename: Option<&Path>,
-) -> Result<PyprojectDiscovery> {
-    if isolated {
-        // First priority: if we're running in isolated mode, use the default settings.
-        let mut config = Configuration::default();
-        overrides.process_config(&mut config);
-        let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
-        Ok(PyprojectDiscovery::Fixed(settings))
-    } else if let Some(pyproject) = config {
-        // Second priority: the user specified a `pyproject.toml` file. Use that
-        // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
-        // current working directory. (This matches ESLint's behavior.)
-        let settings = resolve_settings_with_processor(pyproject, &Relativity::Cwd, overrides)?;
-        Ok(PyprojectDiscovery::Fixed(settings))
-    } else if let Some(pyproject) = pyproject::find_settings_toml(
-        stdin_filename
-            .as_ref()
-            .unwrap_or(&path_dedot::CWD.as_path()),
-    )? {
-        // Third priority: find a `pyproject.toml` file in either an ancestor of
-        // `stdin_filename` (if set) or the current working path all paths relative to
-        // that directory. (With `Strategy::Hierarchical`, we'll end up finding
-        // the "closest" `pyproject.toml` file for every Python file later on,
-        // so these act as the "default" settings.)
-        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Parent, overrides)?;
-        Ok(PyprojectDiscovery::Hierarchical(settings))
-    } else if let Some(pyproject) = pyproject::find_user_settings_toml() {
-        // Fourth priority: find a user-specific `pyproject.toml`, but resolve all paths
-        // relative the current working directory. (With `Strategy::Hierarchical`, we'll
-        // end up the "closest" `pyproject.toml` file for every Python file later on, so
-        // these act as the "default" settings.)
-        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
-        Ok(PyprojectDiscovery::Hierarchical(settings))
-    } else {
-        // Fallback: load Ruff's default settings, and resolve all paths relative to the
-        // current working directory. (With `Strategy::Hierarchical`, we'll end up the
-        // "closest" `pyproject.toml` file for every Python file later on, so these act
-        // as the "default" settings.)
-        let mut config = Configuration::default();
-        overrides.process_config(&mut config);
-        let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
-        Ok(PyprojectDiscovery::Hierarchical(settings))
-    }
-}
-
 fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
-    let (cli, overrides) = Cli::parse().partition();
+    let (cli, overrides) = Args::parse().partition();
 
     let default_panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -112,7 +57,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     if let Some(shell) = cli.generate_shell_completion {
-        shell.generate(&mut Cli::command(), &mut io::stdout());
+        shell.generate(&mut Args::command(), &mut io::stdout());
         return Ok(ExitCode::SUCCESS);
     }
     if cli.clean {
@@ -122,7 +67,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_strategy = resolve(
+    let pyproject_strategy = resolve::resolve(
         cli.isolated,
         cli.config.as_deref(),
         &overrides,

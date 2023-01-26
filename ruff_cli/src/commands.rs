@@ -23,8 +23,8 @@ use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IO
 use serde::Serialize;
 use walkdir::WalkDir;
 
+use crate::args::Overrides;
 use crate::cache;
-use crate::cli::Overrides;
 use crate::diagnostics::{lint_path, lint_stdin, Diagnostics};
 use crate::iterators::par_iter;
 

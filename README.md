@@ -67,6 +67,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Home Assistant](https://github.com/home-assistant/core)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+- [build (PyPA)](https://github.com/pypa/build)
 - [Babel](https://github.com/python-babel/babel)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
@@ -424,9 +425,9 @@ Options:
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help information
+          Print help
   -V, --version
-          Print version information
+          Print version
 ```
 <!-- End auto-generated cli help. -->
 
@@ -2399,7 +2400,7 @@ Enabled by default.
 
 ```toml
 [tool.ruff]
-respect_gitignore = false
+respect-gitignore = false
 ```
 
 ---
@@ -2464,7 +2465,7 @@ my_package/
       bar.py
 ```
 
-The `src` directory should be included in `source` (e.g., `source =
+The `src` directory should be included in the `src` option (e.g., `src =
 ["src"]`), such that when resolving imports, `my_package.foo` is
 considered a first-party import.
 

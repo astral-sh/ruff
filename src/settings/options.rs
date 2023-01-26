@@ -285,7 +285,7 @@ pub struct Options {
         default = "true",
         value_type = "bool",
         example = r#"
-            respect_gitignore = false
+            respect-gitignore = false
         "#
     )]
     /// Whether to automatically exclude files that are ignored by `.ignore`,
@@ -342,7 +342,7 @@ pub struct Options {
     ///       bar.py
     /// ```
     ///
-    /// The `src` directory should be included in `source` (e.g., `source =
+    /// The `src` directory should be included in the `src` option (e.g., `src =
     /// ["src"]`), such that when resolving imports, `my_package.foo` is
     /// considered a first-party import.
     ///

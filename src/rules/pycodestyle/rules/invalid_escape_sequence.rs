@@ -1,10 +1,27 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct InvalidEscapeSequence(pub char);
+);
+impl AlwaysAutofixableViolation for InvalidEscapeSequence {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let InvalidEscapeSequence(char) = self;
+        format!("Invalid escape sequence: '\\{char}'")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add backslash to escape sequence".to_string()
+    }
+}
 
 // See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
 const VALID_ESCAPE_SEQUENCES: &[char; 23] = &[
@@ -75,7 +92,7 @@ pub fn invalid_escape_sequence(
                 let location = Location::new(start.row() + row_offset, col);
                 let end_location = Location::new(location.row(), location.column() + 2);
                 let mut diagnostic = Diagnostic::new(
-                    violations::InvalidEscapeSequence(next_char),
+                    InvalidEscapeSequence(next_char),
                     Range::new(location, end_location),
                 );
                 if autofix {
