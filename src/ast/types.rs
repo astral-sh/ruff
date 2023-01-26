@@ -103,6 +103,23 @@ impl<'a> Scope<'a> {
     }
 }
 
+// Pyflakes defines the following binding hierarchy (via inheritance):
+//   Binding
+//    ExportBinding
+//    Annotation
+//    Argument
+//    Assignment
+//      NamedExprAssignment
+//    Definition
+//      FunctionDefinition
+//      ClassDefinition
+//      Builtin
+//      Importation
+//        SubmoduleImportation
+//        ImportationFrom
+//        StarImportation
+//        FutureImportation
+
 #[derive(Clone, Debug)]
 pub enum BindingKind<'a> {
     Annotation,
@@ -123,10 +140,12 @@ pub enum BindingKind<'a> {
     SubmoduleImportation(&'a str, &'a str),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: Range,
+    /// The context in which the binding was created.
+    pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<RefEquality<'a, Stmt>>,
     /// Tuple of (scope index, range) indicating the scope and range at which
@@ -143,33 +162,16 @@ pub struct Binding<'a> {
 }
 
 #[derive(Copy, Clone)]
-pub enum UsageContext {
+pub enum ExecutionContext {
     Runtime,
     Typing,
 }
 
-// Pyflakes defines the following binding hierarchy (via inheritance):
-//   Binding
-//    ExportBinding
-//    Annotation
-//    Argument
-//    Assignment
-//      NamedExprAssignment
-//    Definition
-//      FunctionDefinition
-//      ClassDefinition
-//      Builtin
-//      Importation
-//        SubmoduleImportation
-//        ImportationFrom
-//        StarImportation
-//        FutureImportation
-
 impl<'a> Binding<'a> {
-    pub fn mark_used(&mut self, scope: usize, range: Range, context: UsageContext) {
+    pub fn mark_used(&mut self, scope: usize, range: Range, context: ExecutionContext) {
         match context {
-            UsageContext::Runtime => self.runtime_usage = Some((scope, range)),
-            UsageContext::Typing => self.typing_usage = Some((scope, range)),
+            ExecutionContext::Runtime => self.runtime_usage = Some((scope, range)),
+            ExecutionContext::Typing => self.typing_usage = Some((scope, range)),
         }
     }
 

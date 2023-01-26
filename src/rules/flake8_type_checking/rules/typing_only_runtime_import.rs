@@ -1,9 +1,8 @@
 use std::path::Path;
 
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Stmt;
 
-use crate::ast::types::{Binding, BindingKind, Range};
+use crate::ast::types::{Binding, BindingKind, ExecutionContext};
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::rules::isort::{categorize, ImportType};
@@ -114,7 +113,6 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 /// TCH001
 pub fn typing_only_runtime_import(
     binding: &Binding,
-    blocks: &[&Stmt],
     runtime_imports: &[&Binding],
     package: Option<&Path>,
     settings: &Settings,
@@ -148,58 +146,48 @@ pub fn typing_only_runtime_import(
         return None;
     }
 
-    let defined_in_type_checking = blocks
-        .iter()
-        .any(|block| Range::from_located(block).contains(&binding.range));
-    if !defined_in_type_checking {
-        if binding.typing_usage.is_some()
-            && binding.runtime_usage.is_none()
-            && binding.synthetic_usage.is_none()
-        {
-            // Extract the module base and level from the full name.
-            // Ex) `foo.bar.baz` -> `foo`, `0`
-            // Ex) `.foo.bar.baz` -> `foo`, `1`
-            let module_base = full_name.split('.').next().unwrap();
-            let level = full_name.chars().take_while(|c| *c == '.').count();
+    if matches!(binding.context, ExecutionContext::Runtime)
+        && binding.typing_usage.is_some()
+        && binding.runtime_usage.is_none()
+        && binding.synthetic_usage.is_none()
+    {
+        // Extract the module base and level from the full name.
+        // Ex) `foo.bar.baz` -> `foo`, `0`
+        // Ex) `.foo.bar.baz` -> `foo`, `1`
+        let module_base = full_name.split('.').next().unwrap();
+        let level = full_name.chars().take_while(|c| *c == '.').count();
 
-            // Categorize the import.
-            match categorize(
-                module_base,
-                Some(&level),
-                &settings.src,
-                package,
-                &settings.isort.known_first_party,
-                &settings.isort.known_third_party,
-                &settings.isort.extra_standard_library,
-            ) {
-                ImportType::LocalFolder | ImportType::FirstParty => {
-                    return Some(Diagnostic::new(
-                        TypingOnlyFirstPartyImport {
-                            full_name: full_name.to_string(),
-                        },
-                        binding.range,
-                    ));
-                }
-                ImportType::ThirdParty => {
-                    return Some(Diagnostic::new(
-                        TypingOnlyThirdPartyImport {
-                            full_name: full_name.to_string(),
-                        },
-                        binding.range,
-                    ));
-                }
-                ImportType::StandardLibrary => {
-                    return Some(Diagnostic::new(
-                        TypingOnlyStandardLibraryImport {
-                            full_name: full_name.to_string(),
-                        },
-                        binding.range,
-                    ));
-                }
-                ImportType::Future => unreachable!("`__future__` imports should be marked as used"),
-            }
+        // Categorize the import.
+        match categorize(
+            module_base,
+            Some(&level),
+            &settings.src,
+            package,
+            &settings.isort.known_first_party,
+            &settings.isort.known_third_party,
+            &settings.isort.extra_standard_library,
+        ) {
+            ImportType::LocalFolder | ImportType::FirstParty => Some(Diagnostic::new(
+                TypingOnlyFirstPartyImport {
+                    full_name: full_name.to_string(),
+                },
+                binding.range,
+            )),
+            ImportType::ThirdParty => Some(Diagnostic::new(
+                TypingOnlyThirdPartyImport {
+                    full_name: full_name.to_string(),
+                },
+                binding.range,
+            )),
+            ImportType::StandardLibrary => Some(Diagnostic::new(
+                TypingOnlyStandardLibraryImport {
+                    full_name: full_name.to_string(),
+                },
+                binding.range,
+            )),
+            ImportType::Future => unreachable!("`__future__` imports should be marked as used"),
         }
+    } else {
+        None
     }
-
-    None
 }
