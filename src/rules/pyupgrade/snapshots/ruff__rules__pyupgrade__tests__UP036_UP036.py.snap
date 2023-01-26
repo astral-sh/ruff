@@ -11,7 +11,10 @@ expression: diagnostics
     row: 2
     column: 44
   fix:
-    content: "from six.moves import badlib\nimport tkinter\nimport queue"
+    content:
+      - from six.moves import badlib
+      - import tkinter
+      - import queue
     location:
       row: 2
       column: 0
@@ -28,7 +31,10 @@ expression: diagnostics
     row: 4
     column: 53
   fix:
-    content: "from six.moves import badlib\nimport tkinter as hello\nimport queue"
+    content:
+      - from six.moves import badlib
+      - import tkinter as hello
+      - import queue
     location:
       row: 4
       column: 0
@@ -45,7 +51,9 @@ expression: diagnostics
     row: 6
     column: 37
   fix:
-    content: "\nimport dbm.gnu as gnud"
+    content:
+      - ""
+      - import dbm.gnu as gnud
     location:
       row: 6
       column: 0
@@ -62,7 +70,9 @@ expression: diagnostics
     row: 9
     column: 47
   fix:
-    content: "from six.moves import urllib_request\n    import queue"
+    content:
+      - from six.moves import urllib_request
+      - "    import queue"
     location:
       row: 9
       column: 4
@@ -79,7 +89,8 @@ expression: diagnostics
     row: 11
     column: 33
   fix:
-    content: from queue import Queue
+    content:
+      - from queue import Queue
     location:
       row: 11
       column: 0
@@ -96,7 +107,9 @@ expression: diagnostics
     row: 13
     column: 27
   fix:
-    content: "\nimport queue"
+    content:
+      - ""
+      - import queue
     location:
       row: 13
       column: 0
@@ -113,7 +126,9 @@ expression: diagnostics
     row: 15
     column: 40
   fix:
-    content: "from six.moves import map, getcwd\nimport queue"
+    content:
+      - "from six.moves import map, getcwd"
+      - import queue
     location:
       row: 15
       column: 0
@@ -130,7 +145,10 @@ expression: diagnostics
     row: 19
     column: 52
   fix:
-    content: "from six.moves import badlib\n        import tkinter\n        import queue"
+    content:
+      - from six.moves import badlib
+      - "        import tkinter"
+      - "        import queue"
     location:
       row: 19
       column: 8
@@ -147,7 +165,10 @@ expression: diagnostics
     row: 24
     column: 48
   fix:
-    content: "from six.moves import badlib\n    import tkinter\n    import queue"
+    content:
+      - from six.moves import badlib
+      - "    import tkinter"
+      - "    import queue"
     location:
       row: 24
       column: 4

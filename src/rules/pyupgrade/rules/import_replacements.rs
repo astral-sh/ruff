@@ -1,12 +1,28 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{AliasData, Located, Stmt};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pyupgrade::helpers::{get_fromimport_str, ImportFormatting};
 use crate::settings::types::PythonVersion;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct ImportReplacements;
+);
+impl AlwaysAutofixableViolation for ImportReplacements {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Replace old formatting imports with their new versions")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Updated the import".to_string()
+    }
+}
 
 const BAD_MODULES: &[&str] = &[
     "collections",
@@ -404,7 +420,7 @@ pub fn import_replacements(
         return;
     }
     let range = Range::from_located(stmt);
-    let mut diagnostic = Diagnostic::new(violations::ImportReplacements, range);
+    let mut diagnostic = Diagnostic::new(ImportReplacements, range);
     if checker.patch(&Rule::ImportReplacements) {
         diagnostic.amend(Fix::replacement(
             clean_result,

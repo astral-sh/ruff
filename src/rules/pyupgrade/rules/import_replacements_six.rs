@@ -1,64 +1,80 @@
 use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{AliasData, Located, Stmt};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pyupgrade::helpers::{get_fromimport_str, ImportFormatting};
 use crate::source_code::Locator;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct ImportReplacementsSix;
+);
+impl AlwaysAutofixableViolation for ImportReplacementsSix {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Replace old formatting imports with their new versions")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Updated the import".to_string()
+    }
+}
 
 static REPLACE_MODS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
-    let mut m = HashMap::new();
-    m.insert("BaseHTTPServer", "http.server");
-    m.insert("CGIHTTPServer", "http.server");
-    m.insert("SimpleHTTPServer", "http.server");
-    m.insert("_dummy_thread", "_dummy_thread");
-    m.insert("_thread", "_thread");
-    m.insert("builtins", "builtins");
-    m.insert("cPickle", "pickle");
-    m.insert("collections_abc", "collections.abc");
-    m.insert("configparser", "configparser");
-    m.insert("copyreg", "copyreg");
-    m.insert("dbm_gnu", "dbm.gnu");
-    m.insert("dbm_ndbm", "dbm.ndbm");
-    m.insert("email_mime_base", "email.mime.base");
-    m.insert("email_mime_image", "email.mime.image");
-    m.insert("email_mime_multipart", "email.mime.multipart");
-    m.insert("email_mime_nonmultipart", "email.mime.nonmultipart");
-    m.insert("email_mime_text", "email.mime.text");
-    m.insert("html_entities", "html.entities");
-    m.insert("html_parser", "html.parser");
-    m.insert("http_client", "http.client");
-    m.insert("http_cookiejar", "http.cookiejar");
-    m.insert("http_cookies", "http.cookies");
-    m.insert("queue", "queue");
-    m.insert("reprlib", "reprlib");
-    m.insert("socketserver", "socketserver");
-    m.insert("tkinter", "tkinter");
-    m.insert("tkinter_colorchooser", "tkinter.colorchooser");
-    m.insert("tkinter_commondialog", "tkinter.commondialog");
-    m.insert("tkinter_constants", "tkinter.constants");
-    m.insert("tkinter_dialog", "tkinter.dialog");
-    m.insert("tkinter_dnd", "tkinter.dnd");
-    m.insert("tkinter_filedialog", "tkinter.filedialog");
-    m.insert("tkinter_font", "tkinter.font");
-    m.insert("tkinter_messagebox", "tkinter.messagebox");
-    m.insert("tkinter_scrolledtext", "tkinter.scrolledtext");
-    m.insert("tkinter_simpledialog", "tkinter.simpledialog");
-    m.insert("tkinter_tix", "tkinter.tix");
-    m.insert("tkinter_tkfiledialog", "tkinter.filedialog");
-    m.insert("tkinter_tksimpledialog", "tkinter.simpledialog");
-    m.insert("tkinter_ttk", "tkinter.ttk");
-    m.insert("urllib_error", "urllib.error");
-    m.insert("urllib_parse", "urllib.parse");
-    m.insert("urllib_robotparser", "urllib.robotparser");
-    m.insert("xmlrpc_client", "xmlrpc.client");
-    m.insert("xmlrpc_server", "xmlrpc.server");
-    m
+    HashMap::from([
+        ("BaseHTTPServer", "http.server"),
+        ("CGIHTTPServer", "http.server"),
+        ("SimpleHTTPServer", "http.server"),
+        ("_dummy_thread", "_dummy_thread"),
+        ("_thread", "_thread"),
+        ("builtins", "builtins"),
+        ("cPickle", "pickle"),
+        ("collections_abc", "collections.abc"),
+        ("configparser", "configparser"),
+        ("copyreg", "copyreg"),
+        ("dbm_gnu", "dbm.gnu"),
+        ("dbm_ndbm", "dbm.ndbm"),
+        ("email_mime_base", "email.mime.base"),
+        ("email_mime_image", "email.mime.image"),
+        ("email_mime_multipart", "email.mime.multipart"),
+        ("email_mime_nonmultipart", "email.mime.nonmultipart"),
+        ("email_mime_text", "email.mime.text"),
+        ("html_entities", "html.entities"),
+        ("html_parser", "html.parser"),
+        ("http_client", "http.client"),
+        ("http_cookiejar", "http.cookiejar"),
+        ("http_cookies", "http.cookies"),
+        ("queue", "queue"),
+        ("reprlib", "reprlib"),
+        ("socketserver", "socketserver"),
+        ("tkinter", "tkinter"),
+        ("tkinter_colorchooser", "tkinter.colorchooser"),
+        ("tkinter_commondialog", "tkinter.commondialog"),
+        ("tkinter_constants", "tkinter.constants"),
+        ("tkinter_dialog", "tkinter.dialog"),
+        ("tkinter_dnd", "tkinter.dnd"),
+        ("tkinter_filedialog", "tkinter.filedialog"),
+        ("tkinter_font", "tkinter.font"),
+        ("tkinter_messagebox", "tkinter.messagebox"),
+        ("tkinter_scrolledtext", "tkinter.scrolledtext"),
+        ("tkinter_simpledialog", "tkinter.simpledialog"),
+        ("tkinter_tix", "tkinter.tix"),
+        ("tkinter_tkfiledialog", "tkinter.filedialog"),
+        ("tkinter_tksimpledialog", "tkinter.simpledialog"),
+        ("tkinter_ttk", "tkinter.ttk"),
+        ("urllib_error", "urllib.error"),
+        ("urllib_parse", "urllib.parse"),
+        ("urllib_robotparser", "urllib.robotparser"),
+        ("xmlrpc_client", "xmlrpc.client"),
+        ("xmlrpc_server", "xmlrpc.server"),
+    ])
 });
 
 static REPLACE_MODS_URLLIB: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
@@ -72,7 +88,7 @@ static REPLACE_MODS_URLLIB: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
 });
 
 fn refactor_segment(
-    locator: &Locator,
+    checker: &Checker,
     stmt: &Stmt,
     replace: &Lazy<HashMap<&str, &str>>,
     names: &[Located<AliasData>],
@@ -85,7 +101,7 @@ fn refactor_segment(
         clean_names.push(name.node.clone());
     }
 
-    let formatting = ImportFormatting::new(locator, stmt, names);
+    let formatting = ImportFormatting::new(checker.locator, stmt, names);
     for name in names {
         let import_name = name.node.name.as_str();
         match replace.get(import_name) {
@@ -114,8 +130,9 @@ fn refactor_segment(
         &formatting.indent,
         &formatting.short_indent,
     );
-    final_str.push_str(&format!("\n{new_entries}"));
-    if final_str.ends_with('\n') {
+    let nl = checker.stylist.line_ending().as_str();
+    final_str.push_str(&format!("{nl}{new_entries}"));
+    if final_str.ends_with(nl) {
         final_str.pop();
     }
     Some(final_str)
@@ -151,16 +168,10 @@ pub fn import_replacements_six(
     let final_string: Option<String>;
     if let Some(module_text) = module {
         if module_text == "six.moves" {
-            final_string =
-                refactor_segment(checker.locator, stmt, &REPLACE_MODS, names, module_text);
+            final_string = refactor_segment(checker, stmt, &REPLACE_MODS, names, module_text);
         } else if module_text == "six.moves.urllib" {
-            final_string = refactor_segment(
-                checker.locator,
-                stmt,
-                &REPLACE_MODS_URLLIB,
-                names,
-                module_text,
-            );
+            final_string =
+                refactor_segment(checker, stmt, &REPLACE_MODS_URLLIB, names, module_text);
         } else if module_text.contains("six.moves.urllib") {
             final_string = replace_from_only(
                 module_text,
@@ -188,7 +199,7 @@ pub fn import_replacements_six(
         None => return,
     };
     let range = Range::from_located(stmt);
-    let mut diagnostic = Diagnostic::new(violations::ImportReplacementsSix, range);
+    let mut diagnostic = Diagnostic::new(ImportReplacementsSix, range);
     if checker.patch(&Rule::ImportReplacementsSix) {
         diagnostic.amend(Fix::replacement(
             final_str,

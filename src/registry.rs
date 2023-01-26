@@ -254,8 +254,8 @@ ruff_macros::define_rule_mapping!(
     UP032 => violations::FString,
     UP033 => violations::FunctoolsCache,
     UP034 => violations::ExtraneousParentheses,
-    UP035 => violations::ImportReplacements,
-    UP036 => violations::ImportReplacementsSix,
+    UP035 => rules::pyupgrade::rules::ImportReplacements,
+    UP036 => rules::pyupgrade::rules::ImportReplacementsSix,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,

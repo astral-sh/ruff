@@ -3235,34 +3235,6 @@ impl AlwaysAutofixableViolation for FunctoolsCache {
     }
 }
 
-define_violation!(
-    pub struct ImportReplacements;
-);
-impl AlwaysAutofixableViolation for ImportReplacements {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Replace old formatting imports with their new versions")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Updated the import".to_string()
-    }
-}
-
-define_violation!(
-    pub struct ImportReplacementsSix;
-);
-impl AlwaysAutofixableViolation for ImportReplacementsSix {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Replace old formatting imports with their new versions")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Updated the import".to_string()
-    }
-}
-
 // pydocstyle
 
 define_violation!(
