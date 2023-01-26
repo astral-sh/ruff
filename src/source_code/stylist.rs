@@ -108,11 +108,17 @@ impl Default for Indentation {
     }
 }
 
+impl Indentation {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl Deref for Indentation {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.as_str()
     }
 }
 
