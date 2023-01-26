@@ -5,10 +5,11 @@ expression: diagnostics
 - kind:
     TryConsiderElse: ~
   location:
-    row: 18
+    row: 20
     column: 8
   end_location:
-    row: 18
-    column: 13
+    row: 20
+    column: 16
   fix: ~
   parent: ~
+
