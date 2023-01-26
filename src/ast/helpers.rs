@@ -974,6 +974,28 @@ impl<'a> SimpleCallArgs<'a> {
     }
 }
 
+/// Return `true` if the given `Expr` is a potential logging call, optionally
+/// matching the given logging level.
+pub fn is_logger_candidate(func: &Expr, level: Option<&str>) -> bool {
+    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+        let level_matches = {
+            if let Some(level) = level {
+                return attr == level;
+            }
+            true
+        };
+        if level_matches {
+            let call_path = collect_call_path(value);
+            if let Some(tail) = call_path.last() {
+                if *tail == "logging" || tail.ends_with("logger") {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;

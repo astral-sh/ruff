@@ -1,7 +1,7 @@
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind};
 
-use crate::ast::helpers::collect_call_path;
+use crate::ast::helpers::is_logger_candidate;
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -34,15 +34,8 @@ where
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let ExprKind::Call { func, .. } = &expr.node {
-            if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                if attr == "error" {
-                    let call_path = collect_call_path(value);
-                    if let Some(tail) = call_path.last() {
-                        if *tail == "logging" || tail.ends_with("logger") {
-                            self.calls.push(expr);
-                        }
-                    }
-                }
+            if is_logger_candidate(func, Some("error")) {
+                self.calls.push(expr);
             }
         }
         visitor::walk_expr(self, expr);
