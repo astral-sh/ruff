@@ -55,13 +55,64 @@ impl Violation for TypingOnlyStandardLibraryImport {
     }
 }
 
+/// Return `true` if `this` is implicitly loaded via importing `that`.
+fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
+    match &this.kind {
+        BindingKind::Importation(.., this_name)
+        | BindingKind::SubmoduleImportation(this_name, ..) => match &that.kind {
+            BindingKind::FromImportation(.., that_name) => {
+                // Ex) `pkg.A` vs. `pkg`
+                this_name
+                    .rfind('.')
+                    .map_or(false, |i| this_name[..i] == *that_name)
+            }
+            BindingKind::Importation(.., that_name)
+            | BindingKind::SubmoduleImportation(that_name, ..) => {
+                // Ex) `pkg.A` vs. `pkg.B`
+                this_name == that_name
+            }
+            _ => false,
+        },
+        BindingKind::FromImportation(.., this_name) => match &that.kind {
+            BindingKind::Importation(.., that_name)
+            | BindingKind::SubmoduleImportation(that_name, ..) => {
+                // Ex) `pkg.A` vs. `pkg`
+                this_name
+                    .rfind('.')
+                    .map_or(false, |i| &this_name[..i] == *that_name)
+            }
+            BindingKind::FromImportation(.., that_name) => {
+                // Ex) `pkg.A` vs. `pkg.B`
+                this_name.rfind('.').map_or(false, |i| {
+                    that_name
+                        .rfind('.')
+                        .map_or(false, |j| this_name[..i] == that_name[..j])
+                })
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
 /// TCH001
 pub fn typing_only_runtime_import(
     binding: &Binding,
     blocks: &[&Stmt],
+    runtime_imports: &[&Binding],
     package: Option<&Path>,
     settings: &Settings,
 ) -> Option<Diagnostic> {
+    // If we're in un-strict mode, don't flag typing-only imports that are
+    // implicitly loaded by way of a valid runtime import.
+    if !settings.flake8_type_checking.strict
+        && runtime_imports
+            .iter()
+            .any(|import| is_implicit_import(binding, import))
+    {
+        return None;
+    }
+
     let full_name = match &binding.kind {
         BindingKind::Importation(.., full_name) => full_name,
         BindingKind::FromImportation(.., full_name) => full_name.as_str(),

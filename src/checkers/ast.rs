@@ -1,5 +1,6 @@
 //! Lint rules based on AST traversal.
 
+use std::iter;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -80,7 +81,7 @@ pub struct Checker<'a> {
     pub(crate) exprs: Vec<RefEquality<'a, Expr>>,
     pub(crate) scopes: Vec<Scope<'a>>,
     pub(crate) scope_stack: Vec<usize>,
-    pub(crate) dead_scopes: Vec<usize>,
+    pub(crate) dead_scopes: Vec<(usize, Vec<usize>)>,
     deferred_string_type_definitions: Vec<(Range, &'a str, bool, DeferralContext<'a>)>,
     deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext<'a>)>,
     deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
@@ -3687,11 +3688,12 @@ impl<'a> Checker<'a> {
     }
 
     fn pop_scope(&mut self) {
-        self.dead_scopes.push(
+        self.dead_scopes.push((
             self.scope_stack
                 .pop()
                 .expect("Attempted to pop without scope"),
-        );
+            self.scope_stack.clone(),
+        ));
     }
 
     fn bind_builtins(&mut self) {
@@ -4363,13 +4365,51 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let mut diagnostics: Vec<Diagnostic> = vec![];
-        for scope in self
-            .dead_scopes
-            .iter()
-            .rev()
-            .map(|index| &self.scopes[*index])
+        // Identify any valid runtime imports. If a module is imported at runtime, and
+        // used at runtime, then by default, we avoid flagging any other
+        // imports from that model as typing-only.
+        let runtime_imports: Vec<Vec<&Binding>> = if !self.settings.flake8_type_checking.strict
+            && (self
+                .settings
+                .rules
+                .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyFirstPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyThirdPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyStandardLibraryImport))
         {
+            self.scopes
+                .iter()
+                .map(|scope| {
+                    scope
+                        .values
+                        .values()
+                        .map(|index| &self.bindings[*index])
+                        .filter(|binding| {
+                            flake8_type_checking::helpers::is_valid_runtime_import(
+                                binding,
+                                &self.type_checking_blocks,
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+
+        let mut diagnostics: Vec<Diagnostic> = vec![];
+        for (index, stack) in self.dead_scopes.iter().rev() {
+            let scope = &self.scopes[*index];
+
             // PLW0602
             if self
                 .settings
@@ -4508,6 +4548,16 @@ impl<'a> Checker<'a> {
                     .rules
                     .enabled(&Rule::TypingOnlyStandardLibraryImport)
             {
+                let runtime_imports: Vec<&Binding> = if self.settings.flake8_type_checking.strict {
+                    vec![]
+                } else {
+                    stack
+                        .iter()
+                        .chain(iter::once(index))
+                        .flat_map(|index| runtime_imports[*index].iter())
+                        .copied()
+                        .collect()
+                };
                 for (.., index) in &scope.values {
                     let binding = &self.bindings[*index];
 
@@ -4523,6 +4573,7 @@ impl<'a> Checker<'a> {
                         flake8_type_checking::rules::typing_only_runtime_import(
                             binding,
                             &self.type_checking_blocks,
+                            &runtime_imports,
                             self.package,
                             self.settings,
                         )
