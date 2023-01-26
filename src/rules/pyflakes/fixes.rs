@@ -8,13 +8,14 @@ use crate::ast::types::Range;
 use crate::cst::matchers::{match_expr, match_module};
 use crate::fix::Fix;
 use crate::python::string::strip_quotes_and_prefixes;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 
 /// Generate a [`Fix`] to remove unused keys from format dict.
 pub fn remove_unused_format_arguments_from_dict(
     unused_arguments: &[&str],
     stmt: &Expr,
     locator: &Locator,
+    stylist: &Stylist,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
     let mut tree = match_module(module_text)?;
@@ -46,7 +47,11 @@ pub fn remove_unused_format_arguments_from_dict(
 
     body.value = Expression::Dict(Box::new(new_dict));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -61,6 +66,7 @@ pub fn remove_unused_keyword_arguments_from_format_call(
     unused_arguments: &[&str],
     location: Range,
     locator: &Locator,
+    stylist: &Stylist,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&location);
     let mut tree = match_module(module_text)?;
@@ -90,7 +96,11 @@ pub fn remove_unused_keyword_arguments_from_format_call(
 
     body.value = Expression::Call(Box::new(new_call));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
