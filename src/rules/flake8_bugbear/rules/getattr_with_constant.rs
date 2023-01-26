@@ -4,7 +4,7 @@ use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::python::identifiers::is_identifier;
+use crate::python::identifiers::{is_identifier, is_mangled_private};
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::violations;
@@ -19,10 +19,6 @@ fn attribute(value: &Expr, attr: &str) -> Expr {
             ctx: ExprContext::Load,
         },
     )
-}
-
-fn is_mangled_private(id: &str) -> bool {
-    id.starts_with("__") && !id.ends_with("__")
 }
 
 /// B009

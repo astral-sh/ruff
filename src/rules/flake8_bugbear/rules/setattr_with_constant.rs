@@ -4,7 +4,7 @@ use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::python::identifiers::is_identifier;
+use crate::python::identifiers::{is_identifier, is_mangled_private};
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
@@ -61,7 +61,10 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         if expr == child.as_ref() {
             let mut diagnostic =
                 Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
-            if checker.patch(diagnostic.kind.rule()) {
+
+            // Don't autofix if name would be mangled by Python's "private variables"
+            // handling
+            if checker.patch(diagnostic.kind.rule()) && !is_mangled_private(name.as_str()) {
                 diagnostic.amend(Fix::replacement(
                     assignment(obj, name, value, checker.stylist),
                     expr.location,
