@@ -239,6 +239,186 @@ where
     }
 }
 
+pub fn any_over_stmt<F>(stmt: &Stmt, func: &F) -> bool
+where
+    F: Fn(&Expr) -> bool,
+{
+    match &stmt.node {
+        StmtKind::FunctionDef {
+            args,
+            body,
+            decorator_list,
+            returns,
+            ..
+        }
+        | StmtKind::AsyncFunctionDef {
+            args,
+            body,
+            decorator_list,
+            returns,
+            ..
+        } => {
+            args.defaults.iter().any(|expr| any_over_expr(expr, func))
+                || args
+                    .kw_defaults
+                    .iter()
+                    .any(|expr| any_over_expr(expr, func))
+                || args.args.iter().any(|arg| {
+                    arg.node
+                        .annotation
+                        .as_ref()
+                        .map_or(false, |expr| any_over_expr(expr, func))
+                })
+                || args.kwonlyargs.iter().any(|arg| {
+                    arg.node
+                        .annotation
+                        .as_ref()
+                        .map_or(false, |expr| any_over_expr(expr, func))
+                })
+                || args.posonlyargs.iter().any(|arg| {
+                    arg.node
+                        .annotation
+                        .as_ref()
+                        .map_or(false, |expr| any_over_expr(expr, func))
+                })
+                || args.vararg.as_ref().map_or(false, |arg| {
+                    arg.node
+                        .annotation
+                        .as_ref()
+                        .map_or(false, |expr| any_over_expr(expr, func))
+                })
+                || args.kwarg.as_ref().map_or(false, |arg| {
+                    arg.node
+                        .annotation
+                        .as_ref()
+                        .map_or(false, |expr| any_over_expr(expr, func))
+                })
+                || body.iter().any(|stmt| any_over_stmt(stmt, func))
+                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || returns
+                    .as_ref()
+                    .map_or(false, |value| any_over_expr(value, func))
+        }
+        StmtKind::ClassDef {
+            bases,
+            keywords,
+            body,
+            decorator_list,
+            ..
+        } => {
+            bases.iter().any(|expr| any_over_expr(expr, func))
+                || keywords
+                    .iter()
+                    .any(|keyword| any_over_expr(&keyword.node.value, func))
+                || body.iter().any(|stmt| any_over_stmt(stmt, func))
+                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+        }
+        StmtKind::Return { value } => value
+            .as_ref()
+            .map_or(false, |value| any_over_expr(value, func)),
+        StmtKind::Delete { targets } => targets.iter().any(|expr| any_over_expr(expr, func)),
+        StmtKind::Assign { targets, value, .. } => {
+            targets.iter().any(|expr| any_over_expr(expr, func)) || any_over_expr(value, func)
+        }
+        StmtKind::AugAssign { target, value, .. } => {
+            any_over_expr(target, func) || any_over_expr(value, func)
+        }
+        StmtKind::AnnAssign {
+            target,
+            annotation,
+            value,
+            ..
+        } => {
+            any_over_expr(target, func)
+                || any_over_expr(annotation, func)
+                || value
+                    .as_ref()
+                    .map_or(false, |value| any_over_expr(value, func))
+        }
+        StmtKind::For {
+            target,
+            iter,
+            body,
+            orelse,
+            ..
+        }
+        | StmtKind::AsyncFor {
+            target,
+            iter,
+            body,
+            orelse,
+            ..
+        } => {
+            any_over_expr(target, func)
+                || any_over_expr(iter, func)
+                || any_over_body(body, func)
+                || any_over_body(orelse, func)
+        }
+        StmtKind::While { test, body, orelse } => {
+            any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func)
+        }
+        StmtKind::If { test, body, orelse } => {
+            any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func)
+        }
+        StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
+            items.iter().any(|withitem| {
+                any_over_expr(&withitem.context_expr, func)
+                    || withitem
+                        .optional_vars
+                        .as_ref()
+                        .map_or(false, |expr| any_over_expr(expr, func))
+            }) || any_over_body(body, func)
+        }
+        StmtKind::Raise { exc, cause } => {
+            exc.as_ref()
+                .map_or(false, |value| any_over_expr(value, func))
+                || cause
+                    .as_ref()
+                    .map_or(false, |value| any_over_expr(value, func))
+        }
+        StmtKind::Try {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+        } => {
+            any_over_body(body, func)
+                || handlers.iter().any(|handler| {
+                    let ExcepthandlerKind::ExceptHandler { type_, body, .. } = &handler.node;
+                    type_
+                        .as_ref()
+                        .map_or(false, |expr| any_over_expr(expr, func))
+                        || any_over_body(body, func)
+                })
+                || any_over_body(orelse, func)
+                || any_over_body(finalbody, func)
+        }
+        StmtKind::Assert { test, msg } => {
+            any_over_expr(test, func)
+                || msg
+                    .as_ref()
+                    .map_or(false, |value| any_over_expr(value, func))
+        }
+        // TODO(charlie): Handle match statements.
+        StmtKind::Match { .. } => false,
+        StmtKind::Import { .. } => false,
+        StmtKind::ImportFrom { .. } => false,
+        StmtKind::Global { .. } => false,
+        StmtKind::Nonlocal { .. } => false,
+        StmtKind::Expr { value } => any_over_expr(value, func),
+        StmtKind::Pass => false,
+        StmtKind::Break => false,
+        StmtKind::Continue => false,
+    }
+}
+
+pub fn any_over_body<F>(body: &[Stmt], func: &F) -> bool
+where
+    F: Fn(&Expr) -> bool,
+{
+    body.iter().any(|stmt| any_over_stmt(stmt, func))
+}
+
 static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
 
 /// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
@@ -380,6 +560,23 @@ pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
     } else {
         false
     }
+}
+
+/// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
+pub fn uses_magic_variable_access(checker: &Checker, body: &[Stmt]) -> bool {
+    any_over_body(body, &|expr| {
+        if let ExprKind::Call { func, .. } = &expr.node {
+            checker.resolve_call_path(func).map_or(false, |call_path| {
+                call_path.as_slice() == ["", "locals"]
+                    || call_path.as_slice() == ["", "globals"]
+                    || call_path.as_slice() == ["", "vars"]
+                    || call_path.as_slice() == ["", "eval"]
+                    || call_path.as_slice() == ["", "exec"]
+            })
+        } else {
+            false
+        }
+    })
 }
 
 /// Format the module name for a relative import.

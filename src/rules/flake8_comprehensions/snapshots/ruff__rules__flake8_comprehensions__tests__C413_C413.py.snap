@@ -11,7 +11,8 @@ expression: diagnostics
     row: 3
     column: 15
   fix:
-    content: sorted(x)
+    content:
+      - sorted(x)
     location:
       row: 3
       column: 0
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 4
     column: 19
   fix:
-    content: "sorted(x, reverse=True)"
+    content:
+      - "sorted(x, reverse=True)"
     location:
       row: 4
       column: 0
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 5
     column: 36
   fix:
-    content: "sorted(x, key=lambda e: e, reverse=True)"
+    content:
+      - "sorted(x, key=lambda e: e, reverse=True)"
     location:
       row: 5
       column: 0
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 6
     column: 33
   fix:
-    content: "sorted(x, reverse=True)"
+    content:
+      - "sorted(x, reverse=True)"
     location:
       row: 6
       column: 0

@@ -11,7 +11,10 @@ expression: diagnostics
     row: 5
     column: 61
   fix:
-    content: "class NT1(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
+    content:
+      - "class NT1(NamedTuple):"
+      - "    a: int"
+      - "    b: tuple[str, ...]"
     location:
       row: 5
       column: 0
@@ -28,7 +31,11 @@ expression: diagnostics
     row: 12
     column: 1
   fix:
-    content: "class NT2(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
+    content:
+      - "class NT2(NamedTuple):"
+      - "    a: int"
+      - "    b: str = \"foo\""
+      - "    c: list[bool] = [True]"
     location:
       row: 8
       column: 0
@@ -45,7 +52,10 @@ expression: diagnostics
     row: 15
     column: 56
   fix:
-    content: "class NT3(typing.NamedTuple):\n    a: int\n    b: str"
+    content:
+      - "class NT3(typing.NamedTuple):"
+      - "    a: int"
+      - "    b: str"
     location:
       row: 15
       column: 0

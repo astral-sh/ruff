@@ -11,7 +11,28 @@ expression: diagnostics
     row: 19
     column: 0
   fix:
-    content: "import math\nimport sys\nfrom logging.handlers import FileHandler, StreamHandler\nfrom os import path, uname\n\n# comment 5\nfrom bar import a  # comment 6\nfrom bar import b  # comment 7\nfrom foo import bar  # comment 3\nfrom foo2 import bar2  # comment 4\n\n# comment 1\n# comment 2\nfrom third_party import lib1\nfrom third_party import lib2\nfrom third_party import lib3\nfrom third_party import lib4\nfrom third_party import lib5\nfrom third_party import lib6\nfrom third_party import lib7\n"
+    content:
+      - import math
+      - import sys
+      - "from logging.handlers import FileHandler, StreamHandler"
+      - "from os import path, uname"
+      - ""
+      - "# comment 5"
+      - "from bar import a  # comment 6"
+      - "from bar import b  # comment 7"
+      - "from foo import bar  # comment 3"
+      - "from foo2 import bar2  # comment 4"
+      - ""
+      - "# comment 1"
+      - "# comment 2"
+      - from third_party import lib1
+      - from third_party import lib2
+      - from third_party import lib3
+      - from third_party import lib4
+      - from third_party import lib5
+      - from third_party import lib6
+      - from third_party import lib7
+      - ""
     location:
       row: 1
       column: 0

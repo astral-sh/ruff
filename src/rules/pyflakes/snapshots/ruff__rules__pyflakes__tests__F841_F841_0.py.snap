@@ -11,7 +11,8 @@ expression: diagnostics
     row: 3
     column: 22
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 3
       column: 17
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 16
     column: 5
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 16
       column: 0
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 20
     column: 7
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 20
       column: 0
@@ -92,7 +95,8 @@ expression: diagnostics
     row: 51
     column: 9
   fix:
-    content: pass
+    content:
+      - pass
     location:
       row: 51
       column: 8
@@ -109,7 +113,8 @@ expression: diagnostics
     row: 79
     column: 32
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 79
       column: 21
@@ -126,7 +131,8 @@ expression: diagnostics
     row: 85
     column: 31
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 85
       column: 20

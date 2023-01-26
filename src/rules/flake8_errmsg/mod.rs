@@ -10,7 +10,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test]
     fn defaults() -> Result<()> {
@@ -22,7 +22,7 @@ mod tests {
                 Rule::DotFormatInException,
             ]),
         )?;
-        insta::assert_yaml_snapshot!("defaults", diagnostics);
+        assert_yaml_snapshot!("defaults", diagnostics);
         Ok(())
     }
 
@@ -41,7 +41,7 @@ mod tests {
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!("custom", diagnostics);
+        assert_yaml_snapshot!("custom", diagnostics);
         Ok(())
     }
 }

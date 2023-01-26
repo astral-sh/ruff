@@ -9,6 +9,7 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
+    use crate::assert_yaml_snapshot;
     use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -19,7 +20,7 @@ mod tests {
             Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
             &Settings::for_rule(Rule::ImportAliasIsNotConventional),
         )?;
-        insta::assert_yaml_snapshot!("defaults", diagnostics);
+        assert_yaml_snapshot!("defaults", diagnostics);
         Ok(())
     }
 
@@ -39,7 +40,7 @@ mod tests {
                 ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
-        insta::assert_yaml_snapshot!("custom", diagnostics);
+        assert_yaml_snapshot!("custom", diagnostics);
         Ok(())
     }
 
@@ -61,7 +62,7 @@ mod tests {
                 ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
-        insta::assert_yaml_snapshot!("remove_default", diagnostics);
+        assert_yaml_snapshot!("remove_default", diagnostics);
         Ok(())
     }
 
@@ -81,7 +82,7 @@ mod tests {
                 ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
-        insta::assert_yaml_snapshot!("override_default", diagnostics);
+        assert_yaml_snapshot!("override_default", diagnostics);
         Ok(())
     }
 
@@ -104,7 +105,7 @@ mod tests {
                 ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
             },
         )?;
-        insta::assert_yaml_snapshot!("from_imports", diagnostics);
+        assert_yaml_snapshot!("from_imports", diagnostics);
         Ok(())
     }
 }

@@ -35,7 +35,14 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                     Range::from_located(pass_stmt),
                 );
                 if checker.patch(&Rule::NoUnnecessaryPass) {
-                    match delete_stmt(pass_stmt, None, &[], checker.locator, checker.indexer) {
+                    match delete_stmt(
+                        pass_stmt,
+                        None,
+                        &[],
+                        checker.locator,
+                        checker.indexer,
+                        checker.stylist,
+                    ) {
                         Ok(fix) => {
                             diagnostic.amend(fix);
                         }
@@ -94,7 +101,14 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                     .map(std::convert::Into::into)
                     .collect();
                 let locator = checker.locator;
-                match delete_stmt(stmt, Some(parent), &deleted, locator, checker.indexer) {
+                match delete_stmt(
+                    stmt,
+                    Some(parent),
+                    &deleted,
+                    locator,
+                    checker.indexer,
+                    checker.stylist,
+                ) {
                     Ok(fix) => {
                         checker.deletions.insert(RefEquality(stmt));
                         diagnostic.amend(fix);

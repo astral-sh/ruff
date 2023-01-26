@@ -13,7 +13,8 @@ expression: diagnostics
     row: 1
     column: 48
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 1
       column: 0
@@ -32,7 +33,8 @@ expression: diagnostics
     row: 2
     column: 55
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 2
       column: 0
@@ -51,7 +53,8 @@ expression: diagnostics
     row: 3
     column: 48
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 3
       column: 0
@@ -69,7 +72,8 @@ expression: diagnostics
     row: 4
     column: 37
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 4
       column: 0
@@ -88,7 +92,8 @@ expression: diagnostics
     row: 5
     column: 53
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 5
       column: 0
@@ -106,7 +111,8 @@ expression: diagnostics
     row: 6
     column: 49
   fix:
-    content: from __future__ import invalid_module
+    content:
+      - from __future__ import invalid_module
     location:
       row: 6
       column: 0
@@ -124,7 +130,8 @@ expression: diagnostics
     row: 9
     column: 41
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 9
       column: 0
@@ -142,7 +149,8 @@ expression: diagnostics
     row: 10
     column: 37
   fix:
-    content: pass
+    content:
+      - pass
     location:
       row: 10
       column: 4
@@ -160,7 +168,8 @@ expression: diagnostics
     row: 13
     column: 41
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 13
       column: 0
@@ -178,7 +187,8 @@ expression: diagnostics
     row: 14
     column: 53
   fix:
-    content: from __future__ import invalid_module
+    content:
+      - from __future__ import invalid_module
     location:
       row: 14
       column: 4

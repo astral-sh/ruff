@@ -6,7 +6,7 @@ use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 use crate::violations;
 
 #[derive(Debug)]
@@ -19,7 +19,11 @@ struct MiddleContent<'a> {
 fn dirty_count(iter: impl Iterator<Item = char>) -> usize {
     let mut the_count = 0;
     for current_char in iter {
-        if current_char == ' ' || current_char == ',' || current_char == '\n' {
+        if current_char == ' '
+            || current_char == ','
+            || current_char == '\n'
+            || current_char == '\r'
+        {
             the_count += 1;
         } else {
             break;
@@ -43,7 +47,13 @@ fn extract_middle(contents: &str) -> Option<MiddleContent> {
 }
 
 /// Generate a [`Fix`] for a `stdout` and `stderr` [`Keyword`] pair.
-fn generate_fix(locator: &Locator, stdout: &Keyword, stderr: &Keyword) -> Option<Fix> {
+fn generate_fix(
+    stylist: &Stylist,
+    locator: &Locator,
+    stdout: &Keyword,
+    stderr: &Keyword,
+) -> Option<Fix> {
+    let line_end = stylist.line_ending().as_str();
     let first = if stdout.location < stderr.location {
         stdout
     } else {
@@ -63,7 +73,7 @@ fn generate_fix(locator: &Locator, stdout: &Keyword, stderr: &Keyword) -> Option
                 return None;
             };
             contents.push(',');
-            contents.push('\n');
+            contents.push_str(line_end);
             contents.push_str(indent);
         } else {
             contents.push(',');
@@ -109,7 +119,7 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
         let mut diagnostic =
             Diagnostic::new(violations::ReplaceStdoutStderr, Range::from_located(expr));
         if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) = generate_fix(checker.locator, stdout, stderr) {
+            if let Some(fix) = generate_fix(checker.stylist, checker.locator, stdout, stderr) {
                 diagnostic.amend(fix);
             };
         }

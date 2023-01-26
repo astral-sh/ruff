@@ -12,7 +12,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"); "N801")]
     #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"); "N802")]
@@ -37,7 +37,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

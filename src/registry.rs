@@ -429,17 +429,20 @@ ruff_macros::define_rule_mapping!(
     EXE004 => rules::flake8_executable::rules::ShebangWhitespace,
     EXE005 => rules::flake8_executable::rules::ShebangNewline,
     // flake8-type-checking
-    TYP001 => rules::flake8_type_checking::rules::TypingOnlyFirstPartyImport,
-    TYP002 => rules::flake8_type_checking::rules::TypingOnlyThirdPartyImport,
-    TYP003 => rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport,
-    TYP004 => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
-    TYP005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
+    TCH001 => rules::flake8_type_checking::rules::TypingOnlyFirstPartyImport,
+    TCH002 => rules::flake8_type_checking::rules::TypingOnlyThirdPartyImport,
+    TCH003 => rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport,
+    TCH004 => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
+    TCH005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // tryceratops
+    TRY002 => rules::tryceratops::rules::RaiseVanillaClass,
+    TRY003 => rules::tryceratops::rules::RaiseVanillaArgs,
     TRY004 => rules::tryceratops::rules::PreferTypeError,
     TRY200 => rules::tryceratops::rules::ReraiseNoCause,
     TRY201 => rules::tryceratops::rules::VerboseRaise,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
     TRY301 => rules::tryceratops::rules::RaiseWithinTry,
+    TRY400 => rules::tryceratops::rules::ErrorInsteadOfException,
     // flake8-use-pathlib
     PTH100 => rules::flake8_use_pathlib::violations::PathlibAbspath,
     PTH101 => rules::flake8_use_pathlib::violations::PathlibChmod,
@@ -593,7 +596,7 @@ pub enum Linter {
     #[prefix = "EXE"]
     Flake8Executable,
     /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
-    #[prefix = "TYP"]
+    #[prefix = "TCH"]
     Flake8TypeChecking,
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]

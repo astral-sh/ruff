@@ -11,7 +11,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::SingleLineImplicitStringConcatenation, Path::new("ISC.py"); "ISC001")]
     #[test_case(Rule::MultiLineImplicitStringConcatenation, Path::new("ISC.py"); "ISC002")]
@@ -24,7 +24,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 

@@ -11,7 +11,8 @@ expression: diagnostics
     row: 3
     column: 27
   fix:
-    content: "''' Not a docstring '''"
+    content:
+      - "''' Not a docstring '''"
     location:
       row: 3
       column: 4
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 5
     column: 43
   fix:
-    content: "'''not a docstring'''"
+    content:
+      - "'''not a docstring'''"
     location:
       row: 5
       column: 22

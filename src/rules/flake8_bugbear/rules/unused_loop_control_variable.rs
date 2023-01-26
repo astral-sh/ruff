@@ -22,8 +22,8 @@ use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
-use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::ast::{helpers, visitor};
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
@@ -73,7 +73,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
 
     for (name, expr) in control_names {
         // Ignore names that are already underscore-prefixed.
-        if name.starts_with('_') {
+        if checker.settings.dummy_variable_rgx.is_match(name) {
             continue;
         }
 
@@ -82,11 +82,15 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
             continue;
         }
 
+        let safe = !helpers::uses_magic_variable_access(checker, body);
         let mut diagnostic = Diagnostic::new(
-            violations::UnusedLoopControlVariable(name.to_string()),
+            violations::UnusedLoopControlVariable {
+                name: name.to_string(),
+                safe,
+            },
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if safe && checker.patch(diagnostic.kind.rule()) {
             // Prefix the variable name with an underscore.
             diagnostic.amend(Fix::replacement(
                 format!("_{name}"),

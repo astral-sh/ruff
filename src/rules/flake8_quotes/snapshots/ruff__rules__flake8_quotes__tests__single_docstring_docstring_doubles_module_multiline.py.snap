@@ -11,7 +11,10 @@ expression: diagnostics
     row: 3
     column: 3
   fix:
-    content: "'''\nDouble quotes multiline module docstring\n'''"
+    content:
+      - "'''"
+      - Double quotes multiline module docstring
+      - "'''"
     location:
       row: 1
       column: 0

@@ -10,7 +10,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::NoEval, Path::new("PGH001_0.py"); "PGH001_0")]
     #[test_case(Rule::NoEval, Path::new("PGH001_1.py"); "PGH001_1")]
@@ -26,7 +26,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

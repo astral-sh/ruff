@@ -1045,7 +1045,9 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport) {
+                if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport)
+                    && self.settings.target_version >= PythonVersion::Py37
+                {
                     if let Some("__future__") = module.as_deref() {
                         pyupgrade::rules::unnecessary_future_import(self, stmt, names);
                     }
@@ -1393,6 +1395,16 @@ where
                         pyupgrade::rules::os_error_alias(self, &item);
                     }
                 }
+                if self.settings.rules.enabled(&Rule::RaiseVanillaClass) {
+                    if let Some(expr) = exc {
+                        tryceratops::rules::raise_vanilla_class(self, expr);
+                    }
+                }
+                if self.settings.rules.enabled(&Rule::RaiseVanillaArgs) {
+                    if let Some(expr) = exc {
+                        tryceratops::rules::raise_vanilla_args(self, expr);
+                    }
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
@@ -1605,6 +1617,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::RaiseWithinTry) {
                     tryceratops::rules::raise_within_try(self, body);
+                }
+                if self.settings.rules.enabled(&Rule::ErrorInsteadOfException) {
+                    tryceratops::rules::error_instead_of_exception(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -4610,6 +4625,7 @@ impl<'a> Checker<'a> {
                             &deleted,
                             self.locator,
                             self.indexer,
+                            self.stylist,
                         ) {
                             Ok(fix) => {
                                 if fix.content.is_empty() || fix.content == "pass" {
