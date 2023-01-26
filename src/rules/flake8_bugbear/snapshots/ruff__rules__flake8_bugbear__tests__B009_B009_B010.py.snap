@@ -45,16 +45,8 @@ expression: diagnostics
     column: 0
   end_location:
     row: 20
-    column: 22
-  fix:
-    content:
-      - foo.abc123
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 20
-      column: 22
+    column: 24
+  fix: ~
   parent: ~
 - kind:
     GetAttrWithConstant: ~
@@ -63,51 +55,87 @@ expression: diagnostics
     column: 0
   end_location:
     row: 21
-    column: 23
+    column: 26
   fix:
     content:
-      - foo.abc123
+      - foo.__123abc__
     location:
       row: 21
       column: 0
     end_location:
       row: 21
+      column: 26
+  parent: ~
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 22
+    column: 22
+  fix:
+    content:
+      - foo.abc123
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 22
+      column: 22
+  parent: ~
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 23
+    column: 23
+  fix:
+    content:
+      - foo.abc123
+    location:
+      row: 23
+      column: 0
+    end_location:
+      row: 23
       column: 23
   parent: ~
 - kind:
     GetAttrWithConstant: ~
   location:
-    row: 22
+    row: 24
     column: 14
   end_location:
-    row: 22
+    row: 24
     column: 31
   fix:
     content:
       - x.bar
     location:
-      row: 22
+      row: 24
       column: 14
     end_location:
-      row: 22
+      row: 24
       column: 31
   parent: ~
 - kind:
     GetAttrWithConstant: ~
   location:
-    row: 23
+    row: 25
     column: 3
   end_location:
-    row: 23
+    row: 25
     column: 20
   fix:
     content:
       - x.bar
     location:
-      row: 23
+      row: 25
       column: 3
     end_location:
-      row: 23
+      row: 25
       column: 20
   parent: ~
 

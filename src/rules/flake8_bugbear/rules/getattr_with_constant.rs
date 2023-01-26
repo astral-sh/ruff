@@ -21,6 +21,10 @@ fn attribute(value: &Expr, attr: &str) -> Expr {
     )
 }
 
+fn is_mangled_private(id: &str) -> bool {
+    id.starts_with("__") && !id.ends_with("__")
+}
+
 /// B009
 pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let ExprKind::Name { id, .. } = &func.node else {
@@ -47,7 +51,10 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
 
     let mut diagnostic =
         Diagnostic::new(violations::GetAttrWithConstant, Range::from_located(expr));
-    if checker.patch(diagnostic.kind.rule()) {
+
+    // Don't autofix if name would be mangled by Python's "private variables"
+    // handling
+    if checker.patch(diagnostic.kind.rule()) && !is_mangled_private(value.as_str()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(&attribute(obj, value), checker.stylist),
             expr.location,
