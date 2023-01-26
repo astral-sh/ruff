@@ -1,10 +1,26 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct NoNewLineAtEndOfFile;
+);
+impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("No newline at end of file")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add trailing newline".to_string()
+    }
+}
 
 /// W292
 pub fn no_newline_at_end_of_file(
@@ -18,10 +34,8 @@ pub fn no_newline_at_end_of_file(
         if let Some(line) = contents.lines().last() {
             // Both locations are at the end of the file (and thus the same).
             let location = Location::new(contents.lines().count(), line.len());
-            let mut diagnostic = Diagnostic::new(
-                violations::NoNewLineAtEndOfFile,
-                Range::new(location, location),
-            );
+            let mut diagnostic =
+                Diagnostic::new(NoNewLineAtEndOfFile, Range::new(location, location));
             if autofix {
                 diagnostic.amend(Fix::insertion(stylist.line_ending().to_string(), location));
             }

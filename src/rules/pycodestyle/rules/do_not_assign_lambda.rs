@@ -1,3 +1,4 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Arguments, Location, Stmt, StmtKind};
 use rustpython_parser::ast::{Expr, ExprKind};
 
@@ -5,19 +6,33 @@ use crate::ast::helpers::{match_leading_content, match_trailing_content, unparse
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct DoNotAssignLambda(pub String);
+);
+impl AlwaysAutofixableViolation for DoNotAssignLambda {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Do not assign a `lambda` expression, use a `def`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DoNotAssignLambda(name) = self;
+        format!("Rewrite `{name}` as a `def`")
+    }
+}
 
 /// E731
 pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
     if let ExprKind::Name { id, .. } = &target.node {
         if let ExprKind::Lambda { args, body } = &value.node {
-            let mut diagnostic = Diagnostic::new(
-                violations::DoNotAssignLambda(id.to_string()),
-                Range::from_located(stmt),
-            );
+            let mut diagnostic =
+                Diagnostic::new(DoNotAssignLambda(id.to_string()), Range::from_located(stmt));
             if checker.patch(diagnostic.kind.rule()) {
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)

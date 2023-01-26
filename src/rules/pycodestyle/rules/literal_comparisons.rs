@@ -1,15 +1,86 @@
 use itertools::izip;
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
 use rustpython_ast::Constant;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+use serde::{Deserialize, Serialize};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::helpers::compare;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EqCmpop {
+    Eq,
+    NotEq,
+}
+
+impl From<&Cmpop> for EqCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Eq => EqCmpop::Eq,
+            Cmpop::NotEq => EqCmpop::NotEq,
+            _ => unreachable!("Expected Cmpop::Eq | Cmpop::NotEq"),
+        }
+    }
+}
+
+define_violation!(
+    pub struct NoneComparison(pub EqCmpop);
+);
+impl AlwaysAutofixableViolation for NoneComparison {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NoneComparison(op) = self;
+        match op {
+            EqCmpop::Eq => format!("Comparison to `None` should be `cond is None`"),
+            EqCmpop::NotEq => format!("Comparison to `None` should be `cond is not None`"),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let NoneComparison(op) = self;
+        match op {
+            EqCmpop::Eq => "Replace with `cond is None`".to_string(),
+            EqCmpop::NotEq => "Replace with `cond is not None`".to_string(),
+        }
+    }
+}
+
+define_violation!(
+    pub struct TrueFalseComparison(pub bool, pub EqCmpop);
+);
+impl AlwaysAutofixableViolation for TrueFalseComparison {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let TrueFalseComparison(value, op) = self;
+        match (value, op) {
+            (true, EqCmpop::Eq) => format!("Comparison to `True` should be `cond is True`"),
+            (true, EqCmpop::NotEq) => {
+                format!("Comparison to `True` should be `cond is not True`")
+            }
+            (false, EqCmpop::Eq) => format!("Comparison to `False` should be `cond is False`"),
+            (false, EqCmpop::NotEq) => {
+                format!("Comparison to `False` should be `cond is not False`")
+            }
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let TrueFalseComparison(value, op) = self;
+        match (value, op) {
+            (true, EqCmpop::Eq) => "Replace with `cond is True`".to_string(),
+            (true, EqCmpop::NotEq) => "Replace with `cond is not True`".to_string(),
+            (false, EqCmpop::Eq) => "Replace with `cond is False`".to_string(),
+            (false, EqCmpop::NotEq) => "Replace with `cond is not False`".to_string(),
+        }
+    }
+}
 
 /// E711, E712
 pub fn literal_comparisons(
@@ -43,20 +114,16 @@ pub fn literal_comparisons(
         )
     {
         if matches!(op, Cmpop::Eq) {
-            let diagnostic = Diagnostic::new(
-                violations::NoneComparison(op.into()),
-                Range::from_located(comparator),
-            );
+            let diagnostic =
+                Diagnostic::new(NoneComparison(op.into()), Range::from_located(comparator));
             if checker.patch(diagnostic.kind.rule()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::Is);
             }
             diagnostics.push(diagnostic);
         }
         if matches!(op, Cmpop::NotEq) {
-            let diagnostic = Diagnostic::new(
-                violations::NoneComparison(op.into()),
-                Range::from_located(comparator),
-            );
+            let diagnostic =
+                Diagnostic::new(NoneComparison(op.into()), Range::from_located(comparator));
             if checker.patch(diagnostic.kind.rule()) && !helpers::is_constant_non_singleton(next) {
                 bad_ops.insert(0, Cmpop::IsNot);
             }
@@ -72,7 +139,7 @@ pub fn literal_comparisons(
         {
             if matches!(op, Cmpop::Eq) {
                 let diagnostic = Diagnostic::new(
-                    violations::TrueFalseComparison(value, op.into()),
+                    TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
                 if checker.patch(diagnostic.kind.rule())
@@ -84,7 +151,7 @@ pub fn literal_comparisons(
             }
             if matches!(op, Cmpop::NotEq) {
                 let diagnostic = Diagnostic::new(
-                    violations::TrueFalseComparison(value, op.into()),
+                    TrueFalseComparison(value, op.into()),
                     Range::from_located(comparator),
                 );
                 if checker.patch(diagnostic.kind.rule())
@@ -109,10 +176,8 @@ pub fn literal_comparisons(
             )
         {
             if matches!(op, Cmpop::Eq) {
-                let diagnostic = Diagnostic::new(
-                    violations::NoneComparison(op.into()),
-                    Range::from_located(next),
-                );
+                let diagnostic =
+                    Diagnostic::new(NoneComparison(op.into()), Range::from_located(next));
                 if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
@@ -121,10 +186,8 @@ pub fn literal_comparisons(
                 diagnostics.push(diagnostic);
             }
             if matches!(op, Cmpop::NotEq) {
-                let diagnostic = Diagnostic::new(
-                    violations::NoneComparison(op.into()),
-                    Range::from_located(next),
-                );
+                let diagnostic =
+                    Diagnostic::new(NoneComparison(op.into()), Range::from_located(next));
                 if checker.patch(diagnostic.kind.rule())
                     && !helpers::is_constant_non_singleton(comparator)
                 {
@@ -142,7 +205,7 @@ pub fn literal_comparisons(
             {
                 if matches!(op, Cmpop::Eq) {
                     let diagnostic = Diagnostic::new(
-                        violations::TrueFalseComparison(value, op.into()),
+                        TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
                     if checker.patch(diagnostic.kind.rule())
@@ -154,7 +217,7 @@ pub fn literal_comparisons(
                 }
                 if matches!(op, Cmpop::NotEq) {
                     let diagnostic = Diagnostic::new(
-                        violations::TrueFalseComparison(value, op.into()),
+                        TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
                     if checker.patch(diagnostic.kind.rule())
