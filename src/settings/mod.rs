@@ -243,7 +243,7 @@ impl From<&Configuration> for RuleTable {
             ignore: config.unfixable.as_deref().unwrap_or_default(),
         }]);
 
-        for code in validate_enabled(resolve_codes(
+        for code in resolve_codes(
             [RuleCodeSpec {
                 select: config.select.as_deref().unwrap_or(defaults::PREFIXES),
                 ignore: config.ignore.as_deref().unwrap_or_default(),
@@ -256,7 +256,7 @@ impl From<&Configuration> for RuleTable {
                     .zip(config.extend_ignore.iter())
                     .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
             ),
-        )) {
+        ) {
             let fix = fixable.contains(&code);
             rules.enable(code, fix);
         }
@@ -270,6 +270,13 @@ impl From<&Configuration> for RuleTable {
         {
             for rule in convention.rules_to_be_ignored() {
                 rules.disable(rule);
+            }
+        }
+
+        // Validate that we didn't enable any incompatible rules.
+        for (a, b, message) in INCOMPATIBLE_CODES {
+            if rules.enabled(a) && rules.enabled(b) {
+                warn_user_once!("{}", message);
             }
         }
 
@@ -362,16 +369,6 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
     }
 
     rules
-}
-
-/// Warn if the set of enabled codes contains any incompatibilities.
-fn validate_enabled(enabled: FxHashSet<Rule>) -> FxHashSet<Rule> {
-    for (a, b, message) in INCOMPATIBLE_CODES {
-        if enabled.contains(a) && enabled.contains(b) {
-            warn_user_once!("{}", message);
-        }
-    }
-    enabled
 }
 
 #[cfg(test)]
