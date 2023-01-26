@@ -229,11 +229,13 @@ If left unspecified, the default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
-line-length = 88
-
 # Enable Pyflakes `E` and `F` codes by default.
 select = ["E", "F"]
 ignore = []
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["A", "B", "C", "D", "E", "F", "..."]
+unfixable = []
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -259,6 +261,9 @@ exclude = [
 ]
 per-file-ignores = {}
 
+# Same as Black.
+line-length = 88
+
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
@@ -270,20 +275,21 @@ target-version = "py310"
 max-complexity = 10
 ```
 
-As an example, the following would configure Ruff to: (1) avoid enforcing line-length violations
-(`E501`); (2) never remove unused imports (`F401`); and (3) ignore import-at-top-of-file violations
-(`E402`) in `__init__.py` files:
+As an example, the following would configure Ruff to: (1) enforce flake8-bugbear rules, in addition
+to the defaults; (2) avoid enforcing line-length violations (`E501`); (3) avoid attempting to fix
+flake8-bugbear (`B`) violations; and (3) ignore import-at-top-of-file violations (`E402`) in
+`__init__.py` files:
 
 ```toml
 [tool.ruff]
-# Enable Pyflakes and pycodestyle rules.
-select = ["E", "F"]
+# Enable flake8-bugbear (`B`) rules.
+select = ["E", "F", "B"]
 
 # Never enforce `E501` (line length violations).
 ignore = ["E501"]
 
-# Never try to fix `F401` (unused imports).
-unfixable = ["F401"]
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+unfixable = ["B"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 [tool.ruff.per-file-ignores]
@@ -308,10 +314,18 @@ prefix, followed by three digits (e.g., `F401`). The prefix indicates that "sour
 rules is determined by the `select` and `ignore` options, which support both the full code (e.g.,
 `F401`) and the prefix (e.g., `F`).
 
-As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some of the
-`pydocstyle` rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
-formats. Enabling `ALL` without further configuration may result in suboptimal behavior, especially
-for the `pydocstyle` plugin.
+As a special-case, Ruff also supports the `ALL` code, which enables all rules.
+
+If you're wondering how to configure Ruff, here are some **recommended guidelines**:
+
+- Prefer `select` and `ignore` over `extend-select` and `extend-ignore`, to make your rule set
+  explicit.
+- Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
+- Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
+  you might consider expanding to `select = ["E", "F", "B"]` to enable the popular `flake8-bugbear`
+  extension.
+- By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
+  consider turning off autofix for specific rules or categories (see: [FAQ](#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
 an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the
@@ -1767,7 +1781,6 @@ unfixable = ["B", "SIM", "TRY", "RUF"]
 ```
 
 If you find a case where Ruff's autofix breaks your code, please file an Issue!
-
 
 ## Contributing
 
