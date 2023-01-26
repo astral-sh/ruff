@@ -423,9 +423,9 @@ Options:
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help information
+          Print help
   -V, --version
-          Print version information
+          Print version
 ```
 <!-- End auto-generated cli help. -->
 
