@@ -290,10 +290,10 @@ impl Violation for DocLineTooLong {
 
 define_violation!(
     pub struct UnusedImport {
-        pub name: string,
+        pub name: String,
         pub ignore_init: bool ,
         pub multiple: bool,
-    };
+    }
 );
 fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
     let UnusedImport{name, ignore_init:_, multiple} = unused_import;
