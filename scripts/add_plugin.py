@@ -22,7 +22,7 @@ def main(*, plugin: str, url: str, prefix_code: str) -> None:
     )
 
     # Create the Plugin rules module.
-    plugin_dir = ROOT_DIR / "src/rules" / dir_name(plugin)
+    plugin_dir = ROOT_DIR / "crates/ruff/src/rules" / dir_name(plugin)
     plugin_dir.mkdir(exist_ok=True)
 
     with (plugin_dir / "mod.rs").open("w+") as fp:
@@ -69,13 +69,13 @@ mod tests {
     (plugin_dir / "snapshots").mkdir(exist_ok=True)
 
     # Add the plugin to `rules/mod.rs`.
-    with (ROOT_DIR / "src/rules/mod.rs").open("a") as fp:
+    with (ROOT_DIR / "crates/ruff/src/rules/mod.rs").open("a") as fp:
         fp.write(f"pub mod {dir_name(plugin)};")
 
     # Add the relevant sections to `src/registry.rs`.
-    content = (ROOT_DIR / "src/registry.rs").read_text()
+    content = (ROOT_DIR / "crates/ruff/src/registry.rs").read_text()
 
-    with (ROOT_DIR / "src/registry.rs").open("w") as fp:
+    with (ROOT_DIR / "crates/ruff/src/registry.rs").open("w") as fp:
         for line in content.splitlines():
             indent = get_indent(line)
 
