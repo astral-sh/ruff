@@ -676,6 +676,24 @@ pub fn match_trailing_content(stmt: &Stmt, locator: &Locator) -> bool {
     false
 }
 
+/// If a `Stmt` has a trailing comment, return the index of the hash.
+pub fn match_trailing_comment(stmt: &Stmt, locator: &Locator) -> Option<usize> {
+    let range = Range::new(
+        stmt.end_location.unwrap(),
+        Location::new(stmt.end_location.unwrap().row() + 1, 0),
+    );
+    let suffix = locator.slice_source_code_range(&range);
+    for (i, char) in suffix.chars().enumerate() {
+        if char == '#' {
+            return Some(i);
+        }
+        if !char.is_whitespace() {
+            return None;
+        }
+    }
+    None
+}
+
 /// Return the number of trailing empty lines following a statement.
 pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
     let suffix =

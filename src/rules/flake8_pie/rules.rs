@@ -4,12 +4,13 @@ use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
-use crate::ast::helpers::unparse_expr;
+use crate::ast::helpers::{match_trailing_comment, unparse_expr};
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
+use crate::message::Location;
 use crate::python::identifiers::is_identifier;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
@@ -112,19 +113,29 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut diagnostic =
                     Diagnostic::new(NoUnnecessaryPass, Range::from_located(pass_stmt));
                 if checker.patch(&Rule::NoUnnecessaryPass) {
-                    match delete_stmt(
-                        pass_stmt,
-                        None,
-                        &[],
-                        checker.locator,
-                        checker.indexer,
-                        checker.stylist,
-                    ) {
-                        Ok(fix) => {
-                            diagnostic.amend(fix);
-                        }
-                        Err(e) => {
-                            error!("Failed to delete `pass` statement: {}", e);
+                    if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
+                        diagnostic.amend(Fix::deletion(
+                            pass_stmt.location,
+                            Location::new(
+                                pass_stmt.end_location.unwrap().row(),
+                                pass_stmt.end_location.unwrap().column() + index,
+                            ),
+                        ));
+                    } else {
+                        match delete_stmt(
+                            pass_stmt,
+                            None,
+                            &[],
+                            checker.locator,
+                            checker.indexer,
+                            checker.stylist,
+                        ) {
+                            Ok(fix) => {
+                                diagnostic.amend(fix);
+                            }
+                            Err(e) => {
+                                error!("Failed to delete `pass` statement: {}", e);
+                            }
                         }
                     }
                 }
