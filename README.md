@@ -2377,7 +2377,7 @@ Enabled by default.
 
 ```toml
 [tool.ruff]
-respect_gitignore = false
+respect-gitignore = false
 ```
 
 ---
