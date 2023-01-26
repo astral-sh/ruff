@@ -191,9 +191,10 @@ pub fn old_code_blocks(
                 fix_py2_block(checker, stmt, orelse);
             }
         }
-        ExprKind::UnaryOp { op, .. } => {
+        ExprKind::UnaryOp { op, operand } => {
             // if not six.PY3
-            if check_path(checker, test, &["six", "PY3"]) && op == &Unaryop::Not {
+            if check_path(checker, operand, &["six", "PY3"]) && op == &Unaryop::Not {
+                println!("six.PY3");
                 fix_py2_block(checker, stmt, orelse);
             }
         }
