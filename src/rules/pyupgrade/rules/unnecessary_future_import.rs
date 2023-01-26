@@ -78,6 +78,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             &deleted,
             checker.locator,
             checker.indexer,
+            checker.stylist,
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {
