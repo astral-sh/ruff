@@ -207,15 +207,15 @@ mod tests {
 
     use super::*;
 
-    #[test_case(PythonVersion::Py36, vec![2], true, true; "compare-2.0")]
-    #[test_case(PythonVersion::Py36, vec![2, 0], true, true; "compare-2.0-whole")]
-    #[test_case(PythonVersion::Py36, vec![3], true, true; "compare-3.0")]
-    #[test_case(PythonVersion::Py36, vec![3, 0], true, true; "compare-3.0-whole")]
-    #[test_case(PythonVersion::Py36, vec![3, 1], true, true; "compare-3.1")]
-    #[test_case(PythonVersion::Py36, vec![3, 5], true, true; "compare-3.5")]
-    #[test_case(PythonVersion::Py36, vec![3, 6], true, true; "compare-3.6")]
-    #[test_case(PythonVersion::Py36, vec![3, 6], false, false; "compare-3.6-not-equal")]
-    #[test_case(PythonVersion::Py36, vec![3, 7], false , false; "compare-3.7")]
+    #[test_case(PythonVersion::Py37, vec![2], true, true; "compare-2.0")]
+    #[test_case(PythonVersion::Py37, vec![2, 0], true, true; "compare-2.0-whole")]
+    #[test_case(PythonVersion::Py37, vec![3], true, true; "compare-3.0")]
+    #[test_case(PythonVersion::Py37, vec![3, 0], true, true; "compare-3.0-whole")]
+    #[test_case(PythonVersion::Py37, vec![3, 1], true, true; "compare-3.1")]
+    #[test_case(PythonVersion::Py37, vec![3, 5], true, true; "compare-3.5")]
+    #[test_case(PythonVersion::Py37, vec![3, 7], true, true; "compare-3.7")]
+    #[test_case(PythonVersion::Py37, vec![3, 7], false, false; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::Py37, vec![3, 8], false , false; "compare-3.8")]
     #[test_case(PythonVersion::Py310, vec![3,9], true, true; "compare-3.9")]
     #[test_case(PythonVersion::Py310, vec![3, 11], true, false; "compare-3.11")]
     fn test_compare_version(
