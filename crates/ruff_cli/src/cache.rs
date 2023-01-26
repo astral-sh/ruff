@@ -65,7 +65,7 @@ pub fn init(path: &Path) -> Result<()> {
     }
 
     // Add the .gitignore.
-    let gitignore_path = path.join("../../../.gitignore");
+    let gitignore_path = path.join(".gitignore");
     if !gitignore_path.exists() {
         let mut file = fs::File::create(gitignore_path)?;
         file.write_all(b"*")?;
