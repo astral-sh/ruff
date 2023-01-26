@@ -34,10 +34,11 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pie, flake8_print,
-    flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
-    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format,
+    flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
+    pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
+    ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -2654,6 +2655,19 @@ where
                     || self.settings.rules.enabled(&Rule::PathlibPyPath)
                 {
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
+                }
+
+                // flake8-logging-format
+                if self.settings.rules.enabled(&Rule::LoggingStringFormat)
+                    || self.settings.rules.enabled(&Rule::LoggingPercentFormat)
+                    || self.settings.rules.enabled(&Rule::LoggingStringConcat)
+                    || self.settings.rules.enabled(&Rule::LoggingFString)
+                    || self.settings.rules.enabled(&Rule::LoggingWarn)
+                    || self.settings.rules.enabled(&Rule::LoggingExtraAttrClash)
+                    || self.settings.rules.enabled(&Rule::LoggingExcInfo)
+                    || self.settings.rules.enabled(&Rule::LoggingRedundantExcInfo)
+                {
+                    flake8_logging_format::rules::logging_call(self, func, args, keywords);
                 }
             }
             ExprKind::Dict { keys, values } => {

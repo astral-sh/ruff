@@ -1,7 +1,7 @@
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind};
 
-use crate::ast::helpers::collect_call_path;
+use crate::ast::helpers::is_logger_candidate;
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -21,28 +21,19 @@ impl Violation for ErrorInsteadOfException {
 }
 
 #[derive(Default)]
-/// Collect `logging.error`-like calls from an AST. Matches `logging.error`,
-/// `logger.error`, `self.logger.error`, etc., but not arbitrary `foo.error`
-/// calls.
-struct ErrorCallVisitor<'a> {
-    calls: Vec<&'a Expr>,
+/// Collect `logging`-like calls from an AST.
+struct LoggerCandidateVisitor<'a> {
+    calls: Vec<(&'a Expr, &'a Expr)>,
 }
 
-impl<'a, 'b> Visitor<'b> for ErrorCallVisitor<'a>
+impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a>
 where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let ExprKind::Call { func, .. } = &expr.node {
-            if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                if attr == "error" {
-                    let call_path = collect_call_path(value);
-                    if let Some(tail) = call_path.last() {
-                        if *tail == "logging" || tail.ends_with("logger") {
-                            self.calls.push(expr);
-                        }
-                    }
-                }
+            if is_logger_candidate(func) {
+                self.calls.push((expr, func));
             }
         }
         visitor::walk_expr(self, expr);
@@ -54,15 +45,19 @@ pub fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandl
     for handler in handlers {
         let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
         let calls = {
-            let mut visitor = ErrorCallVisitor::default();
+            let mut visitor = LoggerCandidateVisitor::default();
             visitor.visit_body(body);
             visitor.calls
         };
-        for expr in calls {
-            checker.diagnostics.push(Diagnostic::new(
-                ErrorInsteadOfException,
-                Range::from_located(expr),
-            ));
+        for (expr, func) in calls {
+            if let ExprKind::Attribute { attr, .. } = &func.node {
+                if attr == "error" {
+                    checker.diagnostics.push(Diagnostic::new(
+                        ErrorInsteadOfException,
+                        Range::from_located(expr),
+                    ));
+                }
+            }
         }
     }
 }

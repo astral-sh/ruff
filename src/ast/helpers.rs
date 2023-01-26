@@ -974,6 +974,21 @@ impl<'a> SimpleCallArgs<'a> {
     }
 }
 
+/// Return `true` if the given `Expr` is a potential logging call. Matches
+/// `logging.error`, `logger.error`, `self.logger.error`, etc., but not
+/// arbitrary `foo.error` calls.
+pub fn is_logger_candidate(func: &Expr) -> bool {
+    if let ExprKind::Attribute { value, .. } = &func.node {
+        let call_path = collect_call_path(value);
+        if let Some(tail) = call_path.last() {
+            if *tail == "logging" || tail.ends_with("logger") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;

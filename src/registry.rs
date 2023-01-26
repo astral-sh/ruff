@@ -469,6 +469,15 @@ ruff_macros::define_rule_mapping!(
     PTH122 => rules::flake8_use_pathlib::violations::PathlibSplitext,
     PTH123 => rules::flake8_use_pathlib::violations::PathlibOpen,
     PTH124 => rules::flake8_use_pathlib::violations::PathlibPyPath,
+    // flake8-logging-format
+    G001 => rules::flake8_logging_format::violations::LoggingStringFormat,
+    G002 => rules::flake8_logging_format::violations::LoggingPercentFormat,
+    G003 => rules::flake8_logging_format::violations::LoggingStringConcat,
+    G004 => rules::flake8_logging_format::violations::LoggingFString,
+    G010 => rules::flake8_logging_format::violations::LoggingWarn,
+    G101 => rules::flake8_logging_format::violations::LoggingExtraAttrClash,
+    G201 => rules::flake8_logging_format::violations::LoggingExcInfo,
+    G202 => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
     // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -595,6 +604,9 @@ pub enum Linter {
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
+    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/)
+    #[prefix = "G"]
+    Flake8LoggingFormat,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

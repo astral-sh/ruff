@@ -148,6 +148,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [tryceratops (TRY)](#tryceratops-try)
    1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
+   1. [flake8-logging-format (G)](#flake8-logging-format-g)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1257,6 +1258,21 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
 | PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
 
+### flake8-logging-format (G)
+
+For more, see [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| G001 | logging-string-format | Logging statement uses `string.format()` |  |
+| G002 | logging-percent-format | Logging statement uses `%` |  |
+| G003 | logging-string-concat | Logging statement uses `+` |  |
+| G004 | logging-f-string | Logging statement uses f-string |  |
+| G010 | logging-warn | Logging statement uses `warn` instead of `warning` | 🛠 |
+| G101 | logging-extra-attr-clash | Logging statement uses an extra field that clashes with a LogRecord field: `{key}` |  |
+| G201 | logging-exc-info | Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)` |  |
+| G202 | logging-redundant-exc-info | Logging statement has redundant `exc_info` |  |
+
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
@@ -1552,6 +1568,7 @@ natively, including:
 - [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
@@ -1561,6 +1578,8 @@ natively, including:
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
+- [`flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [`flake8-use-pathlib`](https://pypi.org/project/flake8-use-pathlib/)
 - [`isort`](https://pypi.org/project/isort/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pandas-vet`](https://pypi.org/project/pandas-vet/)
@@ -1622,6 +1641,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
@@ -1631,6 +1651,8 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
+- [`flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [`flake8-use-pathlib`](https://pypi.org/project/flake8-use-pathlib/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pandas-vet`](https://pypi.org/project/pandas-vet/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
