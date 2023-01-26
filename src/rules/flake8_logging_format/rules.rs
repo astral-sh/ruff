@@ -133,16 +133,17 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
             }
         }
         ExprKind::Call { func, keywords, .. } => {
-            if let ExprKind::Name { id, .. } = &func.node {
-                if id == "dict" {
-                    for keyword in keywords {
-                        if let Some(key) = &keyword.node.arg {
-                            if RESERVER_ATTRS.contains(&key.as_str()) {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    LoggingExtraAttrClash(key.to_string()),
-                                    Range::from_located(keyword),
-                                ));
-                            }
+            if checker
+                .resolve_call_path(func)
+                .map_or(false, |call_path| call_path.as_slice() == ["", "dict"])
+            {
+                for keyword in keywords {
+                    if let Some(key) = &keyword.node.arg {
+                        if RESERVER_ATTRS.contains(&key.as_str()) {
+                            checker.diagnostics.push(Diagnostic::new(
+                                LoggingExtraAttrClash(key.to_string()),
+                                Range::from_located(keyword),
+                            ));
                         }
                     }
                 }
