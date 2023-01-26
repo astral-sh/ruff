@@ -40,7 +40,7 @@ pub fn explicit_true_false_in_ifexpr(
                         id: "bool".to_string(),
                         ctx: ExprContext::Load,
                     })),
-                    args: vec![create_expr(test.node.clone())],
+                    args: vec![test.clone()],
                     keywords: vec![],
                 }),
                 checker.stylist,
