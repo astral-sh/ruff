@@ -1,7 +1,6 @@
 //! Generate a Markdown-compatible listing of configuration options.
 
 use anyhow::Result;
-use clap::Args;
 use itertools::Itertools;
 use ruff::settings::options::Options;
 use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionField};
@@ -11,8 +10,8 @@ use crate::utils::replace_readme_section;
 const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated options sections. -->";
 const END_PRAGMA: &str = "<!-- End auto-generated options sections. -->";
 
-#[derive(Args)]
-pub struct Cli {
+#[derive(clap::Args)]
+pub struct Args {
     /// Write the generated table to stdout (rather than to `README.md`).
     #[arg(long)]
     pub(crate) dry_run: bool,
@@ -39,7 +38,7 @@ fn emit_field(output: &mut String, field: &OptionField, group_name: Option<&str>
     output.push('\n');
 }
 
-pub fn main(cli: &Cli) -> Result<()> {
+pub fn main(args: &Args) -> Result<()> {
     let mut output = String::new();
 
     // Generate all the top-level fields.
@@ -89,7 +88,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         }
     }
 
-    if cli.dry_run {
+    if args.dry_run {
         print!("{output}");
     } else {
         replace_readme_section(&output, BEGIN_PRAGMA, END_PRAGMA)?;

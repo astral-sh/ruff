@@ -20,7 +20,7 @@ impl Violation for ShebangPython {
 /// EXE003
 pub fn shebang_python(lineno: usize, shebang: &ShebangDirective) -> Option<Diagnostic> {
     if let ShebangDirective::Match(_, start, end, content) = shebang {
-        if content.contains("python") {
+        if content.contains("python") || content.contains("pytest") {
             None
         } else {
             let diagnostic = Diagnostic::new(

@@ -89,9 +89,6 @@ pub struct Scope<'a> {
     pub uses_locals: bool,
     /// A map from bound name to binding index.
     pub values: FxHashMap<&'a str, usize>,
-    /// A list of (name, index) pairs for bindings that were overridden in the
-    /// scope.
-    pub overridden: Vec<(&'a str, usize)>,
 }
 
 impl<'a> Scope<'a> {
@@ -102,10 +99,26 @@ impl<'a> Scope<'a> {
             import_starred: false,
             uses_locals: false,
             values: FxHashMap::default(),
-            overridden: Vec::new(),
         }
     }
 }
+
+// Pyflakes defines the following binding hierarchy (via inheritance):
+//   Binding
+//    ExportBinding
+//    Annotation
+//    Argument
+//    Assignment
+//      NamedExprAssignment
+//    Definition
+//      FunctionDefinition
+//      ClassDefinition
+//      Builtin
+//      Importation
+//        SubmoduleImportation
+//        ImportationFrom
+//        StarImportation
+//        FutureImportation
 
 #[derive(Clone, Debug)]
 pub enum BindingKind<'a> {
@@ -127,10 +140,12 @@ pub enum BindingKind<'a> {
     SubmoduleImportation(&'a str, &'a str),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: Range,
+    /// The context in which the binding was created.
+    pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<RefEquality<'a, Stmt>>,
     /// Tuple of (scope index, range) indicating the scope and range at which
@@ -147,33 +162,16 @@ pub struct Binding<'a> {
 }
 
 #[derive(Copy, Clone)]
-pub enum UsageContext {
+pub enum ExecutionContext {
     Runtime,
     Typing,
 }
 
-// Pyflakes defines the following binding hierarchy (via inheritance):
-//   Binding
-//    ExportBinding
-//    Annotation
-//    Argument
-//    Assignment
-//      NamedExprAssignment
-//    Definition
-//      FunctionDefinition
-//      ClassDefinition
-//      Builtin
-//      Importation
-//        SubmoduleImportation
-//        ImportationFrom
-//        StarImportation
-//        FutureImportation
-
 impl<'a> Binding<'a> {
-    pub fn mark_used(&mut self, scope: usize, range: Range, context: UsageContext) {
+    pub fn mark_used(&mut self, scope: usize, range: Range, context: ExecutionContext) {
         match context {
-            UsageContext::Runtime => self.runtime_usage = Some((scope, range)),
-            UsageContext::Typing => self.typing_usage = Some((scope, range)),
+            ExecutionContext::Runtime => self.runtime_usage = Some((scope, range)),
+            ExecutionContext::Typing => self.typing_usage = Some((scope, range)),
         }
     }
 

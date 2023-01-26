@@ -16,11 +16,11 @@ use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle,
-    pydocstyle, pylint, pyupgrade,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
+    pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat, Version};
+use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once;
 
 pub mod configuration;
@@ -88,7 +88,6 @@ pub struct Settings {
     pub extend_exclude: HashableGlobSet,
     pub force_exclude: bool,
     pub respect_gitignore: bool,
-    pub required_version: Option<Version>,
 
     // Rule-specific settings
     pub allowed_confusables: HashableHashSet<char>,
@@ -112,6 +111,7 @@ pub struct Settings {
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::Settings,
+    pub flake8_type_checking: flake8_type_checking::settings::Settings,
     pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
@@ -124,6 +124,16 @@ pub struct Settings {
 
 impl Settings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
+        if let Some(required_version) = &config.required_version {
+            if &**required_version != CARGO_PKG_VERSION {
+                return Err(anyhow!(
+                    "Required version `{}` does not match the running version `{}`",
+                    &**required_version,
+                    CARGO_PKG_VERSION
+                ));
+            }
+        }
+
         Ok(Self {
             rules: (&config).into(),
             allowed_confusables: config
@@ -151,7 +161,6 @@ impl Settings {
                 config.per_file_ignores.unwrap_or_default(),
             )?,
             respect_gitignore: config.respect_gitignore.unwrap_or(true),
-            required_version: config.required_version,
             show_source: config.show_source.unwrap_or_default(),
             src: config
                 .src
@@ -190,6 +199,10 @@ impl Settings {
                 .flake8_tidy_imports
                 .map(Into::into)
                 .unwrap_or_default(),
+            flake8_type_checking: config
+                .flake8_type_checking
+                .map(Into::into)
+                .unwrap_or_default(),
             flake8_unused_arguments: config
                 .flake8_unused_arguments
                 .map(Into::into)
@@ -218,19 +231,6 @@ impl Settings {
             rules: rules.into(),
             ..Settings::default()
         }
-    }
-
-    pub fn validate(&self) -> Result<()> {
-        if let Some(required_version) = &self.required_version {
-            if &**required_version != CARGO_PKG_VERSION {
-                return Err(anyhow!(
-                    "Required version `{}` does not match the running version `{}`",
-                    &**required_version,
-                    CARGO_PKG_VERSION
-                ));
-            }
-        }
-        Ok(())
     }
 }
 

@@ -67,7 +67,9 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Home Assistant](https://github.com/home-assistant/core)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+- [build (PyPA)](https://github.com/pypa/build)
 - [Babel](https://github.com/python-babel/babel)
+- [featuretools](https://github.com/alteryx/featuretools)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -113,9 +115,9 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [pycodestyle (E, W)](#pycodestyle-e-w)
    1. [mccabe (C90)](#mccabe-c90)
    1. [isort (I)](#isort-i)
+   1. [pep8-naming (N)](#pep8-naming-n)
    1. [pydocstyle (D)](#pydocstyle-d)
    1. [pyupgrade (UP)](#pyupgrade-up)
-   1. [pep8-naming (N)](#pep8-naming-n)
    1. [flake8-2020 (YTT)](#flake8-2020-ytt)
    1. [flake8-annotations (ANN)](#flake8-annotations-ann)
    1. [flake8-bandit (S)](#flake8-bandit-s)
@@ -123,30 +125,31 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap-fbt)
    1. [flake8-bugbear (B)](#flake8-bugbear-b)
    1. [flake8-builtins (A)](#flake8-builtins-a)
+   1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-comprehensions (C4)](#flake8-comprehensions-c4)
+   1. [flake8-datetimez (DTZ)](#flake8-datetimez-dtz)
    1. [flake8-debugger (T10)](#flake8-debugger-t10)
    1. [flake8-errmsg (EM)](#flake8-errmsg-em)
+   1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [flake8-implicit-str-concat (ISC)](#flake8-implicit-str-concat-isc)
    1. [flake8-import-conventions (ICN)](#flake8-import-conventions-icn)
+   1. [flake8-logging-format (G)](#flake8-logging-format-g)
+   1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
+   1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-print (T20)](#flake8-print-t20)
    1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
    1. [flake8-simplify (SIM)](#flake8-simplify-sim)
    1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
+   1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
-   1. [flake8-datetimez (DTZ)](#flake8-datetimez-dtz)
+   1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [eradicate (ERA)](#eradicate-era)
    1. [pandas-vet (PD)](#pandas-vet-pd)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PL)](#pylint-pl)
-   1. [flake8-pie (PIE)](#flake8-pie-pie)
-   1. [flake8-commas (COM)](#flake8-commas-com)
-   1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
-   1. [flake8-executable (EXE)](#flake8-executable-exe)
-   1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [tryceratops (TRY)](#tryceratops-try)
-   1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -227,11 +230,13 @@ If left unspecified, the default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
-line-length = 88
-
 # Enable Pyflakes `E` and `F` codes by default.
 select = ["E", "F"]
 ignore = []
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["A", "B", "C", "D", "E", "F", "..."]
+unfixable = []
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -257,6 +262,9 @@ exclude = [
 ]
 per-file-ignores = {}
 
+# Same as Black.
+line-length = 88
+
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
@@ -268,20 +276,21 @@ target-version = "py310"
 max-complexity = 10
 ```
 
-As an example, the following would configure Ruff to: (1) avoid enforcing line-length violations
-(`E501`); (2) never remove unused imports (`F401`); and (3) ignore import-at-top-of-file violations
-(`E402`) in `__init__.py` files:
+As an example, the following would configure Ruff to: (1) enforce flake8-bugbear rules, in addition
+to the defaults; (2) avoid enforcing line-length violations (`E501`); (3) avoid attempting to fix
+flake8-bugbear (`B`) violations; and (3) ignore import-at-top-of-file violations (`E402`) in
+`__init__.py` files:
 
 ```toml
 [tool.ruff]
-# Enable Pyflakes and pycodestyle rules.
-select = ["E", "F"]
+# Enable flake8-bugbear (`B`) rules.
+select = ["E", "F", "B"]
 
 # Never enforce `E501` (line length violations).
 ignore = ["E501"]
 
-# Never try to fix `F401` (unused imports).
-unfixable = ["F401"]
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+unfixable = ["B"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 [tool.ruff.per-file-ignores]
@@ -306,10 +315,18 @@ prefix, followed by three digits (e.g., `F401`). The prefix indicates that "sour
 rules is determined by the `select` and `ignore` options, which support both the full code (e.g.,
 `F401`) and the prefix (e.g., `F`).
 
-As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some of the
-`pydocstyle` rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
-formats. Enabling `ALL` without further configuration may result in suboptimal behavior, especially
-for the `pydocstyle` plugin.
+As a special-case, Ruff also supports the `ALL` code, which enables all rules.
+
+If you're wondering how to configure Ruff, here are some **recommended guidelines**:
+
+- Prefer `select` and `ignore` over `extend-select` and `extend-ignore`, to make your rule set
+  explicit.
+- Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
+- Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
+  you might consider expanding to `select = ["E", "F", "B"]` to enable the popular `flake8-bugbear`
+  extension.
+- By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
+  consider turning off autofix for specific rules or categories (see: [FAQ](#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
 an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the
@@ -352,80 +369,71 @@ Arguments:
   [FILES]...
 
 Options:
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-  -v, --verbose
-          Enable verbose logging
-  -q, --quiet
-          Print lint violations, but nothing else
-  -s, --silent
-          Disable all logging (but still exit with status code "1" upon detecting lint violations)
-  -e, --exit-zero
-          Exit with status code "0", even upon detecting lint violations
-  -w, --watch
-          Run in watch mode by re-running whenever files change
-      --fix
-          Attempt to automatically fix lint violations
-      --fix-only
-          Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
-      --diff
-          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
-  -n, --no-cache
-          Disable cache reads
-      --isolated
-          Ignore all configuration files
+      --fix              Attempt to automatically fix lint violations
+      --show-source      Show violations with source code
+      --diff             Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
+  -w, --watch            Run in watch mode by re-running whenever files change
+      --fix-only         Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
+      --format <FORMAT>  Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
+      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --add-noqa         Enable automatic additions of `noqa` directives to failing lines
+      --show-files       See the files Ruff will be run against with the current settings
+      --show-settings    See the settings Ruff will use to lint a given Python file
+  -h, --help             Print help
+  -V, --version          Print version
+
+Rule selection:
       --select <RULE_CODE>
           Comma-separated list of rule codes to enable (or ALL, to enable all rules)
-      --extend-select <RULE_CODE>
-          Like --select, but adds additional rule codes on top of the selected ones
       --ignore <RULE_CODE>
           Comma-separated list of rule codes to disable
+      --extend-select <RULE_CODE>
+          Like --select, but adds additional rule codes on top of the selected ones
       --extend-ignore <RULE_CODE>
           Like --ignore, but adds additional rule codes on top of the ignored ones
-      --exclude <FILE_PATTERN>
-          List of paths, used to omit files and/or directories from analysis
-      --extend-exclude <FILE_PATTERN>
-          Like --exclude, but adds additional files and directories on top of those already excluded
+      --per-file-ignores <PER_FILE_IGNORES>
+          List of mappings from file pattern to code to exclude
       --fixable <RULE_CODE>
           List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --unfixable <RULE_CODE>
           List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
-      --per-file-ignores <PER_FILE_IGNORES>
-          List of mappings from file pattern to code to exclude
-      --format <FORMAT>
-          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
-      --stdin-filename <STDIN_FILENAME>
-          The name of the file when passing it through stdin
-      --cache-dir <CACHE_DIR>
-          Path to the cache directory [env: RUFF_CACHE_DIR=]
-      --show-source
-          Show violations with source code
-      --respect-gitignore
-          Respect file exclusions via `.gitignore` and other standard ignore files
-      --force-exclude
-          Enforce exclusions, even for paths passed to Ruff directly on the command-line
-      --update-check
-          Enable or disable automatic update checks
-      --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
-          Regular expression matching the name of dummy variables
+
+File selection:
+      --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis
+      --extend-exclude <FILE_PATTERN>  Like --exclude, but adds additional files and directories on top of those already excluded
+      --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files
+      --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line
+
+Rule configuration:
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported
       --line-length <LINE_LENGTH>
           Set the line-length for length-associated rules and automatic formatting
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
-      --clean
-          Clear any caches in the current directory or any subdirectories
-      --explain <EXPLAIN>
-          Explain a rule
-      --show-files
-          See the files Ruff will be run against with the current settings
-      --show-settings
-          See the settings Ruff will use to lint a given Python file
-  -h, --help
-          Print help information
-  -V, --version
-          Print version information
+      --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
+          Regular expression matching the name of dummy variables
+
+Miscellaneous:
+  -n, --no-cache
+          Disable cache reads
+      --isolated
+          Ignore all configuration files
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory [env: RUFF_CACHE_DIR=]
+      --stdin-filename <STDIN_FILENAME>
+          The name of the file when passing it through stdin
+  -e, --exit-zero
+          Exit with status code "0", even upon detecting lint violations
+      --update-check
+          Enable or disable automatic update checks
+
+Subcommands:
+      --explain <EXPLAIN>  Explain a rule
+      --clean              Clear any caches in the current directory or any subdirectories
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print lint violations, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
 ```
 <!-- End auto-generated cli help. -->
 
@@ -548,7 +556,9 @@ add `noqa` directives to all failing lines, with the appropriate rule codes.
 
 Regardless of the rule's origin, Ruff re-implements every rule in Rust as a first-party feature.
 
-By default, Ruff enables all `E` and `F` rule codes, which correspond to those built-in to Flake8.
+By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules from the `F` category,
+and a [subset](#error-e) of the `E` category, omitting those stylistic rules made obsolete by the
+use of an autoformatter, like [Black](https://github.com/psf/black).
 
 The 🛠 emoji indicates that a rule is automatically fixable by the `--fix` command-line option.
 
@@ -652,6 +662,28 @@ For more, see [isort](https://pypi.org/project/isort/) on PyPI.
 | I001 | unsorted-imports | Import block is un-sorted or un-formatted | 🛠 |
 | I002 | missing-required-import | Missing required import: `{name}` | 🛠 |
 
+### pep8-naming (N)
+
+For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| N801 | invalid-class-name | Class name `{name}` should use CapWords convention  |  |
+| N802 | invalid-function-name | Function name `{name}` should be lowercase |  |
+| N803 | invalid-argument-name | Argument name `{name}` should be lowercase |  |
+| N804 | invalid-first-argument-name-for-class-method | First argument of a class method should be named `cls` |  |
+| N805 | invalid-first-argument-name-for-method | First argument of a method should be named `self` |  |
+| N806 | non-lowercase-variable-in-function | Variable `{name}` in function should be lowercase |  |
+| N807 | dunder-function-name | Function name should not start and end with `__` |  |
+| N811 | constant-imported-as-non-constant | Constant `{name}` imported as non-constant `{asname}` |  |
+| N812 | lowercase-imported-as-non-lowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
+| N813 | camelcase-imported-as-lowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
+| N814 | camelcase-imported-as-constant | Camelcase `{name}` imported as constant `{asname}` |  |
+| N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
+| N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
+| N817 | camelcase-imported-as-acronym | Camelcase `{name}` imported as acronym `{asname}` |  |
+| N818 | error-suffix-on-exception-name | Exception name `{name}` should be named with an Error suffix |  |
+
 ### pydocstyle (D)
 
 For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
@@ -744,28 +776,6 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP032 | f-string | Use f-string instead of `format` call | 🛠 |
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
-
-### pep8-naming (N)
-
-For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| N801 | invalid-class-name | Class name `{name}` should use CapWords convention  |  |
-| N802 | invalid-function-name | Function name `{name}` should be lowercase |  |
-| N803 | invalid-argument-name | Argument name `{name}` should be lowercase |  |
-| N804 | invalid-first-argument-name-for-class-method | First argument of a class method should be named `cls` |  |
-| N805 | invalid-first-argument-name-for-method | First argument of a method should be named `self` |  |
-| N806 | non-lowercase-variable-in-function | Variable `{name}` in function should be lowercase |  |
-| N807 | dunder-function-name | Function name should not start and end with `__` |  |
-| N811 | constant-imported-as-non-constant | Constant `{name}` imported as non-constant `{asname}` |  |
-| N812 | lowercase-imported-as-non-lowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
-| N813 | camelcase-imported-as-lowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
-| N814 | camelcase-imported-as-constant | Camelcase `{name}` imported as constant `{asname}` |  |
-| N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
-| N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
-| N817 | camelcase-imported-as-acronym | Camelcase `{name}` imported as acronym `{asname}` |  |
-| N818 | error-suffix-on-exception-name | Exception name `{name}` should be named with an Error suffix |  |
 
 ### flake8-2020 (YTT)
 
@@ -888,6 +898,16 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/) on Py
 | A002 | builtin-argument-shadowing | Argument `{name}` is shadowing a python builtin |  |
 | A003 | builtin-attribute-shadowing | Class attribute `{name}` is shadowing a python builtin |  |
 
+### flake8-commas (COM)
+
+For more, see [flake8-commas](https://pypi.org/project/flake8-commas/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| COM812 | trailing-comma-missing | Trailing comma missing | 🛠 |
+| COM818 | trailing-comma-on-bare-tuple-prohibited | Trailing comma on bare tuple prohibited |  |
+| COM819 | trailing-comma-prohibited | Trailing comma prohibited | 🛠 |
+
 ### flake8-comprehensions (C4)
 
 For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/) on PyPI.
@@ -911,6 +931,22 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C416 | unnecessary-comprehension | Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`) | 🛠 |
 | C417 | unnecessary-map | Unnecessary `map` usage (rewrite using a generator expression) |  |
 
+### flake8-datetimez (DTZ)
+
+For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| DTZ001 | call-datetime-without-tzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
+| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed |  |
+| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
+| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
+| DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
+| DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
+| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
+| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
+| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+
 ### flake8-debugger (T10)
 
 For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/) on PyPI.
@@ -929,6 +965,18 @@ For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/) on PyPI.
 | EM102 | f-string-in-exception | Exception must not use an f-string literal, assign to variable first |  |
 | EM103 | dot-format-in-exception | Exception must not use a `.format()` string directly, assign to variable first |  |
 
+### flake8-executable (EXE)
+
+For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
+| EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
+| EXE003 | shebang-python | Shebang should contain "python" |  |
+| EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
+| EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
+
 ### flake8-implicit-str-concat (ISC)
 
 For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/) on PyPI.
@@ -946,6 +994,42 @@ For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | ICN001 | import-alias-is-not-conventional | `{name}` should be imported as `{asname}` |  |
+
+### flake8-logging-format (G)
+
+For more, see [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| G001 | logging-string-format | Logging statement uses `string.format()` |  |
+| G002 | logging-percent-format | Logging statement uses `%` |  |
+| G003 | logging-string-concat | Logging statement uses `+` |  |
+| G004 | logging-f-string | Logging statement uses f-string |  |
+| G010 | logging-warn | Logging statement uses `warn` instead of `warning` | 🛠 |
+| G101 | logging-extra-attr-clash | Logging statement uses an extra field that clashes with a LogRecord field: `{key}` |  |
+| G201 | logging-exc-info | Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)` |  |
+| G202 | logging-redundant-exc-info | Logging statement has redundant `exc_info` |  |
+
+### flake8-no-pep420 (INP)
+
+For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+
+### flake8-pie (PIE)
+
+For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
+| PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
+| PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
+| PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
+| PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
+| PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
 
 ### flake8-print (T20)
 
@@ -1055,6 +1139,18 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 | TID251 | banned-api | `{name}` is banned: {message} |  |
 | TID252 | relative-imports | Relative imports from parent modules are banned |  |
 
+### flake8-type-checking (TCH)
+
+For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| TCH001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
+| TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
+| TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
+| TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
+| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
+
 ### flake8-unused-arguments (ARG)
 
 For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/) on PyPI.
@@ -1067,21 +1163,37 @@ For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-a
 | ARG004 | unused-static-method-argument | Unused static method argument: `{name}` |  |
 | ARG005 | unused-lambda-argument | Unused lambda argument: `{name}` |  |
 
-### flake8-datetimez (DTZ)
+### flake8-use-pathlib (PTH)
 
-For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/) on PyPI.
+For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| DTZ001 | call-datetime-without-tzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
-| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed |  |
-| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
-| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
-| DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
-| DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
-| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
-| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
-| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+| PTH100 | pathlib-abspath | `os.path.abspath` should be replaced by `.resolve()` |  |
+| PTH101 | pathlib-chmod | `os.chmod` should be replaced by `.chmod()` |  |
+| PTH102 | pathlib-mkdir | `os.mkdir` should be replaced by `.mkdir()` |  |
+| PTH103 | pathlib-makedirs | `os.makedirs` should be replaced by `.mkdir(parents=True)` |  |
+| PTH104 | pathlib-rename | `os.rename` should be replaced by `.rename()` |  |
+| PTH105 | pathlib-replace | `os.replace`should be replaced by `.replace()` |  |
+| PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
+| PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
+| PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
+| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
+| PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
+| PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
+| PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
+| PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
+| PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
+| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
+| PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
+| PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
+| PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
+| PTH119 | pathlib-basename | `os.path.basename` should be replaced by `.name` |  |
+| PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
+| PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
+| PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
+| PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
+| PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
 
 ### eradicate (ERA)
 
@@ -1154,104 +1266,20 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLW0120 | useless-else-on-loop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 | PLW0602 | global-variable-not-assigned | Using global for `{name}` but no assignment is done |  |
 
-### flake8-pie (PIE)
-
-For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
-| PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
-| PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
-| PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
-| PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
-| PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
-
-### flake8-commas (COM)
-
-For more, see [flake8-commas](https://pypi.org/project/flake8-commas/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| COM812 | trailing-comma-missing | Trailing comma missing | 🛠 |
-| COM818 | trailing-comma-on-bare-tuple-prohibited | Trailing comma on bare tuple prohibited |  |
-| COM819 | trailing-comma-prohibited | Trailing comma prohibited | 🛠 |
-
-### flake8-no-pep420 (INP)
-
-For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
-
-### flake8-executable (EXE)
-
-For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
-| EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
-| EXE003 | shebang-python | Shebang should contain "python" |  |
-| EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
-| EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
-
-### flake8-type-checking (TCH)
-
-For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| TCH001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
-| TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
-| TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
-| TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
-| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
-
 ### tryceratops (TRY)
 
 For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| TRY002 | raise-vanilla-class | Create your own exception |  |
+| TRY003 | raise-vanilla-args | Avoid specifying long messages outside the exception class |  |
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
 | TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
 | TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
-| TRY300 | try-consider-else | Consider `else` block |  |
+| TRY300 | try-consider-else | Consider moving this statement to an `else` block |  |
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
-
-### flake8-use-pathlib (PTH)
-
-For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| PTH100 | pathlib-abspath | `os.path.abspath` should be replaced by `.resolve()` |  |
-| PTH101 | pathlib-chmod | `os.chmod` should be replaced by `.chmod()` |  |
-| PTH102 | pathlib-mkdir | `os.mkdir` should be replaced by `.mkdir()` |  |
-| PTH103 | pathlib-makedirs | `os.makedirs` should be replaced by `.mkdir(parents=True)` |  |
-| PTH104 | pathlib-rename | `os.rename` should be replaced by `.rename()` |  |
-| PTH105 | pathlib-replace | `os.replace`should be replaced by `.replace()` |  |
-| PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
-| PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
-| PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
-| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
-| PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
-| PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
-| PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
-| PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
-| PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
-| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
-| PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
-| PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
-| PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
-| PTH119 | pathlib-basename | `os.path.basename` should be replaced by `.name` |  |
-| PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
-| PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
-| PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
-| PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
-| PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
+| TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
 
 ### Ruff-specific rules (RUF)
 
@@ -1524,7 +1552,9 @@ automatically convert your existing configuration.)
 Ruff can be used as a drop-in replacement for Flake8 when used (1) without or with a small number of
 plugins, (2) alongside Black, and (3) on Python 3 code.
 
-Under those conditions, Ruff implements every rule in Flake8.
+Under those conditions, Ruff implements every rule in Flake8. In practice, that means Ruff
+implements all of the `F` rules (which originate from Pyflakes), along with a subset of the `E` and
+`W` rules (which originate from pycodestyle).
 
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:
@@ -1548,6 +1578,7 @@ natively, including:
 - [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
@@ -1557,6 +1588,8 @@ natively, including:
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
+- [`flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [`flake8-use-pathlib`](https://pypi.org/project/flake8-use-pathlib/)
 - [`isort`](https://pypi.org/project/isort/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pandas-vet`](https://pypi.org/project/pandas-vet/)
@@ -1618,6 +1651,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [`flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
 - [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
@@ -1627,6 +1661,8 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
+- [`flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [`flake8-use-pathlib`](https://pypi.org/project/flake8-use-pathlib/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pandas-vet`](https://pypi.org/project/pandas-vet/)
 - [`pep8-naming`](https://pypi.org/project/pep8-naming/)
@@ -1750,7 +1786,6 @@ unfixable = ["B", "SIM", "TRY", "RUF"]
 ```
 
 If you find a case where Ruff's autofix breaks your code, please file an Issue!
-
 
 ## Contributing
 
@@ -2374,7 +2409,7 @@ Enabled by default.
 
 ```toml
 [tool.ruff]
-respect_gitignore = false
+respect-gitignore = false
 ```
 
 ---
@@ -2439,7 +2474,7 @@ my_package/
       bar.py
 ```
 
-The `src` directory should be included in `source` (e.g., `source =
+The `src` directory should be included in the `src` option (e.g., `src =
 ["src"]`), such that when resolving imports, `my_package.foo` is
 considered a first-party import.
 
@@ -3072,6 +3107,45 @@ and can be circumvented via `eval` or `importlib`.
 [tool.ruff.flake8-tidy-imports.banned-api]
 "cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
 "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+```
+
+---
+
+### `flake8-type-checking`
+
+#### [`exempt-modules`](#exempt-modules)
+
+Exempt certain modules from needing to be moved into type-checking
+blocks.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-type-checking]
+exempt-modules = ["typing_extensions"]
+```
+
+---
+
+#### [`strict`](#strict)
+
+Enforce TC001, TC002, and TC003 rules even when valid runtime imports
+are present for the same module.
+See: https://github.com/snok/flake8-type-checking#strict.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-type-checking]
+strict = true
 ```
 
 ---

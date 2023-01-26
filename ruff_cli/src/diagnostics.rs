@@ -42,9 +42,6 @@ pub fn lint_path(
     cache: flags::Cache,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
-    // Validate the `Settings` and return any errors.
-    settings.lib.validate()?;
-
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
     // side-effects that aren't captured in the cache. (In practice, it's fine
@@ -116,9 +113,6 @@ pub fn lint_stdin(
     settings: &Settings,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
-    // Validate the `Settings` and return any errors.
-    settings.validate()?;
-
     // Lint the inputs.
     let (messages, fixed) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
         let (transformed, fixed, messages) = lint_fix(

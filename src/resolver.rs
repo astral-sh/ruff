@@ -16,13 +16,6 @@ use crate::settings::configuration::Configuration;
 use crate::settings::pyproject::settings_toml;
 use crate::settings::{pyproject, AllSettings, Settings};
 
-/// The strategy used to discover Python files in the filesystem..
-#[derive(Debug)]
-pub struct FileDiscovery {
-    pub force_exclude: bool,
-    pub respect_gitignore: bool,
-}
-
 /// The strategy used to discover the relevant `pyproject.toml` file for each
 /// Python file.
 #[derive(Debug)]
@@ -33,6 +26,15 @@ pub enum PyprojectDiscovery {
     /// Use the closest `pyproject.toml` file in the filesystem hierarchy, or
     /// the default settings.
     Hierarchical(AllSettings),
+}
+
+impl PyprojectDiscovery {
+    fn top_level_settings(&self) -> &AllSettings {
+        match self {
+            PyprojectDiscovery::Fixed(settings) => settings,
+            PyprojectDiscovery::Hierarchical(settings) => settings,
+        }
+    }
 }
 
 /// The strategy for resolving file paths in a `pyproject.toml`.
@@ -97,26 +99,6 @@ impl Resolver {
     /// Return an iterator over the resolved `Settings` in this `Resolver`.
     pub fn iter(&self) -> impl Iterator<Item = &AllSettings> {
         self.settings.values()
-    }
-
-    /// Validate all resolved `Settings` in this `Resolver`.
-    pub fn validate(&self, strategy: &PyprojectDiscovery) -> Result<()> {
-        // TODO(charlie): This risks false positives (but not false negatives), since
-        // some of the `Settings` in the path may ultimately be unused (or, e.g., they
-        // could have their `required_version` overridden by other `Settings` in
-        // the path). It'd be preferable to validate once we've determined the
-        // `Settings` for each path, but that's more expensive.
-        match &strategy {
-            PyprojectDiscovery::Fixed(settings) => {
-                settings.lib.validate()?;
-            }
-            PyprojectDiscovery::Hierarchical(default) => {
-                for settings in std::iter::once(default).chain(self.iter()) {
-                    settings.lib.validate()?;
-                }
-            }
-        }
-        Ok(())
     }
 }
 
@@ -232,7 +214,6 @@ pub fn is_python_entry(entry: &DirEntry) -> bool {
 pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
     processor: impl ConfigProcessor,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
@@ -256,7 +237,7 @@ pub fn python_files_in_path(
     }
 
     // Check if the paths themselves are excluded.
-    if file_strategy.force_exclude {
+    if pyproject_strategy.top_level_settings().lib.force_exclude {
         paths.retain(|path| !is_file_excluded(path, &resolver, pyproject_strategy));
         if paths.is_empty() {
             return Ok((vec![], resolver));
@@ -272,7 +253,12 @@ pub fn python_files_in_path(
     for path in &paths[1..] {
         builder.add(path);
     }
-    builder.standard_filters(file_strategy.respect_gitignore);
+    builder.standard_filters(
+        pyproject_strategy
+            .top_level_settings()
+            .lib
+            .respect_gitignore,
+    );
     builder.hidden(false);
     let walker = builder.build_parallel();
 
@@ -369,10 +355,9 @@ pub fn python_files_in_path(
 pub fn python_file_at_path(
     path: &Path,
     pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
     processor: impl ConfigProcessor,
 ) -> Result<bool> {
-    if !file_strategy.force_exclude {
+    if !pyproject_strategy.top_level_settings().lib.force_exclude {
         return Ok(true);
     }
 

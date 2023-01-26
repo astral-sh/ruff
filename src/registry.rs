@@ -13,26 +13,26 @@ use crate::{rules, violations};
 
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
-    E101 => violations::MixedSpacesAndTabs,
+    E101 => rules::pycodestyle::rules::MixedSpacesAndTabs,
     E401 => violations::MultipleImportsOnOneLine,
     E402 => violations::ModuleImportNotAtTopOfFile,
-    E501 => violations::LineTooLong,
-    E711 => violations::NoneComparison,
-    E712 => violations::TrueFalseComparison,
-    E713 => violations::NotInTest,
-    E714 => violations::NotIsTest,
-    E721 => violations::TypeComparison,
-    E722 => violations::DoNotUseBareExcept,
-    E731 => violations::DoNotAssignLambda,
-    E741 => violations::AmbiguousVariableName,
-    E742 => violations::AmbiguousClassName,
-    E743 => violations::AmbiguousFunctionName,
+    E501 => rules::pycodestyle::rules::LineTooLong,
+    E711 => rules::pycodestyle::rules::NoneComparison,
+    E712 => rules::pycodestyle::rules::TrueFalseComparison,
+    E713 => rules::pycodestyle::rules::NotInTest,
+    E714 => rules::pycodestyle::rules::NotIsTest,
+    E721 => rules::pycodestyle::rules::TypeComparison,
+    E722 => rules::pycodestyle::rules::DoNotUseBareExcept,
+    E731 => rules::pycodestyle::rules::DoNotAssignLambda,
+    E741 => rules::pycodestyle::rules::AmbiguousVariableName,
+    E742 => rules::pycodestyle::rules::AmbiguousClassName,
+    E743 => rules::pycodestyle::rules::AmbiguousFunctionName,
     E902 => violations::IOError,
     E999 => violations::SyntaxError,
     // pycodestyle warnings
-    W292 => violations::NoNewLineAtEndOfFile,
-    W505 => violations::DocLineTooLong,
-    W605 => violations::InvalidEscapeSequence,
+    W292 => rules::pycodestyle::rules::NoNewLineAtEndOfFile,
+    W505 => rules::pycodestyle::rules::DocLineTooLong,
+    W605 => rules::pycodestyle::rules::InvalidEscapeSequence,
     // pyflakes
     F401 => violations::UnusedImport,
     F402 => violations::ImportShadowedByLoopVar,
@@ -319,10 +319,10 @@ ruff_macros::define_rule_mapping!(
     N817 => violations::CamelcaseImportedAsAcronym,
     N818 => violations::ErrorSuffixOnExceptionName,
     // isort
-    I001 => violations::UnsortedImports,
-    I002 => violations::MissingRequiredImport,
+    I001 => rules::isort::rules::UnsortedImports,
+    I002 => rules::isort::rules::MissingRequiredImport,
     // eradicate
-    ERA001 => violations::CommentedOutCode,
+    ERA001 => rules::eradicate::rules::CommentedOutCode,
     // flake8-bandit
     S101 => violations::AssertUsed,
     S102 => violations::ExecUsed,
@@ -341,9 +341,9 @@ ruff_macros::define_rule_mapping!(
     S612 => rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     S701 => violations::Jinja2AutoescapeFalse,
     // flake8-boolean-trap
-    FBT001 => violations::BooleanPositionalArgInFunctionDefinition,
-    FBT002 => violations::BooleanDefaultValueInFunctionDefinition,
-    FBT003 => violations::BooleanPositionalValueInFunctionCall,
+    FBT001 => rules::flake8_boolean_trap::rules::BooleanPositionalArgInFunctionDefinition,
+    FBT002 => rules::flake8_boolean_trap::rules::BooleanDefaultValueInFunctionDefinition,
+    FBT003 => rules::flake8_boolean_trap::rules::BooleanPositionalValueInFunctionCall,
     // flake8-unused-arguments
     ARG001 => violations::UnusedFunctionArgument,
     ARG002 => violations::UnusedMethodArgument,
@@ -351,7 +351,7 @@ ruff_macros::define_rule_mapping!(
     ARG004 => violations::UnusedStaticMethodArgument,
     ARG005 => violations::UnusedLambdaArgument,
     // flake8-import-conventions
-    ICN001 => violations::ImportAliasIsNotConventional,
+    ICN001 => rules::flake8_import_conventions::rules::ImportAliasIsNotConventional,
     // flake8-datetimez
     DTZ001 => violations::CallDatetimeWithoutTzinfo,
     DTZ002 => violations::CallDatetimeToday,
@@ -411,18 +411,18 @@ ruff_macros::define_rule_mapping!(
     PT025 => violations::ErroneousUseFixturesOnFixture,
     PT026 => violations::UseFixturesWithoutParameters,
     // flake8-pie
-    PIE790 => violations::NoUnnecessaryPass,
-    PIE794 => violations::DupeClassFieldDefinitions,
-    PIE796 => violations::PreferUniqueEnums,
-    PIE800 => violations::NoUnnecessarySpread,
-    PIE804 => violations::NoUnnecessaryDictKwargs,
-    PIE807 => violations::PreferListBuiltin,
+    PIE790 => rules::flake8_pie::rules::NoUnnecessaryPass,
+    PIE794 => rules::flake8_pie::rules::DupeClassFieldDefinitions,
+    PIE796 => rules::flake8_pie::rules::PreferUniqueEnums,
+    PIE800 => rules::flake8_pie::rules::NoUnnecessarySpread,
+    PIE804 => rules::flake8_pie::rules::NoUnnecessaryDictKwargs,
+    PIE807 => rules::flake8_pie::rules::PreferListBuiltin,
     // flake8-commas
-    COM812 => violations::TrailingCommaMissing,
-    COM818 => violations::TrailingCommaOnBareTupleProhibited,
-    COM819 => violations::TrailingCommaProhibited,
+    COM812 => rules::flake8_commas::rules::TrailingCommaMissing,
+    COM818 => rules::flake8_commas::rules::TrailingCommaOnBareTupleProhibited,
+    COM819 => rules::flake8_commas::rules::TrailingCommaProhibited,
     // flake8-no-pep420
-    INP001 => violations::ImplicitNamespacePackage,
+    INP001 => rules::flake8_no_pep420::rules::ImplicitNamespacePackage,
     // flake8-executable
     EXE001 => rules::flake8_executable::rules::ShebangNotExecutable,
     EXE002 => rules::flake8_executable::rules::ShebangMissingExecutableFile,
@@ -436,11 +436,14 @@ ruff_macros::define_rule_mapping!(
     TCH004 => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
     TCH005 => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
     // tryceratops
+    TRY002 => rules::tryceratops::rules::RaiseVanillaClass,
+    TRY003 => rules::tryceratops::rules::RaiseVanillaArgs,
     TRY004 => rules::tryceratops::rules::PreferTypeError,
     TRY200 => rules::tryceratops::rules::ReraiseNoCause,
     TRY201 => rules::tryceratops::rules::VerboseRaise,
     TRY300 => rules::tryceratops::rules::TryConsiderElse,
     TRY301 => rules::tryceratops::rules::RaiseWithinTry,
+    TRY400 => rules::tryceratops::rules::ErrorInsteadOfException,
     // flake8-use-pathlib
     PTH100 => rules::flake8_use_pathlib::violations::PathlibAbspath,
     PTH101 => rules::flake8_use_pathlib::violations::PathlibChmod,
@@ -467,6 +470,15 @@ ruff_macros::define_rule_mapping!(
     PTH122 => rules::flake8_use_pathlib::violations::PathlibSplitext,
     PTH123 => rules::flake8_use_pathlib::violations::PathlibOpen,
     PTH124 => rules::flake8_use_pathlib::violations::PathlibPyPath,
+    // flake8-logging-format
+    G001 => rules::flake8_logging_format::violations::LoggingStringFormat,
+    G002 => rules::flake8_logging_format::violations::LoggingPercentFormat,
+    G003 => rules::flake8_logging_format::violations::LoggingStringConcat,
+    G004 => rules::flake8_logging_format::violations::LoggingFString,
+    G010 => rules::flake8_logging_format::violations::LoggingWarn,
+    G101 => rules::flake8_logging_format::violations::LoggingExtraAttrClash,
+    G201 => rules::flake8_logging_format::violations::LoggingExcInfo,
+    G202 => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
     // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -491,15 +503,15 @@ pub enum Linter {
     /// [isort](https://pypi.org/project/isort/)
     #[prefix = "I"]
     Isort,
+    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
+    #[prefix = "N"]
+    PEP8Naming,
     /// [pydocstyle](https://pypi.org/project/pydocstyle/)
     #[prefix = "D"]
     Pydocstyle,
     /// [pyupgrade](https://pypi.org/project/pyupgrade/)
     #[prefix = "UP"]
     Pyupgrade,
-    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
-    #[prefix = "N"]
-    PEP8Naming,
     /// [flake8-2020](https://pypi.org/project/flake8-2020/)
     #[prefix = "YTT"]
     Flake82020,
@@ -521,21 +533,39 @@ pub enum Linter {
     /// [flake8-builtins](https://pypi.org/project/flake8-builtins/)
     #[prefix = "A"]
     Flake8Builtins,
+    /// [flake8-commas](https://pypi.org/project/flake8-commas/)
+    #[prefix = "COM"]
+    Flake8Commas,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
+    /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
+    #[prefix = "DTZ"]
+    Flake8Datetimez,
     /// [flake8-debugger](https://pypi.org/project/flake8-debugger/)
     #[prefix = "T10"]
     Flake8Debugger,
     /// [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
     #[prefix = "EM"]
     Flake8ErrMsg,
+    /// [flake8-executable](https://pypi.org/project/flake8-executable/)
+    #[prefix = "EXE"]
+    Flake8Executable,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
     /// [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
     #[prefix = "ICN"]
     Flake8ImportConventions,
+    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/)
+    #[prefix = "G"]
+    Flake8LoggingFormat,
+    /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
+    #[prefix = "INP"]
+    Flake8NoPep420,
+    /// [flake8-pie](https://pypi.org/project/flake8-pie/)
+    #[prefix = "PIE"]
+    Flake8Pie,
     /// [flake8-print](https://pypi.org/project/flake8-print/)
     #[prefix = "T20"]
     Flake8Print,
@@ -554,12 +584,15 @@ pub enum Linter {
     /// [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
     #[prefix = "TID"]
     Flake8TidyImports,
+    /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+    #[prefix = "TCH"]
+    Flake8TypeChecking,
     /// [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/)
     #[prefix = "ARG"]
     Flake8UnusedArguments,
-    /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
-    #[prefix = "DTZ"]
-    Flake8Datetimez,
+    /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
+    #[prefix = "PTH"]
+    Flake8UsePathlib,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
@@ -572,27 +605,9 @@ pub enum Linter {
     /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
-    /// [flake8-pie](https://pypi.org/project/flake8-pie/)
-    #[prefix = "PIE"]
-    Flake8Pie,
-    /// [flake8-commas](https://pypi.org/project/flake8-commas/)
-    #[prefix = "COM"]
-    Flake8Commas,
-    /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
-    #[prefix = "INP"]
-    Flake8NoPep420,
-    /// [flake8-executable](https://pypi.org/project/flake8-executable/)
-    #[prefix = "EXE"]
-    Flake8Executable,
-    /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
-    #[prefix = "TCH"]
-    Flake8TypeChecking,
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
-    /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
-    #[prefix = "PTH"]
-    Flake8UsePathlib,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

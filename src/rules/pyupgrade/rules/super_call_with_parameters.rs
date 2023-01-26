@@ -21,7 +21,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
         return;
     };
     if checker.patch(diagnostic.kind.rule()) {
-        if let Some(fix) = fixes::remove_super_arguments(checker.locator, expr) {
+        if let Some(fix) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
             diagnostic.amend(fix);
         }
     }

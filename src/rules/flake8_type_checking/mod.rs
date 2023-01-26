@@ -1,6 +1,7 @@
 //! Rules from [flake8-type-checking](https://pypi.org/project/flake8-type-checking/).
 pub(crate) mod helpers;
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -26,6 +27,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_7.py"); "TCH004_7")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"); "TCH004_8")]
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"); "TCH005")]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"); "strict")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -35,6 +37,42 @@ mod tests {
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"); "strict")]
+    fn strict(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_type_checking")
+                .join(path)
+                .as_path(),
+            &settings::Settings {
+                flake8_type_checking: super::settings::Settings {
+                    strict: true,
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("exempt_modules.py"); "exempt_modules")]
+    fn exempt_modules(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_type_checking")
+                .join(path)
+                .as_path(),
+            &settings::Settings {
+                flake8_type_checking: super::settings::Settings {
+                    exempt_modules: vec!["pandas".to_string()],
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

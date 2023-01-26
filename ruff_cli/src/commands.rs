@@ -16,15 +16,15 @@ use ruff::linter::add_noqa_to_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
 use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff::resolver::{FileDiscovery, PyprojectDiscovery};
+use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
 use serde::Serialize;
 use walkdir::WalkDir;
 
+use crate::args::Overrides;
 use crate::cache;
-use crate::cli::Overrides;
 use crate::diagnostics::{lint_path, lint_stdin, Diagnostics};
 use crate::iterators::par_iter;
 
@@ -32,15 +32,13 @@ use crate::iterators::par_iter;
 pub fn run(
     files: &[PathBuf],
     pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
     overrides: &Overrides,
     cache: flags::Cache,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (paths, resolver) =
-        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -48,9 +46,6 @@ pub fn run(
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(Diagnostics::default());
     }
-
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
 
     // Initialize the cache.
     if matches!(cache, flags::Cache::Enabled) {
@@ -156,12 +151,11 @@ fn read_from_stdin() -> Result<String> {
 pub fn run_stdin(
     filename: Option<&Path>,
     pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
     overrides: &Overrides,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     if let Some(filename) = filename {
-        if !resolver::python_file_at_path(filename, pyproject_strategy, file_strategy, overrides)? {
+        if !resolver::python_file_at_path(filename, pyproject_strategy, overrides)? {
             return Ok(Diagnostics::default());
         }
     }
@@ -182,13 +176,11 @@ pub fn run_stdin(
 pub fn add_noqa(
     files: &[PathBuf],
     pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
     overrides: &Overrides,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) =
-        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_strategy, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -196,9 +188,6 @@ pub fn add_noqa(
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(0);
     }
-
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
 
     let start = Instant::now();
     let modifications: usize = par_iter(&paths)
@@ -226,15 +215,10 @@ pub fn add_noqa(
 pub fn show_settings(
     files: &[PathBuf],
     pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
     overrides: &Overrides,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) =
-        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
-
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_strategy, overrides)?;
 
     // Print the list of files.
     let Some(entry) = paths
@@ -255,20 +239,15 @@ pub fn show_settings(
 pub fn show_files(
     files: &[PathBuf],
     pyproject_strategy: &PyprojectDiscovery,
-    file_strategy: &FileDiscovery,
     overrides: &Overrides,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) =
-        resolver::python_files_in_path(files, pyproject_strategy, file_strategy, overrides)?;
+    let (paths, _resolver) = resolver::python_files_in_path(files, pyproject_strategy, overrides)?;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(());
     }
-
-    // Validate the `Settings` and return any errors.
-    resolver.validate(pyproject_strategy)?;
 
     // Print the list of files.
     for entry in paths

@@ -230,6 +230,17 @@
         }
       ]
     },
+    "flake8-type-checking": {
+      "description": "Options for the `flake8-type-checking` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8TypeCheckingOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-unused-arguments": {
       "description": "Options for the `flake8-unused-arguments` plugin.",
       "anyOf": [
@@ -421,7 +432,7 @@
       ]
     },
     "src": {
-      "description": "The source code paths to consider, e.g., when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_package/ pyproject.toml src/ my_package/ __init__.py foo.py bar.py ```\n\nThe `src` directory should be included in `source` (e.g., `source = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
+      "description": "The source code paths to consider, e.g., when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_package/ pyproject.toml src/ my_package/ __init__.py foo.py bar.py ```\n\nThe `src` directory should be included in the `src` option (e.g., `src = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
       "type": [
         "array",
         "null"
@@ -818,6 +829,29 @@
           "additionalProperties": {
             "$ref": "#/definitions/ApiBan"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8TypeCheckingOptions": {
+      "type": "object",
+      "properties": {
+        "exempt-modules": {
+          "description": "Exempt certain modules from needing to be moved into type-checking blocks.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "strict": {
+          "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module. See: https://github.com/snok/flake8-type-checking#strict.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -1475,6 +1509,22 @@
         "FBT001",
         "FBT002",
         "FBT003",
+        "G",
+        "G0",
+        "G00",
+        "G001",
+        "G002",
+        "G003",
+        "G004",
+        "G01",
+        "G010",
+        "G1",
+        "G10",
+        "G101",
+        "G2",
+        "G20",
+        "G201",
+        "G202",
         "I",
         "I0",
         "I00",
@@ -1776,6 +1826,8 @@
         "TRY",
         "TRY0",
         "TRY00",
+        "TRY002",
+        "TRY003",
         "TRY004",
         "TRY2",
         "TRY20",
@@ -1785,6 +1837,9 @@
         "TRY30",
         "TRY300",
         "TRY301",
+        "TRY4",
+        "TRY40",
+        "TRY400",
         "UP",
         "UP0",
         "UP00",

@@ -1,16 +1,96 @@
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
-use crate::ast::helpers::unparse_expr;
+use crate::ast::helpers::{match_trailing_comment, unparse_expr};
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
+use crate::message::Location;
 use crate::python::identifiers::is_identifier;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
+
+define_violation!(
+    pub struct NoUnnecessaryPass;
+);
+impl AlwaysAutofixableViolation for NoUnnecessaryPass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary `pass` statement")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove unnecessary `pass`".to_string()
+    }
+}
+
+define_violation!(
+    pub struct DupeClassFieldDefinitions(pub String);
+);
+impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DupeClassFieldDefinitions(name) = self;
+        format!("Class field `{name}` is defined multiple times")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DupeClassFieldDefinitions(name) = self;
+        format!("Remove duplicate field definition for `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct PreferUniqueEnums {
+        pub value: String,
+    }
+);
+impl Violation for PreferUniqueEnums {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PreferUniqueEnums { value } = self;
+        format!("Enum contains duplicate value: `{value}`")
+    }
+}
+
+define_violation!(
+    pub struct NoUnnecessarySpread;
+);
+impl Violation for NoUnnecessarySpread {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary spread `**`")
+    }
+}
+
+define_violation!(
+    pub struct NoUnnecessaryDictKwargs;
+);
+impl Violation for NoUnnecessaryDictKwargs {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary `dict` kwargs")
+    }
+}
+
+define_violation!(
+    pub struct PreferListBuiltin;
+);
+impl AlwaysAutofixableViolation for PreferListBuiltin {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Prefer `list` over useless lambda")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `list`".to_string()
+    }
+}
 
 /// PIE790
 pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
@@ -30,17 +110,32 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             }
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
-                let mut diagnostic = Diagnostic::new(
-                    violations::NoUnnecessaryPass,
-                    Range::from_located(pass_stmt),
-                );
+                let mut diagnostic =
+                    Diagnostic::new(NoUnnecessaryPass, Range::from_located(pass_stmt));
                 if checker.patch(&Rule::NoUnnecessaryPass) {
-                    match delete_stmt(pass_stmt, None, &[], checker.locator, checker.indexer) {
-                        Ok(fix) => {
-                            diagnostic.amend(fix);
-                        }
-                        Err(e) => {
-                            error!("Failed to delete `pass` statement: {}", e);
+                    if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
+                        diagnostic.amend(Fix::deletion(
+                            pass_stmt.location,
+                            Location::new(
+                                pass_stmt.end_location.unwrap().row(),
+                                pass_stmt.end_location.unwrap().column() + index,
+                            ),
+                        ));
+                    } else {
+                        match delete_stmt(
+                            pass_stmt,
+                            None,
+                            &[],
+                            checker.locator,
+                            checker.indexer,
+                            checker.stylist,
+                        ) {
+                            Ok(fix) => {
+                                diagnostic.amend(fix);
+                            }
+                            Err(e) => {
+                                error!("Failed to delete `pass` statement: {}", e);
+                            }
                         }
                     }
                 }
@@ -84,7 +179,7 @@ pub fn dupe_class_field_definitions<'a, 'b>(
 
         if !seen_targets.insert(target) {
             let mut diagnostic = Diagnostic::new(
-                violations::DupeClassFieldDefinitions(target.to_string()),
+                DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
             if checker.patch(&Rule::DupeClassFieldDefinitions) {
@@ -94,7 +189,14 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                     .map(std::convert::Into::into)
                     .collect();
                 let locator = checker.locator;
-                match delete_stmt(stmt, Some(parent), &deleted, locator, checker.indexer) {
+                match delete_stmt(
+                    stmt,
+                    Some(parent),
+                    &deleted,
+                    locator,
+                    checker.indexer,
+                    checker.stylist,
+                ) {
                     Ok(fix) => {
                         checker.deletions.insert(RefEquality(stmt));
                         diagnostic.amend(fix);
@@ -143,7 +245,7 @@ where
 
         if !seen_targets.insert(ComparableExpr::from(value)) {
             let diagnostic = Diagnostic::new(
-                violations::PreferUniqueEnums {
+                PreferUniqueEnums {
                     value: unparse_expr(value, checker.stylist),
                 },
                 Range::from_located(stmt),
@@ -160,8 +262,7 @@ pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], value
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
             if let ExprKind::Dict { .. } = value.node {
-                let diagnostic =
-                    Diagnostic::new(violations::NoUnnecessarySpread, Range::from_located(value));
+                let diagnostic = Diagnostic::new(NoUnnecessarySpread, Range::from_located(value));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -192,10 +293,8 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
                     // handle case of foo(**{**bar})
                     (keys.len() == 1 && keys[0].is_none())
                 {
-                    let diagnostic = Diagnostic::new(
-                        violations::NoUnnecessaryDictKwargs,
-                        Range::from_located(expr),
-                    );
+                    let diagnostic =
+                        Diagnostic::new(NoUnnecessaryDictKwargs, Range::from_located(expr));
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -211,8 +310,7 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     if args.args.is_empty() {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
-                let mut diagnostic =
-                    Diagnostic::new(violations::PreferListBuiltin, Range::from_located(expr));
+                let mut diagnostic = Diagnostic::new(PreferListBuiltin, Range::from_located(expr));
                 if checker.patch(&Rule::PreferListBuiltin) {
                     diagnostic.amend(Fix::replacement(
                         "list".to_string(),

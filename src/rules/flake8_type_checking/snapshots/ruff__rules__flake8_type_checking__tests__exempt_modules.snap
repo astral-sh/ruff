@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: flask
+  location:
+    row: 14
+    column: 11
+  end_location:
+    row: 14
+    column: 16
+  fix: ~
+  parent: ~
+

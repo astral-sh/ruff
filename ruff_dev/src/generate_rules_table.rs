@@ -1,7 +1,6 @@
 //! Generate a Markdown-compatible table of supported lint rules.
 
 use anyhow::Result;
-use clap::Args;
 use ruff::registry::{Linter, LinterCategory, Rule, RuleNamespace};
 use strum::IntoEnumIterator;
 
@@ -13,8 +12,8 @@ const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 const TOC_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated table of contents. -->";
 const TOC_END_PRAGMA: &str = "<!-- End auto-generated table of contents. -->";
 
-#[derive(Args)]
-pub struct Cli {
+#[derive(clap::Args)]
+pub struct Args {
     /// Write the generated table to stdout (rather than to `README.md`).
     #[arg(long)]
     pub(crate) dry_run: bool,
@@ -43,7 +42,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>)
     table_out.push('\n');
 }
 
-pub fn main(cli: &Cli) -> Result<()> {
+pub fn main(args: &Args) -> Result<()> {
     // Generate the table string.
     let mut table_out = String::new();
     let mut toc_out = String::new();
@@ -96,7 +95,7 @@ pub fn main(cli: &Cli) -> Result<()> {
         }
     }
 
-    if cli.dry_run {
+    if args.dry_run {
         print!("Table of Contents: {toc_out}\n Rules Tables: {table_out}");
     } else {
         // Extra newline in the markdown numbered list looks weird
