@@ -46,15 +46,7 @@ expression: diagnostics
   end_location:
     row: 41
     column: 30
-  fix:
-    content:
-      - foo.__123abc = None
-    location:
-      row: 41
-      column: 0
-    end_location:
-      row: 41
-      column: 30
+  fix: ~
   parent: ~
 - kind:
     SetAttrWithConstant: ~
