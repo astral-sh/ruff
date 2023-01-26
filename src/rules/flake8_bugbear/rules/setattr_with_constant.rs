@@ -51,7 +51,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     if !is_identifier(name) {
         return;
     }
-    if KWLIST.contains(&name.as_str()) {
+    if KWLIST.contains(&name.as_str()) || is_mangled_private(name.as_str()) {
         return;
     }
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
@@ -62,9 +62,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
             let mut diagnostic =
                 Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
 
-            // Don't autofix if name would be mangled by Python's "private variables"
-            // handling
-            if checker.patch(diagnostic.kind.rule()) && !is_mangled_private(name.as_str()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     assignment(obj, name, value, checker.stylist),
                     expr.location,

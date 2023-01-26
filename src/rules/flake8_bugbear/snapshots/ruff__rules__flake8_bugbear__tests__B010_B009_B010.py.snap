@@ -5,48 +5,38 @@ expression: diagnostics
 - kind:
     SetAttrWithConstant: ~
   location:
-    row: 39
+    row: 40
     column: 0
   end_location:
-    row: 39
+    row: 40
     column: 25
   fix:
     content:
       - foo.bar = None
     location:
-      row: 39
+      row: 40
       column: 0
     end_location:
-      row: 39
+      row: 40
       column: 25
   parent: ~
 - kind:
     SetAttrWithConstant: ~
   location:
-    row: 40
+    row: 41
     column: 0
   end_location:
-    row: 40
+    row: 41
     column: 29
   fix:
     content:
       - foo._123abc = None
     location:
-      row: 40
+      row: 41
       column: 0
     end_location:
-      row: 40
+      row: 41
       column: 29
-  parent: ~
-- kind:
-    SetAttrWithConstant: ~
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 41
-    column: 30
-  fix: ~
   parent: ~
 - kind:
     SetAttrWithConstant: ~

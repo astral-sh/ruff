@@ -41,16 +41,14 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     if !is_identifier(value) {
         return;
     }
-    if KWLIST.contains(&value.as_str()) {
+    if KWLIST.contains(&value.as_str()) || is_mangled_private(value.as_str()) {
         return;
     }
 
     let mut diagnostic =
         Diagnostic::new(violations::GetAttrWithConstant, Range::from_located(expr));
 
-    // Don't autofix if name would be mangled by Python's "private variables"
-    // handling
-    if checker.patch(diagnostic.kind.rule()) && !is_mangled_private(value.as_str()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(&attribute(obj, value), checker.stylist),
             expr.location,
