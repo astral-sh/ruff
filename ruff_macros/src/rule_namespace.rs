@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashSet;
 
 use proc_macro2::{Ident, Span};
@@ -70,7 +71,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         });
     }
 
-    parsed.sort_by_key(|(prefix, _)| prefix.len());
+    parsed.sort_by_key(|(prefix, _)| Reverse(prefix.len()));
 
     let mut if_statements = quote!();
     let mut into_iter_match_arms = quote!();
