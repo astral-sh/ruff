@@ -4508,11 +4508,7 @@ impl<'a> Checker<'a> {
                     .rules
                     .enabled(&Rule::TypingOnlyStandardLibraryImport)
             {
-                for (.., index) in scope
-                    .values
-                    .iter()
-                    .chain(scope.overridden.iter().map(|(a, b)| (a, b)))
-                {
+                for (.., index) in &scope.values {
                     let binding = &self.bindings[*index];
 
                     if let Some(diagnostic) =
@@ -4549,11 +4545,7 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for (name, index) in scope
-                    .values
-                    .iter()
-                    .chain(scope.overridden.iter().map(|(a, b)| (a, b)))
-                {
+                for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
 
                     let full_name = match &binding.kind {
