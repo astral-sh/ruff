@@ -1394,6 +1394,16 @@ where
                         pyupgrade::rules::os_error_alias(self, &item);
                     }
                 }
+                if self.settings.rules.enabled(&Rule::RaiseVanillaClass) {
+                    if let Some(expr) = exc {
+                        tryceratops::rules::raise_vanilla_class(self, expr);
+                    }
+                }
+                if self.settings.rules.enabled(&Rule::RaiseVanillaArgs) {
+                    if let Some(expr) = exc {
+                        tryceratops::rules::raise_vanilla_args(self, expr);
+                    }
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
