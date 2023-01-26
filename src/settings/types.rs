@@ -52,10 +52,6 @@ impl FromStr for PythonVersion {
 impl PythonVersion {
     pub fn to_tuple(&self) -> (u32, u32) {
         match self {
-            PythonVersion::Py33 => (3, 3),
-            PythonVersion::Py34 => (3, 4),
-            PythonVersion::Py35 => (3, 5),
-            PythonVersion::Py36 => (3, 6),
             PythonVersion::Py37 => (3, 7),
             PythonVersion::Py38 => (3, 8),
             PythonVersion::Py39 => (3, 9),
