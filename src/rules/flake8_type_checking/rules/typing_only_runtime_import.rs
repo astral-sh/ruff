@@ -95,6 +95,22 @@ fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
     }
 }
 
+/// Return `true` if `name` is exempt from typing-only enforcement.
+fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
+    let mut name = name;
+    loop {
+        if exempt_modules.contains(&name) {
+            return true;
+        }
+        match name.rfind('.') {
+            Some(idx) => {
+                name = &name[..idx];
+            }
+            None => return false,
+        }
+    }
+}
+
 /// TCH001
 pub fn typing_only_runtime_import(
     binding: &Binding,
@@ -119,6 +135,18 @@ pub fn typing_only_runtime_import(
         BindingKind::SubmoduleImportation(.., full_name) => full_name,
         _ => return None,
     };
+
+    if is_exempt(
+        full_name,
+        &settings
+            .flake8_type_checking
+            .exempt_modules
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+    ) {
+        return None;
+    }
 
     let defined_in_type_checking = blocks
         .iter()
