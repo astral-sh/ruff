@@ -285,7 +285,7 @@ pub struct Options {
         default = "true",
         value_type = "bool",
         example = r#"
-            respect_gitignore = false
+            respect-gitignore = false
         "#
     )]
     /// Whether to automatically exclude files that are ignored by `.ignore`,
