@@ -318,10 +318,10 @@ ruff_macros::define_rule_mapping!(
     N817 => violations::CamelcaseImportedAsAcronym,
     N818 => violations::ErrorSuffixOnExceptionName,
     // isort
-    I001 => violations::UnsortedImports,
-    I002 => violations::MissingRequiredImport,
+    I001 => rules::isort::rules::UnsortedImports,
+    I002 => rules::isort::rules::MissingRequiredImport,
     // eradicate
-    ERA001 => violations::CommentedOutCode,
+    ERA001 => rules::eradicate::rules::CommentedOutCode,
     // flake8-bandit
     S101 => violations::AssertUsed,
     S102 => violations::ExecUsed,
@@ -340,9 +340,9 @@ ruff_macros::define_rule_mapping!(
     S612 => rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     S701 => violations::Jinja2AutoescapeFalse,
     // flake8-boolean-trap
-    FBT001 => violations::BooleanPositionalArgInFunctionDefinition,
-    FBT002 => violations::BooleanDefaultValueInFunctionDefinition,
-    FBT003 => violations::BooleanPositionalValueInFunctionCall,
+    FBT001 => rules::flake8_boolean_trap::rules::BooleanPositionalArgInFunctionDefinition,
+    FBT002 => rules::flake8_boolean_trap::rules::BooleanDefaultValueInFunctionDefinition,
+    FBT003 => rules::flake8_boolean_trap::rules::BooleanPositionalValueInFunctionCall,
     // flake8-unused-arguments
     ARG001 => violations::UnusedFunctionArgument,
     ARG002 => violations::UnusedMethodArgument,
@@ -350,7 +350,7 @@ ruff_macros::define_rule_mapping!(
     ARG004 => violations::UnusedStaticMethodArgument,
     ARG005 => violations::UnusedLambdaArgument,
     // flake8-import-conventions
-    ICN001 => violations::ImportAliasIsNotConventional,
+    ICN001 => rules::flake8_import_conventions::rules::ImportAliasIsNotConventional,
     // flake8-datetimez
     DTZ001 => violations::CallDatetimeWithoutTzinfo,
     DTZ002 => violations::CallDatetimeToday,
@@ -410,18 +410,18 @@ ruff_macros::define_rule_mapping!(
     PT025 => violations::ErroneousUseFixturesOnFixture,
     PT026 => violations::UseFixturesWithoutParameters,
     // flake8-pie
-    PIE790 => violations::NoUnnecessaryPass,
-    PIE794 => violations::DupeClassFieldDefinitions,
-    PIE796 => violations::PreferUniqueEnums,
-    PIE800 => violations::NoUnnecessarySpread,
-    PIE804 => violations::NoUnnecessaryDictKwargs,
-    PIE807 => violations::PreferListBuiltin,
+    PIE790 => rules::flake8_pie::rules::NoUnnecessaryPass,
+    PIE794 => rules::flake8_pie::rules::DupeClassFieldDefinitions,
+    PIE796 => rules::flake8_pie::rules::PreferUniqueEnums,
+    PIE800 => rules::flake8_pie::rules::NoUnnecessarySpread,
+    PIE804 => rules::flake8_pie::rules::NoUnnecessaryDictKwargs,
+    PIE807 => rules::flake8_pie::rules::PreferListBuiltin,
     // flake8-commas
-    COM812 => violations::TrailingCommaMissing,
-    COM818 => violations::TrailingCommaOnBareTupleProhibited,
-    COM819 => violations::TrailingCommaProhibited,
+    COM812 => rules::flake8_commas::rules::TrailingCommaMissing,
+    COM818 => rules::flake8_commas::rules::TrailingCommaOnBareTupleProhibited,
+    COM819 => rules::flake8_commas::rules::TrailingCommaProhibited,
     // flake8-no-pep420
-    INP001 => violations::ImplicitNamespacePackage,
+    INP001 => rules::flake8_no_pep420::rules::ImplicitNamespacePackage,
     // flake8-executable
     EXE001 => rules::flake8_executable::rules::ShebangNotExecutable,
     EXE002 => rules::flake8_executable::rules::ShebangMissingExecutableFile,

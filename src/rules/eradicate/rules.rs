@@ -1,12 +1,28 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
 
 use super::detection::comment_contains_code;
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct CommentedOutCode;
+);
+impl AlwaysAutofixableViolation for CommentedOutCode {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Found commented-out code")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove commented-out code".to_string()
+    }
+}
 
 fn is_standalone_comment(line: &str) -> bool {
     for char in line.chars() {
@@ -33,7 +49,7 @@ pub fn commented_out_code(
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-        let mut diagnostic = Diagnostic::new(violations::CommentedOutCode, Range::new(start, end));
+        let mut diagnostic = Diagnostic::new(CommentedOutCode, Range::new(start, end));
         if matches!(autofix, flags::Autofix::Enabled)
             && settings.rules.should_fix(&Rule::CommentedOutCode)
         {

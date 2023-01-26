@@ -1,12 +1,14 @@
 use itertools::Itertools;
+use ruff_macros::derive_message_formats;
 use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::token::Tok;
 
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
-use crate::violations;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -104,6 +106,44 @@ impl Context {
 
     fn inc(&mut self) {
         self.num_commas += 1;
+    }
+}
+
+define_violation!(
+    pub struct TrailingCommaMissing;
+);
+impl AlwaysAutofixableViolation for TrailingCommaMissing {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Trailing comma missing")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add trailing comma".to_string()
+    }
+}
+
+define_violation!(
+    pub struct TrailingCommaOnBareTupleProhibited;
+);
+impl Violation for TrailingCommaOnBareTupleProhibited {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Trailing comma on bare tuple prohibited")
+    }
+}
+
+define_violation!(
+    pub struct TrailingCommaProhibited;
+);
+impl AlwaysAutofixableViolation for TrailingCommaProhibited {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Trailing comma prohibited")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove trailing comma".to_string()
     }
 }
 
@@ -212,7 +252,7 @@ pub fn trailing_commas(
         if comma_prohibited {
             let comma = prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(
-                violations::TrailingCommaProhibited,
+                TrailingCommaProhibited,
                 Range {
                     location: comma.0,
                     end_location: comma.2,
@@ -233,7 +273,7 @@ pub fn trailing_commas(
         if bare_comma_prohibited {
             let comma = prev.spanned.unwrap();
             diagnostics.push(Diagnostic::new(
-                violations::TrailingCommaOnBareTupleProhibited,
+                TrailingCommaOnBareTupleProhibited,
                 Range {
                     location: comma.0,
                     end_location: comma.2,
@@ -258,7 +298,7 @@ pub fn trailing_commas(
         if comma_required {
             let missing_comma = prev_prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(
-                violations::TrailingCommaMissing,
+                TrailingCommaMissing,
                 Range {
                     location: missing_comma.2,
                     end_location: missing_comma.2,

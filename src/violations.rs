@@ -3781,54 +3781,6 @@ impl Violation for ErrorSuffixOnExceptionName {
     }
 }
 
-// isort
-
-define_violation!(
-    pub struct UnsortedImports;
-);
-impl AlwaysAutofixableViolation for UnsortedImports {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Import block is un-sorted or un-formatted")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Organize imports".to_string()
-    }
-}
-
-define_violation!(
-    pub struct MissingRequiredImport(pub String);
-);
-impl AlwaysAutofixableViolation for MissingRequiredImport {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let MissingRequiredImport(name) = self;
-        format!("Missing required import: `{name}`")
-    }
-
-    fn autofix_title(&self) -> String {
-        let MissingRequiredImport(name) = self;
-        format!("Insert required import: `{name}`")
-    }
-}
-
-// eradicate
-
-define_violation!(
-    pub struct CommentedOutCode;
-);
-impl AlwaysAutofixableViolation for CommentedOutCode {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Found commented-out code")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove commented-out code".to_string()
-    }
-}
-
 // flake8-bandit
 
 define_violation!(
@@ -4028,38 +3980,6 @@ impl Violation for SnmpWeakCryptography {
     }
 }
 
-// flake8-boolean-trap
-
-define_violation!(
-    pub struct BooleanPositionalArgInFunctionDefinition;
-);
-impl Violation for BooleanPositionalArgInFunctionDefinition {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean positional arg in function definition")
-    }
-}
-
-define_violation!(
-    pub struct BooleanDefaultValueInFunctionDefinition;
-);
-impl Violation for BooleanDefaultValueInFunctionDefinition {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean default value in function definition")
-    }
-}
-
-define_violation!(
-    pub struct BooleanPositionalValueInFunctionCall;
-);
-impl Violation for BooleanPositionalValueInFunctionCall {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean positional value in function call")
-    }
-}
-
 // flake8-unused-arguments
 
 define_violation!(
@@ -4114,19 +4034,6 @@ impl Violation for UnusedLambdaArgument {
     fn message(&self) -> String {
         let UnusedLambdaArgument(name) = self;
         format!("Unused lambda argument: `{name}`")
-    }
-}
-
-// flake8-import-conventions
-
-define_violation!(
-    pub struct ImportAliasIsNotConventional(pub String, pub String);
-);
-impl Violation for ImportAliasIsNotConventional {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let ImportAliasIsNotConventional(name, asname) = self;
-        format!("`{name}` should be imported as `{asname}`")
     }
 }
 
@@ -4734,138 +4641,6 @@ impl AlwaysAutofixableViolation for UseFixturesWithoutParameters {
 
     fn autofix_title(&self) -> String {
         "Remove `usefixtures` decorator or pass parameters".to_string()
-    }
-}
-
-// flake8-pie
-
-define_violation!(
-    pub struct NoUnnecessaryPass;
-);
-impl AlwaysAutofixableViolation for NoUnnecessaryPass {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `pass` statement")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove unnecessary `pass`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct DupeClassFieldDefinitions(pub String);
-);
-impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let DupeClassFieldDefinitions(name) = self;
-        format!("Class field `{name}` is defined multiple times")
-    }
-
-    fn autofix_title(&self) -> String {
-        let DupeClassFieldDefinitions(name) = self;
-        format!("Remove duplicate field definition for `{name}`")
-    }
-}
-
-define_violation!(
-    pub struct PreferUniqueEnums {
-        pub value: String,
-    }
-);
-impl Violation for PreferUniqueEnums {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let PreferUniqueEnums { value } = self;
-        format!("Enum contains duplicate value: `{value}`")
-    }
-}
-
-define_violation!(
-    pub struct NoUnnecessarySpread;
-);
-impl Violation for NoUnnecessarySpread {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary spread `**`")
-    }
-}
-
-define_violation!(
-    pub struct NoUnnecessaryDictKwargs;
-);
-impl Violation for NoUnnecessaryDictKwargs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `dict` kwargs")
-    }
-}
-
-define_violation!(
-    pub struct PreferListBuiltin;
-);
-impl AlwaysAutofixableViolation for PreferListBuiltin {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Prefer `list` over useless lambda")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with `list`".to_string()
-    }
-}
-
-// flake8-commas
-
-define_violation!(
-    pub struct TrailingCommaMissing;
-);
-impl AlwaysAutofixableViolation for TrailingCommaMissing {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma missing")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add trailing comma".to_string()
-    }
-}
-
-define_violation!(
-    pub struct TrailingCommaOnBareTupleProhibited;
-);
-impl Violation for TrailingCommaOnBareTupleProhibited {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma on bare tuple prohibited")
-    }
-}
-
-define_violation!(
-    pub struct TrailingCommaProhibited;
-);
-impl AlwaysAutofixableViolation for TrailingCommaProhibited {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma prohibited")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove trailing comma".to_string()
-    }
-}
-
-// flake8-no-pep420
-
-define_violation!(
-    pub struct ImplicitNamespacePackage(pub String);
-);
-impl Violation for ImplicitNamespacePackage {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let ImplicitNamespacePackage(filename) = self;
-        format!("File `{filename}` is part of an implicit namespace package. Add an `__init__.py`.")
     }
 }
 
