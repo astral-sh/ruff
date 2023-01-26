@@ -1,17 +1,35 @@
 use std::fmt;
 
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Location, StmtKind, Suite};
 
 use super::super::helpers;
 use super::super::track::Block;
 use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::{Locator, Stylist};
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct MissingRequiredImport(pub String);
+);
+impl AlwaysAutofixableViolation for MissingRequiredImport {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingRequiredImport(name) = self;
+        format!("Missing required import: `{name}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let MissingRequiredImport(name) = self;
+        format!("Insert required import: `{name}`")
+    }
+}
 
 struct Alias<'a> {
     name: &'a str,
@@ -123,7 +141,7 @@ fn add_required_import(
     // Always insert the diagnostic at top-of-file.
     let required_import = required_import.to_string();
     let mut diagnostic = Diagnostic::new(
-        violations::MissingRequiredImport(required_import.clone()),
+        MissingRequiredImport(required_import.clone()),
         Range::new(Location::default(), Location::default()),
     );
     if matches!(autofix, flags::Autofix::Enabled)
