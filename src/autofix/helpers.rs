@@ -306,7 +306,11 @@ pub fn remove_unused_imports<'a>(
     if aliases.is_empty() {
         delete_stmt(stmt, parent, deleted, locator, indexer, stylist)
     } else {
-        let mut state = CodegenState::default();
+        let mut state = CodegenState {
+            default_newline: stylist.line_ending(),
+            default_indent: stylist.indentation(),
+            ..CodegenState::default()
+        };
         tree.codegen(&mut state);
 
         Ok(Fix::replacement(

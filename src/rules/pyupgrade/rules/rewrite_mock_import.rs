@@ -128,7 +128,11 @@ fn format_import(
     } else {
         import.names = clean_aliases;
 
-        let mut state = CodegenState::default();
+        let mut state = CodegenState {
+            default_newline: stylist.line_ending(),
+            default_indent: stylist.indentation(),
+            ..CodegenState::default()
+        };
         tree.codegen(&mut state);
 
         let mut content = state.to_string();
@@ -183,7 +187,11 @@ fn format_import_from(
             rpar: vec![],
         })));
 
-        let mut state = CodegenState::default();
+        let mut state = CodegenState {
+            default_newline: stylist.line_ending(),
+            default_indent: stylist.indentation(),
+            ..CodegenState::default()
+        };
         tree.codegen(&mut state);
 
         let mut content = state.to_string();

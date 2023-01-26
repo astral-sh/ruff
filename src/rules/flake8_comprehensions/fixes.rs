@@ -9,7 +9,7 @@ use libcst_native::{
 use crate::ast::types::Range;
 use crate::cst::matchers::{match_expr, match_module};
 use crate::fix::Fix;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 
 fn match_call<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Call<'b>> {
     if let Expression::Call(call) = &mut expr.value {
@@ -30,6 +30,7 @@ fn match_arg<'a, 'b>(call: &'a Call<'b>) -> Result<&'a Arg<'b>> {
 /// (C400) Convert `list(x for x in y)` to `[x for x in y]`.
 pub fn fix_unnecessary_generator_list(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
@@ -58,7 +59,11 @@ pub fn fix_unnecessary_generator_list(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -71,6 +76,7 @@ pub fn fix_unnecessary_generator_list(
 /// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
 pub fn fix_unnecessary_generator_set(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
@@ -99,7 +105,11 @@ pub fn fix_unnecessary_generator_set(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -113,6 +123,7 @@ pub fn fix_unnecessary_generator_set(
 /// range(3)}`.
 pub fn fix_unnecessary_generator_dict(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -157,7 +168,11 @@ pub fn fix_unnecessary_generator_dict(
         whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
     }));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -170,6 +185,7 @@ pub fn fix_unnecessary_generator_dict(
 /// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
 pub fn fix_unnecessary_list_comprehension_set(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(ListComp)))) ->
@@ -197,7 +213,11 @@ pub fn fix_unnecessary_list_comprehension_set(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -211,6 +231,7 @@ pub fn fix_unnecessary_list_comprehension_set(
 /// range(3)}`.
 pub fn fix_unnecessary_list_comprehension_dict(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -248,7 +269,11 @@ pub fn fix_unnecessary_list_comprehension_dict(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -302,7 +327,11 @@ fn drop_trailing_comma<'a>(
 }
 
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
-pub fn fix_unnecessary_literal_set(locator: &Locator, expr: &rustpython_ast::Expr) -> Result<Fix> {
+pub fn fix_unnecessary_literal_set(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
@@ -334,7 +363,11 @@ pub fn fix_unnecessary_literal_set(locator: &Locator, expr: &rustpython_ast::Exp
         }));
     }
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -345,7 +378,11 @@ pub fn fix_unnecessary_literal_set(locator: &Locator, expr: &rustpython_ast::Exp
 }
 
 /// (C406) Convert `dict([(1, 2)])` to `{1: 2}`.
-pub fn fix_unnecessary_literal_dict(locator: &Locator, expr: &rustpython_ast::Expr) -> Result<Fix> {
+pub fn fix_unnecessary_literal_dict(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
@@ -399,7 +436,11 @@ pub fn fix_unnecessary_literal_dict(locator: &Locator, expr: &rustpython_ast::Ex
         rpar: vec![],
     }));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -412,6 +453,7 @@ pub fn fix_unnecessary_literal_dict(locator: &Locator, expr: &rustpython_ast::Ex
 /// (C408)
 pub fn fix_unnecessary_collection_call(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
@@ -508,7 +550,11 @@ pub fn fix_unnecessary_collection_call(
         }
     };
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -521,6 +567,7 @@ pub fn fix_unnecessary_collection_call(
 /// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`
 pub fn fix_unnecessary_literal_within_tuple_call(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -562,7 +609,11 @@ pub fn fix_unnecessary_literal_within_tuple_call(
         }],
     }));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -575,6 +626,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
 /// (C410) Convert `list([1, 2])` to `[1, 2]`
 pub fn fix_unnecessary_literal_within_list_call(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -618,7 +670,11 @@ pub fn fix_unnecessary_literal_within_list_call(
         rpar: vec![],
     }));
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -629,7 +685,11 @@ pub fn fix_unnecessary_literal_within_list_call(
 }
 
 /// (C411) Convert `list([i * i for i in x])` to `[i * i for i in x]`.
-pub fn fix_unnecessary_list_call(locator: &Locator, expr: &rustpython_ast::Expr) -> Result<Fix> {
+pub fn fix_unnecessary_list_call(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &rustpython_ast::Expr,
+) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
@@ -639,7 +699,11 @@ pub fn fix_unnecessary_list_call(locator: &Locator, expr: &rustpython_ast::Expr)
 
     body.value = arg.value.clone();
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -654,6 +718,7 @@ pub fn fix_unnecessary_list_call(locator: &Locator, expr: &rustpython_ast::Expr)
 /// reverse=True)`.
 pub fn fix_unnecessary_call_around_sorted(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -723,7 +788,11 @@ pub fn fix_unnecessary_call_around_sorted(
         }
     }
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
@@ -736,6 +805,7 @@ pub fn fix_unnecessary_call_around_sorted(
 /// (C416) Convert `[i for i in x]` to `list(x)`.
 pub fn fix_unnecessary_comprehension(
     locator: &Locator,
+    stylist: &Stylist,
     expr: &rustpython_ast::Expr,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -792,7 +862,11 @@ pub fn fix_unnecessary_comprehension(
         }
     }
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Ok(Fix::replacement(
