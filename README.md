@@ -1222,6 +1222,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
 | TRY300 | try-consider-else | Consider `else` block |  |
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
+| TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
 
 ### flake8-use-pathlib (PTH)
 
