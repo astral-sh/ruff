@@ -17,7 +17,7 @@ use rustpython_parser::parser;
 use smallvec::smallvec;
 
 use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
-use crate::ast::operations::extract_all_names;
+use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
     Binding, BindingKind, CallPath, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
@@ -4152,14 +4152,25 @@ impl<'a> Checker<'a> {
                 }
                 _ => false,
             } {
+                let (all_names, all_names_flags) =
+                    extract_all_names(parent, current, &self.bindings);
+
+                if self.settings.rules.enabled(&Rule::InvalidAllFormat)
+                    && matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT)
+                {
+                    pylint::rules::invalid_all_format(self, expr);
+                }
+
+                if self.settings.rules.enabled(&Rule::InvalidAllObject)
+                    && matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT)
+                {
+                    pylint::rules::invalid_all_object(self, expr);
+                }
+
                 self.add_binding(
                     id,
                     Binding {
-                        kind: BindingKind::Export(extract_all_names(
-                            parent,
-                            current,
-                            &self.bindings,
-                        )),
+                        kind: BindingKind::Export(all_names),
                         runtime_usage: None,
                         synthetic_usage: None,
                         typing_usage: None,
