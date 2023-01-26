@@ -20,6 +20,7 @@ mod tests {
     #[test_case(Rule::VerboseRaise, Path::new("TRY201.py"); "TRY201")]
     #[test_case(Rule::TryConsiderElse, Path::new("TRY300.py"); "TRY300")]
     #[test_case(Rule::RaiseWithinTry , Path::new("TRY301.py"); "TRY301")]
+    #[test_case(Rule::ErrorInsteadOfException, Path::new("TRY400.py"); "TRY400")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -1,4 +1,4 @@
-pub use exception_instead_error::{error_instead_exception, ErrorInsteadException};
+pub use error_instead_of_exception::{error_instead_of_exception, ErrorInsteadOfException};
 pub use prefer_type_error::{prefer_type_error, PreferTypeError};
 pub use raise_vanilla_args::{raise_vanilla_args, RaiseVanillaArgs};
 pub use raise_vanilla_class::{raise_vanilla_class, RaiseVanillaClass};
@@ -7,7 +7,7 @@ pub use reraise_no_cause::{reraise_no_cause, ReraiseNoCause};
 pub use try_consider_else::{try_consider_else, TryConsiderElse};
 pub use verbose_raise::{verbose_raise, VerboseRaise};
 
-mod exception_instead_error;
+mod error_instead_of_exception;
 mod prefer_type_error;
 mod raise_vanilla_args;
 mod raise_vanilla_class;

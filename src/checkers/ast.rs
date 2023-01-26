@@ -1617,8 +1617,8 @@ where
                 if self.settings.rules.enabled(&Rule::RaiseWithinTry) {
                     tryceratops::rules::raise_within_try(self, body);
                 }
-                if self.settings.rules.enabled(&Rule::ErrorInsteadException) {
-                    tryceratops::rules::error_instead_exception(self, handlers);
+                if self.settings.rules.enabled(&Rule::ErrorInsteadOfException) {
+                    tryceratops::rules::error_instead_of_exception(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
