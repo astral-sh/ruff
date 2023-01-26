@@ -11,7 +11,10 @@ expression: diagnostics
     row: 3
     column: 9
   fix:
-    content: "if a and b:\n    c\n"
+    content:
+      - "if a and b:"
+      - "    c"
+      - ""
     location:
       row: 2
       column: 0
@@ -28,7 +31,11 @@ expression: diagnostics
     row: 9
     column: 13
   fix:
-    content: "if a and b:\n    if c:\n        d\n"
+    content:
+      - "if a and b:"
+      - "    if c:"
+      - "        d"
+      - ""
     location:
       row: 7
       column: 0
@@ -45,7 +52,10 @@ expression: diagnostics
     row: 16
     column: 9
   fix:
-    content: "elif b and c:\n    d\n"
+    content:
+      - "elif b and c:"
+      - "    d"
+      - ""
     location:
       row: 15
       column: 0
@@ -72,7 +82,11 @@ expression: diagnostics
     row: 27
     column: 9
   fix:
-    content: "if a and b:\n    # Fixable due to placement of this comment.\n    c\n"
+    content:
+      - "if a and b:"
+      - "    # Fixable due to placement of this comment."
+      - "    c"
+      - ""
     location:
       row: 26
       column: 0
@@ -89,7 +103,20 @@ expression: diagnostics
     row: 52
     column: 16
   fix:
-    content: "    if True and True:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
+    content:
+      - "    if True and True:"
+      - "        \"\"\"this"
+      - "is valid\"\"\""
+      - ""
+      - "        \"\"\"the indentation on"
+      - "            this line is significant\"\"\""
+      - ""
+      - "        \"this is\" \\"
+      - "\"allowed too\""
+      - ""
+      - "        (\"so is\""
+      - "\"this for some reason\")"
+      - ""
     location:
       row: 51
       column: 0
@@ -106,7 +133,20 @@ expression: diagnostics
     row: 68
     column: 12
   fix:
-    content: "if True and True:\n    \"\"\"this\nis valid\"\"\"\n\n    \"\"\"the indentation on\n        this line is significant\"\"\"\n\n    \"this is\" \\\n\"allowed too\"\n\n    (\"so is\"\n\"this for some reason\")\n"
+    content:
+      - "if True and True:"
+      - "    \"\"\"this"
+      - "is valid\"\"\""
+      - ""
+      - "    \"\"\"the indentation on"
+      - "        this line is significant\"\"\""
+      - ""
+      - "    \"this is\" \\"
+      - "\"allowed too\""
+      - ""
+      - "    (\"so is\""
+      - "\"this for some reason\")"
+      - ""
     location:
       row: 67
       column: 0
@@ -123,7 +163,12 @@ expression: diagnostics
     row: 86
     column: 10
   fix:
-    content: "    if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n        \"multiprocessing.\"\n    )):\n        print(\"Bad module!\")\n"
+    content:
+      - "    if node.module and (node.module == \"multiprocessing\" or node.module.startswith("
+      - "        \"multiprocessing.\""
+      - "    )):"
+      - "        print(\"Bad module!\")"
+      - ""
     location:
       row: 83
       column: 0
@@ -140,12 +185,37 @@ expression: diagnostics
     row: 93
     column: 6
   fix:
-    content: "if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n    \"multiprocessing.\"\n)):\n    print(\"Bad module!\")\n"
+    content:
+      - "if node.module and (node.module == \"multiprocessing\" or node.module.startswith("
+      - "    \"multiprocessing.\""
+      - ")):"
+      - "    print(\"Bad module!\")"
+      - ""
     location:
       row: 90
       column: 0
     end_location:
       row: 95
+      column: 0
+  parent: ~
+- kind:
+    NestedIfStatements: ~
+  location:
+    row: 117
+    column: 4
+  end_location:
+    row: 118
+    column: 13
+  fix:
+    content:
+      - "    if b and c:"
+      - "        print(\"foo\")"
+      - ""
+    location:
+      row: 117
+      column: 0
+    end_location:
+      row: 120
       column: 0
   parent: ~
 

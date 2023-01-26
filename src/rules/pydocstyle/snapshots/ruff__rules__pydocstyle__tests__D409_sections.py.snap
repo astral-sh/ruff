@@ -11,7 +11,9 @@ expression: diagnostics
     row: 105
     column: 7
   fix:
-    content: "    -------\n"
+    content:
+      - "    -------"
+      - ""
     location:
       row: 102
       column: 0
@@ -28,7 +30,9 @@ expression: diagnostics
     row: 221
     column: 7
   fix:
-    content: "    -------\n"
+    content:
+      - "    -------"
+      - ""
     location:
       row: 216
       column: 0

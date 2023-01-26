@@ -40,7 +40,7 @@ pub fn check_imports(
         for block in &blocks {
             if !block.imports.is_empty() {
                 if let Some(diagnostic) = isort::rules::organize_imports(
-                    block, locator, indexer, settings, stylist, autofix, package,
+                    block, locator, stylist, indexer, settings, autofix, package,
                 ) {
                     diagnostics.push(diagnostic);
                 }
@@ -49,7 +49,7 @@ pub fn check_imports(
     }
     if settings.rules.enabled(&Rule::MissingRequiredImport) {
         diagnostics.extend(isort::rules::add_required_imports(
-            &blocks, python_ast, locator, settings, autofix,
+            &blocks, python_ast, locator, stylist, settings, autofix,
         ));
     }
     diagnostics

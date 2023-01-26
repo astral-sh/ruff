@@ -2,24 +2,22 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::iter;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use colored::Colorize;
 use globset::Glob;
-use itertools::Either::{Left, Right};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{Rule, RuleSelector, SuffixLength, CATEGORIES, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, INCOMPATIBLE_CODES};
+use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle,
+    pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat, Version};
@@ -109,6 +107,7 @@ pub struct Settings {
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_builtins: flake8_builtins::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
+    pub flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
@@ -174,6 +173,10 @@ impl Settings {
             flake8_bugbear: config.flake8_bugbear.map(Into::into).unwrap_or_default(),
             flake8_builtins: config.flake8_builtins.map(Into::into).unwrap_or_default(),
             flake8_errmsg: config.flake8_errmsg.map(Into::into).unwrap_or_default(),
+            flake8_implicit_str_concat: config
+                .flake8_implicit_str_concat
+                .map(Into::into)
+                .unwrap_or_default(),
             flake8_import_conventions: config
                 .flake8_import_conventions
                 .map(Into::into)
@@ -236,11 +239,11 @@ impl From<&Configuration> for RuleTable {
         let mut rules = RuleTable::empty();
 
         let fixable = resolve_codes([RuleCodeSpec {
-            select: config.fixable.as_deref().unwrap_or(CATEGORIES),
+            select: config.fixable.as_deref().unwrap_or(&[RuleSelector::All]),
             ignore: config.unfixable.as_deref().unwrap_or_default(),
         }]);
 
-        for code in validate_enabled(resolve_codes(
+        for code in resolve_codes(
             [RuleCodeSpec {
                 select: config.select.as_deref().unwrap_or(defaults::PREFIXES),
                 ignore: config.ignore.as_deref().unwrap_or_default(),
@@ -252,27 +255,31 @@ impl From<&Configuration> for RuleTable {
                     .iter()
                     .zip(config.extend_ignore.iter())
                     .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
-            )
-            .chain(
-                // If a docstring convention is specified, force-disable any incompatible error
-                // codes.
-                if let Some(convention) = config
-                    .pydocstyle
-                    .as_ref()
-                    .and_then(|pydocstyle| pydocstyle.convention)
-                {
-                    Left(iter::once(RuleCodeSpec {
-                        select: &[],
-                        ignore: convention.codes(),
-                    }))
-                } else {
-                    Right(iter::empty())
-                },
             ),
-        )) {
+        ) {
             let fix = fixable.contains(&code);
             rules.enable(code, fix);
         }
+
+        // If a docstring convention is specified, force-disable any incompatible error
+        // codes.
+        if let Some(convention) = config
+            .pydocstyle
+            .as_ref()
+            .and_then(|pydocstyle| pydocstyle.convention)
+        {
+            for rule in convention.rules_to_be_ignored() {
+                rules.disable(rule);
+            }
+        }
+
+        // Validate that we didn't enable any incompatible rules.
+        for (a, b, message) in INCOMPATIBLE_CODES {
+            if rules.enabled(a) && rules.enabled(b) {
+                warn_user_once!("{}", message);
+            }
+        }
+
         rules
     }
 }
@@ -312,19 +319,30 @@ struct RuleCodeSpec<'a> {
 /// rule codes.
 fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<Rule> {
     let mut rules: FxHashSet<Rule> = FxHashSet::default();
+
+    let mut redirects = FxHashMap::default();
+
     for spec in specs {
         for specificity in [
-            SuffixLength::None,
-            SuffixLength::Zero,
-            SuffixLength::One,
-            SuffixLength::Two,
-            SuffixLength::Three,
-            SuffixLength::Four,
-            SuffixLength::Five,
+            Specificity::All,
+            Specificity::Linter,
+            Specificity::Code1Char,
+            Specificity::Code2Chars,
+            Specificity::Code3Chars,
+            Specificity::Code4Chars,
+            Specificity::Code5Chars,
         ] {
             for selector in spec.select {
                 if selector.specificity() == specificity {
                     rules.extend(selector);
+                }
+
+                if let RuleSelector::Prefix {
+                    prefix,
+                    redirected_from: Some(redirect_from),
+                } = selector
+                {
+                    redirects.insert(redirect_from, prefix);
                 }
             }
             for selector in spec.ignore {
@@ -333,33 +351,37 @@ fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHas
                         rules.remove(&rule);
                     }
                 }
+
+                if let RuleSelector::Prefix {
+                    prefix,
+                    redirected_from: Some(redirect_from),
+                } = selector
+                {
+                    redirects.insert(redirect_from, prefix);
+                }
             }
         }
     }
-    rules
-}
 
-/// Warn if the set of enabled codes contains any incompatibilities.
-fn validate_enabled(enabled: FxHashSet<Rule>) -> FxHashSet<Rule> {
-    for (a, b, message) in INCOMPATIBLE_CODES {
-        if enabled.contains(a) && enabled.contains(b) {
-            warn_user_once!("{}", message);
-        }
+    for (from, target) in redirects {
+        // TODO(martin): This belongs into the ruff_cli crate.
+        crate::warn_user!("`{from}` has been remapped to `{}`.", target.as_ref());
     }
-    enabled
+
+    rules
 }
 
 #[cfg(test)]
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::registry::{Rule, RuleSelector};
+    use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::{resolve_codes, RuleCodeSpec};
 
     #[test]
     fn rule_codes() {
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleSelector::W],
+            select: &[RuleCodePrefix::W.into()],
             ignore: &[],
         }]);
         let expected = FxHashSet::from_iter([
@@ -370,33 +392,33 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleSelector::W6],
+            select: &[RuleCodePrefix::W6.into()],
             ignore: &[],
         }]);
         let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleSelector::W],
-            ignore: &[RuleSelector::W292],
+            select: &[RuleCodePrefix::W.into()],
+            ignore: &[RuleCodePrefix::W292.into()],
         }]);
         let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleSelector::W605],
-            ignore: &[RuleSelector::W605],
+            select: &[RuleCodePrefix::W605.into()],
+            ignore: &[RuleCodePrefix::W605.into()],
         }]);
         let expected = FxHashSet::from_iter([]);
         assert_eq!(actual, expected);
 
         let actual = resolve_codes([
             RuleCodeSpec {
-                select: &[RuleSelector::W],
-                ignore: &[RuleSelector::W292],
+                select: &[RuleCodePrefix::W.into()],
+                ignore: &[RuleCodePrefix::W292.into()],
             },
             RuleCodeSpec {
-                select: &[RuleSelector::W292],
+                select: &[RuleCodePrefix::W292.into()],
                 ignore: &[],
             },
         ]);
@@ -409,12 +431,12 @@ mod tests {
 
         let actual = resolve_codes([
             RuleCodeSpec {
-                select: &[RuleSelector::W],
-                ignore: &[RuleSelector::W292],
+                select: &[RuleCodePrefix::W.into()],
+                ignore: &[RuleCodePrefix::W292.into()],
             },
             RuleCodeSpec {
-                select: &[RuleSelector::W292],
-                ignore: &[RuleSelector::W],
+                select: &[RuleCodePrefix::W292.into()],
+                ignore: &[RuleCodePrefix::W.into()],
             },
         ]);
         let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);

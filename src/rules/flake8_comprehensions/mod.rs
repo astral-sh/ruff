@@ -11,7 +11,7 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400.py"); "C400")]
     #[test_case(Rule::UnnecessaryGeneratorSet, Path::new("C401.py"); "C401")]
@@ -38,7 +38,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

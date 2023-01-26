@@ -124,9 +124,12 @@ pub fn check_tokens(
     // ISC001, ISC002
     if enforce_implicit_string_concatenation {
         diagnostics.extend(
-            flake8_implicit_str_concat::rules::implicit(tokens)
-                .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+            flake8_implicit_str_concat::rules::implicit(
+                tokens,
+                &settings.flake8_implicit_str_concat,
+            )
+            .into_iter()
+            .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
     }
 

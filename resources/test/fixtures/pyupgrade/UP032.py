@@ -44,6 +44,8 @@ print("foo {} ".format(x))
 
 "{}".format(a)
 
+'({}={{0!e}})'.format(a)
+
 ###
 # Non-errors
 ###

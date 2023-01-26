@@ -1,4 +1,6 @@
 //! Utility to generate Ruff's `pyproject.toml` section from a Flake8 INI file.
+#![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
@@ -11,7 +13,6 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
-#![forbid(unsafe_code)]
 
 use std::path::PathBuf;
 
@@ -60,7 +61,7 @@ fn main() -> Result<()> {
 
     // Create Ruff's pyproject.toml section.
     let pyproject = flake8_to_ruff::convert(&config, &external_config, cli.plugin)?;
-    println!("{}", toml_edit::easy::to_string_pretty(&pyproject)?);
+    println!("{}", toml::to_string_pretty(&pyproject)?);
 
     Ok(())
 }

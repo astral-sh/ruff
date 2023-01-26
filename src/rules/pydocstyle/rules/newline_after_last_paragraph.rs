@@ -34,7 +34,11 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                             .skip(num_trailing_quotes)
                             .take_while(|c| c.is_whitespace())
                             .count();
-                        let content = format!("\n{}", whitespace::clean(docstring.indentation));
+                        let content = format!(
+                            "{}{}",
+                            checker.stylist.line_ending().as_str(),
+                            whitespace::clean(docstring.indentation)
+                        );
                         diagnostic.amend(Fix::replacement(
                             content,
                             Location::new(

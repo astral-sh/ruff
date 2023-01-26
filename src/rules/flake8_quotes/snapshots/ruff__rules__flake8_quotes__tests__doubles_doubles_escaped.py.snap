@@ -11,7 +11,8 @@ expression: diagnostics
     row: 1
     column: 47
   fix:
-    content: "\"This is a 'string'\""
+    content:
+      - "\"This is a 'string'\""
     location:
       row: 1
       column: 25
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 2
     column: 52
   fix:
-    content: "\"This is \\\\ a \\\\'string'\""
+    content:
+      - "\"This is \\\\ a \\\\'string'\""
     location:
       row: 2
       column: 25

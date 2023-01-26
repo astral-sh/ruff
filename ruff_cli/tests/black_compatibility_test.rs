@@ -10,11 +10,8 @@ use std::{fs, process, str};
 
 use anyhow::{anyhow, Context, Result};
 use assert_cmd::Command;
-use itertools::Itertools;
 use log::info;
 use ruff::logging::{set_up_logging, LogLevel};
-use ruff::registry::{Linter, RuleNamespace};
-use strum::IntoEnumIterator;
 use walkdir::WalkDir;
 
 /// Handles `blackd` process and allows submitting code to it for formatting.
@@ -175,13 +172,6 @@ fn test_ruff_black_compatibility() -> Result<()> {
         .filter_map(Result::ok)
         .collect();
 
-    let codes = Linter::iter()
-        // Exclude ruff codes, specifically RUF100, because it causes differences that are not a
-        // problem. Ruff would add a `# noqa: W292`  after the first run, black introduces a
-        // newline, and ruff removes the `# noqa: W292` again.
-        .filter(|linter| *linter != Linter::Ruff)
-        .map(|linter| linter.prefixes().join(","))
-        .join(",");
     let ruff_args = [
         "-",
         "--silent",
@@ -189,8 +179,11 @@ fn test_ruff_black_compatibility() -> Result<()> {
         "--fix",
         "--line-length",
         "88",
-        "--select",
-        &codes,
+        "--select ALL",
+        // Exclude ruff codes, specifically RUF100, because it causes differences that are not a
+        // problem. Ruff would add a `# noqa: W292`  after the first run, black introduces a
+        // newline, and ruff removes the `# noqa: W292` again.
+        "--ignore RUF",
     ];
 
     for entry in paths {

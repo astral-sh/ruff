@@ -4,13 +4,20 @@ use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
+use crate::rules::flake8_implicit_str_concat::settings::Settings;
 use crate::violations;
 
 /// ISC001, ISC002
-pub fn implicit(tokens: &[LexResult]) -> Vec<Diagnostic> {
+pub fn implicit(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
-    for ((a_start, a_tok, a_end), (b_start, b_tok, b_end)) in
-        tokens.iter().flatten().tuple_windows()
+    for ((a_start, a_tok, a_end), (b_start, b_tok, b_end)) in tokens
+        .iter()
+        .flatten()
+        .filter(|(_, tok, _)| {
+            !matches!(tok, Tok::Comment(..))
+                && (settings.allow_multiline || !matches!(tok, Tok::NonLogicalNewline))
+        })
+        .tuple_windows()
     {
         if matches!(a_tok, Tok::String { .. }) && matches!(b_tok, Tok::String { .. }) {
             if a_end.row() == b_start.row() {
@@ -22,8 +29,6 @@ pub fn implicit(tokens: &[LexResult]) -> Vec<Diagnostic> {
                     },
                 ));
             } else {
-                // Not on the same line, and no NonLogicalNewline between a and b =>
-                // concatantion over a continuation line.
                 diagnostics.push(Diagnostic::new(
                     violations::MultiLineImplicitStringConcatenation,
                     Range {

@@ -2,7 +2,7 @@ use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
-use crate::ast::helpers::create_expr;
+use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -31,8 +31,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         return None;
     }
 
-    let mut generator: Generator = checker.stylist.into();
-    generator.unparse_expr(
+    Some(unparse_expr(
         &create_expr(ExprKind::Constant {
             value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
                 if let ExprKind::Constant {
@@ -49,9 +48,8 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
             })),
             kind: None,
         }),
-        0,
-    );
-    Some(generator.generate())
+        checker.stylist,
+    ))
 }
 
 /// PT006
@@ -102,24 +100,22 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            let mut generator: Generator = checker.stylist.into();
-                            generator.unparse_expr(
-                                &create_expr(ExprKind::List {
-                                    elts: names
-                                        .iter()
-                                        .map(|&name| {
-                                            create_expr(ExprKind::Constant {
-                                                value: Constant::Str(name.to_string()),
-                                                kind: None,
-                                            })
-                                        })
-                                        .collect(),
-                                    ctx: ExprContext::Load,
-                                }),
-                                0,
-                            );
                             diagnostic.amend(Fix::replacement(
-                                generator.generate(),
+                                unparse_expr(
+                                    &create_expr(ExprKind::List {
+                                        elts: names
+                                            .iter()
+                                            .map(|&name| {
+                                                create_expr(ExprKind::Constant {
+                                                    value: Constant::Str(name.to_string()),
+                                                    kind: None,
+                                                })
+                                            })
+                                            .collect(),
+                                        ctx: ExprContext::Load,
+                                    }),
+                                    checker.stylist,
+                                ),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
@@ -144,16 +140,14 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            let mut generator: Generator = checker.stylist.into();
-                            generator.unparse_expr(
-                                &create_expr(ExprKind::List {
-                                    elts: elts.clone(),
-                                    ctx: ExprContext::Load,
-                                }),
-                                0,
-                            );
                             diagnostic.amend(Fix::replacement(
-                                generator.generate(),
+                                unparse_expr(
+                                    &create_expr(ExprKind::List {
+                                        elts: elts.clone(),
+                                        ctx: ExprContext::Load,
+                                    }),
+                                    checker.stylist,
+                                ),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
@@ -285,10 +279,8 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        let mut generator: Generator = checker.stylist.into();
-        generator.unparse_expr(&create_expr(value.node.clone()), 0);
         diagnostic.amend(Fix::replacement(
-            generator.generate(),
+            unparse_expr(&create_expr(value.node.clone()), checker.stylist),
             expr.location,
             expr.end_location.unwrap(),
         ));

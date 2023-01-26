@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_implicit_str_concat/mod.rs
+expression: diagnostics
+---
+- kind:
+    SingleLineImplicitStringConcatenation: ~
+  location:
+    row: 1
+    column: 4
+  end_location:
+    row: 1
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    SingleLineImplicitStringConcatenation: ~
+  location:
+    row: 1
+    column: 8
+  end_location:
+    row: 1
+    column: 15
+  fix: ~
+  parent: ~
+

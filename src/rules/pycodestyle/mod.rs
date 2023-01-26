@@ -2,6 +2,8 @@
 pub(crate) mod rules;
 pub mod settings;
 
+pub mod helpers;
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -12,7 +14,7 @@ mod tests {
     use super::settings::Settings;
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
@@ -45,7 +47,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -59,7 +61,7 @@ mod tests {
                 Rule::IsLiteral,
             ]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -77,7 +79,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -93,7 +95,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

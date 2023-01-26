@@ -11,7 +11,10 @@ expression: diagnostics
     row: 3
     column: 12
   fix:
-    content: "\"\"\" This 'should'\nbe\n'linted' \"\"\""
+    content:
+      - "\"\"\" This 'should'"
+      - be
+      - "'linted' \"\"\""
     location:
       row: 1
       column: 4

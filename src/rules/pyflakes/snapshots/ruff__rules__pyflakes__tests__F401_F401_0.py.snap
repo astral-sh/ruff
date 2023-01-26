@@ -14,7 +14,8 @@ expression: diagnostics
     row: 2
     column: 16
   fix:
-    content: import os
+    content:
+      - import os
     location:
       row: 2
       column: 0
@@ -34,7 +35,11 @@ expression: diagnostics
     row: 6
     column: 15
   fix:
-    content: "from collections import (\n    Counter,\n    namedtuple,\n)"
+    content:
+      - from collections import (
+      - "    Counter,"
+      - "    namedtuple,"
+      - )
     location:
       row: 4
       column: 0
@@ -56,7 +61,8 @@ expression: diagnostics
     row: 12
     column: 23
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 12
       column: 0
@@ -76,7 +82,8 @@ expression: diagnostics
     row: 32
     column: 17
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 32
       column: 0
@@ -96,7 +103,8 @@ expression: diagnostics
     row: 33
     column: 20
   fix:
-    content: pass
+    content:
+      - pass
     location:
       row: 33
       column: 4
@@ -116,7 +124,8 @@ expression: diagnostics
     row: 37
     column: 18
   fix:
-    content: ""
+    content:
+      - ""
     location:
       row: 37
       column: 0
@@ -136,7 +145,8 @@ expression: diagnostics
     row: 52
     column: 21
   fix:
-    content: pass
+    content:
+      - pass
     location:
       row: 52
       column: 8

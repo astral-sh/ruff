@@ -2,18 +2,31 @@ use imperative::Mood;
 use once_cell::sync::Lazy;
 use ruff_macros::derive_message_formats;
 
+use crate::ast::cast;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::violation::Violation;
+use crate::visibility::{is_property, is_test};
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
 /// D401
 pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
+    let (
+        DefinitionKind::Function(parent)
+        | DefinitionKind::NestedFunction(parent)
+        | DefinitionKind::Method(parent)
+    ) = &docstring.kind else {
+        return;
+    };
+    if is_test(cast::name(parent)) || is_property(checker, cast::decorator_list(parent)) {
+        return;
+    }
+
     let body = docstring.body;
 
     // Find first line, disregarding whitespace.

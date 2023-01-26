@@ -11,7 +11,9 @@ expression: diagnostics
     row: 2
     column: 19
   fix:
-    content: "def f(x):\n    return 2 * x"
+    content:
+      - "def f(x):"
+      - "    return 2 * x"
     location:
       row: 2
       column: 0
@@ -28,7 +30,9 @@ expression: diagnostics
     row: 4
     column: 19
   fix:
-    content: "def f(x):\n    return 2 * x"
+    content:
+      - "def f(x):"
+      - "    return 2 * x"
     location:
       row: 4
       column: 0
@@ -45,7 +49,9 @@ expression: diagnostics
     row: 7
     column: 29
   fix:
-    content: "def this(y, z):\n        return 2 * x"
+    content:
+      - "def this(y, z):"
+      - "        return 2 * x"
     location:
       row: 7
       column: 4

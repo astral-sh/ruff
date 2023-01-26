@@ -19,6 +19,6 @@ pub struct Pyproject {
 
 pub fn parse<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = std::fs::read_to_string(path)?;
-    let pyproject = toml_edit::easy::from_str::<Pyproject>(&contents)?;
+    let pyproject = toml::from_str::<Pyproject>(&contents)?;
     Ok(pyproject)
 }

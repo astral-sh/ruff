@@ -51,18 +51,23 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Apache Airflow](https://github.com/apache/airflow)
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
-- [Dagster](https://github.com/dagster-io/dagster)
 - [Pydantic](https://github.com/pydantic/pydantic)
+- [Dagster](https://github.com/dagster-io/dagster)
+- [Dagger](https://github.com/dagger/dagger)
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
-- [Synapse (Matrix)](https://github.com/matrix-org/synapse)
-- [Saleor](https://github.com/saleor/saleor)
+- [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [Polars](https://github.com/pola-rs/polars)
 - [Ibis](https://github.com/ibis-project/ibis)
-- [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
-- [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- [Synapse (Matrix)](https://github.com/matrix-org/synapse)
 - [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
+- [Saleor](https://github.com/saleor/saleor)
+- [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
+- [Home Assistant](https://github.com/home-assistant/core)
+- [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+- [Babel](https://github.com/python-babel/babel)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -139,8 +144,9 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-executable (EXE)](#flake8-executable-exe)
-   1. [flake8-type-checking (TYP)](#flake8-type-checking-typ)
+   1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [tryceratops (TRY)](#tryceratops-try)
+   1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -178,6 +184,12 @@ For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.o
 pacman -S ruff
 ```
 
+For **Alpine** users, Ruff is also available as [`ruff`](https://pkgs.alpinelinux.org/package/edge/testing/x86_64/ruff) on the testing repositories:
+
+```shell
+apk add ruff
+```
+
 [![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
 
 ### Usage
@@ -201,7 +213,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.229'
+  rev: 'v0.0.235'
   hooks:
     - id: ruff
 ```
@@ -666,8 +678,8 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D209 | new-line-after-last-paragraph | Multi-line docstring closing quotes should be on a separate line | 🛠 |
 | D210 | no-surrounding-whitespace | No whitespaces allowed surrounding docstring text | 🛠 |
 | D211 | no-blank-line-before-class | No blank lines allowed before class docstring | 🛠 |
-| D212 | multi-line-summary-first-line | Multi-line docstring summary should start at the first line |  |
-| D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line |  |
+| D212 | multi-line-summary-first-line | Multi-line docstring summary should start at the first line | 🛠 |
+| D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
 | D300 | uses-triple-quotes | Use """triple double quotes""" |  |
@@ -812,6 +824,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
 | S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
+| S612 | logging-config-insecure-listen | Use of insecure `logging.config.listen` detected |  |
 | S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
 
 ### flake8-blind-except (BLE)
@@ -843,7 +856,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B004 | unreliable-callable-check |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
 | B005 | strip-with-multi-characters | Using `.strip()` with multi-character strings is misleading the reader |  |
 | B006 | mutable-argument-default | Do not use mutable data structures for argument defaults |  |
-| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within the loop body | 🛠 |
+| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body |  |
 | B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
 | B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
@@ -1152,7 +1165,9 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 | PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
 | PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
 | PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
-| PIE807 | prefer-list-builtin | Prefer `list()` over useless lambda | 🛠 |
+| PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
+| PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
+| PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
 
 ### flake8-commas (COM)
 
@@ -1178,17 +1193,23 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) o
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
+| EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
 | EXE003 | shebang-python | Shebang should contain "python" |  |
 | EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
 | EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
 
-### flake8-type-checking (TYP)
+### flake8-type-checking (TCH)
 
 For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TYP005 | empty-type-checking-block | Found empty type-checking block |  |
+| TCH001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
+| TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
+| TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
+| TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
+| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
 
 ### tryceratops (TRY)
 
@@ -1197,7 +1218,42 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
+| TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
+| TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
 | TRY300 | try-consider-else | Consider `else` block |  |
+| TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
+
+### flake8-use-pathlib (PTH)
+
+For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PTH100 | pathlib-abspath | `os.path.abspath` should be replaced by `.resolve()` |  |
+| PTH101 | pathlib-chmod | `os.chmod` should be replaced by `.chmod()` |  |
+| PTH102 | pathlib-mkdir | `os.mkdir` should be replaced by `.mkdir()` |  |
+| PTH103 | pathlib-makedirs | `os.makedirs` should be replaced by `.mkdir(parents=True)` |  |
+| PTH104 | pathlib-rename | `os.rename` should be replaced by `.rename()` |  |
+| PTH105 | pathlib-replace | `os.replace`should be replaced by `.replace()` |  |
+| PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
+| PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
+| PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
+| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
+| PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
+| PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
+| PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
+| PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
+| PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
+| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
+| PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
+| PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
+| PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
+| PTH119 | pathlib-basename | `os.path.basename` should be replaced by `.name` |  |
+| PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
+| PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
+| PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
+| PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
+| PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
 
 ### Ruff-specific rules (RUF)
 
@@ -1604,12 +1660,15 @@ project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
 ### How does Ruff's import sorting compare to [`isort`](https://pypi.org/project/isort/)?
 
 Ruff's import sorting is intended to be nearly equivalent to `isort` when used `profile = "black"`.
-(There are some minor differences in how Ruff and isort break ties between similar imports.)
+There are a few known, minor differences in how Ruff and isort break ties between similar imports,
+and in how Ruff and isort treat inline comments in some cases (see: [#1381](https://github.com/charliermarsh/ruff/issues/1381),
+[#2104](https://github.com/charliermarsh/ruff/issues/2104)).
 
 Like `isort`, Ruff's import sorting is compatible with Black.
 
-Ruff is less configurable than `isort`, but supports the `known-first-party`, `known-third-party`,
-`extra-standard-library`, and `src` settings, like so:
+Ruff does not yet support all of `isort`'s configuration options, though it does support many of
+them. You can find the supported settings in the [API reference](#isort). For example, you can set
+`known-first-party` like so:
 
 ```toml
 [tool.ruff]
@@ -1640,7 +1699,7 @@ After installing `ruff` and `nbqa`, you can run Ruff over a notebook like so:
 Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
 Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
 Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused
-Found 3 error(s).
+Found 3 errors.
 1 potentially fixable with the --fix option.
 ```
 
@@ -1675,6 +1734,25 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 ### How can I tell what settings Ruff is using to check my code?
 
 Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
+
+### Ruff tried to fix something, but it broke my code. What should I do?
+
+Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
+have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
+
+In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
+
+In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
+per-category basis using the [`unfixable`](#unfixable) mechanic. For example, to disable autofix
+for some possibly-unsafe rules, you could add the following to your `pyproject.toml`:
+
+```toml
+[tool.ruff]
+unfixable = ["B", "SIM", "TRY", "RUF"]
+```
+
+If you find a case where Ruff's autofix breaks your code, please file an Issue!
+
 
 ## Contributing
 
@@ -2189,10 +2267,9 @@ ignore = ["F841"]
 #### [`ignore-init-module-imports`](#ignore-init-module-imports)
 
 Avoid automatically removing unused imports in `__init__.py` files. Such
-imports will still be +flagged, but with a dedicated message
-suggesting that the import is either added to the module' +`__all__`
-symbol, or re-exported with a redundant alias (e.g., `import os as
-os`).
+imports will still be flagged, but with a dedicated message suggesting
+that the import is either added to the module's `__all__` symbol, or
+re-exported with a redundant alias (e.g., `import os as os`).
 
 **Default value**: `false`
 
@@ -2626,6 +2703,25 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 ---
 
+### `flake8-builtins`
+
+#### [`builtins-ignorelist`](#builtins-ignorelist)
+
+Ignore list of builtins.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-builtins]
+builtins-ignorelist = ["id"]
+```
+
+---
+
 ### `flake8-errmsg`
 
 #### [`max-string-length`](#max-string-length)
@@ -2641,6 +2737,28 @@ Maximum string length for string literals in exception messages.
 ```toml
 [tool.ruff.flake8-errmsg]
 max-string-length = 20
+```
+
+---
+
+### `flake8-implicit-str-concat`
+
+#### [`allow-multiline`](#allow-multiline)
+
+Whether to allow implicit string concatenations for multiline strings.
+By default, implicit concatenations of multiline strings are
+allowed (but continuation lines, delimited with a backslash, are
+prohibited).
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-implicit-str-concat]
+allow-multiline = false
 ```
 
 ---

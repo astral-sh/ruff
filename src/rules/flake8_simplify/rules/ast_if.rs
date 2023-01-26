@@ -50,7 +50,7 @@ fn is_main_check(expr: &Expr) -> bool {
 /// ```
 fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     let [Stmt { node: StmtKind::If { test, body: inner_body, orelse }, ..}] = body else { return None };
-    if !(orelse.is_empty() && body.len() == 1) {
+    if !orelse.is_empty() {
         return None;
     }
     find_last_nested_if(inner_body).or_else(|| {
@@ -67,12 +67,10 @@ pub fn nested_if_statements(
     stmt: &Stmt,
     test: &Expr,
     body: &[Stmt],
+    orelse: &[Stmt],
     parent: Option<&Stmt>,
 ) {
-    if is_main_check(test) {
-        return;
-    }
-
+    // If the parent could contain a nested if-statement, abort.
     if let Some(parent) = parent {
         if let StmtKind::If { body, orelse, .. } = &parent.node {
             if orelse.is_empty() && body.len() == 1 {
@@ -81,6 +79,16 @@ pub fn nested_if_statements(
         }
     }
 
+    // If this if-statement has an else clause, or more than one child, abort.
+    if !(orelse.is_empty() && body.len() == 1) {
+        return;
+    }
+
+    if is_main_check(test) {
+        return;
+    }
+
+    // Find the deepest nested if-statement, to inform the range.
     let Some((test, first_stmt)) = find_last_nested_if(body) else {
         return;
     };

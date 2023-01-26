@@ -1,0 +1,15 @@
+---
+source: src/rules/flake8_use_pathlib/mod.rs
+expression: diagnostics
+---
+- kind:
+    PathlibPyPath: ~
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 17
+  fix: ~
+  parent: ~
+

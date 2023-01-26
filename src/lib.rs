@@ -4,6 +4,8 @@
 //! and subject to change drastically.
 //!
 //! [Ruff]: https://github.com/charliermarsh/ruff
+#![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::collapsible_else_if,
     clippy::collapsible_if,
@@ -16,8 +18,8 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
-#![forbid(unsafe_code)]
 
+mod assert_yaml_snapshot;
 mod ast;
 mod autofix;
 pub mod cache;
@@ -37,6 +39,8 @@ mod noqa;
 mod python;
 pub mod registry;
 pub mod resolver;
+mod rule_redirects;
+mod rule_selector;
 mod rules;
 mod rustpython_helpers;
 pub mod settings;
@@ -47,6 +51,7 @@ mod violations;
 mod visibility;
 
 use cfg_if::cfg_if;
+pub use rule_selector::RuleSelector;
 pub use violation::{AutofixKind, Availability as AutofixAvailability};
 pub use violations::IOError;
 
