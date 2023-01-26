@@ -157,7 +157,8 @@ pub fn convert_named_tuple_functional_to_class(
         violations::ConvertNamedTupleFunctionalToClass(typename.to_string()),
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    if checker.patch(diagnostic.kind.rule()) && stmt.location.column() == 0 {
         match match_defaults(keywords)
             .and_then(|defaults| create_properties_from_args(args, defaults))
         {
