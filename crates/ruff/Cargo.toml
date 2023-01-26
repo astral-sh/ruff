@@ -8,7 +8,7 @@ rust-version = "1.65.0"
 documentation = "https://github.com/charliermarsh/ruff"
 homepage = "https://github.com/charliermarsh/ruff"
 repository = "https://github.com/charliermarsh/ruff"
-readme = "../README.md"
+readme = "../../README.md"
 license = "MIT"
 
 [lib]
