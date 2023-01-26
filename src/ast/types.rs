@@ -89,9 +89,6 @@ pub struct Scope<'a> {
     pub uses_locals: bool,
     /// A map from bound name to binding index.
     pub values: FxHashMap<&'a str, usize>,
-    /// A list of (name, index) pairs for bindings that were overridden in the
-    /// scope.
-    pub overridden: Vec<(&'a str, usize)>,
 }
 
 impl<'a> Scope<'a> {
@@ -102,7 +99,6 @@ impl<'a> Scope<'a> {
             import_starred: false,
             uses_locals: false,
             values: FxHashMap::default(),
-            overridden: Vec::new(),
         }
     }
 }
