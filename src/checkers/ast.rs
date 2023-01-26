@@ -4611,6 +4611,7 @@ impl<'a> Checker<'a> {
                             &deleted,
                             self.locator,
                             self.indexer,
+                            self.stylist,
                         ) {
                             Ok(fix) => {
                                 if fix.content.is_empty() || fix.content == "pass" {
