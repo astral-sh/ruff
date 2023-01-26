@@ -502,15 +502,15 @@ pub enum Linter {
     /// [isort](https://pypi.org/project/isort/)
     #[prefix = "I"]
     Isort,
+    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
+    #[prefix = "N"]
+    PEP8Naming,
     /// [pydocstyle](https://pypi.org/project/pydocstyle/)
     #[prefix = "D"]
     Pydocstyle,
     /// [pyupgrade](https://pypi.org/project/pyupgrade/)
     #[prefix = "UP"]
     Pyupgrade,
-    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
-    #[prefix = "N"]
-    PEP8Naming,
     /// [flake8-2020](https://pypi.org/project/flake8-2020/)
     #[prefix = "YTT"]
     Flake82020,
@@ -532,21 +532,39 @@ pub enum Linter {
     /// [flake8-builtins](https://pypi.org/project/flake8-builtins/)
     #[prefix = "A"]
     Flake8Builtins,
+    /// [flake8-commas](https://pypi.org/project/flake8-commas/)
+    #[prefix = "COM"]
+    Flake8Commas,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
+    /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
+    #[prefix = "DTZ"]
+    Flake8Datetimez,
     /// [flake8-debugger](https://pypi.org/project/flake8-debugger/)
     #[prefix = "T10"]
     Flake8Debugger,
     /// [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
     #[prefix = "EM"]
     Flake8ErrMsg,
+    /// [flake8-executable](https://pypi.org/project/flake8-executable/)
+    #[prefix = "EXE"]
+    Flake8Executable,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
     /// [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
     #[prefix = "ICN"]
     Flake8ImportConventions,
+    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/)
+    #[prefix = "G"]
+    Flake8LoggingFormat,
+    /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
+    #[prefix = "INP"]
+    Flake8NoPep420,
+    /// [flake8-pie](https://pypi.org/project/flake8-pie/)
+    #[prefix = "PIE"]
+    Flake8Pie,
     /// [flake8-print](https://pypi.org/project/flake8-print/)
     #[prefix = "T20"]
     Flake8Print,
@@ -565,12 +583,15 @@ pub enum Linter {
     /// [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
     #[prefix = "TID"]
     Flake8TidyImports,
+    /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+    #[prefix = "TCH"]
+    Flake8TypeChecking,
     /// [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/)
     #[prefix = "ARG"]
     Flake8UnusedArguments,
-    /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
-    #[prefix = "DTZ"]
-    Flake8Datetimez,
+    /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
+    #[prefix = "PTH"]
+    Flake8UsePathlib,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
@@ -583,30 +604,9 @@ pub enum Linter {
     /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
-    /// [flake8-pie](https://pypi.org/project/flake8-pie/)
-    #[prefix = "PIE"]
-    Flake8Pie,
-    /// [flake8-commas](https://pypi.org/project/flake8-commas/)
-    #[prefix = "COM"]
-    Flake8Commas,
-    /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
-    #[prefix = "INP"]
-    Flake8NoPep420,
-    /// [flake8-executable](https://pypi.org/project/flake8-executable/)
-    #[prefix = "EXE"]
-    Flake8Executable,
-    /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
-    #[prefix = "TCH"]
-    Flake8TypeChecking,
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
-    /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
-    #[prefix = "PTH"]
-    Flake8UsePathlib,
-    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/)
-    #[prefix = "G"]
-    Flake8LoggingFormat,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

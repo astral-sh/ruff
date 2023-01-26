@@ -114,9 +114,9 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [pycodestyle (E, W)](#pycodestyle-e-w)
    1. [mccabe (C90)](#mccabe-c90)
    1. [isort (I)](#isort-i)
+   1. [pep8-naming (N)](#pep8-naming-n)
    1. [pydocstyle (D)](#pydocstyle-d)
    1. [pyupgrade (UP)](#pyupgrade-up)
-   1. [pep8-naming (N)](#pep8-naming-n)
    1. [flake8-2020 (YTT)](#flake8-2020-ytt)
    1. [flake8-annotations (ANN)](#flake8-annotations-ann)
    1. [flake8-bandit (S)](#flake8-bandit-s)
@@ -124,31 +124,31 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [flake8-boolean-trap (FBT)](#flake8-boolean-trap-fbt)
    1. [flake8-bugbear (B)](#flake8-bugbear-b)
    1. [flake8-builtins (A)](#flake8-builtins-a)
+   1. [flake8-commas (COM)](#flake8-commas-com)
    1. [flake8-comprehensions (C4)](#flake8-comprehensions-c4)
+   1. [flake8-datetimez (DTZ)](#flake8-datetimez-dtz)
    1. [flake8-debugger (T10)](#flake8-debugger-t10)
    1. [flake8-errmsg (EM)](#flake8-errmsg-em)
+   1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [flake8-implicit-str-concat (ISC)](#flake8-implicit-str-concat-isc)
    1. [flake8-import-conventions (ICN)](#flake8-import-conventions-icn)
+   1. [flake8-logging-format (G)](#flake8-logging-format-g)
+   1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
+   1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-print (T20)](#flake8-print-t20)
    1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
    1. [flake8-simplify (SIM)](#flake8-simplify-sim)
    1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
+   1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
-   1. [flake8-datetimez (DTZ)](#flake8-datetimez-dtz)
+   1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [eradicate (ERA)](#eradicate-era)
    1. [pandas-vet (PD)](#pandas-vet-pd)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PL)](#pylint-pl)
-   1. [flake8-pie (PIE)](#flake8-pie-pie)
-   1. [flake8-commas (COM)](#flake8-commas-com)
-   1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
-   1. [flake8-executable (EXE)](#flake8-executable-exe)
-   1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [tryceratops (TRY)](#tryceratops-try)
-   1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
-   1. [flake8-logging-format (G)](#flake8-logging-format-g)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -654,6 +654,28 @@ For more, see [isort](https://pypi.org/project/isort/) on PyPI.
 | I001 | unsorted-imports | Import block is un-sorted or un-formatted | 🛠 |
 | I002 | missing-required-import | Missing required import: `{name}` | 🛠 |
 
+### pep8-naming (N)
+
+For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| N801 | invalid-class-name | Class name `{name}` should use CapWords convention  |  |
+| N802 | invalid-function-name | Function name `{name}` should be lowercase |  |
+| N803 | invalid-argument-name | Argument name `{name}` should be lowercase |  |
+| N804 | invalid-first-argument-name-for-class-method | First argument of a class method should be named `cls` |  |
+| N805 | invalid-first-argument-name-for-method | First argument of a method should be named `self` |  |
+| N806 | non-lowercase-variable-in-function | Variable `{name}` in function should be lowercase |  |
+| N807 | dunder-function-name | Function name should not start and end with `__` |  |
+| N811 | constant-imported-as-non-constant | Constant `{name}` imported as non-constant `{asname}` |  |
+| N812 | lowercase-imported-as-non-lowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
+| N813 | camelcase-imported-as-lowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
+| N814 | camelcase-imported-as-constant | Camelcase `{name}` imported as constant `{asname}` |  |
+| N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
+| N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
+| N817 | camelcase-imported-as-acronym | Camelcase `{name}` imported as acronym `{asname}` |  |
+| N818 | error-suffix-on-exception-name | Exception name `{name}` should be named with an Error suffix |  |
+
 ### pydocstyle (D)
 
 For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
@@ -746,28 +768,6 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP032 | f-string | Use f-string instead of `format` call | 🛠 |
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
-
-### pep8-naming (N)
-
-For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| N801 | invalid-class-name | Class name `{name}` should use CapWords convention  |  |
-| N802 | invalid-function-name | Function name `{name}` should be lowercase |  |
-| N803 | invalid-argument-name | Argument name `{name}` should be lowercase |  |
-| N804 | invalid-first-argument-name-for-class-method | First argument of a class method should be named `cls` |  |
-| N805 | invalid-first-argument-name-for-method | First argument of a method should be named `self` |  |
-| N806 | non-lowercase-variable-in-function | Variable `{name}` in function should be lowercase |  |
-| N807 | dunder-function-name | Function name should not start and end with `__` |  |
-| N811 | constant-imported-as-non-constant | Constant `{name}` imported as non-constant `{asname}` |  |
-| N812 | lowercase-imported-as-non-lowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
-| N813 | camelcase-imported-as-lowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
-| N814 | camelcase-imported-as-constant | Camelcase `{name}` imported as constant `{asname}` |  |
-| N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
-| N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
-| N817 | camelcase-imported-as-acronym | Camelcase `{name}` imported as acronym `{asname}` |  |
-| N818 | error-suffix-on-exception-name | Exception name `{name}` should be named with an Error suffix |  |
 
 ### flake8-2020 (YTT)
 
@@ -890,6 +890,16 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/) on Py
 | A002 | builtin-argument-shadowing | Argument `{name}` is shadowing a python builtin |  |
 | A003 | builtin-attribute-shadowing | Class attribute `{name}` is shadowing a python builtin |  |
 
+### flake8-commas (COM)
+
+For more, see [flake8-commas](https://pypi.org/project/flake8-commas/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| COM812 | trailing-comma-missing | Trailing comma missing | 🛠 |
+| COM818 | trailing-comma-on-bare-tuple-prohibited | Trailing comma on bare tuple prohibited |  |
+| COM819 | trailing-comma-prohibited | Trailing comma prohibited | 🛠 |
+
 ### flake8-comprehensions (C4)
 
 For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/) on PyPI.
@@ -913,6 +923,22 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C416 | unnecessary-comprehension | Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`) | 🛠 |
 | C417 | unnecessary-map | Unnecessary `map` usage (rewrite using a generator expression) |  |
 
+### flake8-datetimez (DTZ)
+
+For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| DTZ001 | call-datetime-without-tzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
+| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed |  |
+| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
+| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
+| DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
+| DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
+| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
+| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
+| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+
 ### flake8-debugger (T10)
 
 For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/) on PyPI.
@@ -931,6 +957,18 @@ For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/) on PyPI.
 | EM102 | f-string-in-exception | Exception must not use an f-string literal, assign to variable first |  |
 | EM103 | dot-format-in-exception | Exception must not use a `.format()` string directly, assign to variable first |  |
 
+### flake8-executable (EXE)
+
+For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
+| EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
+| EXE003 | shebang-python | Shebang should contain "python" |  |
+| EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
+| EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
+
 ### flake8-implicit-str-concat (ISC)
 
 For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/) on PyPI.
@@ -948,6 +986,42 @@ For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | ICN001 | import-alias-is-not-conventional | `{name}` should be imported as `{asname}` |  |
+
+### flake8-logging-format (G)
+
+For more, see [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| G001 | logging-string-format | Logging statement uses `string.format()` |  |
+| G002 | logging-percent-format | Logging statement uses `%` |  |
+| G003 | logging-string-concat | Logging statement uses `+` |  |
+| G004 | logging-f-string | Logging statement uses f-string |  |
+| G010 | logging-warn | Logging statement uses `warn` instead of `warning` | 🛠 |
+| G101 | logging-extra-attr-clash | Logging statement uses an extra field that clashes with a LogRecord field: `{key}` |  |
+| G201 | logging-exc-info | Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)` |  |
+| G202 | logging-redundant-exc-info | Logging statement has redundant `exc_info` |  |
+
+### flake8-no-pep420 (INP)
+
+For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+
+### flake8-pie (PIE)
+
+For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
+| PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
+| PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
+| PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
+| PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
+| PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
 
 ### flake8-print (T20)
 
@@ -1057,6 +1131,18 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 | TID251 | banned-api | `{name}` is banned: {message} |  |
 | TID252 | relative-imports | Relative imports from parent modules are banned |  |
 
+### flake8-type-checking (TCH)
+
+For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| TCH001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
+| TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
+| TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
+| TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
+| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
+
 ### flake8-unused-arguments (ARG)
 
 For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/) on PyPI.
@@ -1069,21 +1155,37 @@ For more, see [flake8-unused-arguments](https://pypi.org/project/flake8-unused-a
 | ARG004 | unused-static-method-argument | Unused static method argument: `{name}` |  |
 | ARG005 | unused-lambda-argument | Unused lambda argument: `{name}` |  |
 
-### flake8-datetimez (DTZ)
+### flake8-use-pathlib (PTH)
 
-For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/) on PyPI.
+For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| DTZ001 | call-datetime-without-tzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
-| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed |  |
-| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
-| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
-| DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
-| DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
-| DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
-| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
-| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+| PTH100 | pathlib-abspath | `os.path.abspath` should be replaced by `.resolve()` |  |
+| PTH101 | pathlib-chmod | `os.chmod` should be replaced by `.chmod()` |  |
+| PTH102 | pathlib-mkdir | `os.mkdir` should be replaced by `.mkdir()` |  |
+| PTH103 | pathlib-makedirs | `os.makedirs` should be replaced by `.mkdir(parents=True)` |  |
+| PTH104 | pathlib-rename | `os.rename` should be replaced by `.rename()` |  |
+| PTH105 | pathlib-replace | `os.replace`should be replaced by `.replace()` |  |
+| PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
+| PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
+| PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
+| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
+| PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
+| PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
+| PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
+| PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
+| PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
+| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
+| PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
+| PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
+| PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
+| PTH119 | pathlib-basename | `os.path.basename` should be replaced by `.name` |  |
+| PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
+| PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
+| PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
+| PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
+| PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
 
 ### eradicate (ERA)
 
@@ -1156,61 +1258,6 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLW0120 | useless-else-on-loop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
 | PLW0602 | global-variable-not-assigned | Using global for `{name}` but no assignment is done |  |
 
-### flake8-pie (PIE)
-
-For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
-| PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
-| PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
-| PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
-| PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
-| PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
-
-### flake8-commas (COM)
-
-For more, see [flake8-commas](https://pypi.org/project/flake8-commas/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| COM812 | trailing-comma-missing | Trailing comma missing | 🛠 |
-| COM818 | trailing-comma-on-bare-tuple-prohibited | Trailing comma on bare tuple prohibited |  |
-| COM819 | trailing-comma-prohibited | Trailing comma prohibited | 🛠 |
-
-### flake8-no-pep420 (INP)
-
-For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
-
-### flake8-executable (EXE)
-
-For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
-| EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
-| EXE003 | shebang-python | Shebang should contain "python" |  |
-| EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
-| EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
-
-### flake8-type-checking (TCH)
-
-For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checking/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| TCH001 | typing-only-first-party-import | Move application import `{}` into a type-checking block |  |
-| TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
-| TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
-| TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
-| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
-
 ### tryceratops (TRY)
 
 For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI.
@@ -1225,53 +1272,6 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY300 | try-consider-else | Consider `else` block |  |
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 | TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
-
-### flake8-use-pathlib (PTH)
-
-For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| PTH100 | pathlib-abspath | `os.path.abspath` should be replaced by `.resolve()` |  |
-| PTH101 | pathlib-chmod | `os.chmod` should be replaced by `.chmod()` |  |
-| PTH102 | pathlib-mkdir | `os.mkdir` should be replaced by `.mkdir()` |  |
-| PTH103 | pathlib-makedirs | `os.makedirs` should be replaced by `.mkdir(parents=True)` |  |
-| PTH104 | pathlib-rename | `os.rename` should be replaced by `.rename()` |  |
-| PTH105 | pathlib-replace | `os.replace`should be replaced by `.replace()` |  |
-| PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
-| PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
-| PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
-| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
-| PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
-| PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
-| PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
-| PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
-| PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
-| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
-| PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
-| PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
-| PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
-| PTH119 | pathlib-basename | `os.path.basename` should be replaced by `.name` |  |
-| PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
-| PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
-| PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
-| PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
-| PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
-
-### flake8-logging-format (G)
-
-For more, see [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| G001 | logging-string-format | Logging statement uses `string.format()` |  |
-| G002 | logging-percent-format | Logging statement uses `%` |  |
-| G003 | logging-string-concat | Logging statement uses `+` |  |
-| G004 | logging-f-string | Logging statement uses f-string |  |
-| G010 | logging-warn | Logging statement uses `warn` instead of `warning` | 🛠 |
-| G101 | logging-extra-attr-clash | Logging statement uses an extra field that clashes with a LogRecord field: `{key}` |  |
-| G201 | logging-exc-info | Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)` |  |
-| G202 | logging-redundant-exc-info | Logging statement has redundant `exc_info` |  |
 
 ### Ruff-specific rules (RUF)
 
