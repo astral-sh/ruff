@@ -69,6 +69,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
 - [build (PyPA)](https://github.com/pypa/build)
 - [Babel](https://github.com/python-babel/babel)
+- [featuretools](https://github.com/alteryx/featuretools)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
