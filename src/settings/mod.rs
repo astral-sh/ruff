@@ -16,8 +16,8 @@ use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle,
-    pydocstyle, pylint, pyupgrade,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
+    pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
@@ -111,6 +111,7 @@ pub struct Settings {
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::Settings,
+    pub flake8_type_checking: flake8_type_checking::settings::Settings,
     pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
     pub isort: isort::settings::Settings,
     pub mccabe: mccabe::settings::Settings,
@@ -196,6 +197,10 @@ impl Settings {
             flake8_quotes: config.flake8_quotes.map(Into::into).unwrap_or_default(),
             flake8_tidy_imports: config
                 .flake8_tidy_imports
+                .map(Into::into)
+                .unwrap_or_default(),
+            flake8_type_checking: config
+                .flake8_type_checking
                 .map(Into::into)
                 .unwrap_or_default(),
             flake8_unused_arguments: config

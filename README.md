@@ -3106,6 +3106,27 @@ and can be circumvented via `eval` or `importlib`.
 
 ---
 
+### `flake8-type-checking`
+
+#### [`strict`](#strict)
+
+Enforce TC001, TC002, and TC003 rules even when valid runtime imports
+are present for the same module.
+See: https://github.com/snok/flake8-type-checking#strict.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-type-checking]
+strict = true
+```
+
+---
+
 ### `flake8-unused-arguments`
 
 #### [`ignore-variadic-names`](#ignore-variadic-names)
