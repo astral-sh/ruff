@@ -48,4 +48,22 @@ expression: diagnostics
     column: 12
   fix: ~
   parent: ~
+- kind:
+    MissingReturnTypeSpecialMethod: __init__
+  location:
+    row: 47
+    column: 8
+  end_location:
+    row: 47
+    column: 16
+  fix:
+    content:
+      - " -> None"
+    location:
+      row: 47
+      column: 28
+    end_location:
+      row: 47
+      column: 28
+  parent: ~
 
