@@ -69,11 +69,7 @@ define_violation!(
     }
 );
 fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
-    let UnusedImport {
-        name,
-        ignore_init: _,
-        multiple,
-    } = unused_import;
+    let UnusedImport { name, multiple, .. } = unused_import;
     if *multiple {
         "Remove unused import".to_string()
     } else {
@@ -99,11 +95,7 @@ impl Violation for UnusedImport {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedImport {
-            name: _,
-            ignore_init,
-            multiple: _,
-        } = self;
+        let UnusedImport { ignore_init, .. } = self;
         if *ignore_init {
             None
         } else {
