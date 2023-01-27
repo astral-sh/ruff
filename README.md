@@ -1248,8 +1248,8 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | ---- | ---- | ------- | --- |
 | PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
 | PLE0118 | used-prior-global-declaration | Name `{name}` is used prior to global declaration on line {line} |  |
-| PLE0604 | invalid-all-object | Invalid object in __all__, must contain only strings |  |
-| PLE0605 | invalid-all-format | Invalid format for __all__, must be tuple or list |  |
+| PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |
+| PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
 
 #### Refactor (PLR)

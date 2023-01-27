@@ -13,7 +13,7 @@ define_violation!(
 impl Violation for InvalidAllFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid format for __all__, must be tuple or list")
+        format!("Invalid format for `__all__`, must be `tuple` or `list`")
     }
 }
 

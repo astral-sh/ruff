@@ -13,7 +13,7 @@ define_violation!(
 impl Violation for InvalidAllObject {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid object in __all__, must contain only strings")
+        format!("Invalid object in `__all__`, must contain only strings")
     }
 }
 
