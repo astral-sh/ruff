@@ -39,7 +39,8 @@ pub struct Options {
         value_type = "bool",
         example = "check-typed-exception = true"
     )]
-    /// Whether to disallow try-except-pass for specific exception types
+    /// Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default,
+    /// `try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.
     pub check_typed_exception: Option<bool>,
 }
 

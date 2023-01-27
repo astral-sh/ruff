@@ -579,7 +579,7 @@
       "type": "object",
       "properties": {
         "check-typed-exception": {
-          "description": "Whether to disallow try-except-pass for specific exception types",
+          "description": "Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default, `try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.",
           "type": [
             "boolean",
             "null"

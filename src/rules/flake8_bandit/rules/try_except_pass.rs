@@ -13,7 +13,7 @@ define_violation!(
 impl Violation for TryExceptPass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`try`-`except`-`pass` detected")
+        format!("`try`-`except`-`pass` detected, consider logging the exception")
     }
 }
 
@@ -29,9 +29,10 @@ pub fn try_except_pass(
         && body[0].node == StmtKind::Pass
         && (check_typed_exception
             || type_.map_or(true, |type_| {
-                checker
-                    .resolve_call_path(type_)
-                    .map_or(true, |call_path| call_path.as_slice() == ["", "Exception"])
+                checker.resolve_call_path(type_).map_or(true, |call_path| {
+                    call_path.as_slice() == ["", "Exception"]
+                        || call_path.as_slice() == ["", "BaseException"]
+                })
             }))
     {
         checker.diagnostics.push(Diagnostic::new(
