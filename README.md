@@ -612,6 +612,9 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
+| E201 | whitespace-after-brace | Whitespace after `{brace}` | 🛠 |
+| E202 | whitespace-before-brace | Whitespace before `{brace}` | 🛠 |
+| E203 | whitespace-before-comma-semicolon-colon | Whitespace before `{value}` | 🛠 |
 | E401 | multiple-imports-on-one-line | Multiple imports on one line |  |
 | E402 | module-import-not-at-top-of-file | Module level import not at top of file |  |
 | E501 | line-too-long | Line too long ({length} > {limit} characters) |  |

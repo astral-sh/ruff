@@ -14,6 +14,9 @@ use crate::{rules, violations};
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
     E101 => rules::pycodestyle::rules::MixedSpacesAndTabs,
+    E201 => rules::pycodestyle::rules::WhitespaceAfterBrace,
+    E202 => rules::pycodestyle::rules::WhitespaceBeforeBrace,
+    E203 => rules::pycodestyle::rules::WhitespaceBeforeCommaSemicolonColon,
     E401 => violations::MultipleImportsOnOneLine,
     E402 => violations::ModuleImportNotAtTopOfFile,
     E501 => rules::pycodestyle::rules::LineTooLong,
@@ -664,7 +667,10 @@ impl Rule {
             | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
             | Rule::ShebangPython
-            | Rule::ShebangWhitespace => &LintSource::Lines,
+            | Rule::ShebangWhitespace
+            | Rule::WhitespaceAfterBrace
+            | Rule::WhitespaceBeforeBrace
+            | Rule::WhitespaceBeforeCommaSemicolonColon => &LintSource::Lines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString

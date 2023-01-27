@@ -1,0 +1,100 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    WhitespaceAfterBrace:
+      brace: (
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 6
+  fix:
+    content:
+      - (
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 6
+  parent: ~
+- kind:
+    WhitespaceAfterBrace:
+      brace: "["
+  location:
+    row: 3
+    column: 8
+  end_location:
+    row: 3
+    column: 10
+  fix:
+    content:
+      - "["
+    location:
+      row: 3
+      column: 8
+    end_location:
+      row: 3
+      column: 10
+  parent: ~
+- kind:
+    WhitespaceAfterBrace:
+      brace: "{"
+  location:
+    row: 4
+    column: 13
+  end_location:
+    row: 4
+    column: 15
+  fix:
+    content:
+      - "{"
+    location:
+      row: 4
+      column: 13
+    end_location:
+      row: 4
+      column: 15
+  parent: ~
+- kind:
+    WhitespaceAfterBrace:
+      brace: (
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 6
+  fix:
+    content:
+      - (
+    location:
+      row: 5
+      column: 4
+    end_location:
+      row: 5
+      column: 6
+  parent: ~
+- kind:
+    WhitespaceAfterBrace:
+      brace: (
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 2
+  fix:
+    content:
+      - (
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 2
+  parent: ~
+

@@ -8,7 +8,8 @@ use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
 use crate::rules::pycodestyle::rules::{
-    doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
+    check_whitespace, doc_line_too_long, line_too_long, mixed_spaces_and_tabs,
+    no_newline_at_end_of_file,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
@@ -51,6 +52,13 @@ pub fn check_lines(
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
+
+    let enforce_whitespace_after_brace = settings.rules.enabled(&Rule::WhitespaceAfterBrace);
+    let enforce_whitespace_before_brace = settings.rules.enabled(&Rule::WhitespaceBeforeBrace);
+    let enforce_whitespace_before_comma_semicolon_colon = settings
+        .rules
+        .enabled(&Rule::WhitespaceBeforeCommaSemicolonColon);
+
     for (index, line) in contents.lines().enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
@@ -136,6 +144,18 @@ pub fn check_lines(
             if let Some(diagnostic) = line_too_long(index, line, settings) {
                 diagnostics.push(diagnostic);
             }
+        }
+
+        if enforce_whitespace_after_brace
+            || enforce_whitespace_before_brace
+            || enforce_whitespace_before_comma_semicolon_colon
+        {
+            diagnostics.extend(check_whitespace(
+                index,
+                line,
+                matches!(autofix, flags::Autofix::Enabled),
+                settings,
+            ));
         }
     }
 

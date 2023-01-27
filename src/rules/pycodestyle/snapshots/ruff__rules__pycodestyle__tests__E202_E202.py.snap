@@ -1,0 +1,119 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    WhitespaceBeforeBrace:
+      brace: )
+  location:
+    row: 2
+    column: 22
+  end_location:
+    row: 2
+    column: 24
+  fix:
+    content:
+      - )
+    location:
+      row: 2
+      column: 22
+    end_location:
+      row: 2
+      column: 24
+  parent: ~
+- kind:
+    WhitespaceBeforeBrace:
+      brace: "]"
+  location:
+    row: 3
+    column: 10
+  end_location:
+    row: 3
+    column: 12
+  fix:
+    content:
+      - "]"
+    location:
+      row: 3
+      column: 10
+    end_location:
+      row: 3
+      column: 12
+  parent: ~
+- kind:
+    WhitespaceBeforeBrace:
+      brace: "}"
+  location:
+    row: 4
+    column: 21
+  end_location:
+    row: 4
+    column: 23
+  fix:
+    content:
+      - "}"
+    location:
+      row: 4
+      column: 21
+    end_location:
+      row: 4
+      column: 23
+  parent: ~
+- kind:
+    WhitespaceBeforeBrace:
+      brace: "]"
+  location:
+    row: 5
+    column: 11
+  end_location:
+    row: 5
+    column: 13
+  fix:
+    content:
+      - "]"
+    location:
+      row: 5
+      column: 11
+    end_location:
+      row: 5
+      column: 13
+  parent: ~
+- kind:
+    WhitespaceBeforeBrace:
+      brace: )
+  location:
+    row: 7
+    column: 7
+  end_location:
+    row: 7
+    column: 9
+  fix:
+    content:
+      - )
+    location:
+      row: 7
+      column: 7
+    end_location:
+      row: 7
+      column: 9
+  parent: ~
+- kind:
+    WhitespaceBeforeBrace:
+      brace: )
+  location:
+    row: 7
+    column: 19
+  end_location:
+    row: 7
+    column: 21
+  fix:
+    content:
+      - )
+    location:
+      row: 7
+      column: 19
+    end_location:
+      row: 7
+      column: 21
+  parent: ~
+

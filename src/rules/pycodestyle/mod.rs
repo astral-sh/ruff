@@ -39,6 +39,9 @@ mod tests {
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_0.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_1.py"))]
     #[test_case(Rule::MixedSpacesAndTabs, Path::new("E101.py"))]
+    #[test_case(Rule::WhitespaceAfterBrace, Path::new("E201.py"); "E201")]
+    #[test_case(Rule::WhitespaceBeforeBrace, Path::new("E202.py"); "E202")]
+    #[test_case(Rule::WhitespaceBeforeCommaSemicolonColon, Path::new("E203.py"); "E203")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
