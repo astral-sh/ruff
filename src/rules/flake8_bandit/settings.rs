@@ -39,7 +39,7 @@ pub struct Options {
         value_type = "bool",
         example = "check-typed-exception = true"
     )]
-    /// A list of directories to consider temporary.
+    /// Whether to disallow try-except-pass for specific exception types
     pub check_typed_exception: Option<bool>,
 }
 
