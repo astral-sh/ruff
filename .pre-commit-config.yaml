@@ -18,3 +18,9 @@ repos:
         entry: cargo +nightly fmt --
         language: rust
         types: [rust]
+      - id: clippy
+        name: clippy
+        entry: cargo +nightly clippy --workspace --all-targets --all-features
+        language: rust
+        pass_filenames: false
+
