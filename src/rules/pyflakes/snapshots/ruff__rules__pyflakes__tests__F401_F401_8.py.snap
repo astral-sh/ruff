@@ -1,0 +1,6 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+[]
+

@@ -3723,7 +3723,7 @@ impl<'a> Checker<'a> {
                 kind: BindingKind::Builtin,
                 range: Range::default(),
                 runtime_usage: None,
-                synthetic_usage: None,
+                synthetic_usage: Some((0, Range::default())),
                 typing_usage: None,
                 source: None,
                 context: ExecutionContext::Runtime,
@@ -3852,14 +3852,19 @@ impl<'a> Checker<'a> {
 
         // Assume the rebound name is used as a global or within a loop.
         let scope = self.current_scope();
-        let binding = match scope.values.get(&name) {
-            None => binding,
-            Some(index) => Binding {
-                runtime_usage: self.bindings[*index].runtime_usage,
-                synthetic_usage: self.bindings[*index].synthetic_usage,
-                typing_usage: self.bindings[*index].typing_usage,
-                ..binding
-            },
+        let binding = if let Some(index) = scope.values.get(&name) {
+            if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
+                binding
+            } else {
+                Binding {
+                    runtime_usage: self.bindings[*index].runtime_usage,
+                    synthetic_usage: self.bindings[*index].synthetic_usage,
+                    typing_usage: self.bindings[*index].typing_usage,
+                    ..binding
+                }
+            }
+        } else {
+            binding
         };
 
         // Don't treat annotations as assignments if there is an existing value
