@@ -116,4 +116,61 @@ expression: diagnostics
       row: 7
       column: 8
   parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age == YODA
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 11
+  fix:
+    content:
+      - age == YODA
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 11
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age < YODA
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 10
+  fix:
+    content:
+      - age < YODA
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 10
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age <= YODA
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 11
+  fix:
+    content:
+      - age <= YODA
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 11
+  parent: ~
 

@@ -3,6 +3,7 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
+use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::violations;
 
@@ -24,12 +25,6 @@ pub fn yoda_conditions(
     ) {
         return;
     }
-    if !matches!(&left.node, &ExprKind::Constant { .. }) {
-        return;
-    }
-    if matches!(&right.node, &ExprKind::Constant { .. }) {
-        return;
-    }
 
     // Slice exact content to preserve formatting.
     let constant = checker
@@ -38,6 +33,13 @@ pub fn yoda_conditions(
     let variable = checker
         .locator
         .slice_source_code_range(&Range::from_located(right));
+
+    if !matches!(&left.node, &ExprKind::Constant { .. }) && !string::is_upper(constant) {
+        return;
+    }
+    if matches!(&right.node, &ExprKind::Constant { .. }) || string::is_upper(variable) {
+        return;
+    }
 
     // Reverse the operation.
     let reversed_op = match op {
