@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashSet;
 
 use proc_macro2::{Ident, Span};
@@ -70,7 +71,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         });
     }
 
-    parsed.sort_by_key(|(prefix, _)| prefix.len());
+    parsed.sort_by_key(|(prefix, _)| Reverse(prefix.len()));
 
     let mut if_statements = quote!();
     let mut into_iter_match_arms = quote!();
@@ -84,14 +85,14 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
         if field != "Pycodestyle" {
             into_iter_match_arms.extend(quote! {
-                #ident::#field => RuleSelector::#prefix_ident.into_iter(),
+                #ident::#field => RuleCodePrefix::#prefix_ident.into_iter(),
             });
         }
     }
 
     into_iter_match_arms.extend(quote! {
         #ident::Pycodestyle => {
-            let rules: Vec<_> = (&RuleSelector::E).into_iter().chain(&RuleSelector::W).collect();
+            let rules: Vec<_> = (&RuleCodePrefix::E).into_iter().chain(&RuleCodePrefix::W).collect();
             rules.into_iter()
         }
     });

@@ -61,3 +61,34 @@ except Exception as e:
     raise bad
 except BaseException:
     pass
+
+import logging
+
+try:
+    pass
+except Exception:
+    logging.error("...")
+
+
+try:
+    pass
+except Exception:
+    logging.error("...", exc_info=False)
+
+
+try:
+    pass
+except Exception:
+    logging.error("...", exc_info=None)
+
+
+try:
+    pass
+except Exception:
+    logging.exception("...")
+
+
+try:
+    pass
+except Exception:
+    logging.error("...", exc_info=True)

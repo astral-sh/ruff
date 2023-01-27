@@ -1,5 +1,6 @@
 //! Lint rules based on AST traversal.
 
+use std::iter;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -16,11 +17,11 @@ use rustpython_parser::parser;
 use smallvec::smallvec;
 
 use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
-use crate::ast::operations::extract_all_names;
+use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingKind, CallPath, ClassDef, FunctionDef, Lambda, Node, Range, RefEquality, Scope,
-    ScopeKind,
+    Binding, BindingKind, CallPath, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
+    RefEquality, Scope, ScopeKind,
 };
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, visitor};
@@ -34,10 +35,11 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pie, flake8_print,
-    flake8_pytest_style, flake8_return, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
-    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format,
+    flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
+    pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
+    ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -54,6 +56,7 @@ type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 pub struct Checker<'a> {
     // Input data.
     path: &'a Path,
+    package: Option<&'a Path>,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     pub(crate) settings: &'a Settings,
@@ -78,7 +81,7 @@ pub struct Checker<'a> {
     pub(crate) exprs: Vec<RefEquality<'a, Expr>>,
     pub(crate) scopes: Vec<Scope<'a>>,
     pub(crate) scope_stack: Vec<usize>,
-    pub(crate) dead_scopes: Vec<usize>,
+    pub(crate) dead_scopes: Vec<(usize, Vec<usize>)>,
     deferred_string_type_definitions: Vec<(Range, &'a str, bool, DeferralContext<'a>)>,
     deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext<'a>)>,
     deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
@@ -92,6 +95,7 @@ pub struct Checker<'a> {
     in_deferred_type_definition: bool,
     in_literal: bool,
     in_subscript: bool,
+    in_type_checking_block: bool,
     seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
@@ -108,6 +112,7 @@ impl<'a> Checker<'a> {
         autofix: flags::Autofix,
         noqa: flags::Noqa,
         path: &'a Path,
+        package: Option<&'a Path>,
         locator: &'a Locator,
         style: &'a Stylist,
         indexer: &'a Indexer,
@@ -118,6 +123,7 @@ impl<'a> Checker<'a> {
             autofix,
             noqa,
             path,
+            package,
             locator,
             stylist: style,
             indexer,
@@ -149,6 +155,7 @@ impl<'a> Checker<'a> {
             in_deferred_type_definition: false,
             in_literal: false,
             in_subscript: false,
+            in_type_checking_block: false,
             seen_import_boundary: false,
             futures_allowed: true,
             annotations_future_enabled: path.extension().map_or(false, |ext| ext == "pyi"),
@@ -323,15 +330,19 @@ where
                 let ranges = helpers::find_names(stmt, self.locator);
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
+                    let context = self.execution_context();
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Global,
-                            used: usage,
+                            runtime_usage: None,
+                            synthetic_usage: usage,
+                            typing_usage: None,
                             range: *range,
                             source: Some(RefEquality(stmt)),
+                            context,
                         });
                         scope.values.insert(name, index);
                     }
@@ -348,6 +359,7 @@ where
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
                 let ranges = helpers::find_names(stmt, self.locator);
                 if scope_index != GLOBAL_SCOPE_INDEX {
+                    let context = self.execution_context();
                     let scope = &mut self.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
@@ -355,9 +367,12 @@ where
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
-                            used: usage,
+                            runtime_usage: None,
+                            synthetic_usage: usage,
+                            typing_usage: None,
                             range: *range,
                             source: Some(RefEquality(stmt)),
+                            context,
                         });
                         scope.values.insert(name, index);
                     }
@@ -369,7 +384,7 @@ where
                         for index in self.scope_stack.iter().skip(1).rev().skip(1) {
                             if let Some(index) = self.scopes[*index].values.get(&name.as_str()) {
                                 exists = true;
-                                self.bindings[*index].used = usage;
+                                self.bindings[*index].runtime_usage = usage;
                             }
                         }
 
@@ -663,13 +678,18 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
+
+                let context = self.execution_context();
                 self.add_binding(
                     name,
                     Binding {
                         kind: BindingKind::FunctionDefinition,
-                        used: None,
+                        runtime_usage: None,
+                        synthetic_usage: None,
+                        typing_usage: None,
                         range: Range::from_located(stmt),
                         source: Some(self.current_stmt().clone()),
+                        context,
                     },
                 );
             }
@@ -819,9 +839,12 @@ where
                             name,
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(name, full_name),
-                                used: None,
+                                runtime_usage: None,
+                                synthetic_usage: None,
+                                typing_usage: None,
                                 range: Range::from_located(alias),
                                 source: Some(self.current_stmt().clone()),
+                                context: self.execution_context(),
                             },
                         );
                     } else {
@@ -838,9 +861,10 @@ where
                             name,
                             Binding {
                                 kind: BindingKind::Importation(name, full_name),
+                                runtime_usage: None,
                                 // Treat explicit re-export as usage (e.g., `import applications
                                 // as applications`).
-                                used: if alias
+                                synthetic_usage: if alias
                                     .node
                                     .asname
                                     .as_ref()
@@ -857,8 +881,10 @@ where
                                 } else {
                                     None
                                 },
+                                typing_usage: None,
                                 range: Range::from_located(alias),
                                 source: Some(self.current_stmt().clone()),
+                                context: self.execution_context(),
                             },
                         );
                     }
@@ -1027,7 +1053,9 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport) {
+                if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport)
+                    && self.settings.target_version >= PythonVersion::Py37
+                {
                     if let Some("__future__") = module.as_deref() {
                         pyupgrade::rules::unnecessary_future_import(self, stmt, names);
                     }
@@ -1086,8 +1114,9 @@ where
                             name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
+                                runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                used: Some((
+                                synthetic_usage: Some((
                                     self.scopes[*(self
                                         .scope_stack
                                         .last()
@@ -1095,8 +1124,10 @@ where
                                     .id,
                                     Range::from_located(alias),
                                 )),
+                                typing_usage: None,
                                 range: Range::from_located(alias),
                                 source: Some(self.current_stmt().clone()),
+                                context: self.execution_context(),
                             },
                         );
 
@@ -1128,9 +1159,12 @@ where
                             "*",
                             Binding {
                                 kind: BindingKind::StarImportation(*level, module.clone()),
-                                used: None,
+                                runtime_usage: None,
+                                synthetic_usage: None,
+                                typing_usage: None,
                                 range: Range::from_located(stmt),
                                 source: Some(self.current_stmt().clone()),
+                                context: self.execution_context(),
                             },
                         );
 
@@ -1182,9 +1216,10 @@ where
                             name,
                             Binding {
                                 kind: BindingKind::FromImportation(name, full_name),
+                                runtime_usage: None,
                                 // Treat explicit re-export as usage (e.g., `from .applications
                                 // import FastAPI as FastAPI`).
-                                used: if alias
+                                synthetic_usage: if alias
                                     .node
                                     .asname
                                     .as_ref()
@@ -1201,8 +1236,10 @@ where
                                 } else {
                                     None
                                 },
+                                typing_usage: None,
                                 range,
                                 source: Some(self.current_stmt().clone()),
+                                context: self.execution_context(),
                             },
                         );
                     }
@@ -1369,6 +1406,16 @@ where
                         pyupgrade::rules::os_error_alias(self, &item);
                     }
                 }
+                if self.settings.rules.enabled(&Rule::RaiseVanillaClass) {
+                    if let Some(expr) = exc {
+                        tryceratops::rules::raise_vanilla_class(self, expr);
+                    }
+                }
+                if self.settings.rules.enabled(&Rule::RaiseVanillaArgs) {
+                    if let Some(expr) = exc {
+                        tryceratops::rules::raise_vanilla_args(self, expr);
+                    }
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
@@ -1376,9 +1423,6 @@ where
             StmtKind::If { test, body, orelse } => {
                 if self.settings.rules.enabled(&Rule::IfTuple) {
                     pyflakes::rules::if_tuple(self, stmt, test);
-                }
-                if self.settings.rules.enabled(&Rule::EmptyTypeCheckingBlock) {
-                    flake8_type_checking::rules::empty_type_checking_block(self, test, body);
                 }
                 if self.settings.rules.enabled(&Rule::NestedIfStatements) {
                     flake8_simplify::rules::nested_if_statements(
@@ -1582,6 +1626,12 @@ where
                 if self.settings.rules.enabled(&Rule::VerboseRaise) {
                     tryceratops::rules::verbose_raise(self, handlers);
                 }
+                if self.settings.rules.enabled(&Rule::RaiseWithinTry) {
+                    tryceratops::rules::raise_within_try(self, body);
+                }
+                if self.settings.rules.enabled(&Rule::ErrorInsteadOfException) {
+                    tryceratops::rules::error_instead_of_exception(self, handlers);
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.rules.enabled(&Rule::DoNotAssignLambda) {
@@ -1706,9 +1756,12 @@ where
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Assignment,
-                            used: None,
+                            runtime_usage: None,
+                            synthetic_usage: None,
+                            typing_usage: None,
                             range: Range::from_located(stmt),
                             source: Some(RefEquality(stmt)),
+                            context: self.execution_context(),
                         });
                         self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
                     }
@@ -1767,9 +1820,12 @@ where
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
                             kind: BindingKind::Assignment,
-                            used: None,
+                            runtime_usage: None,
+                            synthetic_usage: None,
+                            typing_usage: None,
                             range: Range::from_located(stmt),
                             source: Some(RefEquality(stmt)),
+                            context: self.execution_context(),
                         });
                         self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
                     }
@@ -1826,6 +1882,24 @@ where
                 }
                 self.visit_expr(target);
             }
+            StmtKind::If { test, body, orelse } => {
+                self.visit_expr(test);
+
+                if flake8_type_checking::helpers::is_type_checking_block(self, test) {
+                    if self.settings.rules.enabled(&Rule::EmptyTypeCheckingBlock) {
+                        flake8_type_checking::rules::empty_type_checking_block(self, test, body);
+                    }
+
+                    let prev_in_type_checking_block = self.in_type_checking_block;
+                    self.in_type_checking_block = true;
+                    self.visit_body(body);
+                    self.in_type_checking_block = prev_in_type_checking_block;
+                } else {
+                    self.visit_body(body);
+                }
+
+                self.visit_body(orelse);
+            }
             _ => visitor::walk_stmt(self, stmt),
         };
         self.visible_scope = prev_visible_scope;
@@ -1841,9 +1915,12 @@ where
                     name,
                     Binding {
                         kind: BindingKind::ClassDefinition,
-                        used: None,
+                        runtime_usage: None,
+                        synthetic_usage: None,
+                        typing_usage: None,
                         range: Range::from_located(stmt),
                         source: Some(self.current_stmt().clone()),
+                        context: self.execution_context(),
                     },
                 );
             }
@@ -2591,6 +2668,19 @@ where
                     || self.settings.rules.enabled(&Rule::PathlibPyPath)
                 {
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
+                }
+
+                // flake8-logging-format
+                if self.settings.rules.enabled(&Rule::LoggingStringFormat)
+                    || self.settings.rules.enabled(&Rule::LoggingPercentFormat)
+                    || self.settings.rules.enabled(&Rule::LoggingStringConcat)
+                    || self.settings.rules.enabled(&Rule::LoggingFString)
+                    || self.settings.rules.enabled(&Rule::LoggingWarn)
+                    || self.settings.rules.enabled(&Rule::LoggingExtraAttrClash)
+                    || self.settings.rules.enabled(&Rule::LoggingExcInfo)
+                    || self.settings.rules.enabled(&Rule::LoggingRedundantExcInfo)
+                {
+                    flake8_logging_format::rules::logging_call(self, func, args, keywords);
                 }
             }
             ExprKind::Dict { keys, values } => {
@@ -3411,7 +3501,7 @@ where
                                 [*(self.scope_stack.last().expect("No current scope found"))];
                             &scope.values.remove(&name.as_str())
                         } {
-                            if self.bindings[*index].used.is_none() {
+                            if !self.bindings[*index].used() {
                                 if self.settings.rules.enabled(&Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
                                         violations::UnusedVariable(name.to_string()),
@@ -3529,9 +3619,12 @@ where
             &arg.node.arg,
             Binding {
                 kind: BindingKind::Argument,
-                used: None,
+                runtime_usage: None,
+                synthetic_usage: None,
+                typing_usage: None,
                 range: Range::from_located(arg),
                 source: Some(self.current_stmt().clone()),
+                context: self.execution_context(),
             },
         );
 
@@ -3608,11 +3701,12 @@ impl<'a> Checker<'a> {
     }
 
     fn pop_scope(&mut self) {
-        self.dead_scopes.push(
+        self.dead_scopes.push((
             self.scope_stack
                 .pop()
                 .expect("Attempted to pop without scope"),
-        );
+            self.scope_stack.clone(),
+        ));
     }
 
     fn bind_builtins(&mut self) {
@@ -3628,8 +3722,11 @@ impl<'a> Checker<'a> {
             self.bindings.push(Binding {
                 kind: BindingKind::Builtin,
                 range: Range::default(),
-                used: None,
+                runtime_usage: None,
+                synthetic_usage: Some((0, Range::default())),
+                typing_usage: None,
                 source: None,
+                context: ExecutionContext::Runtime,
             });
             scope.values.insert(builtin, index);
         }
@@ -3664,6 +3761,18 @@ impl<'a> Checker<'a> {
             .iter()
             .rev()
             .map(|index| &self.scopes[*index])
+    }
+
+    pub fn execution_context(&self) -> ExecutionContext {
+        if self.in_type_checking_block
+            || self.in_annotation
+            || self.in_deferred_string_type_definition
+            || self.in_deferred_type_definition
+        {
+            ExecutionContext::Typing
+        } else {
+            ExecutionContext::Runtime
+        }
     }
 
     fn add_binding<'b>(&mut self, name: &'b str, binding: Binding<'a>)
@@ -3713,7 +3822,7 @@ impl<'a> Checker<'a> {
                         ));
                     }
                 } else if in_current_scope {
-                    if existing.used.is_none()
+                    if !existing.used()
                         && binding.redefines(existing)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
                         && !(matches!(existing.kind, BindingKind::FunctionDefinition)
@@ -3743,12 +3852,19 @@ impl<'a> Checker<'a> {
 
         // Assume the rebound name is used as a global or within a loop.
         let scope = self.current_scope();
-        let binding = match scope.values.get(&name) {
-            None => binding,
-            Some(index) => Binding {
-                used: self.bindings[*index].used,
-                ..binding
-            },
+        let binding = if let Some(index) = scope.values.get(&name) {
+            if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
+                binding
+            } else {
+                Binding {
+                    runtime_usage: self.bindings[*index].runtime_usage,
+                    synthetic_usage: self.bindings[*index].synthetic_usage,
+                    typing_usage: self.bindings[*index].typing_usage,
+                    ..binding
+                }
+            }
+        } else {
+            binding
         };
 
         // Don't treat annotations as assignments if there is an existing value
@@ -3782,7 +3898,8 @@ impl<'a> Checker<'a> {
 
                 if let Some(index) = scope.values.get(&id.as_str()) {
                     // Mark the binding as used.
-                    self.bindings[*index].used = Some((scope_id, Range::from_located(expr)));
+                    let context = self.execution_context();
+                    self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
 
                     if matches!(self.bindings[*index].kind, BindingKind::Annotation)
                         && !self.in_deferred_string_type_definition
@@ -3810,8 +3927,11 @@ impl<'a> Checker<'a> {
                             if has_alias {
                                 // Mark the sub-importation as used.
                                 if let Some(index) = scope.values.get(full_name) {
-                                    self.bindings[*index].used =
-                                        Some((scope_id, Range::from_located(expr)));
+                                    self.bindings[*index].mark_used(
+                                        scope_id,
+                                        Range::from_located(expr),
+                                        context,
+                                    );
                                 }
                             }
                         }
@@ -3824,8 +3944,11 @@ impl<'a> Checker<'a> {
                             if has_alias {
                                 // Mark the sub-importation as used.
                                 if let Some(index) = scope.values.get(full_name.as_str()) {
-                                    self.bindings[*index].used =
-                                        Some((scope_id, Range::from_located(expr)));
+                                    self.bindings[*index].mark_used(
+                                        scope_id,
+                                        Range::from_located(expr),
+                                        context,
+                                    );
                                 }
                             }
                         }
@@ -3953,9 +4076,12 @@ impl<'a> Checker<'a> {
                 id,
                 Binding {
                     kind: BindingKind::Annotation,
-                    used: None,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_stmt().clone()),
+                    context: self.execution_context(),
                 },
             );
             return;
@@ -3970,9 +4096,12 @@ impl<'a> Checker<'a> {
                 id,
                 Binding {
                     kind: BindingKind::LoopVar,
-                    used: None,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_stmt().clone()),
+                    context: self.execution_context(),
                 },
             );
             return;
@@ -3983,9 +4112,12 @@ impl<'a> Checker<'a> {
                 id,
                 Binding {
                     kind: BindingKind::Binding,
-                    used: None,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
                     range: Range::from_located(expr),
                     source: Some(self.current_stmt().clone()),
+                    context: self.execution_context(),
                 },
             );
             return;
@@ -4025,17 +4157,31 @@ impl<'a> Checker<'a> {
                 }
                 _ => false,
             } {
+                let (all_names, all_names_flags) =
+                    extract_all_names(parent, current, &self.bindings);
+
+                if self.settings.rules.enabled(&Rule::InvalidAllFormat)
+                    && matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT)
+                {
+                    pylint::rules::invalid_all_format(self, expr);
+                }
+
+                if self.settings.rules.enabled(&Rule::InvalidAllObject)
+                    && matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT)
+                {
+                    pylint::rules::invalid_all_object(self, expr);
+                }
+
                 self.add_binding(
                     id,
                     Binding {
-                        kind: BindingKind::Export(extract_all_names(
-                            parent,
-                            current,
-                            &self.bindings,
-                        )),
-                        used: None,
+                        kind: BindingKind::Export(all_names),
+                        runtime_usage: None,
+                        synthetic_usage: None,
+                        typing_usage: None,
                         range: Range::from_located(expr),
                         source: Some(self.current_stmt().clone()),
+                        context: self.execution_context(),
                     },
                 );
                 return;
@@ -4046,9 +4192,12 @@ impl<'a> Checker<'a> {
             id,
             Binding {
                 kind: BindingKind::Assignment,
-                used: None,
+                runtime_usage: None,
+                synthetic_usage: None,
+                typing_usage: None,
                 range: Range::from_located(expr),
                 source: Some(self.current_stmt().clone()),
+                context: self.execution_context(),
             },
         );
     }
@@ -4226,25 +4375,76 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
-        if !self.settings.rules.enabled(&Rule::UnusedImport)
-            && !self.settings.rules.enabled(&Rule::ImportStarUsage)
-            && !self.settings.rules.enabled(&Rule::RedefinedWhileUnused)
-            && !self.settings.rules.enabled(&Rule::UndefinedExport)
-            && !self
+        if !(self.settings.rules.enabled(&Rule::UnusedImport)
+            || self.settings.rules.enabled(&Rule::ImportStarUsage)
+            || self.settings.rules.enabled(&Rule::RedefinedWhileUnused)
+            || self.settings.rules.enabled(&Rule::UndefinedExport)
+            || self
                 .settings
                 .rules
                 .enabled(&Rule::GlobalVariableNotAssigned)
+            || self
+                .settings
+                .rules
+                .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
+            || self
+                .settings
+                .rules
+                .enabled(&Rule::TypingOnlyFirstPartyImport)
+            || self
+                .settings
+                .rules
+                .enabled(&Rule::TypingOnlyThirdPartyImport)
+            || self
+                .settings
+                .rules
+                .enabled(&Rule::TypingOnlyStandardLibraryImport))
         {
             return;
         }
 
-        let mut diagnostics: Vec<Diagnostic> = vec![];
-        for scope in self
-            .dead_scopes
-            .iter()
-            .rev()
-            .map(|index| &self.scopes[*index])
+        // Identify any valid runtime imports. If a module is imported at runtime, and
+        // used at runtime, then by default, we avoid flagging any other
+        // imports from that model as typing-only.
+        let runtime_imports: Vec<Vec<&Binding>> = if !self.settings.flake8_type_checking.strict
+            && (self
+                .settings
+                .rules
+                .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyFirstPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyThirdPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyStandardLibraryImport))
         {
+            self.scopes
+                .iter()
+                .map(|scope| {
+                    scope
+                        .values
+                        .values()
+                        .map(|index| &self.bindings[*index])
+                        .filter(|binding| {
+                            flake8_type_checking::helpers::is_valid_runtime_import(binding)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+
+        let mut diagnostics: Vec<Diagnostic> = vec![];
+        for (index, stack) in self.dead_scopes.iter().rev() {
+            let scope = &self.scopes[*index];
+
             // PLW0602
             if self
                 .settings
@@ -4310,7 +4510,7 @@ impl<'a> Checker<'a> {
                             | BindingKind::FutureImportation
                     ) {
                         // Skip used exports from `__all__`
-                        if binding.used.is_some()
+                        if binding.used()
                             || all_names
                                 .as_ref()
                                 .map(|names| names.contains(name))
@@ -4366,6 +4566,56 @@ impl<'a> Checker<'a> {
                 }
             }
 
+            if self
+                .settings
+                .rules
+                .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyFirstPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyThirdPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyStandardLibraryImport)
+            {
+                let runtime_imports: Vec<&Binding> = if self.settings.flake8_type_checking.strict {
+                    vec![]
+                } else {
+                    stack
+                        .iter()
+                        .chain(iter::once(index))
+                        .flat_map(|index| runtime_imports[*index].iter())
+                        .copied()
+                        .collect()
+                };
+                for (.., index) in &scope.values {
+                    let binding = &self.bindings[*index];
+
+                    if let Some(diagnostic) =
+                        flake8_type_checking::rules::runtime_import_in_type_checking_block(binding)
+                    {
+                        diagnostics.push(diagnostic);
+                    }
+                    if let Some(diagnostic) =
+                        flake8_type_checking::rules::typing_only_runtime_import(
+                            binding,
+                            &runtime_imports,
+                            self.package,
+                            self.settings,
+                        )
+                    {
+                        if self.settings.rules.enabled(diagnostic.kind.rule()) {
+                            diagnostics.push(diagnostic);
+                        }
+                    }
+                }
+            }
+
             if self.settings.rules.enabled(&Rule::UnusedImport) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
@@ -4377,11 +4627,7 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for (name, index) in scope
-                    .values
-                    .iter()
-                    .chain(scope.overridden.iter().map(|(a, b)| (a, b)))
-                {
+                for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
 
                     let full_name = match &binding.kind {
@@ -4392,7 +4638,7 @@ impl<'a> Checker<'a> {
                     };
 
                     // Skip used exports from `__all__`
-                    if binding.used.is_some()
+                    if binding.used()
                         || all_names
                             .as_ref()
                             .map(|names| names.contains(name))
@@ -4453,6 +4699,7 @@ impl<'a> Checker<'a> {
                             &deleted,
                             self.locator,
                             self.indexer,
+                            self.stylist,
                         ) {
                             Ok(fix) => {
                                 if fix.content.is_empty() || fix.content == "pass" {
@@ -4866,6 +5113,7 @@ pub fn check_ast(
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     path: &Path,
+    package: Option<&Path>,
 ) -> Vec<Diagnostic> {
     let mut checker = Checker::new(
         settings,
@@ -4873,6 +5121,7 @@ pub fn check_ast(
         autofix,
         noqa,
         path,
+        package,
         locator,
         stylist,
         indexer,

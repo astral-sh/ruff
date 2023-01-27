@@ -1,0 +1,45 @@
+---
+source: src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    RaiseVanillaArgs: ~
+  location:
+    row: 8
+    column: 14
+  end_location:
+    row: 8
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    RaiseVanillaArgs: ~
+  location:
+    row: 34
+    column: 14
+  end_location:
+    row: 34
+    column: 68
+  fix: ~
+  parent: ~
+- kind:
+    RaiseVanillaArgs: ~
+  location:
+    row: 39
+    column: 14
+  end_location:
+    row: 39
+    column: 70
+  fix: ~
+  parent: ~
+- kind:
+    RaiseVanillaArgs: ~
+  location:
+    row: 44
+    column: 14
+  end_location:
+    row: 44
+    column: 69
+  fix: ~
+  parent: ~
+

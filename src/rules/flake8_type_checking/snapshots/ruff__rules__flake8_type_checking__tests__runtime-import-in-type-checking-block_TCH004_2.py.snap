@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    RuntimeImportInTypeCheckingBlock:
+      full_name: datetime.date
+  location:
+    row: 4
+    column: 25
+  end_location:
+    row: 4
+    column: 29
+  fix: ~
+  parent: ~
+

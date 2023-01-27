@@ -61,6 +61,7 @@ mod tests {
     use anyhow::Result;
 
     use super::Strictness;
+    use crate::assert_yaml_snapshot;
     use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -77,7 +78,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -93,7 +94,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

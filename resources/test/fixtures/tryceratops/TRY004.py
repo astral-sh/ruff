@@ -94,7 +94,7 @@ def incorrect_MemoryError(some_arg):
         # not multiline is on purpose for fix
         raise MemoryError(
             "..."
-        )  
+        )
 
 
 def incorrect_NameError(some_arg):
@@ -294,3 +294,39 @@ def multiple_ifs(some_args):
                 raise ValueError("...")  # this is ok if we don't simplify
             else:
                 pass
+
+
+def early_return():
+    if isinstance(this, some_type):
+        if x in this:
+            return
+
+        raise ValueError(f"{this} has a problem")  # this is ok
+
+
+def early_break():
+    for x in this:
+        if isinstance(this, some_type):
+            if x in this:
+                break
+
+            raise ValueError(f"{this} has a problem")  # this is ok
+
+
+def early_continue():
+    for x in this:
+        if isinstance(this, some_type):
+            if x in this:
+                continue
+
+            raise ValueError(f"{this} has a problem")  # this is ok
+
+
+def early_return_else():
+    if isinstance(this, some_type):
+        pass
+    else:
+        if x in this:
+            return
+
+        raise ValueError(f"{this} has a problem")  # this is ok

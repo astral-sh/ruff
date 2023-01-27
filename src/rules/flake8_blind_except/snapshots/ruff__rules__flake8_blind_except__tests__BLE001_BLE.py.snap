@@ -72,4 +72,34 @@ expression: diagnostics
     column: 20
   fix: ~
   parent: ~
+- kind:
+    BlindExcept: Exception
+  location:
+    row: 69
+    column: 7
+  end_location:
+    row: 69
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept: Exception
+  location:
+    row: 75
+    column: 7
+  end_location:
+    row: 75
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept: Exception
+  location:
+    row: 81
+    column: 7
+  end_location:
+    row: 81
+    column: 16
+  fix: ~
+  parent: ~
 

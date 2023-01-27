@@ -8,7 +8,7 @@ default-members = [".", "ruff_cli"]
 
 [package]
 name = "ruff"
-version = "0.0.231"
+version = "0.0.236"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -46,7 +46,7 @@ num-traits = "0.2.15"
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 regex = { version = "1.6.0" }
-ruff_macros = { version = "0.0.231", path = "ruff_macros" }
+ruff_macros = { version = "0.0.236", path = "ruff_macros" }
 rustc-hash = { version = "1.1.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
@@ -61,7 +61,7 @@ strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
 thiserror = { version = "1.0" }
 titlecase = { version = "2.2.1" }
-toml_edit = { version = "0.17.1", features = ["easy"] }
+toml = { version = "0.6.0" }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support
@@ -73,8 +73,11 @@ serde-wasm-bindgen = { version = "0.4" }
 js-sys = { version = "0.3.60" }
 wasm-bindgen = { version = "0.2.83" }
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+is_executable = "1.0.1"
+
 [dev-dependencies]
-insta = { version = "1.19.1", features = ["yaml"] }
+insta = { version = "1.19.1", features = ["yaml", "redactions"] }
 test-case = { version = "2.2.2" }
 wasm-bindgen-test = { version = "0.3.33" }
 

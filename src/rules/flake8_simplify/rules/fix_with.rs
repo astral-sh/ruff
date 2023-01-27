@@ -6,11 +6,12 @@ use crate::ast::types::Range;
 use crate::ast::whitespace;
 use crate::cst::matchers::match_module;
 use crate::fix::Fix;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 
 /// (SIM117) Convert `with a: with b:` to `with a, b:`.
 pub(crate) fn fix_multiple_with_statements(
     locator: &Locator,
+    stylist: &Stylist,
     stmt: &rustpython_ast::Stmt,
 ) -> Result<Fix> {
     // Infer the indentation of the outer block.
@@ -30,7 +31,7 @@ pub(crate) fn fix_multiple_with_statements(
     let module_text = if outer_indent.is_empty() {
         contents.to_string()
     } else {
-        format!("def f():\n{contents}")
+        format!("def f():{}{contents}", stylist.line_ending().as_str())
     };
 
     // Parse the CST.
@@ -75,7 +76,11 @@ pub(crate) fn fix_multiple_with_statements(
     }
     outer_with.body = inner_with.body.clone();
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     // Reconstruct and reformat the code.
@@ -83,7 +88,10 @@ pub(crate) fn fix_multiple_with_statements(
     let contents = if outer_indent.is_empty() {
         module_text
     } else {
-        module_text.strip_prefix("def f():\n").unwrap().to_string()
+        module_text
+            .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
+            .unwrap()
+            .to_string()
     };
 
     Ok(Fix::replacement(

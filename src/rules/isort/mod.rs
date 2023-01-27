@@ -3,14 +3,14 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use categorize::{categorize, ImportType};
+pub use categorize::{categorize, ImportType};
 use comments::Comment;
 use helpers::trailing_comma;
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Stmt, StmtKind};
-use settings::RelatveImportsOrder;
+use settings::RelativeImportsOrder;
 use sorting::{cmp_either_import, cmp_import_from, cmp_members, cmp_modules};
 use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
@@ -386,7 +386,7 @@ fn categorize_imports<'a>(
 fn order_imports<'a>(
     block: ImportBlock<'a>,
     order_by_type: bool,
-    relative_imports_order: RelatveImportsOrder,
+    relative_imports_order: RelativeImportsOrder,
     classes: &'a BTreeSet<String>,
     constants: &'a BTreeSet<String>,
     variables: &'a BTreeSet<String>,
@@ -568,7 +568,7 @@ pub fn format_imports(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     order_by_type: bool,
-    relative_imports_order: RelatveImportsOrder,
+    relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
     split_on_trailing_comma: bool,
     classes: &BTreeSet<String>,
@@ -681,7 +681,8 @@ mod tests {
     use test_case::test_case;
 
     use super::categorize::ImportType;
-    use super::settings::RelatveImportsOrder;
+    use super::settings::RelativeImportsOrder;
+    use crate::assert_yaml_snapshot;
     use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -700,8 +701,6 @@ mod tests {
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
     #[test_case(Path::new("leading_prefix.py"))]
-    #[test_case(Path::new("line_ending_crlf.py"))]
-    #[test_case(Path::new("line_ending_lf.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
     #[test_case(Path::new("natural_order.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
@@ -738,9 +737,28 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
+
+    // Test currently disabled as line endings are automatically converted to
+    // platform-appropriate ones in CI/CD #[test_case(Path::new("
+    // line_ending_crlf.py"))] #[test_case(Path::new("line_ending_lf.py"))]
+    // fn source_code_style(path: &Path) -> Result<()> {
+    //     let snapshot = format!("{}", path.to_string_lossy());
+    //     let diagnostics = test_path(
+    //         Path::new("./resources/test/fixtures/isort")
+    //             .join(path)
+    //             .as_path(),
+    //         &Settings {
+    //             src:
+    // vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+    //             ..Settings::for_rule(Rule::UnsortedImports)
+    //         },
+    //     )?;
+    //     insta::assert_yaml_snapshot!(snapshot, diagnostics);
+    //     Ok(())
+    // }
 
     #[test_case(Path::new("combine_as_imports.py"))]
     fn combine_as_imports(path: &Path) -> Result<()> {
@@ -758,7 +776,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -779,7 +797,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -799,7 +817,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -822,7 +840,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -843,7 +861,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -873,7 +891,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -905,7 +923,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -935,7 +953,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -956,7 +974,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -980,7 +998,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1005,7 +1023,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1029,7 +1047,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1051,7 +1069,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1064,14 +1082,14 @@ mod tests {
                 .as_path(),
             &Settings {
                 isort: super::settings::Settings {
-                    relative_imports_order: RelatveImportsOrder::ClosestToFurthest,
+                    relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
                     ..super::settings::Settings::default()
                 },
                 src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -1098,7 +1116,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

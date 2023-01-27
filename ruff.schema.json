@@ -175,6 +175,17 @@
         }
       ]
     },
+    "flake8-implicit-str-concat": {
+      "description": "Options for the `flake8-implicit-str-concat` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-import-conventions": {
       "description": "Options for the `flake8-import-conventions` plugin.",
       "anyOf": [
@@ -213,6 +224,17 @@
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8TidyImportsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-type-checking": {
+      "description": "Options for the `flake8-type-checking` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8TypeCheckingOptions"
         },
         {
           "type": "null"
@@ -410,7 +432,7 @@
       ]
     },
     "src": {
-      "description": "The source code paths to consider, e.g., when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_package/ pyproject.toml src/ my_package/ __init__.py foo.py bar.py ```\n\nThe `src` directory should be included in `source` (e.g., `source = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
+      "description": "The source code paths to consider, e.g., when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_package/ pyproject.toml src/ my_package/ __init__.py foo.py bar.py ```\n\nThe `src` directory should be included in the `src` option (e.g., `src = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
       "type": [
         "array",
         "null"
@@ -626,6 +648,19 @@
       },
       "additionalProperties": false
     },
+    "Flake8ImplicitStrConcatOptions": {
+      "type": "object",
+      "properties": {
+        "allow-multiline": {
+          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "Flake8ImportConventionsOptions": {
       "type": "object",
       "properties": {
@@ -798,6 +833,29 @@
       },
       "additionalProperties": false
     },
+    "Flake8TypeCheckingOptions": {
+      "type": "object",
+      "properties": {
+        "exempt-modules": {
+          "description": "Exempt certain modules from needing to be moved into type-checking blocks.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "strict": {
+          "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module. See: https://github.com/snok/flake8-type-checking#strict.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "Flake8UnusedArgumentsOptions": {
       "type": "object",
       "properties": {
@@ -923,7 +981,7 @@
           "description": "Whether to place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local), or vice versa.\n\nThe default (\"furthest-to-closest\") is equivalent to isort's `reverse-relative` default (`reverse-relative = false`); setting this to \"closest-to-furthest\" is equivalent to isort's `reverse-relative = true`.",
           "anyOf": [
             {
-              "$ref": "#/definitions/RelatveImportsOrder"
+              "$ref": "#/definitions/RelativeImportsOrder"
             },
             {
               "type": "null"
@@ -1114,10 +1172,6 @@
     "PythonVersion": {
       "type": "string",
       "enum": [
-        "py33",
-        "py34",
-        "py35",
-        "py36",
         "py37",
         "py38",
         "py39",
@@ -1143,7 +1197,7 @@
         }
       ]
     },
-    "RelatveImportsOrder": {
+    "RelativeImportsOrder": {
       "oneOf": [
         {
           "description": "Place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local).",
@@ -1164,13 +1218,13 @@
     "RuleSelector": {
       "type": "string",
       "enum": [
+        "ALL",
         "A",
         "A0",
         "A00",
         "A001",
         "A002",
         "A003",
-        "ALL",
         "ANN",
         "ANN0",
         "ANN00",
@@ -1381,6 +1435,8 @@
         "EXE",
         "EXE0",
         "EXE00",
+        "EXE001",
+        "EXE002",
         "EXE003",
         "EXE004",
         "EXE005",
@@ -1453,20 +1509,27 @@
         "FBT001",
         "FBT002",
         "FBT003",
+        "G",
+        "G0",
+        "G00",
+        "G001",
+        "G002",
+        "G003",
+        "G004",
+        "G01",
+        "G010",
+        "G1",
+        "G10",
+        "G101",
+        "G2",
+        "G20",
+        "G201",
+        "G202",
         "I",
         "I0",
         "I00",
         "I001",
         "I002",
-        "I2",
-        "I25",
-        "I252",
-        "IC",
-        "IC0",
-        "IC001",
-        "IC002",
-        "IC003",
-        "IC004",
         "ICN",
         "ICN0",
         "ICN00",
@@ -1481,9 +1544,6 @@
         "ISC001",
         "ISC002",
         "ISC003",
-        "M",
-        "M0",
-        "M001",
         "N",
         "N8",
         "N80",
@@ -1521,23 +1581,6 @@
         "PD9",
         "PD90",
         "PD901",
-        "PDV",
-        "PDV0",
-        "PDV002",
-        "PDV003",
-        "PDV004",
-        "PDV007",
-        "PDV008",
-        "PDV009",
-        "PDV01",
-        "PDV010",
-        "PDV011",
-        "PDV012",
-        "PDV013",
-        "PDV015",
-        "PDV9",
-        "PDV90",
-        "PDV901",
         "PGH",
         "PGH0",
         "PGH00",
@@ -1572,6 +1615,10 @@
         "PLE011",
         "PLE0117",
         "PLE0118",
+        "PLE06",
+        "PLE060",
+        "PLE0604",
+        "PLE0605",
         "PLE1",
         "PLE11",
         "PLE114",
@@ -1672,17 +1719,6 @@
         "Q001",
         "Q002",
         "Q003",
-        "R",
-        "R5",
-        "R50",
-        "R501",
-        "R502",
-        "R503",
-        "R504",
-        "R505",
-        "R506",
-        "R507",
-        "R508",
         "RET",
         "RET5",
         "RET50",
@@ -1778,6 +1814,14 @@
         "T20",
         "T201",
         "T203",
+        "TCH",
+        "TCH0",
+        "TCH00",
+        "TCH001",
+        "TCH002",
+        "TCH003",
+        "TCH004",
+        "TCH005",
         "TID",
         "TID2",
         "TID25",
@@ -1786,6 +1830,8 @@
         "TRY",
         "TRY0",
         "TRY00",
+        "TRY002",
+        "TRY003",
         "TRY004",
         "TRY2",
         "TRY20",
@@ -1794,31 +1840,10 @@
         "TRY3",
         "TRY30",
         "TRY300",
-        "TYP",
-        "TYP0",
-        "TYP00",
-        "TYP005",
-        "U",
-        "U0",
-        "U00",
-        "U001",
-        "U003",
-        "U004",
-        "U005",
-        "U006",
-        "U007",
-        "U008",
-        "U009",
-        "U01",
-        "U010",
-        "U011",
-        "U012",
-        "U013",
-        "U014",
-        "U015",
-        "U016",
-        "U017",
-        "U019",
+        "TRY301",
+        "TRY4",
+        "TRY40",
+        "TRY400",
         "UP",
         "UP0",
         "UP00",

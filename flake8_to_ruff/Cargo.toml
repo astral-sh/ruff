@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.231"
+version = "0.0.236"
 edition = "2021"
 
 [dependencies]
@@ -16,7 +16,7 @@ serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
-toml_edit = { version = "0.17.1", features = ["easy"] }
+toml = { version = "0.6.0" }
 
 [dev-dependencies]
 

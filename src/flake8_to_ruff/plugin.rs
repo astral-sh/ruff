@@ -4,32 +4,44 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 
-use crate::registry::RuleSelector;
+use crate::registry::RuleCodePrefix;
+use crate::rule_selector::RuleSelector;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
+    Flake82020,
     Flake8Annotations,
     Flake8Bandit,
     Flake8BlindExcept,
+    Flake8BooleanTrap,
     Flake8Bugbear,
     Flake8Builtins,
+    Flake8Commas,
     Flake8Comprehensions,
     Flake8Datetimez,
     Flake8Debugger,
     Flake8Docstrings,
     Flake8Eradicate,
     Flake8ErrMsg,
+    Flake8Executable,
     Flake8ImplicitStrConcat,
+    Flake8ImportConventions,
+    Flake8NoPep420,
+    Flake8Pie,
     Flake8Print,
     Flake8PytestStyle,
     Flake8Quotes,
     Flake8Return,
     Flake8Simplify,
     Flake8TidyImports,
+    Flake8TypeChecking,
+    Flake8UnusedArguments,
+    Flake8UsePathlib,
     McCabe,
     PEP8Naming,
     PandasVet,
     Pyupgrade,
+    Tryceratops,
 }
 
 impl FromStr for Plugin {
@@ -37,28 +49,39 @@ impl FromStr for Plugin {
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         match string {
+            "flake8-2020" => Ok(Plugin::Flake82020),
             "flake8-annotations" => Ok(Plugin::Flake8Annotations),
             "flake8-bandit" => Ok(Plugin::Flake8Bandit),
             "flake8-blind-except" => Ok(Plugin::Flake8BlindExcept),
+            "flake8-boolean-trap" => Ok(Plugin::Flake8BooleanTrap),
             "flake8-bugbear" => Ok(Plugin::Flake8Bugbear),
             "flake8-builtins" => Ok(Plugin::Flake8Builtins),
+            "flake8-commas" => Ok(Plugin::Flake8Commas),
             "flake8-comprehensions" => Ok(Plugin::Flake8Comprehensions),
             "flake8-datetimez" => Ok(Plugin::Flake8Datetimez),
             "flake8-debugger" => Ok(Plugin::Flake8Debugger),
             "flake8-docstrings" => Ok(Plugin::Flake8Docstrings),
             "flake8-eradicate" => Ok(Plugin::Flake8Eradicate),
             "flake8-errmsg" => Ok(Plugin::Flake8ErrMsg),
+            "flake8-executable" => Ok(Plugin::Flake8Executable),
             "flake8-implicit-str-concat" => Ok(Plugin::Flake8ImplicitStrConcat),
+            "flake8-import-conventions" => Ok(Plugin::Flake8ImportConventions),
+            "flake8-no-pep420" => Ok(Plugin::Flake8NoPep420),
+            "flake8-pie" => Ok(Plugin::Flake8Pie),
             "flake8-print" => Ok(Plugin::Flake8Print),
             "flake8-pytest-style" => Ok(Plugin::Flake8PytestStyle),
             "flake8-quotes" => Ok(Plugin::Flake8Quotes),
             "flake8-return" => Ok(Plugin::Flake8Return),
             "flake8-simplify" => Ok(Plugin::Flake8Simplify),
             "flake8-tidy-imports" => Ok(Plugin::Flake8TidyImports),
+            "flake8-type-checking" => Ok(Plugin::Flake8TypeChecking),
+            "flake8-unused-arguments" => Ok(Plugin::Flake8UnusedArguments),
+            "flake8-use-pathlib" => Ok(Plugin::Flake8UsePathlib),
             "mccabe" => Ok(Plugin::McCabe),
-            "pandas-vet" => Ok(Plugin::PandasVet),
             "pep8-naming" => Ok(Plugin::PEP8Naming),
+            "pandas-vet" => Ok(Plugin::PandasVet),
             "pyupgrade" => Ok(Plugin::Pyupgrade),
+            "tryceratops" => Ok(Plugin::Tryceratops),
             _ => Err(anyhow!("Unknown plugin: {string}")),
         }
     }
@@ -70,60 +93,81 @@ impl fmt::Debug for Plugin {
             f,
             "{}",
             match self {
+                Plugin::Flake82020 => "flake8-2020",
                 Plugin::Flake8Annotations => "flake8-annotations",
                 Plugin::Flake8Bandit => "flake8-bandit",
                 Plugin::Flake8BlindExcept => "flake8-blind-except",
+                Plugin::Flake8BooleanTrap => "flake8-boolean-trap",
                 Plugin::Flake8Bugbear => "flake8-bugbear",
                 Plugin::Flake8Builtins => "flake8-builtins",
+                Plugin::Flake8Commas => "flake8-commas",
                 Plugin::Flake8Comprehensions => "flake8-comprehensions",
                 Plugin::Flake8Datetimez => "flake8-datetimez",
                 Plugin::Flake8Debugger => "flake8-debugger",
                 Plugin::Flake8Docstrings => "flake8-docstrings",
                 Plugin::Flake8Eradicate => "flake8-eradicate",
                 Plugin::Flake8ErrMsg => "flake8-errmsg",
+                Plugin::Flake8Executable => "flake8-executable",
                 Plugin::Flake8ImplicitStrConcat => "flake8-implicit-str-concat",
+                Plugin::Flake8ImportConventions => "flake8-import-conventions",
+                Plugin::Flake8NoPep420 => "flake8-no-pep420",
+                Plugin::Flake8Pie => "flake8-pie",
                 Plugin::Flake8Print => "flake8-print",
                 Plugin::Flake8PytestStyle => "flake8-pytest-style",
                 Plugin::Flake8Quotes => "flake8-quotes",
                 Plugin::Flake8Return => "flake8-return",
                 Plugin::Flake8Simplify => "flake8-simplify",
                 Plugin::Flake8TidyImports => "flake8-tidy-imports",
+                Plugin::Flake8TypeChecking => "flake8-type-checking",
+                Plugin::Flake8UnusedArguments => "flake8-unused-arguments",
+                Plugin::Flake8UsePathlib => "flake8-use-pathlib",
                 Plugin::McCabe => "mccabe",
                 Plugin::PEP8Naming => "pep8-naming",
                 Plugin::PandasVet => "pandas-vet",
                 Plugin::Pyupgrade => "pyupgrade",
+                Plugin::Tryceratops => "tryceratops",
             }
         )
     }
 }
 
+// TODO(martin): Convert into `impl From<Plugin> for Linter`
 impl Plugin {
     pub fn selector(&self) -> RuleSelector {
         match self {
-            Plugin::Flake8Annotations => RuleSelector::ANN,
-            Plugin::Flake8Bandit => RuleSelector::S,
-            // TODO(charlie): Handle rename of `B` to `BLE`.
-            Plugin::Flake8BlindExcept => RuleSelector::BLE,
-            Plugin::Flake8Bugbear => RuleSelector::B,
-            Plugin::Flake8Builtins => RuleSelector::A,
-            Plugin::Flake8Comprehensions => RuleSelector::C4,
-            Plugin::Flake8Datetimez => RuleSelector::DTZ,
-            Plugin::Flake8Debugger => RuleSelector::T1,
-            Plugin::Flake8Docstrings => RuleSelector::D,
-            // TODO(charlie): Handle rename of `E` to `ERA`.
-            Plugin::Flake8Eradicate => RuleSelector::ERA,
-            Plugin::Flake8ErrMsg => RuleSelector::EM,
-            Plugin::Flake8ImplicitStrConcat => RuleSelector::ISC,
-            Plugin::Flake8Print => RuleSelector::T2,
-            Plugin::Flake8PytestStyle => RuleSelector::PT,
-            Plugin::Flake8Quotes => RuleSelector::Q,
-            Plugin::Flake8Return => RuleSelector::RET,
-            Plugin::Flake8Simplify => RuleSelector::SIM,
-            Plugin::Flake8TidyImports => RuleSelector::TID25,
-            Plugin::McCabe => RuleSelector::C9,
-            Plugin::PandasVet => RuleSelector::PD,
-            Plugin::PEP8Naming => RuleSelector::N,
-            Plugin::Pyupgrade => RuleSelector::UP,
+            Plugin::Flake82020 => RuleCodePrefix::YTT.into(),
+            Plugin::Flake8Annotations => RuleCodePrefix::ANN.into(),
+            Plugin::Flake8Bandit => RuleCodePrefix::S.into(),
+            Plugin::Flake8BlindExcept => RuleCodePrefix::BLE.into(),
+            Plugin::Flake8BooleanTrap => RuleCodePrefix::FBT.into(),
+            Plugin::Flake8Bugbear => RuleCodePrefix::B.into(),
+            Plugin::Flake8Builtins => RuleCodePrefix::A.into(),
+            Plugin::Flake8Commas => RuleCodePrefix::COM.into(),
+            Plugin::Flake8Comprehensions => RuleCodePrefix::C4.into(),
+            Plugin::Flake8Datetimez => RuleCodePrefix::DTZ.into(),
+            Plugin::Flake8Debugger => RuleCodePrefix::T1.into(),
+            Plugin::Flake8Docstrings => RuleCodePrefix::D.into(),
+            Plugin::Flake8Eradicate => RuleCodePrefix::ERA.into(),
+            Plugin::Flake8ErrMsg => RuleCodePrefix::EM.into(),
+            Plugin::Flake8Executable => RuleCodePrefix::EXE.into(),
+            Plugin::Flake8ImplicitStrConcat => RuleCodePrefix::ISC.into(),
+            Plugin::Flake8ImportConventions => RuleCodePrefix::ICN.into(),
+            Plugin::Flake8NoPep420 => RuleCodePrefix::INP.into(),
+            Plugin::Flake8Pie => RuleCodePrefix::PIE.into(),
+            Plugin::Flake8Print => RuleCodePrefix::T2.into(),
+            Plugin::Flake8PytestStyle => RuleCodePrefix::PT.into(),
+            Plugin::Flake8Quotes => RuleCodePrefix::Q.into(),
+            Plugin::Flake8Return => RuleCodePrefix::RET.into(),
+            Plugin::Flake8Simplify => RuleCodePrefix::SIM.into(),
+            Plugin::Flake8TidyImports => RuleCodePrefix::TID.into(),
+            Plugin::Flake8TypeChecking => RuleCodePrefix::TCH.into(),
+            Plugin::Flake8UnusedArguments => RuleCodePrefix::ARG.into(),
+            Plugin::Flake8UsePathlib => RuleCodePrefix::PTH.into(),
+            Plugin::McCabe => RuleCodePrefix::C9.into(),
+            Plugin::PEP8Naming => RuleCodePrefix::N.into(),
+            Plugin::PandasVet => RuleCodePrefix::PD.into(),
+            Plugin::Pyupgrade => RuleCodePrefix::UP.into(),
+            Plugin::Tryceratops => RuleCodePrefix::TRY.into(),
         }
     }
 }
@@ -250,26 +294,40 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
 /// For example, if the user ignores `ANN101`, we should infer that
 /// `flake8-annotations` is active.
 pub fn infer_plugins_from_codes(selectors: &BTreeSet<RuleSelector>) -> Vec<Plugin> {
+    // Ignore cases in which we've knowingly changed rule prefixes.
     [
+        Plugin::Flake82020,
         Plugin::Flake8Annotations,
         Plugin::Flake8Bandit,
-        Plugin::Flake8BlindExcept,
+        // Plugin::Flake8BlindExcept,
+        Plugin::Flake8BooleanTrap,
         Plugin::Flake8Bugbear,
         Plugin::Flake8Builtins,
+        // Plugin::Flake8Commas,
         Plugin::Flake8Comprehensions,
         Plugin::Flake8Datetimez,
         Plugin::Flake8Debugger,
         Plugin::Flake8Docstrings,
-        Plugin::Flake8Eradicate,
+        // Plugin::Flake8Eradicate,
         Plugin::Flake8ErrMsg,
+        Plugin::Flake8Executable,
         Plugin::Flake8ImplicitStrConcat,
+        // Plugin::Flake8ImportConventions,
+        Plugin::Flake8NoPep420,
+        Plugin::Flake8Pie,
         Plugin::Flake8Print,
+        Plugin::Flake8PytestStyle,
         Plugin::Flake8Quotes,
         Plugin::Flake8Return,
         Plugin::Flake8Simplify,
-        Plugin::Flake8TidyImports,
-        Plugin::PandasVet,
+        // Plugin::Flake8TidyImports,
+        // Plugin::Flake8TypeChecking,
+        Plugin::Flake8UnusedArguments,
+        // Plugin::Flake8UsePathlib,
+        Plugin::McCabe,
         Plugin::PEP8Naming,
+        Plugin::PandasVet,
+        Plugin::Tryceratops,
     ]
     .into_iter()
     .filter(|plugin| {
@@ -284,14 +342,6 @@ pub fn infer_plugins_from_codes(selectors: &BTreeSet<RuleSelector>) -> Vec<Plugi
         false
     })
     .collect()
-}
-
-/// Resolve the set of enabled `RuleSelector` values for the given
-/// plugins.
-pub fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleSelector> {
-    let mut select = BTreeSet::from([RuleSelector::F, RuleSelector::E, RuleSelector::W]);
-    select.extend(plugins.iter().map(Plugin::selector));
-    select
 }
 
 #[cfg(test)]

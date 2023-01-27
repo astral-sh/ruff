@@ -33,6 +33,10 @@ impl Range {
     pub fn from_located<T>(located: &Located<T>) -> Self {
         Range::new(located.location, located.end_location.unwrap())
     }
+
+    pub fn contains(&self, other: &Range) -> bool {
+        self.location <= other.location && self.end_location >= other.end_location
+    }
 }
 
 #[derive(Debug)]
@@ -85,9 +89,6 @@ pub struct Scope<'a> {
     pub uses_locals: bool,
     /// A map from bound name to binding index.
     pub values: FxHashMap<&'a str, usize>,
-    /// A list of (name, index) pairs for bindings that were overridden in the
-    /// scope.
-    pub overridden: Vec<(&'a str, usize)>,
 }
 
 impl<'a> Scope<'a> {
@@ -98,10 +99,26 @@ impl<'a> Scope<'a> {
             import_starred: false,
             uses_locals: false,
             values: FxHashMap::default(),
-            overridden: Vec::new(),
         }
     }
 }
+
+// Pyflakes defines the following binding hierarchy (via inheritance):
+//   Binding
+//    ExportBinding
+//    Annotation
+//    Argument
+//    Assignment
+//      NamedExprAssignment
+//    Definition
+//      FunctionDefinition
+//      ClassDefinition
+//      Builtin
+//      Importation
+//        SubmoduleImportation
+//        ImportationFrom
+//        StarImportation
+//        FutureImportation
 
 #[derive(Clone, Debug)]
 pub enum BindingKind<'a> {
@@ -123,35 +140,47 @@ pub enum BindingKind<'a> {
     SubmoduleImportation(&'a str, &'a str),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: Range,
+    /// The context in which the binding was created.
+    pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<RefEquality<'a, Stmt>>,
     /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used.
-    pub used: Option<(usize, Range)>,
+    /// the binding was last used in a runtime context.
+    pub runtime_usage: Option<(usize, Range)>,
+    /// Tuple of (scope index, range) indicating the scope and range at which
+    /// the binding was last used in a typing-time context.
+    pub typing_usage: Option<(usize, Range)>,
+    /// Tuple of (scope index, range) indicating the scope and range at which
+    /// the binding was last used in a synthetic context. This is used for
+    /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
+    /// that should be considered used even if they're never referenced.
+    pub synthetic_usage: Option<(usize, Range)>,
 }
 
-// Pyflakes defines the following binding hierarchy (via inheritance):
-//   Binding
-//    ExportBinding
-//    Annotation
-//    Argument
-//    Assignment
-//      NamedExprAssignment
-//    Definition
-//      FunctionDefinition
-//      ClassDefinition
-//      Builtin
-//      Importation
-//        SubmoduleImportation
-//        ImportationFrom
-//        StarImportation
-//        FutureImportation
+#[derive(Copy, Debug, Clone)]
+pub enum ExecutionContext {
+    Runtime,
+    Typing,
+}
 
 impl<'a> Binding<'a> {
+    pub fn mark_used(&mut self, scope: usize, range: Range, context: ExecutionContext) {
+        match context {
+            ExecutionContext::Runtime => self.runtime_usage = Some((scope, range)),
+            ExecutionContext::Typing => self.typing_usage = Some((scope, range)),
+        }
+    }
+
+    pub fn used(&self) -> bool {
+        self.runtime_usage.is_some()
+            || self.synthetic_usage.is_some()
+            || self.typing_usage.is_some()
+    }
+
     pub fn is_definition(&self) -> bool {
         matches!(
             self.kind,

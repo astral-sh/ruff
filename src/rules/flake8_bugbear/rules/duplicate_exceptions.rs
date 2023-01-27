@@ -3,11 +3,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
 
 use crate::ast::helpers;
+use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::source_code::Generator;
 use crate::violations;
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
@@ -59,14 +59,12 @@ fn duplicate_handler_exceptions<'a>(
                 Range::from_located(expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                let mut generator: Generator = checker.stylist.into();
-                if unique_elts.len() == 1 {
-                    generator.unparse_expr(unique_elts[0], 0);
-                } else {
-                    generator.unparse_expr(&type_pattern(unique_elts), 0);
-                }
                 diagnostic.amend(Fix::replacement(
-                    generator.generate(),
+                    if unique_elts.len() == 1 {
+                        unparse_expr(unique_elts[0], checker.stylist)
+                    } else {
+                        unparse_expr(&type_pattern(unique_elts), checker.stylist)
+                    },
                     expr.location,
                     expr.end_location.unwrap(),
                 ));

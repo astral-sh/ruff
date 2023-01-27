@@ -66,7 +66,7 @@ pub fn unnecessary_generator_list(
             Range::from_located(expr),
         );
         if checker.patch(&Rule::UnnecessaryGeneratorList) {
-            match fixes::fix_unnecessary_generator_list(checker.locator, expr) {
+            match fixes::fix_unnecessary_generator_list(checker.locator, checker.stylist, expr) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
                 }
@@ -97,7 +97,7 @@ pub fn unnecessary_generator_set(
             Range::from_located(expr),
         );
         if checker.patch(&Rule::UnnecessaryGeneratorSet) {
-            match fixes::fix_unnecessary_generator_set(checker.locator, expr) {
+            match fixes::fix_unnecessary_generator_set(checker.locator, checker.stylist, expr) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
                 }
@@ -127,7 +127,11 @@ pub fn unnecessary_generator_dict(
                     Range::from_located(expr),
                 );
                 if checker.patch(&Rule::UnnecessaryGeneratorDict) {
-                    match fixes::fix_unnecessary_generator_dict(checker.locator, expr) {
+                    match fixes::fix_unnecessary_generator_dict(
+                        checker.locator,
+                        checker.stylist,
+                        expr,
+                    ) {
                         Ok(fix) => {
                             diagnostic.amend(fix);
                         }
@@ -161,7 +165,11 @@ pub fn unnecessary_list_comprehension_set(
             Range::from_located(expr),
         );
         if checker.patch(&Rule::UnnecessaryListComprehensionSet) {
-            match fixes::fix_unnecessary_list_comprehension_set(checker.locator, expr) {
+            match fixes::fix_unnecessary_list_comprehension_set(
+                checker.locator,
+                checker.stylist,
+                expr,
+            ) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
                 }
@@ -200,7 +208,8 @@ pub fn unnecessary_list_comprehension_dict(
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryListComprehensionDict) {
-        match fixes::fix_unnecessary_list_comprehension_dict(checker.locator, expr) {
+        match fixes::fix_unnecessary_list_comprehension_dict(checker.locator, checker.stylist, expr)
+        {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }
@@ -234,7 +243,7 @@ pub fn unnecessary_literal_set(
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryLiteralSet) {
-        match fixes::fix_unnecessary_literal_set(checker.locator, expr) {
+        match fixes::fix_unnecessary_literal_set(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }
@@ -275,7 +284,7 @@ pub fn unnecessary_literal_dict(
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryLiteralDict) {
-        match fixes::fix_unnecessary_literal_dict(checker.locator, expr) {
+        match fixes::fix_unnecessary_literal_dict(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }
@@ -316,7 +325,7 @@ pub fn unnecessary_collection_call(
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryCollectionCall) {
-        match fixes::fix_unnecessary_collection_call(checker.locator, expr) {
+        match fixes::fix_unnecessary_collection_call(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }
@@ -349,7 +358,11 @@ pub fn unnecessary_literal_within_tuple_call(
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryLiteralWithinTupleCall) {
-        match fixes::fix_unnecessary_literal_within_tuple_call(checker.locator, expr) {
+        match fixes::fix_unnecessary_literal_within_tuple_call(
+            checker.locator,
+            checker.stylist,
+            expr,
+        ) {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }
@@ -382,7 +395,11 @@ pub fn unnecessary_literal_within_list_call(
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryLiteralWithinListCall) {
-        match fixes::fix_unnecessary_literal_within_list_call(checker.locator, expr) {
+        match fixes::fix_unnecessary_literal_within_list_call(
+            checker.locator,
+            checker.stylist,
+            expr,
+        ) {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }
@@ -406,7 +423,7 @@ pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     let mut diagnostic =
         Diagnostic::new(violations::UnnecessaryListCall, Range::from_located(expr));
     if checker.patch(&Rule::UnnecessaryListCall) {
-        match fixes::fix_unnecessary_list_call(checker.locator, expr) {
+        match fixes::fix_unnecessary_list_call(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }
@@ -449,7 +466,7 @@ pub fn unnecessary_call_around_sorted(
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryCallAroundSorted) {
-        match fixes::fix_unnecessary_call_around_sorted(checker.locator, expr) {
+        match fixes::fix_unnecessary_call_around_sorted(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }
@@ -612,7 +629,7 @@ pub fn unnecessary_comprehension(
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryComprehension) {
-        match fixes::fix_unnecessary_comprehension(checker.locator, expr) {
+        match fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
             }

@@ -1,17 +1,35 @@
 use std::fmt;
 
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Location, StmtKind, Suite};
 
 use super::super::helpers;
 use super::super::track::Block;
 use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
-use crate::violations;
+use crate::source_code::{Locator, Stylist};
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct MissingRequiredImport(pub String);
+);
+impl AlwaysAutofixableViolation for MissingRequiredImport {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingRequiredImport(name) = self;
+        format!("Missing required import: `{name}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let MissingRequiredImport(name) = self;
+        format!("Insert required import: `{name}`")
+    }
+}
 
 struct Alias<'a> {
     name: &'a str,
@@ -102,6 +120,7 @@ fn add_required_import(
     blocks: &[&Block],
     python_ast: &Suite,
     locator: &Locator,
+    stylist: &Stylist,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Diagnostic> {
@@ -122,7 +141,7 @@ fn add_required_import(
     // Always insert the diagnostic at top-of-file.
     let required_import = required_import.to_string();
     let mut diagnostic = Diagnostic::new(
-        violations::MissingRequiredImport(required_import.clone()),
+        MissingRequiredImport(required_import.clone()),
         Range::new(Location::default(), Location::default()),
     );
     if matches!(autofix, flags::Autofix::Enabled)
@@ -134,19 +153,22 @@ fn add_required_import(
         // Generate the edit.
         let mut contents = String::with_capacity(required_import.len() + 1);
 
+        // Newline (LF/CRLF)
+        let line_sep = stylist.line_ending().as_str();
+
         // If we're inserting beyond the start of the file, we add
         // a newline _before_, since the splice represents the _end_ of the last
         // irrelevant token (e.g., the end of a comment or the end of
         // docstring). This ensures that we properly handle awkward cases like
         // docstrings that are followed by semicolons.
         if splice > Location::default() {
-            contents.push('\n');
+            contents.push_str(line_sep);
         }
         contents.push_str(&required_import);
 
         // If we're inserting at the start of the file, add a trailing newline instead.
         if splice == Location::default() {
-            contents.push('\n');
+            contents.push_str(line_sep);
         }
 
         // Construct the fix.
@@ -160,6 +182,7 @@ pub fn add_required_imports(
     blocks: &[&Block],
     python_ast: &Suite,
     locator: &Locator,
+    stylist: &Stylist,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
@@ -192,6 +215,7 @@ pub fn add_required_imports(
                             blocks,
                             python_ast,
                             locator,
+                            stylist,
                             settings,
                             autofix,
                         )
@@ -208,7 +232,8 @@ pub fn add_required_imports(
                             }),
                             blocks,
                             python_ast,
-    locator,
+                            locator,
+                            stylist,
                             settings,
                             autofix,
                         )

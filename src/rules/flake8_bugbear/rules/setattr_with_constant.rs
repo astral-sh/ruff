@@ -1,12 +1,13 @@
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
+use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::python::identifiers::is_identifier;
+use crate::python::identifiers::{is_identifier, is_mangled_private};
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
-use crate::source_code::{Generator, Stylist};
+use crate::source_code::Stylist;
 use crate::violations;
 
 fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String {
@@ -27,9 +28,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String
             type_comment: None,
         },
     );
-    let mut generator: Generator = stylist.into();
-    generator.unparse_stmt(&stmt);
-    generator.generate()
+    unparse_stmt(&stmt, stylist)
 }
 
 /// B010
@@ -52,7 +51,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     if !is_identifier(name) {
         return;
     }
-    if KWLIST.contains(&name.as_str()) {
+    if KWLIST.contains(&name.as_str()) || is_mangled_private(name.as_str()) {
         return;
     }
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
@@ -62,6 +61,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         if expr == child.as_ref() {
             let mut diagnostic =
                 Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
+
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     assignment(obj, name, value, checker.stylist),

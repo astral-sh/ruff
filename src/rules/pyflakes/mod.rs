@@ -15,10 +15,10 @@ mod tests {
     use textwrap::dedent;
 
     use crate::linter::{check_path, test_path};
-    use crate::registry::{Rule, RuleSelector};
+    use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
-    use crate::{directives, rustpython_helpers, settings};
+    use crate::{assert_yaml_snapshot, directives, rustpython_helpers, settings};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"); "F401_0")]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"); "F401_1")]
@@ -28,6 +28,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_5.py"); "F401_5")]
     #[test_case(Rule::UnusedImport, Path::new("F401_6.py"); "F401_6")]
     #[test_case(Rule::UnusedImport, Path::new("F401_7.py"); "F401_7")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_8.py"); "F401_8")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
     #[test_case(Rule::ImportStarUsed, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]
@@ -112,7 +113,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -125,7 +126,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UnusedVariable)
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -135,7 +136,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyflakes/__init__.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName, Rule::UndefinedExport]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -145,7 +146,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyflakes/builtins.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -158,7 +159,7 @@ mod tests {
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -168,7 +169,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyflakes/typing_modules.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -181,7 +182,7 @@ mod tests {
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -191,7 +192,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyflakes/future_annotations.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UndefinedName]),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -201,7 +202,7 @@ mod tests {
             Path::new("./resources/test/fixtures/pyflakes/multi_statement_lines.py"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -209,7 +210,7 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) -> Result<()> {
         let contents = dedent(contents);
-        let settings = settings::Settings::for_rules(&RuleSelector::F);
+        let settings = settings::Settings::for_rules(&RuleCodePrefix::F);
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_contents(&contents, &locator);

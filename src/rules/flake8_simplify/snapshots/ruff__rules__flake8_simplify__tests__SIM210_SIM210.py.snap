@@ -11,7 +11,8 @@ expression: diagnostics
     row: 1
     column: 24
   fix:
-    content: bool(b)
+    content:
+      - bool(b)
     location:
       row: 1
       column: 4
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 3
     column: 29
   fix:
-    content: bool(b != c)
+    content:
+      - bool(b != c)
     location:
       row: 3
       column: 4
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 5
     column: 28
   fix:
-    content: bool(b + c)
+    content:
+      - bool(b + c)
     location:
       row: 5
       column: 4

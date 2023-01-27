@@ -42,9 +42,6 @@ pub fn check_path(
     autofix: flags::Autofix,
     noqa: flags::Noqa,
 ) -> Result<Vec<Diagnostic>> {
-    // Validate the `Settings` and return any errors.
-    settings.validate()?;
-
     // Aggregate all diagnostics.
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -98,6 +95,7 @@ pub fn check_path(
                         autofix,
                         noqa,
                         path,
+                        package,
                     ));
                 }
                 if use_imports {
@@ -141,6 +139,8 @@ pub fn check_path(
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
     {
         diagnostics.extend(check_lines(
+            path,
+            stylist,
             contents,
             indexer.commented_lines(),
             &doc_lines,
@@ -184,9 +184,6 @@ const MAX_ITERATIONS: usize = 100;
 
 /// Add any missing `#noqa` pragmas to the source code at the given `Path`.
 pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
-    // Validate the `Settings` and return any errors.
-    settings.validate()?;
-
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 

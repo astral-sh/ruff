@@ -14,8 +14,8 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
-    use crate::settings;
     use crate::settings::types::PythonVersion;
+    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"); "UP001")]
     #[test_case(Rule::TypeOfPrimitive, Path::new("UP003.py"); "UP003")]
@@ -66,7 +66,7 @@ mod tests {
                 .as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -79,7 +79,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UsePEP585Annotation)
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -92,7 +92,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UsePEP585Annotation)
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -105,7 +105,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UsePEP604Annotation)
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -118,7 +118,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UsePEP604Annotation)
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -131,7 +131,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::DatetimeTimezoneUTC)
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

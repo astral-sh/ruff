@@ -5,12 +5,12 @@ use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::registry::RuleSelector;
+use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_tidy_imports,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
+    pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -285,7 +285,7 @@ pub struct Options {
         default = "true",
         value_type = "bool",
         example = r#"
-            respect_gitignore = false
+            respect-gitignore = false
         "#
     )]
     /// Whether to automatically exclude files that are ignored by `.ignore`,
@@ -342,7 +342,7 @@ pub struct Options {
     ///       bar.py
     /// ```
     ///
-    /// The `src` directory should be included in `source` (e.g., `source =
+    /// The `src` directory should be included in the `src` option (e.g., `src =
     /// ["src"]`), such that when resolving imports, `my_package.foo` is
     /// considered a first-party import.
     ///
@@ -428,6 +428,7 @@ pub struct Options {
     #[option_group]
     /// Options for the `flake8-bugbear` plugin.
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
+    #[option_group]
     /// Options for the `flake8-builtins` plugin.
     pub flake8_builtins: Option<flake8_builtins::settings::Options>,
     #[option_group]
@@ -439,6 +440,12 @@ pub struct Options {
     #[option_group]
     /// Options for the `flake8-tidy-imports` plugin.
     pub flake8_tidy_imports: Option<flake8_tidy_imports::options::Options>,
+    #[option_group]
+    /// Options for the `flake8-type-checking` plugin.
+    pub flake8_type_checking: Option<flake8_type_checking::settings::Options>,
+    #[option_group]
+    /// Options for the `flake8-implicit-str-concat` plugin.
+    pub flake8_implicit_str_concat: Option<flake8_implicit_str_concat::settings::Options>,
     #[option_group]
     /// Options for the `flake8-import-conventions` plugin.
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,

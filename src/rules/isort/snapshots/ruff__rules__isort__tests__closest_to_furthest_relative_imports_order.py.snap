@@ -11,7 +11,11 @@ expression: diagnostics
     row: 4
     column: 0
   fix:
-    content: "from . import c\nfrom .. import b\nfrom ... import a\n"
+    content:
+      - from . import c
+      - from .. import b
+      - from ... import a
+      - ""
     location:
       row: 1
       column: 0

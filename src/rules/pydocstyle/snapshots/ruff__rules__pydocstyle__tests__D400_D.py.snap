@@ -11,7 +11,8 @@ expression: diagnostics
     row: 355
     column: 17
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 355
       column: 14
@@ -28,7 +29,8 @@ expression: diagnostics
     row: 406
     column: 39
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 406
       column: 36
@@ -45,7 +47,8 @@ expression: diagnostics
     row: 410
     column: 24
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 410
       column: 21
@@ -62,7 +65,8 @@ expression: diagnostics
     row: 416
     column: 24
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 416
       column: 21
@@ -79,7 +83,8 @@ expression: diagnostics
     row: 422
     column: 49
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 422
       column: 46
@@ -96,7 +101,8 @@ expression: diagnostics
     row: 429
     column: 63
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 429
       column: 60
@@ -113,7 +119,8 @@ expression: diagnostics
     row: 470
     column: 24
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 470
       column: 21
@@ -130,7 +137,8 @@ expression: diagnostics
     row: 475
     column: 24
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 475
       column: 21
@@ -147,7 +155,8 @@ expression: diagnostics
     row: 480
     column: 24
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 480
       column: 21
@@ -164,7 +173,8 @@ expression: diagnostics
     row: 487
     column: 24
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 487
       column: 21
@@ -181,7 +191,8 @@ expression: diagnostics
     row: 509
     column: 34
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 509
       column: 31
@@ -198,7 +209,8 @@ expression: diagnostics
     row: 514
     column: 33
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 514
       column: 30
@@ -215,7 +227,8 @@ expression: diagnostics
     row: 520
     column: 32
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 520
       column: 29
@@ -232,7 +245,8 @@ expression: diagnostics
     row: 581
     column: 51
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 581
       column: 47
@@ -249,7 +263,8 @@ expression: diagnostics
     row: 617
     column: 7
   fix:
-    content: "."
+    content:
+      - "."
     location:
       row: 615
       column: 14

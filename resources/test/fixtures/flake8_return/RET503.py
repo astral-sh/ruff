@@ -114,3 +114,12 @@ def bar3(x, y, z):
         else:
             return z
         return None
+
+
+def prompts(self, foo):
+    if not foo:
+        return []
+
+    for x in foo:
+        yield x
+        yield x + 1

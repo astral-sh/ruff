@@ -8,7 +8,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::registry::{Diagnostic, Rule, CODE_REDIRECTS};
+use crate::registry::{Diagnostic, Rule};
+use crate::rule_redirects::get_redirect_target;
 use crate::settings::hashable::HashableHashSet;
 use crate::source_code::LineEnding;
 
@@ -71,13 +72,9 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 /// thereof).
 pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
     let needle: &str = needle.code();
-    haystack.iter().any(|candidate| {
-        if let Some(candidate) = CODE_REDIRECTS.get(candidate) {
-            needle == candidate.code()
-        } else {
-            &needle == candidate
-        }
-    })
+    haystack
+        .iter()
+        .any(|candidate| needle == get_redirect_target(candidate).unwrap_or(candidate))
 }
 
 pub fn add_noqa(
@@ -214,6 +211,7 @@ mod tests {
     use crate::ast::types::Range;
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::Diagnostic;
+    use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::settings::hashable::HashableHashSet;
     use crate::source_code::LineEnding;
     use crate::violations;
@@ -267,7 +265,7 @@ mod tests {
 
         let diagnostics = vec![
             Diagnostic::new(
-                violations::AmbiguousVariableName("x".to_string()),
+                AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Diagnostic::new(
@@ -290,7 +288,7 @@ mod tests {
 
         let diagnostics = vec![
             Diagnostic::new(
-                violations::AmbiguousVariableName("x".to_string()),
+                AmbiguousVariableName("x".to_string()),
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Diagnostic::new(

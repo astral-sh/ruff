@@ -1,96 +1,42 @@
+#![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
 #![allow(
     clippy::match_same_arms,
     clippy::missing_errors_doc,
     clippy::module_name_repetitions,
     clippy::too_many_lines
 )]
-#![forbid(unsafe_code)]
 
 use std::io::{self};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::resolver::{
-    resolve_settings_with_processor, ConfigProcessor, FileDiscovery, PyprojectDiscovery, Relativity,
-};
-use ::ruff::settings::configuration::Configuration;
-use ::ruff::settings::pyproject;
+use ::ruff::resolver::PyprojectDiscovery;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
+use args::Args;
 use clap::{CommandFactory, Parser};
-use cli::{extract_log_level, Cli, Overrides};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use path_absolutize::path_dedot;
 use printer::{Printer, Violations};
-use ruff::settings::{AllSettings, CliSettings};
+use ruff::settings::CliSettings;
 
+pub(crate) mod args;
 mod cache;
-mod cli;
 mod commands;
 mod diagnostics;
 mod iterators;
 mod printer;
+mod resolve;
 #[cfg(all(feature = "update-informer"))]
 pub mod updates;
 
-/// Resolve the relevant settings strategy and defaults for the current
-/// invocation.
-fn resolve(
-    isolated: bool,
-    config: Option<&Path>,
-    overrides: &Overrides,
-    stdin_filename: Option<&Path>,
-) -> Result<PyprojectDiscovery> {
-    if isolated {
-        // First priority: if we're running in isolated mode, use the default settings.
-        let mut config = Configuration::default();
-        overrides.process_config(&mut config);
-        let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
-        Ok(PyprojectDiscovery::Fixed(settings))
-    } else if let Some(pyproject) = config {
-        // Second priority: the user specified a `pyproject.toml` file. Use that
-        // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
-        // current working directory. (This matches ESLint's behavior.)
-        let settings = resolve_settings_with_processor(pyproject, &Relativity::Cwd, overrides)?;
-        Ok(PyprojectDiscovery::Fixed(settings))
-    } else if let Some(pyproject) = pyproject::find_settings_toml(
-        stdin_filename
-            .as_ref()
-            .unwrap_or(&path_dedot::CWD.as_path()),
-    )? {
-        // Third priority: find a `pyproject.toml` file in either an ancestor of
-        // `stdin_filename` (if set) or the current working path all paths relative to
-        // that directory. (With `Strategy::Hierarchical`, we'll end up finding
-        // the "closest" `pyproject.toml` file for every Python file later on,
-        // so these act as the "default" settings.)
-        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Parent, overrides)?;
-        Ok(PyprojectDiscovery::Hierarchical(settings))
-    } else if let Some(pyproject) = pyproject::find_user_settings_toml() {
-        // Fourth priority: find a user-specific `pyproject.toml`, but resolve all paths
-        // relative the current working directory. (With `Strategy::Hierarchical`, we'll
-        // end up the "closest" `pyproject.toml` file for every Python file later on, so
-        // these act as the "default" settings.)
-        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
-        Ok(PyprojectDiscovery::Hierarchical(settings))
-    } else {
-        // Fallback: load Ruff's default settings, and resolve all paths relative to the
-        // current working directory. (With `Strategy::Hierarchical`, we'll end up the
-        // "closest" `pyproject.toml` file for every Python file later on, so these act
-        // as the "default" settings.)
-        let mut config = Configuration::default();
-        overrides.process_config(&mut config);
-        let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
-        Ok(PyprojectDiscovery::Hierarchical(settings))
-    }
-}
-
-pub fn main() -> Result<ExitCode> {
+fn inner_main() -> Result<ExitCode> {
     // Extract command-line arguments.
-    let (cli, overrides) = Cli::parse().partition();
+    let args = Args::parse();
 
     let default_panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -107,11 +53,13 @@ quoting the executed command, along with the relevant file contents and `pyproje
         default_panic_hook(info);
     }));
 
-    let log_level = extract_log_level(&cli);
+    let log_level: LogLevel = (&args.log_level_args).into();
     set_up_logging(&log_level)?;
 
+    let (cli, overrides) = args.partition();
+
     if let Some(shell) = cli.generate_shell_completion {
-        shell.generate(&mut Cli::command(), &mut io::stdout());
+        shell.generate(&mut Args::command(), &mut io::stdout());
         return Ok(ExitCode::SUCCESS);
     }
     if cli.clean {
@@ -121,31 +69,15 @@ quoting the executed command, along with the relevant file contents and `pyproje
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_strategy = resolve(
+    let pyproject_strategy = resolve::resolve(
         cli.isolated,
         cli.config.as_deref(),
         &overrides,
         cli.stdin_filename.as_deref(),
     )?;
 
-    // Validate the `Settings` and return any errors.
-    match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => settings.lib.validate()?,
-        PyprojectDiscovery::Hierarchical(settings) => settings.lib.validate()?,
-    };
-
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
-    let file_strategy = FileDiscovery {
-        force_exclude: match &pyproject_strategy {
-            PyprojectDiscovery::Fixed(settings) => settings.lib.force_exclude,
-            PyprojectDiscovery::Hierarchical(settings) => settings.lib.force_exclude,
-        },
-        respect_gitignore: match &pyproject_strategy {
-            PyprojectDiscovery::Fixed(settings) => settings.lib.respect_gitignore,
-            PyprojectDiscovery::Hierarchical(settings) => settings.lib.respect_gitignore,
-        },
-    };
     let CliSettings {
         fix,
         fix_only,
@@ -162,11 +94,11 @@ quoting the executed command, along with the relevant file contents and `pyproje
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_settings {
-        commands::show_settings(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
+        commands::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
     if cli.show_files {
-        commands::show_files(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
+        commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
         return Ok(ExitCode::SUCCESS);
     }
 
@@ -200,11 +132,17 @@ quoting the executed command, along with the relevant file contents and `pyproje
     if cache {
         // `--no-cache` doesn't respect code changes, and so is often confusing during
         // development.
-        warn_user_once!("debug build without --no-cache.");
+        warn_user_once!("Detected debug build without --no-cache.");
     }
 
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
-    if cli.watch {
+
+    if cli.add_noqa {
+        let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
+        if modifications > 0 && log_level >= LogLevel::Default {
+            println!("Added {modifications} noqa directives.");
+        }
+    } else if cli.watch {
         if !matches!(autofix, fix::FixMode::None) {
             warn_user_once!("--fix is not enabled in watch mode.");
         }
@@ -219,7 +157,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
         let messages = commands::run(
             &cli.files,
             &pyproject_strategy,
-            &file_strategy,
             &overrides,
             cache.into(),
             fix::FixMode::None,
@@ -249,7 +186,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
                         let messages = commands::run(
                             &cli.files,
                             &pyproject_strategy,
-                            &file_strategy,
                             &overrides,
                             cache.into(),
                             fix::FixMode::None,
@@ -260,12 +196,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
                 Err(err) => return Err(err.into()),
             }
         }
-    } else if cli.add_noqa {
-        let modifications =
-            commands::add_noqa(&cli.files, &pyproject_strategy, &file_strategy, &overrides)?;
-        if modifications > 0 && log_level >= LogLevel::Default {
-            println!("Added {modifications} noqa directives.");
-        }
     } else {
         let is_stdin = cli.files == vec![PathBuf::from("-")];
 
@@ -274,7 +204,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
             commands::run_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_strategy,
-                &file_strategy,
                 &overrides,
                 autofix,
             )?
@@ -282,7 +211,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
             commands::run(
                 &cli.files,
                 &pyproject_strategy,
-                &file_strategy,
                 &overrides,
                 cache.into(),
                 autofix,
@@ -318,4 +246,15 @@ quoting the executed command, along with the relevant file contents and `pyproje
     }
 
     Ok(ExitCode::SUCCESS)
+}
+
+#[must_use]
+pub fn main() -> ExitCode {
+    match inner_main() {
+        Ok(code) => code,
+        Err(err) => {
+            eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
+            ExitCode::FAILURE
+        }
+    }
 }

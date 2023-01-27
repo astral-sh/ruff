@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Location, Stmt};
 use textwrap::{dedent, indent};
 
@@ -10,11 +11,26 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct UnsortedImports;
+);
+impl AlwaysAutofixableViolation for UnsortedImports {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Import block is un-sorted or un-formatted")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Organize imports".to_string()
+    }
+}
 
 fn extract_range(body: &[&Stmt]) -> Range {
     let location = body.first().unwrap().location;
@@ -31,9 +47,9 @@ fn extract_indentation_range(body: &[&Stmt]) -> Range {
 pub fn organize_imports(
     block: &Block,
     locator: &Locator,
+    stylist: &Stylist,
     indexer: &Indexer,
     settings: &Settings,
-    stylist: &Stylist,
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
@@ -47,7 +63,7 @@ pub fn organize_imports(
     if preceded_by_multi_statement_line(block.imports.first().unwrap(), locator, indexer)
         || followed_by_multi_statement_line(block.imports.last().unwrap(), locator)
     {
-        return Some(Diagnostic::new(violations::UnsortedImports, range));
+        return Some(Diagnostic::new(UnsortedImports, range));
     }
 
     // Extract comments. Take care to grab any inline comments from the last line.
@@ -100,7 +116,7 @@ pub fn organize_imports(
     if actual == dedent(&expected) {
         None
     } else {
-        let mut diagnostic = Diagnostic::new(violations::UnsortedImports, range);
+        let mut diagnostic = Diagnostic::new(UnsortedImports, range);
         if matches!(autofix, flags::Autofix::Enabled)
             && settings.rules.should_fix(diagnostic.kind.rule())
         {

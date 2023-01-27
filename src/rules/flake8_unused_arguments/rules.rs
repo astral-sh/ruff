@@ -43,7 +43,7 @@ fn function(
             .get(&arg.node.arg.as_str())
             .map(|index| &bindings[*index])
         {
-            if binding.used.is_none()
+            if !binding.used()
                 && matches!(binding.kind, BindingKind::Argument)
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
@@ -88,7 +88,7 @@ fn method(
             .get(&arg.node.arg.as_str())
             .map(|index| &bindings[*index])
         {
-            if binding.used.is_none()
+            if !binding.used()
                 && matches!(binding.kind, BindingKind::Argument)
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {

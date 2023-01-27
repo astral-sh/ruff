@@ -9,6 +9,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::assert_yaml_snapshot;
     use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::rules::pylint;
@@ -33,6 +34,8 @@ mod tests {
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
+    #[test_case(Rule::InvalidAllFormat, Path::new("PLE0605.py"); "PLE0605")]
+    #[test_case(Rule::InvalidAllObject, Path::new("PLE0604.py"); "PLE0604")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -41,7 +44,7 @@ mod tests {
                 .as_path(),
             &Settings::for_rules(vec![rule_code]),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -56,7 +59,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::MagicValueComparison])
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

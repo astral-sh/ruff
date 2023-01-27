@@ -111,7 +111,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
                     let mut content = String::new();
                     content.push_str(indent);
                     content.push_str("return None");
-                    content.push('\n');
+                    content.push_str(checker.stylist.line_ending().as_str());
                     diagnostic.amend(Fix::insertion(
                         content,
                         Location::new(last_stmt.end_location.unwrap().row() + 1, 0),
@@ -324,6 +324,11 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
         }
         visitor.stack
     };
+
+    // Avoid false positives for generators.
+    if !stack.yields.is_empty() {
+        return;
+    }
 
     if checker.settings.rules.enabled(&Rule::SuperfluousElseReturn)
         || checker.settings.rules.enabled(&Rule::SuperfluousElseRaise)

@@ -1,0 +1,93 @@
+---
+source: src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas
+  location:
+    row: 5
+    column: 11
+  end_location:
+    row: 5
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas.DataFrame
+  location:
+    row: 11
+    column: 23
+  end_location:
+    row: 11
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas.DataFrame
+  location:
+    row: 17
+    column: 23
+  end_location:
+    row: 17
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas
+  location:
+    row: 23
+    column: 11
+  end_location:
+    row: 23
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas.DataFrame
+  location:
+    row: 29
+    column: 23
+  end_location:
+    row: 29
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas.DataFrame
+  location:
+    row: 35
+    column: 23
+  end_location:
+    row: 35
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas
+  location:
+    row: 41
+    column: 11
+  end_location:
+    row: 41
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas
+  location:
+    row: 47
+    column: 11
+  end_location:
+    row: 47
+    column: 23
+  fix: ~
+  parent: ~
+

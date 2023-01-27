@@ -38,191 +38,6 @@ impl Violation for ModuleImportNotAtTopOfFile {
 }
 
 define_violation!(
-    pub struct LineTooLong(pub usize, pub usize);
-);
-impl Violation for LineTooLong {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let LineTooLong(length, limit) = self;
-        format!("Line too long ({length} > {limit} characters)")
-    }
-}
-
-define_violation!(
-    pub struct MixedSpacesAndTabs;
-);
-impl Violation for MixedSpacesAndTabs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Indentation contains mixed spaces and tabs")
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EqCmpop {
-    Eq,
-    NotEq,
-}
-
-impl From<&Cmpop> for EqCmpop {
-    fn from(cmpop: &Cmpop) -> Self {
-        match cmpop {
-            Cmpop::Eq => EqCmpop::Eq,
-            Cmpop::NotEq => EqCmpop::NotEq,
-            _ => unreachable!("Expected Cmpop::Eq | Cmpop::NotEq"),
-        }
-    }
-}
-
-define_violation!(
-    pub struct NoneComparison(pub EqCmpop);
-);
-impl AlwaysAutofixableViolation for NoneComparison {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let NoneComparison(op) = self;
-        match op {
-            EqCmpop::Eq => format!("Comparison to `None` should be `cond is None`"),
-            EqCmpop::NotEq => format!("Comparison to `None` should be `cond is not None`"),
-        }
-    }
-
-    fn autofix_title(&self) -> String {
-        let NoneComparison(op) = self;
-        match op {
-            EqCmpop::Eq => "Replace with `cond is None`".to_string(),
-            EqCmpop::NotEq => "Replace with `cond is not None`".to_string(),
-        }
-    }
-}
-
-define_violation!(
-    pub struct TrueFalseComparison(pub bool, pub EqCmpop);
-);
-impl AlwaysAutofixableViolation for TrueFalseComparison {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let TrueFalseComparison(value, op) = self;
-        match (value, op) {
-            (true, EqCmpop::Eq) => format!("Comparison to `True` should be `cond is True`"),
-            (true, EqCmpop::NotEq) => {
-                format!("Comparison to `True` should be `cond is not True`")
-            }
-            (false, EqCmpop::Eq) => format!("Comparison to `False` should be `cond is False`"),
-            (false, EqCmpop::NotEq) => {
-                format!("Comparison to `False` should be `cond is not False`")
-            }
-        }
-    }
-
-    fn autofix_title(&self) -> String {
-        let TrueFalseComparison(value, op) = self;
-        match (value, op) {
-            (true, EqCmpop::Eq) => "Replace with `cond is True`".to_string(),
-            (true, EqCmpop::NotEq) => "Replace with `cond is not True`".to_string(),
-            (false, EqCmpop::Eq) => "Replace with `cond is False`".to_string(),
-            (false, EqCmpop::NotEq) => "Replace with `cond is not False`".to_string(),
-        }
-    }
-}
-
-define_violation!(
-    pub struct NotInTest;
-);
-impl AlwaysAutofixableViolation for NotInTest {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Test for membership should be `not in`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Convert to `not in`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct NotIsTest;
-);
-impl AlwaysAutofixableViolation for NotIsTest {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Test for object identity should be `is not`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Convert to `is not`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct TypeComparison;
-);
-impl Violation for TypeComparison {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Do not compare types, use `isinstance()`")
-    }
-}
-
-define_violation!(
-    pub struct DoNotUseBareExcept;
-);
-impl Violation for DoNotUseBareExcept {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Do not use bare `except`")
-    }
-}
-
-define_violation!(
-    pub struct DoNotAssignLambda(pub String);
-);
-impl AlwaysAutofixableViolation for DoNotAssignLambda {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Do not assign a `lambda` expression, use a `def`")
-    }
-
-    fn autofix_title(&self) -> String {
-        let DoNotAssignLambda(name) = self;
-        format!("Rewrite `{name}` as a `def`")
-    }
-}
-
-define_violation!(
-    pub struct AmbiguousVariableName(pub String);
-);
-impl Violation for AmbiguousVariableName {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let AmbiguousVariableName(name) = self;
-        format!("Ambiguous variable name: `{name}`")
-    }
-}
-
-define_violation!(
-    pub struct AmbiguousClassName(pub String);
-);
-impl Violation for AmbiguousClassName {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let AmbiguousClassName(name) = self;
-        format!("Ambiguous class name: `{name}`")
-    }
-}
-
-define_violation!(
-    pub struct AmbiguousFunctionName(pub String);
-);
-impl Violation for AmbiguousFunctionName {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let AmbiguousFunctionName(name) = self;
-        format!("Ambiguous function name: `{name}`")
-    }
-}
-
-define_violation!(
     pub struct IOError(pub String);
 );
 impl Violation for IOError {
@@ -241,48 +56,6 @@ impl Violation for SyntaxError {
     fn message(&self) -> String {
         let SyntaxError(message) = self;
         format!("SyntaxError: {message}")
-    }
-}
-
-// pycodestyle warnings
-
-define_violation!(
-    pub struct NoNewLineAtEndOfFile;
-);
-impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("No newline at end of file")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add trailing newline".to_string()
-    }
-}
-
-define_violation!(
-    pub struct InvalidEscapeSequence(pub char);
-);
-impl AlwaysAutofixableViolation for InvalidEscapeSequence {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let InvalidEscapeSequence(char) = self;
-        format!("Invalid escape sequence: '\\{char}'")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add backslash to escape sequence".to_string()
-    }
-}
-
-define_violation!(
-    pub struct DocLineTooLong(pub usize, pub usize);
-);
-impl Violation for DocLineTooLong {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let DocLineTooLong(length, limit) = self;
-        format!("Doc line too long ({length} > {limit} characters)")
     }
 }
 
@@ -415,7 +188,7 @@ impl Violation for PercentFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatInvalidFormat(message) = self;
-        format!("'...' % ... has invalid format string: {message}")
+        format!("`%`-format string has invalid format string: {message}")
     }
 }
 
@@ -425,7 +198,7 @@ define_violation!(
 impl Violation for PercentFormatExpectedMapping {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...' % ... expected mapping but got sequence")
+        format!("`%`-format string expected mapping but got sequence")
     }
 }
 
@@ -435,7 +208,7 @@ define_violation!(
 impl Violation for PercentFormatExpectedSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...' % ... expected sequence but got mapping")
+        format!("`%`-format string expected sequence but got mapping")
     }
 }
 
@@ -447,7 +220,7 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
     fn message(&self) -> String {
         let PercentFormatExtraNamedArguments(missing) = self;
         let message = missing.join(", ");
-        format!("'...' % ... has unused named argument(s): {message}")
+        format!("`%`-format string has unused named argument(s): {message}")
     }
 
     fn autofix_title(&self) -> String {
@@ -465,7 +238,7 @@ impl Violation for PercentFormatMissingArgument {
     fn message(&self) -> String {
         let PercentFormatMissingArgument(missing) = self;
         let message = missing.join(", ");
-        format!("'...' % ... is missing argument(s) for placeholder(s): {message}")
+        format!("`%`-format string is missing argument(s) for placeholder(s): {message}")
     }
 }
 
@@ -475,7 +248,7 @@ define_violation!(
 impl Violation for PercentFormatMixedPositionalAndNamed {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...' % ... has mixed positional and named placeholders")
+        format!("`%`-format string has mixed positional and named placeholders")
     }
 }
 
@@ -486,7 +259,7 @@ impl Violation for PercentFormatPositionalCountMismatch {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatPositionalCountMismatch(wanted, got) = self;
-        format!("'...' % ... has {wanted} placeholder(s) but {got} substitution(s)")
+        format!("`%`-format string has {wanted} placeholder(s) but {got} substitution(s)")
     }
 }
 
@@ -496,7 +269,7 @@ define_violation!(
 impl Violation for PercentFormatStarRequiresSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...' % ... `*` specifier requires sequence")
+        format!("`%`-format string `*` specifier requires sequence")
     }
 }
 
@@ -507,7 +280,7 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatUnsupportedFormatCharacter(char) = self;
-        format!("'...' % ... has unsupported format character '{char}'")
+        format!("`%`-format string has unsupported format character '{char}'")
     }
 }
 
@@ -518,7 +291,7 @@ impl Violation for StringDotFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
         let StringDotFormatInvalidFormat(message) = self;
-        format!("'...'.format(...) has invalid format string: {message}")
+        format!("`.format` call has invalid format string: {message}")
     }
 }
 
@@ -530,7 +303,7 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
     fn message(&self) -> String {
         let StringDotFormatExtraNamedArguments(missing) = self;
         let message = missing.join(", ");
-        format!("'...'.format(...) has unused named argument(s): {message}")
+        format!("`.format` call has unused named argument(s): {message}")
     }
 
     fn autofix_title(&self) -> String {
@@ -548,7 +321,7 @@ impl Violation for StringDotFormatExtraPositionalArguments {
     fn message(&self) -> String {
         let StringDotFormatExtraPositionalArguments(missing) = self;
         let message = missing.join(", ");
-        format!("'...'.format(...) has unused arguments at position(s): {message}")
+        format!("`.format` call has unused arguments at position(s): {message}")
     }
 }
 
@@ -560,7 +333,7 @@ impl Violation for StringDotFormatMissingArguments {
     fn message(&self) -> String {
         let StringDotFormatMissingArguments(missing) = self;
         let message = missing.join(", ");
-        format!("'...'.format(...) is missing argument(s) for placeholder(s): {message}")
+        format!("`.format` call is missing argument(s) for placeholder(s): {message}")
     }
 }
 
@@ -570,7 +343,7 @@ define_violation!(
 impl Violation for StringDotFormatMixingAutomatic {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...'.format(...) mixes automatic and manual numbering")
+        format!("`.format` string mixes automatic and manual numbering")
     }
 }
 
@@ -1195,18 +968,35 @@ impl Violation for MutableArgumentDefault {
 }
 
 define_violation!(
-    pub struct UnusedLoopControlVariable(pub String);
+    pub struct UnusedLoopControlVariable {
+        /// The name of the loop control variable.
+        pub name: String,
+        /// Whether the variable is safe to rename. A variable is unsafe to
+        /// rename if it _might_ be used by magic control flow (e.g.,
+        /// `locals()`).
+        pub safe: bool,
+    }
 );
-impl AlwaysAutofixableViolation for UnusedLoopControlVariable {
+impl Violation for UnusedLoopControlVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedLoopControlVariable(name) = self;
-        format!("Loop control variable `{name}` not used within the loop body")
+        let UnusedLoopControlVariable { name, safe } = self;
+        if *safe {
+            format!("Loop control variable `{name}` not used within loop body")
+        } else {
+            format!("Loop control variable `{name}` may not be used within loop body")
+        }
     }
 
-    fn autofix_title(&self) -> String {
-        let UnusedLoopControlVariable(name) = self;
-        format!("Rename unused `{name}` to `_{name}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let UnusedLoopControlVariable { safe, .. } = self;
+        if *safe {
+            Some(|UnusedLoopControlVariable { name, .. }| {
+                format!("Rename unused `{name}` to `_{name}`")
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -3499,20 +3289,28 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeClass {
 define_violation!(
     pub struct MultiLineSummaryFirstLine;
 );
-impl Violation for MultiLineSummaryFirstLine {
+impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multi-line docstring summary should start at the first line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove whitespace after opening quotes".to_string()
     }
 }
 
 define_violation!(
     pub struct MultiLineSummarySecondLine;
 );
-impl Violation for MultiLineSummarySecondLine {
+impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multi-line docstring summary should start at the second line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Insert line break and indentation after opening quotes".to_string()
     }
 }
 
@@ -3997,54 +3795,6 @@ impl Violation for ErrorSuffixOnExceptionName {
     }
 }
 
-// isort
-
-define_violation!(
-    pub struct UnsortedImports;
-);
-impl AlwaysAutofixableViolation for UnsortedImports {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Import block is un-sorted or un-formatted")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Organize imports".to_string()
-    }
-}
-
-define_violation!(
-    pub struct MissingRequiredImport(pub String);
-);
-impl AlwaysAutofixableViolation for MissingRequiredImport {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let MissingRequiredImport(name) = self;
-        format!("Missing required import: `{name}`")
-    }
-
-    fn autofix_title(&self) -> String {
-        let MissingRequiredImport(name) = self;
-        format!("Insert required import: `{name}`")
-    }
-}
-
-// eradicate
-
-define_violation!(
-    pub struct CommentedOutCode;
-);
-impl AlwaysAutofixableViolation for CommentedOutCode {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Found commented-out code")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove commented-out code".to_string()
-    }
-}
-
 // flake8-bandit
 
 define_violation!(
@@ -4244,38 +3994,6 @@ impl Violation for SnmpWeakCryptography {
     }
 }
 
-// flake8-boolean-trap
-
-define_violation!(
-    pub struct BooleanPositionalArgInFunctionDefinition;
-);
-impl Violation for BooleanPositionalArgInFunctionDefinition {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean positional arg in function definition")
-    }
-}
-
-define_violation!(
-    pub struct BooleanDefaultValueInFunctionDefinition;
-);
-impl Violation for BooleanDefaultValueInFunctionDefinition {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean default value in function definition")
-    }
-}
-
-define_violation!(
-    pub struct BooleanPositionalValueInFunctionCall;
-);
-impl Violation for BooleanPositionalValueInFunctionCall {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean positional value in function call")
-    }
-}
-
 // flake8-unused-arguments
 
 define_violation!(
@@ -4330,19 +4048,6 @@ impl Violation for UnusedLambdaArgument {
     fn message(&self) -> String {
         let UnusedLambdaArgument(name) = self;
         format!("Unused lambda argument: `{name}`")
-    }
-}
-
-// flake8-import-conventions
-
-define_violation!(
-    pub struct ImportAliasIsNotConventional(pub String, pub String);
-);
-impl Violation for ImportAliasIsNotConventional {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let ImportAliasIsNotConventional(name, asname) = self;
-        format!("`{name}` should be imported as `{asname}`")
     }
 }
 
@@ -4950,138 +4655,6 @@ impl AlwaysAutofixableViolation for UseFixturesWithoutParameters {
 
     fn autofix_title(&self) -> String {
         "Remove `usefixtures` decorator or pass parameters".to_string()
-    }
-}
-
-// flake8-pie
-
-define_violation!(
-    pub struct NoUnnecessaryPass;
-);
-impl AlwaysAutofixableViolation for NoUnnecessaryPass {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `pass` statement")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove unnecessary `pass`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct DupeClassFieldDefinitions(pub String);
-);
-impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let DupeClassFieldDefinitions(name) = self;
-        format!("Class field `{name}` is defined multiple times")
-    }
-
-    fn autofix_title(&self) -> String {
-        let DupeClassFieldDefinitions(name) = self;
-        format!("Remove duplicate field definition for `{name}`")
-    }
-}
-
-define_violation!(
-    pub struct PreferUniqueEnums {
-        pub value: String,
-    }
-);
-impl Violation for PreferUniqueEnums {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let PreferUniqueEnums { value } = self;
-        format!("Enum contains duplicate value: `{value}`")
-    }
-}
-
-define_violation!(
-    pub struct NoUnnecessarySpread;
-);
-impl Violation for NoUnnecessarySpread {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary spread `**`")
-    }
-}
-
-define_violation!(
-    pub struct NoUnnecessaryDictKwargs;
-);
-impl Violation for NoUnnecessaryDictKwargs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `dict` kwargs")
-    }
-}
-
-define_violation!(
-    pub struct PreferListBuiltin;
-);
-impl AlwaysAutofixableViolation for PreferListBuiltin {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Prefer `list` over useless lambda")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with `list`".to_string()
-    }
-}
-
-// flake8-commas
-
-define_violation!(
-    pub struct TrailingCommaMissing;
-);
-impl AlwaysAutofixableViolation for TrailingCommaMissing {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma missing")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add trailing comma".to_string()
-    }
-}
-
-define_violation!(
-    pub struct TrailingCommaOnBareTupleProhibited;
-);
-impl Violation for TrailingCommaOnBareTupleProhibited {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma on bare tuple prohibited")
-    }
-}
-
-define_violation!(
-    pub struct TrailingCommaProhibited;
-);
-impl AlwaysAutofixableViolation for TrailingCommaProhibited {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma prohibited")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove trailing comma".to_string()
-    }
-}
-
-// flake8-no-pep420
-
-define_violation!(
-    pub struct ImplicitNamespacePackage(pub String);
-);
-impl Violation for ImplicitNamespacePackage {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let ImplicitNamespacePackage(filename) = self;
-        format!("File `{filename}` is part of an implicit namespace package. Add an `__init__.py`.")
     }
 }
 

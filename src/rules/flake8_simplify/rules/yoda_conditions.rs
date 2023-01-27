@@ -3,8 +3,19 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
+use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::violations;
+
+/// Return `true` if an [`Expr`] is a constant or a constant-like name.
+fn is_constant_like(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Constant { .. } => true,
+        ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant_like),
+        ExprKind::Name { id, .. } => string::is_upper(id),
+        _ => false,
+    }
+}
 
 /// SIM300
 pub fn yoda_conditions(
@@ -24,10 +35,8 @@ pub fn yoda_conditions(
     ) {
         return;
     }
-    if !matches!(&left.node, &ExprKind::Constant { .. }) {
-        return;
-    }
-    if matches!(&right.node, &ExprKind::Constant { .. }) {
+
+    if !is_constant_like(left) || is_constant_like(right) {
         return;
     }
 
