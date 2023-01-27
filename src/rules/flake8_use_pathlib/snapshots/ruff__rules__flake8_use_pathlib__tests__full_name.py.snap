@@ -252,4 +252,14 @@ expression: diagnostics
     column: 4
   fix: ~
   parent: ~
+- kind:
+    PathlibGetcwd: ~
+  location:
+    row: 32
+    column: 0
+  end_location:
+    row: 32
+    column: 10
+  fix: ~
+  parent: ~
 
