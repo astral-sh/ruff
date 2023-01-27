@@ -20,12 +20,12 @@ repos:
         types: [rust]
       - id: clippy
         name: clippy
-        entry: cargo +nightly clippy --workspace --all-targets --all-features
+        entry: cargo clippy --workspace --all-targets --all-features
         language: rust
         pass_filenames: false
       - id: dev-generate-all
         name: dev-generate-all
-        entry: cargo +nightly dev generate-all
+        entry: cargo dev generate-all
         language: rust
         pass_filenames: false
         exclude: target
