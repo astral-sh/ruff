@@ -25,13 +25,11 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2022-11-01
-          override: true
       - uses: Swatinem/rust-cache@v1
       - run: cargo build --all
       - run: ./target/debug/ruff_dev generate-all
-      - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo +nightly dev generate-all'."
-      - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo +nightly dev generate-all'."
+      - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo dev generate-all'."
+      - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo dev generate-all'."
       - run: git diff --exit-code -- README.md ruff.schema.json
 
   cargo-fmt:
@@ -42,8 +40,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2022-11-01
-          override: true
           components: rustfmt
       - run: cargo fmt --all --check
 
@@ -55,8 +51,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2022-11-01
-          override: true
           components: clippy
           target: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
@@ -74,8 +68,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.65.0
-          override: true
       - uses: Swatinem/rust-cache@v1
       - run: cargo install cargo-insta
       - run: pip install black[d]==22.12.0
@@ -105,7 +97,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          override: true
       - uses: Swatinem/rust-cache@v1
       - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
       - run: cargo check
@@ -126,8 +117,8 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          toolchain: nightly-2022-11-01
-#          override: true
+
+
 #      - uses: actions/cache@v3
 #        env:
 #          cache-name: cache-cargo
@@ -152,8 +143,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.65.0
-          override: true
       - uses: Swatinem/rust-cache@v1
       - uses: actions/setup-python@v4
         with:
