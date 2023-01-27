@@ -1,4 +1,7 @@
-use rustpython_ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind};
+use anyhow::Result;
+use log::error;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
 
 use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
@@ -8,10 +11,164 @@ use crate::ast::helpers::{collect_arg_names, collect_call_path};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::autofix::helpers::remove_argument;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
+use crate::source_code::Locator;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
+
+define_violation!(
+    pub struct IncorrectFixtureParenthesesStyle {
+        pub expected_parens: String,
+        pub actual_parens: String,
+    }
+);
+impl AlwaysAutofixableViolation for IncorrectFixtureParenthesesStyle {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IncorrectFixtureParenthesesStyle {
+            expected_parens,
+            actual_parens,
+        } = self;
+        format!("Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add/remove parentheses".to_string()
+    }
+}
+
+define_violation!(
+    pub struct FixturePositionalArgs {
+        pub function: String,
+    }
+);
+impl Violation for FixturePositionalArgs {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let FixturePositionalArgs { function } = self;
+        format!("Configuration for fixture `{function}` specified via positional args, use kwargs")
+    }
+}
+
+define_violation!(
+    pub struct ExtraneousScopeFunction;
+);
+impl Violation for ExtraneousScopeFunction {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`scope='function'` is implied in `@pytest.fixture()`")
+    }
+}
+
+define_violation!(
+    pub struct MissingFixtureNameUnderscore {
+        pub function: String,
+    }
+);
+impl Violation for MissingFixtureNameUnderscore {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingFixtureNameUnderscore { function } = self;
+        format!("Fixture `{function}` does not return anything, add leading underscore")
+    }
+}
+
+define_violation!(
+    pub struct IncorrectFixtureNameUnderscore {
+        pub function: String,
+    }
+);
+impl Violation for IncorrectFixtureNameUnderscore {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IncorrectFixtureNameUnderscore { function } = self;
+        format!("Fixture `{function}` returns a value, remove leading underscore")
+    }
+}
+
+define_violation!(
+    pub struct FixtureParamWithoutValue {
+        pub name: String,
+    }
+);
+impl Violation for FixtureParamWithoutValue {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let FixtureParamWithoutValue { name } = self;
+        format!(
+            "Fixture `{name}` without value is injected as parameter, use \
+             `@pytest.mark.usefixtures` instead"
+        )
+    }
+}
+
+define_violation!(
+    pub struct DeprecatedYieldFixture;
+);
+impl Violation for DeprecatedYieldFixture {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`")
+    }
+}
+
+define_violation!(
+    pub struct FixtureFinalizerCallback;
+);
+impl Violation for FixtureFinalizerCallback {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use `yield` instead of `request.addfinalizer`")
+    }
+}
+
+define_violation!(
+    pub struct UselessYieldFixture {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for UselessYieldFixture {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UselessYieldFixture { name } = self;
+        format!("No teardown in fixture `{name}`, use `return` instead of `yield`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace `yield` with `return`".to_string()
+    }
+}
+
+define_violation!(
+    pub struct ErroneousUseFixturesOnFixture;
+);
+impl AlwaysAutofixableViolation for ErroneousUseFixturesOnFixture {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`pytest.mark.usefixtures` has no effect on fixtures")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove `pytest.mark.usefixtures`".to_string()
+    }
+}
+
+define_violation!(
+    pub struct UnnecessaryAsyncioMarkOnFixture;
+);
+impl AlwaysAutofixableViolation for UnnecessaryAsyncioMarkOnFixture {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`pytest.mark.asyncio` is unnecessary for fixtures")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove `pytest.mark.asyncio`".to_string()
+    }
+}
 
 #[derive(Default)]
 /// Visitor that skips functions
@@ -80,7 +237,7 @@ fn pytest_fixture_parentheses(
     actual: &str,
 ) {
     let mut diagnostic = Diagnostic::new(
-        violations::IncorrectFixtureParenthesesStyle {
+        IncorrectFixtureParenthesesStyle {
             expected_parens: preferred.to_string(),
             actual_parens: actual.to_string(),
         },
@@ -90,6 +247,17 @@ fn pytest_fixture_parentheses(
         diagnostic.amend(fix);
     }
     checker.diagnostics.push(diagnostic);
+}
+
+pub fn fix_extraneous_scope_function(
+    locator: &Locator,
+    stmt_at: Location,
+    expr_at: Location,
+    expr_end: Location,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Result<Fix> {
+    remove_argument(locator, stmt_at, expr_at, expr_end, args, keywords, false)
 }
 
 /// PT001, PT002, PT003
@@ -116,7 +284,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
 
             if checker.settings.rules.enabled(&Rule::FixturePositionalArgs) && !args.is_empty() {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::FixturePositionalArgs {
+                    FixturePositionalArgs {
                         function: func_name.to_string(),
                     },
                     Range::from_located(decorator),
@@ -134,10 +302,26 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
 
                 if let Some(scope_keyword) = scope_keyword {
                     if keyword_is_literal(scope_keyword, "function") {
-                        checker.diagnostics.push(Diagnostic::new(
-                            violations::ExtraneousScopeFunction,
+                        let mut diagnostic = Diagnostic::new(
+                            ExtraneousScopeFunction,
                             Range::from_located(scope_keyword),
-                        ));
+                        );
+                        if checker.patch(diagnostic.kind.rule()) {
+                            match fix_extraneous_scope_function(
+                                checker.locator,
+                                decorator.location,
+                                diagnostic.location,
+                                diagnostic.end_location,
+                                args,
+                                keywords,
+                            ) {
+                                Ok(fix) => {
+                                    diagnostic.amend(fix);
+                                }
+                                Err(e) => error!("Failed to generate fix: {e}"),
+                            }
+                        }
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -172,7 +356,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && func_name.starts_with('_')
     {
         checker.diagnostics.push(Diagnostic::new(
-            violations::IncorrectFixtureNameUnderscore {
+            IncorrectFixtureNameUnderscore {
                 function: func_name.to_string(),
             },
             Range::from_located(func),
@@ -186,7 +370,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && !func_name.starts_with('_')
     {
         checker.diagnostics.push(Diagnostic::new(
-            violations::MissingFixtureNameUnderscore {
+            MissingFixtureNameUnderscore {
                 function: func_name.to_string(),
             },
             Range::from_located(func),
@@ -199,7 +383,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                 if let ExprKind::Yield { .. } = value.node {
                     if visitor.yield_statements.len() == 1 {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UselessYieldFixture {
+                            UselessYieldFixture {
                                 name: func_name.to_string(),
                             },
                             Range::from_located(stmt),
@@ -228,7 +412,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
         let name = &arg.node.arg;
         if name.starts_with('_') {
             checker.diagnostics.push(Diagnostic::new(
-                violations::FixtureParamWithoutValue {
+                FixtureParamWithoutValue {
                     name: name.to_string(),
                 },
                 Range::from_located(arg),
@@ -241,7 +425,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
 fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
     if is_pytest_yield_fixture(decorator, checker) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::DeprecatedYieldFixture,
+            DeprecatedYieldFixture,
             Range::from_located(decorator),
         ));
     }
@@ -261,7 +445,7 @@ fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[S
 
     if let Some(addfinalizer) = visitor.addfinalizer_call {
         checker.diagnostics.push(Diagnostic::new(
-            violations::FixtureFinalizerCallback,
+            FixtureFinalizerCallback,
             Range::from_located(addfinalizer),
         ));
     }
@@ -278,10 +462,8 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
             .enabled(&Rule::UnnecessaryAsyncioMarkOnFixture)
         {
             if name == "asyncio" {
-                let mut diagnostic = Diagnostic::new(
-                    violations::UnnecessaryAsyncioMarkOnFixture,
-                    Range::from_located(mark),
-                );
+                let mut diagnostic =
+                    Diagnostic::new(UnnecessaryAsyncioMarkOnFixture, Range::from_located(mark));
                 if checker.patch(diagnostic.kind.rule()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
@@ -297,10 +479,8 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
             .enabled(&Rule::ErroneousUseFixturesOnFixture)
         {
             if name == "usefixtures" {
-                let mut diagnostic = Diagnostic::new(
-                    violations::ErroneousUseFixturesOnFixture,
-                    Range::from_located(mark),
-                );
+                let mut diagnostic =
+                    Diagnostic::new(ErroneousUseFixturesOnFixture, Range::from_located(mark));
                 if checker.patch(diagnostic.kind.rule()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);

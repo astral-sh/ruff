@@ -4685,76 +4685,6 @@ impl Violation for DotFormatInException {
 // flake8-pytest-style
 
 define_violation!(
-    pub struct IncorrectFixtureParenthesesStyle {
-        pub expected_parens: String,
-        pub actual_parens: String,
-    }
-);
-impl AlwaysAutofixableViolation for IncorrectFixtureParenthesesStyle {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let IncorrectFixtureParenthesesStyle {
-            expected_parens,
-            actual_parens,
-        } = self;
-        format!("Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add/remove parentheses".to_string()
-    }
-}
-
-define_violation!(
-    pub struct FixturePositionalArgs {
-        pub function: String,
-    }
-);
-impl Violation for FixturePositionalArgs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let FixturePositionalArgs { function } = self;
-        format!("Configuration for fixture `{function}` specified via positional args, use kwargs")
-    }
-}
-
-define_violation!(
-    pub struct ExtraneousScopeFunction;
-);
-impl Violation for ExtraneousScopeFunction {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`scope='function'` is implied in `@pytest.fixture()`")
-    }
-}
-
-define_violation!(
-    pub struct MissingFixtureNameUnderscore {
-        pub function: String,
-    }
-);
-impl Violation for MissingFixtureNameUnderscore {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let MissingFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` does not return anything, add leading underscore")
-    }
-}
-
-define_violation!(
-    pub struct IncorrectFixtureNameUnderscore {
-        pub function: String,
-    }
-);
-impl Violation for IncorrectFixtureNameUnderscore {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let IncorrectFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` returns a value, remove leading underscore")
-    }
-}
-
-define_violation!(
     pub struct ParametrizeNamesWrongType {
         pub expected: ParametrizeNameType,
     }
@@ -4906,59 +4836,6 @@ impl Violation for CompositeAssertion {
 }
 
 define_violation!(
-    pub struct FixtureParamWithoutValue {
-        pub name: String,
-    }
-);
-impl Violation for FixtureParamWithoutValue {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let FixtureParamWithoutValue { name } = self;
-        format!(
-            "Fixture `{name}` without value is injected as parameter, use \
-             `@pytest.mark.usefixtures` instead"
-        )
-    }
-}
-
-define_violation!(
-    pub struct DeprecatedYieldFixture;
-);
-impl Violation for DeprecatedYieldFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`")
-    }
-}
-
-define_violation!(
-    pub struct FixtureFinalizerCallback;
-);
-impl Violation for FixtureFinalizerCallback {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `yield` instead of `request.addfinalizer`")
-    }
-}
-
-define_violation!(
-    pub struct UselessYieldFixture {
-        pub name: String,
-    }
-);
-impl AlwaysAutofixableViolation for UselessYieldFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let UselessYieldFixture { name } = self;
-        format!("No teardown in fixture `{name}`, use `return` instead of `yield`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace `yield` with `return`".to_string()
-    }
-}
-
-define_violation!(
     pub struct IncorrectMarkParenthesesStyle {
         pub mark_name: String,
         pub expected_parens: String,
@@ -4981,34 +4858,6 @@ impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
 
     fn autofix_title(&self) -> String {
         "Add/remove parentheses".to_string()
-    }
-}
-
-define_violation!(
-    pub struct UnnecessaryAsyncioMarkOnFixture;
-);
-impl AlwaysAutofixableViolation for UnnecessaryAsyncioMarkOnFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`pytest.mark.asyncio` is unnecessary for fixtures")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `pytest.mark.asyncio`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct ErroneousUseFixturesOnFixture;
-);
-impl AlwaysAutofixableViolation for ErroneousUseFixturesOnFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`pytest.mark.usefixtures` has no effect on fixtures")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `pytest.mark.usefixtures`".to_string()
     }
 }
 
