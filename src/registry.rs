@@ -734,12 +734,20 @@ impl Diagnostic {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[(
-    Rule::OneBlankLineBeforeClass,
-    Rule::NoBlankLineBeforeClass,
-    "`D203` (one-blank-line-before-class) and `D211` (no-blank-line-before-class) are incompatible. \
-     Consider adding `D203` to `ignore`.",
-)];
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[
+    (
+        Rule::OneBlankLineBeforeClass,
+        Rule::NoBlankLineBeforeClass,
+        "`D203` (one-blank-line-before-class) and `D211` (no-blank-line-before-class) are \
+         incompatible. Consider adding `D203` to `ignore`.",
+    ),
+    (
+        Rule::MultiLineSummaryFirstLine,
+        Rule::MultiLineSummarySecondLine,
+        "`D212` (multi-line-summary-first-line) and `D213` (multi-line-summary-second-line) are \
+         incompatible. Consider adding one to `ignore`.",
+    ),
+];
 
 #[cfg(test)]
 mod tests {
