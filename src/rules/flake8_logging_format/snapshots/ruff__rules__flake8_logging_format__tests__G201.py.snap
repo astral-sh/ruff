@@ -1,0 +1,15 @@
+---
+source: src/rules/flake8_logging_format/mod.rs
+expression: diagnostics
+---
+- kind:
+    LoggingExcInfo: ~
+  location:
+    row: 3
+    column: 8
+  end_location:
+    row: 3
+    column: 13
+  fix: ~
+  parent: ~
+

@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     UnusedImport:
-      - a.b.c
-      - false
-      - false
+      name: a.b.c
+      ignore_init: false
+      multiple: false
   location:
     row: 2
     column: 16
@@ -25,9 +25,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - d.e.f
-      - false
-      - false
+      name: d.e.f
+      ignore_init: false
+      multiple: false
   location:
     row: 3
     column: 16
@@ -46,9 +46,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - h.i
-      - false
-      - false
+      name: h.i
+      ignore_init: false
+      multiple: false
   location:
     row: 4
     column: 7
@@ -67,9 +67,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - j.k
-      - false
-      - false
+      name: j.k
+      ignore_init: false
+      multiple: false
   location:
     row: 5
     column: 7

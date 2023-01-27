@@ -84,7 +84,7 @@ mod tests {
                 fp.write("\n")
 
             elif line.strip() == "/// Ruff-specific rules":
-                fp.write(f"/// [{plugin}]({url})\n")
+                fp.write(f"{indent}/// [{plugin}]({url})\n")
                 fp.write(f'{indent}#[prefix = "{prefix_code}"]\n')
                 fp.write(f"{indent}{pascal_case(plugin)},")
                 fp.write("\n")

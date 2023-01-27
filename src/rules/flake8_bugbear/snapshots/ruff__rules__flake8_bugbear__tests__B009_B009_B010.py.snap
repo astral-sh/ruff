@@ -5,109 +5,127 @@ expression: diagnostics
 - kind:
     GetAttrWithConstant: ~
   location:
-    row: 18
+    row: 19
     column: 0
   end_location:
-    row: 18
+    row: 19
     column: 19
   fix:
     content:
       - foo.bar
     location:
-      row: 18
+      row: 19
       column: 0
     end_location:
-      row: 18
+      row: 19
       column: 19
   parent: ~
 - kind:
     GetAttrWithConstant: ~
   location:
-    row: 19
+    row: 20
     column: 0
   end_location:
-    row: 19
+    row: 20
     column: 23
   fix:
     content:
       - foo._123abc
     location:
-      row: 19
+      row: 20
       column: 0
     end_location:
-      row: 19
+      row: 20
       column: 23
   parent: ~
 - kind:
     GetAttrWithConstant: ~
   location:
-    row: 20
+    row: 21
     column: 0
   end_location:
-    row: 20
+    row: 21
+    column: 26
+  fix:
+    content:
+      - foo.__123abc__
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 21
+      column: 26
+  parent: ~
+- kind:
+    GetAttrWithConstant: ~
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 22
     column: 22
   fix:
     content:
       - foo.abc123
     location:
-      row: 20
+      row: 22
       column: 0
     end_location:
-      row: 20
+      row: 22
       column: 22
   parent: ~
 - kind:
     GetAttrWithConstant: ~
   location:
-    row: 21
+    row: 23
     column: 0
   end_location:
-    row: 21
+    row: 23
     column: 23
   fix:
     content:
       - foo.abc123
     location:
-      row: 21
+      row: 23
       column: 0
     end_location:
-      row: 21
+      row: 23
       column: 23
   parent: ~
 - kind:
     GetAttrWithConstant: ~
   location:
-    row: 22
+    row: 24
     column: 14
   end_location:
-    row: 22
+    row: 24
     column: 31
   fix:
     content:
       - x.bar
     location:
-      row: 22
+      row: 24
       column: 14
     end_location:
-      row: 22
+      row: 24
       column: 31
   parent: ~
 - kind:
     GetAttrWithConstant: ~
   location:
-    row: 23
+    row: 25
     column: 3
   end_location:
-    row: 23
+    row: 25
     column: 20
   fix:
     content:
       - x.bar
     location:
-      row: 23
+      row: 25
       column: 3
     end_location:
-      row: 23
+      row: 25
       column: 20
   parent: ~
 

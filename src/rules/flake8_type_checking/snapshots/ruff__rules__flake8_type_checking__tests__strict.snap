@@ -1,0 +1,38 @@
+---
+source: src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pkg.A
+  location:
+    row: 24
+    column: 20
+  end_location:
+    row: 24
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pkg.A
+  location:
+    row: 32
+    column: 20
+  end_location:
+    row: 32
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pkg.bar.A
+  location:
+    row: 51
+    column: 24
+  end_location:
+    row: 51
+    column: 25
+  fix: ~
+  parent: ~
+

@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     UnusedImport:
-      - models.Nut
-      - false
-      - false
+      name: models.Nut
+      ignore_init: false
+      multiple: false
   location:
     row: 8
     column: 4

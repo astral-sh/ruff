@@ -1,5 +1,7 @@
 pub use await_outside_async::await_outside_async;
 pub use constant_comparison::constant_comparison;
+pub use invalid_all_format::{invalid_all_format, InvalidAllFormat};
+pub use invalid_all_object::{invalid_all_object, InvalidAllObject};
 pub use magic_value_comparison::magic_value_comparison;
 pub use merge_isinstance::merge_isinstance;
 pub use property_with_parameters::property_with_parameters;
@@ -12,6 +14,8 @@ pub use useless_import_alias::useless_import_alias;
 
 mod await_outside_async;
 mod constant_comparison;
+mod invalid_all_format;
+mod invalid_all_object;
 mod magic_value_comparison;
 mod merge_isinstance;
 mod property_with_parameters;

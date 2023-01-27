@@ -10,7 +10,7 @@ use super::categorize::ImportType;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum RelatveImportsOrder {
+pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
     /// "further" imports (more `.` characters, least local).
     ClosestToFurthest,
@@ -19,7 +19,7 @@ pub enum RelatveImportsOrder {
     FurthestToClosest,
 }
 
-impl Default for RelatveImportsOrder {
+impl Default for RelativeImportsOrder {
     fn default() -> Self {
         Self::FurthestToClosest
     }
@@ -163,7 +163,7 @@ pub struct Options {
     /// `reverse-relative` default (`reverse-relative = false`); setting
     /// this to "closest-to-furthest" is equivalent to isort's `reverse-relative
     /// = true`.
-    pub relative_imports_order: Option<RelatveImportsOrder>,
+    pub relative_imports_order: Option<RelativeImportsOrder>,
     #[option(
         default = r#"[]"#,
         value_type = "Vec<String>",
@@ -227,7 +227,7 @@ pub struct Settings {
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
     pub order_by_type: bool,
-    pub relative_imports_order: RelatveImportsOrder,
+    pub relative_imports_order: RelativeImportsOrder,
     pub single_line_exclusions: BTreeSet<String>,
     pub split_on_trailing_comma: bool,
     pub classes: BTreeSet<String>,
@@ -248,7 +248,7 @@ impl Default for Settings {
             known_first_party: BTreeSet::new(),
             known_third_party: BTreeSet::new(),
             order_by_type: true,
-            relative_imports_order: RelatveImportsOrder::default(),
+            relative_imports_order: RelativeImportsOrder::default(),
             single_line_exclusions: BTreeSet::new(),
             split_on_trailing_comma: true,
             classes: BTreeSet::new(),

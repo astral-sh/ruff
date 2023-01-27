@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 static SHEBANG_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?P<spaces>\s*)#!(?P<directive>.*)").unwrap());
+    Lazy::new(|| Regex::new(r"^(?P<spaces>\s*)#!(?P<directive>.*)").unwrap());
 
 #[derive(Debug)]
 pub enum ShebangDirective<'a> {
@@ -67,7 +67,7 @@ mod tests {
         ));
         assert!(matches!(
             extract_shebang("print('test')  #!/usr/bin/python"),
-            ShebangDirective::Match(2, 17, 32, "/usr/bin/python")
+            ShebangDirective::None
         ));
     }
 }

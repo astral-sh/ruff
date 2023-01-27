@@ -10,6 +10,7 @@ use crate::cst::matchers::{match_call, match_expression};
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
+use crate::source_code::{Locator, Stylist};
 use crate::violations;
 
 // An opening curly brace, followed by any integer, followed by any text,
@@ -54,7 +55,13 @@ fn generate_arguments<'a>(
 }
 
 /// Returns the corrected function call.
-fn generate_call(module_text: &str, correct_order: &[usize]) -> Result<String> {
+fn generate_call(
+    expr: &Expr,
+    correct_order: &[usize],
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<String> {
+    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut expression = match_expression(module_text)?;
     let mut call = match_call(&mut expression)?;
 
@@ -66,13 +73,21 @@ fn generate_call(module_text: &str, correct_order: &[usize]) -> Result<String> {
         panic!("Expected: Expression::Attribute")
     };
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     item.codegen(&mut state);
     let cleaned = remove_specifiers(&state.to_string());
 
     call.func = Box::new(match_expression(&cleaned)?);
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     expression.codegen(&mut state);
     if module_text == state.to_string() {
         // Ex) `'{' '0}'.format(1)`
@@ -101,12 +116,9 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
     if checker.patch(diagnostic.kind.rule()) {
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846
-        if let Ok(contents) = generate_call(
-            checker
-                .locator
-                .slice_source_code_range(&Range::from_located(expr)),
-            &summary.indexes,
-        ) {
+        if let Ok(contents) =
+            generate_call(expr, &summary.indexes, checker.locator, checker.stylist)
+        {
             diagnostic.amend(Fix::replacement(
                 contents,
                 expr.location,

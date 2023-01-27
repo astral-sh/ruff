@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     UnusedImport:
-      - functools
-      - false
-      - false
+      name: functools
+      ignore_init: false
+      multiple: false
   location:
     row: 2
     column: 7
@@ -25,9 +25,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - collections.OrderedDict
-      - false
-      - false
+      name: collections.OrderedDict
+      ignore_init: false
+      multiple: false
   location:
     row: 6
     column: 4
@@ -51,9 +51,9 @@ expression: diagnostics
     column: 0
 - kind:
     UnusedImport:
-      - logging.handlers
-      - false
-      - false
+      name: logging.handlers
+      ignore_init: false
+      multiple: false
   location:
     row: 12
     column: 7
@@ -72,9 +72,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - shelve
-      - false
-      - false
+      name: shelve
+      ignore_init: false
+      multiple: false
   location:
     row: 32
     column: 11
@@ -93,9 +93,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - importlib
-      - false
-      - false
+      name: importlib
+      ignore_init: false
+      multiple: false
   location:
     row: 33
     column: 11
@@ -114,9 +114,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - pathlib
-      - false
-      - false
+      name: pathlib
+      ignore_init: false
+      multiple: false
   location:
     row: 37
     column: 11
@@ -135,9 +135,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - pickle
-      - false
-      - false
+      name: pickle
+      ignore_init: false
+      multiple: false
   location:
     row: 52
     column: 15

@@ -1,10 +1,42 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Arguments, ExprKind};
 use rustpython_parser::ast::{Constant, Expr};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::violations;
+use crate::violation::Violation;
+
+define_violation!(
+    pub struct BooleanPositionalArgInFunctionDefinition;
+);
+impl Violation for BooleanPositionalArgInFunctionDefinition {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Boolean positional arg in function definition")
+    }
+}
+
+define_violation!(
+    pub struct BooleanDefaultValueInFunctionDefinition;
+);
+impl Violation for BooleanDefaultValueInFunctionDefinition {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Boolean default value in function definition")
+    }
+}
+
+define_violation!(
+    pub struct BooleanPositionalValueInFunctionCall;
+);
+impl Violation for BooleanPositionalValueInFunctionCall {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Boolean positional value in function call")
+    }
+}
 
 const FUNC_NAME_ALLOWLIST: &[&str] = &[
     "assertEqual",
@@ -77,7 +109,7 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Argume
             continue;
         }
         checker.diagnostics.push(Diagnostic::new(
-            violations::BooleanPositionalArgInFunctionDefinition,
+            BooleanPositionalArgInFunctionDefinition,
             Range::from_located(arg),
         ));
     }
@@ -88,11 +120,7 @@ pub fn check_boolean_default_value_in_function_definition(
     arguments: &Arguments,
 ) {
     for arg in &arguments.defaults {
-        add_if_boolean(
-            checker,
-            arg,
-            violations::BooleanDefaultValueInFunctionDefinition.into(),
-        );
+        add_if_boolean(checker, arg, BooleanDefaultValueInFunctionDefinition.into());
     }
 }
 
@@ -105,10 +133,6 @@ pub fn check_boolean_positional_value_in_function_call(
         if allow_boolean_trap(func) {
             continue;
         }
-        add_if_boolean(
-            checker,
-            arg,
-            violations::BooleanPositionalValueInFunctionCall.into(),
-        );
+        add_if_boolean(checker, arg, BooleanPositionalValueInFunctionCall.into());
     }
 }

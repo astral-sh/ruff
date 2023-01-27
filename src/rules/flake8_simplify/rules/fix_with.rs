@@ -78,7 +78,8 @@ pub(crate) fn fix_multiple_with_statements(
 
     let mut state = CodegenState {
         default_newline: stylist.line_ending(),
-        ..Default::default()
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
     };
     tree.codegen(&mut state);
 

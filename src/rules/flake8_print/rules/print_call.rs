@@ -63,6 +63,7 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                 &deleted,
                 checker.locator,
                 checker.indexer,
+                checker.stylist,
             ) {
                 Ok(fix) => {
                     if fix.content.is_empty() || fix.content == "pass" {

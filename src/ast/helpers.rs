@@ -489,6 +489,17 @@ pub fn is_const_none(expr: &Expr) -> bool {
     )
 }
 
+/// Return `true` if an [`Expr`] is `True`.
+pub fn is_const_true(expr: &Expr) -> bool {
+    matches!(
+        &expr.node,
+        ExprKind::Constant {
+            value: Constant::Bool(true),
+            kind: None
+        },
+    )
+}
+
 /// Return `true` if a keyword argument is present with a non-`None` value.
 pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
     find_keyword(keywords, keyword).map_or(false, |keyword| {
@@ -663,6 +674,24 @@ pub fn match_trailing_content(stmt: &Stmt, locator: &Locator) -> bool {
         }
     }
     false
+}
+
+/// If a `Stmt` has a trailing comment, return the index of the hash.
+pub fn match_trailing_comment(stmt: &Stmt, locator: &Locator) -> Option<usize> {
+    let range = Range::new(
+        stmt.end_location.unwrap(),
+        Location::new(stmt.end_location.unwrap().row() + 1, 0),
+    );
+    let suffix = locator.slice_source_code_range(&range);
+    for (i, char) in suffix.chars().enumerate() {
+        if char == '#' {
+            return Some(i);
+        }
+        if !char.is_whitespace() {
+            return None;
+        }
+    }
+    None
 }
 
 /// Return the number of trailing empty lines following a statement.
@@ -972,6 +1001,21 @@ impl<'a> SimpleCallArgs<'a> {
     pub fn len(&self) -> usize {
         self.args.len() + self.kwargs.len()
     }
+}
+
+/// Return `true` if the given `Expr` is a potential logging call. Matches
+/// `logging.error`, `logger.error`, `self.logger.error`, etc., but not
+/// arbitrary `foo.error` calls.
+pub fn is_logger_candidate(func: &Expr) -> bool {
+    if let ExprKind::Attribute { value, .. } = &func.node {
+        let call_path = collect_call_path(value);
+        if let Some(tail) = call_path.last() {
+            if *tail == "logging" || tail.ends_with("logger") {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 #[cfg(test)]

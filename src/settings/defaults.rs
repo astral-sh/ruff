@@ -11,8 +11,8 @@ use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle,
-    pydocstyle, pylint, pyupgrade,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
+    pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 
 pub const PREFIXES: &[RuleSelector] = &[
@@ -68,7 +68,6 @@ impl Default for Settings {
             line_length: LINE_LENGTH,
             namespace_packages: vec![],
             per_file_ignores: vec![],
-            required_version: None,
             respect_gitignore: true,
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
@@ -85,6 +84,7 @@ impl Default for Settings {
             flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::Settings::default(),
+            flake8_type_checking: flake8_type_checking::settings::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
             isort: isort::settings::Settings::default(),
             mccabe: mccabe::settings::Settings::default(),

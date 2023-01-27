@@ -19,124 +19,166 @@ use rustc_hash::FxHashMap;
 )]
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct Cli {
+pub struct Args {
     #[arg(required_unless_present_any = ["clean", "explain", "generate_shell_completion"])]
     pub files: Vec<PathBuf>,
-    /// Path to the `pyproject.toml` or `ruff.toml` file to use for
-    /// configuration.
-    #[arg(long, conflicts_with = "isolated")]
-    pub config: Option<PathBuf>,
-    /// Enable verbose logging.
-    #[arg(short, long, group = "verbosity")]
-    pub verbose: bool,
-    /// Print lint violations, but nothing else.
-    #[arg(short, long, group = "verbosity")]
-    pub quiet: bool,
-    /// Disable all logging (but still exit with status code "1" upon detecting
-    /// lint violations).
-    #[arg(short, long, group = "verbosity")]
-    pub silent: bool,
-    /// Exit with status code "0", even upon detecting lint violations.
-    #[arg(short, long)]
-    pub exit_zero: bool,
-    /// Run in watch mode by re-running whenever files change.
-    #[arg(short, long)]
-    pub watch: bool,
     /// Attempt to automatically fix lint violations.
     #[arg(long, overrides_with("no_fix"))]
     fix: bool,
     #[clap(long, overrides_with("fix"), hide = true)]
     no_fix: bool,
+    /// Show violations with source code.
+    #[arg(long, overrides_with("no_show_source"))]
+    show_source: bool,
+    #[clap(long, overrides_with("show_source"), hide = true)]
+    no_show_source: bool,
+    /// Avoid writing any fixed files back; instead, output a diff for each
+    /// changed file to stdout.
+    #[arg(long)]
+    pub diff: bool,
+    /// Run in watch mode by re-running whenever files change.
+    #[arg(short, long)]
+    pub watch: bool,
     /// Fix any fixable lint violations, but don't report on leftover
     /// violations. Implies `--fix`.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
     no_fix_only: bool,
-    /// Avoid writing any fixed files back; instead, output a diff for each
-    /// changed file to stdout.
-    #[arg(long)]
-    pub diff: bool,
-    /// Disable cache reads.
-    #[arg(short, long)]
-    pub no_cache: bool,
-    /// Ignore all configuration files.
-    #[arg(long, conflicts_with = "config")]
-    pub isolated: bool,
-    /// Comma-separated list of rule codes to enable (or ALL, to enable all
-    /// rules).
-    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub select: Option<Vec<RuleSelector>>,
-    /// Like --select, but adds additional rule codes on top of the selected
-    /// ones.
-    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub extend_select: Option<Vec<RuleSelector>>,
-    /// Comma-separated list of rule codes to disable.
-    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub ignore: Option<Vec<RuleSelector>>,
-    /// Like --ignore, but adds additional rule codes on top of the ignored
-    /// ones.
-    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
-    /// List of paths, used to omit files and/or directories from analysis.
-    #[arg(long, value_delimiter = ',', value_name = "FILE_PATTERN")]
-    pub exclude: Option<Vec<FilePattern>>,
-    /// Like --exclude, but adds additional files and directories on top of
-    /// those already excluded.
-    #[arg(long, value_delimiter = ',', value_name = "FILE_PATTERN")]
-    pub extend_exclude: Option<Vec<FilePattern>>,
-    /// List of rule codes to treat as eligible for autofix. Only applicable
-    /// when autofix itself is enabled (e.g., via `--fix`).
-    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub fixable: Option<Vec<RuleSelector>>,
-    /// List of rule codes to treat as ineligible for autofix. Only applicable
-    /// when autofix itself is enabled (e.g., via `--fix`).
-    #[arg(long, value_delimiter = ',', value_name = "RULE_CODE")]
-    pub unfixable: Option<Vec<RuleSelector>>,
-    /// List of mappings from file pattern to code to exclude
-    #[arg(long, value_delimiter = ',')]
-    pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
-    /// The name of the file when passing it through stdin.
-    #[arg(long)]
-    pub stdin_filename: Option<PathBuf>,
-    /// Path to the cache directory.
-    #[arg(long, env = "RUFF_CACHE_DIR")]
-    pub cache_dir: Option<PathBuf>,
-    /// Show violations with source code.
-    #[arg(long, overrides_with("no_show_source"))]
-    show_source: bool,
-    #[clap(long, overrides_with("show_source"), hide = true)]
-    no_show_source: bool,
+    /// Path to the `pyproject.toml` or `ruff.toml` file to use for
+    /// configuration.
+    #[arg(long, conflicts_with = "isolated")]
+    pub config: Option<PathBuf>,
+    /// Comma-separated list of rule codes to enable (or ALL, to enable all
+    /// rules).
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        help_heading = "Rule selection"
+    )]
+    pub select: Option<Vec<RuleSelector>>,
+    /// Comma-separated list of rule codes to disable.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        help_heading = "Rule selection"
+    )]
+    pub ignore: Option<Vec<RuleSelector>>,
+    /// Like --select, but adds additional rule codes on top of the selected
+    /// ones.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        help_heading = "Rule selection"
+    )]
+    pub extend_select: Option<Vec<RuleSelector>>,
+    /// Like --ignore, but adds additional rule codes on top of the ignored
+    /// ones.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        help_heading = "Rule selection"
+    )]
+    pub extend_ignore: Option<Vec<RuleSelector>>,
+    /// List of mappings from file pattern to code to exclude
+    #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
+    pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    /// List of paths, used to omit files and/or directories from analysis.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "FILE_PATTERN",
+        help_heading = "File selection"
+    )]
+    pub exclude: Option<Vec<FilePattern>>,
+    /// Like --exclude, but adds additional files and directories on top of
+    /// those already excluded.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "FILE_PATTERN",
+        help_heading = "File selection"
+    )]
+    pub extend_exclude: Option<Vec<FilePattern>>,
+    /// List of rule codes to treat as eligible for autofix. Only applicable
+    /// when autofix itself is enabled (e.g., via `--fix`).
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        help_heading = "Rule selection"
+    )]
+    pub fixable: Option<Vec<RuleSelector>>,
+    /// List of rule codes to treat as ineligible for autofix. Only applicable
+    /// when autofix itself is enabled (e.g., via `--fix`).
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        help_heading = "Rule selection"
+    )]
+    pub unfixable: Option<Vec<RuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore
     /// files.
-    #[arg(long, overrides_with("no_respect_gitignore"))]
+    #[arg(
+        long,
+        overrides_with("no_respect_gitignore"),
+        help_heading = "File selection"
+    )]
     respect_gitignore: bool,
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
     /// Enforce exclusions, even for paths passed to Ruff directly on the
     /// command-line.
-    #[arg(long, overrides_with("no_force_exclude"))]
+    #[arg(
+        long,
+        overrides_with("no_force_exclude"),
+        help_heading = "File selection"
+    )]
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
-    /// Enable or disable automatic update checks.
-    #[arg(long, overrides_with("no_update_check"))]
-    update_check: bool,
-    #[clap(long, overrides_with("update_check"), hide = true)]
-    no_update_check: bool,
-    /// Regular expression matching the name of dummy variables.
-    #[arg(long)]
-    pub dummy_variable_rgx: Option<Regex>,
     /// The minimum Python version that should be supported.
-    #[arg(long)]
+    #[arg(long, help_heading = "Rule configuration")]
     pub target_version: Option<PythonVersion>,
     /// Set the line-length for length-associated rules and automatic
     /// formatting.
-    #[arg(long)]
+    #[arg(long, help_heading = "Rule configuration")]
     pub line_length: Option<usize>,
+    /// Regular expression matching the name of dummy variables.
+    #[arg(long, help_heading = "Rule configuration")]
+    pub dummy_variable_rgx: Option<Regex>,
+    /// Disable cache reads.
+    #[arg(short, long, help_heading = "Miscellaneous")]
+    pub no_cache: bool,
+    /// Ignore all configuration files.
+    #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
+    pub isolated: bool,
+    /// Path to the cache directory.
+    #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
+    pub cache_dir: Option<PathBuf>,
+    /// The name of the file when passing it through stdin.
+    #[arg(long, help_heading = "Miscellaneous")]
+    pub stdin_filename: Option<PathBuf>,
+    /// Exit with status code "0", even upon detecting lint violations.
+    #[arg(short, long, help_heading = "Miscellaneous")]
+    pub exit_zero: bool,
+    /// Enable or disable automatic update checks.
+    #[arg(
+        long,
+        overrides_with("no_update_check"),
+        help_heading = "Miscellaneous"
+    )]
+    update_check: bool,
+    #[clap(long, overrides_with("update_check"), hide = true)]
+    no_update_check: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
     #[arg(
         long,
@@ -151,25 +193,11 @@ pub struct Cli {
         conflicts_with = "watch",
     )]
     pub add_noqa: bool,
-    /// Clear any caches in the current directory or any subdirectories.
-    #[arg(
-        long,
-        // Fake subcommands.
-        conflicts_with = "add_noqa",
-        // conflicts_with = "clean",
-        conflicts_with = "explain",
-        conflicts_with = "generate_shell_completion",
-        conflicts_with = "show_files",
-        conflicts_with = "show_settings",
-        // Unsupported default-command arguments.
-        conflicts_with = "stdin_filename",
-        conflicts_with = "watch",
-    )]
-    pub clean: bool,
     /// Explain a rule.
     #[arg(
         long,
         value_parser=Rule::from_code,
+        help_heading="Subcommands",
         // Fake subcommands.
         conflicts_with = "add_noqa",
         conflicts_with = "clean",
@@ -182,6 +210,22 @@ pub struct Cli {
         conflicts_with = "watch",
     )]
     pub explain: Option<&'static Rule>,
+    /// Clear any caches in the current directory or any subdirectories.
+    #[arg(
+        long,
+        help_heading="Subcommands",
+        // Fake subcommands.
+        conflicts_with = "add_noqa",
+        // conflicts_with = "clean",
+        conflicts_with = "explain",
+        conflicts_with = "generate_shell_completion",
+        conflicts_with = "show_files",
+        conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+    )]
+    pub clean: bool,
     /// Generate shell completion
     #[arg(
         long,
@@ -229,9 +273,40 @@ pub struct Cli {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
+    #[clap(flatten)]
+    pub log_level_args: LogLevelArgs,
 }
 
-impl Cli {
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug, clap::Args)]
+pub struct LogLevelArgs {
+    /// Enable verbose logging.
+    #[arg(short, long, group = "verbosity", help_heading = "Log levels")]
+    pub verbose: bool,
+    /// Print lint violations, but nothing else.
+    #[arg(short, long, group = "verbosity", help_heading = "Log levels")]
+    pub quiet: bool,
+    /// Disable all logging (but still exit with status code "1" upon detecting
+    /// lint violations).
+    #[arg(short, long, group = "verbosity", help_heading = "Log levels")]
+    pub silent: bool,
+}
+
+impl From<&LogLevelArgs> for LogLevel {
+    fn from(args: &LogLevelArgs) -> Self {
+        if args.silent {
+            LogLevel::Silent
+        } else if args.quiet {
+            LogLevel::Quiet
+        } else if args.verbose {
+            LogLevel::Verbose
+        } else {
+            LogLevel::Default
+        }
+    }
+}
+
+impl Args {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
     pub fn partition(self) -> (Arguments, Overrides) {
@@ -247,12 +322,9 @@ impl Cli {
                 generate_shell_completion: self.generate_shell_completion,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
-                quiet: self.quiet,
                 show_files: self.show_files,
                 show_settings: self.show_settings,
-                silent: self.silent,
                 stdin_filename: self.stdin_filename,
-                verbose: self.verbose,
                 watch: self.watch,
             },
             Overrides {
@@ -308,12 +380,9 @@ pub struct Arguments {
     pub generate_shell_completion: Option<clap_complete_command::Shell>,
     pub isolated: bool,
     pub no_cache: bool,
-    pub quiet: bool,
     pub show_files: bool,
     pub show_settings: bool,
-    pub silent: bool,
     pub stdin_filename: Option<PathBuf>,
-    pub verbose: bool,
     pub watch: bool,
 }
 
@@ -417,19 +486,6 @@ impl ConfigProcessor for &Overrides {
             }
             (None, None) => {}
         }
-    }
-}
-
-/// Map the CLI settings to a `LogLevel`.
-pub fn extract_log_level(cli: &Arguments) -> LogLevel {
-    if cli.silent {
-        LogLevel::Silent
-    } else if cli.quiet {
-        LogLevel::Quiet
-    } else if cli.verbose {
-        LogLevel::Verbose
-    } else {
-        LogLevel::Default
     }
 }
 

@@ -7,7 +7,7 @@ use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 
 /// Generate a fix to remove a base from a `ClassDef` statement.
 pub fn remove_class_def_base(
@@ -105,7 +105,7 @@ pub fn remove_class_def_base(
 }
 
 /// Generate a fix to remove arguments from a `super` call.
-pub fn remove_super_arguments(locator: &Locator, expr: &Expr) -> Option<Fix> {
+pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr) -> Option<Fix> {
     let range = Range::from_located(expr);
     let contents = locator.slice_source_code_range(&range);
 
@@ -125,7 +125,11 @@ pub fn remove_super_arguments(locator: &Locator, expr: &Expr) -> Option<Fix> {
     body.whitespace_before_args = ParenthesizableWhitespace::default();
     body.whitespace_after_func = ParenthesizableWhitespace::default();
 
-    let mut state = CodegenState::default();
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
     tree.codegen(&mut state);
 
     Some(Fix::replacement(

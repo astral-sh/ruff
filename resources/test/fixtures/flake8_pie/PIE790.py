@@ -1,12 +1,12 @@
 class Foo:
     """buzz"""
 
-    pass  # PIE790
+    pass
 
 
 if foo:
     """foo"""
-    pass  # PIE790
+    pass
 
 
 def multi_statement() -> None:
@@ -18,28 +18,28 @@ if foo:
     pass
 else:
     """bar"""
-    pass  # PIE790
+    pass
 
 
 while True:
     pass
 else:
     """bar"""
-    pass  # PIE790
+    pass
 
 
 for _ in range(10):
     pass
 else:
     """bar"""
-    pass  # PIE790
+    pass
 
 
 async for _ in range(10):
     pass
 else:
     """bar"""
-    pass  # PIE790
+    pass
 
 
 def foo() -> None:
@@ -47,7 +47,7 @@ def foo() -> None:
     buzz
     """
 
-    pass  # PIE790
+    pass
 
 
 async def foo():
@@ -55,14 +55,14 @@ async def foo():
     buzz
     """
 
-    pass  # PIE790
+    pass
 
 
 try:
     """
     buzz
     """
-    pass  # PIE790
+    pass
 except ValueError:
     pass
 
@@ -71,29 +71,34 @@ try:
     bar()
 except ValueError:
     """bar"""
-    pass  # PIE790
+    pass
 
 
 for _ in range(10):
     """buzz"""
-    pass  # PIE790
+    pass
 
 async for _ in range(10):
     """buzz"""
-    pass  # PIE790
+    pass
 
 while cond:
     """buzz"""
-    pass  # PIE790
+    pass
 
 
 with bar:
     """buzz"""
-    pass  # PIE790
+    pass
 
 async with bar:
     """buzz"""
-    pass  # PIE790
+    pass
+
+
+def foo() -> None:
+    """buzz"""
+    pass  # bar
 
 
 class Foo:
