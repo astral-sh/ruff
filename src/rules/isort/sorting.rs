@@ -2,7 +2,7 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
-use super::settings::RelatveImportsOrder;
+use super::settings::RelativeImportsOrder;
 use super::types::EitherImport::{Import, ImportFrom};
 use super::types::{AliasData, EitherImport, ImportFromData};
 use crate::python::string;
@@ -75,15 +75,15 @@ pub fn cmp_members(
 pub fn cmp_levels(
     level1: Option<&usize>,
     level2: Option<&usize>,
-    relative_imports_order: RelatveImportsOrder,
+    relative_imports_order: RelativeImportsOrder,
 ) -> Ordering {
     match (level1, level2) {
         (None, None) => Ordering::Equal,
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
         (Some(level1), Some(level2)) => match relative_imports_order {
-            RelatveImportsOrder::ClosestToFurthest => level1.cmp(level2),
-            RelatveImportsOrder::FurthestToClosest => level2.cmp(level1),
+            RelativeImportsOrder::ClosestToFurthest => level1.cmp(level2),
+            RelativeImportsOrder::FurthestToClosest => level2.cmp(level1),
         },
     }
 }
@@ -92,7 +92,7 @@ pub fn cmp_levels(
 pub fn cmp_import_from(
     import_from1: &ImportFromData,
     import_from2: &ImportFromData,
-    relative_imports_order: RelatveImportsOrder,
+    relative_imports_order: RelativeImportsOrder,
 ) -> Ordering {
     cmp_levels(
         import_from1.level,
@@ -113,7 +113,7 @@ pub fn cmp_import_from(
 pub fn cmp_either_import(
     a: &EitherImport,
     b: &EitherImport,
-    relative_imports_order: RelatveImportsOrder,
+    relative_imports_order: RelativeImportsOrder,
 ) -> Ordering {
     match (a, b) {
         (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2),
