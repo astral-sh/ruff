@@ -1,0 +1,36 @@
+name: mkdocs
+
+on:
+  push:
+    paths:
+      - README.md
+      - .github/workflows/docs.yaml
+    branches: [ main ]
+
+jobs:
+  mkdocs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest changes
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+      - name: Install dependencies
+        run: |
+          pip install "mkdocs~=1.4.2" "mkdocs-material~=9.0.6"
+      - name: Copy README File
+        run: |
+          mkdir -p docs/
+          cp README.md docs/index.md
+      - uses: EndBug/add-and-commit@v9
+        with:
+          default_author: github_actions
+          message: |
+            chore: Ruff Docs - ${{ github.sha }}
+
+            [skip ci]
+      - name: Publish docs to gh-pages branch
+        run: |
+          mkdocs gh-deploy --force
