@@ -2995,19 +2995,6 @@ impl AlwaysAutofixableViolation for FString {
 }
 
 define_violation!(
-    pub struct OldCodeBlocks;
-);
-impl AlwaysAutofixableViolation for OldCodeBlocks {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Remove old code blocks")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Rewrite to only contain new block".to_string()
-    }
-}
-define_violation!(
     pub struct FunctoolsCache;
 );
 impl AlwaysAutofixableViolation for FunctoolsCache {

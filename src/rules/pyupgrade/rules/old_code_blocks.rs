@@ -1,15 +1,31 @@
 use num_bigint::Sign;
+use ruff_macros::derive_message_formats;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, Unaryop};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::{Range, RefEquality};
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
 use crate::source_code::Locator;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct OldCodeBlocks;
+);
+impl AlwaysAutofixableViolation for OldCodeBlocks {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Remove old code blocks")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Rewrite to only contain new block".to_string()
+    }
+}
 
 /// Checks whether the give attribute is from the given path
 fn check_path(checker: &Checker, expr: &Expr, path: &[&str]) -> bool {
@@ -164,7 +180,7 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
         .slice_source_code_range(&Range::from_located(stmt));
     println!("\n{}\n", text);
     let range = Range::new(stmt.location, ending_location);
-    let mut diagnostic = Diagnostic::new(violations::OldCodeBlocks, range);
+    let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::deletion(stmt.location, ending_location));
     }

@@ -8,7 +8,7 @@ pub(crate) use format_literals::format_literals;
 pub(crate) use functools_cache::functools_cache;
 pub(crate) use lru_cache_without_parameters::lru_cache_without_parameters;
 pub(crate) use native_literals::native_literals;
-pub(crate) use old_code_blocks::old_code_blocks;
+pub(crate) use old_code_blocks::{old_code_blocks, OldCodeBlocks};
 use once_cell::sync::Lazy;
 pub(crate) use open_alias::open_alias;
 pub(crate) use os_error_alias::os_error_alias;
