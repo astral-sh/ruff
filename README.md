@@ -938,14 +938,14 @@ For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/) on 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | DTZ001 | call-datetime-without-tzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
-| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed |  |
-| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
-| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
+| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed, use `datetime.datetime.now(tz=)` instead |  |
+| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed, use `datetime.datetime.now(tz=)` instead |  |
+| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead |  |
 | DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
 | DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
 | DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
-| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
-| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead |  |
+| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead |  |
 
 ### flake8-debugger (T10)
 
