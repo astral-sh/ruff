@@ -4061,7 +4061,10 @@ define_violation!(
 impl Violation for CallDatetimeToday {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of `datetime.datetime.today()` is not allowed")
+        format!(
+            "The use of `datetime.datetime.today()` is not allowed, use \
+             `datetime.datetime.now(tz=)` instead"
+        )
     }
 }
 
@@ -4071,7 +4074,10 @@ define_violation!(
 impl Violation for CallDatetimeUtcnow {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of `datetime.datetime.utcnow()` is not allowed")
+        format!(
+            "The use of `datetime.datetime.utcnow()` is not allowed, use \
+             `datetime.datetime.now(tz=)` instead"
+        )
     }
 }
 
@@ -4081,7 +4087,10 @@ define_violation!(
 impl Violation for CallDatetimeUtcfromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of `datetime.datetime.utcfromtimestamp()` is not allowed")
+        format!(
+            "The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use \
+             `datetime.datetime.fromtimestamp(ts, tz=)` instead"
+        )
     }
 }
 
@@ -4126,7 +4135,10 @@ define_violation!(
 impl Violation for CallDateToday {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of `datetime.date.today()` is not allowed.")
+        format!(
+            "The use of `datetime.date.today()` is not allowed, use \
+             `datetime.datetime.now(tz=).date()` instead"
+        )
     }
 }
 
@@ -4136,7 +4148,10 @@ define_violation!(
 impl Violation for CallDateFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of `datetime.date.fromtimestamp()` is not allowed")
+        format!(
+            "The use of `datetime.date.fromtimestamp()` is not allowed, use \
+             `datetime.datetime.fromtimestamp(ts, tz=).date()` instead"
+        )
     }
 }
 
