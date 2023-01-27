@@ -827,7 +827,6 @@ impl Violation for UseSysExit {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UseSysExit(_name) = self;
         Some(|UseSysExit(name)| format!("Replace `{name}` with `sys.exit()`"))
     }
 }
@@ -2186,7 +2185,6 @@ impl Violation for UseTernaryOperator {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UseTernaryOperator(_contents) = self;
         Some(|UseTernaryOperator(contents)| format!("Replace if-else-block with `{contents}`"))
     }
 }
