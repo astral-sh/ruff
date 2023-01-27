@@ -826,6 +826,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S106 | hardcoded-password-func-arg | Possible hardcoded password: "{}" |  |
 | S107 | hardcoded-password-default | Possible hardcoded password: "{}" |  |
 | S108 | hardcoded-temp-file | Probable insecure usage of temporary file or directory: "{}" |  |
+| S110 | try-except-pass | `try`-`except`-`pass` detected, consider logging the exception |  |
 | S113 | request-without-timeout | Probable use of requests call with timeout set to `{value}` |  |
 | S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: "{}" |  |
 | S501 | request-with-no-cert-validation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |
@@ -2681,6 +2682,24 @@ suppress-none-returning = true
 ---
 
 ### `flake8-bandit`
+
+#### [`check-typed-exception`](#check-typed-exception)
+
+Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default,
+`try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-bandit]
+check-typed-exception = true
+```
+
+---
 
 #### [`hardcoded-tmp-directory`](#hardcoded-tmp-directory)
 

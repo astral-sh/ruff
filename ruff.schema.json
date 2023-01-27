@@ -578,6 +578,13 @@
     "Flake8BanditOptions": {
       "type": "object",
       "properties": {
+        "check-typed-exception": {
+          "description": "Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default, `try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "hardcoded-tmp-directory": {
           "description": "A list of directories to consider temporary.",
           "type": [
@@ -1753,6 +1760,7 @@
         "S107",
         "S108",
         "S11",
+        "S110",
         "S113",
         "S3",
         "S32",

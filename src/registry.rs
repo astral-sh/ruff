@@ -333,6 +333,7 @@ ruff_macros::define_rule_mapping!(
     S106 => violations::HardcodedPasswordFuncArg,
     S107 => violations::HardcodedPasswordDefault,
     S108 => violations::HardcodedTempFile,
+    S110 => rules::flake8_bandit::rules::TryExceptPass,
     S113 => violations::RequestWithoutTimeout,
     S324 => violations::HashlibInsecureHashFunction,
     S501 => violations::RequestWithNoCertValidation,

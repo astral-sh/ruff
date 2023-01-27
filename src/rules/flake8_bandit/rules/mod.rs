@@ -17,6 +17,7 @@ pub use request_with_no_cert_validation::request_with_no_cert_validation;
 pub use request_without_timeout::request_without_timeout;
 pub use snmp_insecure_version::snmp_insecure_version;
 pub use snmp_weak_cryptography::snmp_weak_cryptography;
+pub use try_except_pass::{try_except_pass, TryExceptPass};
 pub use unsafe_yaml_load::unsafe_yaml_load;
 
 mod assert_used;
@@ -34,4 +35,5 @@ mod request_with_no_cert_validation;
 mod request_without_timeout;
 mod snmp_insecure_version;
 mod snmp_weak_cryptography;
+mod try_except_pass;
 mod unsafe_yaml_load;
