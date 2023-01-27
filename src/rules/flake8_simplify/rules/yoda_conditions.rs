@@ -10,6 +10,7 @@ use crate::violations;
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
 fn is_constant_like(expr: &Expr) -> bool {
     match &expr.node {
+        ExprKind::Attribute { attr, .. } => string::is_upper(attr),
         ExprKind::Constant { .. } => true,
         ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant_like),
         ExprKind::Name { id, .. } => string::is_upper(id),
