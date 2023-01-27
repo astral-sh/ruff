@@ -8,9 +8,10 @@ use crate::registry::Diagnostic;
 use crate::violations;
 
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
-fn is_constant(expr: &Expr) -> bool {
+fn is_constant_like(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::Constant { .. } => true,
+        ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant_like),
         ExprKind::Name { id, .. } => string::is_upper(id),
         _ => false,
     }
@@ -35,7 +36,7 @@ pub fn yoda_conditions(
         return;
     }
 
-    if !is_constant(left) || is_constant(right) {
+    if !is_constant_like(left) || is_constant_like(right) {
         return;
     }
 
