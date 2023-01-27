@@ -66,20 +66,26 @@ fn check_parent_if(checker: &Checker, stmt: &Stmt) -> bool {
 /// Checks for a single else in the statement provided
 fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
     let text = locator.slice_source_code_range(&Range::from_located(&located));
-    // There has to be a way to make this more efficient
-    let mut tokens1 = lexer::make_tokenizer(&text);
-    let mut tokens2 = lexer::make_tokenizer(&text);
-    let mut tokens3 = lexer::make_tokenizer(&text);
-    let first_token = tokens1.next().unwrap().unwrap().1;
-    let has_else = tokens2
-        .by_ref()
-        .map(|token| token.unwrap().1 == Tok::Else)
-        .any(|x| x);
-    let has_elif = tokens3
-        .by_ref()
-        .map(|token| token.unwrap().1 == Tok::Elif)
-        .any(|x| x);
-    TokenCheck::new(first_token, has_else, has_elif)
+    let tokens = lexer::make_tokenizer(&text);
+    let mut first_token: Option<Tok> = None;
+    let mut has_else = false;
+    let mut has_elif = false;
+
+    for token_item in tokens {
+        let token = token_item.unwrap().1;
+        if first_token.is_none() {
+            first_token = Some(token.clone());
+        }
+        if token == Tok::Else {
+            has_else = true;
+        } else if token == Tok::Elif {
+            has_elif = true;
+        }
+        if has_else && has_elif {
+            return TokenCheck::new(first_token.unwrap(), has_else, has_elif);
+        }
+    }
+    TokenCheck::new(first_token.unwrap(), has_else, has_elif)
 }
 
 /// Gets the version from the tuple
