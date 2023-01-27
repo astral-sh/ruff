@@ -981,7 +981,7 @@
           "description": "Whether to place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local), or vice versa.\n\nThe default (\"furthest-to-closest\") is equivalent to isort's `reverse-relative` default (`reverse-relative = false`); setting this to \"closest-to-furthest\" is equivalent to isort's `reverse-relative = true`.",
           "anyOf": [
             {
-              "$ref": "#/definitions/RelatveImportsOrder"
+              "$ref": "#/definitions/RelativeImportsOrder"
             },
             {
               "type": "null"
@@ -1197,7 +1197,7 @@
         }
       ]
     },
-    "RelatveImportsOrder": {
+    "RelativeImportsOrder": {
       "oneOf": [
         {
           "description": "Place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local).",
