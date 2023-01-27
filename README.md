@@ -216,7 +216,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.235'
+  rev: 'v0.0.236'
   hooks:
     - id: ruff
 ```
@@ -577,20 +577,20 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F405 | import-star-usage | `{name}` may be undefined, or defined from star imports: {sources} |  |
 | F406 | import-star-not-permitted | `from {name} import *` only allowed at module level |  |
 | F407 | future-feature-not-defined | Future feature `{name}` is not defined |  |
-| F501 | percent-format-invalid-format | '...' % ... has invalid format string: {message} |  |
-| F502 | percent-format-expected-mapping | '...' % ... expected mapping but got sequence |  |
-| F503 | percent-format-expected-sequence | '...' % ... expected sequence but got mapping |  |
-| F504 | percent-format-extra-named-arguments | '...' % ... has unused named argument(s): {message} | 🛠 |
-| F505 | percent-format-missing-argument | '...' % ... is missing argument(s) for placeholder(s): {message} |  |
-| F506 | percent-format-mixed-positional-and-named | '...' % ... has mixed positional and named placeholders |  |
-| F507 | percent-format-positional-count-mismatch | '...' % ... has {wanted} placeholder(s) but {got} substitution(s) |  |
-| F508 | percent-format-star-requires-sequence | '...' % ... `*` specifier requires sequence |  |
-| F509 | percent-format-unsupported-format-character | '...' % ... has unsupported format character '{char}' |  |
-| F521 | string-dot-format-invalid-format | '...'.format(...) has invalid format string: {message} |  |
-| F522 | string-dot-format-extra-named-arguments | '...'.format(...) has unused named argument(s): {message} | 🛠 |
-| F523 | string-dot-format-extra-positional-arguments | '...'.format(...) has unused arguments at position(s): {message} |  |
-| F524 | string-dot-format-missing-arguments | '...'.format(...) is missing argument(s) for placeholder(s): {message} |  |
-| F525 | string-dot-format-mixing-automatic | '...'.format(...) mixes automatic and manual numbering |  |
+| F501 | percent-format-invalid-format | `%`-format string has invalid format string: {message} |  |
+| F502 | percent-format-expected-mapping | `%`-format string expected mapping but got sequence |  |
+| F503 | percent-format-expected-sequence | `%`-format string expected sequence but got mapping |  |
+| F504 | percent-format-extra-named-arguments | `%`-format string has unused named argument(s): {message} | 🛠 |
+| F505 | percent-format-missing-argument | `%`-format string is missing argument(s) for placeholder(s): {message} |  |
+| F506 | percent-format-mixed-positional-and-named | `%`-format string has mixed positional and named placeholders |  |
+| F507 | percent-format-positional-count-mismatch | `%`-format string has {wanted} placeholder(s) but {got} substitution(s) |  |
+| F508 | percent-format-star-requires-sequence | `%`-format string `*` specifier requires sequence |  |
+| F509 | percent-format-unsupported-format-character | `%`-format string has unsupported format character '{char}' |  |
+| F521 | string-dot-format-invalid-format | `.format` call has invalid format string: {message} |  |
+| F522 | string-dot-format-extra-named-arguments | `.format` call has unused named argument(s): {message} | 🛠 |
+| F523 | string-dot-format-extra-positional-arguments | `.format` call has unused arguments at position(s): {message} |  |
+| F524 | string-dot-format-missing-arguments | `.format` call is missing argument(s) for placeholder(s): {message} |  |
+| F525 | string-dot-format-mixing-automatic | `.format` string mixes automatic and manual numbering |  |
 | F541 | f-string-missing-placeholders | f-string without any placeholders | 🛠 |
 | F601 | multi-value-repeated-key-literal | Dictionary key literal `{name}` repeated | 🛠 |
 | F602 | multi-value-repeated-key-variable | Dictionary key `{name}` repeated | 🛠 |
@@ -1248,6 +1248,8 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | ---- | ---- | ------- | --- |
 | PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
 | PLE0118 | used-prior-global-declaration | Name `{name}` is used prior to global declaration on line {line} |  |
+| PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |
+| PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
 
 #### Refactor (PLR)

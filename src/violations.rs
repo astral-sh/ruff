@@ -62,10 +62,14 @@ impl Violation for SyntaxError {
 // pyflakes
 
 define_violation!(
-    pub struct UnusedImport(pub String, pub bool, pub bool);
+    pub struct UnusedImport {
+        pub name: String,
+        pub ignore_init: bool,
+        pub multiple: bool,
+    }
 );
 fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
-    let UnusedImport(name, _, multiple) = unused_import;
+    let UnusedImport { name, multiple, .. } = unused_import;
     if *multiple {
         "Remove unused import".to_string()
     } else {
@@ -77,7 +81,9 @@ impl Violation for UnusedImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedImport(name, ignore_init, ..) = self;
+        let UnusedImport {
+            name, ignore_init, ..
+        } = self;
         if *ignore_init {
             format!(
                 "`{name}` imported but unused; consider adding to `__all__` or using a redundant \
@@ -89,7 +95,7 @@ impl Violation for UnusedImport {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedImport(_, ignore_init, _) = self;
+        let UnusedImport { ignore_init, .. } = self;
         if *ignore_init {
             None
         } else {
@@ -174,7 +180,7 @@ impl Violation for PercentFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatInvalidFormat(message) = self;
-        format!("'...' % ... has invalid format string: {message}")
+        format!("`%`-format string has invalid format string: {message}")
     }
 }
 
@@ -184,7 +190,7 @@ define_violation!(
 impl Violation for PercentFormatExpectedMapping {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...' % ... expected mapping but got sequence")
+        format!("`%`-format string expected mapping but got sequence")
     }
 }
 
@@ -194,7 +200,7 @@ define_violation!(
 impl Violation for PercentFormatExpectedSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...' % ... expected sequence but got mapping")
+        format!("`%`-format string expected sequence but got mapping")
     }
 }
 
@@ -206,7 +212,7 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
     fn message(&self) -> String {
         let PercentFormatExtraNamedArguments(missing) = self;
         let message = missing.join(", ");
-        format!("'...' % ... has unused named argument(s): {message}")
+        format!("`%`-format string has unused named argument(s): {message}")
     }
 
     fn autofix_title(&self) -> String {
@@ -224,7 +230,7 @@ impl Violation for PercentFormatMissingArgument {
     fn message(&self) -> String {
         let PercentFormatMissingArgument(missing) = self;
         let message = missing.join(", ");
-        format!("'...' % ... is missing argument(s) for placeholder(s): {message}")
+        format!("`%`-format string is missing argument(s) for placeholder(s): {message}")
     }
 }
 
@@ -234,7 +240,7 @@ define_violation!(
 impl Violation for PercentFormatMixedPositionalAndNamed {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...' % ... has mixed positional and named placeholders")
+        format!("`%`-format string has mixed positional and named placeholders")
     }
 }
 
@@ -245,7 +251,7 @@ impl Violation for PercentFormatPositionalCountMismatch {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatPositionalCountMismatch(wanted, got) = self;
-        format!("'...' % ... has {wanted} placeholder(s) but {got} substitution(s)")
+        format!("`%`-format string has {wanted} placeholder(s) but {got} substitution(s)")
     }
 }
 
@@ -255,7 +261,7 @@ define_violation!(
 impl Violation for PercentFormatStarRequiresSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...' % ... `*` specifier requires sequence")
+        format!("`%`-format string `*` specifier requires sequence")
     }
 }
 
@@ -266,7 +272,7 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatUnsupportedFormatCharacter(char) = self;
-        format!("'...' % ... has unsupported format character '{char}'")
+        format!("`%`-format string has unsupported format character '{char}'")
     }
 }
 
@@ -277,7 +283,7 @@ impl Violation for StringDotFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
         let StringDotFormatInvalidFormat(message) = self;
-        format!("'...'.format(...) has invalid format string: {message}")
+        format!("`.format` call has invalid format string: {message}")
     }
 }
 
@@ -289,7 +295,7 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
     fn message(&self) -> String {
         let StringDotFormatExtraNamedArguments(missing) = self;
         let message = missing.join(", ");
-        format!("'...'.format(...) has unused named argument(s): {message}")
+        format!("`.format` call has unused named argument(s): {message}")
     }
 
     fn autofix_title(&self) -> String {
@@ -307,7 +313,7 @@ impl Violation for StringDotFormatExtraPositionalArguments {
     fn message(&self) -> String {
         let StringDotFormatExtraPositionalArguments(missing) = self;
         let message = missing.join(", ");
-        format!("'...'.format(...) has unused arguments at position(s): {message}")
+        format!("`.format` call has unused arguments at position(s): {message}")
     }
 }
 
@@ -319,7 +325,7 @@ impl Violation for StringDotFormatMissingArguments {
     fn message(&self) -> String {
         let StringDotFormatMissingArguments(missing) = self;
         let message = missing.join(", ");
-        format!("'...'.format(...) is missing argument(s) for placeholder(s): {message}")
+        format!("`.format` call is missing argument(s) for placeholder(s): {message}")
     }
 }
 
@@ -329,7 +335,7 @@ define_violation!(
 impl Violation for StringDotFormatMixingAutomatic {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("'...'.format(...) mixes automatic and manual numbering")
+        format!("`.format` string mixes automatic and manual numbering")
     }
 }
 

@@ -1,0 +1,15 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    InvalidAllObject: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 7
+  fix: ~
+  parent: ~
+

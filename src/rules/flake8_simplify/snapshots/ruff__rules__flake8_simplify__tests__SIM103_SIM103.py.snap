@@ -12,7 +12,7 @@ expression: diagnostics
     column: 20
   fix:
     content:
-      - return a
+      - return bool(a)
     location:
       row: 3
       column: 4
@@ -30,7 +30,7 @@ expression: diagnostics
     column: 20
   fix:
     content:
-      - return b
+      - return bool(b)
     location:
       row: 13
       column: 4
@@ -48,7 +48,7 @@ expression: diagnostics
     column: 24
   fix:
     content:
-      - return b
+      - return bool(b)
     location:
       row: 24
       column: 8

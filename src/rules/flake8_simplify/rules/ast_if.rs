@@ -178,7 +178,14 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         && !has_comments_in(Range::from_located(stmt), checker.locator)
     {
         let return_stmt = create_stmt(StmtKind::Return {
-            value: Some(test.clone()),
+            value: Some(Box::new(create_expr(ExprKind::Call {
+                func: Box::new(create_expr(ExprKind::Name {
+                    id: "bool".to_string(),
+                    ctx: ExprContext::Load,
+                })),
+                args: vec![(**test).clone()],
+                keywords: vec![],
+            }))),
         });
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&return_stmt, checker.stylist),
