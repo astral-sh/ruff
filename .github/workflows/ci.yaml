@@ -112,6 +112,7 @@ jobs:
           python-version: "3.11"
       - run: pip install maturin
       - run: maturin build -b bin
+      - run: python scripts/transform_readme.py --target pypi
 
   typos:
     name: "spell check"
