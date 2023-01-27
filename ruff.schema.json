@@ -579,7 +579,7 @@
       "type": "object",
       "properties": {
         "check-typed-exception": {
-          "description": "A list of directories to consider temporary.",
+          "description": "Whether to disallow try-except-pass for specific exception types",
           "type": [
             "boolean",
             "null"

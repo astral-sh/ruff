@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Located, Stmt, StmtKind};
+use rustpython_ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -13,7 +13,7 @@ define_violation!(
 impl Violation for TryExceptPass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Try, Except, Pass detected.")
+        format!("`try`-`except`-`pass` detected")
     }
 }
 
@@ -28,14 +28,11 @@ pub fn try_except_pass(
     if body.len() == 1
         && body[0].node == StmtKind::Pass
         && (check_typed_exception
-            || match &type_ {
-                Some(Located {
-                    node: ExprKind::Name { id, .. },
-                    ..
-                }) => id == "Exception",
-                None => true,
-                _ => false,
-            })
+            || type_.map_or(true, |type_| {
+                checker
+                    .resolve_call_path(&type_)
+                    .map_or(true, |call_path| call_path.as_slice() == ["", "Exception"])
+            }))
     {
         checker.diagnostics.push(Diagnostic::new(
             TryExceptPass,
