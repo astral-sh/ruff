@@ -78,6 +78,8 @@ ruff_macros::define_rule_mapping!(
     F842 => violations::UnusedAnnotation,
     F901 => violations::RaiseNotImplemented,
     // pylint
+    PLE0604 => rules::pylint::rules::InvalidAllObject,
+    PLE0605 => rules::pylint::rules::InvalidAllFormat,
     PLC0414 => violations::UselessImportAlias,
     PLC3002 => violations::UnnecessaryDirectLambdaCall,
     PLE0117 => violations::NonlocalWithoutBinding,
