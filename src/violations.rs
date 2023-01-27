@@ -817,16 +817,17 @@ impl Violation for ConsiderMergingIsinstance {
 define_violation!(
     pub struct UseSysExit(pub String);
 );
-impl AlwaysAutofixableViolation for UseSysExit {
+impl Violation for UseSysExit {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UseSysExit(name) = self;
         format!("Use `sys.exit()` instead of `{name}`")
     }
 
-    fn autofix_title(&self) -> String {
-        let UseSysExit(name) = self;
-        format!("Replace `{name}` with `sys.exit()`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|UseSysExit(name)| format!("Replace `{name}` with `sys.exit()`"))
     }
 }
 
@@ -2174,16 +2175,17 @@ impl Violation for ReturnInTryExceptFinally {
 define_violation!(
     pub struct UseTernaryOperator(pub String);
 );
-impl AlwaysAutofixableViolation for UseTernaryOperator {
+impl Violation for UseTernaryOperator {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UseTernaryOperator(contents) = self;
         format!("Use ternary operator `{contents}` instead of if-else-block")
     }
 
-    fn autofix_title(&self) -> String {
-        let UseTernaryOperator(contents) = self;
-        format!("Replace if-else-block with `{contents}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|UseTernaryOperator(contents)| format!("Replace if-else-block with `{contents}`"))
     }
 }
 
