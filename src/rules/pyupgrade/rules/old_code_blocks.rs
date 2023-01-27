@@ -168,18 +168,17 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     checker.diagnostics.push(diagnostic);
 }
 
-// def _fix_py3_block(i: int, tokens: list[Token]) -> None:
-// if tokens[i].src == 'if':
-// if_block = Block.find(tokens, i)
-// if_block.dedent(tokens)
-// del tokens[if_block.start:if_block.block]
-// else:
-// if_block = Block.find(tokens, _find_elif(tokens, i))
-// if_block.replace_condition(tokens, [Token('NAME', 'else')])
-
 /// This is called if the first statement after the tigger item is an `elif`
-fn fix_py3_block_elif(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
+fn fix_py3_block_elif(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &[Stmt],
+    orelse: &[Stmt],
+) {
+    println!("Checkpoint three");
     let token_checker = check_tokens(checker.locator, stmt);
+    let mut new_text: String;
     // If the first statement is an if, just use the body of this statement, and the
     // rest of the statement can be ignored, because we essentially have `if
     // True:`
@@ -190,21 +189,35 @@ fn fix_py3_block_elif(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse:
         let start = body.first().unwrap();
         let end = body.last().unwrap();
         let text_range = Range::new(start.location, end.end_location.unwrap());
-        let new_text = checker.locator.slice_source_code_range(&text_range);
-        println!("{:?}", new_text);
-        let mut diagnostic = Diagnostic::new(OldCodeBlocks, Range::from_located(stmt));
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
-                new_text.to_string(),
-                stmt.location,
-                stmt.end_location.unwrap(),
-            ));
-        }
-        checker.diagnostics.push(diagnostic);
+        new_text = checker
+            .locator
+            .slice_source_code_range(&text_range)
+            .to_string();
     // Here we are dealing with an elif, so we need to replace it with an else,
     // preserve the body of the elif, and remove anything else
     } else {
+        let end = body.last().unwrap();
+        let text_range = Range::new(stmt.location, end.end_location.unwrap());
+        let test_range = Range::from_located(test);
+        let whole_text = checker.locator.slice_source_code_range(&text_range);
+        let new_test = checker.locator.slice_source_code_range(&test_range);
+        // First we remove the test text, so that if there is a colon the the test it
+        // doesn't cause issues
+        let clean1 = whole_text.replace(new_test, "");
+        let colon_index = clean1.find(":").unwrap();
+        let clean2 = &clean1[colon_index..];
+        new_text = String::from("else");
+        new_text.push_str(clean2);
     }
+    let mut diagnostic = Diagnostic::new(OldCodeBlocks, Range::from_located(stmt));
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.amend(Fix::replacement(
+            new_text,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 /// This is called if the first statement after the tigger item is an `else`
@@ -223,9 +236,10 @@ fn fix_py3_block_else(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
 // del tokens[if_block.end:else_block.end]
 // if_block.replace_condition(tokens, [Token('NAME', 'else')])
 
-fn fix_py3_block(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
+fn fix_py3_block(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt], orelse: &[Stmt]) {
+    println!("We made it");
     match &orelse.get(0).unwrap().node {
-        StmtKind::If { test, body, orelse } => fix_py3_block_elif(checker, stmt, body, orelse),
+        StmtKind::If { .. } => fix_py3_block_elif(checker, stmt, test, body, orelse),
         _ => fix_py3_block_else(checker, stmt, orelse),
     }
 }
@@ -265,7 +279,7 @@ pub fn old_code_blocks(
                             }
                         } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
                             if compare_version(extract_version(elts), target, op == &Cmpop::GtE) {
-                                fix_py3_block(checker, stmt, body, orelse);
+                                fix_py3_block(checker, stmt, test, body, orelse);
                             }
                         }
                     }
