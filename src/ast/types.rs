@@ -140,7 +140,7 @@ pub enum BindingKind<'a> {
     SubmoduleImportation(&'a str, &'a str),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: Range,
@@ -161,7 +161,7 @@ pub struct Binding<'a> {
     pub synthetic_usage: Option<(usize, Range)>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Debug, Clone)]
 pub enum ExecutionContext {
     Runtime,
     Typing,

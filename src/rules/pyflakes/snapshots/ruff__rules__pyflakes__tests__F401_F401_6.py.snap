@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     UnusedImport:
-      - ".background.BackgroundTasks"
-      - false
-      - false
+      name: ".background.BackgroundTasks"
+      ignore_init: false
+      multiple: false
   location:
     row: 7
     column: 24
@@ -25,9 +25,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - ".datastructures.UploadFile"
-      - false
-      - false
+      name: ".datastructures.UploadFile"
+      ignore_init: false
+      multiple: false
   location:
     row: 10
     column: 28
@@ -46,9 +46,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - background
-      - false
-      - false
+      name: background
+      ignore_init: false
+      multiple: false
   location:
     row: 16
     column: 7
@@ -67,9 +67,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - datastructures
-      - false
-      - false
+      name: datastructures
+      ignore_init: false
+      multiple: false
   location:
     row: 19
     column: 7

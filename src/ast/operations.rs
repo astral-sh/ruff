@@ -1,3 +1,4 @@
+use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Cmpop, Located};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
@@ -9,9 +10,21 @@ use crate::ast::types::{Binding, BindingKind, Scope};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 
+bitflags! {
+    #[derive(Default)]
+    pub struct AllNamesFlags: u32 {
+        const INVALID_FORMAT = 0b0000_0001;
+        const INVALID_OBJECT = 0b0000_0010;
+    }
+}
+
 /// Extract the names bound to a given __all__ assignment.
-pub fn extract_all_names(stmt: &Stmt, scope: &Scope, bindings: &[Binding]) -> Vec<String> {
-    fn add_to_names(names: &mut Vec<String>, elts: &[Expr]) {
+pub fn extract_all_names(
+    stmt: &Stmt,
+    scope: &Scope,
+    bindings: &[Binding],
+) -> (Vec<String>, AllNamesFlags) {
+    fn add_to_names(names: &mut Vec<String>, elts: &[Expr], flags: &mut AllNamesFlags) {
         for elt in elts {
             if let ExprKind::Constant {
                 value: Constant::Str(value),
@@ -19,11 +32,14 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope, bindings: &[Binding]) -> Ve
             } = &elt.node
             {
                 names.push(value.to_string());
+            } else {
+                *flags |= AllNamesFlags::INVALID_OBJECT;
             }
         }
     }
 
     let mut names: Vec<String> = vec![];
+    let mut flags = AllNamesFlags::empty();
 
     // Grab the existing bound __all__ values.
     if let StmtKind::AugAssign { .. } = &stmt.node {
@@ -42,7 +58,7 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope, bindings: &[Binding]) -> Ve
     } {
         match &value.node {
             ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
-                add_to_names(&mut names, elts);
+                add_to_names(&mut names, elts, &mut flags);
             }
             ExprKind::BinOp { left, right, .. } => {
                 let mut current_left = left;
@@ -50,27 +66,35 @@ pub fn extract_all_names(stmt: &Stmt, scope: &Scope, bindings: &[Binding]) -> Ve
                 while let Some(elts) = match &current_right.node {
                     ExprKind::List { elts, .. } => Some(elts),
                     ExprKind::Tuple { elts, .. } => Some(elts),
-                    _ => None,
+                    _ => {
+                        flags |= AllNamesFlags::INVALID_FORMAT;
+                        None
+                    }
                 } {
-                    add_to_names(&mut names, elts);
+                    add_to_names(&mut names, elts, &mut flags);
                     match &current_left.node {
                         ExprKind::BinOp { left, right, .. } => {
                             current_left = left;
                             current_right = right;
                         }
                         ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
-                            add_to_names(&mut names, elts);
+                            add_to_names(&mut names, elts, &mut flags);
                             break;
                         }
-                        _ => break,
+                        _ => {
+                            flags |= AllNamesFlags::INVALID_FORMAT;
+                            break;
+                        }
                     }
                 }
             }
-            _ => {}
+            _ => {
+                flags |= AllNamesFlags::INVALID_FORMAT;
+            }
         }
     }
 
-    names
+    (names, flags)
 }
 
 #[derive(Default)]

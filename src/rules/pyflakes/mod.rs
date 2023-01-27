@@ -28,6 +28,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_5.py"); "F401_5")]
     #[test_case(Rule::UnusedImport, Path::new("F401_6.py"); "F401_6")]
     #[test_case(Rule::UnusedImport, Path::new("F401_7.py"); "F401_7")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_8.py"); "F401_8")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
     #[test_case(Rule::ImportStarUsed, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]

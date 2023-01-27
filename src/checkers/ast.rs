@@ -17,7 +17,7 @@ use rustpython_parser::parser;
 use smallvec::smallvec;
 
 use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
-use crate::ast::operations::extract_all_names;
+use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
     Binding, BindingKind, CallPath, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
@@ -3447,6 +3447,15 @@ where
                         body,
                     );
                 }
+                if self.settings.rules.enabled(&Rule::TryExceptPass) {
+                    flake8_bandit::rules::try_except_pass(
+                        self,
+                        type_.as_deref(),
+                        name.as_deref(),
+                        body,
+                        self.settings.flake8_bandit.check_typed_exception,
+                    );
+                }
                 if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
@@ -3723,7 +3732,7 @@ impl<'a> Checker<'a> {
                 kind: BindingKind::Builtin,
                 range: Range::default(),
                 runtime_usage: None,
-                synthetic_usage: None,
+                synthetic_usage: Some((0, Range::default())),
                 typing_usage: None,
                 source: None,
                 context: ExecutionContext::Runtime,
@@ -3852,14 +3861,19 @@ impl<'a> Checker<'a> {
 
         // Assume the rebound name is used as a global or within a loop.
         let scope = self.current_scope();
-        let binding = match scope.values.get(&name) {
-            None => binding,
-            Some(index) => Binding {
-                runtime_usage: self.bindings[*index].runtime_usage,
-                synthetic_usage: self.bindings[*index].synthetic_usage,
-                typing_usage: self.bindings[*index].typing_usage,
-                ..binding
-            },
+        let binding = if let Some(index) = scope.values.get(&name) {
+            if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
+                binding
+            } else {
+                Binding {
+                    runtime_usage: self.bindings[*index].runtime_usage,
+                    synthetic_usage: self.bindings[*index].synthetic_usage,
+                    typing_usage: self.bindings[*index].typing_usage,
+                    ..binding
+                }
+            }
+        } else {
+            binding
         };
 
         // Don't treat annotations as assignments if there is an existing value
@@ -4152,14 +4166,25 @@ impl<'a> Checker<'a> {
                 }
                 _ => false,
             } {
+                let (all_names, all_names_flags) =
+                    extract_all_names(parent, current, &self.bindings);
+
+                if self.settings.rules.enabled(&Rule::InvalidAllFormat)
+                    && matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT)
+                {
+                    pylint::rules::invalid_all_format(self, expr);
+                }
+
+                if self.settings.rules.enabled(&Rule::InvalidAllObject)
+                    && matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT)
+                {
+                    pylint::rules::invalid_all_object(self, expr);
+                }
+
                 self.add_binding(
                     id,
                     Binding {
-                        kind: BindingKind::Export(extract_all_names(
-                            parent,
-                            current,
-                            &self.bindings,
-                        )),
+                        kind: BindingKind::Export(all_names),
                         runtime_usage: None,
                         synthetic_usage: None,
                         typing_usage: None,
@@ -4703,7 +4728,11 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
+                            violations::UnusedImport {
+                                name: full_name.to_string(),
+                                ignore_init,
+                                multiple,
+                            },
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })
@@ -4725,7 +4754,11 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedImport(full_name.to_string(), ignore_init, multiple),
+                            violations::UnusedImport {
+                                name: full_name.to_string(),
+                                ignore_init,
+                                multiple,
+                            },
                             *range,
                         );
                         if matches!(child.node, StmtKind::ImportFrom { .. })

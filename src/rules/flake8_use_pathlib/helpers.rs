@@ -26,6 +26,7 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "remove"] => Some(PathlibRemove.into()),
                 ["os", "unlink"] => Some(PathlibUnlink.into()),
                 ["os", "getcwd"] => Some(PathlibGetcwd.into()),
+                ["os", "getcwdb"] => Some(PathlibGetcwd.into()),
                 ["os", "path", "exists"] => Some(PathlibExists.into()),
                 ["os", "path", "expanduser"] => Some(PathlibExpanduser.into()),
                 ["os", "path", "isdir"] => Some(PathlibIsDir.into()),

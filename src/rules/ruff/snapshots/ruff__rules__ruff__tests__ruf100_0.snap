@@ -238,9 +238,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - shelve
-      - false
-      - false
+      name: shelve
+      ignore_init: false
+      multiple: false
   location:
     row: 85
     column: 7

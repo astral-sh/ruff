@@ -29,3 +29,4 @@ os.path.splitext(p)
 with open(p) as fp:
     fp.read()
 open(p).close()
+os.getcwdb(p)

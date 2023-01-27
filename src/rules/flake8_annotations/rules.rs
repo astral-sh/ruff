@@ -125,8 +125,8 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
             // ANN002, ANN401
             if let Some(arg) = &args.vararg {
-                has_any_typed_arg = true;
                 if let Some(expr) = &arg.node.annotation {
+                    has_any_typed_arg = true;
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
                         if checker
                             .settings
@@ -153,8 +153,8 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
             // ANN003, ANN401
             if let Some(arg) = &args.kwarg {
-                has_any_typed_arg = true;
                 if let Some(expr) = &arg.node.annotation {
+                    has_any_typed_arg = true;
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
                         if checker
                             .settings

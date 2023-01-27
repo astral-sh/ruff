@@ -577,20 +577,20 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F405 | import-star-usage | `{name}` may be undefined, or defined from star imports: {sources} |  |
 | F406 | import-star-not-permitted | `from {name} import *` only allowed at module level |  |
 | F407 | future-feature-not-defined | Future feature `{name}` is not defined |  |
-| F501 | percent-format-invalid-format | '...' % ... has invalid format string: {message} |  |
-| F502 | percent-format-expected-mapping | '...' % ... expected mapping but got sequence |  |
-| F503 | percent-format-expected-sequence | '...' % ... expected sequence but got mapping |  |
-| F504 | percent-format-extra-named-arguments | '...' % ... has unused named argument(s): {message} | 🛠 |
-| F505 | percent-format-missing-argument | '...' % ... is missing argument(s) for placeholder(s): {message} |  |
-| F506 | percent-format-mixed-positional-and-named | '...' % ... has mixed positional and named placeholders |  |
-| F507 | percent-format-positional-count-mismatch | '...' % ... has {wanted} placeholder(s) but {got} substitution(s) |  |
-| F508 | percent-format-star-requires-sequence | '...' % ... `*` specifier requires sequence |  |
-| F509 | percent-format-unsupported-format-character | '...' % ... has unsupported format character '{char}' |  |
-| F521 | string-dot-format-invalid-format | '...'.format(...) has invalid format string: {message} |  |
-| F522 | string-dot-format-extra-named-arguments | '...'.format(...) has unused named argument(s): {message} | 🛠 |
-| F523 | string-dot-format-extra-positional-arguments | '...'.format(...) has unused arguments at position(s): {message} |  |
-| F524 | string-dot-format-missing-arguments | '...'.format(...) is missing argument(s) for placeholder(s): {message} |  |
-| F525 | string-dot-format-mixing-automatic | '...'.format(...) mixes automatic and manual numbering |  |
+| F501 | percent-format-invalid-format | `%`-format string has invalid format string: {message} |  |
+| F502 | percent-format-expected-mapping | `%`-format string expected mapping but got sequence |  |
+| F503 | percent-format-expected-sequence | `%`-format string expected sequence but got mapping |  |
+| F504 | percent-format-extra-named-arguments | `%`-format string has unused named argument(s): {message} | 🛠 |
+| F505 | percent-format-missing-argument | `%`-format string is missing argument(s) for placeholder(s): {message} |  |
+| F506 | percent-format-mixed-positional-and-named | `%`-format string has mixed positional and named placeholders |  |
+| F507 | percent-format-positional-count-mismatch | `%`-format string has {wanted} placeholder(s) but {got} substitution(s) |  |
+| F508 | percent-format-star-requires-sequence | `%`-format string `*` specifier requires sequence |  |
+| F509 | percent-format-unsupported-format-character | `%`-format string has unsupported format character '{char}' |  |
+| F521 | string-dot-format-invalid-format | `.format` call has invalid format string: {message} |  |
+| F522 | string-dot-format-extra-named-arguments | `.format` call has unused named argument(s): {message} | 🛠 |
+| F523 | string-dot-format-extra-positional-arguments | `.format` call has unused arguments at position(s): {message} |  |
+| F524 | string-dot-format-missing-arguments | `.format` call is missing argument(s) for placeholder(s): {message} |  |
+| F525 | string-dot-format-mixing-automatic | `.format` string mixes automatic and manual numbering |  |
 | F541 | f-string-missing-placeholders | f-string without any placeholders | 🛠 |
 | F601 | multi-value-repeated-key-literal | Dictionary key literal `{name}` repeated | 🛠 |
 | F602 | multi-value-repeated-key-variable | Dictionary key `{name}` repeated | 🛠 |
@@ -826,6 +826,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S106 | hardcoded-password-func-arg | Possible hardcoded password: "{}" |  |
 | S107 | hardcoded-password-default | Possible hardcoded password: "{}" |  |
 | S108 | hardcoded-temp-file | Probable insecure usage of temporary file or directory: "{}" |  |
+| S110 | try-except-pass | `try`-`except`-`pass` detected, consider logging the exception |  |
 | S113 | request-without-timeout | Probable use of requests call with timeout set to `{value}` |  |
 | S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: "{}" |  |
 | S501 | request-with-no-cert-validation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |
@@ -864,12 +865,12 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B004 | unreliable-callable-check |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
 | B005 | strip-with-multi-characters | Using `.strip()` with multi-character strings is misleading the reader |  |
 | B006 | mutable-argument-default | Do not use mutable data structures for argument defaults |  |
-| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body |  |
+| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body | 🛠 |
 | B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
 | B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B011 | do-not-assert-false | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
-| B012 | jump-statement-in-finally | `{name}` inside finally blocks cause exceptions to be silenced |  |
+| B012 | jump-statement-in-finally | `{name}` inside `finally` blocks cause exceptions to be silenced |  |
 | B013 | redundant-tuple-in-exception-handler | A length-one tuple literal is redundant. Write `except {name}` instead of `except ({name},)`. | 🛠 |
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
 | B015 | useless-comparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
@@ -938,14 +939,14 @@ For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/) on 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | DTZ001 | call-datetime-without-tzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
-| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed |  |
-| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
-| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
+| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed, use `datetime.datetime.now(tz=)` instead |  |
+| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed, use `datetime.datetime.now(tz=)` instead |  |
+| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead |  |
 | DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
 | DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
 | DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
-| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
-| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead |  |
+| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead |  |
 
 ### flake8-debugger (T10)
 
@@ -1248,6 +1249,8 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | ---- | ---- | ------- | --- |
 | PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
 | PLE0118 | used-prior-global-declaration | Name `{name}` is used prior to global declaration on line {line} |  |
+| PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |
+| PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
 
 #### Refactor (PLR)
@@ -2680,6 +2683,24 @@ suppress-none-returning = true
 
 ### `flake8-bandit`
 
+#### [`check-typed-exception`](#check-typed-exception)
+
+Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default,
+`try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-bandit]
+check-typed-exception = true
+```
+
+---
+
 #### [`hardcoded-tmp-directory`](#hardcoded-tmp-directory)
 
 A list of directories to consider temporary.
@@ -3118,7 +3139,7 @@ and can be circumvented via `eval` or `importlib`.
 Exempt certain modules from needing to be moved into type-checking
 blocks.
 
-**Default value**: `[]`
+**Default value**: `["typing"]`
 
 **Type**: `Vec<String>`
 
@@ -3126,7 +3147,7 @@ blocks.
 
 ```toml
 [tool.ruff.flake8-type-checking]
-exempt-modules = ["typing_extensions"]
+exempt-modules = ["typing", "typing_extensions"]
 ```
 
 ---
