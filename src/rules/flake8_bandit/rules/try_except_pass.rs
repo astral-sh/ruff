@@ -30,7 +30,7 @@ pub fn try_except_pass(
         && (check_typed_exception
             || type_.map_or(true, |type_| {
                 checker
-                    .resolve_call_path(&type_)
+                    .resolve_call_path(type_)
                     .map_or(true, |call_path| call_path.as_slice() == ["", "Exception"])
             }))
     {
