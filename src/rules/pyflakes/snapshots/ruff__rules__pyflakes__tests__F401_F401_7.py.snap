@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     UnusedImport:
-      - typing.Union
-      - false
-      - false
+      name: typing.Union
+      ignore_init: false
+      multiple: false
   location:
     row: 30
     column: 4
@@ -29,9 +29,9 @@ expression: diagnostics
     column: 0
 - kind:
     UnusedImport:
-      - typing.Awaitable
-      - false
-      - true
+      name: typing.Awaitable
+      ignore_init: false
+      multiple: true
   location:
     row: 66
     column: 19
@@ -50,9 +50,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - typing.AwaitableGenerator
-      - false
-      - true
+      name: typing.AwaitableGenerator
+      ignore_init: false
+      multiple: true
   location:
     row: 66
     column: 30

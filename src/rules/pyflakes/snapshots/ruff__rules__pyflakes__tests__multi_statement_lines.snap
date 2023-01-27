@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     UnusedImport:
-      - foo1
-      - false
-      - false
+      name: foo1
+      ignore_init: false
+      multiple: false
   location:
     row: 3
     column: 11
@@ -25,9 +25,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo2
-      - false
-      - false
+      name: foo2
+      ignore_init: false
+      multiple: false
   location:
     row: 4
     column: 11
@@ -46,9 +46,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo3
-      - false
-      - false
+      name: foo3
+      ignore_init: false
+      multiple: false
   location:
     row: 7
     column: 11
@@ -67,9 +67,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo4
-      - false
-      - false
+      name: foo4
+      ignore_init: false
+      multiple: false
   location:
     row: 11
     column: 11
@@ -88,9 +88,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo5
-      - false
-      - false
+      name: foo5
+      ignore_init: false
+      multiple: false
   location:
     row: 16
     column: 18
@@ -109,9 +109,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo6
-      - false
-      - false
+      name: foo6
+      ignore_init: false
+      multiple: false
   location:
     row: 21
     column: 16
@@ -130,9 +130,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo7
-      - false
-      - false
+      name: foo7
+      ignore_init: false
+      multiple: false
   location:
     row: 26
     column: 17
@@ -151,9 +151,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo8
-      - false
-      - false
+      name: foo8
+      ignore_init: false
+      multiple: false
   location:
     row: 30
     column: 18
@@ -172,9 +172,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo9
-      - false
-      - false
+      name: foo9
+      ignore_init: false
+      multiple: false
   location:
     row: 31
     column: 22
@@ -193,9 +193,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo10
-      - false
-      - false
+      name: foo10
+      ignore_init: false
+      multiple: false
   location:
     row: 35
     column: 15
@@ -214,9 +214,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo11
-      - false
-      - false
+      name: foo11
+      ignore_init: false
+      multiple: false
   location:
     row: 40
     column: 16
@@ -235,9 +235,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo12
-      - false
-      - false
+      name: foo12
+      ignore_init: false
+      multiple: false
   location:
     row: 46
     column: 7
@@ -256,9 +256,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedImport:
-      - foo13
-      - false
-      - false
+      name: foo13
+      ignore_init: false
+      multiple: false
   location:
     row: 51
     column: 7
