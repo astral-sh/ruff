@@ -971,6 +971,8 @@ define_violation!(
     }
 );
 impl Violation for UnusedLoopControlVariable {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedLoopControlVariable { name, safe } = self;
@@ -1063,7 +1065,7 @@ impl Violation for JumpStatementInFinally {
     #[derive_message_formats]
     fn message(&self) -> String {
         let JumpStatementInFinally(name) = self;
-        format!("`{name}` inside finally blocks cause exceptions to be silenced")
+        format!("`{name}` inside `finally` blocks cause exceptions to be silenced")
     }
 }
 

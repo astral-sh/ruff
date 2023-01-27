@@ -864,12 +864,12 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B004 | unreliable-callable-check |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
 | B005 | strip-with-multi-characters | Using `.strip()` with multi-character strings is misleading the reader |  |
 | B006 | mutable-argument-default | Do not use mutable data structures for argument defaults |  |
-| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body |  |
+| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body | 🛠 |
 | B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
 | B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B011 | do-not-assert-false | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
-| B012 | jump-statement-in-finally | `{name}` inside finally blocks cause exceptions to be silenced |  |
+| B012 | jump-statement-in-finally | `{name}` inside `finally` blocks cause exceptions to be silenced |  |
 | B013 | redundant-tuple-in-exception-handler | A length-one tuple literal is redundant. Write `except {name}` instead of `except ({name},)`. | 🛠 |
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
 | B015 | useless-comparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
