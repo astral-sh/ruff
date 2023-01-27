@@ -18,10 +18,8 @@ jobs:
        CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          target: wasm32-unknown-unknown
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v3
         with:
           node-version: 18
