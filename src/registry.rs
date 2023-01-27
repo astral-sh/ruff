@@ -739,13 +739,13 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[
         Rule::OneBlankLineBeforeClass,
         Rule::NoBlankLineBeforeClass,
         "`D203` (one-blank-line-before-class) and `D211` (no-blank-line-before-class) are \
-         incompatible. Consider adding `D203` to `ignore`.",
+         incompatible. Consider ignoring `D203`.",
     ),
     (
         Rule::MultiLineSummaryFirstLine,
         Rule::MultiLineSummarySecondLine,
         "`D212` (multi-line-summary-first-line) and `D213` (multi-line-summary-second-line) are \
-         incompatible. Consider adding one to `ignore`.",
+         incompatible. Consider ignoring one.",
     ),
 ];
 
