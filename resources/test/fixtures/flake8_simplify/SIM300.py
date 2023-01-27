@@ -19,4 +19,4 @@ x == y
 age == YODA
 age < YODA
 age <= YODA
-
+YODA == YODA
