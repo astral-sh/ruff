@@ -7,6 +7,15 @@ use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::violations;
 
+/// Return `true` if an [`Expr`] is a constant or a constant-like name.
+fn is_constant(expr: &Expr) -> bool {
+    match &expr.node {
+        ExprKind::Constant { .. } => true,
+        ExprKind::Name { id, .. } => string::is_upper(id),
+        _ => false,
+    }
+}
+
 /// SIM300
 pub fn yoda_conditions(
     checker: &mut Checker,
@@ -26,6 +35,10 @@ pub fn yoda_conditions(
         return;
     }
 
+    if !is_constant(left) || is_constant(right) {
+        return;
+    }
+
     // Slice exact content to preserve formatting.
     let constant = checker
         .locator
@@ -33,13 +46,6 @@ pub fn yoda_conditions(
     let variable = checker
         .locator
         .slice_source_code_range(&Range::from_located(right));
-
-    if !matches!(&left.node, &ExprKind::Constant { .. }) && !string::is_upper(constant) {
-        return;
-    }
-    if matches!(&right.node, &ExprKind::Constant { .. }) || string::is_upper(variable) {
-        return;
-    }
 
     // Reverse the operation.
     let reversed_op = match op {
