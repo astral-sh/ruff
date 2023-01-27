@@ -3120,7 +3120,7 @@ and can be circumvented via `eval` or `importlib`.
 Exempt certain modules from needing to be moved into type-checking
 blocks.
 
-**Default value**: `[]`
+**Default value**: `["typing"]`
 
 **Type**: `Vec<String>`
 
@@ -3128,7 +3128,7 @@ blocks.
 
 ```toml
 [tool.ruff.flake8-type-checking]
-exempt-modules = ["typing_extensions"]
+exempt-modules = ["typing", "typing_extensions"]
 ```
 
 ---

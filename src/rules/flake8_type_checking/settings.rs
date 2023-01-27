@@ -25,10 +25,10 @@ pub struct Options {
     /// See: https://github.com/snok/flake8-type-checking#strict.
     pub strict: Option<bool>,
     #[option(
-        default = "[]",
+        default = "[\"typing\"]",
         value_type = "Vec<String>",
         example = r#"
-            exempt-modules = ["typing_extensions"]
+            exempt-modules = ["typing", "typing_extensions"]
         "#
     )]
     /// Exempt certain modules from needing to be moved into type-checking
@@ -36,17 +36,28 @@ pub struct Options {
     pub exempt_modules: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash, Default)]
+#[derive(Debug, Hash)]
 pub struct Settings {
     pub strict: bool,
     pub exempt_modules: Vec<String>,
 }
 
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            strict: false,
+            exempt_modules: vec!["typing".to_string()],
+        }
+    }
+}
+
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
-            strict: options.strict.unwrap_or_default(),
-            exempt_modules: options.exempt_modules.unwrap_or_default(),
+            strict: options.strict.unwrap_or(false),
+            exempt_modules: options
+                .exempt_modules
+                .unwrap_or_else(|| vec!["typing".to_string()]),
         }
     }
 }
