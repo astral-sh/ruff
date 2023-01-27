@@ -2176,16 +2176,18 @@ impl Violation for ReturnInTryExceptFinally {
 define_violation!(
     pub struct UseTernaryOperator(pub String);
 );
-impl AlwaysAutofixableViolation for UseTernaryOperator {
+impl Violation for UseTernaryOperator {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UseTernaryOperator(contents) = self;
         format!("Use ternary operator `{contents}` instead of if-else-block")
     }
 
-    fn autofix_title(&self) -> String {
-        let UseTernaryOperator(contents) = self;
-        format!("Replace if-else-block with `{contents}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let UseTernaryOperator(_contents) = self;
+        Some(|UseTernaryOperator(contents)| format!("Replace if-else-block with `{contents}`"))
     }
 }
 
