@@ -12,6 +12,8 @@ mod tests {
 
     use crate::linter::test_path;
     use crate::registry::Rule;
+    use crate::settings::resolve_per_file_ignores;
+    use crate::settings::types::PerFileIgnore;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::KeywordArgumentBeforeStarArgument, Path::new("RUF004.py"); "RUF004")]
@@ -65,6 +67,26 @@ mod tests {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/ruff/RUF100_1.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruf100_2() -> Result<()> {
+        let mut settings =
+            settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]);
+
+        settings.per_file_ignores = resolve_per_file_ignores(vec![PerFileIgnore::new(
+            "RUF100_2.py".to_string(),
+            &["F401".parse().unwrap()],
+            None,
+        )])
+        .unwrap();
+
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/ruff/RUF100_2.py"),
+            &settings,
         )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())
