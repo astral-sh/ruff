@@ -13,22 +13,21 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
+      primary: red
       toggle:
         icon: material/weather-sunny
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
+      primary: red
       toggle:
         icon: material/weather-night
         name: Switch to light mode
 repo_url: https://github.com/charliermarsh/ruff
 repo_name: ruff
 site_author: charliermarsh
-remote_branch: gh-pages
 nav:
-  - Ruff: index.md
+  - Home: index.md
 markdown_extensions:
   - toc:
       permalink: "#"
