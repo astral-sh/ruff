@@ -413,6 +413,14 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_rules(Configuration {
+            select: Some(vec![RuleCodePrefix::W292.into()]),
+            ignore: Some(vec![RuleCodePrefix::W.into()]),
+            ..Configuration::default()
+        });
+        let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules(Configuration {
             select: Some(vec![RuleCodePrefix::W605.into()]),
             ignore: Some(vec![RuleCodePrefix::W605.into()]),
             ..Configuration::default()
