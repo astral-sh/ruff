@@ -67,7 +67,7 @@
       }
     },
     "extend-ignore": {
-      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.\n\nNote that `extend-ignore` is applied after resolving rules from `ignore`/`select` and a less specific rule in `extend-ignore` would overwrite a more specific rule in `select`. It is recommended to only use `extend-ignore` when extending a `pyproject.toml` file via `extend`.",
+      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.\n\nThis option has been DEPRECATED in favor of `ignore` since its usage is now interchangeable with `ignore`.",
       "type": [
         "array",
         "null"
@@ -77,7 +77,7 @@
       }
     },
     "extend-select": {
-      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.\n\nNote that `extend-select` is applied after resolving rules from `ignore`/`select` and a less specific rule in `extend-select` would overwrite a more specific rule in `ignore`. It is recommended to only use `extend-select` when extending a `pyproject.toml` file via `extend`.",
+      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
       "type": [
         "array",
         "null"

@@ -433,8 +433,6 @@ Rule selection:
           Comma-separated list of rule codes to disable
       --extend-select <RULE_CODE>
           Like --select, but adds additional rule codes on top of the selected ones
-      --extend-ignore <RULE_CODE>
-          Like --ignore, but adds additional rule codes on top of the ignored ones
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --fixable <RULE_CODE>
@@ -2212,11 +2210,8 @@ extend-exclude = ["tests", "src/bad.py"]
 A list of rule codes or prefixes to ignore, in addition to those
 specified by `ignore`.
 
-Note that `extend-ignore` is applied after resolving rules from
-`ignore`/`select` and a less specific rule in `extend-ignore`
-would overwrite a more specific rule in `select`. It is
-recommended to only use `extend-ignore` when extending a
-`pyproject.toml` file via `extend`.
+This option has been DEPRECATED in favor of `ignore`
+since its usage is now interchangeable with `ignore`.
 
 **Default value**: `[]`
 
@@ -2236,12 +2231,6 @@ extend-ignore = ["F841"]
 
 A list of rule codes or prefixes to enable, in addition to those
 specified by `select`.
-
-Note that `extend-select` is applied after resolving rules from
-`ignore`/`select` and a less specific rule in `extend-select`
-would overwrite a more specific rule in `ignore`. It is
-recommended to only use `extend-select` when extending a
-`pyproject.toml` file via `extend`.
 
 **Default value**: `[]`
 
