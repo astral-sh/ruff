@@ -17,25 +17,25 @@
     ruff --explain E402 --format json   # Works!
     ruff explain E402   --format json   # Works! (And preferred.)
 
-This change is largely backwards compatible -- most users should experience no change in behavior.
-However, please note the following exceptions:
+This change is largely backwards compatible -- most users should experience
+no change in behavior. However, please note the following exceptions:
 
-* Subcommands will now fail when invoked with unsupported arguments, instead of silently ignoring
-  them. For example, the following will now fail:
+* Subcommands will now fail when invoked with unsupported arguments, instead
+  of silently ignoring them. For example, the following will now fail:
 
       ruff --explain E402 --respect-gitignore
 
-  (`explain` command doesn't support `--respect-gitignore`.)
+  (the `explain` command doesn't support `--respect-gitignore`.)
 
-* The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand. For
-  example, prior to this release, running `ruff explain` would run `ruff` over a file or directory
-  called `explain`. Now, `ruff explain` would invoke the `explain` subcommand.
+* The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand.
+  For example, prior to this release, running `ruff explain` would run `ruff` over a file or
+  directory called `explain`. Now, `ruff explain` would invoke the `explain` subcommand.
 
-* Scripts that nvoke ruff should supply `--` before any positional arguments. (The semantics of
-  `ruff -- <arg>` have not changed.)
+* Scripts that invoke ruff should supply `--` before any positional arguments.
+  (The semantics of `ruff -- <arg>` have not changed.)
 
-* `--explain` previously treated `--format grouped` as a synonym for `--format text`. This is no
-  longer supported; instead, use `--format text`.
+* `--explain` previously treated `--format grouped` as a synonym for `--format text`.
+  This is no longer supported; instead, use `--format text`.
 
 ## 0.0.226
 
