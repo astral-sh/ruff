@@ -169,19 +169,12 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
 }
 
 /// This is called if the first statement after the tigger item is an `elif`
-fn fix_py3_block_elif(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    orelse: &[Stmt],
-) {
+fn fix_py3_block_elif(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]) {
     println!("Checkpoint three");
     let token_checker = check_tokens(checker.locator, stmt);
     let mut new_text: String;
     // If the first statement is an if, just use the body of this statement, and the
-    // rest of the statement can be ignored, because we essentially have `if
-    // True:`
+    // rest of the statement can be ignored, because we basically have `if True:`
     if token_checker.first_token == Tok::If {
         if body.is_empty() {
             return;
@@ -221,8 +214,22 @@ fn fix_py3_block_elif(
 }
 
 /// This is called if the first statement after the tigger item is an `else`
-fn fix_py3_block_else(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
+fn fix_py3_block_else(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
     let token_checker = check_tokens(checker.locator, stmt);
+    if token_checker.first_token == Tok::If {
+        if body.is_empty() {
+            return;
+        }
+        let start = body.first().unwrap();
+        let end = body.last().unwrap();
+        let text_range = Range::new(start.location, end.end_location.unwrap());
+        let new_text = checker
+            .locator
+            .slice_source_code_range(&text_range)
+            .to_string();
+        // Here we are dealing with an elif, so we need to replace it with an
+        // else, preserve the body of the elif, and remove anything else
+    }
 }
 // def _fix_py3_block_else(i: int, tokens: list[Token]) -> None:
 // if tokens[i].src == 'if':
@@ -239,8 +246,8 @@ fn fix_py3_block_else(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
 fn fix_py3_block(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt], orelse: &[Stmt]) {
     println!("We made it");
     match &orelse.get(0).unwrap().node {
-        StmtKind::If { .. } => fix_py3_block_elif(checker, stmt, test, body, orelse),
-        _ => fix_py3_block_else(checker, stmt, orelse),
+        StmtKind::If { .. } => fix_py3_block_elif(checker, stmt, test, body),
+        _ => fix_py3_block_elif(checker, stmt, test, body),
     }
 }
 
