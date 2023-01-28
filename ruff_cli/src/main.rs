@@ -44,7 +44,7 @@ fn inner_main() -> Result<ExitCode> {
         if !Command::has_subcommand(rewrite_legacy_subcommand(arg))
             && arg != "-h"
             && arg != "--help"
-            && arg != "-v"
+            && arg != "-V"
             && arg != "--version"
             && arg != "help"
         {
