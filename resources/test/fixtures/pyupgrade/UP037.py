@@ -33,6 +33,7 @@ if six.PY2:
 else:
     def f():
         print("py3")
+        print("This the next")
 
 if not six.PY2:
     print("py3")

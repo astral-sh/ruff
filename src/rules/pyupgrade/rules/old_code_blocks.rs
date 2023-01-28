@@ -1,13 +1,16 @@
 use std::cmp::Ordering;
 
+use libcst_native::{Codegen, CodegenState, CompoundStatement, Else, OrElse, Statement};
 use num_bigint::Sign;
 use ruff_macros::derive_message_formats;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, Unaryop};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt, Unaryop};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+use textwrap::dedent;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::cst::matchers::match_module;
 use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
@@ -50,6 +53,26 @@ impl TokenCheck {
             has_elif,
         }
     }
+}
+
+fn get_else_string(checker: &Checker, if_text: &str) -> Option<String> {
+    let mut tree = match_module(if_text).unwrap();
+    let [Statement::Compound(CompoundStatement::If(embedding))] = &mut *tree.body else {
+        return None;
+    };
+    let orelse = embedding.orelse.as_ref().unwrap();
+    if let OrElse::Else(Else { body, .. }) = orelse.as_ref() {
+        let mut state = CodegenState {
+            default_newline: checker.stylist.line_ending(),
+            default_indent: checker.stylist.indentation(),
+            ..CodegenState::default()
+        };
+        body.codegen(&mut state);
+
+        let mut content = state.to_string();
+        return Some(content);
+    }
+    None
 }
 
 /// Checks for a single else in the statement provided
@@ -133,20 +156,36 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     // automatically only sends the start of the statement as the if or elif, so
     // I did not see that as necessary.
     let token_checker = check_tokens(checker.locator, stmt);
-    let has_else = token_checker.has_else;
     // The statement MUST have an else
-    if !has_else {
+    if !token_checker.has_else {
         return;
     }
     let else_statement = orelse.last().unwrap();
     let mut ending_location = else_statement.location;
+    let range = Range::new(stmt.location, stmt.end_location.unwrap());
+    let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
+    // If we only have an if and an else, we just need to get the else code and
+    // dedent
+    if token_checker.first_token == Tok::If && !token_checker.has_elif && orelse.len() == 1 {
+        let module_text = checker
+            .locator
+            .slice_source_code_range(&Range::from_located(stmt));
+        let current_str = get_else_string(checker, module_text).unwrap();
+        println!("Hit the special function");
+        let new_str = dedent(&current_str);
+        println!("{}\n==========\n{}", current_str, new_str);
+        diagnostic.amend(Fix::replacement(
+            new_str,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+        checker.diagnostics.push(diagnostic);
+        return;
     // If we have an elif, we need the "e" and "l" to make an if
-    if token_checker.first_token == Tok::If && token_checker.has_elif {
+    } else if token_checker.first_token == Tok::If && token_checker.has_elif {
         ending_location.go_right();
         ending_location.go_right();
     }
-    let range = Range::new(stmt.location, stmt.end_location.unwrap());
-    let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::deletion(stmt.location, ending_location));
     }
