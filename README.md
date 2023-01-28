@@ -209,6 +209,7 @@ To run Ruff, try any of the following:
 ruff path/to/code/to/lint.py  # Run Ruff over `lint.py`
 ruff path/to/code/            # Run Ruff over all files in `/path/to/code` (and any subdirectories)
 ruff path/to/code/*.py        # Run Ruff over all `.py` files in `/path/to/code`
+ruff .                        # Run Ruff over all `.py` files in current working directory 
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
