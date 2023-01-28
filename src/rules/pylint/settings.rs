@@ -85,7 +85,7 @@ impl From<Options> for Settings {
             allow_magic_value_types: options
                 .allow_magic_value_types
                 .unwrap_or_else(|| vec![ConstantType::Str]),
-            max_args: options.max_args.unwrap_or_else(|| 5),
+            max_args: options.max_args.unwrap_or(5),
         }
     }
 }

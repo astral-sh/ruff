@@ -13,6 +13,6 @@ pub fn too_many_args(checker: &mut Checker, args: &Arguments, stmt: &Stmt) {
                 max_args: checker.settings.pylint.max_args,
             },
             Range::from_located(stmt),
-        ))
+        ));
     }
 }
