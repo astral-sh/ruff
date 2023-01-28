@@ -7,7 +7,7 @@ use syn::Ident;
 pub fn expand<'a>(
     rule_type: &Ident,
     prefix_ident: &Ident,
-    variants: impl Iterator<Item = &'a Ident>,
+    code_idents: impl Iterator<Item = &'a Ident>,
     variant_name: impl Fn(&str) -> &'a Ident,
 ) -> proc_macro2::TokenStream {
     // Build up a map from prefix to matching RuleCodes.
@@ -16,8 +16,8 @@ pub fn expand<'a>(
     let mut all_codes = BTreeSet::new();
     let mut pl_codes = BTreeSet::new();
 
-    for variant in variants {
-        let code_str = variant.to_string();
+    for code in code_idents {
+        let code_str = code.to_string();
         let code_prefix_len = code_str
             .chars()
             .take_while(|char| char.is_alphabetic())
@@ -77,7 +77,7 @@ fn generate_impls<'a>(
     variant_name: impl Fn(&str) -> &'a Ident,
 ) -> proc_macro2::TokenStream {
     let into_iter_match_arms = prefix_to_codes.iter().map(|(prefix_str, codes)| {
-        let codes = codes.iter().map(|code| {
+        let rule_variants = codes.iter().map(|code| {
             let rule_variant = variant_name(code);
             quote! {
                 #rule_type::#rule_variant
@@ -86,7 +86,7 @@ fn generate_impls<'a>(
         let prefix = Ident::new(prefix_str, Span::call_site());
 
         quote! {
-            #prefix_ident::#prefix => vec![#(#codes),*].into_iter(),
+            #prefix_ident::#prefix => vec![#(#rule_variants),*].into_iter(),
         }
     });
 
