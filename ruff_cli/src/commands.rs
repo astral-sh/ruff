@@ -268,7 +268,7 @@ struct Explanation<'a> {
 }
 
 /// Explain a `Rule` to the user.
-pub fn explain(rule: &Rule, format: HelpFormat) -> Result<()> {
+pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let (linter, _) = Linter::parse_code(rule.code()).unwrap();
     match format {
         HelpFormat::Text => {

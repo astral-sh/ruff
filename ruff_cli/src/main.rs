@@ -77,7 +77,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Explain { rule, format } => commands::explain(rule, format)?,
+        Command::Rule { rule, format } => commands::rule(rule, format)?,
         Command::Clean => commands::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut io::stdout());
@@ -272,7 +272,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
 
 fn rewrite_legacy_subcommand(cmd: &str) -> &str {
     match cmd {
-        "--explain" => "explain",
+        "--explain" => "rule",
         "--clean" => "clean",
         "--generate-shell-completion" => "generate-shell-completion",
         cmd => cmd,

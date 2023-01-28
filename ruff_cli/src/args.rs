@@ -33,7 +33,7 @@ pub enum Command {
     Check(CheckArgs),
     /// Explain a rule.
     #[clap(alias = "--explain")]
-    Explain {
+    Rule {
         #[arg(value_parser=Rule::from_code)]
         rule: &'static Rule,
 
