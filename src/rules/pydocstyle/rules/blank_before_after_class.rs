@@ -7,7 +7,7 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::rules::regexes::COMMENT_REGEX;
 use crate::violations;
 
-/// D203, D204, D211
+/// D204, D211
 pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     let (DefinitionKind::Class(parent) | DefinitionKind::NestedClass(parent)) = &docstring.kind else {
         return;
@@ -16,11 +16,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     if checker
         .settings
         .rules
-        .enabled(&Rule::OneBlankLineBeforeClass)
-        || checker
-            .settings
-            .rules
-            .enabled(&Rule::NoBlankLineBeforeClass)
+        .enabled(&Rule::NoBlankLineBeforeClass)
     {
         let (before, ..) = checker.locator.partition_source_code_at(
             &Range::from_located(parent),
@@ -46,27 +42,6 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 if checker.patch(diagnostic.kind.rule()) {
                     // Delete the blank line before the class.
                     diagnostic.amend(Fix::deletion(
-                        Location::new(docstring.expr.location.row() - blank_lines_before, 0),
-                        Location::new(docstring.expr.location.row(), 0),
-                    ));
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-        }
-        if checker
-            .settings
-            .rules
-            .enabled(&Rule::OneBlankLineBeforeClass)
-        {
-            if blank_lines_before != 1 {
-                let mut diagnostic = Diagnostic::new(
-                    violations::OneBlankLineBeforeClass(blank_lines_before),
-                    Range::from_located(docstring.expr),
-                );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Insert one blank line before the class.
-                    diagnostic.amend(Fix::replacement(
-                        checker.stylist.line_ending().to_string(),
                         Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                         Location::new(docstring.expr.location.row(), 0),
                     ));

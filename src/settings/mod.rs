@@ -11,7 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{Rule, INCOMPATIBLE_CODES};
+use crate::registry::Rule;
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
@@ -21,7 +21,6 @@ use crate::rules::{
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
-use crate::warn_user_once;
 
 pub mod configuration;
 pub mod defaults;
@@ -270,13 +269,6 @@ impl From<&Configuration> for RuleTable {
         {
             for rule in convention.rules_to_be_ignored() {
                 rules.disable(rule);
-            }
-        }
-
-        // Validate that we didn't enable any incompatible rules.
-        for (a, b, message) in INCOMPATIBLE_CODES {
-            if rules.enabled(a) && rules.enabled(b) {
-                warn_user_once!("{}", message);
             }
         }
 

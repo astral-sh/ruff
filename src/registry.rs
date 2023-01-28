@@ -268,7 +268,6 @@ ruff_macros::define_rule_mapping!(
     D200 => violations::FitsOnOneLine,
     D201 => violations::NoBlankLineBeforeFunction,
     D202 => violations::NoBlankLineAfterFunction,
-    D203 => violations::OneBlankLineBeforeClass,
     D204 => violations::OneBlankLineAfterClass,
     D205 => violations::BlankLineAfterSummary,
     D206 => violations::IndentWithSpaces,
@@ -278,7 +277,6 @@ ruff_macros::define_rule_mapping!(
     D210 => violations::NoSurroundingWhitespace,
     D211 => violations::NoBlankLineBeforeClass,
     D212 => violations::MultiLineSummaryFirstLine,
-    D213 => violations::MultiLineSummarySecondLine,
     D214 => violations::SectionNotOverIndented,
     D215 => violations::SectionUnderlineNotOverIndented,
     D300 => violations::UsesTripleQuotes,
@@ -733,22 +731,6 @@ impl Diagnostic {
         self
     }
 }
-
-/// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[
-    (
-        Rule::OneBlankLineBeforeClass,
-        Rule::NoBlankLineBeforeClass,
-        "`one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
-         incompatible. Consider ignoring `one-blank-line-before-class`.",
-    ),
-    (
-        Rule::MultiLineSummaryFirstLine,
-        Rule::MultiLineSummarySecondLine,
-        "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
-         incompatible. Consider ignoring one.",
-    ),
-];
 
 #[cfg(test)]
 mod tests {

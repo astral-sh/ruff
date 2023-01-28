@@ -21,9 +21,7 @@ impl Convention {
     pub fn rules_to_be_ignored(self) -> &'static [Rule] {
         match self {
             Convention::Google => &[
-                Rule::OneBlankLineBeforeClass,
                 Rule::OneBlankLineAfterClass,
-                Rule::MultiLineSummarySecondLine,
                 Rule::SectionUnderlineNotOverIndented,
                 Rule::EndsInPeriod,
                 Rule::NoThisPrefix,
@@ -35,9 +33,7 @@ impl Convention {
             ],
             Convention::Numpy => &[
                 Rule::PublicInit,
-                Rule::OneBlankLineBeforeClass,
                 Rule::MultiLineSummaryFirstLine,
-                Rule::MultiLineSummarySecondLine,
                 Rule::NoSignature,
                 Rule::BlankLineAfterLastSection,
                 Rule::EndsInPunctuation,
@@ -45,9 +41,7 @@ impl Convention {
                 Rule::DocumentAllArguments,
             ],
             Convention::Pep257 => &[
-                Rule::OneBlankLineBeforeClass,
                 Rule::MultiLineSummaryFirstLine,
-                Rule::MultiLineSummarySecondLine,
                 Rule::SectionNotOverIndented,
                 Rule::SectionUnderlineNotOverIndented,
                 Rule::NoThisPrefix,

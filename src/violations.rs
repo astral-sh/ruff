@@ -3145,20 +3145,6 @@ impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {
 }
 
 define_violation!(
-    pub struct OneBlankLineBeforeClass(pub usize);
-);
-impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("1 blank line required before class docstring")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Insert 1 blank line before class docstring".to_string()
-    }
-}
-
-define_violation!(
     pub struct OneBlankLineAfterClass(pub usize);
 );
 impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
@@ -3293,20 +3279,6 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
 
     fn autofix_title(&self) -> String {
         "Remove whitespace after opening quotes".to_string()
-    }
-}
-
-define_violation!(
-    pub struct MultiLineSummarySecondLine;
-);
-impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Multi-line docstring summary should start at the second line")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Insert line break and indentation after opening quotes".to_string()
     }
 }
 

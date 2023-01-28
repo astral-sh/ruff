@@ -315,10 +315,7 @@ prefix, followed by three digits (e.g., `F401`). The prefix indicates that "sour
 rules is determined by the `select` and `ignore` options, which support both the full code (e.g.,
 `F401`) and the prefix (e.g., `F`).
 
-As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some of the
-`pydocstyle` rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
-formats. Enabling `ALL` without further configuration may result in suboptimal behavior, especially
-for the `pydocstyle` plugin.
+As a special-case, Ruff also supports the `ALL` code, which enables all rules.
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
@@ -652,7 +649,6 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D200 | fits-on-one-line | One-line docstring should fit on one line | 🛠 |
 | D201 | no-blank-line-before-function | No blank lines allowed before function docstring (found {num_lines}) | 🛠 |
 | D202 | no-blank-line-after-function | No blank lines allowed after function docstring (found {num_lines}) | 🛠 |
-| D203 | one-blank-line-before-class | 1 blank line required before class docstring | 🛠 |
 | D204 | one-blank-line-after-class | 1 blank line required after class docstring | 🛠 |
 | D205 | blank-line-after-summary | 1 blank line required between summary line and description | 🛠 |
 | D206 | indent-with-spaces | Docstring should be indented with spaces, not tabs |  |
@@ -662,7 +658,6 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D210 | no-surrounding-whitespace | No whitespaces allowed surrounding docstring text | 🛠 |
 | D211 | no-blank-line-before-class | No blank lines allowed before class docstring | 🛠 |
 | D212 | multi-line-summary-first-line | Multi-line docstring summary should start at the first line | 🛠 |
-| D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
 | D300 | uses-triple-quotes | Use """triple double quotes""" |  |

@@ -4821,7 +4821,6 @@ impl<'a> Checker<'a> {
                 .rules
                 .enabled(&Rule::NoBlankLineBeforeFunction)
             || self.settings.rules.enabled(&Rule::NoBlankLineAfterFunction)
-            || self.settings.rules.enabled(&Rule::OneBlankLineBeforeClass)
             || self.settings.rules.enabled(&Rule::OneBlankLineAfterClass)
             || self.settings.rules.enabled(&Rule::BlankLineAfterSummary)
             || self.settings.rules.enabled(&Rule::IndentWithSpaces)
@@ -4837,10 +4836,6 @@ impl<'a> Checker<'a> {
                 .settings
                 .rules
                 .enabled(&Rule::MultiLineSummaryFirstLine)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::MultiLineSummarySecondLine)
             || self.settings.rules.enabled(&Rule::SectionNotOverIndented)
             || self
                 .settings
@@ -4953,8 +4948,7 @@ impl<'a> Checker<'a> {
                 {
                     pydocstyle::rules::blank_before_after_function(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::OneBlankLineBeforeClass)
-                    || self.settings.rules.enabled(&Rule::OneBlankLineAfterClass)
+                if self.settings.rules.enabled(&Rule::OneBlankLineAfterClass)
                     || self.settings.rules.enabled(&Rule::NoBlankLineBeforeClass)
                 {
                     pydocstyle::rules::blank_before_after_class(self, &docstring);
@@ -4982,10 +4976,6 @@ impl<'a> Checker<'a> {
                     .settings
                     .rules
                     .enabled(&Rule::MultiLineSummaryFirstLine)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(&Rule::MultiLineSummarySecondLine)
                 {
                     pydocstyle::rules::multi_line_summary_start(self, &docstring);
                 }
