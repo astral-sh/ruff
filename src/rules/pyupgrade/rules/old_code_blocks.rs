@@ -1,10 +1,12 @@
+use std::cmp::Ordering;
+
 use num_bigint::Sign;
 use ruff_macros::derive_message_formats;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, StmtKind, Unaryop};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, Unaryop};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
-use crate::ast::types::{Range, RefEquality};
+use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
@@ -50,23 +52,10 @@ impl TokenCheck {
     }
 }
 
-/// Checks whether the parent statement is an if statement
-fn check_parent_if(checker: &Checker, stmt: &Stmt) -> bool {
-    let parent = match checker.child_to_parent.get(&RefEquality(stmt)) {
-        Some(parent) => parent,
-        None => return false,
-    };
-    let text = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(&parent));
-    let mut tokens = lexer::make_tokenizer(&text);
-    tokens.next().unwrap().unwrap().1 == Tok::If
-}
-
 /// Checks for a single else in the statement provided
 fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
-    let text = locator.slice_source_code_range(&Range::from_located(&located));
-    let tokens = lexer::make_tokenizer(&text);
+    let text = locator.slice_source_code_range(&Range::from_located(located));
+    let tokens = lexer::make_tokenizer(text);
     let mut first_token: Option<Tok> = None;
     let mut has_else = false;
     let mut has_elif = false;
@@ -105,7 +94,7 @@ fn extract_version(elts: &[Expr]) -> Vec<u32> {
                 }
                 Sign::Plus => {
                     // Assuming that the version will never be above a 32 bit
-                    version.push(*the_number.1.get(0).unwrap())
+                    version.push(*the_number.1.first().unwrap());
                 }
             }
         } else {
@@ -115,30 +104,29 @@ fn extract_version(elts: &[Expr]) -> Vec<u32> {
     version
 }
 
-/// Returns true if the if_version is less than the PythonVersion
-fn compare_version(if_version: Vec<u32>, py_version: PythonVersion, or_equal: bool) -> bool {
+/// Returns true if the `if_version` is less than the `PythonVersion`
+fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool) -> bool {
     let mut ver_iter = if_version.iter();
     // Check the first number (the major version)
     if let Some(first) = ver_iter.next() {
-        if *first < 3 {
-            return true;
-        } else if *first == 3 {
-            // Check the second number (the minor version)
-            if let Some(second) = ver_iter.next() {
-                // If there is an equal, then we need to require one level higher of python
-                if *second < py_version.to_tuple().1 + or_equal as u32 {
-                    return true;
+        match first.cmp(&3) {
+            Ordering::Less => return true,
+            Ordering::Equal => {
+                if let Some(second) = ver_iter.next() {
+                    // Check the second number (the minor version)
+                    // If there is an equal, then we need to require one level higher of python
+                    return *second < py_version.to_tuple().1 + u32::from(or_equal);
                 }
-            } else {
                 // If there is no second number was assumed python 3.0, and upgrade
                 return true;
             }
+            Ordering::Greater => return false,
         }
     }
     false
 }
 
-/// Converts an if statement that has the py2 block on top
+/// Converts an if statement where the code to keep is in the else statement
 fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     // FOR REVIEWER: pyupgrade had a check to see if the first statement was an if
     // or an elif, and would check for an index based on this. Our parser
@@ -157,9 +145,6 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
         ending_location.go_right();
         ending_location.go_right();
     }
-    let text = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(stmt));
     let range = Range::new(stmt.location, stmt.end_location.unwrap());
     let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
     if checker.patch(diagnostic.kind.rule()) {
@@ -168,8 +153,8 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     checker.diagnostics.push(diagnostic);
 }
 
-/// This is called if the first statement after the tigger item is an `elif`
-fn fix_py3_block_elif(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]) {
+/// This is called to fix statements where the code to keep is not in the else
+fn fix_py3_block(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]) {
     println!("Checkpoint three");
     let token_checker = check_tokens(checker.locator, stmt);
     let mut new_text: String;
@@ -197,7 +182,7 @@ fn fix_py3_block_elif(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[S
         // First we remove the test text, so that if there is a colon the the test it
         // doesn't cause issues
         let clean1 = whole_text.replace(new_test, "");
-        let colon_index = clean1.find(":").unwrap();
+        let colon_index = clean1.find(':').unwrap();
         let clean2 = &clean1[colon_index..];
         new_text = String::from("else");
         new_text.push_str(clean2);
@@ -213,44 +198,6 @@ fn fix_py3_block_elif(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[S
     checker.diagnostics.push(diagnostic);
 }
 
-/// This is called if the first statement after the tigger item is an `else`
-fn fix_py3_block_else(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
-    let token_checker = check_tokens(checker.locator, stmt);
-    if token_checker.first_token == Tok::If {
-        if body.is_empty() {
-            return;
-        }
-        let start = body.first().unwrap();
-        let end = body.last().unwrap();
-        let text_range = Range::new(start.location, end.end_location.unwrap());
-        let new_text = checker
-            .locator
-            .slice_source_code_range(&text_range)
-            .to_string();
-        // Here we are dealing with an elif, so we need to replace it with an
-        // else, preserve the body of the elif, and remove anything else
-    }
-}
-// def _fix_py3_block_else(i: int, tokens: list[Token]) -> None:
-// if tokens[i].src == 'if':
-// if_block, else_block = _find_if_else_block(tokens, i)
-// if_block.dedent(tokens)
-// del tokens[if_block.end:else_block.end]
-// del tokens[if_block.start:if_block.block]
-// else:
-// j = _find_elif(tokens, i)
-// if_block, else_block = _find_if_else_block(tokens, j)
-// del tokens[if_block.end:else_block.end]
-// if_block.replace_condition(tokens, [Token('NAME', 'else')])
-
-fn fix_py3_block(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt], orelse: &[Stmt]) {
-    println!("We made it");
-    match &orelse.get(0).unwrap().node {
-        StmtKind::If { .. } => fix_py3_block_elif(checker, stmt, test, body),
-        _ => fix_py3_block_elif(checker, stmt, test, body),
-    }
-}
-
 /// UP037
 pub fn old_code_blocks(
     checker: &mut Checker,
@@ -261,7 +208,6 @@ pub fn old_code_blocks(
 ) {
     // NOTE: Pyupgrade ONLY works if `sys.version_info` is on the left
     // We have to have an else statement in order to refactor
-    println!("====================");
     if orelse.is_empty() {
         return;
     }
@@ -281,12 +227,12 @@ pub fn old_code_blocks(
                         let version = extract_version(elts);
                         let target = checker.settings.target_version;
                         if op == &Cmpop::Lt || op == &Cmpop::LtE {
-                            if compare_version(version, target, op == &Cmpop::LtE) {
+                            if compare_version(&version, target, op == &Cmpop::LtE) {
                                 fix_py2_block(checker, stmt, orelse);
                             }
                         } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
-                            if compare_version(extract_version(elts), target, op == &Cmpop::GtE) {
-                                fix_py3_block(checker, stmt, test, body, orelse);
+                            if compare_version(&version, target, op == &Cmpop::GtE) {
+                                fix_py3_block(checker, stmt, test, body);
                             }
                         }
                     }
@@ -315,20 +261,20 @@ mod tests {
 
     use super::*;
 
-    #[test_case(PythonVersion::Py37, vec![2], true, true; "compare-2.0")]
-    #[test_case(PythonVersion::Py37, vec![2, 0], true, true; "compare-2.0-whole")]
-    #[test_case(PythonVersion::Py37, vec![3], true, true; "compare-3.0")]
-    #[test_case(PythonVersion::Py37, vec![3, 0], true, true; "compare-3.0-whole")]
-    #[test_case(PythonVersion::Py37, vec![3, 1], true, true; "compare-3.1")]
-    #[test_case(PythonVersion::Py37, vec![3, 5], true, true; "compare-3.5")]
-    #[test_case(PythonVersion::Py37, vec![3, 7], true, true; "compare-3.7")]
-    #[test_case(PythonVersion::Py37, vec![3, 7], false, false; "compare-3.7-not-equal")]
-    #[test_case(PythonVersion::Py37, vec![3, 8], false , false; "compare-3.8")]
-    #[test_case(PythonVersion::Py310, vec![3,9], true, true; "compare-3.9")]
-    #[test_case(PythonVersion::Py310, vec![3, 11], true, false; "compare-3.11")]
+    #[test_case(PythonVersion::Py37, &[2], true, true; "compare-2.0")]
+    #[test_case(PythonVersion::Py37, &[2, 0], true, true; "compare-2.0-whole")]
+    #[test_case(PythonVersion::Py37, &[3], true, true; "compare-3.0")]
+    #[test_case(PythonVersion::Py37, &[3, 0], true, true; "compare-3.0-whole")]
+    #[test_case(PythonVersion::Py37, &[3, 1], true, true; "compare-3.1")]
+    #[test_case(PythonVersion::Py37, &[3, 5], true, true; "compare-3.5")]
+    #[test_case(PythonVersion::Py37, &[3, 7], true, true; "compare-3.7")]
+    #[test_case(PythonVersion::Py37, &[3, 7], false, false; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::Py37, &[3, 8], false , false; "compare-3.8")]
+    #[test_case(PythonVersion::Py310, &[3,9], true, true; "compare-3.9")]
+    #[test_case(PythonVersion::Py310, &[3, 11], true, false; "compare-3.11")]
     fn test_compare_version(
         version: PythonVersion,
-        version_vec: Vec<u32>,
+        version_vec: &[u32],
         or_equal: bool,
         expected: bool,
     ) {
