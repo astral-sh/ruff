@@ -382,10 +382,11 @@ Ruff: An extremely fast Python linter.
 Usage: ruff [OPTIONS] <COMMAND>
 
 Commands:
-  check  Run Ruff on the given files or directories (default)
-  rule   Explain a rule
-  clean  Clear any caches in the current directory and any subdirectories
-  help   Print this message or the help of the given subcommand(s)
+  check   Run Ruff on the given files or directories (default)
+  rule    Explain a rule
+  linter  List all supported upstream linters
+  clean   Clear any caches in the current directory and any subdirectories
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help

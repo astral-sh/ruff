@@ -41,6 +41,12 @@ pub enum Command {
         #[arg(long, value_enum, default_value = "text")]
         format: HelpFormat,
     },
+    /// List all supported upstream linters
+    Linter {
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        format: HelpFormat,
+    },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
     Clean,
