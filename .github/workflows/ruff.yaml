@@ -26,8 +26,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - name: "Install Rust toolchain"
-        run: rustup show
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - x86_64"
         uses: messense/maturin-action@v1
         with:
@@ -49,8 +49,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - name: "Install Rust toolchain"
-        run: rustup show
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - universal2"
         uses: messense/maturin-action@v1
         with:
@@ -75,8 +75,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.target }}
-      - name: "Install Rust toolchain"
-        run: rustup show
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
@@ -103,6 +103,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
@@ -129,6 +131,8 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
@@ -167,6 +171,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
@@ -202,6 +208,8 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
@@ -242,6 +250,8 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: pypy${{ matrix.python-version }}
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
