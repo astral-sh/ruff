@@ -366,9 +366,9 @@ Ruff: An extremely fast Python linter.
 Usage: ruff [OPTIONS] <COMMAND>
 
 Commands:
-  check    Run ruff on the given files or directories (this command is used by default and may be omitted)
+  check    Run Ruff on the given files or directories (default)
   explain  Explain a rule
-  clean    Clear any caches in the current directory or any subdirectories
+  clean    Clear any caches in the current directory and any subdirectories
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -380,7 +380,7 @@ Log levels:
   -q, --quiet    Print lint violations, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
 
-To get help about a specific command, see 'ruff help <command>'.
+For help with a specific command, see: `ruff help <command>`.
 ```
 <!-- End auto-generated cli help. -->
 

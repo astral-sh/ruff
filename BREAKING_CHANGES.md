@@ -1,39 +1,41 @@
 # Breaking Changes
 
-## Unreleased
+## 0.0.237
 
-`--explain`, `--clean` and `--generate-shell-completion` are now
-implemented as subcommands:
+### `--explain`, `--clean`, and `--generate-shell-completion` are now subcommands ([#2190](https://github.com/charliermarsh/ruff/pull/2190))
 
-    ruff .         # still works and will always work
-    ruff check .   # now also works
+`--explain`, `--clean`, and `--generate-shell-completion` are now implemented as subcommands:
 
-    ruff --explain E402   # still works
-    ruff explain E402     # now also works
+    ruff .         # Still works! And will always work.
+    ruff check .   # New! Also works.
 
-    ruff --format json --explain E402   # no longer works
-    # the command has to come first:
-    ruff --explain E402 --format json   # or using the new syntax:
-    ruff explain E402   --format json
+    ruff --explain E402   # Still works.
+    ruff explain E402     # New! Also works. (And preferred.)
 
-Please also note that:
+    # Oops! The command has to come first.
+    ruff --format json --explain E402   # No longer works.
+    ruff --explain E402 --format json   # Works!
+    ruff explain E402   --format json   # Works! (And preferred.)
 
-* the subcommands will now fail when invoked with unsupported arguments
-  instead of silently ignoring them, e.g. the following will now fail:
+This change is largely backwards compatible -- most users should experience no change in behavior.
+However, please note the following exceptions:
+
+* Subcommands will now fail when invoked with unsupported arguments, instead of silently ignoring
+  them. For example, the following will now fail:
 
       ruff --explain E402 --respect-gitignore
 
-  Since the `explain` command doesn't support `--respect-gitignore`.
+  (`explain` command doesn't support `--respect-gitignore`.)
 
-* The semantics of `ruff <arg>` has changed when `<arg>` is a
-  subcommand, e.g. before `ruff explain` would look for a file or
-  directory `explain` in the current directory but now it just invokes
-  the explain command. Note that scripts invoking ruff should supply
-  `--` anyway before any positional arguments and the semantics of
-  `ruff -- <arg>` have not changed.
+* The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand. For
+  example, prior to this release, running `ruff explain` would run `ruff` over a file or directory
+  called `explain`. Now, `ruff explain` would invoke the `explain` subcommand.
 
-* `--explain` previously treated `--format grouped` just like `--format text`
-  (this is no longer supported, use `--format text` instead)
+* Scripts that nvoke ruff should supply `--` before any positional arguments. (The semantics of
+  `ruff -- <arg>` have not changed.)
+
+* `--explain` previously treated `--format grouped` as a synonym for `--format text`. This is no
+  longer supported; instead, use `--format text`.
 
 ## 0.0.226
 
