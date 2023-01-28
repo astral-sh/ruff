@@ -773,7 +773,6 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| S101 | assert-used | Use of `assert` detected |  |
 | S102 | exec-used | Use of `exec` detected |  |
 | S103 | bad-file-permissions | `os.chmod` setting a permissive mask `{mask:#o}` on file or directory |  |
 | S104 | hardcoded-bind-all-interfaces | Possible binding to all interfaces |  |
@@ -790,6 +789,11 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
 | S612 | logging-config-insecure-listen | Use of insecure `logging.config.listen` detected |  |
 | S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
+
+
+The following rules have been disabled by default:
+
+* S101 (assert-used): `assert` is generally not considered to be an anti-pattern.
 
 ### flake8-blind-except (BLE)
 

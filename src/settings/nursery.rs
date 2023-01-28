@@ -8,6 +8,7 @@ pub fn nursery_reason(rule: &Rule) -> Option<&'static str> {
         Rule::OneBlankLineBeforeClass => Some("Conflicts with PEP 257."),
         Rule::MultiLineSummaryFirstLine => Some("Not part of PEP 257 and conflicts with D213."),
         Rule::MultiLineSummarySecondLine => Some("Not part of PEP 257 and conflicts with D212."),
+        Rule::AssertUsed => Some("`assert` is generally not considered to be an anti-pattern."),
         _ => None,
     }
 }
