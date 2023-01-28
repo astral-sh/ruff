@@ -244,7 +244,11 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff)) {
-            printer.write_once(&diagnostics)?;
+            if cli.statistics {
+                printer.write_statistics(&diagnostics)?;
+            } else {
+                printer.write_once(&diagnostics)?;
+            }
         }
 
         // Check for updates if we're in a non-silent log level.

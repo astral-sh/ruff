@@ -246,6 +246,9 @@ pub struct CheckArgs {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
+    /// Format and print the statistics
+    #[arg(long)]
+    pub statistics: bool,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -316,6 +319,7 @@ impl CheckArgs {
                 no_cache: self.no_cache,
                 show_files: self.show_files,
                 show_settings: self.show_settings,
+                statistics: self.statistics,
                 stdin_filename: self.stdin_filename,
                 watch: self.watch,
             },
@@ -371,6 +375,7 @@ pub struct Arguments {
     pub no_cache: bool,
     pub show_files: bool,
     pub show_settings: bool,
+    pub statistics: bool,
     pub stdin_filename: Option<PathBuf>,
     pub watch: bool,
 }
