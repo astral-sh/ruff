@@ -454,10 +454,9 @@ There are a few exceptions to these rules:
    resolved relative to the _current working directory_.
 3. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
    a default configuration. If a user-specific configuration file exists
-   at `${config_dir}/ruff/pyproject.toml`,
-   that file will be used instead of the default configuration, with `${config_dir}` being
-   determined via the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all
-   relative paths being again resolved relative to the _current working directory_.
+   at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
+   configuration, with `${config_dir}` being determined via the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html)
+   crate, and all relative paths being again resolved relative to the _current working directory_.
 4. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
    `--select`) will override the settings in _every_ resolved configuration file.
 
@@ -476,6 +475,8 @@ line-length = 100
 
 All of the above rules apply equivalently to `ruff.toml` files. If Ruff detects both a `ruff.toml`
 and `pyproject.toml` file, it will defer to the `ruff.toml`.
+
+
 
 ### Python file discovery
 
@@ -1632,6 +1633,21 @@ Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements 
 Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
 
 Pylint parity is being tracked in [#970](https://github.com/charliermarsh/ruff/issues/970).
+
+### How does Ruff compare to Mypy, or Pyright, or Pyre?
+
+Ruff is a linter, not a type checker. It can detect some of the same problems that a type checker
+can, but a type checker will catch certain errors that Ruff would miss. The opposite is also true:
+Ruff will catch certain errors that a type checker would typically ignore.
+
+For example, unlike a type checker, Ruff will notify you if an import is unused, by looking for
+references to that import in the source code; on the other hand, a type checker could flag that you
+passed an integer argument to a function that expects a string, which Ruff would miss. The
+tools are complementary.
+
+It's recommended that you use Ruff in conjunction with a type checker, like Mypy, Pyright, or Pyre,
+with Ruff providing faster feedback on lint violations and the type checker providing more detailed
+feedback on type errors.
 
 ### Which tools does Ruff replace?
 
