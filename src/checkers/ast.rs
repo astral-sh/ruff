@@ -692,6 +692,9 @@ where
                         context,
                     },
                 );
+                if self.settings.rules.enabled(&Rule::TooManyArgs) {
+                    pylint::rules::too_many_args(self, args, stmt);
+                }
             }
             StmtKind::Return { .. } => {
                 if self.settings.rules.enabled(&Rule::ReturnOutsideFunction) {

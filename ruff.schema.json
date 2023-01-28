@@ -1172,6 +1172,15 @@
           "items": {
             "$ref": "#/definitions/ConstantType"
           }
+        },
+        "max-args": {
+          "description": "Constant types to ignore when used as \"magic values\".",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -1641,6 +1650,9 @@
         "PLR04",
         "PLR040",
         "PLR0402",
+        "PLR09",
+        "PLR091",
+        "PLR0913",
         "PLR1",
         "PLR17",
         "PLR170",

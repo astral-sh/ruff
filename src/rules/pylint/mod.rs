@@ -4,9 +4,8 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use anyhow::Result;
+    use std::path::Path;
     use test_case::test_case;
 
     use crate::assert_yaml_snapshot;
@@ -36,6 +35,7 @@ mod tests {
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
     #[test_case(Rule::InvalidAllFormat, Path::new("PLE0605.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("PLE0604.py"); "PLE0604")]
+    #[test_case(Rule::TooManyArgs, Path::new("too_many_args.py"); "PLR0913")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -55,6 +55,7 @@ mod tests {
             &Settings {
                 pylint: pylint::settings::Settings {
                     allow_magic_value_types: vec![pylint::settings::ConstantType::Int],
+                    ..pylint::settings::Settings::default()
                 },
                 ..Settings::for_rules(vec![Rule::MagicValueComparison])
             },

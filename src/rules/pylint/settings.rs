@@ -53,17 +53,28 @@ pub struct Options {
     )]
     /// Constant types to ignore when used as "magic values".
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
+    #[option(
+        default = r#"5"#,
+        value_type = "usize",
+        example = r#"
+            allow-magic-value-types = 5
+        "#
+    )]
+    /// Constant types to ignore when used as "magic values".
+    pub max_args: Option<usize>,
 }
 
 #[derive(Debug, Hash)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
+    pub max_args: usize,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_magic_value_types: vec![ConstantType::Str],
+            max_args: 5,
         }
     }
 }
@@ -74,6 +85,7 @@ impl From<Options> for Settings {
             allow_magic_value_types: options
                 .allow_magic_value_types
                 .unwrap_or_else(|| vec![ConstantType::Str]),
+            max_args: options.max_args.unwrap_or_else(|| 5),
         }
     }
 }
@@ -82,6 +94,7 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             allow_magic_value_types: Some(settings.allow_magic_value_types),
+            max_args: Some(settings.max_args),
         }
     }
 }
