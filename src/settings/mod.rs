@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use globset::Glob;
 use rustc_hash::{FxHashMap, FxHashSet};
+use strum::IntoEnumIterator;
 
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
@@ -236,29 +237,110 @@ impl Settings {
 
 impl From<&Configuration> for RuleTable {
     fn from(config: &Configuration) -> Self {
+        // The select_set keeps track of which rules have been selected.
+        let mut select_set: FxHashSet<Rule> = defaults::PREFIXES.iter().flatten().collect();
+        // The fixable set keeps track of which rules are fixable.
+        let mut fixable_set: FxHashSet<Rule> = RuleSelector::All.into_iter().collect();
+
+        let mut redirects = FxHashMap::default();
+
+        for selection in &config.rule_selections {
+            // We do not have an extend-fixable option, so fixable and unfixable
+            // selectors can simply be applied directly to fixable_set.
+            if selection.fixable.is_some() {
+                fixable_set.clear();
+            }
+
+            // If a selection only specifies extend-select we cannot directly
+            // apply its rule selectors to the select_set because we firstly have
+            // to resolve the effectively selected rules within the current rule selection
+            // (taking specificity into account since more specific selectors take
+            // precedence over less specific selectors within a rule selection).
+            // We do this via the following HashMap where the bool indicates
+            // whether to enable or disable the given rule.
+            let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
+
+            for spec in Specificity::iter() {
+                for selector in selection
+                    .select
+                    .iter()
+                    .flatten()
+                    .chain(selection.extend_select.iter())
+                    .filter(|s| s.specificity() == spec)
+                {
+                    for rule in selector {
+                        select_map_updates.insert(rule, true);
+                    }
+                }
+                for selector in selection.ignore.iter().filter(|s| s.specificity() == spec) {
+                    for rule in selector {
+                        select_map_updates.insert(rule, false);
+                    }
+                }
+                if let Some(fixable) = &selection.fixable {
+                    fixable_set
+                        .extend(fixable.iter().filter(|s| s.specificity() == spec).flatten());
+                }
+                for selector in selection
+                    .unfixable
+                    .iter()
+                    .filter(|s| s.specificity() == spec)
+                {
+                    for rule in selector {
+                        fixable_set.remove(&rule);
+                    }
+                }
+            }
+
+            if selection.select.is_some() {
+                // If the `select` option is given we reassign the whole select_set
+                // (overriding everything that has been defined previously).
+                select_set = select_map_updates
+                    .into_iter()
+                    .filter_map(|(rule, enabled)| enabled.then_some(rule))
+                    .collect();
+            } else {
+                // Otherwise we apply the updates on top of the existing select_set.
+                for (rule, enabled) in select_map_updates {
+                    if enabled {
+                        select_set.insert(rule);
+                    } else {
+                        select_set.remove(&rule);
+                    }
+                }
+            }
+
+            // We insert redirects into the hashmap so that we
+            // can warn the users about remapped rule codes.
+            for selector in selection
+                .select
+                .iter()
+                .chain(selection.fixable.iter())
+                .flatten()
+                .chain(selection.ignore.iter())
+                .chain(selection.extend_select.iter())
+                .chain(selection.unfixable.iter())
+            {
+                if let RuleSelector::Prefix {
+                    prefix,
+                    redirected_from: Some(redirect_from),
+                } = selector
+                {
+                    redirects.insert(redirect_from, prefix);
+                }
+            }
+        }
+
+        for (from, target) in redirects {
+            // TODO(martin): This belongs into the ruff_cli crate.
+            crate::warn_user!("`{from}` has been remapped to `{}`.", target.as_ref());
+        }
+
         let mut rules = RuleTable::empty();
 
-        let fixable = resolve_codes([RuleCodeSpec {
-            select: config.fixable.as_deref().unwrap_or(&[RuleSelector::All]),
-            ignore: config.unfixable.as_deref().unwrap_or_default(),
-        }]);
-
-        for code in resolve_codes(
-            [RuleCodeSpec {
-                select: config.select.as_deref().unwrap_or(defaults::PREFIXES),
-                ignore: config.ignore.as_deref().unwrap_or_default(),
-            }]
-            .into_iter()
-            .chain(
-                config
-                    .extend_select
-                    .iter()
-                    .zip(config.extend_ignore.iter())
-                    .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
-            ),
-        ) {
-            let fix = fixable.contains(&code);
-            rules.enable(code, fix);
+        for rule in select_set {
+            let fix = fixable_set.contains(&rule);
+            rules.enable(rule.clone(), fix);
         }
 
         // If a docstring convention is specified, force-disable any incompatible error
@@ -309,68 +391,6 @@ pub fn resolve_per_file_ignores(
         .collect()
 }
 
-#[derive(Debug)]
-struct RuleCodeSpec<'a> {
-    select: &'a [RuleSelector],
-    ignore: &'a [RuleSelector],
-}
-
-/// Given a set of selected and ignored prefixes, resolve the set of enabled
-/// rule codes.
-fn resolve_codes<'a>(specs: impl IntoIterator<Item = RuleCodeSpec<'a>>) -> FxHashSet<Rule> {
-    let mut rules: FxHashSet<Rule> = FxHashSet::default();
-
-    let mut redirects = FxHashMap::default();
-
-    for spec in specs {
-        for specificity in [
-            Specificity::All,
-            Specificity::Linter,
-            Specificity::Code1Char,
-            Specificity::Code2Chars,
-            Specificity::Code3Chars,
-            Specificity::Code4Chars,
-            Specificity::Code5Chars,
-        ] {
-            for selector in spec.select {
-                if selector.specificity() == specificity {
-                    rules.extend(selector);
-                }
-
-                if let RuleSelector::Prefix {
-                    prefix,
-                    redirected_from: Some(redirect_from),
-                } = selector
-                {
-                    redirects.insert(redirect_from, prefix);
-                }
-            }
-            for selector in spec.ignore {
-                if selector.specificity() == specificity {
-                    for rule in selector {
-                        rules.remove(&rule);
-                    }
-                }
-
-                if let RuleSelector::Prefix {
-                    prefix,
-                    redirected_from: Some(redirect_from),
-                } = selector
-                {
-                    redirects.insert(redirect_from, prefix);
-                }
-            }
-        }
-    }
-
-    for (from, target) in redirects {
-        // TODO(martin): This belongs into the ruff_cli crate.
-        crate::warn_user!("`{from}` has been remapped to `{}`.", target.as_ref());
-    }
-
-    rules
-}
-
 #[cfg(test)]
 mod tests {
     use rustc_hash::FxHashSet;
@@ -379,17 +399,26 @@ mod tests {
     use crate::settings::configuration::Configuration;
     use crate::settings::rule_table::RuleTable;
 
+    use super::configuration::RuleSelection;
+
     #[allow(clippy::needless_pass_by_value)]
-    fn resolve_rules(config: Configuration) -> FxHashSet<Rule> {
-        RuleTable::from(&config).iter_enabled().cloned().collect()
+    fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> FxHashSet<Rule> {
+        RuleTable::from(&Configuration {
+            rule_selections: selections.into_iter().collect(),
+            ..Configuration::default()
+        })
+        .iter_enabled()
+        .cloned()
+        .collect()
     }
 
     #[test]
     fn rule_codes() {
-        let actual = resolve_rules(Configuration {
+        let actual = resolve_rules([RuleSelection {
             select: Some(vec![RuleCodePrefix::W.into()]),
-            ..Configuration::default()
-        });
+            ..RuleSelection::default()
+        }]);
+
         let expected = FxHashSet::from_iter([
             Rule::NoNewLineAtEndOfFile,
             Rule::DocLineTooLong,
@@ -397,44 +426,48 @@ mod tests {
         ]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_rules(Configuration {
+        let actual = resolve_rules([RuleSelection {
             select: Some(vec![RuleCodePrefix::W6.into()]),
-            ..Configuration::default()
-        });
+            ..RuleSelection::default()
+        }]);
         let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_rules(Configuration {
+        let actual = resolve_rules([RuleSelection {
             select: Some(vec![RuleCodePrefix::W.into()]),
-            ignore: Some(vec![RuleCodePrefix::W292.into()]),
-            ..Configuration::default()
-        });
+            ignore: vec![RuleCodePrefix::W292.into()],
+            ..RuleSelection::default()
+        }]);
         let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_rules(Configuration {
+        let actual = resolve_rules([RuleSelection {
             select: Some(vec![RuleCodePrefix::W292.into()]),
-            ignore: Some(vec![RuleCodePrefix::W.into()]),
-            ..Configuration::default()
-        });
+            ignore: vec![RuleCodePrefix::W.into()],
+            ..RuleSelection::default()
+        }]);
         let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_rules(Configuration {
+        let actual = resolve_rules([RuleSelection {
             select: Some(vec![RuleCodePrefix::W605.into()]),
-            ignore: Some(vec![RuleCodePrefix::W605.into()]),
-            ..Configuration::default()
-        });
+            ignore: vec![RuleCodePrefix::W605.into()],
+            ..RuleSelection::default()
+        }]);
         let expected = FxHashSet::from_iter([]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_rules(Configuration {
-            select: Some(vec![RuleCodePrefix::W.into()]),
-            ignore: Some(vec![RuleCodePrefix::W292.into()]),
-            extend_select: vec![vec![RuleCodePrefix::W292.into()]],
-            extend_ignore: vec![vec![]],
-            ..Configuration::default()
-        });
+        let actual = resolve_rules([
+            RuleSelection {
+                select: Some(vec![RuleCodePrefix::W.into()]),
+                ignore: vec![RuleCodePrefix::W292.into()],
+                ..RuleSelection::default()
+            },
+            RuleSelection {
+                extend_select: vec![RuleCodePrefix::W292.into()],
+                ..RuleSelection::default()
+            },
+        ]);
         let expected = FxHashSet::from_iter([
             Rule::NoNewLineAtEndOfFile,
             Rule::DocLineTooLong,
@@ -442,13 +475,18 @@ mod tests {
         ]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_rules(Configuration {
-            select: Some(vec![RuleCodePrefix::W.into()]),
-            ignore: Some(vec![RuleCodePrefix::W292.into()]),
-            extend_select: vec![vec![RuleCodePrefix::W292.into()]],
-            extend_ignore: vec![vec![RuleCodePrefix::W.into()]],
-            ..Configuration::default()
-        });
+        let actual = resolve_rules([
+            RuleSelection {
+                select: Some(vec![RuleCodePrefix::W.into()]),
+                ignore: vec![RuleCodePrefix::W292.into()],
+                ..RuleSelection::default()
+            },
+            RuleSelection {
+                extend_select: vec![RuleCodePrefix::W292.into()],
+                ignore: vec![RuleCodePrefix::W.into()],
+                ..RuleSelection::default()
+            },
+        ]);
         let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
         assert_eq!(actual, expected);
     }

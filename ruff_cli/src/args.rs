@@ -5,6 +5,7 @@ use regex::Regex;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::resolver::ConfigProcessor;
+use ruff::settings::configuration::RuleSelection;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
@@ -116,13 +117,13 @@ pub struct CheckArgs {
         help_heading = "Rule selection"
     )]
     pub extend_select: Option<Vec<RuleSelector>>,
-    /// Like --ignore, but adds additional rule codes on top of the ignored
-    /// ones.
+    /// Like --ignore. (Deprecated: You can just use --ignore instead.)
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        help_heading = "Rule selection"
+        help_heading = "Rule selection",
+        hide = true
     )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
     /// List of mappings from file pattern to code to exclude
@@ -442,17 +443,24 @@ impl ConfigProcessor for &Overrides {
         if let Some(fix_only) = &self.fix_only {
             config.fix_only = Some(*fix_only);
         }
-        if let Some(fixable) = &self.fixable {
-            config.fixable = Some(fixable.clone());
-        }
+        config.rule_selections.push(RuleSelection {
+            select: self.select.clone(),
+            ignore: self
+                .ignore
+                .iter()
+                .cloned()
+                .chain(self.extend_ignore.iter().cloned().into_iter())
+                .flatten()
+                .collect(),
+            extend_select: self.extend_select.clone().unwrap_or_default(),
+            fixable: self.fixable.clone(),
+            unfixable: self.unfixable.clone().unwrap_or_default(),
+        });
         if let Some(format) = &self.format {
             config.format = Some(*format);
         }
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
-        }
-        if let Some(ignore) = &self.ignore {
-            config.ignore = Some(ignore.clone());
         }
         if let Some(line_length) = &self.line_length {
             config.line_length = Some(*line_length);
@@ -463,37 +471,14 @@ impl ConfigProcessor for &Overrides {
         if let Some(respect_gitignore) = &self.respect_gitignore {
             config.respect_gitignore = Some(*respect_gitignore);
         }
-        if let Some(select) = &self.select {
-            config.select = Some(select.clone());
-        }
         if let Some(show_source) = &self.show_source {
             config.show_source = Some(*show_source);
         }
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
         }
-        if let Some(unfixable) = &self.unfixable {
-            config.unfixable = Some(unfixable.clone());
-        }
         if let Some(update_check) = &self.update_check {
             config.update_check = Some(*update_check);
-        }
-        // Special-case: `extend_ignore` and `extend_select` are parallel arrays, so
-        // push an empty array if only one of the two is provided.
-        match (&self.extend_ignore, &self.extend_select) {
-            (Some(extend_ignore), Some(extend_select)) => {
-                config.extend_ignore.push(extend_ignore.clone());
-                config.extend_select.push(extend_select.clone());
-            }
-            (Some(extend_ignore), None) => {
-                config.extend_ignore.push(extend_ignore.clone());
-                config.extend_select.push(Vec::new());
-            }
-            (None, Some(extend_select)) => {
-                config.extend_ignore.push(Vec::new());
-                config.extend_select.push(extend_select.clone());
-            }
-            (None, None) => {}
         }
     }
 }
