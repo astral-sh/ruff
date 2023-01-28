@@ -132,15 +132,6 @@ pub fn check_path(
         doc_lines.dedup();
     }
 
-    // Ignore diagnostics based on per-file-ignores.
-    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
-        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;
-
-        if !ignores.is_empty() {
-            diagnostics.retain(|diagnostic| !ignores.contains(&diagnostic.kind.rule()));
-        }
-    };
-
     // Run the lines-based rules.
     if settings
         .rules
@@ -157,6 +148,15 @@ pub fn check_path(
             autofix,
         ));
     }
+
+    // Ignore diagnostics based on per-file-ignores.
+    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
+        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;
+
+        if !ignores.is_empty() {
+            diagnostics.retain(|diagnostic| !ignores.contains(&diagnostic.kind.rule()));
+        }
+    };
 
     // Enforce `noqa` directives.
     if (matches!(noqa, flags::Noqa::Enabled) && !diagnostics.is_empty())
