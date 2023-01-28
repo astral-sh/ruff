@@ -61,4 +61,3 @@ ureq = { version = "2.5.0", features = [] }
 
 [package.metadata.maturin]
 name = "ruff"
-# Setting the name here is necessary for maturin to include the package in its builds.

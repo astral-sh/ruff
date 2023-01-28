@@ -21,4 +21,3 @@ opt-level = 3
 # https://github.com/bytecodealliance/wasm-tools/blob/b5c3d98e40590512a3b12470ef358d5c7b983b15/crates/wasmparser/src/limits.rs#L29
 [profile.dev.package.rustpython-parser]
 opt-level = 1
-

@@ -17,7 +17,3 @@ serde_json = { version = "1.0.87" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 toml = { version = "0.6.0" }
-
-[dev-dependencies]
-
-[features]
