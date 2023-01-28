@@ -1788,6 +1788,46 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 
 Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
+### I want to use Ruff, but I don't want to use `pyproject.toml`. Is that possible?
+
+Yes! In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
+files are functionally equivalent and have an identical schema, with the exception that a `ruff.toml`
+file can omit the `[tool.ruff]` section header.
+
+For example, given this `pyproject.toml`:
+
+```toml
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.pydocstyle]
+convention = "google"
+```
+
+You could instead use a `ruff.toml` file like so:
+
+```toml
+line-length = 88
+
+[pydocstyle]
+convention = "google"
+```
+
+Ruff doesn't currently support INI files, like `setup.cfg` or `tox.ini`.
+
+### How can I change Ruff's default configuration?
+
+When no configuration file is found, Ruff will look for a user-specific `pyproject.toml` or
+`ruff.toml` file as a last resort. This behavior is similar to Flake8's `~/.config/flake8`.
+
+On macOS, Ruff expects that file to be located at `/Users/Alice/Library/Application Support/ruff/ruff.toml`.
+
+On Linux, Ruff expects that file to be located at `/home/alice/.config/ruff/ruff.toml`.
+
+On Windows, Ruff expects that file to be located at `C:\Users\Alice\AppData\Roaming\ruff\ruff.toml`.
+
+For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate.
+
 ### Ruff tried to fix something, but it broke my code. What should I do?
 
 Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
