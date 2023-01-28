@@ -39,18 +39,18 @@ fn inner_main() -> Result<ExitCode> {
 
     // Clap doesn't support default subcommands but we want to run `check` by
     // default for convenience and backwards-compatibility, so we just
-    // preprocess the arguments accordingly before passing them to clap.
-    if let Some(arg1) = args.get(1).and_then(|s| s.to_str()) {
-        if !Command::has_subcommand(arg1)
-            && !arg1
+    // preprocess the arguments accordingly before passing them to Clap.
+    if let Some(arg) = args.get(1).and_then(|s| s.to_str()) {
+        if !Command::has_subcommand(arg)
+            && !arg
                 .strip_prefix("--")
                 .map(Command::has_subcommand)
                 .unwrap_or_default()
-            && arg1 != "-h"
-            && arg1 != "--help"
-            && arg1 != "-v"
-            && arg1 != "--version"
-            && arg1 != "help"
+            && arg != "-h"
+            && arg != "--help"
+            && arg != "-v"
+            && arg != "--version"
+            && arg != "help"
         {
             args.insert(1, "check".into());
         }
