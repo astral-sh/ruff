@@ -315,7 +315,10 @@ prefix, followed by three digits (e.g., `F401`). The prefix indicates that "sour
 rules is determined by the `select` and `ignore` options, which support both the full code (e.g.,
 `F401`) and the prefix (e.g., `F`).
 
-As a special-case, Ruff also supports the `ALL` code, which enables all rules.
+As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some of the
+`pydocstyle` rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
+formats. Enabling `ALL` without further configuration may result in suboptimal behavior, especially
+for the `pydocstyle` plugin.
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
