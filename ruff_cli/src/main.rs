@@ -41,11 +41,7 @@ fn inner_main() -> Result<ExitCode> {
     // default for convenience and backwards-compatibility, so we just
     // preprocess the arguments accordingly before passing them to Clap.
     if let Some(arg) = args.get(1).and_then(|s| s.to_str()) {
-        if !Command::has_subcommand(arg)
-            && !arg
-                .strip_prefix("--")
-                .map(Command::has_subcommand)
-                .unwrap_or_default()
+        if !Command::has_subcommand(rewrite_legacy_subcommand(arg))
             && arg != "-h"
             && arg != "--help"
             && arg != "-v"
@@ -272,6 +268,15 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn rewrite_legacy_subcommand(cmd: &str) -> &str {
+    match cmd {
+        "--explain" => "explain",
+        "--clean" => "clean",
+        "--generate-shell-completion" => "generate-shell-completion",
+        cmd => cmd,
+    }
 }
 
 #[must_use]
