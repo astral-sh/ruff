@@ -206,9 +206,10 @@ apk add ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff path/to/code/to/lint.py  # Run Ruff over `lint.py`
-ruff path/to/code/            # Run Ruff over all files in `/path/to/code` (and any subdirectories)
-ruff path/to/code/*.py        # Run Ruff over all `.py` files in `/path/to/code`
+ruff .                        # Lint all files in the current directory (and any subdirectories)
+ruff path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
+ruff path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
+ruff path/to/code/to/file.py  # Lint `file.py`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
