@@ -89,7 +89,7 @@ co-creator of [GraphQL](https://graphql.org/):
 
 > Why is Ruff a gamechanger? Primarily because it is nearly 1000x faster. Literally. Not a typo. On
 > our largest module (dagster itself, 250k LOC) pylint takes about 2.5 minutes, parallelized across 4
-> cores on my M1. Running ruff against our *entire* codebase takes .4 seconds.
+> cores on my M1. Running ruff against our _entire_ codebase takes .4 seconds.
 
 [**Bryan Van de Ven**](https://github.com/bokeh/bokeh/pull/12605), co-creator
 of [Bokeh](https://github.com/bokeh/bokeh/), original author
@@ -383,7 +383,7 @@ ruff path/to/code/ --select F401 --select F403 --quiet
 See `ruff help` for more on Ruff's top-level commands:
 
 <!-- Begin auto-generated command help. -->
-```
+```text
 Ruff: An extremely fast Python linter.
 
 Usage: ruff [OPTIONS] <COMMAND>
@@ -411,7 +411,7 @@ For help with a specific command, see: `ruff help <command>`.
 Or `ruff help check` for more on the linting command:
 
 <!-- Begin auto-generated subcommand help. -->
-```
+```text
 Run Ruff on the given files or directories (default)
 
 Usage: ruff check [OPTIONS] [FILES]...
@@ -575,7 +575,7 @@ x = 1  # noqa: F841
 # Ignore E741 and F841.
 i = 1  # noqa: E741, F841
 
-# Ignore _all_ violations.
+# Ignore *all* violations.
 x = 1  # noqa
 ```
 
@@ -694,6 +694,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 
 #### Error (E)
+
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
@@ -714,6 +715,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | E999 | syntax-error | SyntaxError: {message} |  |
 
 #### Warning (W)
+
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | W292 | no-new-line-at-end-of-file | No newline at end of file | 🛠 |
@@ -1315,12 +1317,14 @@ For more, see [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) on GitH
 For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 #### Convention (PLC)
+
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PLC0414 | useless-import-alias | Import alias does not rename original package | 🛠 |
 | PLC3002 | unnecessary-direct-lambda-call | Lambda expression called directly. Execute the expression inline instead. |  |
 
 #### Error (PLE)
+
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
@@ -1330,6 +1334,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
 
 #### Refactor (PLR)
+
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PLR0133 | constant-comparison | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
@@ -1342,6 +1347,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLR2004 | magic-value-comparison | Magic value used in comparison, consider replacing {value} with a constant variable |  |
 
 #### Warning (PLW)
+
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PLW0120 | useless-else-on-loop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
@@ -1402,7 +1408,7 @@ For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
 Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff),
 which supports autofix actions, import sorting, and more.
 
-![](https://user-images.githubusercontent.com/1309177/205175763-cf34871d-5c05-4abf-9916-440afc82dbf8.gif)
+![Ruff VS Code extension](https://user-images.githubusercontent.com/1309177/205175763-cf34871d-5c05-4abf-9916-440afc82dbf8.gif)
 
 ### Language Server Protocol (Official)
 
@@ -1547,13 +1553,14 @@ let g:ale_fixers = {
 ```yaml
 tools:
   python-ruff: &python-ruff
-    lint-command: 'ruff --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}'
+    lint-command: "ruff --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}"
     lint-stdin: true
     lint-formats:
-      - '%f:%l:%c: %m'
-    format-command: 'ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -'
+      - "%f:%l:%c: %m"
+    format-command: "ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -"
     format-stdin: true
 ```
+
 </details>
 
 <details>
@@ -1570,8 +1577,8 @@ null_ls.setup({
     }
 })
 ```
-</details>
 
+</details>
 
 ### PyCharm (External Tool)
 
@@ -3063,11 +3070,12 @@ mark-parentheses = true
 
 Expected type for multiple argument names in `@pytest.mark.parametrize`.
 The following values are supported:
-* `csv` — a comma-separated list, e.g.
+
+- `csv` — a comma-separated list, e.g.
   `@pytest.mark.parametrize('name1,name2', ...)`
-* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+- `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
   ...)`
-* `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
+- `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
 
 **Default value**: `tuple`
 
@@ -3086,9 +3094,10 @@ parametrize-names-type = "list"
 
 Expected type for each row of values in `@pytest.mark.parametrize` in
 case of multiple parameters. The following values are supported:
-* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+
+- `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
   [(1, 2), (3, 4)])`
-* `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2],
+- `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2],
   [3, 4]])`
 
 **Default value**: `tuple`
@@ -3108,8 +3117,9 @@ parametrize-values-row-type = "list"
 
 Expected type for the list of values rows in `@pytest.mark.parametrize`.
 The following values are supported:
-* `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))`
-* `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`
+
+- `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))`
+- `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`
 
 **Default value**: `list`
 
@@ -3307,7 +3317,7 @@ exempt-modules = ["typing", "typing_extensions"]
 
 Enforce TC001, TC002, and TC003 rules even when valid runtime imports
 are present for the same module.
-See: https://github.com/snok/flake8-type-checking#strict.
+See flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.
 
 **Default value**: `false`
 

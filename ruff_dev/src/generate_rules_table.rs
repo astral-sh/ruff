@@ -97,6 +97,7 @@ pub fn main(args: &Args) -> Result<()> {
             for LinterCategory(prefix, name, selector) in categories {
                 table_out.push_str(&format!("#### {name} ({prefix})"));
                 table_out.push('\n');
+                table_out.push('\n');
                 generate_table(&mut table_out, selector);
             }
         } else {

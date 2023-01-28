@@ -11,6 +11,21 @@ repos:
     hooks:
       - id: validate-pyproject
 
+  # - repo: https://github.com/pre-commit/mirrors-prettier
+  #   rev: v3.0.0-alpha.4
+  #   hooks:
+  #     - id: prettier
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.33.0
+    hooks:
+      - id: markdownlint-fix
+        args:
+          - --disable
+          - MD013
+          - MD033
+          - --
+
   - repo: local
     hooks:
       - id: cargo-fmt

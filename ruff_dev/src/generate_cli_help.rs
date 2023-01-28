@@ -33,12 +33,12 @@ pub fn main(args: &Args) -> Result<()> {
         print!("{subcommand_help}");
     } else {
         replace_readme_section(
-            &format!("```\n{command_help}\n```\n"),
+            &format!("```text\n{command_help}\n```\n"),
             COMMAND_HELP_BEGIN_PRAGMA,
             COMMAND_HELP_END_PRAGMA,
         )?;
         replace_readme_section(
-            &format!("```\n{subcommand_help}\n```\n"),
+            &format!("```text\n{subcommand_help}\n```\n"),
             SUBCOMMAND_HELP_BEGIN_PRAGMA,
             SUBCOMMAND_HELP_END_PRAGMA,
         )?;
