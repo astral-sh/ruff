@@ -26,8 +26,6 @@ theme:
 repo_url: https://github.com/charliermarsh/ruff
 repo_name: ruff
 site_author: charliermarsh
-nav:
-  - Home: index.md
 markdown_extensions:
   - toc:
       permalink: "#"
