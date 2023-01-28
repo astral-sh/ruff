@@ -3859,11 +3859,31 @@ impl<'a> Checker<'a> {
             }
         }
 
-        // Assume the rebound name is used as a global or within a loop.
         let scope = self.current_scope();
         let binding = if let Some(index) = scope.values.get(&name) {
             if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
+                // Avoid overriding builtins.
                 binding
+            } else if matches!(self.bindings[*index].kind, BindingKind::Global) {
+                // If the original binding was a global, and the new binding conflicts within the
+                // current scope, then the new binding is also a global.
+                Binding {
+                    runtime_usage: self.bindings[*index].runtime_usage,
+                    synthetic_usage: self.bindings[*index].synthetic_usage,
+                    typing_usage: self.bindings[*index].typing_usage,
+                    kind: BindingKind::Global,
+                    ..binding
+                }
+            } else if matches!(self.bindings[*index].kind, BindingKind::Nonlocal) {
+                // If the original binding was a nonlocal, and the new binding conflicts within the
+                // current scope, then the new binding is also a nonlocal.
+                Binding {
+                    runtime_usage: self.bindings[*index].runtime_usage,
+                    synthetic_usage: self.bindings[*index].synthetic_usage,
+                    typing_usage: self.bindings[*index].typing_usage,
+                    kind: BindingKind::Nonlocal,
+                    ..binding
+                }
             } else {
                 Binding {
                     runtime_usage: self.bindings[*index].runtime_usage,
@@ -4463,10 +4483,14 @@ impl<'a> Checker<'a> {
                 for (name, index) in &scope.values {
                     let binding = &self.bindings[*index];
                     if matches!(binding.kind, BindingKind::Global) {
-                        diagnostics.push(Diagnostic::new(
-                            violations::GlobalVariableNotAssigned((*name).to_string()),
-                            binding.range,
-                        ));
+                        if let Some(stmt) = &binding.source {
+                            if matches!(stmt.node, StmtKind::Global { .. }) {
+                                diagnostics.push(Diagnostic::new(
+                                    violations::GlobalVariableNotAssigned((*name).to_string()),
+                                    binding.range,
+                                ));
+                            }
+                        }
                     }
                 }
             }

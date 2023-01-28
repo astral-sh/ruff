@@ -2,31 +2,37 @@
 # Errors.
 ###
 def f():
-    global x
+    global X
 
 
 def f():
-    global x
+    global X
 
-    print(x)
+    print(X)
 
 
 ###
 # Non-errors.
 ###
 def f():
-    global x
+    global X
 
-    x = 1
-
-
-def f():
-    global x
-
-    (x, y) = (1, 2)
+    X = 1
 
 
 def f():
-    global x
+    global X
 
-    del x
+    (X, y) = (1, 2)
+
+
+def f():
+    global X
+
+    del X
+
+
+def f():
+    global X
+
+    X += 1
