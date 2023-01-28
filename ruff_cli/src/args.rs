@@ -16,7 +16,7 @@ use rustc_hash::FxHashMap;
     author,
     name = "ruff",
     about = "Ruff: An extremely fast Python linter.",
-    after_help = "To get help about a specific command, see 'ruff help <command>'."
+    after_help = "For help with a specific command, see: `ruff help <command>`."
 )]
 #[command(version)]
 pub struct Args {
@@ -29,8 +29,7 @@ pub struct Args {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
-    /// Run ruff on the given files or directories (this command is used by
-    /// default and may be omitted)
+    /// Run Ruff on the given files or directories (default).
     Check(CheckArgs),
     /// Explain a rule.
     #[clap(alias = "--explain")]
@@ -42,10 +41,10 @@ pub enum Command {
         #[arg(long, value_enum, env = "RUFF_FORMAT", default_value = "text")]
         format: HelpFormat,
     },
-    /// Clear any caches in the current directory or any subdirectories.
+    /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
     Clean,
-    /// Generate shell completion
+    /// Generate shell completion.
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
 }
@@ -53,6 +52,7 @@ pub enum Command {
 #[derive(Debug, clap::Args)]
 #[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
 pub struct CheckArgs {
+    /// List of files or directories to check.
     pub files: Vec<PathBuf>,
     /// Attempt to automatically fix lint violations.
     #[arg(long, overrides_with("no_fix"))]
