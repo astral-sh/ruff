@@ -1,11 +1,4 @@
 repos:
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.240
-    hooks:
-      - id: ruff
-        args: [--fix]
-        exclude: ^resources
-
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.10.1
     hooks:
@@ -38,6 +31,13 @@ repos:
         entry: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
         language: rust
         pass_filenames: false
+      - id: ruff
+        name: ruff
+        entry: cargo run -- --no-cache --fix
+        language: rust
+        types_or: [python, pyi]
+        require_serial: true
+        exclude: ^resources
       - id: dev-generate-all
         name: dev-generate-all
         entry: cargo dev generate-all
