@@ -14,7 +14,7 @@
 
     # Oops! The command has to come first.
     ruff --format json --explain E402   # No longer works.
-    ruff --explain E402 --format json   # Works!
+    ruff --explain E402 --format json   # Still works!
     ruff rule E402   --format json      # Works! (And preferred.)
 
 This change is largely backwards compatible -- most users should experience
@@ -29,7 +29,9 @@ no change in behavior. However, please note the following exceptions:
 
 * The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand.
   For example, prior to this release, running `ruff rule` would run `ruff` over a file or
-  directory called `rule`. Now, `ruff rule` would invoke the `rule` subcommand.
+  directory called `rule`. Now, `ruff rule` would invoke the `rule` subcommand. This should
+  only impact projects with files or directories named `rule`, `check`, `explain`, `clean`,
+  or `generate-shell-completion`.
 
 * Scripts that invoke ruff should supply `--` before any positional arguments.
   (The semantics of `ruff -- <arg>` have not changed.)
