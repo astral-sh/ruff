@@ -10,12 +10,12 @@
     ruff check .   # New! Also works.
 
     ruff --explain E402   # Still works.
-    ruff explain E402     # New! Also works. (And preferred.)
+    ruff rule E402        # New! Also works. (And preferred.)
 
     # Oops! The command has to come first.
     ruff --format json --explain E402   # No longer works.
     ruff --explain E402 --format json   # Works!
-    ruff explain E402   --format json   # Works! (And preferred.)
+    ruff rule E402   --format json      # Works! (And preferred.)
 
 This change is largely backwards compatible -- most users should experience
 no change in behavior. However, please note the following exceptions:
@@ -23,13 +23,13 @@ no change in behavior. However, please note the following exceptions:
 * Subcommands will now fail when invoked with unsupported arguments, instead
   of silently ignoring them. For example, the following will now fail:
 
-      ruff --explain E402 --respect-gitignore
+      ruff --clean --respect-gitignore
 
-  (the `explain` command doesn't support `--respect-gitignore`.)
+  (the `clean` command doesn't support `--respect-gitignore`.)
 
 * The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand.
-  For example, prior to this release, running `ruff explain` would run `ruff` over a file or
-  directory called `explain`. Now, `ruff explain` would invoke the `explain` subcommand.
+  For example, prior to this release, running `ruff rule` would run `ruff` over a file or
+  directory called `rule`. Now, `ruff rule` would invoke the `rule` subcommand.
 
 * Scripts that invoke ruff should supply `--` before any positional arguments.
   (The semantics of `ruff -- <arg>` have not changed.)
