@@ -37,8 +37,8 @@ pub enum Command {
         #[arg(value_parser=Rule::from_code)]
         rule: &'static Rule,
 
-        /// Output serialization format for violations.
-        #[arg(long, value_enum, env = "RUFF_FORMAT", default_value = "text")]
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
         format: HelpFormat,
     },
     /// Clear any caches in the current directory and any subdirectories.
