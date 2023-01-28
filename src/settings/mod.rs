@@ -376,14 +376,20 @@ mod tests {
     use rustc_hash::FxHashSet;
 
     use crate::registry::{Rule, RuleCodePrefix};
-    use crate::settings::{resolve_codes, RuleCodeSpec};
+    use crate::settings::configuration::Configuration;
+    use crate::settings::rule_table::RuleTable;
+
+    #[allow(clippy::needless_pass_by_value)]
+    fn resolve_rules(config: Configuration) -> FxHashSet<Rule> {
+        RuleTable::from(&config).iter_enabled().cloned().collect()
+    }
 
     #[test]
     fn rule_codes() {
-        let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleCodePrefix::W.into()],
-            ignore: &[],
-        }]);
+        let actual = resolve_rules(Configuration {
+            select: Some(vec![RuleCodePrefix::W.into()]),
+            ..Configuration::default()
+        });
         let expected = FxHashSet::from_iter([
             Rule::NoNewLineAtEndOfFile,
             Rule::DocLineTooLong,
@@ -391,37 +397,36 @@ mod tests {
         ]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleCodePrefix::W6.into()],
-            ignore: &[],
-        }]);
+        let actual = resolve_rules(Configuration {
+            select: Some(vec![RuleCodePrefix::W6.into()]),
+            ..Configuration::default()
+        });
         let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleCodePrefix::W.into()],
-            ignore: &[RuleCodePrefix::W292.into()],
-        }]);
+        let actual = resolve_rules(Configuration {
+            select: Some(vec![RuleCodePrefix::W.into()]),
+            ignore: Some(vec![RuleCodePrefix::W292.into()]),
+            ..Configuration::default()
+        });
         let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes([RuleCodeSpec {
-            select: &[RuleCodePrefix::W605.into()],
-            ignore: &[RuleCodePrefix::W605.into()],
-        }]);
+        let actual = resolve_rules(Configuration {
+            select: Some(vec![RuleCodePrefix::W605.into()]),
+            ignore: Some(vec![RuleCodePrefix::W605.into()]),
+            ..Configuration::default()
+        });
         let expected = FxHashSet::from_iter([]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes([
-            RuleCodeSpec {
-                select: &[RuleCodePrefix::W.into()],
-                ignore: &[RuleCodePrefix::W292.into()],
-            },
-            RuleCodeSpec {
-                select: &[RuleCodePrefix::W292.into()],
-                ignore: &[],
-            },
-        ]);
+        let actual = resolve_rules(Configuration {
+            select: Some(vec![RuleCodePrefix::W.into()]),
+            ignore: Some(vec![RuleCodePrefix::W292.into()]),
+            extend_select: vec![vec![RuleCodePrefix::W292.into()]],
+            extend_ignore: vec![vec![]],
+            ..Configuration::default()
+        });
         let expected = FxHashSet::from_iter([
             Rule::NoNewLineAtEndOfFile,
             Rule::DocLineTooLong,
@@ -429,16 +434,13 @@ mod tests {
         ]);
         assert_eq!(actual, expected);
 
-        let actual = resolve_codes([
-            RuleCodeSpec {
-                select: &[RuleCodePrefix::W.into()],
-                ignore: &[RuleCodePrefix::W292.into()],
-            },
-            RuleCodeSpec {
-                select: &[RuleCodePrefix::W292.into()],
-                ignore: &[RuleCodePrefix::W.into()],
-            },
-        ]);
+        let actual = resolve_rules(Configuration {
+            select: Some(vec![RuleCodePrefix::W.into()]),
+            ignore: Some(vec![RuleCodePrefix::W292.into()]),
+            extend_select: vec![vec![RuleCodePrefix::W292.into()]],
+            extend_ignore: vec![vec![RuleCodePrefix::W.into()]],
+            ..Configuration::default()
+        });
         let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
         assert_eq!(actual, expected);
     }
