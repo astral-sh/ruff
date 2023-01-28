@@ -27,6 +27,7 @@ pub mod configuration;
 pub mod defaults;
 pub mod flags;
 pub mod hashable;
+pub mod nursery;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
@@ -243,7 +244,24 @@ impl From<&Configuration> for RuleTable {
             ignore: config.unfixable.as_deref().unwrap_or_default(),
         }]);
 
-        for code in resolve_codes(
+        let explicitly_selected: FxHashSet<_> = config
+            .select
+            .iter()
+            .flatten()
+            .chain(config.extend_select.iter().flatten())
+            .filter_map(|rs| match rs {
+                RuleSelector::All => None,
+                RuleSelector::Prefix { prefix, .. } => {
+                    if prefix.identifies_specific_rule() {
+                        Some(prefix.into_iter().next().unwrap())
+                    } else {
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        for rule in resolve_codes(
             [RuleCodeSpec {
                 select: config.select.as_deref().unwrap_or(defaults::PREFIXES),
                 ignore: config.ignore.as_deref().unwrap_or_default(),
@@ -257,8 +275,12 @@ impl From<&Configuration> for RuleTable {
                     .map(|(select, ignore)| RuleCodeSpec { select, ignore }),
             ),
         ) {
-            let fix = fixable.contains(&code);
-            rules.enable(code, fix);
+            if nursery::nursery_reason(&rule).is_some() && !explicitly_selected.contains(&rule) {
+                // Skip rules that are known to be problematic and that haven't been explicitly selected.
+                continue;
+            }
+            let fix = fixable.contains(&rule);
+            rules.enable(rule, fix);
         }
 
         // If a docstring convention is specified, force-disable any incompatible error

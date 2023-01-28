@@ -1,7 +1,10 @@
 //! Generate a Markdown-compatible table of supported lint rules.
 
 use anyhow::Result;
-use ruff::registry::{Linter, LinterCategory, Rule, RuleNamespace};
+use ruff::{
+    registry::{Linter, LinterCategory, Rule, RuleNamespace},
+    settings::nursery::nursery_reason,
+};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -17,6 +20,26 @@ pub struct Args {
     /// Write the generated table to stdout (rather than to `README.md`).
     #[arg(long)]
     pub(crate) dry_run: bool,
+}
+
+fn document_rules(table_out: &mut String, rules: impl IntoIterator<Item = Rule>) {
+    let (stable, nursery): (Vec<_>, Vec<_>) =
+        rules.into_iter().partition(|r| nursery_reason(r).is_none());
+
+    generate_table(table_out, stable);
+
+    if !nursery.is_empty() {
+        table_out.push_str("\nThe following rules have been disabled by default:\n\n");
+        for rule in nursery {
+            table_out.push_str(&format!(
+                "* {} ({}): {}\n",
+                rule.code(),
+                rule.as_ref(),
+                nursery_reason(&rule).unwrap()
+            ));
+        }
+        table_out.push('\n');
+    }
 }
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>) {
@@ -88,10 +111,10 @@ pub fn main(args: &Args) -> Result<()> {
             for LinterCategory(prefix, name, selector) in categories {
                 table_out.push_str(&format!("#### {name} ({prefix})"));
                 table_out.push('\n');
-                generate_table(&mut table_out, selector);
+                document_rules(&mut table_out, selector);
             }
         } else {
-            generate_table(&mut table_out, &linter);
+            document_rules(&mut table_out, &linter);
         }
     }
 

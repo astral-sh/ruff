@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use proc_macro2::Span;
 use quote::quote;
@@ -15,6 +15,8 @@ pub fn expand<'a>(
 
     let mut all_codes = BTreeSet::new();
     let mut pl_codes = BTreeSet::new();
+
+    let code_idents: HashSet<_> = code_idents.collect();
 
     for code in code_idents {
         let code_str = code.to_string();
@@ -76,7 +78,10 @@ fn generate_impls<'a>(
     prefix_to_codes: &BTreeMap<String, BTreeSet<String>>,
     variant_name: impl Fn(&str) -> &'a Ident,
 ) -> proc_macro2::TokenStream {
-    let into_iter_match_arms = prefix_to_codes.iter().map(|(prefix_str, codes)| {
+    let mut into_iter_match_arms = quote!();
+    let mut identifies_specific_rule_match_arms = quote!();
+
+    for (prefix_str, codes) in prefix_to_codes {
         let rule_variants = codes.iter().map(|code| {
             let rule_variant = variant_name(code);
             quote! {
@@ -85,10 +90,14 @@ fn generate_impls<'a>(
         });
         let prefix = Ident::new(prefix_str, Span::call_site());
 
-        quote! {
+        let identifies_specific_rule = codes.contains(prefix_str);
+        identifies_specific_rule_match_arms.extend(quote! {
+            #prefix_ident::#prefix => #identifies_specific_rule,
+        });
+        into_iter_match_arms.extend(quote! {
             #prefix_ident::#prefix => vec![#(#rule_variants),*].into_iter(),
-        }
-    });
+        });
+    }
 
     let specificity_match_arms = prefix_to_codes.keys().map(|prefix_str| {
         let prefix = Ident::new(prefix_str, Span::call_site());
@@ -120,6 +129,12 @@ fn generate_impls<'a>(
                     #(#specificity_match_arms)*
                 }
             }
+
+            pub(crate) fn identifies_specific_rule(&self) -> bool {
+                match self {
+                    #identifies_specific_rule_match_arms
+                }
+            }
         }
 
         impl IntoIterator for &#prefix_ident {
@@ -129,7 +144,7 @@ fn generate_impls<'a>(
             fn into_iter(self) -> Self::IntoIter {
                 #[allow(clippy::match_same_arms)]
                 match self {
-                    #(#into_iter_match_arms)*
+                    #into_iter_match_arms
                 }
             }
         }

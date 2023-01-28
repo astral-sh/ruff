@@ -18,6 +18,7 @@ use ruff::message::{Location, Message};
 use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
+use ruff::settings::nursery::nursery_reason;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
 use serde::Serialize;
 use walkdir::WalkDir;
@@ -274,6 +275,11 @@ pub fn explain(rule: &Rule, format: HelpFormat) -> Result<()> {
         HelpFormat::Text => {
             println!("{}\n", rule.as_ref());
             println!("Code: {} ({})\n", rule.code(), linter.name());
+
+            if let Some(reason) = nursery_reason(rule) {
+                println!("This rule is disabled by default: {reason}");
+                println!("(but you can still choose to enable it by explicitly selecting it)\n");
+            }
 
             if let Some(autofix) = rule.autofixable() {
                 println!(

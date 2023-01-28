@@ -652,7 +652,6 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D200 | fits-on-one-line | One-line docstring should fit on one line | 🛠 |
 | D201 | no-blank-line-before-function | No blank lines allowed before function docstring (found {num_lines}) | 🛠 |
 | D202 | no-blank-line-after-function | No blank lines allowed after function docstring (found {num_lines}) | 🛠 |
-| D203 | one-blank-line-before-class | 1 blank line required before class docstring | 🛠 |
 | D204 | one-blank-line-after-class | 1 blank line required after class docstring | 🛠 |
 | D205 | blank-line-after-summary | 1 blank line required between summary line and description | 🛠 |
 | D206 | indent-with-spaces | Docstring should be indented with spaces, not tabs |  |
@@ -661,8 +660,6 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D209 | new-line-after-last-paragraph | Multi-line docstring closing quotes should be on a separate line | 🛠 |
 | D210 | no-surrounding-whitespace | No whitespaces allowed surrounding docstring text | 🛠 |
 | D211 | no-blank-line-before-class | No blank lines allowed before class docstring | 🛠 |
-| D212 | multi-line-summary-first-line | Multi-line docstring summary should start at the first line | 🛠 |
-| D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
 | D300 | uses-triple-quotes | Use """triple double quotes""" |  |
@@ -687,6 +684,13 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D417 | document-all-arguments | Missing argument description in the docstring: `{name}` |  |
 | D418 | skip-docstring | Function decorated with `@overload` shouldn't contain a docstring |  |
 | D419 | non-empty | Docstring is empty |  |
+
+
+The following rules have been disabled by default:
+
+* D203 (one-blank-line-before-class): Conflicts with PEP 257.
+* D212 (multi-line-summary-first-line): Not part of PEP 257 and conflicts with D213.
+* D213 (multi-line-summary-second-line): Not part of PEP 257 and conflicts with D212.
 
 ### pyupgrade (UP)
 
