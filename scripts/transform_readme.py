@@ -21,24 +21,18 @@ GITHUB = """
 # https://github.com/pypi/warehouse/issues/11251
 PYPI = """
 <p align="center">
-  <picture align="center">
-    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
-  </picture>
+  <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
 </p>
 """
 
 # https://squidfunk.github.io/mkdocs-material/reference/images/#light-and-dark-mode
 MK_DOCS = """
 <p align="center">
-  <picture align="center">
-    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg#only-light">
-  </picture>
+  <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg#only-light">
 </p>
 
 <p align="center">
-  <picture align="center">
-    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg#only-dark">
-  </picture>
+  <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg#only-dark">
 </p>
 """
 
