@@ -1,7 +1,8 @@
 # Local cache
 .ruff_cache
 resources/test/cpython
-docs/index.md
+docs/
+mkdocs.yml
 
 ###
 # Rust.gitignore

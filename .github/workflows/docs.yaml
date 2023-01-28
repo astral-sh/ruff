@@ -23,9 +23,8 @@ jobs:
       - name: "Copy README File"
         run: |
           python scripts/transform_readme.py --target mkdocs
-          mkdir -p docs/
-          cp README.md docs/index.md
-          mkdocs build
+          python scripts/generate_mkdocs.py
+          mkdocs build --strict
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
         uses: cloudflare/wrangler-action@2.0.0
