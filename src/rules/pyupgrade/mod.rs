@@ -60,6 +60,7 @@ mod tests {
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]
     #[test_case(Rule::OldCodeBlocks, Path::new("UP037_0.py"); "UP037_0")]
     #[test_case(Rule::OldCodeBlocks, Path::new("UP037_1.py"); "UP037_1")]
+    #[test_case(Rule::OldCodeBlocks, Path::new("UP037_2.py"); "UP037_2")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
