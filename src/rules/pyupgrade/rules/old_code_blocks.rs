@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use libcst_native::{Codegen, CodegenState, CompoundStatement, Else, OrElse, Statement};
+use libcst_native::{Codegen, CodegenState, CompoundStatement, Else, If, OrElse, Statement};
 use num_bigint::Sign;
 use ruff_macros::derive_message_formats;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt, Unaryop};
@@ -9,6 +9,7 @@ use rustpython_parser::lexer::Tok;
 use textwrap::dedent;
 
 use crate::ast::types::Range;
+use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_module;
 use crate::define_violation;
@@ -69,7 +70,7 @@ fn get_else_string(checker: &Checker, if_text: &str) -> Option<String> {
         };
         body.codegen(&mut state);
 
-        let mut content = state.to_string();
+        let content = state.to_string();
         return Some(content);
     }
     None
@@ -78,14 +79,18 @@ fn get_else_string(checker: &Checker, if_text: &str) -> Option<String> {
 /// Checks for a single else in the statement provided
 fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
     let text = locator.slice_source_code_range(&Range::from_located(located));
-    let tokens = lexer::make_tokenizer(text);
+    let curr_indent = indentation(locator, located).unwrap();
+    // I am worried this might cause issues in some situations, but im not sure what
+    // those would be As far as I am concerned, the indent will always be cut
+    // off
+    let final_text = format!("{curr_indent}{text}");
+    let tokens = lexer::make_tokenizer(&final_text);
     let mut first_token: Option<Tok> = None;
     let mut has_else = false;
     let mut has_elif = false;
 
     for token_item in tokens {
         let token = token_item.unwrap().1;
-        println!("{:?}", token);
         if first_token.is_none() {
             first_token = Some(token.clone());
         }
@@ -156,28 +161,24 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     // or an elif, and would check for an index based on this. Our parser
     // automatically only sends the start of the statement as the if or elif, so
     // I did not see that as necessary.
-    println!("WE HERE");
     let token_checker = check_tokens(checker.locator, stmt);
     // The statement MUST have an else
     if !token_checker.has_else {
         return;
     }
-    println!("WE HERE");
     let else_statement = orelse.last().unwrap();
     let mut ending_location = else_statement.location;
     let range = Range::new(stmt.location, stmt.end_location.unwrap());
     let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
     // If we only have an if and an else, we just need to get the else code and
     // dedent
-    println!("WE HERE");
     if token_checker.first_token == Tok::If && !token_checker.has_elif && orelse.len() == 1 {
         let module_text = checker
             .locator
             .slice_source_code_range(&Range::from_located(stmt));
-        let current_str = get_else_string(checker, module_text).unwrap();
-        println!("Hit the special function");
+        let curr_indent = indentation(checker.locator, stmt).unwrap();
+        let current_str = get_else_string(checker, &format!("{curr_indent}{module_text}")).unwrap();
         let new_str = dedent(&current_str);
-        println!("{}\n==========\n{}", current_str, new_str);
         diagnostic.amend(Fix::replacement(
             new_str,
             stmt.location,
@@ -251,7 +252,6 @@ pub fn old_code_blocks(
 ) {
     // NOTE: Pyupgrade ONLY works if `sys.version_info` is on the left
     // We have to have an else statement in order to refactor
-    println!("STARTING");
     if orelse.is_empty() {
         return;
     }
