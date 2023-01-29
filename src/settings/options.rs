@@ -190,14 +190,15 @@ pub struct Options {
     /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
     pub fix_only: Option<bool>,
     #[option(
-        default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]"#,
+        default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]"#,
         value_type = "Vec<RuleSelector>",
         example = r#"
             # Only allow autofix behavior for `E` and `F` rules.
             fixable = ["E", "F"]
         "#
     )]
-    /// A list of rule codes or prefixes to consider autofixable.
+    /// A list of rule codes or prefixes to consider autofixable. By default, all rules are
+    /// considered autofixable.
     pub fixable: Option<Vec<RuleSelector>>,
     #[option(
         default = r#""text""#,
