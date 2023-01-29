@@ -88,6 +88,11 @@ pub fn extract_all_names(
                     }
                 }
             }
+            ExprKind::ListComp { .. } => {
+                // Allow list comprehensions, even though we can't statically analyze them.
+                // TODO(charlie): Allow `list()` and `tuple()` calls too, and extract the members
+                // from them (even if, e.g., it's `list({...})`).
+            }
             _ => {
                 flags |= AllNamesFlags::INVALID_FORMAT;
             }
