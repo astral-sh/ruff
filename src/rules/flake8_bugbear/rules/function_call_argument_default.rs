@@ -48,7 +48,10 @@ where
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((
-                        violations::FunctionCallArgumentDefault(compose_call_path(expr)).into(),
+                        violations::FunctionCallArgumentDefault {
+                            name: compose_call_path(expr),
+                        }
+                        .into(),
                         Range::from_located(expr),
                     ));
                 }

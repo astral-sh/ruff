@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     PercentFormatPositionalCountMismatch:
-      - 2
-      - 1
+      wanted: 2
+      got: 1
   location:
     row: 5
     column: 0
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     PercentFormatPositionalCountMismatch:
-      - 2
-      - 3
+      wanted: 2
+      got: 3
   location:
     row: 6
     column: 0

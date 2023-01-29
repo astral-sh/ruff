@@ -3,7 +3,8 @@ source: src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingReturnTypePublicFunction: foo
+    MissingReturnTypePublicFunction:
+      name: foo
   location:
     row: 4
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeFunctionArgument: a
+    MissingTypeFunctionArgument:
+      name: a
   location:
     row: 4
     column: 8
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeFunctionArgument: b
+    MissingTypeFunctionArgument:
+      name: b
   location:
     row: 4
     column: 11
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypePublicFunction: foo
+    MissingReturnTypePublicFunction:
+      name: foo
   location:
     row: 9
     column: 4
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeFunctionArgument: b
+    MissingTypeFunctionArgument:
+      name: b
   location:
     row: 9
     column: 16
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeFunctionArgument: b
+    MissingTypeFunctionArgument:
+      name: b
   location:
     row: 14
     column: 16
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypePublicFunction: foo
+    MissingReturnTypePublicFunction:
+      name: foo
   location:
     row: 19
     column: 4
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypePublicFunction: foo
+    MissingReturnTypePublicFunction:
+      name: foo
   location:
     row: 24
     column: 4
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: a
+    DynamicallyTypedExpression:
+      name: a
   location:
     row: 44
     column: 11
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: foo
+    DynamicallyTypedExpression:
+      name: foo
   location:
     row: 49
     column: 46
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: "*args"
+    DynamicallyTypedExpression:
+      name: "*args"
   location:
     row: 54
     column: 23
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: "**kwargs"
+    DynamicallyTypedExpression:
+      name: "**kwargs"
   location:
     row: 54
     column: 38
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: "*args"
+    DynamicallyTypedExpression:
+      name: "*args"
   location:
     row: 59
     column: 23
@@ -133,7 +146,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: "**kwargs"
+    DynamicallyTypedExpression:
+      name: "**kwargs"
   location:
     row: 64
     column: 38
@@ -143,7 +157,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeSelf: self
+    MissingTypeSelf:
+      name: self
   location:
     row: 74
     column: 12
@@ -153,7 +168,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: a
+    DynamicallyTypedExpression:
+      name: a
   location:
     row: 78
     column: 28
@@ -163,7 +179,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: foo
+    DynamicallyTypedExpression:
+      name: foo
   location:
     row: 82
     column: 66
@@ -173,7 +190,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: "*params"
+    DynamicallyTypedExpression:
+      name: "*params"
   location:
     row: 86
     column: 42
@@ -183,7 +201,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: "**options"
+    DynamicallyTypedExpression:
+      name: "**options"
   location:
     row: 86
     column: 58
@@ -193,7 +212,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: "*params"
+    DynamicallyTypedExpression:
+      name: "*params"
   location:
     row: 90
     column: 42
@@ -203,7 +223,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: "**options"
+    DynamicallyTypedExpression:
+      name: "**options"
   location:
     row: 94
     column: 58
@@ -213,7 +234,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeCls: cls
+    MissingTypeCls:
+      name: cls
   location:
     row: 104
     column: 12

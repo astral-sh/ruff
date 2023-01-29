@@ -56,7 +56,9 @@ pub fn hashlib_insecure_hash_functions(
                     if let Some(hash_func_name) = string_literal(name_arg) {
                         if WEAK_HASHES.contains(&hash_func_name.to_lowercase().as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::HashlibInsecureHashFunction(hash_func_name.to_string()),
+                                violations::HashlibInsecureHashFunction {
+                                    string: hash_func_name.to_string(),
+                                },
                                 Range::from_located(name_arg),
                             ));
                         }
@@ -71,7 +73,9 @@ pub fn hashlib_insecure_hash_functions(
                 }
 
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::HashlibInsecureHashFunction((*func_name).to_string()),
+                    violations::HashlibInsecureHashFunction {
+                        string: (*func_name).to_string(),
+                    },
                     Range::from_located(func),
                 ));
             }

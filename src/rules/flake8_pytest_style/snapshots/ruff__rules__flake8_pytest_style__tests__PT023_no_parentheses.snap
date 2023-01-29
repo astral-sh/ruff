@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     IncorrectMarkParenthesesStyle:
-      - foo
-      - ""
-      - ()
+      mark_name: foo
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 46
     column: 1
@@ -25,9 +25,9 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectMarkParenthesesStyle:
-      - foo
-      - ""
-      - ()
+      mark_name: foo
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 51
     column: 1
@@ -46,9 +46,9 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectMarkParenthesesStyle:
-      - foo
-      - ""
-      - ()
+      mark_name: foo
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 58
     column: 5
@@ -67,9 +67,9 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectMarkParenthesesStyle:
-      - foo
-      - ""
-      - ()
+      mark_name: foo
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 64
     column: 5
@@ -88,9 +88,9 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectMarkParenthesesStyle:
-      - foo
-      - ""
-      - ()
+      mark_name: foo
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 72
     column: 9

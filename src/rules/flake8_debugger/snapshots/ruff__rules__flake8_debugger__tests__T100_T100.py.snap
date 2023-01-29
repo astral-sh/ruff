@@ -4,7 +4,8 @@ expression: diagnostics
 ---
 - kind:
     Debugger:
-      Call: breakpoint
+      using_type:
+        Call: breakpoint
   location:
     row: 1
     column: 0
@@ -15,7 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     Debugger:
-      Import: pdb
+      using_type:
+        Import: pdb
   location:
     row: 3
     column: 0
@@ -26,7 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     Debugger:
-      Import: builtins.breakpoint
+      using_type:
+        Import: builtins.breakpoint
   location:
     row: 5
     column: 0
@@ -37,7 +40,8 @@ expression: diagnostics
   parent: ~
 - kind:
     Debugger:
-      Import: pdb.set_trace
+      using_type:
+        Import: pdb.set_trace
   location:
     row: 6
     column: 0
@@ -48,7 +52,8 @@ expression: diagnostics
   parent: ~
 - kind:
     Debugger:
-      Import: celery.contrib.rdb.set_trace
+      using_type:
+        Import: celery.contrib.rdb.set_trace
   location:
     row: 7
     column: 0
@@ -59,7 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     Debugger:
-      Import: celery.contrib.rdb
+      using_type:
+        Import: celery.contrib.rdb
   location:
     row: 9
     column: 0
@@ -70,7 +76,8 @@ expression: diagnostics
   parent: ~
 - kind:
     Debugger:
-      Call: builtins.breakpoint
+      using_type:
+        Call: builtins.breakpoint
   location:
     row: 11
     column: 0
@@ -81,7 +88,8 @@ expression: diagnostics
   parent: ~
 - kind:
     Debugger:
-      Call: pdb.set_trace
+      using_type:
+        Call: pdb.set_trace
   location:
     row: 12
     column: 0
@@ -92,7 +100,8 @@ expression: diagnostics
   parent: ~
 - kind:
     Debugger:
-      Call: celery.contrib.rdb.set_trace
+      using_type:
+        Call: celery.contrib.rdb.set_trace
   location:
     row: 13
     column: 0

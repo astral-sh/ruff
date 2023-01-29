@@ -81,7 +81,9 @@ pub fn unpack_instead_of_concatenating_to_collection_literal(checker: &mut Check
     };
 
     let mut diagnostic = Diagnostic::new(
-        violations::UnpackInsteadOfConcatenatingToCollectionLiteral(new_expr_string.clone()),
+        violations::UnpackInsteadOfConcatenatingToCollectionLiteral {
+            expr: new_expr_string.clone(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {

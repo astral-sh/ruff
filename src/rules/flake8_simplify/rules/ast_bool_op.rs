@@ -62,7 +62,9 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     for (arg_name, indices) in duplicates {
         if indices.len() > 1 {
             let mut diagnostic = Diagnostic::new(
-                violations::DuplicateIsinstanceCall(arg_name.to_string()),
+                violations::DuplicateIsinstanceCall {
+                    name: arg_name.to_string(),
+                },
                 Range::from_located(expr),
             );
             if checker.patch(&Rule::DuplicateIsinstanceCall) {
@@ -273,7 +275,9 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut diagnostic = Diagnostic::new(
-                    violations::AAndNotA(id.to_string()),
+                    violations::AAndNotA {
+                        name: id.to_string(),
+                    },
                     Range::from_located(expr),
                 );
                 if checker.patch(&Rule::AAndNotA) {
@@ -325,7 +329,9 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut diagnostic = Diagnostic::new(
-                    violations::AOrNotA(id.to_string()),
+                    violations::AOrNotA {
+                        name: id.to_string(),
+                    },
                     Range::from_located(expr),
                 );
                 if checker.patch(&Rule::AAndNotA) {

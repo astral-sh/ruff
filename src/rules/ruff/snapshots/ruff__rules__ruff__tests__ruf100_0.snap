@@ -3,7 +3,8 @@ source: src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedNOQA: ~
+    UnusedNOQA:
+      codes: ~
   location:
     row: 9
     column: 11
@@ -22,10 +23,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - E501
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - E501
   location:
     row: 13
     column: 11
@@ -44,11 +46,12 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - F841
-        - E501
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F841
+          - E501
   location:
     row: 16
     column: 11
@@ -67,12 +70,13 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown:
-        - W191
-      disabled:
-        - F821
-      unmatched:
-        - F841
+      codes:
+        unknown:
+          - W191
+        disabled:
+          - F821
+        unmatched:
+          - F841
   location:
     row: 19
     column: 11
@@ -91,11 +95,12 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown:
-        - V101
-      disabled: []
-      unmatched:
-        - F841
+      codes:
+        unknown:
+          - V101
+        disabled: []
+        unmatched:
+          - F841
   location:
     row: 22
     column: 11
@@ -114,10 +119,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - E501
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - E501
   location:
     row: 26
     column: 9
@@ -135,7 +141,8 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnusedVariable: d
+    UnusedVariable:
+      name: d
   location:
     row: 29
     column: 4
@@ -154,10 +161,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - E501
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - E501
   location:
     row: 29
     column: 32
@@ -176,10 +184,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - F841
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F841
   location:
     row: 55
     column: 5
@@ -198,10 +207,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - E501
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - E501
   location:
     row: 63
     column: 5
@@ -219,7 +229,8 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    UnusedNOQA: ~
+    UnusedNOQA:
+      codes: ~
   location:
     row: 71
     column: 5

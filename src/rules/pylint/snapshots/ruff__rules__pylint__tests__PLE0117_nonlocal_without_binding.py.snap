@@ -3,7 +3,8 @@ source: src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NonlocalWithoutBinding: x
+    NonlocalWithoutBinding:
+      name: x
   location:
     row: 5
     column: 13
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonlocalWithoutBinding: y
+    NonlocalWithoutBinding:
+      name: y
   location:
     row: 9
     column: 13
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonlocalWithoutBinding: y
+    NonlocalWithoutBinding:
+      name: y
   location:
     row: 19
     column: 17

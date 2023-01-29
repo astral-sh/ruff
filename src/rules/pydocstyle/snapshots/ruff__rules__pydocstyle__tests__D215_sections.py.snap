@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SectionUnderlineNotOverIndented: Returns
+    SectionUnderlineNotOverIndented:
+      name: Returns
   location:
     row: 147
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    SectionUnderlineNotOverIndented: Returns
+    SectionUnderlineNotOverIndented:
+      name: Returns
   location:
     row: 161
     column: 4

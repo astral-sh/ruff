@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 3
     column: 4
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "1"
-      - false
+      name: "1"
+      repeated_value: false
   location:
     row: 9
     column: 4
@@ -28,8 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "b\"123\""
-      - false
+      name: "b\"123\""
+      repeated_value: false
   location:
     row: 11
     column: 4
@@ -40,8 +40,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 16
     column: 4
@@ -52,8 +52,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 17
     column: 4
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - true
+      name: "\"a\""
+      repeated_value: true
   location:
     row: 18
     column: 4
@@ -84,8 +84,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 23
     column: 4
@@ -96,8 +96,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 24
     column: 4
@@ -108,8 +108,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - true
+      name: "\"a\""
+      repeated_value: true
   location:
     row: 25
     column: 4
@@ -128,8 +128,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 26
     column: 4
@@ -140,8 +140,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - true
+      name: "\"a\""
+      repeated_value: true
   location:
     row: 31
     column: 4
@@ -160,8 +160,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 32
     column: 4
@@ -172,8 +172,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 33
     column: 4
@@ -184,8 +184,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 34
     column: 4
@@ -196,8 +196,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 41
     column: 4
@@ -208,8 +208,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - false
+      name: "\"a\""
+      repeated_value: false
   location:
     row: 43
     column: 4
@@ -220,8 +220,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - true
+      name: "\"a\""
+      repeated_value: true
   location:
     row: 45
     column: 4
@@ -240,8 +240,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - true
+      name: "\"a\""
+      repeated_value: true
   location:
     row: 49
     column: 13
@@ -260,8 +260,8 @@ expression: diagnostics
   parent: ~
 - kind:
     MultiValueRepeatedKeyLiteral:
-      - "\"a\""
-      - true
+      name: "\"a\""
+      repeated_value: true
   location:
     row: 50
     column: 21

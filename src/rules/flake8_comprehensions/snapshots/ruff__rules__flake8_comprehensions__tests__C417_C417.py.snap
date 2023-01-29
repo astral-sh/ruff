@@ -3,7 +3,8 @@ source: src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryMap: generator
+    UnnecessaryMap:
+      obj_type: generator
   location:
     row: 2
     column: 0
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryMap: generator
+    UnnecessaryMap:
+      obj_type: generator
   location:
     row: 3
     column: 0
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryMap: list
+    UnnecessaryMap:
+      obj_type: list
   location:
     row: 4
     column: 0
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryMap: generator
+    UnnecessaryMap:
+      obj_type: generator
   location:
     row: 4
     column: 5
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryMap: set
+    UnnecessaryMap:
+      obj_type: set
   location:
     row: 5
     column: 0
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryMap: generator
+    UnnecessaryMap:
+      obj_type: generator
   location:
     row: 5
     column: 4
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryMap: dict
+    UnnecessaryMap:
+      obj_type: dict
   location:
     row: 6
     column: 0
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryMap: generator
+    UnnecessaryMap:
+      obj_type: generator
   location:
     row: 6
     column: 5

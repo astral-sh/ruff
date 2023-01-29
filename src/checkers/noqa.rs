@@ -103,7 +103,7 @@ pub fn check_noqa(
                 Directive::All(spaces, start, end) => {
                     if matches.is_empty() {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedNOQA(None),
+                            violations::UnusedNOQA { codes: None },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
@@ -154,20 +154,22 @@ pub fn check_noqa(
                         && unmatched_codes.is_empty())
                     {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedNOQA(Some(UnusedCodes {
-                                disabled: disabled_codes
-                                    .iter()
-                                    .map(|code| (*code).to_string())
-                                    .collect(),
-                                unknown: unknown_codes
-                                    .iter()
-                                    .map(|code| (*code).to_string())
-                                    .collect(),
-                                unmatched: unmatched_codes
-                                    .iter()
-                                    .map(|code| (*code).to_string())
-                                    .collect(),
-                            })),
+                            violations::UnusedNOQA {
+                                codes: Some(UnusedCodes {
+                                    disabled: disabled_codes
+                                        .iter()
+                                        .map(|code| (*code).to_string())
+                                        .collect(),
+                                    unknown: unknown_codes
+                                        .iter()
+                                        .map(|code| (*code).to_string())
+                                        .collect(),
+                                    unmatched: unmatched_codes
+                                        .iter()
+                                        .map(|code| (*code).to_string())
+                                        .collect(),
+                                }),
+                            },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)

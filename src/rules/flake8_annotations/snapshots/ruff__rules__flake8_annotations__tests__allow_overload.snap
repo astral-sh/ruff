@@ -3,7 +3,8 @@ source: src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingReturnTypePublicFunction: bar
+    MissingReturnTypePublicFunction:
+      name: bar
   location:
     row: 29
     column: 8

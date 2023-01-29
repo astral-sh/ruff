@@ -3,7 +3,8 @@ source: src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingFixtureNameUnderscore: patch_something
+    MissingFixtureNameUnderscore:
+      function: patch_something
   location:
     row: 51
     column: 0
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingFixtureNameUnderscore: activate_context
+    MissingFixtureNameUnderscore:
+      function: activate_context
   location:
     row: 56
     column: 0

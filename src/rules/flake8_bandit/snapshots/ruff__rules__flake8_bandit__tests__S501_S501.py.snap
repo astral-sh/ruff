@@ -3,7 +3,8 @@ source: src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RequestWithNoCertValidation: requests
+    RequestWithNoCertValidation:
+      string: requests
   location:
     row: 5
     column: 53
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: requests
+    RequestWithNoCertValidation:
+      string: requests
   location:
     row: 7
     column: 54
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: requests
+    RequestWithNoCertValidation:
+      string: requests
   location:
     row: 9
     column: 53
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: requests
+    RequestWithNoCertValidation:
+      string: requests
   location:
     row: 11
     column: 56
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: requests
+    RequestWithNoCertValidation:
+      string: requests
   location:
     row: 13
     column: 55
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: requests
+    RequestWithNoCertValidation:
+      string: requests
   location:
     row: 15
     column: 57
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: requests
+    RequestWithNoCertValidation:
+      string: requests
   location:
     row: 17
     column: 54
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 20
     column: 49
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 22
     column: 38
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 24
     column: 42
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 26
     column: 39
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 28
     column: 39
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 30
     column: 38
@@ -133,7 +146,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 32
     column: 40
@@ -143,7 +157,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 34
     column: 41
@@ -153,7 +168,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 36
     column: 41
@@ -163,7 +179,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 38
     column: 20
@@ -173,7 +190,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation: httpx
+    RequestWithNoCertValidation:
+      string: httpx
   location:
     row: 40
     column: 25

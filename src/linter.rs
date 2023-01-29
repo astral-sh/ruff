@@ -118,7 +118,9 @@ pub fn check_path(
             Err(parse_error) => {
                 if settings.rules.enabled(&Rule::SyntaxError) {
                     diagnostics.push(Diagnostic::new(
-                        violations::SyntaxError(parse_error.error.to_string()),
+                        violations::SyntaxError {
+                            message: parse_error.error.to_string(),
+                        },
                         Range::new(parse_error.location, parse_error.location),
                     ));
                 }

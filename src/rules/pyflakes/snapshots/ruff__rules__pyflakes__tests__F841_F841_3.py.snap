@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedVariable: x
+    UnusedVariable:
+      name: x
   location:
     row: 5
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable: y
+    UnusedVariable:
+      name: y
   location:
     row: 6
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable: x
+    UnusedVariable:
+      name: x
   location:
     row: 13
     column: 4
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable: y
+    UnusedVariable:
+      name: y
   location:
     row: 14
     column: 4
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable: x1
+    UnusedVariable:
+      name: x1
   location:
     row: 21
     column: 18
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UnusedVariable: x3
+    UnusedVariable:
+      name: x3
   location:
     row: 27
     column: 19
@@ -111,7 +117,8 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnusedVariable: y3
+    UnusedVariable:
+      name: y3
   location:
     row: 27
     column: 32
@@ -129,7 +136,8 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    UnusedVariable: z3
+    UnusedVariable:
+      name: z3
   location:
     row: 27
     column: 45
@@ -147,7 +155,8 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    UnusedVariable: x1
+    UnusedVariable:
+      name: x1
   location:
     row: 32
     column: 5
@@ -157,7 +166,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: y1
+    UnusedVariable:
+      name: y1
   location:
     row: 32
     column: 9
@@ -167,7 +177,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: coords2
+    UnusedVariable:
+      name: coords2
   location:
     row: 33
     column: 15
@@ -177,7 +188,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: coords3
+    UnusedVariable:
+      name: coords3
   location:
     row: 34
     column: 4
@@ -187,7 +199,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: x1
+    UnusedVariable:
+      name: x1
   location:
     row: 40
     column: 25
@@ -205,7 +218,8 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    UnusedVariable: x2
+    UnusedVariable:
+      name: x2
   location:
     row: 45
     column: 46
@@ -223,7 +237,8 @@ expression: diagnostics
       column: 48
   parent: ~
 - kind:
-    UnusedVariable: x
+    UnusedVariable:
+      name: x
   location:
     row: 50
     column: 4
@@ -241,7 +256,8 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    UnusedVariable: y
+    UnusedVariable:
+      name: y
   location:
     row: 56
     column: 4
@@ -259,7 +275,8 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    UnusedVariable: x
+    UnusedVariable:
+      name: x
   location:
     row: 61
     column: 4
@@ -277,7 +294,8 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    UnusedVariable: y
+    UnusedVariable:
+      name: y
   location:
     row: 67
     column: 4

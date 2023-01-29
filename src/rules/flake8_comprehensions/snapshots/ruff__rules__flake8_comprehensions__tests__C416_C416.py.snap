@@ -3,7 +3,8 @@ source: src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryComprehension: list
+    UnnecessaryComprehension:
+      obj_type: list
   location:
     row: 2
     column: 0
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    UnnecessaryComprehension: set
+    UnnecessaryComprehension:
+      obj_type: set
   location:
     row: 3
     column: 0

@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IsLiteral: Is
+    IsLiteral:
+      cmpop: Is
   location:
     row: 1
     column: 3
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    IsLiteral: IsNot
+    IsLiteral:
+      cmpop: IsNot
   location:
     row: 4
     column: 3
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    IsLiteral: IsNot
+    IsLiteral:
+      cmpop: IsNot
   location:
     row: 7
     column: 3
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    IsLiteral: Is
+    IsLiteral:
+      cmpop: Is
   location:
     row: 11
     column: 3
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    IsLiteral: Is
+    IsLiteral:
+      cmpop: Is
   location:
     row: 14
     column: 3
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    IsLiteral: Is
+    IsLiteral:
+      cmpop: Is
   location:
     row: 17
     column: 3
@@ -111,7 +117,8 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    IsLiteral: Is
+    IsLiteral:
+      cmpop: Is
   location:
     row: 20
     column: 13

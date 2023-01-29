@@ -49,13 +49,13 @@ fn duplicate_handler_exceptions<'a>(
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut diagnostic = Diagnostic::new(
-                violations::DuplicateHandlerException(
-                    duplicates
+                violations::DuplicateHandlerException {
+                    names: duplicates
                         .into_iter()
                         .map(|call_path| call_path.join("."))
                         .sorted()
                         .collect::<Vec<String>>(),
-                ),
+                },
                 Range::from_located(expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -115,7 +115,9 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
         for (name, exprs) in duplicates {
             for expr in exprs {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::DuplicateTryBlockException(name.join(".")),
+                    violations::DuplicateTryBlockException {
+                        name: name.join("."),
+                    },
                     Range::from_located(expr),
                 ));
             }

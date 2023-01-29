@@ -35,7 +35,9 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
                 return None;
             }
             Some(Diagnostic::new(
-                violations::HardcodedPasswordString(string.to_string()),
+                violations::HardcodedPasswordString {
+                    string: string.to_string(),
+                },
                 Range::from_located(comp),
             ))
         })
@@ -48,7 +50,9 @@ pub fn assign_hardcoded_password_string(value: &Expr, targets: &[Expr]) -> Optio
         for target in targets {
             if is_password_target(target) {
                 return Some(Diagnostic::new(
-                    violations::HardcodedPasswordString(string.to_string()),
+                    violations::HardcodedPasswordString {
+                        string: string.to_string(),
+                    },
                     Range::from_located(value),
                 ));
             }

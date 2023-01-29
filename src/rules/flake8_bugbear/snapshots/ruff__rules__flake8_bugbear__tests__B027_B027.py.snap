@@ -3,7 +3,8 @@ source: src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    EmptyMethodWithoutAbstractDecorator: AbstractClass
+    EmptyMethodWithoutAbstractDecorator:
+      name: AbstractClass
   location:
     row: 13
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyMethodWithoutAbstractDecorator: AbstractClass
+    EmptyMethodWithoutAbstractDecorator:
+      name: AbstractClass
   location:
     row: 16
     column: 4
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyMethodWithoutAbstractDecorator: AbstractClass
+    EmptyMethodWithoutAbstractDecorator:
+      name: AbstractClass
   location:
     row: 19
     column: 4
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyMethodWithoutAbstractDecorator: AbstractClass
+    EmptyMethodWithoutAbstractDecorator:
+      name: AbstractClass
   location:
     row: 23
     column: 4
