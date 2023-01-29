@@ -146,12 +146,15 @@ impl Violation for LateFutureImport {
 }
 
 define_violation!(
-    pub struct ImportStarUsage(pub String, pub Vec<String>);
+    pub struct ImportStarUsage {
+        pub name: String,
+        pub sources: Vec<String>,
+    }
 );
 impl Violation for ImportStarUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportStarUsage(name, sources) = self;
+        let ImportStarUsage { name, sources } = self;
         let sources = sources
             .iter()
             .map(|source| format!("`{source}`"))
@@ -264,12 +267,15 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
 }
 
 define_violation!(
-    pub struct PercentFormatPositionalCountMismatch(pub usize, pub usize);
+    pub struct PercentFormatPositionalCountMismatch {
+        pub wanted: usize,
+        pub got: usize,
+    }
 );
 impl Violation for PercentFormatPositionalCountMismatch {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PercentFormatPositionalCountMismatch(wanted, got) = self;
+        let PercentFormatPositionalCountMismatch { wanted, got } = self;
         format!("`%`-format string has {wanted} placeholder(s) but {got} substitution(s)")
     }
 }
@@ -773,12 +779,15 @@ impl Violation for PropertyWithParameters {
 }
 
 define_violation!(
-    pub struct ConsiderUsingFromImport(pub String, pub String);
+    pub struct ConsiderUsingFromImport {
+        pub module: String,
+        pub name: String,
+    }
 );
 impl Violation for ConsiderUsingFromImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConsiderUsingFromImport(module, name) = self;
+        let ConsiderUsingFromImport { module, name } = self;
         format!("Use `from {module} import {name}` in lieu of alias")
     }
 }
@@ -856,12 +865,15 @@ impl Violation for ConstantComparison {
 }
 
 define_violation!(
-    pub struct ConsiderMergingIsinstance(pub String, pub Vec<String>);
+    pub struct ConsiderMergingIsinstance {
+        pub obj: String,
+        pub types: Vec<String>,
+    }
 );
 impl Violation for ConsiderMergingIsinstance {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConsiderMergingIsinstance(obj, types) = self;
+        let ConsiderMergingIsinstance { obj, types } = self;
         let types = types.join(", ");
         format!("Merge these isinstance calls: `isinstance({obj}, ({types}))`")
     }
@@ -1599,12 +1611,15 @@ impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {
 }
 
 define_violation!(
-    pub struct UnnecessaryDoubleCastOrProcess(pub String, pub String);
+    pub struct UnnecessaryDoubleCastOrProcess {
+        pub inner: String,
+        pub outer: String,
+    }
 );
 impl Violation for UnnecessaryDoubleCastOrProcess {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryDoubleCastOrProcess(inner, outer) = self;
+        let UnnecessaryDoubleCastOrProcess { inner, outer } = self;
         format!("Unnecessary `{inner}` call within `{outer}()`")
     }
 }
@@ -2234,17 +2249,20 @@ impl Violation for OpenFileWithContextHandler {
 }
 
 define_violation!(
-    pub struct UseCapitalEnvironmentVariables(pub String, pub String);
+    pub struct UseCapitalEnvironmentVariables {
+        pub expected: String,
+        pub original: String,
+    }
 );
 impl AlwaysAutofixableViolation for UseCapitalEnvironmentVariables {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UseCapitalEnvironmentVariables(expected, original) = self;
+        let UseCapitalEnvironmentVariables { expected, original } = self;
         format!("Use capitalized environment variable `{expected}` instead of `{original}`")
     }
 
     fn autofix_title(&self) -> String {
-        let UseCapitalEnvironmentVariables(expected, original) = self;
+        let UseCapitalEnvironmentVariables { expected, original } = self;
         format!("Replace `{original}` with `{expected}`")
     }
 }
@@ -2413,28 +2431,34 @@ impl AlwaysAutofixableViolation for MultipleWithStatements {
 }
 
 define_violation!(
-    pub struct KeyInDict(pub String, pub String);
+    pub struct KeyInDict {
+        pub key: String,
+        pub dict: String,
+    }
 );
 impl AlwaysAutofixableViolation for KeyInDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let KeyInDict(key, dict) = self;
+        let KeyInDict { key, dict } = self;
         format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
     }
 
     fn autofix_title(&self) -> String {
-        let KeyInDict(key, dict) = self;
+        let KeyInDict { key, dict } = self;
         format!("Convert to `{key} in {dict}`")
     }
 }
 
 define_violation!(
-    pub struct NegateEqualOp(pub String, pub String);
+    pub struct NegateEqualOp {
+        pub left: String,
+        pub right: String,
+    }
 );
 impl AlwaysAutofixableViolation for NegateEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NegateEqualOp(left, right) = self;
+        let NegateEqualOp { left, right } = self;
         format!("Use `{left} != {right}` instead of `not {left} == {right}`")
     }
 
@@ -2444,12 +2468,15 @@ impl AlwaysAutofixableViolation for NegateEqualOp {
 }
 
 define_violation!(
-    pub struct NegateNotEqualOp(pub String, pub String);
+    pub struct NegateNotEqualOp {
+        pub left: String,
+        pub right: String,
+    }
 );
 impl AlwaysAutofixableViolation for NegateNotEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NegateNotEqualOp(left, right) = self;
+        let NegateNotEqualOp { left, right } = self;
         format!("Use `{left} == {right}` instead of `not {left} != {right}`")
     }
 
@@ -2593,12 +2620,18 @@ impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
 }
 
 define_violation!(
-    pub struct IfExprWithTwistedArms(pub String, pub String);
+    pub struct IfExprWithTwistedArms {
+        pub expr_body: String,
+        pub expr_else: String,
+    }
 );
 impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfExprWithTwistedArms(expr_body, expr_else) = self;
+        let IfExprWithTwistedArms {
+            expr_body,
+            expr_else,
+        } = self;
         format!(
             "Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not \
              {expr_else} else {expr_else}`"
@@ -2606,7 +2639,10 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
     }
 
     fn autofix_title(&self) -> String {
-        let IfExprWithTwistedArms(expr_body, expr_else) = self;
+        let IfExprWithTwistedArms {
+            expr_body,
+            expr_else,
+        } = self;
         format!("Replace with `{expr_else} if {expr_else} else {expr_body}`")
     }
 }
@@ -2694,17 +2730,20 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
 }
 
 define_violation!(
-    pub struct DeprecatedUnittestAlias(pub String, pub String);
+    pub struct DeprecatedUnittestAlias {
+        pub alias: String,
+        pub target: String,
+    }
 );
 impl AlwaysAutofixableViolation for DeprecatedUnittestAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DeprecatedUnittestAlias(alias, target) = self;
+        let DeprecatedUnittestAlias { alias, target } = self;
         format!("`{alias}` is deprecated, use `{target}`")
     }
 
     fn autofix_title(&self) -> String {
-        let DeprecatedUnittestAlias(alias, target) = self;
+        let DeprecatedUnittestAlias { alias, target } = self;
         format!("Replace `{target}` with `{alias}`")
     }
 }
@@ -3936,45 +3975,57 @@ impl Violation for DunderFunctionName {
 }
 
 define_violation!(
-    pub struct ConstantImportedAsNonConstant(pub String, pub String);
+    pub struct ConstantImportedAsNonConstant {
+        pub name: String,
+        pub asname: String,
+    }
 );
 impl Violation for ConstantImportedAsNonConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConstantImportedAsNonConstant(name, asname) = self;
+        let ConstantImportedAsNonConstant { name, asname } = self;
         format!("Constant `{name}` imported as non-constant `{asname}`")
     }
 }
 
 define_violation!(
-    pub struct LowercaseImportedAsNonLowercase(pub String, pub String);
+    pub struct LowercaseImportedAsNonLowercase {
+        pub name: String,
+        pub asname: String,
+    }
 );
 impl Violation for LowercaseImportedAsNonLowercase {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LowercaseImportedAsNonLowercase(name, asname) = self;
+        let LowercaseImportedAsNonLowercase { name, asname } = self;
         format!("Lowercase `{name}` imported as non-lowercase `{asname}`")
     }
 }
 
 define_violation!(
-    pub struct CamelcaseImportedAsLowercase(pub String, pub String);
+    pub struct CamelcaseImportedAsLowercase {
+        pub name: String,
+        pub asname: String,
+    }
 );
 impl Violation for CamelcaseImportedAsLowercase {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsLowercase(name, asname) = self;
+        let CamelcaseImportedAsLowercase { name, asname } = self;
         format!("Camelcase `{name}` imported as lowercase `{asname}`")
     }
 }
 
 define_violation!(
-    pub struct CamelcaseImportedAsConstant(pub String, pub String);
+    pub struct CamelcaseImportedAsConstant {
+        pub name: String,
+        pub asname: String,
+    }
 );
 impl Violation for CamelcaseImportedAsConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsConstant(name, asname) = self;
+        let CamelcaseImportedAsConstant { name, asname } = self;
         format!("Camelcase `{name}` imported as constant `{asname}`")
     }
 }
@@ -4006,12 +4057,15 @@ impl Violation for MixedCaseVariableInGlobalScope {
 }
 
 define_violation!(
-    pub struct CamelcaseImportedAsAcronym(pub String, pub String);
+    pub struct CamelcaseImportedAsAcronym {
+        pub name: String,
+        pub asname: String,
+    }
 );
 impl Violation for CamelcaseImportedAsAcronym {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsAcronym(name, asname) = self;
+        let CamelcaseImportedAsAcronym { name, asname } = self;
         format!("Camelcase `{name}` imported as acronym `{asname}`")
     }
 }
@@ -4631,12 +4685,18 @@ impl Violation for DotFormatInException {
 // flake8-pytest-style
 
 define_violation!(
-    pub struct IncorrectFixtureParenthesesStyle(pub String, pub String);
+    pub struct IncorrectFixtureParenthesesStyle {
+        pub expected_parens: String,
+        pub actual_parens: String,
+    }
 );
 impl AlwaysAutofixableViolation for IncorrectFixtureParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IncorrectFixtureParenthesesStyle(expected_parens, actual_parens) = self;
+        let IncorrectFixtureParenthesesStyle {
+            expected_parens,
+            actual_parens,
+        } = self;
         format!("Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}`")
     }
 
@@ -4713,12 +4773,15 @@ impl AlwaysAutofixableViolation for ParametrizeNamesWrongType {
 }
 
 define_violation!(
-    pub struct ParametrizeValuesWrongType(pub ParametrizeValuesType, pub ParametrizeValuesRowType);
+    pub struct ParametrizeValuesWrongType {
+        pub values: ParametrizeValuesType,
+        pub row: ParametrizeValuesRowType,
+    }
 );
 impl Violation for ParametrizeValuesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ParametrizeValuesWrongType(values, row) = self;
+        let ParametrizeValuesWrongType { values, row } = self;
         format!("Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}`")
     }
 }

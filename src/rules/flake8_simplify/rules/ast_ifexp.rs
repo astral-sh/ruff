@@ -124,10 +124,10 @@ pub fn twisted_arms_in_ifexpr(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::IfExprWithTwistedArms(
-            unparse_expr(body, checker.stylist),
-            unparse_expr(orelse, checker.stylist),
-        ),
+        violations::IfExprWithTwistedArms {
+            expr_body: unparse_expr(body, checker.stylist),
+            expr_else: unparse_expr(orelse, checker.stylist),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {

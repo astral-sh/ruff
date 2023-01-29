@@ -261,7 +261,10 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         ExprKind::List { elts, .. } => {
             if values_type != types::ParametrizeValuesType::List {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::ParametrizeValuesWrongType(values_type, values_row_type),
+                    violations::ParametrizeValuesWrongType {
+                        values: values_type,
+                        row: values_row_type,
+                    },
                     Range::from_located(values),
                 ));
             }
@@ -272,7 +275,10 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         ExprKind::Tuple { elts, .. } => {
             if values_type != types::ParametrizeValuesType::Tuple {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::ParametrizeValuesWrongType(values_type, values_row_type),
+                    violations::ParametrizeValuesWrongType {
+                        values: values_type,
+                        row: values_row_type,
+                    },
                     Range::from_located(values),
                 ));
             }
@@ -313,7 +319,10 @@ fn handle_value_rows(
             ExprKind::Tuple { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::ParametrizeValuesWrongType(values_type, values_row_type),
+                        violations::ParametrizeValuesWrongType {
+                            values: values_type,
+                            row: values_row_type,
+                        },
                         Range::from_located(elt),
                     ));
                 }
@@ -321,7 +330,10 @@ fn handle_value_rows(
             ExprKind::List { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::ParametrizeValuesWrongType(values_type, values_row_type),
+                        violations::ParametrizeValuesWrongType {
+                            values: values_type,
+                            row: values_row_type,
+                        },
                         Range::from_located(elt),
                     ));
                 }

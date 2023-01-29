@@ -497,7 +497,10 @@ pub fn unnecessary_double_cast_or_process(
 ) {
     fn diagnostic(inner: &str, outer: &str, location: Range) -> Diagnostic {
         Diagnostic::new(
-            violations::UnnecessaryDoubleCastOrProcess(inner.to_string(), outer.to_string()),
+            violations::UnnecessaryDoubleCastOrProcess {
+                inner: inner.to_string(),
+                outer: outer.to_string(),
+            },
             location,
         )
     }

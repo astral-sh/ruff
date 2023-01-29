@@ -80,7 +80,10 @@ fn pytest_fixture_parentheses(
     actual: &str,
 ) {
     let mut diagnostic = Diagnostic::new(
-        violations::IncorrectFixtureParenthesesStyle(preferred.to_string(), actual.to_string()),
+        violations::IncorrectFixtureParenthesesStyle {
+            expected_parens: preferred.to_string(),
+            actual_parens: actual.to_string(),
+        },
         Range::from_located(decorator),
     );
     if checker.patch(diagnostic.kind.rule()) {

@@ -4025,7 +4025,10 @@ impl<'a> Checker<'a> {
                     from_list.sort();
 
                     self.diagnostics.push(Diagnostic::new(
-                        violations::ImportStarUsage(id.to_string(), from_list),
+                        violations::ImportStarUsage {
+                            name: id.to_string(),
+                            sources: from_list,
+                        },
                         Range::from_located(expr),
                     ));
                 }
@@ -4610,10 +4613,10 @@ impl<'a> Checker<'a> {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
                                     diagnostics.push(Diagnostic::new(
-                                        violations::ImportStarUsage(
-                                            name.to_string(),
-                                            from_list.clone(),
-                                        ),
+                                        violations::ImportStarUsage {
+                                            name: name.to_string(),
+                                            sources: from_list.clone(),
+                                        },
                                         all_binding.range,
                                     ));
                                 }

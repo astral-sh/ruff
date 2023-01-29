@@ -178,7 +178,10 @@ pub fn constant_imported_as_non_constant(
 ) -> Option<Diagnostic> {
     if string::is_upper(name) && !string::is_upper(asname) {
         return Some(Diagnostic::new(
-            violations::ConstantImportedAsNonConstant(name.to_string(), asname.to_string()),
+            violations::ConstantImportedAsNonConstant {
+                name: name.to_string(),
+                asname: asname.to_string(),
+            },
             identifier_range(import_from, locator),
         ));
     }
@@ -194,7 +197,10 @@ pub fn lowercase_imported_as_non_lowercase(
 ) -> Option<Diagnostic> {
     if !string::is_upper(name) && string::is_lower(name) && asname.to_lowercase() != asname {
         return Some(Diagnostic::new(
-            violations::LowercaseImportedAsNonLowercase(name.to_string(), asname.to_string()),
+            violations::LowercaseImportedAsNonLowercase {
+                name: name.to_string(),
+                asname: asname.to_string(),
+            },
             identifier_range(import_from, locator),
         ));
     }
@@ -210,7 +216,10 @@ pub fn camelcase_imported_as_lowercase(
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name) && string::is_lower(asname) {
         return Some(Diagnostic::new(
-            violations::CamelcaseImportedAsLowercase(name.to_string(), asname.to_string()),
+            violations::CamelcaseImportedAsLowercase {
+                name: name.to_string(),
+                asname: asname.to_string(),
+            },
             identifier_range(import_from, locator),
         ));
     }
@@ -230,7 +239,10 @@ pub fn camelcase_imported_as_constant(
         && !helpers::is_acronym(name, asname)
     {
         return Some(Diagnostic::new(
-            violations::CamelcaseImportedAsConstant(name.to_string(), asname.to_string()),
+            violations::CamelcaseImportedAsConstant {
+                name: name.to_string(),
+                asname: asname.to_string(),
+            },
             identifier_range(import_from, locator),
         ));
     }
@@ -284,7 +296,10 @@ pub fn camelcase_imported_as_acronym(
         && helpers::is_acronym(name, asname)
     {
         return Some(Diagnostic::new(
-            violations::CamelcaseImportedAsAcronym(name.to_string(), asname.to_string()),
+            violations::CamelcaseImportedAsAcronym {
+                name: name.to_string(),
+                asname: asname.to_string(),
+            },
             identifier_range(import_from, locator),
         ));
     }

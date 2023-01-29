@@ -220,7 +220,10 @@ pub(crate) fn percent_format_positional_count_mismatch(
 
             if found != summary.num_positional {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::PercentFormatPositionalCountMismatch(summary.num_positional, found),
+                    violations::PercentFormatPositionalCountMismatch {
+                        wanted: summary.num_positional,
+                        got: found,
+                    },
                     location,
                 ));
             }

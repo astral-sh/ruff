@@ -43,7 +43,10 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::DeprecatedUnittestAlias(attr.to_string(), target.to_string()),
+        violations::DeprecatedUnittestAlias {
+            alias: attr.to_string(),
+            target: target.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
