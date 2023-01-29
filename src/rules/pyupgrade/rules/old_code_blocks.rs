@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use libcst_native::{Codegen, CodegenState, CompoundStatement, Else, If, OrElse, Statement};
-use num_bigint::Sign;
+use num_bigint::{BigInt, Sign};
 use ruff_macros::derive_message_formats;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt, Unaryop};
 use rustpython_parser::lexer;
@@ -87,6 +87,15 @@ fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
     TokenCheck::new(first_token.unwrap(), has_else, has_elif)
 }
 
+/// Converts a `BigInt` to a `u32`, if the number is negative, it will return 0
+fn bigint_to_u32(number: &BigInt) -> u32 {
+    let the_number = number.to_u32_digits();
+    match the_number.0 {
+        Sign::Minus | Sign::NoSign => 0,
+        Sign::Plus => *the_number.1.first().unwrap(),
+    }
+}
+
 /// Gets the version from the tuple
 fn extract_version(elts: &[Expr]) -> Vec<u32> {
     let mut version: Vec<u32> = vec![];
@@ -96,17 +105,8 @@ fn extract_version(elts: &[Expr]) -> Vec<u32> {
             ..
         } = &elt.node
         {
-            let the_number = item.to_u32_digits();
-            match the_number.0 {
-                // We do not have a way of handling these values, so return what was gathered
-                Sign::Minus | Sign::NoSign => {
-                    return version;
-                }
-                Sign::Plus => {
-                    // Assuming that the version will never be above a 32 bit
-                    version.push(*the_number.1.first().unwrap());
-                }
-            }
+            let number = bigint_to_u32(item);
+            version.push(number);
         } else {
             return version;
         }
@@ -284,21 +284,35 @@ pub fn old_code_blocks(
             if check_path(checker, left, &["sys", "version_info"]) {
                 // We need to ensure we have only one operation and one comparison
                 if ops.len() == 1 && comparators.len() == 1 {
-                    if let ExprKind::Tuple { elts, .. } = &comparators.get(0).unwrap().node {
-                        let op = ops.get(0).unwrap();
-                        // Here we check for the correct operator, and also adjust the desired
-                        // target based on whether we are accepting equal to
-                        let version = extract_version(elts);
-                        let target = checker.settings.target_version;
-                        if op == &Cmpop::Lt || op == &Cmpop::LtE {
-                            if compare_version(&version, target, op == &Cmpop::LtE) {
-                                fix_py2_block(checker, stmt, orelse);
-                            }
-                        } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
-                            if compare_version(&version, target, op == &Cmpop::GtE) {
-                                fix_py3_block(checker, stmt, test, body);
+                    let comparison = &comparators.get(0).unwrap().node;
+                    let op = ops.get(0).unwrap();
+                    match comparison {
+                        ExprKind::Tuple { elts, .. } => {
+                            // Here we check for the correct operator, and also adjust the desired
+                            // target based on whether we are accepting equal to
+                            let version = extract_version(elts);
+                            let target = checker.settings.target_version;
+                            if op == &Cmpop::Lt || op == &Cmpop::LtE {
+                                if compare_version(&version, target, op == &Cmpop::LtE) {
+                                    fix_py2_block(checker, stmt, orelse);
+                                }
+                            } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
+                                if compare_version(&version, target, op == &Cmpop::GtE) {
+                                    fix_py3_block(checker, stmt, test, body);
+                                }
                             }
                         }
+                        ExprKind::Constant { value, .. } => {
+                            if let Constant::Int(number) = value {
+                                let version_number = bigint_to_u32(number);
+                                if version_number == 2 && op == &Cmpop::Eq {
+                                    fix_py2_block(checker, stmt, orelse);
+                                } else if version_number == 3 && op == &Cmpop::Eq {
+                                    fix_py3_block(checker, stmt, test, body);
+                                }
+                            }
+                        }
+                        _ => (),
                     }
                 }
             }
