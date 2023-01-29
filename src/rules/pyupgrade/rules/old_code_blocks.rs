@@ -40,6 +40,7 @@ fn check_path(checker: &Checker, expr: &Expr, path: &[&str]) -> bool {
         .map_or(false, |call_path| call_path.as_slice() == path)
 }
 
+#[derive(Debug)]
 struct TokenCheck {
     first_token: Tok,
     has_else: bool,
@@ -57,6 +58,7 @@ impl TokenCheck {
 }
 
 fn get_else_string(checker: &Checker, if_text: &str) -> Option<String> {
+    println!("{}", if_text);
     let mut tree = match_module(if_text).unwrap();
     let [Statement::Compound(CompoundStatement::If(embedding))] = &mut *tree.body else {
         return None;
@@ -91,7 +93,7 @@ fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
 
     for token_item in tokens {
         let token = token_item.unwrap().1;
-        if first_token.is_none() {
+        if first_token.is_none() && Tok::Indent != token {
             first_token = Some(token.clone());
         }
         if token == Tok::Else {
@@ -162,6 +164,7 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     // automatically only sends the start of the statement as the if or elif, so
     // I did not see that as necessary.
     let token_checker = check_tokens(checker.locator, stmt);
+    println!("{:?}", token_checker);
     // The statement MUST have an else
     if !token_checker.has_else {
         return;
@@ -172,22 +175,8 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
     // If we only have an if and an else, we just need to get the else code and
     // dedent
-    if token_checker.first_token == Tok::If && !token_checker.has_elif && orelse.len() == 1 {
-        let module_text = checker
-            .locator
-            .slice_source_code_range(&Range::from_located(stmt));
-        let curr_indent = indentation(checker.locator, stmt).unwrap();
-        let current_str = get_else_string(checker, &format!("{curr_indent}{module_text}")).unwrap();
-        let new_str = dedent(&current_str);
-        diagnostic.amend(Fix::replacement(
-            new_str,
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ));
-        checker.diagnostics.push(diagnostic);
-        return;
     // If we have an elif, we need the "e" and "l" to make an if
-    } else if token_checker.first_token == Tok::If && token_checker.has_elif {
+    if token_checker.first_token == Tok::If && token_checker.has_elif {
         ending_location.go_right();
         ending_location.go_right();
     }

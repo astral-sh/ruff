@@ -1,0 +1,210 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 8
+    column: 16
+  fix:
+    content:
+      - ""
+      - "print(\"py3\")"
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 8
+      column: 16
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 16
+    column: 16
+  fix:
+    content:
+      - ""
+      - "print(\"py3\")"
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 16
+      column: 16
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 19
+    column: 19
+  fix:
+    content:
+      - "print(\"PY3!\")"
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 19
+      column: 19
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 22
+    column: 4
+  end_location:
+    row: 25
+    column: 20
+  fix:
+    content:
+      - ""
+    location:
+      row: 22
+      column: 4
+    end_location:
+      row: 25
+      column: 8
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 29
+    column: 16
+  fix:
+    content:
+      - ""
+      - "print(\"py3\")"
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 29
+      column: 16
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 37
+    column: 30
+  fix:
+    content:
+      - ""
+      - "def f():"
+      - "    print(\"py3\")"
+      - "    print(\"This the next\")"
+    location:
+      row: 31
+      column: 0
+    end_location:
+      row: 37
+      column: 30
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 39
+    column: 0
+  end_location:
+    row: 42
+    column: 16
+  fix:
+    content:
+      - "print(\"py3\")"
+    location:
+      row: 39
+      column: 0
+    end_location:
+      row: 42
+      column: 16
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 47
+    column: 16
+  fix:
+    content:
+      - "print(\"py3\")"
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 47
+      column: 16
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 52
+    column: 0
+  end_location:
+    row: 53
+    column: 18
+  fix:
+    content:
+      - "print(\"py3\")"
+    location:
+      row: 52
+      column: 0
+    end_location:
+      row: 53
+      column: 18
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 55
+    column: 0
+  end_location:
+    row: 58
+    column: 16
+  fix:
+    content:
+      - "print(\"py3\")"
+    location:
+      row: 55
+      column: 0
+    end_location:
+      row: 58
+      column: 16
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 60
+    column: 0
+  end_location:
+    row: 63
+    column: 16
+  fix:
+    content:
+      - ""
+      - "print(\"py3\")"
+    location:
+      row: 60
+      column: 0
+    end_location:
+      row: 63
+      column: 16
+  parent: ~
+
