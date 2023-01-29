@@ -35,3 +35,6 @@ if sys.version_info <= (3, 5):
     3-5
 else:
     3+6
+
+if sys.version_info >= (3, 5):
+    pass

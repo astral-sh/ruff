@@ -159,6 +159,9 @@ fn fix_py2_block(
     orelse: &[Stmt],
     tokens: &TokenCheck,
 ) {
+    if orelse.is_empty() {
+        return;
+    }
     // FOR REVIEWER: pyupgrade had a check to see if the first statement was an if
     // or an elif, and would check for an index based on this. Our parser
     // automatically only sends the start of the statement as the if or elif, so
@@ -288,11 +291,7 @@ pub fn old_code_blocks(
     orelse: &[Stmt],
 ) {
     // NOTE: Pyupgrade ONLY works if `sys.version_info` is on the left
-    // We have to have an else statement in order to refactor
     let tokens = check_tokens(checker.locator, stmt);
-    if orelse.is_empty() && tokens.first_token == Tok::If {
-        return;
-    }
     match &test.node {
         ExprKind::Compare {
             left,

@@ -296,4 +296,58 @@ expression: diagnostics
       row: 115
       column: 20
   parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 118
+    column: 4
+  end_location:
+    row: 119
+    column: 16
+  fix:
+    content:
+      - print(3)
+    location:
+      row: 118
+      column: 4
+    end_location:
+      row: 119
+      column: 16
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 123
+    column: 0
+  end_location:
+    row: 123
+    column: 20
+  fix:
+    content:
+      - print(3)
+    location:
+      row: 123
+      column: 0
+    end_location:
+      row: 123
+      column: 20
+  parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 125
+    column: 0
+  end_location:
+    row: 126
+    column: 12
+  fix:
+    content:
+      - print(3)
+    location:
+      row: 125
+      column: 0
+    end_location:
+      row: 126
+      column: 12
+  parent: ~
 

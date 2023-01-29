@@ -113,3 +113,14 @@ else:
         print("py3")
     def g():
         print("py3")
+
+if True:
+    if sys.version_info > (3,):
+        print(3)
+    # comment
+    print(2+3)
+
+if six.PY3: print(3)
+
+if six.PY3:
+    print(3)
