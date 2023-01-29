@@ -18,8 +18,8 @@ use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
 struct IndentationLevel {
-    tabs: usize,
-    spaces: usize,
+    tabs: u32,
+    spaces: u32,
 }
 
 impl IndentationLevel {
@@ -225,7 +225,8 @@ where
             at_begin_of_line: true,
             nesting: 0,
             indentations: Indentations::default(),
-            pending: Vec::new(),
+            // Usually we have less than 5 tokens pending.
+            pending: Vec::with_capacity(5),
             location: start,
             window: CharWindow::new(input),
         };
@@ -257,13 +258,13 @@ where
         };
 
         let start_pos = self.get_pos();
-        let mut name = String::new();
+        let mut name = String::with_capacity(8);
         while self.is_identifier_continuation() {
             name.push(self.next_char().unwrap());
         }
         let end_pos = self.get_pos();
 
-        if let Some(tok) = KEYWORDS.get(name.as_str()) {
+        if let Some(tok) = KEYWORDS.get(&name) {
             Ok((start_pos, tok.clone(), end_pos))
         } else {
             Ok((start_pos, Tok::Name { name }, end_pos))
@@ -464,7 +465,7 @@ where
             self.next_char();
         }
         let quote_char = self.next_char().unwrap();
-        let mut string_content = String::new();
+        let mut string_content = String::with_capacity(5);
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close
@@ -567,8 +568,8 @@ where
     /// Given we are at the start of a line, count the number of spaces and/or tabs until the first character.
     fn eat_indentation(&mut self) -> Result<IndentationLevel, LexicalError> {
         // Determine indentation:
-        let mut spaces: usize = 0;
-        let mut tabs: usize = 0;
+        let mut spaces: u32 = 0;
+        let mut tabs: u32 = 0;
         loop {
             match self.window[0] {
                 Some(' ') => {
@@ -1127,7 +1128,7 @@ where
 
     fn eat_single_char(&mut self, ty: Tok) {
         let tok_start = self.get_pos();
-        self.next_char().unwrap();
+        self.next_char();
         let tok_end = self.get_pos();
         self.emit((tok_start, ty, tok_end));
     }
