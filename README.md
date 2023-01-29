@@ -521,6 +521,33 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
 For example, `ruff /path/to/excluded/file.py` will always lint `file.py`.
 
+### Rule resolution
+
+The set of enabled rules is controlled via the [`select`](#select) and [`ignore`](#ignore) settings,
+along with the [`extend-select`](#extend-select) and [`extend-ignore`](#extend-ignore) modifiers.
+
+To resolve the enabled rule set, Ruff may need to reconcile `select` and `ignore` from a variety
+of sources, including the current `pyproject.toml`, any inherited `pyproject.toml` files, and the
+CLI (e.g., `--select`).
+
+In those scenarios, Ruff uses the "highest-priority" `select` as the basis for the rule set, and
+then applies any `extend-select`, `ignore`, and `extend-ignore` adjustments. CLI options are given
+higher priority than `pyproject.toml` options, and the current `pyproject.toml` file is given higher
+priority than any inherited `pyproject.toml` files.
+
+For example, given the following `pyproject.toml` file:
+
+```toml
+[tool.ruff]
+select = ["E", "F"]
+ignore = ["F401"]
+```
+
+Running `ruff --select F401` would result in Ruff enforcing `F401`, and no other rules.
+
+Running `ruff --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules, with
+the exception of `F401`.
+
 ### Ignoring errors
 
 To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](#ignore) or
