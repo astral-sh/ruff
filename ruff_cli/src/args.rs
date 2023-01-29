@@ -211,6 +211,15 @@ pub struct CheckArgs {
     update_check: bool,
     #[clap(long, overrides_with("update_check"), hide = true)]
     no_update_check: bool,
+    /// Show counts for every rule with at least one violation.
+    #[arg(
+        long,
+        // Unsupported default-command arguments.
+        conflicts_with = "diff",
+        conflicts_with = "show_source",
+        conflicts_with = "watch",
+    )]
+    pub statistics: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
     #[arg(
         long,
@@ -218,6 +227,7 @@ pub struct CheckArgs {
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
@@ -230,6 +240,7 @@ pub struct CheckArgs {
         // conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
@@ -242,13 +253,11 @@ pub struct CheckArgs {
         conflicts_with = "show_files",
         // conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
-    /// Show counts for every rule with at least one violation.
-    #[arg(long)]
-    pub statistics: bool,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
