@@ -5,6 +5,7 @@ ignore = [
   "INP001",  # implicit-namespace-package
   "PLR2004", # magic-value-comparison
   "S101",    # assert-used
+  "EM"
 ]
 
 [tool.ruff.pydocstyle]

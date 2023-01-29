@@ -3,7 +3,8 @@ source: src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ErrorSuffixOnExceptionName: C
+    ErrorSuffixOnExceptionName:
+      name: C
   location:
     row: 9
     column: 6
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ErrorSuffixOnExceptionName: E
+    ErrorSuffixOnExceptionName:
+      name: E
   location:
     row: 17
     column: 6

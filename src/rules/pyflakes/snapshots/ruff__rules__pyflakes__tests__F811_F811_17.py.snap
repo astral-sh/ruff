@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     RedefinedWhileUnused:
-      - fu
-      - 2
+      name: fu
+      line: 2
   location:
     row: 6
     column: 11
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedWhileUnused:
-      - fu
-      - 6
+      name: fu
+      line: 6
   location:
     row: 9
     column: 12

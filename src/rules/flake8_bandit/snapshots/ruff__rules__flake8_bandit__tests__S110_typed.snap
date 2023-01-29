@@ -1,0 +1,35 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    TryExceptPass: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    TryExceptPass: ~
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    TryExceptPass: ~
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 8
+  fix: ~
+  parent: ~
+

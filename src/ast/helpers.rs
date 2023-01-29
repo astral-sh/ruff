@@ -1010,7 +1010,7 @@ pub fn is_logger_candidate(func: &Expr) -> bool {
     if let ExprKind::Attribute { value, .. } = &func.node {
         let call_path = collect_call_path(value);
         if let Some(tail) = call_path.last() {
-            if *tail == "logging" || tail.ends_with("logger") {
+            if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging") {
                 return true;
             }
         }

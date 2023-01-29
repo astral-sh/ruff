@@ -4,7 +4,8 @@ expression: diagnostics
 ---
 - kind:
     PercentFormatMissingArgument:
-      - bar
+      missing:
+        - bar
   location:
     row: 7
     column: 0

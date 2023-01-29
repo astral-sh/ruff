@@ -114,9 +114,9 @@ pub(crate) fn percent_format_extra_named_arguments(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::PercentFormatExtraNamedArguments(
-            missing.iter().map(|&arg| arg.to_string()).collect(),
-        ),
+        violations::PercentFormatExtraNamedArguments {
+            missing: missing.iter().map(|&arg| arg.to_string()).collect(),
+        },
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
@@ -174,9 +174,9 @@ pub(crate) fn percent_format_missing_arguments(
 
         if !missing.is_empty() {
             checker.diagnostics.push(Diagnostic::new(
-                violations::PercentFormatMissingArgument(
-                    missing.iter().map(|&s| s.clone()).collect(),
-                ),
+                violations::PercentFormatMissingArgument {
+                    missing: missing.iter().map(|&s| s.clone()).collect(),
+                },
                 location,
             ));
         }
@@ -220,7 +220,10 @@ pub(crate) fn percent_format_positional_count_mismatch(
 
             if found != summary.num_positional {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::PercentFormatPositionalCountMismatch(summary.num_positional, found),
+                    violations::PercentFormatPositionalCountMismatch {
+                        wanted: summary.num_positional,
+                        got: found,
+                    },
                     location,
                 ));
             }
@@ -277,9 +280,9 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::StringDotFormatExtraNamedArguments(
-            missing.iter().map(|&arg| arg.to_string()).collect(),
-        ),
+        violations::StringDotFormatExtraNamedArguments {
+            missing: missing.iter().map(|&arg| arg.to_string()).collect(),
+        },
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
@@ -318,12 +321,12 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     }
 
     checker.diagnostics.push(Diagnostic::new(
-        violations::StringDotFormatExtraPositionalArguments(
-            missing
+        violations::StringDotFormatExtraPositionalArguments {
+            missing: missing
                 .iter()
                 .map(std::string::ToString::to_string)
                 .collect::<Vec<String>>(),
-        ),
+        },
         location,
     ));
 }
@@ -365,7 +368,7 @@ pub(crate) fn string_dot_format_missing_argument(
 
     if !missing.is_empty() {
         checker.diagnostics.push(Diagnostic::new(
-            violations::StringDotFormatMissingArguments(missing),
+            violations::StringDotFormatMissingArguments { missing },
             location,
         ));
     }

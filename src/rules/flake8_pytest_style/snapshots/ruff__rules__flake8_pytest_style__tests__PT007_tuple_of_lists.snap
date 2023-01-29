@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 12
     column: 8
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 13
     column: 8
@@ -28,8 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 31
     column: 34
@@ -40,8 +40,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 38
     column: 4
@@ -52,8 +52,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 39
     column: 8
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 40
     column: 8
@@ -76,8 +76,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 49
     column: 4
@@ -88,8 +88,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 60
     column: 4
@@ -100,8 +100,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - list
+      values: tuple
+      row: list
   location:
     row: 71
     column: 4

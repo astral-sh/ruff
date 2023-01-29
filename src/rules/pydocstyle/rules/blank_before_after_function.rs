@@ -35,7 +35,9 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             .count();
         if blank_lines_before != 0 {
             let mut diagnostic = Diagnostic::new(
-                violations::NoBlankLineBeforeFunction(blank_lines_before),
+                violations::NoBlankLineBeforeFunction {
+                    num_lines: blank_lines_before,
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -80,7 +82,9 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
 
         if blank_lines_after != 0 {
             let mut diagnostic = Diagnostic::new(
-                violations::NoBlankLineAfterFunction(blank_lines_after),
+                violations::NoBlankLineAfterFunction {
+                    num_lines: blank_lines_after,
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {

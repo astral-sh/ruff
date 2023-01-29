@@ -31,6 +31,7 @@ mod tests {
     #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"); "S509")]
     #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"); "S612")]
     #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"); "S701")]
+    #[test_case(Rule::TryExceptPass, Path::new("S110.py"); "S110")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -55,11 +56,28 @@ mod tests {
                         "/dev/shm".to_string(),
                         "/foo".to_string(),
                     ],
+                    check_typed_exception: false,
                 },
                 ..Settings::for_rule(Rule::HardcodedTempFile)
             },
         )?;
         assert_yaml_snapshot!("S108_extend", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn check_typed_exception() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_bandit/S110.py"),
+            &Settings {
+                flake8_bandit: super::settings::Settings {
+                    check_typed_exception: true,
+                    ..Default::default()
+                },
+                ..Settings::for_rule(Rule::TryExceptPass)
+            },
+        )?;
+        assert_yaml_snapshot!("S110_typed", diagnostics);
         Ok(())
     }
 }

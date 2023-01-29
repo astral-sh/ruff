@@ -49,7 +49,7 @@ pub fn use_contextlib_suppress(
                 handler_names.join(", ")
             };
             checker.diagnostics.push(Diagnostic::new(
-                violations::UseContextlibSuppress(exception),
+                violations::UseContextlibSuppress { exception },
                 Range::from_located(stmt),
             ));
         }

@@ -42,4 +42,24 @@ expression: diagnostics
     column: 7
   fix: ~
   parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 7
+  fix: ~
+  parent: ~
 

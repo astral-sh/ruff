@@ -7,7 +7,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.236"
+version = "0.0.237"
 description = "An extremely fast Python linter, written in Rust."
 authors = [
   { name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" },
@@ -15,6 +15,7 @@ authors = [
 maintainers = [
   { name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" },
 ]
+readme = "README.md"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
 keywords = ["automation", "flake8", "pycodestyle", "pyflakes", "pylint", "clippy"]

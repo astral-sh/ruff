@@ -88,7 +88,9 @@ pub fn abstract_base_class(
 
         if !has_abstract_decorator && is_empty_body(body) && !is_overload(checker, decorator_list) {
             checker.diagnostics.push(Diagnostic::new(
-                violations::EmptyMethodWithoutAbstractDecorator(name.to_string()),
+                violations::EmptyMethodWithoutAbstractDecorator {
+                    name: name.to_string(),
+                },
                 Range::from_located(stmt),
             ));
         }
@@ -100,7 +102,9 @@ pub fn abstract_base_class(
     {
         if !has_abstract_method {
             checker.diagnostics.push(Diagnostic::new(
-                violations::AbstractBaseClassWithoutAbstractMethod(name.to_string()),
+                violations::AbstractBaseClassWithoutAbstractMethod {
+                    name: name.to_string(),
+                },
                 Range::from_located(stmt),
             ));
         }

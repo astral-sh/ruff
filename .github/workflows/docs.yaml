@@ -1,0 +1,35 @@
+name: mkdocs
+
+on:
+  push:
+    paths:
+      - README.md
+      - mkdocs.template.yml
+      - .github/workflows/docs.yaml
+    branches: [ main ]
+  workflow_dispatch:
+
+
+jobs:
+  mkdocs:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+      - name: "Install dependencies"
+        run: |
+          pip install "mkdocs~=1.4.2" "mkdocs-material~=9.0.6"
+      - name: "Copy README File"
+        run: |
+          python scripts/transform_readme.py --target mkdocs
+          python scripts/generate_mkdocs.py
+          mkdocs build --strict
+      - name: "Deploy to Cloudflare Pages"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        uses: cloudflare/wrangler-action@2.0.0
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages publish site --project-name=ruff-docs --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}

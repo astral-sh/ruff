@@ -3,7 +3,8 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NativeLiterals: Str
+    NativeLiterals:
+      literal_type: Str
   location:
     row: 20
     column: 0
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    NativeLiterals: Str
+    NativeLiterals:
+      literal_type: Str
   location:
     row: 21
     column: 0
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    NativeLiterals: Str
+    NativeLiterals:
+      literal_type: Str
   location:
     row: 22
     column: 0
@@ -58,7 +61,8 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    NativeLiterals: Bytes
+    NativeLiterals:
+      literal_type: Bytes
   location:
     row: 24
     column: 0
@@ -76,7 +80,8 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    NativeLiterals: Bytes
+    NativeLiterals:
+      literal_type: Bytes
   location:
     row: 25
     column: 0
@@ -94,7 +99,8 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    NativeLiterals: Bytes
+    NativeLiterals:
+      literal_type: Bytes
   location:
     row: 26
     column: 0

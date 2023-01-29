@@ -4,7 +4,8 @@ expression: diagnostics
 ---
 - kind:
     StringDotFormatExtraNamedArguments:
-      - bar
+      missing:
+        - bar
   location:
     row: 1
     column: 0
@@ -23,7 +24,8 @@ expression: diagnostics
   parent: ~
 - kind:
     StringDotFormatExtraNamedArguments:
-      - spam
+      missing:
+        - spam
   location:
     row: 2
     column: 0
@@ -42,8 +44,9 @@ expression: diagnostics
   parent: ~
 - kind:
     StringDotFormatExtraNamedArguments:
-      - eggs
-      - ham
+      missing:
+        - eggs
+        - ham
   location:
     row: 4
     column: 0

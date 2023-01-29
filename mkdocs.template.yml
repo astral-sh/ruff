@@ -1,0 +1,49 @@
+site_name: Ruff
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.code.annotate
+    - toc.integrate
+    - toc.follow
+    - navigation.path
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+repo_url: https://github.com/charliermarsh/ruff
+repo_name: ruff
+site_author: charliermarsh
+site_url: https://beta.ruff.rs/docs/
+site_dir: site/docs
+markdown_extensions:
+  - toc:
+      permalink: "#"
+  - pymdownx.snippets:
+  - pymdownx.magiclink:
+  - attr_list:
+  - md_in_html:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite:
+  - pymdownx.superfences:
+  - markdown.extensions.attr_list:
+  - pymdownx.keys:
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+plugins:
+  - search

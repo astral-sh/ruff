@@ -3,7 +3,8 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ReturnBoolConditionDirectly: a
+    ReturnBoolConditionDirectly:
+      cond: a
   location:
     row: 3
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ReturnBoolConditionDirectly: b
+    ReturnBoolConditionDirectly:
+      cond: b
   location:
     row: 13
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ReturnBoolConditionDirectly: b
+    ReturnBoolConditionDirectly:
+      cond: b
   location:
     row: 24
     column: 8
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    ReturnBoolConditionDirectly: a
+    ReturnBoolConditionDirectly:
+      cond: a
   location:
     row: 49
     column: 4

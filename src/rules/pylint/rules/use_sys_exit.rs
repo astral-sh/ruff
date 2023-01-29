@@ -92,7 +92,9 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(
-            violations::UseSysExit(name.to_string()),
+            violations::UseSysExit {
+                name: name.to_string(),
+            },
             Range::from_located(func),
         );
         if checker.patch(diagnostic.kind.rule()) {

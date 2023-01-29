@@ -3,7 +3,8 @@ source: src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RedundantTupleInExceptionHandler: ValueError
+    RedundantTupleInExceptionHandler:
+      name: ValueError
   location:
     row: 3
     column: 7

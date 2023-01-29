@@ -32,7 +32,9 @@ pub fn keyword_argument_before_star_argument(
                 let KeywordData { arg, .. } = &keyword.node;
                 if let Some(arg) = arg {
                     diagnostics.push(Diagnostic::new(
-                        violations::KeywordArgumentBeforeStarArgument(arg.to_string()),
+                        violations::KeywordArgumentBeforeStarArgument {
+                            name: arg.to_string(),
+                        },
                         Range::from_located(keyword),
                     ));
                 }

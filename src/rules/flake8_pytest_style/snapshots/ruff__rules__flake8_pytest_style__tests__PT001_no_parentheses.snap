@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     IncorrectFixtureParenthesesStyle:
-      - ""
-      - ()
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 14
     column: 1
@@ -24,8 +24,8 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectFixtureParenthesesStyle:
-      - ""
-      - ()
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 24
     column: 1
@@ -44,8 +44,8 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectFixtureParenthesesStyle:
-      - ""
-      - ()
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 39
     column: 1
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectFixtureParenthesesStyle:
-      - ""
-      - ()
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 49
     column: 1
@@ -84,8 +84,8 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectFixtureParenthesesStyle:
-      - ""
-      - ()
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 64
     column: 1
@@ -104,8 +104,8 @@ expression: diagnostics
   parent: ~
 - kind:
     IncorrectFixtureParenthesesStyle:
-      - ""
-      - ()
+      expected_parens: ""
+      actual_parens: ()
   location:
     row: 74
     column: 1

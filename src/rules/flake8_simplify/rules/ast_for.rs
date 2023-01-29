@@ -194,7 +194,9 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 }
 
                 let mut diagnostic = Diagnostic::new(
-                    violations::ConvertLoopToAny(contents.clone()),
+                    violations::ConvertLoopToAny {
+                        any: contents.clone(),
+                    },
                     Range::from_located(stmt),
                 );
                 if checker.patch(&Rule::ConvertLoopToAny) {
@@ -242,7 +244,9 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 }
 
                 let mut diagnostic = Diagnostic::new(
-                    violations::ConvertLoopToAll(contents.clone()),
+                    violations::ConvertLoopToAll {
+                        all: contents.clone(),
+                    },
                     Range::from_located(stmt),
                 );
                 if checker.patch(&Rule::ConvertLoopToAll) {

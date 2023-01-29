@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     RedefinedWhileUnused:
-      - os
-      - 5
+      name: os
+      line: 5
   location:
     row: 6
     column: 11

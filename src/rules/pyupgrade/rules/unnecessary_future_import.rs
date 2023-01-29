@@ -49,13 +49,13 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryFutureImport(
-            unused_imports
+        violations::UnnecessaryFutureImport {
+            names: unused_imports
                 .iter()
                 .map(|alias| alias.node.name.to_string())
                 .sorted()
                 .collect(),
-        ),
+        },
         Range::from_located(stmt),
     );
 

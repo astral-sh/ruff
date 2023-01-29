@@ -46,7 +46,7 @@ macro_rules! notify_user {
     }
 }
 
-#[derive(Debug, Default, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Default, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 pub enum LogLevel {
     // No output (+ `log::LevelFilter::Off`).
     Silent,
@@ -60,6 +60,7 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn level_filter(&self) -> log::LevelFilter {
         match self {
             LogLevel::Default => log::LevelFilter::Info,

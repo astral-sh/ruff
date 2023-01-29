@@ -230,7 +230,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Return { .. }) {
             if checker.settings.rules.enabled(&Rule::SuperfluousElseReturn) {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::SuperfluousElseReturn(branch),
+                    violations::SuperfluousElseReturn { branch },
                     elif_else_range(stmt, checker.locator)
                         .unwrap_or_else(|| Range::from_located(stmt)),
                 ));
@@ -240,7 +240,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Break) {
             if checker.settings.rules.enabled(&Rule::SuperfluousElseBreak) {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::SuperfluousElseBreak(branch),
+                    violations::SuperfluousElseBreak { branch },
                     elif_else_range(stmt, checker.locator)
                         .unwrap_or_else(|| Range::from_located(stmt)),
                 ));
@@ -250,7 +250,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Raise { .. }) {
             if checker.settings.rules.enabled(&Rule::SuperfluousElseRaise) {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::SuperfluousElseRaise(branch),
+                    violations::SuperfluousElseRaise { branch },
                     elif_else_range(stmt, checker.locator)
                         .unwrap_or_else(|| Range::from_located(stmt)),
                 ));
@@ -264,7 +264,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 .enabled(&Rule::SuperfluousElseContinue)
             {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::SuperfluousElseContinue(branch),
+                    violations::SuperfluousElseContinue { branch },
                     elif_else_range(stmt, checker.locator)
                         .unwrap_or_else(|| Range::from_located(stmt)),
                 ));

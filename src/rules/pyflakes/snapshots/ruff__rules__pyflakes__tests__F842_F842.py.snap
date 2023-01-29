@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedAnnotation: name
+    UnusedAnnotation:
+      name: name
   location:
     row: 2
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedAnnotation: age
+    UnusedAnnotation:
+      name: age
   location:
     row: 3
     column: 4

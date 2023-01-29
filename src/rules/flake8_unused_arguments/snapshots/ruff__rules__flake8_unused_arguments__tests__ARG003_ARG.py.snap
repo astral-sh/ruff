@@ -3,7 +3,8 @@ source: src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedClassMethodArgument: x
+    UnusedClassMethodArgument:
+      name: x
   location:
     row: 45
     column: 15

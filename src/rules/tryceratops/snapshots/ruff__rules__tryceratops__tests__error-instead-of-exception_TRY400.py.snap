@@ -49,7 +49,7 @@ expression: diagnostics
     column: 8
   end_location:
     row: 35
-    column: 49
+    column: 41
   fix: ~
   parent: ~
 - kind:
@@ -59,6 +59,26 @@ expression: diagnostics
     column: 12
   end_location:
     row: 38
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 45
+    column: 8
+  end_location:
+    row: 45
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 48
+    column: 12
+  end_location:
+    row: 48
     column: 53
   fix: ~
   parent: ~

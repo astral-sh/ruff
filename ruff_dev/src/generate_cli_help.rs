@@ -1,11 +1,14 @@
 //! Generate CLI help.
 
-use anyhow::Result;
-
 use crate::utils::replace_readme_section;
+use anyhow::Result;
+use std::str;
 
-const HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated cli help. -->";
-const HELP_END_PRAGMA: &str = "<!-- End auto-generated cli help. -->";
+const COMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated command help. -->";
+const COMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated command help. -->";
+
+const SUBCOMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated subcommand help. -->";
+const SUBCOMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated subcommand help. -->";
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -19,15 +22,25 @@ fn trim_lines(s: &str) -> String {
 }
 
 pub fn main(args: &Args) -> Result<()> {
-    let output = trim_lines(ruff_cli::help().trim());
+    // Generate `ruff help`.
+    let command_help = trim_lines(ruff_cli::command_help().trim());
+
+    // Generate `ruff help check`.
+    let subcommand_help = trim_lines(ruff_cli::subcommand_help().trim());
 
     if args.dry_run {
-        print!("{output}");
+        print!("{command_help}");
+        print!("{subcommand_help}");
     } else {
         replace_readme_section(
-            &format!("```\n{output}\n```\n"),
-            HELP_BEGIN_PRAGMA,
-            HELP_END_PRAGMA,
+            &format!("```\n{command_help}\n```\n"),
+            COMMAND_HELP_BEGIN_PRAGMA,
+            COMMAND_HELP_END_PRAGMA,
+        )?;
+        replace_readme_section(
+            &format!("```\n{subcommand_help}\n```\n"),
+            SUBCOMMAND_HELP_BEGIN_PRAGMA,
+            SUBCOMMAND_HELP_END_PRAGMA,
         )?;
     }
 
