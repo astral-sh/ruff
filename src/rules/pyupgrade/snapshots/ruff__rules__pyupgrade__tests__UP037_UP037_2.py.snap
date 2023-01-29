@@ -128,4 +128,22 @@ expression: diagnostics
       row: 37
       column: 7
   parent: ~
+- kind:
+    OldCodeBlocks: ~
+  location:
+    row: 39
+    column: 0
+  end_location:
+    row: 40
+    column: 8
+  fix:
+    content:
+      - pass
+    location:
+      row: 39
+      column: 0
+    end_location:
+      row: 40
+      column: 8
+  parent: ~
 
