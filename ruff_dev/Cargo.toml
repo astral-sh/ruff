@@ -15,7 +15,7 @@ rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
 schemars = { version = "0.8.11" }
-serde_json = {version="1.0.91"}
+serde_json = { version = "1.0.91" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 textwrap = { version = "0.16.0" }
