@@ -57,7 +57,6 @@ impl TokenCheck {
     }
 }
 
-/// Checks for a single else in the statement provided
 fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
     let text = locator.slice_source_code_range(&Range::from_located(located));
     let curr_indent = indentation(locator, located).unwrap();
@@ -153,23 +152,18 @@ fn indent_after_first<'a>(text: &'a str, indent_str: &str) -> String {
 }
 
 /// Converts an if statement where the code to keep is in the else statement
-fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
+fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt], tokens: &TokenCheck) {
     // FOR REVIEWER: pyupgrade had a check to see if the first statement was an if
     // or an elif, and would check for an index based on this. Our parser
     // automatically only sends the start of the statement as the if or elif, so
     // I did not see that as necessary.
-    let token_checker = check_tokens(checker.locator, stmt);
-    // The statement MUST have an else
-    if !token_checker.has_else {
-        return;
-    }
     let else_statement = orelse.last().unwrap();
     let mut ending_location = else_statement.location;
     let range = Range::new(stmt.location, stmt.end_location.unwrap());
     let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
     // If we only have an if and an else, we just need to get the else code and
     // dedent
-    if token_checker.first_token == Tok::If && !token_checker.has_elif {
+    if tokens.first_token == Tok::If && !tokens.has_elif {
         let start = orelse.first().unwrap();
         let end = orelse.last().unwrap();
         let the_range = Range::new(start.location, end.end_location.unwrap());
@@ -192,7 +186,7 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
         checker.diagnostics.push(diagnostic);
         return;
     // If we have an elif, we need the "e" and "l" to make an if
-    } else if token_checker.first_token == Tok::If && token_checker.has_elif {
+    } else if tokens.first_token == Tok::If && tokens.has_elif {
         ending_location.go_right();
         ending_location.go_right();
     }
@@ -203,16 +197,21 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
 }
 
 /// This is called to fix statements where the code to keep is not in the else
-fn fix_py3_block(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]) {
-    let token_checker = check_tokens(checker.locator, stmt);
+fn fix_py3_block(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &[Stmt],
+    tokens: &TokenCheck,
+) {
     let mut new_text: String;
     // If the first statement is an if, just use the body of this statement, and the
     // rest of the statement can be ignored, because we basically have `if True:`
-    if token_checker.first_token == Tok::If {
+    if tokens.first_token == Tok::If {
         if body.is_empty() {
             return;
         }
-        if !token_checker.has_elif {
+        if !tokens.has_elif {
             let start = body.first().unwrap();
             let end = body.last().unwrap();
             let the_range = Range::new(start.location, end.end_location.unwrap());
@@ -272,7 +271,8 @@ pub fn old_code_blocks(
 ) {
     // NOTE: Pyupgrade ONLY works if `sys.version_info` is on the left
     // We have to have an else statement in order to refactor
-    if orelse.is_empty() {
+    let tokens = check_tokens(checker.locator, stmt);
+    if orelse.is_empty() && tokens.first_token == Tok::If {
         return;
     }
     match &test.node {
@@ -294,11 +294,11 @@ pub fn old_code_blocks(
                             let target = checker.settings.target_version;
                             if op == &Cmpop::Lt || op == &Cmpop::LtE {
                                 if compare_version(&version, target, op == &Cmpop::LtE) {
-                                    fix_py2_block(checker, stmt, orelse);
+                                    fix_py2_block(checker, stmt, orelse, &tokens);
                                 }
                             } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
                                 if compare_version(&version, target, op == &Cmpop::GtE) {
-                                    fix_py3_block(checker, stmt, test, body);
+                                    fix_py3_block(checker, stmt, test, body, &tokens);
                                 }
                             }
                         }
@@ -306,9 +306,9 @@ pub fn old_code_blocks(
                             if let Constant::Int(number) = value {
                                 let version_number = bigint_to_u32(number);
                                 if version_number == 2 && op == &Cmpop::Eq {
-                                    fix_py2_block(checker, stmt, orelse);
+                                    fix_py2_block(checker, stmt, orelse, &tokens);
                                 } else if version_number == 3 && op == &Cmpop::Eq {
-                                    fix_py3_block(checker, stmt, test, body);
+                                    fix_py3_block(checker, stmt, test, body, &tokens);
                                 }
                             }
                         }
@@ -320,20 +320,20 @@ pub fn old_code_blocks(
         ExprKind::Attribute { .. } => {
             // if six.PY2
             if check_path(checker, test, &["six", "PY2"]) {
-                fix_py2_block(checker, stmt, orelse);
+                fix_py2_block(checker, stmt, orelse, &tokens);
             // if six.PY3
             } else if check_path(checker, test, &["six", "PY3"]) {
-                fix_py3_block(checker, stmt, test, body);
+                fix_py3_block(checker, stmt, test, body, &tokens);
             }
         }
         ExprKind::UnaryOp { op, operand } => {
             // if not six.PY3
             if check_path(checker, operand, &["six", "PY3"]) && op == &Unaryop::Not {
-                fix_py2_block(checker, stmt, orelse);
+                fix_py2_block(checker, stmt, orelse, &tokens);
             }
             // if not six.PY2
             if check_path(checker, operand, &["six", "PY2"]) && op == &Unaryop::Not {
-                fix_py3_block(checker, stmt, test, body);
+                fix_py3_block(checker, stmt, test, body, &tokens);
             }
         }
         _ => (),
