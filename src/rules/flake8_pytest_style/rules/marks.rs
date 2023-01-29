@@ -15,11 +15,11 @@ fn pytest_mark_parentheses(
     actual: &str,
 ) {
     let mut diagnostic = Diagnostic::new(
-        violations::IncorrectMarkParenthesesStyle(
-            get_mark_name(decorator).to_string(),
-            preferred.to_string(),
-            actual.to_string(),
-        ),
+        violations::IncorrectMarkParenthesesStyle {
+            mark_name: get_mark_name(decorator).to_string(),
+            expected_parens: preferred.to_string(),
+            actual_parens: actual.to_string(),
+        },
         Range::from_located(decorator),
     );
     if checker.patch(diagnostic.kind.rule()) {

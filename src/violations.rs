@@ -389,21 +389,24 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
 }
 
 define_violation!(
-    pub struct MultiValueRepeatedKeyLiteral(pub String, pub bool);
+    pub struct MultiValueRepeatedKeyLiteral {
+        pub name: String,
+        pub repeated_value: bool,
+    }
 );
 impl Violation for MultiValueRepeatedKeyLiteral {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyLiteral(name, ..) = self;
+        let MultiValueRepeatedKeyLiteral { name, .. } = self;
         format!("Dictionary key literal `{name}` repeated")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyLiteral(.., repeated_value) = self;
+        let MultiValueRepeatedKeyLiteral { repeated_value, .. } = self;
         if *repeated_value {
-            Some(|MultiValueRepeatedKeyLiteral(name, ..)| {
+            Some(|MultiValueRepeatedKeyLiteral { name, .. }| {
                 format!("Remove repeated key literal `{name}`")
             })
         } else {
@@ -413,21 +416,26 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 }
 
 define_violation!(
-    pub struct MultiValueRepeatedKeyVariable(pub String, pub bool);
+    pub struct MultiValueRepeatedKeyVariable {
+        pub name: String,
+        pub repeated_value: bool,
+    }
 );
 impl Violation for MultiValueRepeatedKeyVariable {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyVariable(name, ..) = self;
+        let MultiValueRepeatedKeyVariable { name, .. } = self;
         format!("Dictionary key `{name}` repeated")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyVariable(.., repeated_value) = self;
+        let MultiValueRepeatedKeyVariable { repeated_value, .. } = self;
         if *repeated_value {
-            Some(|MultiValueRepeatedKeyVariable(name, ..)| format!("Remove repeated key `{name}`"))
+            Some(|MultiValueRepeatedKeyVariable { name, .. }| {
+                format!("Remove repeated key `{name}`")
+            })
         } else {
             None
         }
@@ -3378,7 +3386,9 @@ impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {
 }
 
 define_violation!(
-    pub struct OneBlankLineBeforeClass(pub usize);
+    pub struct OneBlankLineBeforeClass {
+        pub lines: usize,
+    }
 );
 impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
     #[derive_message_formats]
@@ -3392,7 +3402,9 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 }
 
 define_violation!(
-    pub struct OneBlankLineAfterClass(pub usize);
+    pub struct OneBlankLineAfterClass {
+        pub lines: usize,
+    }
 );
 impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
     #[derive_message_formats]
@@ -3504,7 +3516,9 @@ impl AlwaysAutofixableViolation for NoSurroundingWhitespace {
 }
 
 define_violation!(
-    pub struct NoBlankLineBeforeClass(pub usize);
+    pub struct NoBlankLineBeforeClass {
+        pub lines: usize,
+    }
 );
 impl AlwaysAutofixableViolation for NoBlankLineBeforeClass {
     #[derive_message_formats]
@@ -4959,12 +4973,20 @@ impl AlwaysAutofixableViolation for UselessYieldFixture {
 }
 
 define_violation!(
-    pub struct IncorrectMarkParenthesesStyle(pub String, pub String, pub String);
+    pub struct IncorrectMarkParenthesesStyle {
+        pub mark_name: String,
+        pub expected_parens: String,
+        pub actual_parens: String,
+    }
 );
 impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IncorrectMarkParenthesesStyle(mark_name, expected_parens, actual_parens) = self;
+        let IncorrectMarkParenthesesStyle {
+            mark_name,
+            expected_parens,
+            actual_parens,
+        } = self;
         format!(
             "Use `@pytest.mark.{mark_name}{expected_parens}` over \
              `@pytest.mark.{mark_name}{actual_parens}`"
