@@ -364,10 +364,13 @@ unfixable = ["B"]
 
 For a full list of configurable options, see the [API reference](#reference).
 
-Some common configuration settings can be provided via the command-line:
+### Command-line interface
+
+Some configuration settings can be provided via the command-line, such as those related to
+rule enablement and disablement, file discovery, logging level, and more:
 
 ```shell
-ruff path/to/code/ --select F401 --select F403
+ruff path/to/code/ --select F401 --select F403 --quiet
 ```
 
 See `ruff help` for more on Ruff's top-level commands:
@@ -401,7 +404,7 @@ Or `ruff help check` for more on the linting command:
 
 <!-- Begin auto-generated subcommand help. -->
 ```
-Run Ruff on the given files or directories (default)
+Run Ruff on the given files or directories
 
 Usage: ruff check [OPTIONS] [FILES]...
 
@@ -465,11 +468,6 @@ Miscellaneous:
           Exit with status code "0", even upon detecting lint violations
       --update-check
           Enable or disable automatic update checks
-
-Log levels:
-  -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
 ```
 <!-- End auto-generated subcommand help. -->
 

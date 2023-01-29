@@ -2017,7 +2017,6 @@ name = "ruff_dev"
 version = "0.0.237"
 dependencies = [
  "anyhow",
- "assert_cmd",
  "clap 4.1.4",
  "itertools",
  "libcst",

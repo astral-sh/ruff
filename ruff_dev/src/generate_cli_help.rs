@@ -2,9 +2,7 @@
 
 use crate::utils::replace_readme_section;
 use anyhow::Result;
-use assert_cmd::Command;
 use std::str;
-const BIN_NAME: &str = "ruff";
 
 const COMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated command help. -->";
 const COMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated command help. -->";
@@ -19,16 +17,16 @@ pub struct Args {
     pub(crate) dry_run: bool,
 }
 
+fn trim_lines(s: &str) -> String {
+    s.lines().map(str::trim_end).collect::<Vec<_>>().join("\n")
+}
+
 pub fn main(args: &Args) -> Result<()> {
     // Generate `ruff help`.
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    let output = cmd.args(["help"]).assert().success();
-    let command_help = str::from_utf8(&output.get_output().stdout)?.trim();
+    let command_help = trim_lines(ruff_cli::command_help().trim());
 
     // Generate `ruff help check`.
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    let output = cmd.args(["help", "check"]).assert().success();
-    let subcommand_help = str::from_utf8(&output.get_output().stdout)?.trim();
+    let subcommand_help = trim_lines(ruff_cli::subcommand_help().trim());
 
     if args.dry_run {
         print!("{command_help}");
