@@ -6,7 +6,7 @@ use ruff_macros::derive_message_formats;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt, Unaryop};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
-use textwrap::dedent;
+use textwrap::{dedent, indent};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
@@ -55,27 +55,6 @@ impl TokenCheck {
             has_elif,
         }
     }
-}
-
-fn get_else_string(checker: &Checker, if_text: &str) -> Option<String> {
-    println!("{}", if_text);
-    let mut tree = match_module(if_text).unwrap();
-    let [Statement::Compound(CompoundStatement::If(embedding))] = &mut *tree.body else {
-        return None;
-    };
-    let orelse = embedding.orelse.as_ref().unwrap();
-    if let OrElse::Else(Else { body, .. }) = orelse.as_ref() {
-        let mut state = CodegenState {
-            default_newline: checker.stylist.line_ending(),
-            default_indent: checker.stylist.indentation(),
-            ..CodegenState::default()
-        };
-        body.codegen(&mut state);
-
-        let content = state.to_string();
-        return Some(content);
-    }
-    None
 }
 
 /// Checks for a single else in the statement provided
@@ -157,6 +136,22 @@ fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool
     false
 }
 
+fn indent_after_first<'a>(text: &'a str, indent_str: &str) -> String {
+    let first_newline = match text.find('\n') {
+        Some(item) => item,
+        None => return text.to_string(),
+    };
+    if text.len() < first_newline + 2 {
+        return text.to_string();
+    }
+    let first_part = &text[..first_newline + 1];
+    let second_part = &text[first_newline + 1..];
+    let new_second_part = indent(second_part, indent_str);
+    let mut final_string = String::from(first_part);
+    final_string.push_str(&new_second_part);
+    final_string
+}
+
 /// Converts an if statement where the code to keep is in the else statement
 fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     // FOR REVIEWER: pyupgrade had a check to see if the first statement was an if
@@ -164,7 +159,6 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     // automatically only sends the start of the statement as the if or elif, so
     // I did not see that as necessary.
     let token_checker = check_tokens(checker.locator, stmt);
-    println!("{:?}", token_checker);
     // The statement MUST have an else
     if !token_checker.has_else {
         return;
@@ -175,8 +169,30 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
     // If we only have an if and an else, we just need to get the else code and
     // dedent
+    if token_checker.first_token == Tok::If && !token_checker.has_elif {
+        let start = orelse.first().unwrap();
+        let end = orelse.last().unwrap();
+        let the_range = Range::new(start.location, end.end_location.unwrap());
+        let text = checker.locator.slice_source_code_range(&the_range);
+        let curr_indent = indentation(checker.locator, start).unwrap_or_default();
+        // Includes the first indent so thag we can properly dedent the string
+        let whole_text = format!("{curr_indent}{text}");
+        let closer_text = dedent(&whole_text);
+        let if_indent = indentation(checker.locator, stmt).unwrap_or_default();
+        // The replacement library only remembers the correct indentation for the first
+        // line anything after that, we need to run indent manually
+        let final_text = indent_after_first(&closer_text, if_indent);
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.amend(Fix::replacement(
+                final_text,
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
+        }
+        checker.diagnostics.push(diagnostic);
+        return;
     // If we have an elif, we need the "e" and "l" to make an if
-    if token_checker.first_token == Tok::If && token_checker.has_elif {
+    } else if token_checker.first_token == Tok::If && token_checker.has_elif {
         ending_location.go_right();
         ending_location.go_right();
     }
@@ -188,7 +204,6 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
 
 /// This is called to fix statements where the code to keep is not in the else
 fn fix_py3_block(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]) {
-    println!("Checkpoint three");
     let token_checker = check_tokens(checker.locator, stmt);
     let mut new_text: String;
     // If the first statement is an if, just use the body of this statement, and the
@@ -197,13 +212,29 @@ fn fix_py3_block(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt])
         if body.is_empty() {
             return;
         }
-        let start = body.first().unwrap();
-        let end = body.last().unwrap();
-        let text_range = Range::new(start.location, end.end_location.unwrap());
-        new_text = checker
-            .locator
-            .slice_source_code_range(&text_range)
-            .to_string();
+        if !token_checker.has_elif {
+            let start = body.first().unwrap();
+            let end = body.last().unwrap();
+            let the_range = Range::new(start.location, end.end_location.unwrap());
+            let text = checker.locator.slice_source_code_range(&the_range);
+            let curr_indent = indentation(checker.locator, start).unwrap_or_default();
+            // Includes the first indent so thag we can properly dedent the string
+            let whole_text = format!("{curr_indent}{text}");
+            let closer_text = dedent(&whole_text);
+            let if_indent = indentation(checker.locator, stmt).unwrap_or_default();
+            // The replacement library only remembers the correct indentation for the first
+            // line anything after that, we need to run indent manually
+            new_text = indent_after_first(&closer_text, if_indent);
+        // If we have an elif, we need the "e" and "l" to make an if
+        } else {
+            let start = body.first().unwrap();
+            let end = body.last().unwrap();
+            let text_range = Range::new(start.location, end.end_location.unwrap());
+            new_text = checker
+                .locator
+                .slice_source_code_range(&text_range)
+                .to_string();
+        }
     // Here we are dealing with an elif, so we need to replace it with an else,
     // preserve the body of the elif, and remove anything else
     } else {
