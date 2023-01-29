@@ -1,9 +1,8 @@
 use std::cmp::Ordering;
 
-use libcst_native::{Codegen, CodegenState, CompoundStatement, Else, If, OrElse, Statement};
 use num_bigint::{BigInt, Sign};
 use ruff_macros::derive_message_formats;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt, Unaryop};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, Unaryop};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use textwrap::{dedent, indent};
@@ -11,7 +10,6 @@ use textwrap::{dedent, indent};
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::match_module;
 use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
@@ -43,15 +41,13 @@ fn check_path(checker: &Checker, expr: &Expr, path: &[&str]) -> bool {
 #[derive(Debug)]
 struct TokenCheck {
     first_token: Tok,
-    has_else: bool,
     has_elif: bool,
 }
 
 impl TokenCheck {
-    fn new(first_token: Tok, has_else: bool, has_elif: bool) -> Self {
+    fn new(first_token: Tok, has_elif: bool) -> Self {
         Self {
             first_token,
-            has_else,
             has_elif,
         }
     }
@@ -66,7 +62,6 @@ fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
     let final_text = format!("{curr_indent}{text}");
     let tokens = lexer::make_tokenizer(&final_text);
     let mut first_token: Option<Tok> = None;
-    let mut has_else = false;
     let mut has_elif = false;
 
     for token_item in tokens {
@@ -74,16 +69,16 @@ fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
         if first_token.is_none() && Tok::Indent != token {
             first_token = Some(token.clone());
         }
-        if token == Tok::Else {
-            has_else = true;
-        } else if token == Tok::Elif {
+        if token == Tok::Elif {
             has_elif = true;
         }
-        if has_else && has_elif {
-            return TokenCheck::new(first_token.unwrap(), has_else, has_elif);
+        if let Some(first) = &first_token {
+            if has_elif {
+                return TokenCheck::new(first.clone(), has_elif);
+            }
         }
     }
-    TokenCheck::new(first_token.unwrap(), has_else, has_elif)
+    TokenCheck::new(first_token.unwrap(), has_elif)
 }
 
 /// Converts a `BigInt` to a `u32`, if the number is negative, it will return 0
@@ -135,7 +130,7 @@ fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool
     false
 }
 
-fn indent_after_first<'a>(text: &'a str, indent_str: &str) -> String {
+fn indent_after_first(text: &str, indent_str: &str) -> String {
     let first_newline = match text.find('\n') {
         Some(item) => item,
         None => return text.to_string(),
@@ -143,7 +138,7 @@ fn indent_after_first<'a>(text: &'a str, indent_str: &str) -> String {
     if text.len() < first_newline + 2 {
         return text.to_string();
     }
-    let first_part = &text[..first_newline + 1];
+    let first_part = &text[..=first_newline];
     let second_part = &text[first_newline + 1..];
     let new_second_part = indent(second_part, indent_str);
     let mut final_string = String::from(first_part);
@@ -200,9 +195,9 @@ fn fix_py2_block(
         ending_location.go_right();
     } else if tokens.first_token == Tok::Elif {
         ending_location = body.last().unwrap().end_location.unwrap();
-        let mut next_item = ending_location.clone();
+        let mut next_item = ending_location;
         next_item.go_right();
-        let mut after_item = ending_location.clone();
+        let mut after_item = ending_location;
         after_item.go_right();
         let range = Range::new(ending_location, after_item);
         let next_str = checker.locator.slice_source_code_range(&range);
@@ -232,7 +227,15 @@ fn fix_py3_block(
         if body.is_empty() {
             return;
         }
-        if !tokens.has_elif {
+        if tokens.has_elif {
+            let start = body.first().unwrap();
+            let end = body.last().unwrap();
+            let text_range = Range::new(start.location, end.end_location.unwrap());
+            new_text = checker
+                .locator
+                .slice_source_code_range(&text_range)
+                .to_string();
+        } else {
             let start = body.first().unwrap();
             let end = body.last().unwrap();
             let the_range = Range::new(start.location, end.end_location.unwrap());
@@ -245,15 +248,6 @@ fn fix_py3_block(
             // The replacement library only remembers the correct indentation for the first
             // line anything after that, we need to run indent manually
             new_text = indent_after_first(&closer_text, if_indent);
-        // If we have an elif, we need the "e" and "l" to make an if
-        } else {
-            let start = body.first().unwrap();
-            let end = body.last().unwrap();
-            let text_range = Range::new(start.location, end.end_location.unwrap());
-            new_text = checker
-                .locator
-                .slice_source_code_range(&text_range)
-                .to_string();
         }
     // Here we are dealing with an elif, so we need to replace it with an else,
     // preserve the body of the elif, and remove anything else
@@ -319,14 +313,15 @@ pub fn old_code_blocks(
                                 }
                             }
                         }
-                        ExprKind::Constant { value, .. } => {
-                            if let Constant::Int(number) = value {
-                                let version_number = bigint_to_u32(number);
-                                if version_number == 2 && op == &Cmpop::Eq {
-                                    fix_py2_block(checker, stmt, body, orelse, &tokens);
-                                } else if version_number == 3 && op == &Cmpop::Eq {
-                                    fix_py3_block(checker, stmt, test, body, &tokens);
-                                }
+                        ExprKind::Constant {
+                            value: Constant::Int(number),
+                            ..
+                        } => {
+                            let version_number = bigint_to_u32(number);
+                            if version_number == 2 && op == &Cmpop::Eq {
+                                fix_py2_block(checker, stmt, body, orelse, &tokens);
+                            } else if version_number == 3 && op == &Cmpop::Eq {
+                                fix_py3_block(checker, stmt, test, body, &tokens);
                             }
                         }
                         _ => (),
