@@ -534,12 +534,15 @@ where
     }
 
     fn is_identifier_start(&self, c: char) -> bool {
-        c == '_' || is_xid_start(c)
+        match c {
+            'a'..='z' | 'A'..='Z' | '_' => true,
+            _ => is_xid_start(c),
+        }
     }
 
     fn is_identifier_continuation(&self) -> bool {
         match self.window[0] {
-            Some('_' | '0'..='9') => true,
+            Some('a'..='z' | 'A'..='Z' | '_' | '0'..='9') => true,
             Some(c) => is_xid_continue(c),
             _ => false,
         }
