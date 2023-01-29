@@ -79,3 +79,37 @@ def f():
             pass
     else:
         yield
+
+
+class C:
+    def g():
+        pass
+
+    if six.PY2:
+        def f(py2):
+            pass
+    else:
+        def f(py3):
+            pass
+
+    def h():
+        pass
+
+if True:
+    if six.PY2:
+        2
+    else:
+        3
+
+    # comment
+
+if six.PY2:
+    def f():
+        print("py2")
+    def g():
+        print("py2")
+else:
+    def f():
+        print("py3")
+    def g():
+        print("py3")
