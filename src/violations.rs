@@ -38,23 +38,27 @@ impl Violation for ModuleImportNotAtTopOfFile {
 }
 
 define_violation!(
-    pub struct IOError(pub String);
+    pub struct IOError {
+        pub message: String,
+    }
 );
 impl Violation for IOError {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IOError(message) = self;
+        let IOError { message } = self;
         format!("{message}")
     }
 }
 
 define_violation!(
-    pub struct SyntaxError(pub String);
+    pub struct SyntaxError {
+        pub message: String,
+    }
 );
 impl Violation for SyntaxError {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SyntaxError(message) = self;
+        let SyntaxError { message } = self;
         format!("SyntaxError: {message}")
     }
 }
