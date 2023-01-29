@@ -62,12 +62,18 @@ pub fn cmp_members(
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
 ) -> Ordering {
-    if order_by_type {
-        prefix(alias1.name, classes, constants, variables)
-            .cmp(&prefix(alias2.name, classes, constants, variables))
-            .then_with(|| cmp_modules(alias1, alias2))
-    } else {
-        cmp_modules(alias1, alias2)
+    match (alias1.name == "*", alias2.name == "*") {
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
+        _ => {
+            if order_by_type {
+                prefix(alias1.name, classes, constants, variables)
+                    .cmp(&prefix(alias2.name, classes, constants, variables))
+                    .then_with(|| cmp_modules(alias1, alias2))
+            } else {
+                cmp_modules(alias1, alias2)
+            }
+        }
     }
 }
 
