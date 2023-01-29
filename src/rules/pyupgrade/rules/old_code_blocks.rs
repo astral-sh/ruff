@@ -85,6 +85,7 @@ fn check_tokens<T>(locator: &Locator, located: &Located<T>) -> TokenCheck {
 
     for token_item in tokens {
         let token = token_item.unwrap().1;
+        println!("{:?}", token);
         if first_token.is_none() {
             first_token = Some(token.clone());
         }
@@ -155,17 +156,20 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt]) {
     // or an elif, and would check for an index based on this. Our parser
     // automatically only sends the start of the statement as the if or elif, so
     // I did not see that as necessary.
+    println!("WE HERE");
     let token_checker = check_tokens(checker.locator, stmt);
     // The statement MUST have an else
     if !token_checker.has_else {
         return;
     }
+    println!("WE HERE");
     let else_statement = orelse.last().unwrap();
     let mut ending_location = else_statement.location;
     let range = Range::new(stmt.location, stmt.end_location.unwrap());
     let mut diagnostic = Diagnostic::new(OldCodeBlocks, range);
     // If we only have an if and an else, we just need to get the else code and
     // dedent
+    println!("WE HERE");
     if token_checker.first_token == Tok::If && !token_checker.has_elif && orelse.len() == 1 {
         let module_text = checker
             .locator
@@ -247,6 +251,7 @@ pub fn old_code_blocks(
 ) {
     // NOTE: Pyupgrade ONLY works if `sys.version_info` is on the left
     // We have to have an else statement in order to refactor
+    println!("STARTING");
     if orelse.is_empty() {
         return;
     }
