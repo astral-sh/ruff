@@ -689,24 +689,12 @@ where
     fn consume_normal(&mut self) -> Result<(), LexicalError> {
         // Check if we have some character:
         if let Some(c) = self.window[0] {
-            // First check identifier:
-            if self.is_identifier_start(c) {
-                let identifier = self.lex_identifier()?;
-                self.emit(identifier);
-            } else if is_emoji_presentation(c) {
-                let tok_start = self.get_pos();
-                self.next_char();
-                let tok_end = self.get_pos();
-                self.emit((
-                    tok_start,
-                    Tok::Name {
-                        name: c.to_string(),
-                    },
-                    tok_end,
-                ));
-            } else {
-                self.consume_character(c)?;
-            }
+               if self.is_identifier_start(c) {
+                    let identifier = self.lex_identifier()?;
+                    self.emit(identifier);
+               } else {
+                    self.consume_character(c)?;
+               }
         } else {
             // We reached end of file.
             let tok_pos = self.get_pos();
@@ -1112,13 +1100,25 @@ where
                     });
                 }
             }
-
             _ => {
-                let c = self.next_char();
-                return Err(LexicalError {
-                    error: LexicalErrorType::UnrecognizedToken { tok: c.unwrap() },
-                    location: self.get_pos(),
-                });
+                 if is_emoji_presentation(c) {
+                    let tok_start = self.get_pos();
+                    self.next_char();
+                    let tok_end = self.get_pos();
+                    self.emit((
+                        tok_start,
+                        Tok::Name {
+                            name: c.to_string(),
+                        },
+                        tok_end,
+                    ));
+                } else {
+                    let c = self.next_char();
+                    return Err(LexicalError {
+                        error: LexicalErrorType::UnrecognizedToken { tok: c.unwrap() },
+                        location: self.get_pos(),
+                    });
+                }
             } // Ignore all the rest..
         }
 
