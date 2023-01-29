@@ -334,6 +334,7 @@ ruff_macros::define_rule_mapping!(
     S106 => violations::HardcodedPasswordFuncArg,
     S107 => violations::HardcodedPasswordDefault,
     S108 => violations::HardcodedTempFile,
+    S110 => rules::flake8_bandit::rules::TryExceptPass,
     S113 => violations::RequestWithoutTimeout,
     S324 => violations::HashlibInsecureHashFunction,
     S501 => violations::RequestWithNoCertValidation,
@@ -735,12 +736,20 @@ impl Diagnostic {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[(
-    Rule::OneBlankLineBeforeClass,
-    Rule::NoBlankLineBeforeClass,
-    "`D203` (OneBlankLineBeforeClass) and `D211` (NoBlankLinesBeforeClass) are incompatible. \
-     Consider adding `D203` to `ignore`.",
-)];
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[
+    (
+        Rule::OneBlankLineBeforeClass,
+        Rule::NoBlankLineBeforeClass,
+        "`one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
+         incompatible. Consider ignoring `one-blank-line-before-class`.",
+    ),
+    (
+        Rule::MultiLineSummaryFirstLine,
+        Rule::MultiLineSummarySecondLine,
+        "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
+         incompatible. Consider ignoring one.",
+    ),
+];
 
 #[cfg(test)]
 mod tests {

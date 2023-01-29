@@ -4,8 +4,9 @@ expression: diagnostics
 ---
 - kind:
     ImportStarUsage:
-      - name
-      - - mymodule
+      name: name
+      sources:
+        - mymodule
   location:
     row: 5
     column: 10
@@ -16,8 +17,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportStarUsage:
-      - a
-      - - mymodule
+      name: a
+      sources:
+        - mymodule
   location:
     row: 11
     column: 0

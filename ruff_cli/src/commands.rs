@@ -18,12 +18,11 @@ use ruff::message::{Location, Message};
 use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
-use ruff::settings::types::SerializationFormat;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::args::Overrides;
+use crate::args::{HelpFormat, Overrides};
 use crate::cache;
 use crate::diagnostics::{lint_path, lint_stdin, Diagnostics};
 use crate::iterators::par_iter;
@@ -111,7 +110,7 @@ pub fn run(
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(&Rule::IOError) {
                         Diagnostics::new(vec![Message {
-                            kind: IOError(message).into(),
+                            kind: IOError { message }.into(),
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,
@@ -269,10 +268,10 @@ struct Explanation<'a> {
 }
 
 /// Explain a `Rule` to the user.
-pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
+pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let (linter, _) = Linter::parse_code(rule.code()).unwrap();
     match format {
-        SerializationFormat::Text | SerializationFormat::Grouped => {
+        HelpFormat::Text => {
             println!("{}\n", rule.as_ref());
             println!("Code: {} ({})\n", rule.code(), linter.name());
 
@@ -290,7 +289,7 @@ pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
                 println!("* {format}");
             }
         }
-        SerializationFormat::Json => {
+        HelpFormat::Json => {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
@@ -300,24 +299,12 @@ pub fn explain(rule: &Rule, format: SerializationFormat) -> Result<()> {
                 })?
             );
         }
-        SerializationFormat::Junit => {
-            bail!("`--explain` does not support junit format")
-        }
-        SerializationFormat::Github => {
-            bail!("`--explain` does not support GitHub format")
-        }
-        SerializationFormat::Gitlab => {
-            bail!("`--explain` does not support GitLab format")
-        }
-        SerializationFormat::Pylint => {
-            bail!("`--explain` does not support pylint format")
-        }
     };
     Ok(())
 }
 
 /// Clear any caches in the current directory or any subdirectories.
-pub fn clean(level: &LogLevel) -> Result<()> {
+pub fn clean(level: LogLevel) -> Result<()> {
     for entry in WalkDir::new(&*path_dedot::CWD)
         .into_iter()
         .filter_map(Result::ok)
@@ -325,7 +312,7 @@ pub fn clean(level: &LogLevel) -> Result<()> {
     {
         let cache = entry.path().join(CACHE_DIR_NAME);
         if cache.is_dir() {
-            if level >= &LogLevel::Default {
+            if level >= LogLevel::Default {
                 eprintln!("Removing cache at: {}", fs::relativize_path(&cache).bold());
             }
             remove_dir_all(&cache)?;

@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 23
     column: 8
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 24
     column: 8
@@ -28,8 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 31
     column: 34
@@ -40,8 +40,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 38
     column: 4
@@ -52,8 +52,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 49
     column: 4
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 50
     column: 8
@@ -76,8 +76,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 51
     column: 8
@@ -88,8 +88,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 60
     column: 4
@@ -100,8 +100,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 61
     column: 8
@@ -112,8 +112,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 62
     column: 8
@@ -124,8 +124,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ParametrizeValuesWrongType:
-      - tuple
-      - tuple
+      values: tuple
+      row: tuple
   location:
     row: 71
     column: 4

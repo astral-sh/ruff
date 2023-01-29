@@ -3,7 +3,8 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ConvertNamedTupleFunctionalToClass: NT1
+    ConvertNamedTupleFunctionalToClass:
+      name: NT1
   location:
     row: 5
     column: 0
@@ -23,7 +24,8 @@ expression: diagnostics
       column: 61
   parent: ~
 - kind:
-    ConvertNamedTupleFunctionalToClass: NT2
+    ConvertNamedTupleFunctionalToClass:
+      name: NT2
   location:
     row: 8
     column: 0
@@ -44,7 +46,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    ConvertNamedTupleFunctionalToClass: NT3
+    ConvertNamedTupleFunctionalToClass:
+      name: NT3
   location:
     row: 15
     column: 0
@@ -64,7 +67,8 @@ expression: diagnostics
       column: 56
   parent: ~
 - kind:
-    ConvertNamedTupleFunctionalToClass: NT4
+    ConvertNamedTupleFunctionalToClass:
+      name: NT4
   location:
     row: 18
     column: 0

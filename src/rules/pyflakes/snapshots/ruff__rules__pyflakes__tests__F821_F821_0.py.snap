@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedName: self
+    UndefinedName:
+      name: self
   location:
     row: 2
     column: 11
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: self
+    UndefinedName:
+      name: self
   location:
     row: 6
     column: 12
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: self
+    UndefinedName:
+      name: self
   location:
     row: 10
     column: 8
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: numeric_string
+    UndefinedName:
+      name: numeric_string
   location:
     row: 21
     column: 11
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: Bar
+    UndefinedName:
+      name: Bar
   location:
     row: 58
     column: 3
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: TOMATO
+    UndefinedName:
+      name: TOMATO
   location:
     row: 83
     column: 10
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: B
+    UndefinedName:
+      name: B
   location:
     row: 87
     column: 7
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: B
+    UndefinedName:
+      name: B
   location:
     row: 90
     column: 7
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: B
+    UndefinedName:
+      name: B
   location:
     row: 92
     column: 10
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: B
+    UndefinedName:
+      name: B
   location:
     row: 93
     column: 13
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: PEP593Test123
+    UndefinedName:
+      name: PEP593Test123
   location:
     row: 115
     column: 8
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: foo
+    UndefinedName:
+      name: foo
   location:
     row: 123
     column: 13
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: bar
+    UndefinedName:
+      name: bar
   location:
     row: 123
     column: 20

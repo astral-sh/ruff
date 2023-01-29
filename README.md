@@ -1,3 +1,5 @@
+<!-- Begin section: Overview -->
+
 # Ruff
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json)](https://github.com/charliermarsh/ruff)
@@ -106,6 +108,8 @@ developer of [Zulip](https://github.com/zulip/zulip):
 
 > This is just ridiculously fast... `ruff` is amazing.
 
+<!-- End section: Overview -->
+
 ## Table of Contents
 
 1. [Installation and Usage](#installation-and-usage)
@@ -161,6 +165,8 @@ developer of [Zulip](https://github.com/zulip/zulip):
 
 ## Installation and Usage
 
+<!-- Begin section: Installation and Usage -->
+
 ### Installation
 
 Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
@@ -200,9 +206,10 @@ apk add ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff path/to/code/to/lint.py  # Run Ruff over `lint.py`
-ruff path/to/code/            # Run Ruff over all files in `/path/to/code` (and any subdirectories)
-ruff path/to/code/*.py        # Run Ruff over all `.py` files in `/path/to/code`
+ruff .                        # Lint all files in the current directory (and any subdirectories)
+ruff path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
+ruff path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
+ruff path/to/code/to/file.py  # Lint `file.py`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
@@ -216,12 +223,16 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.236'
+  rev: 'v0.0.237'
   hooks:
     - id: ruff
 ```
 
+<!-- End section: Installation and Usage -->
+
 ## Configuration
+
+<!-- Begin section: Configuration -->
 
 Ruff is configurable both via `pyproject.toml` and the command line. For a full list of configurable
 options, see the [API reference](#reference).
@@ -315,7 +326,10 @@ prefix, followed by three digits (e.g., `F401`). The prefix indicates that "sour
 rules is determined by the `select` and `ignore` options, which support both the full code (e.g.,
 `F401`) and the prefix (e.g., `F`).
 
-As a special-case, Ruff also supports the `ALL` code, which enables all rules.
+As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some of the
+`pydocstyle` rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
+formats. Enabling `ALL` without further configuration may result in suboptimal behavior, especially
+for the `pydocstyle` plugin.
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
@@ -333,15 +347,14 @@ an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For ex
 `pyproject.toml` described above would be represented via the following `ruff.toml`:
 
 ```toml
-# Enable Pyflakes and pycodestyle rules.
-select = ["E", "F"]
+# Enable flake8-bugbear (`B`) rules.
+select = ["E", "F", "B"]
 
 # Never enforce `E501` (line length violations).
 ignore = ["E501"]
 
-# Always autofix, but never try to fix `F401` (unused imports).
-fix = true
-unfixable = ["F401"]
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+unfixable = ["B"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 [per-file-ignores]
@@ -351,22 +364,52 @@ unfixable = ["F401"]
 
 For a full list of configurable options, see the [API reference](#reference).
 
-Some common configuration settings can be provided via the command-line:
+### Command-line interface
+
+Some configuration settings can be provided via the command-line, such as those related to
+rule enablement and disablement, file discovery, logging level, and more:
 
 ```shell
-ruff path/to/code/ --select F401 --select F403
+ruff path/to/code/ --select F401 --select F403 --quiet
 ```
 
-See `ruff --help` for more:
+See `ruff help` for more on Ruff's top-level commands:
 
-<!-- Begin auto-generated cli help. -->
+<!-- Begin auto-generated command help. -->
 ```
 Ruff: An extremely fast Python linter.
 
-Usage: ruff [OPTIONS] [FILES]...
+Usage: ruff [OPTIONS] <COMMAND>
+
+Commands:
+  check  Run Ruff on the given files or directories (default)
+  rule   Explain a rule
+  clean  Clear any caches in the current directory and any subdirectories
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print lint violations, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
+
+For help with a specific command, see: `ruff help <command>`.
+```
+<!-- End auto-generated command help. -->
+
+Or `ruff help check` for more on the linting command:
+
+<!-- Begin auto-generated subcommand help. -->
+```
+Run Ruff on the given files or directories
+
+Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...
+  [FILES]...  List of files or directories to check
 
 Options:
       --fix              Attempt to automatically fix lint violations
@@ -376,11 +419,11 @@ Options:
       --fix-only         Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
       --format <FORMAT>  Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
       --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --statistics       Show counts for every rule with at least one violation
       --add-noqa         Enable automatic additions of `noqa` directives to failing lines
       --show-files       See the files Ruff will be run against with the current settings
       --show-settings    See the settings Ruff will use to lint a given Python file
   -h, --help             Print help
-  -V, --version          Print version
 
 Rule selection:
       --select <RULE_CODE>
@@ -425,17 +468,8 @@ Miscellaneous:
           Exit with status code "0", even upon detecting lint violations
       --update-check
           Enable or disable automatic update checks
-
-Subcommands:
-      --explain <EXPLAIN>  Explain a rule
-      --clean              Clear any caches in the current directory or any subdirectories
-
-Log levels:
-  -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
 ```
-<!-- End auto-generated cli help. -->
+<!-- End auto-generated subcommand help. -->
 
 ### `pyproject.toml` discovery
 
@@ -454,10 +488,9 @@ There are a few exceptions to these rules:
    resolved relative to the _current working directory_.
 3. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
    a default configuration. If a user-specific configuration file exists
-   at `${config_dir}/ruff/pyproject.toml`,
-   that file will be used instead of the default configuration, with `${config_dir}` being
-   determined via the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate, and all
-   relative paths being again resolved relative to the _current working directory_.
+   at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
+   configuration, with `${config_dir}` being determined via the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html)
+   crate, and all relative paths being again resolved relative to the _current working directory_.
 4. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
    `--select`) will override the settings in _every_ resolved configuration file.
 
@@ -552,7 +585,11 @@ Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This
 migrating a new codebase to Ruff. You can run `ruff /path/to/file.py --add-noqa` to automatically
 add `noqa` directives to all failing lines, with the appropriate rule codes.
 
+<!-- End section: Configuration -->
+
 ## Supported Rules
+
+<!-- Begin section: Rules -->
 
 Regardless of the rule's origin, Ruff re-implements every rule in Rust as a first-party feature.
 
@@ -827,6 +864,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S106 | hardcoded-password-func-arg | Possible hardcoded password: "{}" |  |
 | S107 | hardcoded-password-default | Possible hardcoded password: "{}" |  |
 | S108 | hardcoded-temp-file | Probable insecure usage of temporary file or directory: "{}" |  |
+| S110 | try-except-pass | `try`-`except`-`pass` detected, consider logging the exception |  |
 | S113 | request-without-timeout | Probable use of requests call with timeout set to `{value}` |  |
 | S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: "{}" |  |
 | S501 | request-with-no-cert-validation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |
@@ -865,12 +903,12 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B004 | unreliable-callable-check |  Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results. |  |
 | B005 | strip-with-multi-characters | Using `.strip()` with multi-character strings is misleading the reader |  |
 | B006 | mutable-argument-default | Do not use mutable data structures for argument defaults |  |
-| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body |  |
+| B007 | unused-loop-control-variable | Loop control variable `{name}` not used within loop body | 🛠 |
 | B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
 | B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B011 | do-not-assert-false | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
-| B012 | jump-statement-in-finally | `{name}` inside finally blocks cause exceptions to be silenced |  |
+| B012 | jump-statement-in-finally | `{name}` inside `finally` blocks cause exceptions to be silenced |  |
 | B013 | redundant-tuple-in-exception-handler | A length-one tuple literal is redundant. Write `except {name}` instead of `except ({name},)`. | 🛠 |
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
 | B015 | useless-comparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
@@ -939,14 +977,14 @@ For more, see [flake8-datetimez](https://pypi.org/project/flake8-datetimez/) on 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | DTZ001 | call-datetime-without-tzinfo | The use of `datetime.datetime()` without `tzinfo` argument is not allowed |  |
-| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed |  |
-| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed |  |
-| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed |  |
+| DTZ002 | call-datetime-today | The use of `datetime.datetime.today()` is not allowed, use `datetime.datetime.now(tz=)` instead |  |
+| DTZ003 | call-datetime-utcnow | The use of `datetime.datetime.utcnow()` is not allowed, use `datetime.datetime.now(tz=)` instead |  |
+| DTZ004 | call-datetime-utcfromtimestamp | The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead |  |
 | DTZ005 | call-datetime-now-without-tzinfo | The use of `datetime.datetime.now()` without `tz` argument is not allowed |  |
 | DTZ006 | call-datetime-fromtimestamp | The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed |  |
 | DTZ007 | call-datetime-strptime-without-zone | The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()` |  |
-| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed. |  |
-| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed |  |
+| DTZ011 | call-date-today | The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead |  |
+| DTZ012 | call-date-fromtimestamp | The use of `datetime.date.fromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead |  |
 
 ### flake8-debugger (T10)
 
@@ -1297,7 +1335,11 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 <!-- End auto-generated sections. -->
 
+<!-- End section: Rules -->
+
 ## Editor Integrations
+
+<!-- Begin section: Editor Integrations -->
 
 ### VS Code (Official)
 
@@ -1537,7 +1579,11 @@ jobs:
         run: ruff --format=github .
 ```
 
+<!-- End section: Editor Integrations -->
+
 ## FAQ
+
+<!-- Begin section: FAQ -->
 
 ### Is Ruff compatible with Black?
 
@@ -1581,9 +1627,9 @@ natively, including:
 - [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
-- [`flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
+- [`flake8-logging-format`](https://pypi.org/project/flake8-logging-format/)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
-- [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
+- [`flake8-pie`](https://pypi.org/project/flake8-pie/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
@@ -1591,7 +1637,7 @@ natively, including:
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
-- [`flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [`flake8-type-checking`](https://pypi.org/project/flake8-type-checking/)
 - [`flake8-use-pathlib`](https://pypi.org/project/flake8-use-pathlib/)
 - [`isort`](https://pypi.org/project/isort/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
@@ -1633,6 +1679,21 @@ Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
 
 Pylint parity is being tracked in [#970](https://github.com/charliermarsh/ruff/issues/970).
 
+### How does Ruff compare to Mypy, or Pyright, or Pyre?
+
+Ruff is a linter, not a type checker. It can detect some of the same problems that a type checker
+can, but a type checker will catch certain errors that Ruff would miss. The opposite is also true:
+Ruff will catch certain errors that a type checker would typically ignore.
+
+For example, unlike a type checker, Ruff will notify you if an import is unused, by looking for
+references to that import in the source code; on the other hand, a type checker could flag that you
+passed an integer argument to a function that expects a string, which Ruff would miss. The
+tools are complementary.
+
+It's recommended that you use Ruff in conjunction with a type checker, like Mypy, Pyright, or Pyre,
+with Ruff providing faster feedback on lint violations and the type checker providing more detailed
+feedback on type errors.
+
 ### Which tools does Ruff replace?
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
@@ -1654,9 +1715,9 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-executable`](https://pypi.org/project/flake8-executable/)
 - [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
 - [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
-- [`flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
+- [`flake8-logging-format`](https://pypi.org/project/flake8-logging-format/)
 - [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
-- [`flake8-pie`](https://pypi.org/project/flake8-pie/) ([#1543](https://github.com/charliermarsh/ruff/issues/1543))
+- [`flake8-pie`](https://pypi.org/project/flake8-pie/)
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
@@ -1664,7 +1725,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
 - [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
-- [`flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [`flake8-type-checking`](https://pypi.org/project/flake8-type-checking/)
 - [`flake8-use-pathlib`](https://pypi.org/project/flake8-use-pathlib/)
 - [`mccabe`](https://pypi.org/project/mccabe/)
 - [`pandas-vet`](https://pypi.org/project/pandas-vet/)
@@ -1772,6 +1833,46 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 
 Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
+### I want to use Ruff, but I don't want to use `pyproject.toml`. Is that possible?
+
+Yes! In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
+files are functionally equivalent and have an identical schema, with the exception that a `ruff.toml`
+file can omit the `[tool.ruff]` section header.
+
+For example, given this `pyproject.toml`:
+
+```toml
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.pydocstyle]
+convention = "google"
+```
+
+You could instead use a `ruff.toml` file like so:
+
+```toml
+line-length = 88
+
+[pydocstyle]
+convention = "google"
+```
+
+Ruff doesn't currently support INI files, like `setup.cfg` or `tox.ini`.
+
+### How can I change Ruff's default configuration?
+
+When no configuration file is found, Ruff will look for a user-specific `pyproject.toml` or
+`ruff.toml` file as a last resort. This behavior is similar to Flake8's `~/.config/flake8`.
+
+On macOS, Ruff expects that file to be located at `/Users/Alice/Library/Application Support/ruff/ruff.toml`.
+
+On Linux, Ruff expects that file to be located at `/home/alice/.config/ruff/ruff.toml`.
+
+On Windows, Ruff expects that file to be located at `C:\Users\Alice\AppData\Roaming\ruff\ruff.toml`.
+
+For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate.
+
 ### Ruff tried to fix something, but it broke my code. What should I do?
 
 Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
@@ -1789,6 +1890,8 @@ unfixable = ["B", "SIM", "TRY", "RUF"]
 ```
 
 If you find a case where Ruff's autofix breaks your code, please file an Issue!
+
+<!-- End section: FAQ -->
 
 ## Contributing
 
@@ -1926,7 +2029,9 @@ Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
 
 ## Reference
 
-### Options
+<!-- Begin section: Settings -->
+
+### Top-level
 
 <!-- Sections automatically generated by `cargo dev generate-options`. -->
 <!-- Begin auto-generated options sections. -->
@@ -2212,9 +2317,10 @@ fix-only = true
 
 #### [`fixable`](#fixable)
 
-A list of rule codes or prefixes to consider autofixable.
+A list of rule codes or prefixes to consider autofixable. By default, all rules are
+considered autofixable.
 
-**Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
+**Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]`
 
 **Type**: `Vec<RuleSelector>`
 
@@ -2683,6 +2789,24 @@ suppress-none-returning = true
 
 ### `flake8-bandit`
 
+#### [`check-typed-exception`](#check-typed-exception)
+
+Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default,
+`try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-bandit]
+check-typed-exception = true
+```
+
+---
+
 #### [`hardcoded-tmp-directory`](#hardcoded-tmp-directory)
 
 A list of directories to consider temporary.
@@ -3121,7 +3245,7 @@ and can be circumvented via `eval` or `importlib`.
 Exempt certain modules from needing to be moved into type-checking
 blocks.
 
-**Default value**: `[]`
+**Default value**: `["typing"]`
 
 **Type**: `Vec<String>`
 
@@ -3129,7 +3253,7 @@ blocks.
 
 ```toml
 [tool.ruff.flake8-type-checking]
-exempt-modules = ["typing_extensions"]
+exempt-modules = ["typing", "typing_extensions"]
 ```
 
 ---
@@ -3400,7 +3524,7 @@ this to "closest-to-furthest" is equivalent to isort's `reverse-relative
 
 **Default value**: `furthest-to-closest`
 
-**Type**: `RelatveImportsOrder`
+**Type**: `RelativeImportsOrder`
 
 **Example usage**:
 
@@ -3668,6 +3792,8 @@ keep-runtime-typing = true
 ---
 
 <!-- End auto-generated options sections. -->
+
+<!-- End section: Settings -->
 
 ## License
 

@@ -22,16 +22,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2022-11-01
-          override: true
+      - name: "Install Rust toolchain"
+        run: rustup show
       - uses: Swatinem/rust-cache@v1
       - run: cargo build --all
       - run: ./target/debug/ruff_dev generate-all
-      - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo +nightly dev generate-all'."
-      - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo +nightly dev generate-all'."
+      - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo dev generate-all'."
+      - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo dev generate-all'."
       - run: git diff --exit-code -- README.md ruff.schema.json
 
   cargo-fmt:
@@ -39,12 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2022-11-01
-          override: true
-          components: rustfmt
+      - name: "Install Rust toolchain"
+        run: rustup component add rustfmt
       - run: cargo fmt --all --check
 
   cargo_clippy:
@@ -52,13 +45,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2022-11-01
-          override: true
-          components: clippy
-          target: wasm32-unknown-unknown
+      - name: "Install Rust toolchain"
+        run: |
+          rustup component add clippy
+          rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
       - run: cargo clippy -p ruff --target wasm32-unknown-unknown --all-features -- -D warnings -W clippy::pedantic
@@ -71,20 +61,17 @@ jobs:
     name: "cargo test | ${{ matrix.os }}"
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: 1.65.0
-          override: true
+      - name: "Install Rust toolchain"
+        run: rustup show
       - uses: Swatinem/rust-cache@v1
       - run: cargo install cargo-insta
       - run: pip install black[d]==22.12.0
-      - name: Run tests (Ubuntu)
+      - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           cargo insta test --all --delete-unreferenced-snapshots
           git diff --exit-code
-      - name: Run tests (Windows)
+      - name: "Run tests (Windows)"
         if: ${{ matrix.os == 'windows-latest' }}
         shell: bash
         run: |
@@ -102,10 +89,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          override: true
+      - name: "Install Rust toolchain"
+        run: rustup show
       - uses: Swatinem/rust-cache@v1
       - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
       - run: cargo check
@@ -114,61 +99,26 @@ jobs:
          ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
       - run: cargo check
 
-# TODO(charlie): Re-enable the `wasm-pack` tests.
-# See: https://github.com/charliermarsh/ruff/issues/1425
-#  wasm-pack-test:
-#    name: "wasm-pack test"
-#    runs-on: ubuntu-latest
-#    env:
-#      WASM_BINDGEN_TEST_TIMEOUT: 60
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          toolchain: nightly-2022-11-01
-#          override: true
-#      - uses: actions/cache@v3
-#        env:
-#          cache-name: cache-cargo
-#        with:
-#          path: |
-#            ~/.cargo/registry
-#            ~/.cargo/git
-#          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-#          restore-keys: |
-#            ${{ runner.os }}-build-${{ env.cache-name }}-
-#            ${{ runner.os }}-build-
-#            ${{ runner.os }}-
-#      - uses: jetli/wasm-pack-action@v0.4.0
-#      - uses: jetli/wasm-bindgen-action@v0.2.0
-#      - run: wasm-pack test --node
-
   maturin-build:
     name: "maturin build"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: 1.65.0
-          override: true
+      - name: "Install Rust toolchain"
+        run: rustup show
       - uses: Swatinem/rust-cache@v1
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
       - run: pip install maturin
       - run: maturin build -b bin
+      - run: python scripts/transform_readme.py --target pypi
 
   typos:
-    name: Spell Check with Typos
+    name: "spell check"
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Actions Repository
-      uses: actions/checkout@v3
-
-    - name: Check spelling of file.txt
-      uses: crate-ci/typos@master
+    - uses: actions/checkout@v3
+    - uses: crate-ci/typos@master
       with:
         files: .

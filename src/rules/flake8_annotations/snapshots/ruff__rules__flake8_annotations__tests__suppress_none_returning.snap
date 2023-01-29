@@ -3,7 +3,8 @@ source: src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingReturnTypePublicFunction: foo
+    MissingReturnTypePublicFunction:
+      name: foo
   location:
     row: 45
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypePublicFunction: foo
+    MissingReturnTypePublicFunction:
+      name: foo
   location:
     row: 50
     column: 4

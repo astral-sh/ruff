@@ -25,11 +25,11 @@ pub fn native_literals(
 
     if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let mut diagnostic = Diagnostic::new(violations::NativeLiterals(if id == "str" {
+            let mut diagnostic = Diagnostic::new(violations::NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
-            }), Range::from_located(expr));
+            }}, Range::from_located(expr));
             if checker.patch(&Rule::NativeLiterals) {
                 diagnostic.amend(Fix::replacement(
                     if id == "bytes" {
@@ -94,11 +94,13 @@ pub fn native_literals(
         }
 
         let mut diagnostic = Diagnostic::new(
-            violations::NativeLiterals(if id == "str" {
-                LiteralType::Str
-            } else {
-                LiteralType::Bytes
-            }),
+            violations::NativeLiterals {
+                literal_type: if id == "str" {
+                    LiteralType::Str
+                } else {
+                    LiteralType::Bytes
+                },
+            },
             Range::from_located(expr),
         );
         if checker.patch(&Rule::NativeLiterals) {

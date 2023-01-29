@@ -3,7 +3,8 @@ source: src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NonLowercaseVariableInFunction: Camel
+    NonLowercaseVariableInFunction:
+      name: Camel
   location:
     row: 13
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonLowercaseVariableInFunction: CONSTANT
+    NonLowercaseVariableInFunction:
+      name: CONSTANT
   location:
     row: 14
     column: 4

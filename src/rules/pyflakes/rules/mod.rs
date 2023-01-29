@@ -47,7 +47,9 @@ pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &[Binding]) -> O
                     if let Some((scope_id, location)) = binding.runtime_usage {
                         if scope_id == current.id {
                             return Some(Diagnostic::new(
-                                violations::UndefinedLocal(name.to_string()),
+                                violations::UndefinedLocal {
+                                    name: name.to_string(),
+                                },
                                 location,
                             ));
                         }

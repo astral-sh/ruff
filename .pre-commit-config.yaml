@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.236
+    rev: v0.0.237
     hooks:
       - id: ruff
         args: [--fix]
@@ -15,6 +15,17 @@ repos:
     hooks:
       - id: cargo-fmt
         name: cargo fmt
-        entry: cargo +nightly fmt --
+        entry: cargo fmt --
         language: rust
         types: [rust]
+      - id: clippy
+        name: clippy
+        entry: cargo clippy --workspace --all-targets --all-features
+        language: rust
+        pass_filenames: false
+      - id: dev-generate-all
+        name: dev-generate-all
+        entry: cargo dev generate-all
+        language: rust
+        pass_filenames: false
+        exclude: target

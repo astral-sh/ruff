@@ -3,7 +3,8 @@ source: src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 11
     column: 8
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 12
     column: 8
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 13
     column: 8
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 14
     column: 8
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 43
   parent: ~
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 15
     column: 8
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 43
   parent: ~
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 16
     column: 8
@@ -103,7 +109,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 17
     column: 8
@@ -113,7 +120,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 18
     column: 8
@@ -123,7 +131,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion: assertTrue
+    UnittestAssertion:
+      assertion: assertTrue
   location:
     row: 19
     column: 8
@@ -133,7 +142,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion: assertFalse
+    UnittestAssertion:
+      assertion: assertFalse
   location:
     row: 22
     column: 8
@@ -151,7 +161,8 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnittestAssertion: assertEqual
+    UnittestAssertion:
+      assertion: assertEqual
   location:
     row: 25
     column: 8
@@ -169,7 +180,8 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnittestAssertion: assertNotEqual
+    UnittestAssertion:
+      assertion: assertNotEqual
   location:
     row: 28
     column: 8
@@ -187,7 +199,8 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    UnittestAssertion: assertGreater
+    UnittestAssertion:
+      assertion: assertGreater
   location:
     row: 31
     column: 8
@@ -205,7 +218,8 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    UnittestAssertion: assertGreaterEqual
+    UnittestAssertion:
+      assertion: assertGreaterEqual
   location:
     row: 34
     column: 8
@@ -223,7 +237,8 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    UnittestAssertion: assertLess
+    UnittestAssertion:
+      assertion: assertLess
   location:
     row: 37
     column: 8
@@ -241,7 +256,8 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnittestAssertion: assertLessEqual
+    UnittestAssertion:
+      assertion: assertLessEqual
   location:
     row: 40
     column: 8
@@ -259,7 +275,8 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    UnittestAssertion: assertIn
+    UnittestAssertion:
+      assertion: assertIn
   location:
     row: 43
     column: 8
@@ -277,7 +294,8 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    UnittestAssertion: assertNotIn
+    UnittestAssertion:
+      assertion: assertNotIn
   location:
     row: 46
     column: 8
@@ -295,7 +313,8 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    UnittestAssertion: assertIsNone
+    UnittestAssertion:
+      assertion: assertIsNone
   location:
     row: 49
     column: 8
@@ -313,7 +332,8 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    UnittestAssertion: assertIsNotNone
+    UnittestAssertion:
+      assertion: assertIsNotNone
   location:
     row: 52
     column: 8
@@ -331,7 +351,8 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    UnittestAssertion: assertIs
+    UnittestAssertion:
+      assertion: assertIs
   location:
     row: 55
     column: 8
@@ -349,7 +370,8 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnittestAssertion: assertIsNot
+    UnittestAssertion:
+      assertion: assertIsNot
   location:
     row: 58
     column: 8
@@ -367,7 +389,8 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnittestAssertion: assertIsInstance
+    UnittestAssertion:
+      assertion: assertIsInstance
   location:
     row: 61
     column: 8
@@ -385,7 +408,8 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    UnittestAssertion: assertNotIsInstance
+    UnittestAssertion:
+      assertion: assertNotIsInstance
   location:
     row: 64
     column: 8
@@ -403,7 +427,8 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    UnittestAssertion: assertRegex
+    UnittestAssertion:
+      assertion: assertRegex
   location:
     row: 67
     column: 8
@@ -421,7 +446,8 @@ expression: diagnostics
       column: 39
   parent: ~
 - kind:
-    UnittestAssertion: assertNotRegex
+    UnittestAssertion:
+      assertion: assertNotRegex
   location:
     row: 70
     column: 8
@@ -439,7 +465,8 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    UnittestAssertion: assertRegexpMatches
+    UnittestAssertion:
+      assertion: assertRegexpMatches
   location:
     row: 73
     column: 8
@@ -457,7 +484,8 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    UnittestAssertion: assertNotRegex
+    UnittestAssertion:
+      assertion: assertNotRegex
   location:
     row: 76
     column: 8

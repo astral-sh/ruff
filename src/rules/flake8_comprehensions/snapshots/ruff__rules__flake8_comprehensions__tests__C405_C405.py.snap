@@ -3,7 +3,8 @@ source: src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryLiteralSet: list
+    UnnecessaryLiteralSet:
+      obj_type: list
   location:
     row: 1
     column: 0
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    UnnecessaryLiteralSet: tuple
+    UnnecessaryLiteralSet:
+      obj_type: tuple
   location:
     row: 2
     column: 0
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    UnnecessaryLiteralSet: list
+    UnnecessaryLiteralSet:
+      obj_type: list
   location:
     row: 3
     column: 0
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    UnnecessaryLiteralSet: tuple
+    UnnecessaryLiteralSet:
+      obj_type: tuple
   location:
     row: 4
     column: 0
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    UnnecessaryLiteralSet: tuple
+    UnnecessaryLiteralSet:
+      obj_type: tuple
   location:
     row: 6
     column: 0
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    UnnecessaryLiteralSet: tuple
+    UnnecessaryLiteralSet:
+      obj_type: tuple
   location:
     row: 7
     column: 0
@@ -113,7 +119,8 @@ expression: diagnostics
       column: 2
   parent: ~
 - kind:
-    UnnecessaryLiteralSet: list
+    UnnecessaryLiteralSet:
+      obj_type: list
   location:
     row: 10
     column: 0
@@ -133,7 +140,8 @@ expression: diagnostics
       column: 2
   parent: ~
 - kind:
-    UnnecessaryLiteralSet: tuple
+    UnnecessaryLiteralSet:
+      obj_type: tuple
   location:
     row: 13
     column: 0
@@ -151,7 +159,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UnnecessaryLiteralSet: list
+    UnnecessaryLiteralSet:
+      obj_type: list
   location:
     row: 16
     column: 0

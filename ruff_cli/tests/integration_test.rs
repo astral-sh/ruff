@@ -14,7 +14,7 @@ const BIN_NAME: &str = "ruff";
 #[test]
 fn test_stdin_success() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    cmd.args(["-", "--format", "text"])
+    cmd.args(["-", "--format", "text", "--isolated"])
         .write_stdin("")
         .assert()
         .success();
@@ -25,7 +25,7 @@ fn test_stdin_success() -> Result<()> {
 fn test_stdin_error() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "text"])
+        .args(["-", "--format", "text", "--isolated"])
         .write_stdin("import os\n")
         .assert()
         .failure();
@@ -41,7 +41,14 @@ fn test_stdin_error() -> Result<()> {
 fn test_stdin_filename() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "text", "--stdin-filename", "F401.py"])
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--stdin-filename",
+            "F401.py",
+            "--isolated",
+        ])
         .write_stdin("import os\n")
         .assert()
         .failure();
@@ -58,7 +65,14 @@ fn test_stdin_filename() -> Result<()> {
 fn test_stdin_json() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "json", "--stdin-filename", "F401.py"])
+        .args([
+            "-",
+            "--format",
+            "json",
+            "--stdin-filename",
+            "F401.py",
+            "--isolated",
+        ])
         .write_stdin("import os\n")
         .assert()
         .failure();
@@ -107,7 +121,7 @@ fn test_stdin_json() -> Result<()> {
 fn test_stdin_autofix() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "text", "--fix"])
+        .args(["-", "--format", "text", "--fix", "--isolated"])
         .write_stdin("import os\nimport sys\n\nprint(sys.version)\n")
         .assert()
         .success();
@@ -122,7 +136,7 @@ fn test_stdin_autofix() -> Result<()> {
 fn test_stdin_autofix_when_not_fixable_should_still_print_contents() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "text", "--fix"])
+        .args(["-", "--format", "text", "--fix", "--isolated"])
         .write_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n")
         .assert()
         .failure();
@@ -137,7 +151,7 @@ fn test_stdin_autofix_when_not_fixable_should_still_print_contents() -> Result<(
 fn test_stdin_autofix_when_no_issues_should_still_print_contents() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "text", "--fix"])
+        .args(["-", "--format", "text", "--fix", "--isolated"])
         .write_stdin("import sys\n\nprint(sys.version)\n")
         .assert()
         .success();
@@ -152,7 +166,7 @@ fn test_stdin_autofix_when_no_issues_should_still_print_contents() -> Result<()>
 fn test_show_source() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "text", "--show-source"])
+        .args(["-", "--format", "text", "--show-source", "--isolated"])
         .write_stdin("l = 1")
         .assert()
         .failure();
@@ -163,8 +177,26 @@ fn test_show_source() -> Result<()> {
 #[test]
 fn explain_status_codes() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    cmd.args(["-", "--explain", "F401"]).assert().success();
+    cmd.args(["--explain", "F401"]).assert().success();
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    cmd.args(["-", "--explain", "RUF404"]).assert().failure();
+    cmd.args(["--explain", "RUF404"]).assert().failure();
+    Ok(())
+}
+
+#[test]
+fn show_statistics() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let output = cmd
+        .args(["-", "--format", "text", "--select", "F401", "--statistics"])
+        .write_stdin("import sys\nimport os\n\nprint(os.getuid())\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?
+            .lines()
+            .last()
+            .unwrap(),
+        "1\tF401\t`sys` imported but unused"
+    );
     Ok(())
 }

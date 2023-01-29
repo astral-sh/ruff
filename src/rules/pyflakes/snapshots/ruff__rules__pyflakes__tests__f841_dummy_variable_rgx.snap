@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedVariable: e
+    UnusedVariable:
+      name: e
   location:
     row: 3
     column: 21
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    UnusedVariable: foo
+    UnusedVariable:
+      name: foo
   location:
     row: 20
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable: a
+    UnusedVariable:
+      name: a
   location:
     row: 21
     column: 5
@@ -49,7 +52,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: b
+    UnusedVariable:
+      name: b
   location:
     row: 21
     column: 8
@@ -59,7 +63,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: baz
+    UnusedVariable:
+      name: baz
   location:
     row: 26
     column: 13
@@ -69,7 +74,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: _
+    UnusedVariable:
+      name: _
   location:
     row: 35
     column: 4
@@ -87,7 +93,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable: __
+    UnusedVariable:
+      name: __
   location:
     row: 36
     column: 4
@@ -105,7 +112,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable: _discarded
+    UnusedVariable:
+      name: _discarded
   location:
     row: 37
     column: 4
@@ -123,7 +131,8 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    UnusedVariable: b
+    UnusedVariable:
+      name: b
   location:
     row: 51
     column: 8
@@ -141,7 +150,8 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnusedVariable: my_file
+    UnusedVariable:
+      name: my_file
   location:
     row: 79
     column: 25
@@ -159,7 +169,8 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    UnusedVariable: my_file
+    UnusedVariable:
+      name: my_file
   location:
     row: 85
     column: 24

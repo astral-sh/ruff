@@ -154,7 +154,9 @@ pub fn convert_named_tuple_functional_to_class(
         return;
     };
     let mut diagnostic = Diagnostic::new(
-        violations::ConvertNamedTupleFunctionalToClass(typename.to_string()),
+        violations::ConvertNamedTupleFunctionalToClass {
+            name: typename.to_string(),
+        },
         Range::from_located(stmt),
     );
     // TODO(charlie): Preserve indentation, to remove the first-column requirement.

@@ -81,7 +81,9 @@ fn create_check(
     patch: bool,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
-        violations::RedundantOpenModes(replacement_value.clone()),
+        violations::RedundantOpenModes {
+            replacement: replacement_value.clone(),
+        },
         Range::from_located(expr),
     );
     if patch {

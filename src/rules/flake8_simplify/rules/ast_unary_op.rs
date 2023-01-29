@@ -45,10 +45,10 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::NegateEqualOp(
-            unparse_expr(left, checker.stylist),
-            unparse_expr(&comparators[0], checker.stylist),
-        ),
+        violations::NegateEqualOp {
+            left: unparse_expr(left, checker.stylist),
+            right: unparse_expr(&comparators[0], checker.stylist),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
@@ -96,10 +96,10 @@ pub fn negation_with_not_equal_op(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::NegateNotEqualOp(
-            unparse_expr(left, checker.stylist),
-            unparse_expr(&comparators[0], checker.stylist),
-        ),
+        violations::NegateNotEqualOp {
+            left: unparse_expr(left, checker.stylist),
+            right: unparse_expr(&comparators[0], checker.stylist),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
@@ -132,7 +132,9 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::DoubleNegation(operand.to_string()),
+        violations::DoubleNegation {
+            expr: operand.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {

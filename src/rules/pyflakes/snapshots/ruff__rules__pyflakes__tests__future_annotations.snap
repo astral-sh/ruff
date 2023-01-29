@@ -28,7 +28,8 @@ expression: diagnostics
     row: 6
     column: 0
 - kind:
-    UndefinedName: Bar
+    UndefinedName:
+      name: Bar
   location:
     row: 26
     column: 18

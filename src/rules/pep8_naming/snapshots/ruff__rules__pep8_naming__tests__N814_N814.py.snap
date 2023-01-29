@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     CamelcaseImportedAsConstant:
-      - Camel
-      - CAMEL
+      name: Camel
+      asname: CAMEL
   location:
     row: 1
     column: 0
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     CamelcaseImportedAsConstant:
-      - CamelCase
-      - CAMELCASE
+      name: CamelCase
+      asname: CAMELCASE
   location:
     row: 2
     column: 0
@@ -28,8 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     CamelcaseImportedAsConstant:
-      - AnotherCamelCase
-      - ANOTHER_CAMELCASE
+      name: AnotherCamelCase
+      asname: ANOTHER_CAMELCASE
   location:
     row: 3
     column: 0

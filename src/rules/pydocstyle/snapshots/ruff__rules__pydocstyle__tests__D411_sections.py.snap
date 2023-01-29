@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BlankLineBeforeSection: Yields
+    BlankLineBeforeSection:
+      name: Yields
   location:
     row: 67
     column: 4
@@ -22,7 +23,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    BlankLineBeforeSection: Returns
+    BlankLineBeforeSection:
+      name: Returns
   location:
     row: 122
     column: 4
@@ -41,7 +43,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    BlankLineBeforeSection: Raises
+    BlankLineBeforeSection:
+      name: Raises
   location:
     row: 207
     column: 4

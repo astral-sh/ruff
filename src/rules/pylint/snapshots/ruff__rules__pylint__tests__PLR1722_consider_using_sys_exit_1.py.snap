@@ -3,7 +3,8 @@ source: src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UseSysExit: exit
+    UseSysExit:
+      name: exit
   location:
     row: 3
     column: 0
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    UseSysExit: quit
+    UseSysExit:
+      name: quit
   location:
     row: 4
     column: 0
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    UseSysExit: exit
+    UseSysExit:
+      name: exit
   location:
     row: 8
     column: 4
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    UseSysExit: quit
+    UseSysExit:
+      name: quit
   location:
     row: 9
     column: 4

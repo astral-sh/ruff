@@ -32,6 +32,16 @@ def bad():
     try:
         a = 1
     except Exception:
+        log.error("Context message here")
+
+        if True:
+            log.error("Context message here")
+
+
+def bad():
+    try:
+        a = 1
+    except Exception:
         self.logger.error("Context message here")
 
         if True:

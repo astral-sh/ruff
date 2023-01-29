@@ -67,7 +67,9 @@ pub fn blind_except(
             }
 
             checker.diagnostics.push(Diagnostic::new(
-                violations::BlindExcept(id.to_string()),
+                violations::BlindExcept {
+                    name: id.to_string(),
+                },
                 Range::from_located(type_),
             ));
         }

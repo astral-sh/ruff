@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BlankLineAfterSummary: 0
+    BlankLineAfterSummary:
+      num_lines: 0
   location:
     row: 200
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BlankLineAfterSummary: 2
+    BlankLineAfterSummary:
+      num_lines: 2
   location:
     row: 210
     column: 4

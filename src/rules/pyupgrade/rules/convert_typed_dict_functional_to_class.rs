@@ -201,7 +201,9 @@ pub fn convert_typed_dict_functional_to_class(
     };
 
     let mut diagnostic = Diagnostic::new(
-        violations::ConvertTypedDictFunctionalToClass(class_name.to_string()),
+        violations::ConvertTypedDictFunctionalToClass {
+            name: class_name.to_string(),
+        },
         Range::from_located(stmt),
     );
     // TODO(charlie): Preserve indentation, to remove the first-column requirement.

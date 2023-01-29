@@ -4,7 +4,8 @@ expression: diagnostics
 ---
 - kind:
     DuplicateHandlerException:
-      - OSError
+      names:
+        - OSError
   location:
     row: 17
     column: 7
@@ -23,7 +24,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DuplicateHandlerException:
-      - MyError
+      names:
+        - MyError
   location:
     row: 28
     column: 7
@@ -42,7 +44,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DuplicateHandlerException:
-      - re.error
+      names:
+        - re.error
   location:
     row: 49
     column: 7

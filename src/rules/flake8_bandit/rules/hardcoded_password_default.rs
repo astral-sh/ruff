@@ -12,7 +12,9 @@ fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Diagno
         return None;
     }
     Some(Diagnostic::new(
-        violations::HardcodedPasswordDefault(string.to_string()),
+        violations::HardcodedPasswordDefault {
+            string: string.to_string(),
+        },
         Range::from_located(default),
     ))
 }

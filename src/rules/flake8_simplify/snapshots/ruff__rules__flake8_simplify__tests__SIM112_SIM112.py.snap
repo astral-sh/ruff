@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     UseCapitalEnvironmentVariables:
-      - FOO
-      - foo
+      expected: FOO
+      original: foo
   location:
     row: 4
     column: 11
@@ -24,8 +24,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UseCapitalEnvironmentVariables:
-      - FOO
-      - foo
+      expected: FOO
+      original: foo
   location:
     row: 6
     column: 15
@@ -44,8 +44,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UseCapitalEnvironmentVariables:
-      - FOO
-      - foo
+      expected: FOO
+      original: foo
   location:
     row: 8
     column: 15
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UseCapitalEnvironmentVariables:
-      - FOO
-      - foo
+      expected: FOO
+      original: foo
   location:
     row: 10
     column: 10

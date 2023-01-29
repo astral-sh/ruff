@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FutureFeatureNotDefined: non_existent_feature
+    FutureFeatureNotDefined:
+      name: non_existent_feature
   location:
     row: 2
     column: 23

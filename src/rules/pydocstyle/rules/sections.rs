@@ -78,7 +78,9 @@ fn blanks_and_section_underline(
             .enabled(&Rule::DashedUnderlineAfterSection)
         {
             let mut diagnostic = Diagnostic::new(
-                violations::DashedUnderlineAfterSection(context.section_name.to_string()),
+                violations::DashedUnderlineAfterSection {
+                    name: context.section_name.to_string(),
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -101,7 +103,9 @@ fn blanks_and_section_underline(
         }
         if checker.settings.rules.enabled(&Rule::NonEmptySection) {
             checker.diagnostics.push(Diagnostic::new(
-                violations::NonEmptySection(context.section_name.to_string()),
+                violations::NonEmptySection {
+                    name: context.section_name.to_string(),
+                },
                 Range::from_located(docstring.expr),
             ));
         }
@@ -121,7 +125,9 @@ fn blanks_and_section_underline(
                 .enabled(&Rule::SectionUnderlineAfterName)
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::SectionUnderlineAfterName(context.section_name.to_string()),
+                    violations::SectionUnderlineAfterName {
+                        name: context.section_name.to_string(),
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -157,9 +163,9 @@ fn blanks_and_section_underline(
                 .enabled(&Rule::SectionUnderlineMatchesSectionLength)
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::SectionUnderlineMatchesSectionLength(
-                        context.section_name.to_string(),
-                    ),
+                    violations::SectionUnderlineMatchesSectionLength {
+                        name: context.section_name.to_string(),
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -201,7 +207,9 @@ fn blanks_and_section_underline(
             let leading_space = whitespace::leading_space(non_empty_line);
             if leading_space.len() > docstring.indentation.len() {
                 let mut diagnostic = Diagnostic::new(
-                    violations::SectionUnderlineNotOverIndented(context.section_name.to_string()),
+                    violations::SectionUnderlineNotOverIndented {
+                        name: context.section_name.to_string(),
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -241,7 +249,9 @@ fn blanks_and_section_underline(
                 if blank_lines_after_dashes == rest_of_lines.len() {
                     if checker.settings.rules.enabled(&Rule::NonEmptySection) {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::NonEmptySection(context.section_name.to_string()),
+                            violations::NonEmptySection {
+                                name: context.section_name.to_string(),
+                            },
                             Range::from_located(docstring.expr),
                         ));
                     }
@@ -252,9 +262,9 @@ fn blanks_and_section_underline(
                         .enabled(&Rule::NoBlankLinesBetweenHeaderAndContent)
                     {
                         let mut diagnostic = Diagnostic::new(
-                            violations::NoBlankLinesBetweenHeaderAndContent(
-                                context.section_name.to_string(),
-                            ),
+                            violations::NoBlankLinesBetweenHeaderAndContent {
+                                name: context.section_name.to_string(),
+                            },
                             Range::from_located(docstring.expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
@@ -284,7 +294,9 @@ fn blanks_and_section_underline(
         } else {
             if checker.settings.rules.enabled(&Rule::NonEmptySection) {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::NonEmptySection(context.section_name.to_string()),
+                    violations::NonEmptySection {
+                        name: context.section_name.to_string(),
+                    },
                     Range::from_located(docstring.expr),
                 ));
             }
@@ -296,7 +308,9 @@ fn blanks_and_section_underline(
             .enabled(&Rule::DashedUnderlineAfterSection)
         {
             let mut diagnostic = Diagnostic::new(
-                violations::DashedUnderlineAfterSection(context.section_name.to_string()),
+                violations::DashedUnderlineAfterSection {
+                    name: context.section_name.to_string(),
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -324,9 +338,9 @@ fn blanks_and_section_underline(
                 .enabled(&Rule::NoBlankLinesBetweenHeaderAndContent)
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::NoBlankLinesBetweenHeaderAndContent(
-                        context.section_name.to_string(),
-                    ),
+                    violations::NoBlankLinesBetweenHeaderAndContent {
+                        name: context.section_name.to_string(),
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -365,7 +379,9 @@ fn common_section(
                 .contains(capitalized_section_name.as_str())
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::CapitalizeSectionName(context.section_name.to_string()),
+                    violations::CapitalizeSectionName {
+                        name: context.section_name.to_string(),
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -401,7 +417,9 @@ fn common_section(
         let leading_space = whitespace::leading_space(context.line);
         if leading_space.len() > docstring.indentation.len() {
             let mut diagnostic = Diagnostic::new(
-                violations::SectionNotOverIndented(context.section_name.to_string()),
+                violations::SectionNotOverIndented {
+                    name: context.section_name.to_string(),
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -432,7 +450,9 @@ fn common_section(
                 .enabled(&Rule::BlankLineAfterLastSection)
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::BlankLineAfterLastSection(context.section_name.to_string()),
+                    violations::BlankLineAfterLastSection {
+                        name: context.section_name.to_string(),
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -453,7 +473,9 @@ fn common_section(
         } else {
             if checker.settings.rules.enabled(&Rule::BlankLineAfterSection) {
                 let mut diagnostic = Diagnostic::new(
-                    violations::BlankLineAfterSection(context.section_name.to_string()),
+                    violations::BlankLineAfterSection {
+                        name: context.section_name.to_string(),
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -481,7 +503,9 @@ fn common_section(
     {
         if !context.previous_line.is_empty() {
             let mut diagnostic = Diagnostic::new(
-                violations::BlankLineBeforeSection(context.section_name.to_string()),
+                violations::BlankLineBeforeSection {
+                    name: context.section_name.to_string(),
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -564,7 +588,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     if !missing_arg_names.is_empty() {
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
-            violations::DocumentAllArguments(names),
+            violations::DocumentAllArguments { names },
             Range::from_located(parent),
         ));
     }
@@ -674,7 +698,9 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
             .unwrap();
         if !suffix.is_empty() {
             let mut diagnostic = Diagnostic::new(
-                violations::NewLineAfterSectionName(context.section_name.to_string()),
+                violations::NewLineAfterSectionName {
+                    name: context.section_name.to_string(),
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -724,7 +750,9 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
             .unwrap();
         if suffix != ":" {
             let mut diagnostic = Diagnostic::new(
-                violations::SectionNameEndsInColon(context.section_name.to_string()),
+                violations::SectionNameEndsInColon {
+                    name: context.section_name.to_string(),
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {

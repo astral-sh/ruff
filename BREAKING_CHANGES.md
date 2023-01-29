@@ -1,5 +1,44 @@
 # Breaking Changes
 
+## 0.0.237
+
+### `--explain`, `--clean`, and `--generate-shell-completion` are now subcommands ([#2190](https://github.com/charliermarsh/ruff/pull/2190))
+
+`--explain`, `--clean`, and `--generate-shell-completion` are now implemented as subcommands:
+
+    ruff .         # Still works! And will always work.
+    ruff check .   # New! Also works.
+
+    ruff --explain E402   # Still works.
+    ruff rule E402        # New! Also works. (And preferred.)
+
+    # Oops! The command has to come first.
+    ruff --format json --explain E402   # No longer works.
+    ruff --explain E402 --format json   # Still works!
+    ruff rule E402   --format json      # Works! (And preferred.)
+
+This change is largely backwards compatible -- most users should experience
+no change in behavior. However, please note the following exceptions:
+
+* Subcommands will now fail when invoked with unsupported arguments, instead
+  of silently ignoring them. For example, the following will now fail:
+
+      ruff --clean --respect-gitignore
+
+  (the `clean` command doesn't support `--respect-gitignore`.)
+
+* The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand.
+  For example, prior to this release, running `ruff rule` would run `ruff` over a file or
+  directory called `rule`. Now, `ruff rule` would invoke the `rule` subcommand. This should
+  only impact projects with files or directories named `rule`, `check`, `explain`, `clean`,
+  or `generate-shell-completion`.
+
+* Scripts that invoke ruff should supply `--` before any positional arguments.
+  (The semantics of `ruff -- <arg>` have not changed.)
+
+* `--explain` previously treated `--format grouped` as a synonym for `--format text`.
+  This is no longer supported; instead, use `--format text`.
+
 ## 0.0.226
 
 ### `misplaced-comparison-constant` (`PLC2201`) was deprecated in favor of `SIM300` ([#1980](https://github.com/charliermarsh/ruff/pull/1980))

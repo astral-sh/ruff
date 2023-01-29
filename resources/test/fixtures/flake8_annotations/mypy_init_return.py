@@ -39,3 +39,10 @@ class Foo:
 # Error
 def __init__(self, foo: int):
     ...
+
+
+# Error – used to be ok for a moment since the mere presence
+# of a vararg falsely indicated that the function has a typed argument.
+class Foo:
+    def __init__(self, *arg):
+        ...

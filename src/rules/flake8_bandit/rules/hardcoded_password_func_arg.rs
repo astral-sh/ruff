@@ -16,7 +16,9 @@ pub fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnostic> {
                 return None;
             }
             Some(Diagnostic::new(
-                violations::HardcodedPasswordFuncArg(string.to_string()),
+                violations::HardcodedPasswordFuncArg {
+                    string: string.to_string(),
+                },
                 Range::from_located(keyword),
             ))
         })

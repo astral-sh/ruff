@@ -40,7 +40,9 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         {
             if blank_lines_before != 0 {
                 let mut diagnostic = Diagnostic::new(
-                    violations::NoBlankLineBeforeClass(blank_lines_before),
+                    violations::NoBlankLineBeforeClass {
+                        lines: blank_lines_before,
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -60,7 +62,9 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         {
             if blank_lines_before != 1 {
                 let mut diagnostic = Diagnostic::new(
-                    violations::OneBlankLineBeforeClass(blank_lines_before),
+                    violations::OneBlankLineBeforeClass {
+                        lines: blank_lines_before,
+                    },
                     Range::from_located(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
@@ -101,7 +105,9 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             .count();
         if blank_lines_after != 1 {
             let mut diagnostic = Diagnostic::new(
-                violations::OneBlankLineAfterClass(blank_lines_after),
+                violations::OneBlankLineAfterClass {
+                    lines: blank_lines_after,
+                },
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
