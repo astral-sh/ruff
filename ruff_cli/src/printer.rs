@@ -392,7 +392,7 @@ impl<'a> Printer<'a> {
                 for msg in statistics {
                     writeln!(
                         stdout,
-                        "{:>count_width$}  {:<code_width$}  {}",
+                        "{:>count_width$}\t{:<code_width$}\t{}",
                         msg.count, msg.code, msg.message
                     )?;
                 }

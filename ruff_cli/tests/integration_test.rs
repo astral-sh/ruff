@@ -196,7 +196,7 @@ fn show_statistics() -> Result<()> {
             .lines()
             .last()
             .unwrap(),
-        "1     F401 `sys` imported but unused"
+        "1\tF401\t`sys` imported but unused"
     );
     Ok(())
 }
