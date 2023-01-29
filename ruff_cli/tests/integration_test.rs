@@ -182,3 +182,21 @@ fn explain_status_codes() -> Result<()> {
     cmd.args(["--explain", "RUF404"]).assert().failure();
     Ok(())
 }
+
+#[test]
+fn show_statistics() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let output = cmd
+        .args(["-", "--format", "text", "--select", "F401", "--statistics"])
+        .write_stdin("import sys\nimport os\n\nprint(os.getuid())\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?
+            .lines()
+            .last()
+            .unwrap(),
+        "1\tF401\t`sys` imported but unused"
+    );
+    Ok(())
+}
