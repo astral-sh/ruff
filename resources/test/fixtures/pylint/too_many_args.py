@@ -15,3 +15,6 @@ def foo(x,y,z,ignored_u,unused_v,r): #OK ^ignored_|^unused_ can be ignored
 
 def foo(x,y,z,u_ignored,v_unused,r): # Too many arguments (6/5)
     pass
+
+def foo(x,y,z,skip_u,skip_v,r): # Too many arguments (6/5)
+    pass

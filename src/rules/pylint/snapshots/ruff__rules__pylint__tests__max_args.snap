@@ -38,4 +38,16 @@ expression: diagnostics
     column: 8
   fix: ~
   parent: ~
+- kind:
+    TooManyArgs:
+      c_args: 6
+      max_args: 4
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 19
+    column: 8
+  fix: ~
+  parent: ~
 
