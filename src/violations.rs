@@ -870,21 +870,6 @@ impl Violation for GlobalVariableNotAssigned {
     }
 }
 
-define_violation!(
-    pub struct TooManyArgs {
-        pub c_args: usize,
-        pub max_args: usize,
-    }
-);
-
-impl Violation for TooManyArgs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let TooManyArgs { c_args, max_args } = self;
-        format!("Too many arguments ({c_args}/{max_args})")
-    }
-}
-
 // flake8-builtins
 
 define_violation!(
