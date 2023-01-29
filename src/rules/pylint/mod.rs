@@ -80,4 +80,19 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+    #[test]
+    fn ignore_arg_names() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pylint/too_many_args.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    ignored_argument_names: r"skip_.*".try_into().unwrap(),
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyArgs])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
 }
