@@ -246,7 +246,7 @@ pub struct CheckArgs {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
-    /// Format and print the statistics
+    /// Show counts for every rule with at least one violation.
     #[arg(long)]
     pub statistics: bool,
 }
