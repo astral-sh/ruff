@@ -347,15 +347,14 @@ an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For ex
 `pyproject.toml` described above would be represented via the following `ruff.toml`:
 
 ```toml
-# Enable Pyflakes and pycodestyle rules.
-select = ["E", "F"]
+# Enable flake8-bugbear (`B`) rules.
+select = ["E", "F", "B"]
 
 # Never enforce `E501` (line length violations).
 ignore = ["E501"]
 
-# Always autofix, but never try to fix `F401` (unused imports).
-fix = true
-unfixable = ["F401"]
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+unfixable = ["B"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 [per-file-ignores]
@@ -371,30 +370,74 @@ Some common configuration settings can be provided via the command-line:
 ruff path/to/code/ --select F401 --select F403
 ```
 
-See `ruff --help` for more:
+See `ruff check --help` for more:
 
 <!-- Begin auto-generated cli help. -->
 ```
-Ruff: An extremely fast Python linter.
+Run Ruff on the given files or directories (default)
 
-Usage: ruff [OPTIONS] <COMMAND>
+Usage: check [OPTIONS] [FILES]...
 
-Commands:
-  check  Run Ruff on the given files or directories (default)
-  rule   Explain a rule
-  clean  Clear any caches in the current directory and any subdirectories
-  help   Print this message or the help of the given subcommand(s)
+Arguments:
+  [FILES]...  List of files or directories to check
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+      --fix              Attempt to automatically fix lint violations
+      --show-source      Show violations with source code
+      --diff             Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
+  -w, --watch            Run in watch mode by re-running whenever files change
+      --fix-only         Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
+      --format <FORMAT>  Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
+      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --statistics       Show counts for every rule with at least one violation
+      --add-noqa         Enable automatic additions of `noqa` directives to failing lines
+      --show-files       See the files Ruff will be run against with the current settings
+      --show-settings    See the settings Ruff will use to lint a given Python file
+  -h, --help             Print help
 
-Log levels:
-  -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
+Rule selection:
+      --select <RULE_CODE>
+          Comma-separated list of rule codes to enable (or ALL, to enable all rules)
+      --ignore <RULE_CODE>
+          Comma-separated list of rule codes to disable
+      --extend-select <RULE_CODE>
+          Like --select, but adds additional rule codes on top of the selected ones
+      --extend-ignore <RULE_CODE>
+          Like --ignore, but adds additional rule codes on top of the ignored ones
+      --per-file-ignores <PER_FILE_IGNORES>
+          List of mappings from file pattern to code to exclude
+      --fixable <RULE_CODE>
+          List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+      --unfixable <RULE_CODE>
+          List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
 
-For help with a specific command, see: `ruff help <command>`.
+File selection:
+      --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis
+      --extend-exclude <FILE_PATTERN>  Like --exclude, but adds additional files and directories on top of those already excluded
+      --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files
+      --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line
+
+Rule configuration:
+      --target-version <TARGET_VERSION>
+          The minimum Python version that should be supported
+      --line-length <LINE_LENGTH>
+          Set the line-length for length-associated rules and automatic formatting
+      --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
+          Regular expression matching the name of dummy variables
+
+Miscellaneous:
+  -n, --no-cache
+          Disable cache reads
+      --isolated
+          Ignore all configuration files
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory [env: RUFF_CACHE_DIR=]
+      --stdin-filename <STDIN_FILENAME>
+          The name of the file when passing it through stdin
+  -e, --exit-zero
+          Exit with status code "0", even upon detecting lint violations
+      --update-check
+          Enable or disable automatic update checks
 ```
 <!-- End auto-generated cli help. -->
 
