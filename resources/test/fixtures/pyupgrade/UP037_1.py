@@ -62,3 +62,22 @@ def f():
         print(1)
     elif six.PY3:
         print(3)
+
+if True:
+    print(1)
+elif six.PY2:
+    print(2)
+else:
+    print(3)
+
+def f():
+    if True:
+        print(1)
+    elif six.PY3:
+        print(3)
+
+if True:
+    if sys.version_info > (3,):
+        print(3)
+    # comment
+    print(2+3)

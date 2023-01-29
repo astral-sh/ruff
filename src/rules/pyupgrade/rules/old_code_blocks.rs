@@ -152,7 +152,13 @@ fn indent_after_first<'a>(text: &'a str, indent_str: &str) -> String {
 }
 
 /// Converts an if statement where the code to keep is in the else statement
-fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt], tokens: &TokenCheck) {
+fn fix_py2_block(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    body: &[Stmt],
+    orelse: &[Stmt],
+    tokens: &TokenCheck,
+) {
     // FOR REVIEWER: pyupgrade had a check to see if the first statement was an if
     // or an elif, and would check for an index based on this. Our parser
     // automatically only sends the start of the statement as the if or elif, so
@@ -189,6 +195,18 @@ fn fix_py2_block(checker: &mut Checker, stmt: &Stmt, orelse: &[Stmt], tokens: &T
     } else if tokens.first_token == Tok::If && tokens.has_elif {
         ending_location.go_right();
         ending_location.go_right();
+    } else if tokens.first_token == Tok::Elif {
+        ending_location = body.last().unwrap().end_location.unwrap();
+        let mut next_item = ending_location.clone();
+        next_item.go_right();
+        let mut after_item = ending_location.clone();
+        after_item.go_right();
+        let range = Range::new(ending_location, after_item);
+        let next_str = checker.locator.slice_source_code_range(&range);
+        // If the next item it a new line, remove it so that we do not get an empty line
+        if next_str == "\n" {
+            ending_location.go_right();
+        }
     }
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::deletion(stmt.location, ending_location));
@@ -294,7 +312,7 @@ pub fn old_code_blocks(
                             let target = checker.settings.target_version;
                             if op == &Cmpop::Lt || op == &Cmpop::LtE {
                                 if compare_version(&version, target, op == &Cmpop::LtE) {
-                                    fix_py2_block(checker, stmt, orelse, &tokens);
+                                    fix_py2_block(checker, stmt, body, orelse, &tokens);
                                 }
                             } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
                                 if compare_version(&version, target, op == &Cmpop::GtE) {
@@ -306,7 +324,7 @@ pub fn old_code_blocks(
                             if let Constant::Int(number) = value {
                                 let version_number = bigint_to_u32(number);
                                 if version_number == 2 && op == &Cmpop::Eq {
-                                    fix_py2_block(checker, stmt, orelse, &tokens);
+                                    fix_py2_block(checker, stmt, body, orelse, &tokens);
                                 } else if version_number == 3 && op == &Cmpop::Eq {
                                     fix_py3_block(checker, stmt, test, body, &tokens);
                                 }
@@ -320,7 +338,7 @@ pub fn old_code_blocks(
         ExprKind::Attribute { .. } => {
             // if six.PY2
             if check_path(checker, test, &["six", "PY2"]) {
-                fix_py2_block(checker, stmt, orelse, &tokens);
+                fix_py2_block(checker, stmt, body, orelse, &tokens);
             // if six.PY3
             } else if check_path(checker, test, &["six", "PY3"]) {
                 fix_py3_block(checker, stmt, test, body, &tokens);
@@ -329,7 +347,7 @@ pub fn old_code_blocks(
         ExprKind::UnaryOp { op, operand } => {
             // if not six.PY3
             if check_path(checker, operand, &["six", "PY3"]) && op == &Unaryop::Not {
-                fix_py2_block(checker, stmt, orelse, &tokens);
+                fix_py2_block(checker, stmt, body, orelse, &tokens);
             }
             // if not six.PY2
             if check_path(checker, operand, &["six", "PY2"]) && op == &Unaryop::Not {
