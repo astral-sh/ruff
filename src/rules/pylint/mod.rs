@@ -65,4 +65,19 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+    #[test]
+    fn max_args() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pylint/too_many_args.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_args: 4,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyArgs])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
 }
