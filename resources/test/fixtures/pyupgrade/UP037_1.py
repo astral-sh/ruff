@@ -75,9 +75,3 @@ def f():
         print(1)
     elif six.PY3:
         print(3)
-
-if True:
-    if sys.version_info > (3,):
-        print(3)
-    # comment
-    print(2+3)
