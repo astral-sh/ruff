@@ -2243,7 +2243,8 @@ fix-only = true
 
 #### [`fixable`](#fixable)
 
-A list of rule codes or prefixes to consider autofixable.
+A list of rule codes or prefixes to consider autofixable. By default, all rules are
+considered autofixable.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]`
 
