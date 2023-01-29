@@ -3,7 +3,8 @@ source: src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    InvalidFunctionName: Bad
+    InvalidFunctionName:
+      name: Bad
   location:
     row: 4
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidFunctionName: _Bad
+    InvalidFunctionName:
+      name: _Bad
   location:
     row: 8
     column: 4
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidFunctionName: BAD
+    InvalidFunctionName:
+      name: BAD
   location:
     row: 12
     column: 4
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidFunctionName: BAD_FUNC
+    InvalidFunctionName:
+      name: BAD_FUNC
   location:
     row: 16
     column: 4
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidFunctionName: testTest
+    InvalidFunctionName:
+      name: testTest
   location:
     row: 40
     column: 8

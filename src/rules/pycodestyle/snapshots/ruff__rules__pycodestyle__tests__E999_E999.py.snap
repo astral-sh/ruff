@@ -3,7 +3,8 @@ source: src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SyntaxError: unindent does not match any outer indentation level
+    SyntaxError:
+      message: unindent does not match any outer indentation level
   location:
     row: 3
     column: 0

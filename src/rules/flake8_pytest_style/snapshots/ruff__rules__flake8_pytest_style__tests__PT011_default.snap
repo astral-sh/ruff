@@ -3,7 +3,8 @@ source: src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RaisesTooBroad: ValueError
+    RaisesTooBroad:
+      exception: ValueError
   location:
     row: 17
     column: 23
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesTooBroad: socket.error
+    RaisesTooBroad:
+      exception: socket.error
   location:
     row: 20
     column: 23
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesTooBroad: ValueError
+    RaisesTooBroad:
+      exception: ValueError
   location:
     row: 25
     column: 23
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesTooBroad: ValueError
+    RaisesTooBroad:
+      exception: ValueError
   location:
     row: 28
     column: 23
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesTooBroad: ValueError
+    RaisesTooBroad:
+      exception: ValueError
   location:
     row: 31
     column: 23

@@ -48,7 +48,9 @@ pub fn request_with_no_cert_validation(
             } = &verify_arg.node
             {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::RequestWithNoCertValidation(target.to_string()),
+                    violations::RequestWithNoCertValidation {
+                        string: target.to_string(),
+                    },
                     Range::from_located(verify_arg),
                 ));
             }

@@ -3,7 +3,8 @@ source: src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SuperfluousElseReturn: Elif
+    SuperfluousElseReturn:
+      branch: Elif
   location:
     row: 8
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn: Elif
+    SuperfluousElseReturn:
+      branch: Elif
   location:
     row: 23
     column: 4
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn: Elif
+    SuperfluousElseReturn:
+      branch: Elif
   location:
     row: 41
     column: 4
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn: Else
+    SuperfluousElseReturn:
+      branch: Else
   location:
     row: 53
     column: 4
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn: Else
+    SuperfluousElseReturn:
+      branch: Else
   location:
     row: 64
     column: 8
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn: Else
+    SuperfluousElseReturn:
+      branch: Else
   location:
     row: 79
     column: 4
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn: Else
+    SuperfluousElseReturn:
+      branch: Else
   location:
     row: 89
     column: 8
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn: Else
+    SuperfluousElseReturn:
+      branch: Else
   location:
     row: 99
     column: 4

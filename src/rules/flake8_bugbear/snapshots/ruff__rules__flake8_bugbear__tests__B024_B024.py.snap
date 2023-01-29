@@ -3,7 +3,8 @@ source: src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AbstractBaseClassWithoutAbstractMethod: Base_1
+    AbstractBaseClassWithoutAbstractMethod:
+      name: Base_1
   location:
     row: 18
     column: 0
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod: MetaBase_1
+    AbstractBaseClassWithoutAbstractMethod:
+      name: MetaBase_1
   location:
     row: 71
     column: 0
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod: abc_Base_1
+    AbstractBaseClassWithoutAbstractMethod:
+      name: abc_Base_1
   location:
     row: 82
     column: 0
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod: abc_Base_2
+    AbstractBaseClassWithoutAbstractMethod:
+      name: abc_Base_2
   location:
     row: 87
     column: 0
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod: notabc_Base_1
+    AbstractBaseClassWithoutAbstractMethod:
+      name: notabc_Base_1
   location:
     row: 92
     column: 0
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod: abc_set_class_variable_4
+    AbstractBaseClassWithoutAbstractMethod:
+      name: abc_set_class_variable_4
   location:
     row: 141
     column: 0

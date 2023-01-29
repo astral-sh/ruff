@@ -3,7 +3,8 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UseTernaryOperator: b = c if a else d
+    UseTernaryOperator:
+      contents: b = c if a else d
   location:
     row: 2
     column: 0
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    UseTernaryOperator: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
+    UseTernaryOperator:
+      contents: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
   location:
     row: 82
     column: 0

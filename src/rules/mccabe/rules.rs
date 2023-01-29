@@ -66,7 +66,10 @@ pub fn function_is_too_complex(
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
         Some(Diagnostic::new(
-            violations::FunctionIsTooComplex(name.to_string(), complexity),
+            violations::FunctionIsTooComplex {
+                name: name.to_string(),
+                complexity,
+            },
             identifier_range(stmt, locator),
         ))
     } else {

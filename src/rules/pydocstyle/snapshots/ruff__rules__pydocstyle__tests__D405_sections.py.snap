@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CapitalizeSectionName: returns
+    CapitalizeSectionName:
+      name: returns
   location:
     row: 17
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    CapitalizeSectionName: Short summary
+    CapitalizeSectionName:
+      name: Short summary
   location:
     row: 207
     column: 4

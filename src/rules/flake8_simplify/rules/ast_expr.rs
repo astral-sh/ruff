@@ -37,7 +37,10 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::UseCapitalEnvironmentVariables(capital_env_var.clone(), env_var.clone()),
+        violations::UseCapitalEnvironmentVariables {
+            expected: capital_env_var.clone(),
+            original: env_var.clone(),
+        },
         Range::from_located(arg),
     );
     if checker.patch(&Rule::UseCapitalEnvironmentVariables) {
@@ -76,7 +79,10 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::UseCapitalEnvironmentVariables(capital_env_var.clone(), env_var.clone()),
+        violations::UseCapitalEnvironmentVariables {
+            expected: capital_env_var.clone(),
+            original: env_var.clone(),
+        },
         Range::from_located(slice),
     );
     if checker.patch(&Rule::UseCapitalEnvironmentVariables) {

@@ -174,7 +174,9 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
             && name != &"__traceback_supplement__"
         {
             let mut diagnostic = Diagnostic::new(
-                violations::UnusedVariable((*name).to_string()),
+                violations::UnusedVariable {
+                    name: (*name).to_string(),
+                },
                 binding.range,
             );
             if checker.patch(&Rule::UnusedVariable) {

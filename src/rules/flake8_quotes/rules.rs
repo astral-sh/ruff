@@ -77,7 +77,9 @@ pub fn quotes(
         }
 
         let mut diagnostic = Diagnostic::new(
-            violations::BadQuotesDocstring(quotes_settings.docstring_quotes.clone()),
+            violations::BadQuotesDocstring {
+                quote: quotes_settings.docstring_quotes.clone(),
+            },
             Range::new(start, end),
         );
         if matches!(autofix, flags::Autofix::Enabled)
@@ -107,7 +109,9 @@ pub fn quotes(
         }
 
         let mut diagnostic = Diagnostic::new(
-            violations::BadQuotesMultilineString(quotes_settings.multiline_quotes.clone()),
+            violations::BadQuotesMultilineString {
+                quote: quotes_settings.multiline_quotes.clone(),
+            },
             Range::new(start, end),
         );
 
@@ -191,7 +195,9 @@ pub fn quotes(
         // If we're not using the preferred type, only allow use to avoid escapes.
         if !string_contents.contains(good_single(&quotes_settings.inline_quotes)) {
             let mut diagnostic = Diagnostic::new(
-                violations::BadQuotesInlineString(quotes_settings.inline_quotes.clone()),
+                violations::BadQuotesInlineString {
+                    quote: quotes_settings.inline_quotes.clone(),
+                },
                 Range::new(start, end),
             );
             if matches!(autofix, flags::Autofix::Enabled)

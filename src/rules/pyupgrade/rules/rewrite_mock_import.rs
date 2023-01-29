@@ -209,7 +209,9 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
         if collect_call_path(value).as_slice() == ["mock", "mock"] {
             let mut diagnostic = Diagnostic::new(
-                violations::RewriteMockImport(MockReference::Attribute),
+                violations::RewriteMockImport {
+                    reference_type: MockReference::Attribute,
+                },
                 Range::from_located(value),
             );
             if checker.patch(&Rule::RewriteMockImport) {
@@ -254,7 +256,9 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 for name in names {
                     if name.node.name == "mock" || name.node.name == "mock.mock" {
                         let mut diagnostic = Diagnostic::new(
-                            violations::RewriteMockImport(MockReference::Import),
+                            violations::RewriteMockImport {
+                                reference_type: MockReference::Import,
+                            },
                             Range::from_located(name),
                         );
                         if let Some(content) = content.as_ref() {
@@ -280,7 +284,9 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
 
             if module == "mock" {
                 let mut diagnostic = Diagnostic::new(
-                    violations::RewriteMockImport(MockReference::Import),
+                    violations::RewriteMockImport {
+                        reference_type: MockReference::Import,
+                    },
                     Range::from_located(stmt),
                 );
                 if checker.patch(&Rule::RewriteMockImport) {

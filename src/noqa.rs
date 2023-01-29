@@ -247,7 +247,9 @@ mod tests {
         assert_eq!(output, format!("{contents}\n"));
 
         let diagnostics = vec![Diagnostic::new(
-            violations::UnusedVariable("x".to_string()),
+            violations::UnusedVariable {
+                name: "x".to_string(),
+            },
             Range::new(Location::new(1, 0), Location::new(1, 0)),
         )];
         let contents = "x = 1";
@@ -269,7 +271,9 @@ mod tests {
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Diagnostic::new(
-                violations::UnusedVariable("x".to_string()),
+                violations::UnusedVariable {
+                    name: "x".to_string(),
+                },
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];
@@ -292,7 +296,9 @@ mod tests {
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Diagnostic::new(
-                violations::UnusedVariable("x".to_string()),
+                violations::UnusedVariable {
+                    name: "x".to_string(),
+                },
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
         ];

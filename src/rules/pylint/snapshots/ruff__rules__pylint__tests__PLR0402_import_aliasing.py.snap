@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     ConsiderUsingFromImport:
-      - os
-      - path
+      module: os
+      name: path
   location:
     row: 9
     column: 7
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ConsiderUsingFromImport:
-      - foo.bar
-      - foobar
+      module: foo.bar
+      name: foobar
   location:
     row: 11
     column: 7

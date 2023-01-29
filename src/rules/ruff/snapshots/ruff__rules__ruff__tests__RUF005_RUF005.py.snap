@@ -3,7 +3,8 @@ source: src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "[1, 2, 3, *foo]"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[1, 2, 3, *foo]"
   location:
     row: 10
     column: 6
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "(7, 8, 9, *zoob)"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(7, 8, 9, *zoob)"
   location:
     row: 12
     column: 7
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "(*quux, 10, 11, 12)"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(*quux, 10, 11, 12)"
   location:
     row: 13
     column: 7
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "[*spom, 13, 14, 15]"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[*spom, 13, 14, 15]"
   location:
     row: 15
     column: 7
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "(\"we all say\", *yay())"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(\"we all say\", *yay())"
   location:
     row: 16
     column: 12
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "(\"we all think\", *Fun().yay())"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(\"we all think\", *Fun().yay())"
   location:
     row: 17
     column: 13
@@ -111,7 +117,8 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "(\"we all feel\", *Fun.words)"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(\"we all feel\", *Fun.words)"
   location:
     row: 18
     column: 15
@@ -129,7 +136,8 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "[\"a\", \"b\", \"c\", *eggs]"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[\"a\", \"b\", \"c\", *eggs]"
   location:
     row: 20
     column: 8
@@ -147,7 +155,8 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "(\"yes\", \"no\", \"pants\", *zoob)"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(\"yes\", \"no\", \"pants\", *zoob)"
   location:
     row: 20
     column: 38
@@ -165,7 +174,8 @@ expression: diagnostics
       column: 67
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "(*zoob,)"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(*zoob,)"
   location:
     row: 22
     column: 6
@@ -183,7 +193,8 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral: "[*first, 4, 5, 6]"
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[*first, 4, 5, 6]"
   location:
     row: 32
     column: 9

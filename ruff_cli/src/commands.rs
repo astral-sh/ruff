@@ -110,7 +110,7 @@ pub fn run(
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(&Rule::IOError) {
                         Diagnostics::new(vec![Message {
-                            kind: IOError(message).into(),
+                            kind: IOError { message }.into(),
                             location: Location::default(),
                             end_location: Location::default(),
                             fix: None,

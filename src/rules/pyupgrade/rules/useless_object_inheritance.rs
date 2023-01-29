@@ -27,7 +27,9 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             continue;
         }
         return Some(Diagnostic::new(
-            violations::UselessObjectInheritance(name.to_string()),
+            violations::UselessObjectInheritance {
+                name: name.to_string(),
+            },
             Range::from_located(expr),
         ));
     }

@@ -3450,7 +3450,7 @@ this to "closest-to-furthest" is equivalent to isort's `reverse-relative
 
 **Default value**: `furthest-to-closest`
 
-**Type**: `RelatveImportsOrder`
+**Type**: `RelativeImportsOrder`
 
 **Example usage**:
 

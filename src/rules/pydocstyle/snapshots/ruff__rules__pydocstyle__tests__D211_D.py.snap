@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoBlankLineBeforeClass: 1
+    NoBlankLineBeforeClass:
+      lines: 1
   location:
     row: 170
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineBeforeClass: 1
+    NoBlankLineBeforeClass:
+      lines: 1
   location:
     row: 181
     column: 4

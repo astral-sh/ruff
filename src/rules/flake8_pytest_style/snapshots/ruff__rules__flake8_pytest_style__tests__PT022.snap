@@ -3,7 +3,8 @@ source: src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UselessYieldFixture: error
+    UselessYieldFixture:
+      name: error
   location:
     row: 17
     column: 4

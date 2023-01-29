@@ -3,7 +3,8 @@ source: src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BadFilePermissions: 151
+    BadFilePermissions:
+      mask: 151
   location:
     row: 6
     column: 24
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 7
+    BadFilePermissions:
+      mask: 7
   location:
     row: 7
     column: 24
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 511
+    BadFilePermissions:
+      mask: 511
   location:
     row: 9
     column: 24
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 504
+    BadFilePermissions:
+      mask: 504
   location:
     row: 10
     column: 24
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 510
+    BadFilePermissions:
+      mask: 510
   location:
     row: 11
     column: 24
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 511
+    BadFilePermissions:
+      mask: 511
   location:
     row: 13
     column: 22
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 511
+    BadFilePermissions:
+      mask: 511
   location:
     row: 14
     column: 23
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 511
+    BadFilePermissions:
+      mask: 511
   location:
     row: 15
     column: 24
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 511
+    BadFilePermissions:
+      mask: 511
   location:
     row: 17
     column: 18
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 511
+    BadFilePermissions:
+      mask: 511
   location:
     row: 18
     column: 18
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 511
+    BadFilePermissions:
+      mask: 511
   location:
     row: 19
     column: 18
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 8
+    BadFilePermissions:
+      mask: 8
   location:
     row: 20
     column: 26
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadFilePermissions: 2
+    BadFilePermissions:
+      mask: 2
   location:
     row: 22
     column: 24

@@ -3,7 +3,8 @@ source: src/rules/flake8_builtins/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BuiltinArgumentShadowing: str
+    BuiltinArgumentShadowing:
+      name: str
   location:
     row: 1
     column: 10
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing: type
+    BuiltinArgumentShadowing:
+      name: type
   location:
     row: 1
     column: 18
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing: complex
+    BuiltinArgumentShadowing:
+      name: complex
   location:
     row: 1
     column: 25
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing: Exception
+    BuiltinArgumentShadowing:
+      name: Exception
   location:
     row: 1
     column: 34
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing: getattr
+    BuiltinArgumentShadowing:
+      name: getattr
   location:
     row: 1
     column: 47
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing: bytes
+    BuiltinArgumentShadowing:
+      name: bytes
   location:
     row: 5
     column: 16
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing: float
+    BuiltinArgumentShadowing:
+      name: float
   location:
     row: 11
     column: 15

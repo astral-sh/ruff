@@ -27,13 +27,13 @@ pub fn unsafe_yaml_load(checker: &mut Checker, func: &Expr, args: &[Expr], keywo
                     _ => None,
                 };
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::UnsafeYAMLLoad(loader),
+                    violations::UnsafeYAMLLoad { loader },
                     Range::from_located(loader_arg),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
-                violations::UnsafeYAMLLoad(None),
+                violations::UnsafeYAMLLoad { loader: None },
                 Range::from_located(func),
             ));
         }

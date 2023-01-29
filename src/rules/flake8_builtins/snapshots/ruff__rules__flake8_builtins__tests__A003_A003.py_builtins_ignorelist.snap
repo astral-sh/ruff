@@ -3,7 +3,8 @@ source: src/rules/flake8_builtins/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BuiltinAttributeShadowing: ImportError
+    BuiltinAttributeShadowing:
+      name: ImportError
   location:
     row: 2
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinAttributeShadowing: str
+    BuiltinAttributeShadowing:
+      name: str
   location:
     row: 11
     column: 4

@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     IfExprWithTwistedArms:
-      - b
-      - a
+      expr_body: b
+      expr_else: a
   location:
     row: 1
     column: 4
@@ -24,8 +24,8 @@ expression: diagnostics
   parent: ~
 - kind:
     IfExprWithTwistedArms:
-      - b + c
-      - a
+      expr_body: b + c
+      expr_else: a
   location:
     row: 3
     column: 4

@@ -3,7 +3,8 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OSErrorAlias: ~
+    OSErrorAlias:
+      name: ~
   location:
     row: 5
     column: 7
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    OSErrorAlias: ~
+    OSErrorAlias:
+      name: ~
   location:
     row: 7
     column: 7
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    OSErrorAlias: ~
+    OSErrorAlias:
+      name: ~
   location:
     row: 12
     column: 7

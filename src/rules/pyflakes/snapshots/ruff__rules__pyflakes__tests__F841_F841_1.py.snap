@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedVariable: x
+    UnusedVariable:
+      name: x
   location:
     row: 6
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: y
+    UnusedVariable:
+      name: y
   location:
     row: 6
     column: 7
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: coords
+    UnusedVariable:
+      name: coords
   location:
     row: 16
     column: 13
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: coords
+    UnusedVariable:
+      name: coords
   location:
     row: 20
     column: 4
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: a
+    UnusedVariable:
+      name: a
   location:
     row: 24
     column: 5
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: b
+    UnusedVariable:
+      name: b
   location:
     row: 24
     column: 8
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: x
+    UnusedVariable:
+      name: x
   location:
     row: 24
     column: 14
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable: y
+    UnusedVariable:
+      name: y
   location:
     row: 24
     column: 17

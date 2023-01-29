@@ -43,15 +43,15 @@ pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values:
     for (obj, (num_calls, types)) in obj_to_types {
         if num_calls > 1 && types.len() > 1 {
             checker.diagnostics.push(Diagnostic::new(
-                violations::ConsiderMergingIsinstance(
-                    unparse_expr(obj.as_expr(), checker.stylist),
-                    types
+                violations::ConsiderMergingIsinstance {
+                    obj: unparse_expr(obj.as_expr(), checker.stylist),
+                    types: types
                         .iter()
                         .map(HashableExpr::as_expr)
                         .map(|expr| unparse_expr(expr, checker.stylist))
                         .sorted()
                         .collect(),
-                ),
+                },
                 Range::from_located(expr),
             ));
         }

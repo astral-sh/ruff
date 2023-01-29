@@ -3,7 +3,8 @@ source: src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryCollectionCall: tuple
+    UnnecessaryCollectionCall:
+      obj_type: tuple
   location:
     row: 1
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    UnnecessaryCollectionCall: list
+    UnnecessaryCollectionCall:
+      obj_type: list
   location:
     row: 2
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    UnnecessaryCollectionCall: dict
+    UnnecessaryCollectionCall:
+      obj_type: dict
   location:
     row: 3
     column: 5
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    UnnecessaryCollectionCall: dict
+    UnnecessaryCollectionCall:
+      obj_type: dict
   location:
     row: 4
     column: 5

@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoBlankLineBeforeFunction: 1
+    NoBlankLineBeforeFunction:
+      num_lines: 1
   location:
     row: 137
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineBeforeFunction: 1
+    NoBlankLineBeforeFunction:
+      num_lines: 1
   location:
     row: 151
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineBeforeFunction: 1
+    NoBlankLineBeforeFunction:
+      num_lines: 1
   location:
     row: 546
     column: 4
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineBeforeFunction: 1
+    NoBlankLineBeforeFunction:
+      num_lines: 1
   location:
     row: 568
     column: 4

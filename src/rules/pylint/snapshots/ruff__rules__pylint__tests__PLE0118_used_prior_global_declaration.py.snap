@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 7
+      name: x
+      line: 7
   location:
     row: 5
     column: 10
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 17
+      name: x
+      line: 17
   location:
     row: 15
     column: 10
@@ -28,8 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 25
+      name: x
+      line: 25
   location:
     row: 23
     column: 10
@@ -40,8 +40,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 35
+      name: x
+      line: 35
   location:
     row: 33
     column: 10
@@ -52,8 +52,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 43
+      name: x
+      line: 43
   location:
     row: 41
     column: 4
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 53
+      name: x
+      line: 53
   location:
     row: 51
     column: 4
@@ -76,8 +76,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 61
+      name: x
+      line: 61
   location:
     row: 59
     column: 8
@@ -88,8 +88,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 71
+      name: x
+      line: 71
   location:
     row: 69
     column: 8
@@ -100,8 +100,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 79
+      name: x
+      line: 79
   location:
     row: 77
     column: 8
@@ -112,8 +112,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 89
+      name: x
+      line: 89
   location:
     row: 87
     column: 8
@@ -124,8 +124,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 97
+      name: x
+      line: 97
   location:
     row: 95
     column: 8
@@ -136,8 +136,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 107
+      name: x
+      line: 107
   location:
     row: 105
     column: 8
@@ -148,8 +148,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UsedPriorGlobalDeclaration:
-      - x
-      - 114
+      name: x
+      line: 114
   location:
     row: 113
     column: 13

@@ -150,7 +150,7 @@ pub struct Options {
     pub extra_standard_library: Option<Vec<String>>,
     #[option(
         default = r#"furthest-to-closest"#,
-        value_type = "RelatveImportsOrder",
+        value_type = "RelativeImportsOrder",
         example = r#"
             relative-imports-order = "closest-to-furthest"
         "#
