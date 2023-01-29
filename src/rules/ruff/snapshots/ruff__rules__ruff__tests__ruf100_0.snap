@@ -135,7 +135,8 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnusedVariable: d
+    UnusedVariable:
+      name: d
   location:
     row: 29
     column: 4

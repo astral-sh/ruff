@@ -239,7 +239,9 @@ pub fn unnecessary_literal_set(
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryLiteralSet(kind.to_string()),
+        violations::UnnecessaryLiteralSet {
+            obj_type: kind.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryLiteralSet) {
@@ -280,7 +282,9 @@ pub fn unnecessary_literal_dict(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryLiteralDict(kind.to_string()),
+        violations::UnnecessaryLiteralDict {
+            obj_type: kind.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryLiteralDict) {
@@ -321,7 +325,9 @@ pub fn unnecessary_collection_call(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryCollectionCall(id.to_string()),
+        violations::UnnecessaryCollectionCall {
+            obj_type: id.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryCollectionCall) {
@@ -354,7 +360,9 @@ pub fn unnecessary_literal_within_tuple_call(
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
+        violations::UnnecessaryLiteralWithinTupleCall {
+            literal: argument_kind.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryLiteralWithinTupleCall) {
@@ -391,7 +399,9 @@ pub fn unnecessary_literal_within_list_call(
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
+        violations::UnnecessaryLiteralWithinListCall {
+            literal: argument_kind.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryLiteralWithinListCall) {
@@ -625,7 +635,9 @@ pub fn unnecessary_comprehension(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryComprehension(id.to_string()),
+        violations::UnnecessaryComprehension {
+            obj_type: id.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryComprehension) {
@@ -642,7 +654,12 @@ pub fn unnecessary_comprehension(
 /// C417
 pub fn unnecessary_map(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     fn diagnostic(kind: &str, location: Range) -> Diagnostic {
-        Diagnostic::new(violations::UnnecessaryMap(kind.to_string()), location)
+        Diagnostic::new(
+            violations::UnnecessaryMap {
+                obj_type: kind.to_string(),
+            },
+            location,
+        )
     }
 
     let Some(id) = function_name(func)  else {

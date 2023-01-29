@@ -392,7 +392,9 @@ where
                         if !exists {
                             if self.settings.rules.enabled(&Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    violations::NonlocalWithoutBinding(name.to_string()),
+                                    violations::NonlocalWithoutBinding {
+                                        name: name.to_string(),
+                                    },
                                     *range,
                                 ));
                             }
@@ -3513,7 +3515,9 @@ where
                             if !self.bindings[*index].used() {
                                 if self.settings.rules.enabled(&Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
-                                        violations::UnusedVariable(name.to_string()),
+                                        violations::UnusedVariable {
+                                            name: name.to_string(),
+                                        },
                                         name_range,
                                     );
                                     if self.patch(&Rule::UnusedVariable) {
@@ -3823,10 +3827,10 @@ impl<'a> Checker<'a> {
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::ImportShadowedByLoopVar(
-                                name.to_string(),
-                                existing.range.location.row(),
-                            ),
+                            violations::ImportShadowedByLoopVar {
+                                name: name.to_string(),
+                                line: existing.range.location.row(),
+                            },
                             binding.range,
                         ));
                     }
@@ -3842,10 +3846,10 @@ impl<'a> Checker<'a> {
                     {
                         if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
                             self.diagnostics.push(Diagnostic::new(
-                                violations::RedefinedWhileUnused(
-                                    name.to_string(),
-                                    existing.range.location.row(),
-                                ),
+                                violations::RedefinedWhileUnused {
+                                    name: name.to_string(),
+                                    line: existing.range.location.row(),
+                                },
                                 binding_range(&binding, self.locator),
                             ));
                         }
@@ -4040,7 +4044,7 @@ impl<'a> Checker<'a> {
                 }
 
                 self.diagnostics.push(Diagnostic::new(
-                    violations::UndefinedName(id.clone()),
+                    violations::UndefinedName { name: id.clone() },
                     Range::from_located(expr),
                 ));
             }
@@ -4248,7 +4252,9 @@ impl<'a> Checker<'a> {
                 && self.settings.rules.enabled(&Rule::UndefinedName)
             {
                 self.diagnostics.push(Diagnostic::new(
-                    violations::UndefinedName(id.to_string()),
+                    violations::UndefinedName {
+                        name: id.to_string(),
+                    },
                     Range::from_located(expr),
                 ));
             }
@@ -4486,7 +4492,9 @@ impl<'a> Checker<'a> {
                         if let Some(stmt) = &binding.source {
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(
-                                    violations::GlobalVariableNotAssigned((*name).to_string()),
+                                    violations::GlobalVariableNotAssigned {
+                                        name: (*name).to_string(),
+                                    },
                                     binding.range,
                                 ));
                             }
@@ -4517,7 +4525,9 @@ impl<'a> Checker<'a> {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
                                     diagnostics.push(Diagnostic::new(
-                                        violations::UndefinedExport(name.to_string()),
+                                        violations::UndefinedExport {
+                                            name: name.to_string(),
+                                        },
                                         all_binding.range,
                                     ));
                                 }
@@ -4555,10 +4565,10 @@ impl<'a> Checker<'a> {
                         if let Some(indices) = self.redefinitions.get(index) {
                             for index in indices {
                                 diagnostics.push(Diagnostic::new(
-                                    violations::RedefinedWhileUnused(
-                                        (*name).to_string(),
-                                        binding.range.location.row(),
-                                    ),
+                                    violations::RedefinedWhileUnused {
+                                        name: (*name).to_string(),
+                                        line: binding.range.location.row(),
+                                    },
                                     binding_range(&self.bindings[*index], self.locator),
                                 ));
                             }

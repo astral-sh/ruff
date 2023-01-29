@@ -109,12 +109,15 @@ impl Violation for UnusedImport {
 }
 
 define_violation!(
-    pub struct ImportShadowedByLoopVar(pub String, pub usize);
+    pub struct ImportShadowedByLoopVar {
+        pub name: String,
+        pub line: usize,
+    }
 );
 impl Violation for ImportShadowedByLoopVar {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportShadowedByLoopVar(name, line) = self;
+        let ImportShadowedByLoopVar { name, line } = self;
         format!("Import `{name}` from line {line} shadowed by loop variable")
     }
 }
@@ -571,72 +574,85 @@ impl Violation for ForwardAnnotationSyntaxError {
 }
 
 define_violation!(
-    pub struct RedefinedWhileUnused(pub String, pub usize);
+    pub struct RedefinedWhileUnused {
+        pub name: String,
+        pub line: usize,
+    }
 );
 impl Violation for RedefinedWhileUnused {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedWhileUnused(name, line) = self;
+        let RedefinedWhileUnused { name, line } = self;
         format!("Redefinition of unused `{name}` from line {line}")
     }
 }
 
 define_violation!(
-    pub struct UndefinedName(pub String);
+    pub struct UndefinedName {
+        pub name: String,
+    }
 );
 impl Violation for UndefinedName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedName(name) = self;
+        let UndefinedName { name } = self;
         format!("Undefined name `{name}`")
     }
 }
 
 define_violation!(
-    pub struct UndefinedExport(pub String);
+    pub struct UndefinedExport {
+        pub name: String,
+    }
 );
 impl Violation for UndefinedExport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedExport(name) = self;
+        let UndefinedExport { name } = self;
         format!("Undefined name `{name}` in `__all__`")
     }
 }
 
 define_violation!(
-    pub struct UndefinedLocal(pub String);
+    pub struct UndefinedLocal {
+        pub name: String,
+    }
 );
 impl Violation for UndefinedLocal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocal(name) = self;
+        let UndefinedLocal { name } = self;
         format!("Local variable `{name}` referenced before assignment")
     }
 }
 
 define_violation!(
-    pub struct UnusedVariable(pub String);
+    pub struct UnusedVariable {
+        pub name: String,
+    }
 );
 impl AlwaysAutofixableViolation for UnusedVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedVariable(name) = self;
+        let UnusedVariable { name } = self;
         format!("Local variable `{name}` is assigned to but never used")
     }
 
     fn autofix_title(&self) -> String {
-        let UnusedVariable(name) = self;
+        let UnusedVariable { name } = self;
         format!("Remove assignment to unused variable `{name}`")
     }
 }
 
 define_violation!(
-    pub struct UnusedAnnotation(pub String);
+    pub struct UnusedAnnotation {
+        pub name: String,
+    }
 );
 impl Violation for UnusedAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedAnnotation(name) = self;
+        let UnusedAnnotation { name } = self;
         format!("Local variable `{name}` is annotated but never used")
     }
 }
@@ -682,23 +698,28 @@ impl Violation for UnnecessaryDirectLambdaCall {
 }
 
 define_violation!(
-    pub struct NonlocalWithoutBinding(pub String);
+    pub struct NonlocalWithoutBinding {
+        pub name: String,
+    }
 );
 impl Violation for NonlocalWithoutBinding {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonlocalWithoutBinding(name) = self;
+        let NonlocalWithoutBinding { name } = self;
         format!("Nonlocal name `{name}` found without binding")
     }
 }
 
 define_violation!(
-    pub struct UsedPriorGlobalDeclaration(pub String, pub usize);
+    pub struct UsedPriorGlobalDeclaration {
+        pub name: String,
+        pub line: usize,
+    }
 );
 impl Violation for UsedPriorGlobalDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UsedPriorGlobalDeclaration(name, line) = self;
+        let UsedPriorGlobalDeclaration { name, line } = self;
         format!("Name `{name}` is used prior to global declaration on line {line}")
     }
 }
@@ -819,19 +840,21 @@ impl Violation for ConsiderMergingIsinstance {
 }
 
 define_violation!(
-    pub struct UseSysExit(pub String);
+    pub struct UseSysExit {
+        pub name: String,
+    }
 );
 impl Violation for UseSysExit {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UseSysExit(name) = self;
+        let UseSysExit { name } = self;
         format!("Use `sys.exit()` instead of `{name}`")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|UseSysExit(name)| format!("Replace `{name}` with `sys.exit()`"))
+        Some(|UseSysExit { name }| format!("Replace `{name}` with `sys.exit()`"))
     }
 }
 
@@ -864,12 +887,14 @@ impl Violation for UselessElseOnLoop {
 }
 
 define_violation!(
-    pub struct GlobalVariableNotAssigned(pub String);
+    pub struct GlobalVariableNotAssigned {
+        pub name: String,
+    }
 );
 impl Violation for GlobalVariableNotAssigned {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let GlobalVariableNotAssigned(name) = self;
+        let GlobalVariableNotAssigned { name } = self;
         format!("Using global for `{name}` but no assignment is done")
     }
 }
@@ -877,34 +902,40 @@ impl Violation for GlobalVariableNotAssigned {
 // flake8-builtins
 
 define_violation!(
-    pub struct BuiltinVariableShadowing(pub String);
+    pub struct BuiltinVariableShadowing {
+        pub name: String,
+    }
 );
 impl Violation for BuiltinVariableShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinVariableShadowing(name) = self;
+        let BuiltinVariableShadowing { name } = self;
         format!("Variable `{name}` is shadowing a python builtin")
     }
 }
 
 define_violation!(
-    pub struct BuiltinArgumentShadowing(pub String);
+    pub struct BuiltinArgumentShadowing {
+        pub name: String,
+    }
 );
 impl Violation for BuiltinArgumentShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinArgumentShadowing(name) = self;
+        let BuiltinArgumentShadowing { name } = self;
         format!("Argument `{name}` is shadowing a python builtin")
     }
 }
 
 define_violation!(
-    pub struct BuiltinAttributeShadowing(pub String);
+    pub struct BuiltinAttributeShadowing {
+        pub name: String,
+    }
 );
 impl Violation for BuiltinAttributeShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinAttributeShadowing(name) = self;
+        let BuiltinAttributeShadowing { name } = self;
         format!("Class attribute `{name}` is shadowing a python builtin")
     }
 }
@@ -1063,23 +1094,27 @@ impl AlwaysAutofixableViolation for DoNotAssertFalse {
 }
 
 define_violation!(
-    pub struct JumpStatementInFinally(pub String);
+    pub struct JumpStatementInFinally {
+        pub name: String,
+    }
 );
 impl Violation for JumpStatementInFinally {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let JumpStatementInFinally(name) = self;
+        let JumpStatementInFinally { name } = self;
         format!("`{name}` inside `finally` blocks cause exceptions to be silenced")
     }
 }
 
 define_violation!(
-    pub struct RedundantTupleInExceptionHandler(pub String);
+    pub struct RedundantTupleInExceptionHandler {
+        pub name: String,
+    }
 );
 impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedundantTupleInExceptionHandler(name) = self;
+        let RedundantTupleInExceptionHandler { name } = self;
         format!(
             "A length-one tuple literal is redundant. Write `except {name}` instead of `except \
              ({name},)`."
@@ -1087,7 +1122,7 @@ impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
     }
 
     fn autofix_title(&self) -> String {
-        let RedundantTupleInExceptionHandler(name) = self;
+        let RedundantTupleInExceptionHandler { name } = self;
         format!("Replace with `except {name}`")
     }
 }
@@ -1169,12 +1204,14 @@ impl Violation for CachedInstanceMethod {
 }
 
 define_violation!(
-    pub struct LoopVariableOverridesIterator(pub String);
+    pub struct LoopVariableOverridesIterator {
+        pub name: String,
+    }
 );
 impl Violation for LoopVariableOverridesIterator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LoopVariableOverridesIterator(name) = self;
+        let LoopVariableOverridesIterator { name } = self;
         format!("Loop control variable `{name}` overrides iterable it iterates")
     }
 }
@@ -1206,34 +1243,40 @@ impl Violation for UselessContextlibSuppress {
 }
 
 define_violation!(
-    pub struct FunctionUsesLoopVariable(pub String);
+    pub struct FunctionUsesLoopVariable {
+        pub name: String,
+    }
 );
 impl Violation for FunctionUsesLoopVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionUsesLoopVariable(name) = self;
+        let FunctionUsesLoopVariable { name } = self;
         format!("Function definition does not bind loop variable `{name}`")
     }
 }
 
 define_violation!(
-    pub struct AbstractBaseClassWithoutAbstractMethod(pub String);
+    pub struct AbstractBaseClassWithoutAbstractMethod {
+        pub name: String,
+    }
 );
 impl Violation for AbstractBaseClassWithoutAbstractMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AbstractBaseClassWithoutAbstractMethod(name) = self;
+        let AbstractBaseClassWithoutAbstractMethod { name } = self;
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
 
 define_violation!(
-    pub struct DuplicateTryBlockException(pub String);
+    pub struct DuplicateTryBlockException {
+        pub name: String,
+    }
 );
 impl Violation for DuplicateTryBlockException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateTryBlockException(name) = self;
+        let DuplicateTryBlockException { name } = self;
         format!("try-except block with duplicate exception `{name}`")
     }
 }
@@ -1249,12 +1292,14 @@ impl Violation for StarArgUnpackingAfterKeywordArg {
 }
 
 define_violation!(
-    pub struct EmptyMethodWithoutAbstractDecorator(pub String);
+    pub struct EmptyMethodWithoutAbstractDecorator {
+        pub name: String,
+    }
 );
 impl Violation for EmptyMethodWithoutAbstractDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let EmptyMethodWithoutAbstractDecorator(name) = self;
+        let EmptyMethodWithoutAbstractDecorator { name } = self;
         format!(
             "`{name}` is an empty method in an abstract base class, but has no abstract decorator"
         )
@@ -1287,12 +1332,14 @@ impl Violation for ZipWithoutExplicitStrict {
 // flake8-blind-except
 
 define_violation!(
-    pub struct BlindExcept(pub String);
+    pub struct BlindExcept {
+        pub name: String,
+    }
 );
 impl Violation for BlindExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlindExcept(name) = self;
+        let BlindExcept { name } = self;
         format!("Do not catch blind exception: `{name}`")
     }
 }
@@ -1370,12 +1417,14 @@ impl AlwaysAutofixableViolation for UnnecessaryListComprehensionDict {
 }
 
 define_violation!(
-    pub struct UnnecessaryLiteralSet(pub String);
+    pub struct UnnecessaryLiteralSet {
+        pub obj_type: String,
+    }
 );
 impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralSet(obj_type) = self;
+        let UnnecessaryLiteralSet { obj_type } = self;
         format!("Unnecessary `{obj_type}` literal (rewrite as a `set` literal)")
     }
 
@@ -1385,12 +1434,14 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {
 }
 
 define_violation!(
-    pub struct UnnecessaryLiteralDict(pub String);
+    pub struct UnnecessaryLiteralDict {
+        pub obj_type: String,
+    }
 );
 impl AlwaysAutofixableViolation for UnnecessaryLiteralDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralDict(obj_type) = self;
+        let UnnecessaryLiteralDict { obj_type } = self;
         format!("Unnecessary `{obj_type}` literal (rewrite as a `dict` literal)")
     }
 
@@ -1400,12 +1451,14 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralDict {
 }
 
 define_violation!(
-    pub struct UnnecessaryCollectionCall(pub String);
+    pub struct UnnecessaryCollectionCall {
+        pub obj_type: String,
+    }
 );
 impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryCollectionCall(obj_type) = self;
+        let UnnecessaryCollectionCall { obj_type } = self;
         format!("Unnecessary `{obj_type}` call (rewrite as a literal)")
     }
 
@@ -1415,12 +1468,14 @@ impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {
 }
 
 define_violation!(
-    pub struct UnnecessaryLiteralWithinTupleCall(pub String);
+    pub struct UnnecessaryLiteralWithinTupleCall {
+        pub literal: String,
+    }
 );
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralWithinTupleCall(literal) = self;
+        let UnnecessaryLiteralWithinTupleCall { literal } = self;
         if literal == "list" {
             format!(
                 "Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` \
@@ -1435,7 +1490,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
     }
 
     fn autofix_title(&self) -> String {
-        let UnnecessaryLiteralWithinTupleCall(literal) = self;
+        let UnnecessaryLiteralWithinTupleCall { literal } = self;
         {
             if literal == "list" {
                 "Rewrite as a `tuple` literal".to_string()
@@ -1447,12 +1502,14 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
 }
 
 define_violation!(
-    pub struct UnnecessaryLiteralWithinListCall(pub String);
+    pub struct UnnecessaryLiteralWithinListCall {
+        pub literal: String,
+    }
 );
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinListCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralWithinListCall(literal) = self;
+        let UnnecessaryLiteralWithinListCall { literal } = self;
         if literal == "list" {
             format!(
                 "Unnecessary `{literal}` literal passed to `list()` (remove the outer call to \
@@ -1466,7 +1523,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinListCall {
     }
 
     fn autofix_title(&self) -> String {
-        let UnnecessaryLiteralWithinListCall(literal) = self;
+        let UnnecessaryLiteralWithinListCall { literal } = self;
         {
             if literal == "list" {
                 "Remove outer `list` call".to_string()
@@ -1530,28 +1587,32 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 define_violation!(
-    pub struct UnnecessaryComprehension(pub String);
+    pub struct UnnecessaryComprehension {
+        pub obj_type: String,
+    }
 );
 impl AlwaysAutofixableViolation for UnnecessaryComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryComprehension(obj_type) = self;
+        let UnnecessaryComprehension { obj_type } = self;
         format!("Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`)")
     }
 
     fn autofix_title(&self) -> String {
-        let UnnecessaryComprehension(obj_type) = self;
+        let UnnecessaryComprehension { obj_type } = self;
         format!("Rewrite using `{obj_type}()`")
     }
 }
 
 define_violation!(
-    pub struct UnnecessaryMap(pub String);
+    pub struct UnnecessaryMap {
+        pub obj_type: String,
+    }
 );
 impl Violation for UnnecessaryMap {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryMap(obj_type) = self;
+        let UnnecessaryMap { obj_type } = self;
         if obj_type == "generator" {
             format!("Unnecessary `map` usage (rewrite using a generator expression)")
         } else {
@@ -1579,12 +1640,15 @@ impl Violation for Debugger {
 // mccabe
 
 define_violation!(
-    pub struct FunctionIsTooComplex(pub String, pub usize);
+    pub struct FunctionIsTooComplex {
+        pub name: String,
+        pub complexity: usize,
+    }
 );
 impl Violation for FunctionIsTooComplex {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionIsTooComplex(name, complexity) = self;
+        let FunctionIsTooComplex { name, complexity } = self;
         format!("`{name}` is too complex ({complexity})")
     }
 }
@@ -1661,45 +1725,53 @@ impl fmt::Display for Branch {
 }
 
 define_violation!(
-    pub struct SuperfluousElseReturn(pub Branch);
+    pub struct SuperfluousElseReturn {
+        pub branch: Branch,
+    }
 );
 impl Violation for SuperfluousElseReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseReturn(branch) = self;
+        let SuperfluousElseReturn { branch } = self;
         format!("Unnecessary `{branch}` after `return` statement")
     }
 }
 
 define_violation!(
-    pub struct SuperfluousElseRaise(pub Branch);
+    pub struct SuperfluousElseRaise {
+        pub branch: Branch,
+    }
 );
 impl Violation for SuperfluousElseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseRaise(branch) = self;
+        let SuperfluousElseRaise { branch } = self;
         format!("Unnecessary `{branch}` after `raise` statement")
     }
 }
 
 define_violation!(
-    pub struct SuperfluousElseContinue(pub Branch);
+    pub struct SuperfluousElseContinue {
+        pub branch: Branch,
+    }
 );
 impl Violation for SuperfluousElseContinue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseContinue(branch) = self;
+        let SuperfluousElseContinue { branch } = self;
         format!("Unnecessary `{branch}` after `continue` statement")
     }
 }
 
 define_violation!(
-    pub struct SuperfluousElseBreak(pub Branch);
+    pub struct SuperfluousElseBreak {
+        pub branch: Branch,
+    }
 );
 impl Violation for SuperfluousElseBreak {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseBreak(branch) = self;
+        let SuperfluousElseBreak { branch } = self;
         format!("Unnecessary `{branch}` after `break` statement")
     }
 }
@@ -1851,89 +1923,105 @@ impl AlwaysAutofixableViolation for AvoidQuoteEscape {
 // flake8-annotations
 
 define_violation!(
-    pub struct MissingTypeFunctionArgument(pub String);
+    pub struct MissingTypeFunctionArgument {
+        pub name: String,
+    }
 );
 impl Violation for MissingTypeFunctionArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeFunctionArgument(name) = self;
+        let MissingTypeFunctionArgument { name } = self;
         format!("Missing type annotation for function argument `{name}`")
     }
 }
 
 define_violation!(
-    pub struct MissingTypeArgs(pub String);
+    pub struct MissingTypeArgs {
+        pub name: String,
+    }
 );
 impl Violation for MissingTypeArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeArgs(name) = self;
+        let MissingTypeArgs { name } = self;
         format!("Missing type annotation for `*{name}`")
     }
 }
 
 define_violation!(
-    pub struct MissingTypeKwargs(pub String);
+    pub struct MissingTypeKwargs {
+        pub name: String,
+    }
 );
 impl Violation for MissingTypeKwargs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeKwargs(name) = self;
+        let MissingTypeKwargs { name } = self;
         format!("Missing type annotation for `**{name}`")
     }
 }
 
 define_violation!(
-    pub struct MissingTypeSelf(pub String);
+    pub struct MissingTypeSelf {
+        pub name: String,
+    }
 );
 impl Violation for MissingTypeSelf {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeSelf(name) = self;
+        let MissingTypeSelf { name } = self;
         format!("Missing type annotation for `{name}` in method")
     }
 }
 
 define_violation!(
-    pub struct MissingTypeCls(pub String);
+    pub struct MissingTypeCls {
+        pub name: String,
+    }
 );
 impl Violation for MissingTypeCls {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeCls(name) = self;
+        let MissingTypeCls { name } = self;
         format!("Missing type annotation for `{name}` in classmethod")
     }
 }
 
 define_violation!(
-    pub struct MissingReturnTypePublicFunction(pub String);
+    pub struct MissingReturnTypePublicFunction {
+        pub name: String,
+    }
 );
 impl Violation for MissingReturnTypePublicFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypePublicFunction(name) = self;
+        let MissingReturnTypePublicFunction { name } = self;
         format!("Missing return type annotation for public function `{name}`")
     }
 }
 
 define_violation!(
-    pub struct MissingReturnTypePrivateFunction(pub String);
+    pub struct MissingReturnTypePrivateFunction {
+        pub name: String,
+    }
 );
 impl Violation for MissingReturnTypePrivateFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypePrivateFunction(name) = self;
+        let MissingReturnTypePrivateFunction { name } = self;
         format!("Missing return type annotation for private function `{name}`")
     }
 }
 
 define_violation!(
-    pub struct MissingReturnTypeSpecialMethod(pub String);
+    pub struct MissingReturnTypeSpecialMethod {
+        pub name: String,
+    }
 );
 impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypeSpecialMethod(name) = self;
+        let MissingReturnTypeSpecialMethod { name } = self;
         format!("Missing return type annotation for special method `{name}`")
     }
 
@@ -1943,34 +2031,40 @@ impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
 }
 
 define_violation!(
-    pub struct MissingReturnTypeStaticMethod(pub String);
+    pub struct MissingReturnTypeStaticMethod {
+        pub name: String,
+    }
 );
 impl Violation for MissingReturnTypeStaticMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypeStaticMethod(name) = self;
+        let MissingReturnTypeStaticMethod { name } = self;
         format!("Missing return type annotation for staticmethod `{name}`")
     }
 }
 
 define_violation!(
-    pub struct MissingReturnTypeClassMethod(pub String);
+    pub struct MissingReturnTypeClassMethod {
+        pub name: String,
+    }
 );
 impl Violation for MissingReturnTypeClassMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypeClassMethod(name) = self;
+        let MissingReturnTypeClassMethod { name } = self;
         format!("Missing return type annotation for classmethod `{name}`")
     }
 }
 
 define_violation!(
-    pub struct DynamicallyTypedExpression(pub String);
+    pub struct DynamicallyTypedExpression {
+        pub name: String,
+    }
 );
 impl Violation for DynamicallyTypedExpression {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DynamicallyTypedExpression(name) = self;
+        let DynamicallyTypedExpression { name } = self;
         format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
     }
 }

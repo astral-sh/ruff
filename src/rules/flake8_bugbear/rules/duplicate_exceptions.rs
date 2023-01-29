@@ -115,7 +115,9 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
         for (name, exprs) in duplicates {
             for expr in exprs {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::DuplicateTryBlockException(name.join(".")),
+                    violations::DuplicateTryBlockException {
+                        name: name.join("."),
+                    },
                     Range::from_located(expr),
                 ));
             }

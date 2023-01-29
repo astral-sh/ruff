@@ -3,7 +3,8 @@ source: src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryLiteralWithinTupleCall: list
+    UnnecessaryLiteralWithinTupleCall:
+      literal: list
   location:
     row: 1
     column: 5
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    UnnecessaryLiteralWithinTupleCall: list
+    UnnecessaryLiteralWithinTupleCall:
+      literal: list
   location:
     row: 2
     column: 5
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    UnnecessaryLiteralWithinTupleCall: tuple
+    UnnecessaryLiteralWithinTupleCall:
+      literal: tuple
   location:
     row: 3
     column: 5
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    UnnecessaryLiteralWithinTupleCall: list
+    UnnecessaryLiteralWithinTupleCall:
+      literal: list
   location:
     row: 4
     column: 5
@@ -78,7 +82,8 @@ expression: diagnostics
       column: 2
   parent: ~
 - kind:
-    UnnecessaryLiteralWithinTupleCall: tuple
+    UnnecessaryLiteralWithinTupleCall:
+      literal: tuple
   location:
     row: 8
     column: 5

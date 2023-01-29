@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedExport: b
+    UndefinedExport:
+      name: b
   location:
     row: 3
     column: 0

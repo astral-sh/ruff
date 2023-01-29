@@ -16,15 +16,18 @@ pub fn builtin_shadowing<T>(
     if BUILTINS.contains(&name) && !ignorelist.contains(&name.to_string()) {
         Some(Diagnostic::new::<DiagnosticKind>(
             match node_type {
-                ShadowingType::Variable => {
-                    violations::BuiltinVariableShadowing(name.to_string()).into()
+                ShadowingType::Variable => violations::BuiltinVariableShadowing {
+                    name: name.to_string(),
                 }
-                ShadowingType::Argument => {
-                    violations::BuiltinArgumentShadowing(name.to_string()).into()
+                .into(),
+                ShadowingType::Argument => violations::BuiltinArgumentShadowing {
+                    name: name.to_string(),
                 }
-                ShadowingType::Attribute => {
-                    violations::BuiltinAttributeShadowing(name.to_string()).into()
+                .into(),
+                ShadowingType::Attribute => violations::BuiltinAttributeShadowing {
+                    name: name.to_string(),
                 }
+                .into(),
             },
             Range::from_located(located),
         ))
