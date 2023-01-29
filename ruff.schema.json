@@ -1173,8 +1173,15 @@
             "$ref": "#/definitions/ConstantType"
           }
         },
+        "ignored-argument-names": {
+          "description": "Argument names that match this expression will be ignored.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "max-args": {
-          "description": "Constant types to ignore when used as \"magic values\".",
+          "description": "Maximum number of arguments for function / method.",
           "type": [
             "integer",
             "null"

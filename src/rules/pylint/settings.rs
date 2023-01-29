@@ -55,12 +55,12 @@ pub struct Options {
     /// Constant types to ignore when used as "magic values".
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
     #[option(default = r"5", value_type = "usize", example = r"max_args = 5")]
-    /// Maximum number of arguments for function / method..
+    /// Maximum number of arguments for function / method.
     pub max_args: Option<usize>,
     #[option(
         default = r"^_.*|^ignored_|^unused_",
         value_type = "String",
-        example = r"ignored-argument-names = skip_prefix.*"
+        example = r"ignored-argument-names = skip_.*"
     )]
     /// Argument names that match this expression will be ignored.
     pub ignored_argument_names: Option<String>,

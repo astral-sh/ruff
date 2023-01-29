@@ -3692,9 +3692,26 @@ allow-magic-value-types = ["int"]
 
 ---
 
+#### [`ignored-argument-names`](#ignored-argument-names)
+
+Argument names that match this expression will be ignored.
+
+**Default value**: `^_.*|^ignored_|^unused_`
+
+**Type**: `String`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pylint]
+ignored-argument-names = skip_.*
+```
+
+---
+
 #### [`max-args`](#max-args)
 
-Constant types to ignore when used as "magic values".
+Maximum number of arguments for function / method.
 
 **Default value**: `5`
 
@@ -3704,7 +3721,7 @@ Constant types to ignore when used as "magic values".
 
 ```toml
 [tool.ruff.pylint]
-allow-magic-value-types = 5
+max_args = 5
 ```
 
 ---
