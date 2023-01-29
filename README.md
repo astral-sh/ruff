@@ -370,13 +370,40 @@ Some common configuration settings can be provided via the command-line:
 ruff path/to/code/ --select F401 --select F403
 ```
 
-See `ruff check --help` for more:
+See `ruff help` for more on Ruff's top-level commands:
 
-<!-- Begin auto-generated cli help. -->
+<!-- Begin auto-generated command help. -->
+```
+Ruff: An extremely fast Python linter.
+
+Usage: ruff [OPTIONS] <COMMAND>
+
+Commands:
+  check  Run Ruff on the given files or directories (default)
+  rule   Explain a rule
+  clean  Clear any caches in the current directory and any subdirectories
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print lint violations, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
+
+For help with a specific command, see: `ruff help <command>`.
+```
+<!-- End auto-generated command help. -->
+
+Or `ruff help check` for more on the linting command:
+
+<!-- Begin auto-generated subcommand help. -->
 ```
 Run Ruff on the given files or directories (default)
 
-Usage: check [OPTIONS] [FILES]...
+Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
   [FILES]...  List of files or directories to check
@@ -438,8 +465,13 @@ Miscellaneous:
           Exit with status code "0", even upon detecting lint violations
       --update-check
           Enable or disable automatic update checks
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print lint violations, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
 ```
-<!-- End auto-generated cli help. -->
+<!-- End auto-generated subcommand help. -->
 
 ### `pyproject.toml` discovery
 
