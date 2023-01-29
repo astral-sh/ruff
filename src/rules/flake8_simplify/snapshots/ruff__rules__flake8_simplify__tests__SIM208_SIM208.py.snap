@@ -3,7 +3,8 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DoubleNegation: a
+    DoubleNegation:
+      expr: a
   location:
     row: 1
     column: 3
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    DoubleNegation: a == b
+    DoubleNegation:
+      expr: a == b
   location:
     row: 4
     column: 3

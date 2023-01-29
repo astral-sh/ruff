@@ -66,7 +66,9 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType(names_type),
+                            violations::ParametrizeNamesWrongType {
+                                expected: names_type,
+                            },
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
@@ -96,7 +98,9 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::List => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType(names_type),
+                            violations::ParametrizeNamesWrongType {
+                                expected: names_type,
+                            },
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
@@ -136,7 +140,9 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     types::ParametrizeNameType::Tuple => {}
                     types::ParametrizeNameType::List => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType(names_type),
+                            violations::ParametrizeNamesWrongType {
+                                expected: names_type,
+                            },
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
@@ -156,7 +162,9 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType(names_type),
+                            violations::ParametrizeNamesWrongType {
+                                expected: names_type,
+                            },
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
@@ -183,7 +191,9 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     types::ParametrizeNameType::List => {}
                     types::ParametrizeNameType::Tuple => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType(names_type),
+                            violations::ParametrizeNamesWrongType {
+                                expected: names_type,
+                            },
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
@@ -205,7 +215,9 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType(names_type),
+                            violations::ParametrizeNamesWrongType {
+                                expected: names_type,
+                            },
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
@@ -274,7 +286,9 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     let mut diagnostic = Diagnostic::new(
-        violations::ParametrizeNamesWrongType(types::ParametrizeNameType::Csv),
+        violations::ParametrizeNamesWrongType {
+            expected: types::ParametrizeNameType::Csv,
+        },
         Range::from_located(expr),
     );
 

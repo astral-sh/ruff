@@ -33,7 +33,9 @@ pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
             .find(|target| call_path.as_slice() == **target)
     }) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::Debugger(DebuggerUsingType::Call(format_call_path(target))),
+            violations::Debugger {
+                using_type: DebuggerUsingType::Call(format_call_path(target)),
+            },
             Range::from_located(expr),
         ));
     }
@@ -52,7 +54,9 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
         call_path.push(name);
         if DEBUGGERS.iter().any(|target| call_path == **target) {
             return Some(Diagnostic::new(
-                violations::Debugger(DebuggerUsingType::Import(format_call_path(&call_path))),
+                violations::Debugger {
+                    using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
+                },
                 Range::from_located(stmt),
             ));
         }
@@ -63,7 +67,9 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
             .any(|call_path| call_path[..call_path.len() - 1] == parts)
         {
             return Some(Diagnostic::new(
-                violations::Debugger(DebuggerUsingType::Import(name.to_string())),
+                violations::Debugger {
+                    using_type: DebuggerUsingType::Import(name.to_string()),
+                },
                 Range::from_located(stmt),
             ));
         }

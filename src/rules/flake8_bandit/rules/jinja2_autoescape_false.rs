@@ -29,20 +29,20 @@ pub fn jinja2_autoescape_false(
                     if let ExprKind::Name { id, .. } = &func.node {
                         if id.as_str() != "select_autoescape" {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::Jinja2AutoescapeFalse(true),
+                                violations::Jinja2AutoescapeFalse { value: true },
                                 Range::from_located(autoescape_arg),
                             ));
                         }
                     }
                 }
                 _ => checker.diagnostics.push(Diagnostic::new(
-                    violations::Jinja2AutoescapeFalse(true),
+                    violations::Jinja2AutoescapeFalse { value: true },
                     Range::from_located(autoescape_arg),
                 )),
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
-                violations::Jinja2AutoescapeFalse(false),
+                violations::Jinja2AutoescapeFalse { value: false },
                 Range::from_located(func),
             ));
         }

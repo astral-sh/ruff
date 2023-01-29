@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BlankLineAfterSection: Returns
+    BlankLineAfterSection:
+      name: Returns
   location:
     row: 67
     column: 4
@@ -22,7 +23,8 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    BlankLineAfterSection: Returns
+    BlankLineAfterSection:
+      name: Returns
   location:
     row: 207
     column: 4

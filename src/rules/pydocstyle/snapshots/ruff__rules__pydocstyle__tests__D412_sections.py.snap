@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoBlankLinesBetweenHeaderAndContent: Short summary
+    NoBlankLinesBetweenHeaderAndContent:
+      name: Short summary
   location:
     row: 207
     column: 4

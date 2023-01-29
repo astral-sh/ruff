@@ -472,7 +472,9 @@ pub fn unnecessary_call_around_sorted(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryCallAroundSorted(outer.to_string()),
+        violations::UnnecessaryCallAroundSorted {
+            func: outer.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(&Rule::UnnecessaryCallAroundSorted) {
@@ -597,7 +599,9 @@ pub fn unnecessary_subscript_reversal(
         return;
     };
     checker.diagnostics.push(Diagnostic::new(
-        violations::UnnecessarySubscriptReversal(id.to_string()),
+        violations::UnnecessarySubscriptReversal {
+            func: id.to_string(),
+        },
         Range::from_located(expr),
     ));
 }

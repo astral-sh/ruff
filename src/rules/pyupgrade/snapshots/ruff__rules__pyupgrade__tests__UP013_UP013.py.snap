@@ -3,7 +3,8 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType1
+    ConvertTypedDictFunctionalToClass:
+      name: MyType1
   location:
     row: 5
     column: 0
@@ -23,7 +24,8 @@ expression: diagnostics
       column: 52
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType2
+    ConvertTypedDictFunctionalToClass:
+      name: MyType2
   location:
     row: 8
     column: 0
@@ -43,7 +45,8 @@ expression: diagnostics
       column: 50
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType3
+    ConvertTypedDictFunctionalToClass:
+      name: MyType3
   location:
     row: 11
     column: 0
@@ -63,7 +66,8 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType4
+    ConvertTypedDictFunctionalToClass:
+      name: MyType4
   location:
     row: 14
     column: 0
@@ -82,7 +86,8 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType5
+    ConvertTypedDictFunctionalToClass:
+      name: MyType5
   location:
     row: 17
     column: 0
@@ -101,7 +106,8 @@ expression: diagnostics
       column: 46
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType6
+    ConvertTypedDictFunctionalToClass:
+      name: MyType6
   location:
     row: 18
     column: 0
@@ -120,7 +126,8 @@ expression: diagnostics
       column: 41
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType7
+    ConvertTypedDictFunctionalToClass:
+      name: MyType7
   location:
     row: 21
     column: 0
@@ -139,7 +146,8 @@ expression: diagnostics
       column: 56
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType8
+    ConvertTypedDictFunctionalToClass:
+      name: MyType8
   location:
     row: 24
     column: 0
@@ -159,7 +167,8 @@ expression: diagnostics
       column: 65
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType9
+    ConvertTypedDictFunctionalToClass:
+      name: MyType9
   location:
     row: 27
     column: 0
@@ -169,7 +178,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType10
+    ConvertTypedDictFunctionalToClass:
+      name: MyType10
   location:
     row: 30
     column: 0
@@ -188,7 +198,8 @@ expression: diagnostics
       column: 59
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType11
+    ConvertTypedDictFunctionalToClass:
+      name: MyType11
   location:
     row: 33
     column: 0
@@ -207,7 +218,8 @@ expression: diagnostics
       column: 53
   parent: ~
 - kind:
-    ConvertTypedDictFunctionalToClass: MyType12
+    ConvertTypedDictFunctionalToClass:
+      name: MyType12
   location:
     row: 37
     column: 0

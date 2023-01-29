@@ -3,7 +3,8 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DuplicateIsinstanceCall: a
+    DuplicateIsinstanceCall:
+      name: a
   location:
     row: 1
     column: 3
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    DuplicateIsinstanceCall: a
+    DuplicateIsinstanceCall:
+      name: a
   location:
     row: 4
     column: 3
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 53
   parent: ~
 - kind:
-    DuplicateIsinstanceCall: a
+    DuplicateIsinstanceCall:
+      name: a
   location:
     row: 7
     column: 3
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 68
   parent: ~
 - kind:
-    DuplicateIsinstanceCall: a
+    DuplicateIsinstanceCall:
+      name: a
   location:
     row: 10
     column: 3
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 68
   parent: ~
 - kind:
-    DuplicateIsinstanceCall: a
+    DuplicateIsinstanceCall:
+      name: a
   location:
     row: 13
     column: 3
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 68
   parent: ~
 - kind:
-    DuplicateIsinstanceCall: a
+    DuplicateIsinstanceCall:
+      name: a
   location:
     row: 16
     column: 4

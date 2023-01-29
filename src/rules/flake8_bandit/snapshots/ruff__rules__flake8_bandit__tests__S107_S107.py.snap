@@ -3,7 +3,8 @@ source: src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedPasswordDefault: default
+    HardcodedPasswordDefault:
+      string: default
   location:
     row: 5
     column: 28
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordDefault: posonly
+    HardcodedPasswordDefault:
+      string: posonly
   location:
     row: 13
     column: 44
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordDefault: kwonly
+    HardcodedPasswordDefault:
+      string: kwonly
   location:
     row: 21
     column: 38
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordDefault: posonly
+    HardcodedPasswordDefault:
+      string: posonly
   location:
     row: 29
     column: 38
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordDefault: kwonly
+    HardcodedPasswordDefault:
+      string: kwonly
   location:
     row: 29
     column: 61

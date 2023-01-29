@@ -116,7 +116,9 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
 
             if checker.settings.rules.enabled(&Rule::FixturePositionalArgs) && !args.is_empty() {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::FixturePositionalArgs(func_name.to_string()),
+                    violations::FixturePositionalArgs {
+                        function: func_name.to_string(),
+                    },
                     Range::from_located(decorator),
                 ));
             }
@@ -170,7 +172,9 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && func_name.starts_with('_')
     {
         checker.diagnostics.push(Diagnostic::new(
-            violations::IncorrectFixtureNameUnderscore(func_name.to_string()),
+            violations::IncorrectFixtureNameUnderscore {
+                function: func_name.to_string(),
+            },
             Range::from_located(func),
         ));
     } else if checker
@@ -182,7 +186,9 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         && !func_name.starts_with('_')
     {
         checker.diagnostics.push(Diagnostic::new(
-            violations::MissingFixtureNameUnderscore(func_name.to_string()),
+            violations::MissingFixtureNameUnderscore {
+                function: func_name.to_string(),
+            },
             Range::from_located(func),
         ));
     }
@@ -193,7 +199,9 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                 if let ExprKind::Yield { .. } = value.node {
                     if visitor.yield_statements.len() == 1 {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UselessYieldFixture(func_name.to_string()),
+                            violations::UselessYieldFixture {
+                                name: func_name.to_string(),
+                            },
                             Range::from_located(stmt),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
@@ -220,7 +228,9 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
         let name = &arg.node.arg;
         if name.starts_with('_') {
             checker.diagnostics.push(Diagnostic::new(
-                violations::FixtureParamWithoutValue(name.to_string()),
+                violations::FixtureParamWithoutValue {
+                    name: name.to_string(),
+                },
                 Range::from_located(arg),
             ));
         }

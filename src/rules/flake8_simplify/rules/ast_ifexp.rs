@@ -29,7 +29,9 @@ pub fn explicit_true_false_in_ifexpr(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::IfExprWithTrueFalse(unparse_expr(test, checker.stylist)),
+        violations::IfExprWithTrueFalse {
+            expr: unparse_expr(test, checker.stylist),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
@@ -74,7 +76,9 @@ pub fn explicit_false_true_in_ifexpr(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::IfExprWithFalseTrue(unparse_expr(test, checker.stylist)),
+        violations::IfExprWithFalseTrue {
+            expr: unparse_expr(test, checker.stylist),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {

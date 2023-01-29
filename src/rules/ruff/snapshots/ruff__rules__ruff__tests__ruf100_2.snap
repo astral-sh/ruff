@@ -4,10 +4,11 @@ expression: diagnostics
 ---
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - F401
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F401
   location:
     row: 1
     column: 18

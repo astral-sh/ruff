@@ -3,7 +3,8 @@ source: src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedMethodArgument: x
+    UnusedMethodArgument:
+      name: x
   location:
     row: 35
     column: 16
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedMethodArgument: x
+    UnusedMethodArgument:
+      name: x
   location:
     row: 38
     column: 19
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedMethodArgument: x
+    UnusedMethodArgument:
+      name: x
   location:
     row: 41
     column: 15
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedMethodArgument: x
+    UnusedMethodArgument:
+      name: x
   location:
     row: 190
     column: 23

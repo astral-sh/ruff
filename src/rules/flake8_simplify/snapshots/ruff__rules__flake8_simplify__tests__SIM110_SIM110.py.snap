@@ -3,7 +3,8 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ConvertLoopToAny: return any(check(x) for x in iterable)
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
   location:
     row: 3
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    ConvertLoopToAny: return any(check(x) for x in iterable)
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
   location:
     row: 55
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ConvertLoopToAny: return any(check(x) for x in iterable)
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
   location:
     row: 73
     column: 4

@@ -15,7 +15,9 @@ pub fn invalid_class_name(class_def: &Stmt, name: &str, locator: &Locator) -> Op
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
         return Some(Diagnostic::new(
-            violations::InvalidClassName(name.to_string()),
+            violations::InvalidClassName {
+                name: name.to_string(),
+            },
             identifier_range(class_def, locator),
         ));
     }
@@ -31,7 +33,9 @@ pub fn invalid_function_name(
 ) -> Option<Diagnostic> {
     if name.to_lowercase() != name && !ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return Some(Diagnostic::new(
-            violations::InvalidFunctionName(name.to_string()),
+            violations::InvalidFunctionName {
+                name: name.to_string(),
+            },
             identifier_range(func_def, locator),
         ));
     }
@@ -42,7 +46,9 @@ pub fn invalid_function_name(
 pub fn invalid_argument_name(name: &str, arg: &Arg) -> Option<Diagnostic> {
     if name.to_lowercase() != name {
         return Some(Diagnostic::new(
-            violations::InvalidArgumentName(name.to_string()),
+            violations::InvalidArgumentName {
+                name: name.to_string(),
+            },
             Range::from_located(arg),
         ));
     }
@@ -131,7 +137,9 @@ pub fn non_lowercase_variable_in_function(
         && !helpers::is_type_var_assignment(checker, stmt)
     {
         checker.diagnostics.push(Diagnostic::new(
-            violations::NonLowercaseVariableInFunction(name.to_string()),
+            violations::NonLowercaseVariableInFunction {
+                name: name.to_string(),
+            },
             Range::from_located(expr),
         ));
     }
@@ -238,7 +246,9 @@ pub fn mixed_case_variable_in_class_scope(
 ) {
     if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::MixedCaseVariableInClassScope(name.to_string()),
+            violations::MixedCaseVariableInClassScope {
+                name: name.to_string(),
+            },
             Range::from_located(expr),
         ));
     }
@@ -253,7 +263,9 @@ pub fn mixed_case_variable_in_global_scope(
 ) {
     if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::MixedCaseVariableInGlobalScope(name.to_string()),
+            violations::MixedCaseVariableInGlobalScope {
+                name: name.to_string(),
+            },
             Range::from_located(expr),
         ));
     }
@@ -300,7 +312,9 @@ pub fn error_suffix_on_exception_name(
         return None;
     }
     Some(Diagnostic::new(
-        violations::ErrorSuffixOnExceptionName(name.to_string()),
+        violations::ErrorSuffixOnExceptionName {
+            name: name.to_string(),
+        },
         identifier_range(class_def, locator),
     ))
 }

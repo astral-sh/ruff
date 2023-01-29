@@ -4,7 +4,8 @@ expression: diagnostics
 ---
 - kind:
     StringDotFormatExtraPositionalArguments:
-      - "1"
+      missing:
+        - "1"
   location:
     row: 2
     column: 0
@@ -15,8 +16,9 @@ expression: diagnostics
   parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
-      - "0"
-      - "2"
+      missing:
+        - "0"
+        - "2"
   location:
     row: 3
     column: 0
@@ -27,7 +29,8 @@ expression: diagnostics
   parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
-      - "2"
+      missing:
+        - "2"
   location:
     row: 5
     column: 0
@@ -38,7 +41,8 @@ expression: diagnostics
   parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
-      - "1"
+      missing:
+        - "1"
   location:
     row: 6
     column: 0
@@ -49,7 +53,8 @@ expression: diagnostics
   parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
-      - "1"
+      missing:
+        - "1"
   location:
     row: 9
     column: 0
@@ -60,8 +65,9 @@ expression: diagnostics
   parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
-      - "1"
-      - "2"
+      missing:
+        - "1"
+        - "2"
   location:
     row: 10
     column: 0
@@ -72,7 +78,8 @@ expression: diagnostics
   parent: ~
 - kind:
     StringDotFormatExtraPositionalArguments:
-      - "2"
+      missing:
+        - "2"
   location:
     row: 12
     column: 0

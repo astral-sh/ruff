@@ -3,7 +3,8 @@ source: src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    Jinja2AutoescapeFalse: true
+    Jinja2AutoescapeFalse:
+      value: true
   location:
     row: 9
     column: 67
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Jinja2AutoescapeFalse: true
+    Jinja2AutoescapeFalse:
+      value: true
   location:
     row: 10
     column: 44
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Jinja2AutoescapeFalse: true
+    Jinja2AutoescapeFalse:
+      value: true
   location:
     row: 13
     column: 23
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Jinja2AutoescapeFalse: false
+    Jinja2AutoescapeFalse:
+      value: false
   location:
     row: 15
     column: 0
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Jinja2AutoescapeFalse: true
+    Jinja2AutoescapeFalse:
+      value: true
   location:
     row: 29
     column: 46

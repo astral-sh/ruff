@@ -3,7 +3,8 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypeOfPrimitive: Str
+    TypeOfPrimitive:
+      primitive: Str
   location:
     row: 1
     column: 0
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    TypeOfPrimitive: Bytes
+    TypeOfPrimitive:
+      primitive: Bytes
   location:
     row: 2
     column: 0
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TypeOfPrimitive: Int
+    TypeOfPrimitive:
+      primitive: Int
   location:
     row: 3
     column: 0
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    TypeOfPrimitive: Float
+    TypeOfPrimitive:
+      primitive: Float
   location:
     row: 4
     column: 0
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TypeOfPrimitive: Complex
+    TypeOfPrimitive:
+      primitive: Complex
   location:
     row: 5
     column: 0

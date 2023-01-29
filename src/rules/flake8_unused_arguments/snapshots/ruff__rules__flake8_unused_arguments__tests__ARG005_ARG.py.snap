@@ -3,7 +3,8 @@ source: src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedLambdaArgument: x
+    UnusedLambdaArgument:
+      name: x
   location:
     row: 28
     column: 7

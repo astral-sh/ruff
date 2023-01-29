@@ -3,7 +3,8 @@ source: src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    KeywordArgumentBeforeStarArgument: kw
+    KeywordArgumentBeforeStarArgument:
+      name: kw
   location:
     row: 13
     column: 2
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    KeywordArgumentBeforeStarArgument: kw
+    KeywordArgumentBeforeStarArgument:
+      name: kw
   location:
     row: 14
     column: 2
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    KeywordArgumentBeforeStarArgument: kw
+    KeywordArgumentBeforeStarArgument:
+      name: kw
   location:
     row: 15
     column: 6

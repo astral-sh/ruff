@@ -12,7 +12,9 @@ pub fn hardcoded_tmp_directory(
 ) -> Option<Diagnostic> {
     if prefixes.iter().any(|prefix| value.starts_with(prefix)) {
         Some(Diagnostic::new(
-            violations::HardcodedTempFile(value.to_string()),
+            violations::HardcodedTempFile {
+                string: value.to_string(),
+            },
             Range::from_located(expr),
         ))
     } else {

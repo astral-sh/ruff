@@ -4,7 +4,8 @@ expression: diagnostics
 ---
 - kind:
     PercentFormatExtraNamedArguments:
-      - b
+      missing:
+        - b
   location:
     row: 3
     column: 0
@@ -23,7 +24,8 @@ expression: diagnostics
   parent: ~
 - kind:
     PercentFormatExtraNamedArguments:
-      - b
+      missing:
+        - b
   location:
     row: 8
     column: 0
@@ -42,7 +44,8 @@ expression: diagnostics
   parent: ~
 - kind:
     PercentFormatExtraNamedArguments:
-      - b
+      missing:
+        - b
   location:
     row: 9
     column: 0

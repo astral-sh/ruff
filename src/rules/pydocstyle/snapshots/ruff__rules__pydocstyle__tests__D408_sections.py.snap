@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SectionUnderlineAfterName: Returns
+    SectionUnderlineAfterName:
+      name: Returns
   location:
     row: 85
     column: 4

@@ -1140,9 +1140,9 @@ where
                         if self.settings.rules.enabled(&Rule::FutureFeatureNotDefined) {
                             if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    violations::FutureFeatureNotDefined(
-                                        alias.node.name.to_string(),
-                                    ),
+                                    violations::FutureFeatureNotDefined {
+                                        name: alias.node.name.to_string(),
+                                    },
                                     Range::from_located(alias),
                                 ));
                             }
@@ -1175,12 +1175,12 @@ where
                                 [*(self.scope_stack.last().expect("No current scope found"))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    violations::ImportStarNotPermitted(
-                                        helpers::format_import_from(
+                                    violations::ImportStarNotPermitted {
+                                        name: helpers::format_import_from(
                                             level.as_ref(),
                                             module.as_deref(),
                                         ),
-                                    ),
+                                    },
                                     Range::from_located(stmt),
                                 ));
                             }
@@ -1188,10 +1188,12 @@ where
 
                         if self.settings.rules.enabled(&Rule::ImportStarUsed) {
                             self.diagnostics.push(Diagnostic::new(
-                                violations::ImportStarUsed(helpers::format_import_from(
-                                    level.as_ref(),
-                                    module.as_deref(),
-                                )),
+                                violations::ImportStarUsed {
+                                    name: helpers::format_import_from(
+                                        level.as_ref(),
+                                        module.as_deref(),
+                                    ),
+                                },
                                 Range::from_located(stmt),
                             ));
                         }
@@ -2146,9 +2148,9 @@ where
                                             .enabled(&Rule::StringDotFormatInvalidFormat)
                                         {
                                             self.diagnostics.push(Diagnostic::new(
-                                                violations::StringDotFormatInvalidFormat(
-                                                    pyflakes::format::error_to_string(&e),
-                                                ),
+                                                violations::StringDotFormatInvalidFormat {
+                                                    message: pyflakes::format::error_to_string(&e),
+                                                },
                                                 location,
                                             ));
                                         }
@@ -2707,7 +2709,9 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction(DeferralKeyword::Yield),
+                            violations::YieldOutsideFunction {
+                                keyword: DeferralKeyword::Yield,
+                            },
                             Range::from_located(expr),
                         ));
                     }
@@ -2718,7 +2722,9 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction(DeferralKeyword::YieldFrom),
+                            violations::YieldOutsideFunction {
+                                keyword: DeferralKeyword::YieldFrom,
+                            },
                             Range::from_located(expr),
                         ));
                     }
@@ -2729,7 +2735,9 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction(DeferralKeyword::Await),
+                            violations::YieldOutsideFunction {
+                                keyword: DeferralKeyword::Await,
+                            },
                             Range::from_located(expr),
                         ));
                     }
@@ -2815,7 +2823,9 @@ where
                                     .enabled(&Rule::PercentFormatUnsupportedFormatCharacter)
                                 {
                                     self.diagnostics.push(Diagnostic::new(
-                                        violations::PercentFormatUnsupportedFormatCharacter(c),
+                                        violations::PercentFormatUnsupportedFormatCharacter {
+                                            char: c,
+                                        },
                                         location,
                                     ));
                                 }
@@ -2827,7 +2837,9 @@ where
                                     .enabled(&Rule::PercentFormatInvalidFormat)
                                 {
                                     self.diagnostics.push(Diagnostic::new(
-                                        violations::PercentFormatInvalidFormat(e.to_string()),
+                                        violations::PercentFormatInvalidFormat {
+                                            message: e.to_string(),
+                                        },
                                         location,
                                     ));
                                 }
@@ -4320,7 +4332,9 @@ impl<'a> Checker<'a> {
                     .enabled(&Rule::ForwardAnnotationSyntaxError)
                 {
                     self.diagnostics.push(Diagnostic::new(
-                        violations::ForwardAnnotationSyntaxError(expression.to_string()),
+                        violations::ForwardAnnotationSyntaxError {
+                            body: expression.to_string(),
+                        },
                         range,
                     ));
                 }

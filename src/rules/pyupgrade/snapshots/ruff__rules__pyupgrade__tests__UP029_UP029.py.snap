@@ -4,7 +4,8 @@ expression: diagnostics
 ---
 - kind:
     UnnecessaryBuiltinImport:
-      - "*"
+      names:
+        - "*"
   location:
     row: 1
     column: 0
@@ -23,8 +24,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryBuiltinImport:
-      - ascii
-      - bytes
+      names:
+        - ascii
+        - bytes
   location:
     row: 2
     column: 0
@@ -43,8 +45,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryBuiltinImport:
-      - filter
-      - zip
+      names:
+        - filter
+        - zip
   location:
     row: 4
     column: 0
@@ -63,7 +66,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryBuiltinImport:
-      - open
+      names:
+        - open
   location:
     row: 5
     column: 0

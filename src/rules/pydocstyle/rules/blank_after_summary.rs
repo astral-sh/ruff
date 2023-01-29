@@ -22,7 +22,9 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     }
     if lines_count > 1 && blanks_count != 1 {
         let mut diagnostic = Diagnostic::new(
-            violations::BlankLineAfterSummary(blanks_count),
+            violations::BlankLineAfterSummary {
+                num_lines: blanks_count,
+            },
             Range::from_located(docstring.expr),
         );
         if checker.patch(diagnostic.kind.rule()) {

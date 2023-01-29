@@ -4,8 +4,9 @@ expression: diagnostics
 ---
 - kind:
     DocumentAllArguments:
-      - y
-      - z
+      names:
+        - y
+        - z
   location:
     row: 1
     column: 0
@@ -16,8 +17,9 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
-      - z
+      names:
+        - y
+        - z
   location:
     row: 14
     column: 0
@@ -28,8 +30,9 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
-      - z
+      names:
+        - y
+        - z
   location:
     row: 27
     column: 0
@@ -40,8 +43,9 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
-      - z
+      names:
+        - y
+        - z
   location:
     row: 39
     column: 0
@@ -52,7 +56,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
+      names:
+        - y
   location:
     row: 52
     column: 0
@@ -63,7 +68,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
+      names:
+        - y
   location:
     row: 65
     column: 0
@@ -74,7 +80,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
+      names:
+        - y
   location:
     row: 77
     column: 0
@@ -85,7 +92,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - x
+      names:
+        - x
   location:
     row: 98
     column: 0
@@ -96,7 +104,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - "*args"
+      names:
+        - "*args"
   location:
     row: 108
     column: 0

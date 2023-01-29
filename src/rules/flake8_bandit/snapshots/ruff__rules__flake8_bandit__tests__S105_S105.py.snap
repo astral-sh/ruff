@@ -3,7 +3,8 @@ source: src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 12
     column: 11
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 13
     column: 8
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 14
     column: 9
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 15
     column: 6
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 16
     column: 9
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 17
     column: 8
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 18
     column: 10
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 19
     column: 18
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 20
     column: 18
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 22
     column: 16
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 23
     column: 12
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 24
     column: 14
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 25
     column: 11
@@ -133,7 +146,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 26
     column: 14
@@ -143,7 +157,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 27
     column: 13
@@ -153,7 +168,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 28
     column: 15
@@ -163,7 +179,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 29
     column: 23
@@ -173,7 +190,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 30
     column: 23
@@ -183,7 +201,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 34
     column: 15
@@ -193,7 +212,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 38
     column: 19
@@ -203,7 +223,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 39
     column: 16
@@ -213,7 +234,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 40
     column: 17
@@ -223,7 +245,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 41
     column: 14
@@ -233,7 +256,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 42
     column: 17
@@ -243,7 +267,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 43
     column: 16
@@ -253,7 +278,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 44
     column: 18
@@ -263,7 +289,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 46
     column: 12
@@ -273,7 +300,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 47
     column: 9
@@ -283,7 +311,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 48
     column: 10
@@ -293,7 +322,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 49
     column: 7
@@ -303,7 +333,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 50
     column: 10
@@ -313,7 +344,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 51
     column: 9
@@ -323,7 +355,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 52
     column: 11
@@ -333,7 +366,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: s3cr3t
+    HardcodedPasswordString:
+      string: s3cr3t
   location:
     row: 53
     column: 20
@@ -343,7 +377,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: "1\n2"
+    HardcodedPasswordString:
+      string: "1\n2"
   location:
     row: 55
     column: 12
@@ -353,7 +388,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: "3\t4"
+    HardcodedPasswordString:
+      string: "3\t4"
   location:
     row: 58
     column: 12
@@ -363,7 +399,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString: "5\r6"
+    HardcodedPasswordString:
+      string: "5\r6"
   location:
     row: 61
     column: 12

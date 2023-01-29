@@ -132,7 +132,9 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::DoubleNegation(operand.to_string()),
+        violations::DoubleNegation {
+            expr: operand.to_string(),
+        },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
