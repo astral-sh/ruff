@@ -286,50 +286,48 @@ pub fn old_code_blocks(
 ) {
     // NOTE: Pyupgrade ONLY works if `sys.version_info` is on the left
     let tokens = check_tokens(checker.locator, stmt);
-    match &test.node {
-        ExprKind::Compare {
-            left,
-            ops,
-            comparators,
-        } => {
-            if check_path(checker, left, &["sys", "version_info"]) {
-                // We need to ensure we have only one operation and one comparison
-                if ops.len() == 1 && comparators.len() == 1 {
-                    let comparison = &comparators.get(0).unwrap().node;
-                    let op = ops.get(0).unwrap();
-                    match comparison {
-                        ExprKind::Tuple { elts, .. } => {
-                            // Here we check for the correct operator, and also adjust the desired
-                            // target based on whether we are accepting equal to
-                            let version = extract_version(elts);
-                            let target = checker.settings.target_version;
-                            if op == &Cmpop::Lt || op == &Cmpop::LtE {
-                                if compare_version(&version, target, op == &Cmpop::LtE) {
-                                    fix_py2_block(checker, stmt, body, orelse, &tokens);
-                                }
-                            } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
-                                if compare_version(&version, target, op == &Cmpop::GtE) {
-                                    fix_py3_block(checker, stmt, test, body, &tokens);
-                                }
-                            }
-                        }
-                        ExprKind::Constant {
-                            value: Constant::Int(number),
-                            ..
-                        } => {
-                            let version_number = bigint_to_u32(number);
-                            if version_number == 2 && op == &Cmpop::Eq {
+    if let ExprKind::Compare {
+        left,
+        ops,
+        comparators,
+    } = &test.node
+    {
+        if check_path(checker, left, &["sys", "version_info"]) {
+            // We need to ensure we have only one operation and one comparison
+            if ops.len() == 1 && comparators.len() == 1 {
+                let comparison = &comparators.get(0).unwrap().node;
+                let op = ops.get(0).unwrap();
+                match comparison {
+                    ExprKind::Tuple { elts, .. } => {
+                        // Here we check for the correct operator, and also adjust the desired
+                        // target based on whether we are accepting equal to
+                        let version = extract_version(elts);
+                        let target = checker.settings.target_version;
+                        if op == &Cmpop::Lt || op == &Cmpop::LtE {
+                            if compare_version(&version, target, op == &Cmpop::LtE) {
                                 fix_py2_block(checker, stmt, body, orelse, &tokens);
-                            } else if version_number == 3 && op == &Cmpop::Eq {
+                            }
+                        } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
+                            if compare_version(&version, target, op == &Cmpop::GtE) {
                                 fix_py3_block(checker, stmt, test, body, &tokens);
                             }
                         }
-                        _ => (),
                     }
+                    ExprKind::Constant {
+                        value: Constant::Int(number),
+                        ..
+                    } => {
+                        let version_number = bigint_to_u32(number);
+                        if version_number == 2 && op == &Cmpop::Eq {
+                            fix_py2_block(checker, stmt, body, orelse, &tokens);
+                        } else if version_number == 3 && op == &Cmpop::Eq {
+                            fix_py3_block(checker, stmt, test, body, &tokens);
+                        }
+                    }
+                    _ => (),
                 }
             }
         }
-        _ => (),
     }
 }
 
