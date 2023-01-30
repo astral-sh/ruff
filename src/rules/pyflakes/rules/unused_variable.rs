@@ -9,7 +9,7 @@ use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violations;
 
@@ -179,7 +179,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
                 },
                 binding.range,
             );
-            if checker.patch(&Rule::UnusedVariable) {
+            if checker.patch(diagnostic.kind.rule()) {
                 if let Some(stmt) = binding.source.as_ref().map(std::convert::Into::into) {
                     if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
                     {

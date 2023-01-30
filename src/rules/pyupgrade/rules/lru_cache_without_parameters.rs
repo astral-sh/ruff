@@ -5,7 +5,7 @@ use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// UP011
@@ -30,7 +30,7 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
                 violations::LRUCacheWithoutParameters,
                 Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
             );
-            if checker.patch(&Rule::LRUCacheWithoutParameters) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(func, checker.stylist),
                     expr.location,

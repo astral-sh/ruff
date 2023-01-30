@@ -9,7 +9,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
@@ -258,7 +258,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     }
 
     let mut diagnostic = Diagnostic::new(violations::FString, Range::from_located(expr));
-    if checker.patch(&Rule::FString) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             expr.location,
