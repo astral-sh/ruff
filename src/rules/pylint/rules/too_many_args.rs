@@ -24,14 +24,15 @@ impl Violation for TooManyArgs {
 
 /// PLR0913
 pub fn too_many_args(checker: &mut Checker, args: &Arguments, stmt: &Stmt) {
-    let re = &checker.settings.dummy_variable_rgx;
-
-    let filtered_args = args.args.iter().filter(|x| !re.is_match(&x.node.arg));
-    let count = filtered_args.count();
-    if count > checker.settings.pylint.max_args {
+    let num_args = args
+        .args
+        .iter()
+        .filter(|arg| !checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
+        .count();
+    if num_args > checker.settings.pylint.max_args {
         checker.diagnostics.push(Diagnostic::new(
             TooManyArgs {
-                c_args: args.args.len(),
+                c_args: num_args,
                 max_args: checker.settings.pylint.max_args,
             },
             Range::from_located(stmt),

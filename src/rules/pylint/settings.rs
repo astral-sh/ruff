@@ -51,10 +51,10 @@ pub struct Options {
             allow-magic-value-types = ["int"]
         "#
     )]
-    /// Constant types to ignore when used as "magic values".
+    /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
     #[option(default = r"5", value_type = "usize", example = r"max_args = 5")]
-    /// Maximum number of arguments for function / method.
+    /// Maximum number of arguments allowed for a function definition (see: `PLR0913`).
     pub max_args: Option<usize>,
 }
 
@@ -75,13 +75,12 @@ impl Default for Settings {
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
-        let settings_default = Settings::default();
-
+        let defaults = Settings::default();
         Self {
             allow_magic_value_types: options
                 .allow_magic_value_types
-                .unwrap_or(settings_default.allow_magic_value_types),
-            max_args: options.max_args.unwrap_or(settings_default.max_args),
+                .unwrap_or(defaults.allow_magic_value_types),
+            max_args: options.max_args.unwrap_or(defaults.max_args),
         }
     }
 }
