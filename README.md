@@ -10,6 +10,8 @@
 
 An extremely fast Python linter, written in Rust.
 
+This README is also available as [documentation](https://beta.ruff.rs/docs/).
+
 <p align="center">
   <picture align="center">
     <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg">
