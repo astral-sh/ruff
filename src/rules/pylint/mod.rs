@@ -1,5 +1,4 @@
 //! Rules from [Pylint](https://pypi.org/project/pylint/).
-pub mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 
@@ -68,7 +67,7 @@ mod tests {
     #[test]
     fn max_args() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pylint/too_many_args.py"),
+            Path::new("./resources/test/fixtures/pylint/too_many_args_params.py"),
             &Settings {
                 pylint: pylint::settings::Settings {
                     max_args: 4,
@@ -83,7 +82,7 @@ mod tests {
     #[test]
     fn ignore_arg_names() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pylint/too_many_args.py"),
+            Path::new("./resources/test/fixtures/pylint/too_many_args_params.py"),
             &Settings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap().into(),
                 ..Settings::for_rules(vec![Rule::TooManyArgs])
