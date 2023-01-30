@@ -1,5 +1,6 @@
+use rustpython_ast::{Alias, AliasData, Stmt};
+
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{AliasData, Located, Stmt};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -11,20 +12,32 @@ use crate::settings::types::PythonVersion;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    pub struct ImportReplacements;
+    pub struct ImportReplacements {
+        pub existing: String,
+        pub replacement: String,
+    }
 );
 impl AlwaysAutofixableViolation for ImportReplacements {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace old formatting imports with their new versions")
+        let ImportReplacements {
+            existing,
+            replacement,
+        } = self;
+        format!("Import `{existing}` from `{replacement}`")
     }
 
     fn autofix_title(&self) -> String {
-        "Updated the import".to_string()
+        let ImportReplacements {
+            existing,
+            replacement,
+        } = self;
+        format!("Replace with `{replacement}`")
     }
 }
 
-const BAD_MODULES: &[&str] = &[
+// A list of modules that may involve import rewrites.
+const RELEVANT_MODULES: &[&str] = &[
     "collections",
     "pipes",
     "six",
@@ -36,6 +49,7 @@ const BAD_MODULES: &[&str] = &[
     "typing.re",
 ];
 
+// Members of `collections` that have been moved to `collections.abc`.
 const COLLECTIONS_TO_ABC: &[&str] = &[
     "AsyncGenerator",
     "AsyncIterable",
@@ -64,27 +78,22 @@ const COLLECTIONS_TO_ABC: &[&str] = &[
     "ValuesView",
 ];
 
+// Members of `pipes` that have been moved to `shlex`.
 const PIPES_TO_SHLEX: &[&str] = &["quote"];
 
+// Members of `six` that have been moved to various modules.
 const SIX_TO_IO: &[&str] = &["BytesIO", "StringIO"];
-
 const SIX_TO_FUNCTOOLS: &[&str] = &["wraps"];
+const SIX_MOVES_TO_IO: &[&str] = &["StringIO"];
+const SIX_MOVES_TO_COLLECTIONS: &[&str] = &["UserDict", "UserList", "UserString"];
+const SIX_MOVES_TO_ITERTOOLS: &[&str] = &["filterfalse", "zip_longest"];
+const SIX_MOVES_TO_OS: &[&str] = &["getcwd", "getcwdb"];
+const SIX_MOVES_TO_SUBPROCESS: &[&str] = &["getouput"];
+const SIX_MOVES_TO_SYS: &[&str] = &["intern"];
+const SIX_MOVES_TO_URLLIB: &[&str] = &["parse", "request", "response", "error", "robotparser"];
 
-const SIXMOVES_TO_IO: &[&str] = &["StringIO"];
-
-const SIXMOVES_TO_COLLECTIONS: &[&str] = &["UserDict", "UserList", "UserString"];
-
-const SIXMOVES_TO_ITERTOOLS: &[&str] = &["filterfalse", "zip_longest"];
-
-const SIXMOVES_TO_OS: &[&str] = &["getcwd", "getcwdb"];
-
-const SIXMOVES_TO_SUBPROCESS: &[&str] = &["getouput"];
-
-const SIXMOVES_TO_SYS: &[&str] = &["intern"];
-
-const SIXMOVES_TO_URLLIB: &[&str] = &["parse", "request", "response", "error", "robotparser"];
-
-const TYPINGEXTENSIONS_TO_TYPING: &[&str] = &[
+// Members of `typing_extensions` that have been moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "AsyncIterable",
     "AsyncIterator",
     "Awaitable",
@@ -98,11 +107,13 @@ const TYPINGEXTENSIONS_TO_TYPING: &[&str] = &[
     "Type",
 ];
 
-// Items below this require python 3.7 or higher
+// Python 3.7+
 
-const MYPYEXTENSIONS_TO_TYPING_37: &[&str] = &["NoReturn"];
+// Members of `mypy_extensions` that have been moved to `typing`.
+const MYPY_EXTENSIONS_TO_TYPING_37: &[&str] = &["NoReturn"];
 
-const TYPINGEXTENSIONS_TO_TYPING_37: &[&str] = &[
+// Members of `typing_extensions` that have been moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
     "AsyncContextManager",
     "AsyncGenerator",
     "ChainMap",
@@ -111,11 +122,13 @@ const TYPINGEXTENSIONS_TO_TYPING_37: &[&str] = &[
     "NoReturn",
 ];
 
-// Items below this require python 3.8 or higher
+// Python 3.8+
 
-const MYPYEXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
+// Members of `mypy_extensions` that have been moved to `typing`.
+const MYPY_EXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
 
-const TYPINGEXTENSIONS_TO_TYPING_38: &[&str] = &[
+// Members of `typing_extensions` that have been moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
     "Literal",
     "OrderedDict",
@@ -124,9 +137,10 @@ const TYPINGEXTENSIONS_TO_TYPING_38: &[&str] = &[
     "runtime_checkable",
 ];
 
-// Items below this require python 3.9 or higher
+// Python 3.9+
 
-const TYPING_TO_COLLECTIONSABC_39: &[&str] = &[
+// Members of `typing` that have been moved to `collections.abc`.
+const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "AsyncGenerator",
     "AsyncIterable",
     "AsyncIterator",
@@ -154,17 +168,22 @@ const TYPING_TO_COLLECTIONSABC_39: &[&str] = &[
     "ValuesView",
 ];
 
+// Members of `typing` that have been moved to `typing.re`.
 const TYPING_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
-const TYPINGRE_TO_RE_39: &[&str] = &["Match", "Pattern"];
+// Members of `typing.re` that have been moved to `re`.
+const TYPING_RE_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
-const TYPINGEXTENSIONS_TO_TYPING_39: &[&str] = &["Annotated", "get_type_hints"];
+// Members of `typing_extensions` that have been moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_39: &[&str] = &["Annotated", "get_type_hints"];
 
-// Items below this require python 3.10 or higher
+// Python 3.10+
 
-const TYPING_TO_COLLECTIONSABC_310: &[&str] = &["Callable"];
+// Members of `typing` that have been moved to `collections.abc`.
+const TYPING_TO_COLLECTIONS_ABC_310: &[&str] = &["Callable"];
 
-const TYPINGEXTENSIONS_TO_TYPING_310: &[&str] = &[
+// Members of `typing_extensions` that have been moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "Concatenate",
     "ParamSpecArgs",
     "ParamSpecKwargs",
@@ -175,9 +194,10 @@ const TYPINGEXTENSIONS_TO_TYPING_310: &[&str] = &[
     "is_typeddict",
 ];
 
-// Items below this require python 3.11 or higher
+// Python 3.11+
 
-const TYPINGEXTENSIONS_TO_TYPING_311: &[&str] = &[
+// Members of `typing_extensions` that have been moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "Any",
     "LiteralString",
     "NamedTuple",
@@ -253,83 +273,83 @@ impl<'a> FixImports<'a> {
                 }
             }
             "six.moves" => {
-                if has_match(SIXMOVES_TO_IO, self.names) {
-                    self.create_new_str(SIXMOVES_TO_IO, "io")
-                } else if has_match(SIXMOVES_TO_COLLECTIONS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_COLLECTIONS, "collections")
-                } else if has_match(SIXMOVES_TO_ITERTOOLS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_ITERTOOLS, "itertools")
-                } else if has_match(SIXMOVES_TO_OS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_OS, "os")
-                } else if has_match(SIXMOVES_TO_SUBPROCESS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_SUBPROCESS, "subprocess")
-                } else if has_match(SIXMOVES_TO_SYS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_SYS, "sys")
-                } else if has_match(SIXMOVES_TO_URLLIB, self.names) {
-                    self.create_new_str(SIXMOVES_TO_URLLIB, "urllib")
+                if has_match(SIX_MOVES_TO_IO, self.names) {
+                    self.create_new_str(SIX_MOVES_TO_IO, "io")
+                } else if has_match(SIX_MOVES_TO_COLLECTIONS, self.names) {
+                    self.create_new_str(SIX_MOVES_TO_COLLECTIONS, "collections")
+                } else if has_match(SIX_MOVES_TO_ITERTOOLS, self.names) {
+                    self.create_new_str(SIX_MOVES_TO_ITERTOOLS, "itertools")
+                } else if has_match(SIX_MOVES_TO_OS, self.names) {
+                    self.create_new_str(SIX_MOVES_TO_OS, "os")
+                } else if has_match(SIX_MOVES_TO_SUBPROCESS, self.names) {
+                    self.create_new_str(SIX_MOVES_TO_SUBPROCESS, "subprocess")
+                } else if has_match(SIX_MOVES_TO_SYS, self.names) {
+                    self.create_new_str(SIX_MOVES_TO_SYS, "sys")
+                } else if has_match(SIX_MOVES_TO_URLLIB, self.names) {
+                    self.create_new_str(SIX_MOVES_TO_URLLIB, "urllib")
                 } else {
                     None
                 }
             }
             "typing_extensions" => {
-                if has_match(TYPINGEXTENSIONS_TO_TYPING, self.names) {
-                    self.create_new_str(TYPINGEXTENSIONS_TO_TYPING, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_37, self.names)
+                if has_match(TYPING_EXTENSIONS_TO_TYPING, self.names) {
+                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING, "typing")
+                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_37, self.names)
                     && self.version >= PythonVersion::Py37
                 {
-                    self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_37, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_38, self.names)
+                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_37, "typing")
+                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_38, self.names)
                     && self.version >= PythonVersion::Py38
                 {
-                    self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_38, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_39, self.names)
+                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_38, "typing")
+                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_39, self.names)
                     && self.version >= PythonVersion::Py39
                 {
-                    self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_39, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_310, self.names)
+                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_39, "typing")
+                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_310, self.names)
                     && self.version >= PythonVersion::Py310
                 {
-                    self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_310, "typing")
-                } else if has_match(TYPINGEXTENSIONS_TO_TYPING_311, self.names)
+                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_310, "typing")
+                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_311, self.names)
                     && self.version >= PythonVersion::Py311
                 {
-                    self.create_new_str(TYPINGEXTENSIONS_TO_TYPING_311, "typing")
+                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_311, "typing")
                 } else {
                     None
                 }
             }
             "mypy_extensions" => {
-                if has_match(MYPYEXTENSIONS_TO_TYPING_37, self.names)
+                if has_match(MYPY_EXTENSIONS_TO_TYPING_37, self.names)
                     && self.version >= PythonVersion::Py37
                 {
-                    self.create_new_str(MYPYEXTENSIONS_TO_TYPING_37, "typing")
-                } else if has_match(MYPYEXTENSIONS_TO_TYPING_38, self.names)
+                    self.create_new_str(MYPY_EXTENSIONS_TO_TYPING_37, "typing")
+                } else if has_match(MYPY_EXTENSIONS_TO_TYPING_38, self.names)
                     && self.version >= PythonVersion::Py38
                 {
-                    self.create_new_str(MYPYEXTENSIONS_TO_TYPING_38, "typing")
+                    self.create_new_str(MYPY_EXTENSIONS_TO_TYPING_38, "typing")
                 } else {
                     None
                 }
             }
             "typing" => {
-                if has_match(TYPING_TO_COLLECTIONSABC_39, self.names)
+                if has_match(TYPING_TO_COLLECTIONS_ABC_39, self.names)
                     && self.version >= PythonVersion::Py39
                 {
-                    self.create_new_str(TYPING_TO_COLLECTIONSABC_39, "collections.abc")
+                    self.create_new_str(TYPING_TO_COLLECTIONS_ABC_39, "collections.abc")
                 } else if has_match(TYPING_TO_RE_39, self.names)
                     && self.version >= PythonVersion::Py39
                 {
                     self.create_new_str(TYPING_TO_RE_39, "re")
-                } else if has_match(TYPING_TO_COLLECTIONSABC_310, self.names)
+                } else if has_match(TYPING_TO_COLLECTIONS_ABC_310, self.names)
                     && self.version >= PythonVersion::Py310
                 {
-                    self.create_new_str(TYPING_TO_COLLECTIONSABC_310, "collections.abc")
+                    self.create_new_str(TYPING_TO_COLLECTIONS_ABC_310, "collections.abc")
                 } else {
                     None
                 }
             }
             "typing.re" if self.version >= PythonVersion::Py39 => {
-                self.create_new_str(TYPINGRE_TO_RE_39, "re")
+                self.create_new_str(TYPING_RE_TO_RE_39, "re")
             }
             _ => None,
         }
@@ -352,7 +372,7 @@ impl<'a> FixImports<'a> {
             self.indent,
             self.short_indent,
         );
-        // We don't replace if there is just an unmatching, because then we don't need
+        // We don't replace if there is unmatching, because then we don't need
         // to refactor
         if !unmatching.is_empty() && !matching.is_empty() {
             Some(format!("{unmatching}\n{}{matching}", self.starting_indent))
@@ -384,18 +404,18 @@ impl<'a> FixImports<'a> {
 pub fn import_replacements(
     checker: &mut Checker,
     stmt: &Stmt,
-    names: &Vec<Located<AliasData>>,
-    module: &Option<String>,
+    names: &[Alias],
+    module: Option<&str>,
 ) {
     // Pyupgrade only works with import_from statements, so this linter does that as
     // well
-    let clean_mod = match module {
-        None => return,
-        Some(item) => item,
+    let Some(module) = module else {
+        return;
     };
-    if !BAD_MODULES.contains(&clean_mod.as_str()) {
+    if !RELEVANT_MODULES.contains(&module) {
         return;
     }
+
     let mut clean_names: Vec<AliasData> = vec![];
     for name in names {
         clean_names.push(name.node.clone());
@@ -405,22 +425,27 @@ pub fn import_replacements(
         .slice_source_code_range(&Range::from_located(stmt));
     let formatting = ImportFormatting::new(checker.locator, stmt, names);
     let fixer = FixImports::new(
-        clean_mod,
+        module,
         formatting.multi_line,
         &clean_names,
         &formatting.indent,
         checker.settings.target_version,
         &formatting.start_indent,
     );
-    let clean_result = match fixer.check_replacement() {
-        None => return,
-        Some(item) => item,
+    let Some(clean_result) = fixer.check_replacement() else {
+        return;
     };
     if clean_result == module_text {
         return;
     }
     let range = Range::from_located(stmt);
-    let mut diagnostic = Diagnostic::new(ImportReplacements, range);
+    let mut diagnostic = Diagnostic::new(
+        ImportReplacements {
+            existing: module.to_string(),
+            replacement: clean_result.to_string(),
+        },
+        range,
+    );
     if checker.patch(&Rule::ImportReplacements) {
         diagnostic.amend(Fix::replacement(
             clean_result,

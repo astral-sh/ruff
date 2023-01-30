@@ -1069,7 +1069,12 @@ where
                     pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::ImportReplacements) {
-                    pyupgrade::rules::import_replacements(self, stmt, names, module);
+                    pyupgrade::rules::import_replacements(
+                        self,
+                        stmt,
+                        names,
+                        module.as_ref().map(String::as_str),
+                    );
                 }
                 if self.settings.rules.enabled(&Rule::ImportReplacementsSix) {
                     pyupgrade::rules::import_replacements_six(self, stmt, module, names);

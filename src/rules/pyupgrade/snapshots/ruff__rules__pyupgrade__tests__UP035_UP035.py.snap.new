@@ -1,0 +1,331 @@
+---
+source: src/rules/pyupgrade/mod.rs
+assertion_line: 71
+expression: diagnostics
+---
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: from collections.abc import Mapping
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 31
+  fix:
+    content:
+      - from collections.abc import Mapping
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 31
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: from collections.abc import Mapping as MAP
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 38
+  fix:
+    content:
+      - from collections.abc import Mapping as MAP
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 38
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections.abc import Mapping, Sequence"
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 41
+  fix:
+    content:
+      - "from collections.abc import Mapping, Sequence"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 41
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import Counter\nfrom collections.abc import Mapping"
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 40
+  fix:
+    content:
+      - from collections import Counter
+      - from collections.abc import Mapping
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 40
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import Counter\nfrom collections.abc import Mapping"
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 42
+  fix:
+    content:
+      - from collections import Counter
+      - from collections.abc import Mapping
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 42
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import (\n    Counter\n )\nfrom collections.abc import (\n    Mapping\n )"
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 13
+    column: 33
+  fix:
+    content:
+      - from collections import (
+      - "    Counter"
+      - " )"
+      - from collections.abc import (
+      - "    Mapping"
+      - " )"
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 13
+      column: 33
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import (\n    Counter\n )\nfrom collections.abc import (\n    Mapping\n )"
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 16
+    column: 32
+  fix:
+    content:
+      - from collections import (
+      - "    Counter"
+      - " )"
+      - from collections.abc import (
+      - "    Mapping"
+      - " )"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 16
+      column: 32
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import Counter\nfrom collections.abc import Mapping, Sequence"
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 50
+  fix:
+    content:
+      - from collections import Counter
+      - "from collections.abc import Mapping, Sequence"
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 18
+      column: 50
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: six.moves
+      replacement: "from six.moves import getcwd\nfrom io import StringIO"
+  location:
+    row: 20
+    column: 0
+  end_location:
+    row: 20
+    column: 38
+  fix:
+    content:
+      - from six.moves import getcwd
+      - from io import StringIO
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 20
+      column: 38
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import Counter\nfrom collections.abc import Mapping as mapping"
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 22
+    column: 51
+  fix:
+    content:
+      - from collections import Counter
+      - from collections.abc import Mapping as mapping
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 22
+      column: 51
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import Counter\n    from collections.abc import Mapping"
+  location:
+    row: 25
+    column: 4
+  end_location:
+    row: 25
+    column: 44
+  fix:
+    content:
+      - from collections import Counter
+      - "    from collections.abc import Mapping"
+    location:
+      row: 25
+      column: 4
+    end_location:
+      row: 25
+      column: 44
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import Counter\n    from collections.abc import Mapping"
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 30
+    column: 44
+  fix:
+    content:
+      - from collections import Counter
+      - "    from collections.abc import Mapping"
+    location:
+      row: 30
+      column: 4
+    end_location:
+      row: 30
+      column: 44
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: from collections.abc import Mapping
+  location:
+    row: 32
+    column: 9
+  end_location:
+    row: 32
+    column: 40
+  fix:
+    content:
+      - from collections.abc import Mapping
+    location:
+      row: 32
+      column: 9
+    end_location:
+      row: 32
+      column: 40
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import Counter\nfrom collections.abc import Mapping"
+  location:
+    row: 35
+    column: 0
+  end_location:
+    row: 35
+    column: 40
+  fix:
+    content:
+      - from collections import Counter
+      - from collections.abc import Mapping
+    location:
+      row: 35
+      column: 0
+    end_location:
+      row: 35
+      column: 40
+  parent: ~
+- kind:
+    ImportReplacements:
+      existing: collections
+      replacement: "from collections import (\n        Bad,\n        Good\n     )\n    from collections.abc import (\n        Mapping,\n        Callable\n     )"
+  location:
+    row: 39
+    column: 4
+  end_location:
+    row: 44
+    column: 5
+  fix:
+    content:
+      - from collections import (
+      - "        Bad,"
+      - "        Good"
+      - "     )"
+      - "    from collections.abc import ("
+      - "        Mapping,"
+      - "        Callable"
+      - "     )"
+    location:
+      row: 39
+      column: 4
+    end_location:
+      row: 44
+      column: 5
+  parent: ~
+

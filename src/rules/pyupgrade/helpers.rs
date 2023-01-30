@@ -26,9 +26,7 @@ pub fn curly_escape(text: &str) -> String {
         .to_string()
 }
 
-/// Converts a list of names and a module into a from import string. I do not
-/// love this and would MUCH rather use libcst, so if you have any better ideas
-/// feel free to let me know.
+/// Converts a list of names and a module into an `import from`-style import.
 pub fn get_fromimport_str(
     names: &[AliasData],
     module: &str,
@@ -66,7 +64,7 @@ pub fn get_fromimport_str(
 
 pub fn clean_indent<T>(locator: &Locator, located: &Located<T>) -> String {
     match indentation(locator, located) {
-        // This is an opninionated way of formatting import statements
+        // This is an opinionated way of formatting import statements.
         None => "    ".to_string(),
         Some(item) => item.to_string(),
     }
