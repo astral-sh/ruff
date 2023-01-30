@@ -147,6 +147,7 @@ pub struct Options {
     ///
     /// This option has been DEPRECATED in favor of `ignore`
     /// since its usage is now interchangeable with `ignore`.
+    #[schemars(skip)]
     pub extend_ignore: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",

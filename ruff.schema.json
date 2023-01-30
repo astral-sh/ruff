@@ -66,16 +66,6 @@
         "type": "string"
       }
     },
-    "extend-ignore": {
-      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.\n\nThis option has been DEPRECATED in favor of `ignore` since its usage is now interchangeable with `ignore`.",
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/RuleSelector"
-      }
-    },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
       "type": [
