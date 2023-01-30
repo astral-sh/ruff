@@ -1,6 +1,6 @@
 # Breaking Changes
 
-## 0.0.239
+## 0.0.238
 
 ### `select`, `extend-select`, `ignore`, and `extend-ignore` have new semantics ([#2312](https://github.com/charliermarsh/ruff/pull/2312))
 
