@@ -9,8 +9,6 @@ use globset::Glob;
 use rustc_hash::{FxHashMap, FxHashSet};
 use strum::IntoEnumIterator;
 
-use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
-use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
 use crate::registry::{Rule, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
@@ -23,6 +21,9 @@ use crate::rules::{
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once;
+
+use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
+use self::rule_table::RuleTable;
 
 pub mod configuration;
 pub mod defaults;
@@ -355,11 +356,18 @@ impl From<&Configuration> for RuleTable {
             }
         }
 
-        // Validate that we didn't enable any incompatible rules.
-        for (a, b, message) in INCOMPATIBLE_CODES {
-            if rules.enabled(a) && rules.enabled(b) {
-                warn_user_once!("{}", message);
-            }
+        // Validate that we didn't enable any incompatible rules. Use this awkward approach to
+        // give each pair it's own `warn_user_once`.
+        let [pair1, pair2] = INCOMPATIBLE_CODES;
+        let (preferred, expendable, message) = pair1;
+        if rules.enabled(preferred) && rules.enabled(expendable) {
+            warn_user_once!("{}", message);
+            rules.disable(expendable);
+        }
+        let (preferred, expendable, message) = pair2;
+        if rules.enabled(preferred) && rules.enabled(expendable) {
+            warn_user_once!("{}", message);
+            rules.disable(expendable);
         }
 
         rules
