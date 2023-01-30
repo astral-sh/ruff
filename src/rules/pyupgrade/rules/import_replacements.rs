@@ -4,36 +4,36 @@ use ruff_macros::derive_message_formats;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pyupgrade::helpers::{format_import_from, ImportFormatting};
 use crate::settings::types::PythonVersion;
 use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::violation::{Availability, Violation};
+use crate::{define_violation, AutofixKind};
 
 define_violation!(
     pub struct ImportReplacements {
-        pub existing: String,
         pub replacement: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for ImportReplacements {
+impl Violation for ImportReplacements {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportReplacements {
-            existing,
-            replacement,
-        } = self;
-        format!("Import `{existing}` from `{replacement}`")
+        let ImportReplacements { replacement, .. } = self;
+        format!("Import from `{replacement}` instead")
     }
 
-    fn autofix_title(&self) -> String {
-        let ImportReplacements {
-            existing: _,
-            replacement,
-        } = self;
-        format!("Replace with `{replacement}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let ImportReplacements { fixable, .. } = self;
+        if *fixable {
+            Some(|ImportReplacements { replacement, .. }| format!("Import from `{replacement}`"))
+        } else {
+            None
+        }
     }
 }
 
@@ -233,7 +233,7 @@ impl<'a> FixImports<'a> {
         }
     }
 
-    fn check_replacement(&self) -> Option<String> {
+    fn check_replacement(&self) -> Option<(String, Option<String>)> {
         match self.module {
             "collections" => self.create_new_str(COLLECTIONS_TO_ABC, "collections.abc"),
             "pipes" => self.create_new_str(PIPES_TO_SHLEX, "shlex"),
@@ -303,15 +303,19 @@ impl<'a> FixImports<'a> {
 
     // TODO(charlie): This needs to return the `replace` module and the list of matched names,
     // to improve the error message.
-    fn create_new_str(&self, matches: &[&str], replace: &str) -> Option<String> {
+    fn create_new_str(&self, matches: &[&str], replace: &str) -> Option<(String, Option<String>)> {
         let (matched_names, unmatched_names) = self.partition_imports(matches);
 
         // If we have no matched names, we don't need to do anything.
+        if matched_names.is_empty() {
+            return None;
+        }
+
         // If we have matched _and_ unmatched names, but the import is not on its own line, we
         // can't add a statement after it. For example, if we have `if True: import foo`, we can't
         // add a statement to the next line.
-        if matched_names.is_empty() || (!unmatched_names.is_empty() && !self.formatting.own_line) {
-            return None;
+        if !unmatched_names.is_empty() && !self.formatting.own_line {
+            return Some((replace.to_string(), None));
         }
 
         let matched = format_import_from(
@@ -324,7 +328,7 @@ impl<'a> FixImports<'a> {
         );
 
         if unmatched_names.is_empty() {
-            return Some(matched);
+            return Some((replace.to_string(), Some(matched)));
         }
 
         let unmatched = format_import_from(
@@ -335,10 +339,13 @@ impl<'a> FixImports<'a> {
             self.formatting.stmt_indent,
             self.stylist,
         );
-        Some(format!(
-            "{unmatched}{}{}{matched}",
-            self.stylist.line_ending().as_str(),
-            self.formatting.stmt_indent
+        Some((
+            replace.to_string(),
+            Some(format!(
+                "{unmatched}{}{}{matched}",
+                self.stylist.line_ending().as_str(),
+                self.formatting.stmt_indent
+            )),
         ))
     }
 
@@ -387,24 +394,25 @@ pub fn import_replacements(
         checker.stylist,
     );
 
-    // TODO(charlie): Even if we can't fix this, we should still flag it. Some cases can't be fixed.
-    let Some(content) = fixer.check_replacement() else {
+    let Some((module, content)) = fixer.check_replacement() else {
         return;
     };
 
     let mut diagnostic = Diagnostic::new(
         ImportReplacements {
-            existing: module.to_string(),
-            replacement: content.to_string(),
+            replacement: module,
+            fixable: content.is_some(),
         },
         Range::from_located(stmt),
     );
     if checker.patch(&Rule::ImportReplacements) {
-        diagnostic.amend(Fix::replacement(
-            content,
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ));
+        if let Some(content) = content {
+            diagnostic.amend(Fix::replacement(
+                content,
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

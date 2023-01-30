@@ -3,7 +3,9 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 2
     column: 0
@@ -21,7 +23,9 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 4
     column: 0
@@ -39,7 +43,9 @@ expression: diagnostics
       column: 38
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 6
     column: 0
@@ -57,7 +63,9 @@ expression: diagnostics
       column: 41
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 8
     column: 0
@@ -76,7 +84,9 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 10
     column: 0
@@ -95,7 +105,9 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 12
     column: 0
@@ -105,11 +117,11 @@ expression: diagnostics
   fix:
     content:
       - from collections import (
-      - "    Counter"
-      - " )"
+      - "    Counter,"
+      - )
       - from collections.abc import (
-      - "    Mapping"
-      - " )"
+      - "    Mapping,"
+      - )
     location:
       row: 12
       column: 0
@@ -118,7 +130,9 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 15
     column: 0
@@ -128,11 +142,11 @@ expression: diagnostics
   fix:
     content:
       - from collections import (
-      - "    Counter"
-      - " )"
+      - "    Counter,"
+      - )
       - from collections.abc import (
-      - "    Mapping"
-      - " )"
+      - "    Mapping,"
+      - )
     location:
       row: 15
       column: 0
@@ -141,7 +155,9 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 18
     column: 0
@@ -160,7 +176,9 @@ expression: diagnostics
       column: 50
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 20
     column: 0
@@ -179,7 +197,9 @@ expression: diagnostics
       column: 51
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 23
     column: 4
@@ -198,7 +218,9 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 28
     column: 4
@@ -217,7 +239,9 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 30
     column: 9
@@ -235,7 +259,9 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 33
     column: 0
@@ -254,7 +280,9 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    ImportReplacements: ~
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: true
   location:
     row: 37
     column: 4
@@ -265,17 +293,29 @@ expression: diagnostics
     content:
       - from collections import (
       - "        Bad,"
-      - "        Good"
-      - "     )"
+      - "        Good,"
+      - "    )"
       - "    from collections.abc import ("
       - "        Mapping,"
-      - "        Callable"
-      - "     )"
+      - "        Callable,"
+      - "    )"
     location:
       row: 37
       column: 4
     end_location:
       row: 42
       column: 5
+  parent: ~
+- kind:
+    ImportReplacements:
+      replacement: collections.abc
+      fixable: false
+  location:
+    row: 47
+    column: 9
+  end_location:
+    row: 48
+    column: 21
+  fix: ~
   parent: ~
 
