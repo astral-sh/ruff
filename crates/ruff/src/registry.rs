@@ -895,7 +895,7 @@ mod tests {
     fn check_code_serialization() {
         for rule in Rule::iter() {
             assert!(
-                Rule::from_code(rule.code()).is_ok(),
+                Rule::from_code(rule.noqa_code()).is_ok(),
                 "{rule:?} could not be round-trip serialized."
             );
         }
@@ -904,7 +904,7 @@ mod tests {
     #[test]
     fn test_linter_parse_code() {
         for rule in Rule::iter() {
-            let code = rule.code();
+            let code = rule.noqa_code();
             let (linter, rest) =
                 Linter::parse_code(code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));

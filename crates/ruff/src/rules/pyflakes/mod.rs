@@ -111,7 +111,7 @@ mod tests {
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"); "F842")]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"); "F901")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
