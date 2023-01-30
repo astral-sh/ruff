@@ -2936,20 +2936,6 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
 }
 
 define_violation!(
-    pub struct RemoveSixCompat;
-);
-impl AlwaysAutofixableViolation for RemoveSixCompat {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `six` compatibility usage")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `six` usage".to_string()
-    }
-}
-
-define_violation!(
     pub struct DatetimeTimezoneUTC {
         pub straight_import: bool,
     }

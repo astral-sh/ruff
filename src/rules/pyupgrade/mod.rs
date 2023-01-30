@@ -35,7 +35,6 @@ mod tests {
     #[test_case(Rule::ConvertTypedDictFunctionalToClass, Path::new("UP013.py"); "UP013")]
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"); "UP014")]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"); "UP015")]
-    #[test_case(Rule::RemoveSixCompat, Path::new("UP016.py"); "UP016")]
     #[test_case(Rule::NativeLiterals, Path::new("UP018.py"); "UP018")]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"); "UP019")]
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"); "UP021")]

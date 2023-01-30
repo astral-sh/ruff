@@ -237,7 +237,6 @@ ruff_macros::define_rule_mapping!(
     UP013 => violations::ConvertTypedDictFunctionalToClass,
     UP014 => violations::ConvertNamedTupleFunctionalToClass,
     UP015 => violations::RedundantOpenModes,
-    UP016 => violations::RemoveSixCompat,
     UP017 => violations::DatetimeTimezoneUTC,
     UP018 => violations::NativeLiterals,
     UP019 => violations::TypingTextStrAlias,
