@@ -5,10 +5,10 @@ expression: diagnostics
 - kind:
     OldCodeBlocks: ~
   location:
-    row: 5
+    row: 4
     column: 0
   end_location:
-    row: 12
+    row: 11
     column: 28
   fix:
     content:
@@ -16,19 +16,19 @@ expression: diagnostics
       - "for item in range(10):"
       - "    print(f\"PY3-{item}\")"
     location:
-      row: 5
+      row: 4
       column: 0
     end_location:
-      row: 12
+      row: 11
       column: 28
   parent: ~
 - kind:
     OldCodeBlocks: ~
   location:
-    row: 15
+    row: 14
     column: 4
   end_location:
-    row: 22
+    row: 21
     column: 32
   fix:
     content:
@@ -36,28 +36,28 @@ expression: diagnostics
       - "    for item in range(10):"
       - "        print(f\"PY3-{item}\")"
     location:
-      row: 15
+      row: 14
       column: 4
     end_location:
-      row: 22
+      row: 21
       column: 32
   parent: ~
 - kind:
     OldCodeBlocks: ~
   location:
-    row: 25
+    row: 24
     column: 0
   end_location:
-    row: 26
+    row: 25
     column: 50
   fix:
     content:
       - "print(\"PY3!\")"
     location:
-      row: 25
+      row: 24
       column: 0
     end_location:
-      row: 26
+      row: 25
       column: 50
   parent: ~
 

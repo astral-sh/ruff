@@ -64,7 +64,7 @@ if True:
     else:
         print("py2")
 
-if sys.version_info > (3,):
+if sys.version_info < (3,):
     print("py2")
 else:
     print("py3")
