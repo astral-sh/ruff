@@ -93,6 +93,7 @@ pub struct Checker<'a> {
     in_type_definition: bool,
     in_deferred_string_type_definition: bool,
     in_deferred_type_definition: bool,
+    in_exception_handler: bool,
     in_literal: bool,
     in_subscript: bool,
     in_type_checking_block: bool,
@@ -153,6 +154,7 @@ impl<'a> Checker<'a> {
             in_type_definition: false,
             in_deferred_string_type_definition: false,
             in_deferred_type_definition: false,
+            in_exception_handler: false,
             in_literal: false,
             in_subscript: false,
             in_type_checking_block: false,
@@ -1714,6 +1716,7 @@ where
         }
 
         // Recurse.
+        let prev_in_exception_handler = self.in_exception_handler;
         let prev_visible_scope = self.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef {
@@ -1865,9 +1868,13 @@ where
                 }
                 self.visit_body(body);
                 self.except_handlers.pop();
+
+                self.in_exception_handler = true;
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
+                self.in_exception_handler = prev_in_exception_handler;
+
                 self.visit_body(orelse);
                 self.visit_body(finalbody);
             }
@@ -3779,6 +3786,10 @@ impl<'a> Checker<'a> {
             .iter()
             .rev()
             .map(|index| &self.scopes[*index])
+    }
+
+    pub fn in_exception_handler(&self) -> bool {
+        self.in_exception_handler
     }
 
     pub fn execution_context(&self) -> ExecutionContext {
