@@ -2245,7 +2245,7 @@ extend-exclude = ["tests", "src/bad.py"]
 A list of rule codes or prefixes to ignore, in addition to those
 specified by `ignore`.
 
-This option has been DEPRECATED in favor of `ignore`
+This option has been **deprecated** in favor of `ignore`
 since its usage is now interchangeable with `ignore`.
 
 **Default value**: `[]`

@@ -145,7 +145,7 @@ pub struct Options {
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
     ///
-    /// This option has been DEPRECATED in favor of `ignore`
+    /// This option has been **deprecated** in favor of `ignore`
     /// since its usage is now interchangeable with `ignore`.
     #[schemars(skip)]
     pub extend_ignore: Option<Vec<RuleSelector>>,
