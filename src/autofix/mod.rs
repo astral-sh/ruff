@@ -8,7 +8,6 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 
-pub mod fixer;
 pub mod helpers;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
@@ -24,7 +23,7 @@ pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String
 }
 
 /// Apply a series of fixes.
-pub(crate) fn apply_fixes<'a>(
+fn apply_fixes<'a>(
     fixes: impl Iterator<Item = &'a Fix>,
     locator: &'a Locator<'a>,
 ) -> (String, usize) {
@@ -67,11 +66,29 @@ pub(crate) fn apply_fixes<'a>(
     (output, num_fixed)
 }
 
+/// Apply a single fix.
+pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
+    let mut output = String::new();
+
+    // Add all contents from `last_pos` to `fix.location`.
+    let slice = locator.slice_source_code_range(&Range::new(Location::new(1, 0), fix.location));
+    output.push_str(slice);
+
+    // Add the patch itself.
+    output.push_str(&fix.content);
+
+    // Add the remaining content.
+    let slice = locator.slice_source_code_at(fix.end_location);
+    output.push_str(slice);
+
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use rustpython_parser::ast::Location;
 
-    use crate::autofix::apply_fixes;
+    use crate::autofix::{apply_fix, apply_fixes};
     use crate::fix::Fix;
     use crate::source_code::Locator;
 
@@ -85,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_single_replacement() {
+    fn apply_one_replacement() {
         let fixes = vec![Fix {
             content: "Bar".to_string(),
             location: Location::new(1, 8),
@@ -111,7 +128,7 @@ class A(Bar):
     }
 
     #[test]
-    fn apply_single_removal() {
+    fn apply_one_removal() {
         let fixes = vec![Fix {
             content: String::new(),
             location: Location::new(1, 7),
@@ -137,7 +154,7 @@ class A:
     }
 
     #[test]
-    fn apply_double_removal() {
+    fn apply_two_removals() {
         let fixes = vec![
             Fix {
                 content: String::new(),
@@ -201,5 +218,32 @@ class A:
             .trim(),
         );
         assert_eq!(fixed, 1);
+    }
+
+    #[test]
+    fn apply_single_fix() {
+        let locator = Locator::new(
+            r#"
+class A(object):
+    ...
+"#
+            .trim(),
+        );
+        let contents = apply_fix(
+            &Fix {
+                content: String::new(),
+                location: Location::new(1, 7),
+                end_location: Location::new(1, 15),
+            },
+            &locator,
+        );
+        assert_eq!(
+            contents,
+            r#"
+class A:
+    ...
+"#
+            .trim()
+        );
     }
 }

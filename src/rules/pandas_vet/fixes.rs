@@ -2,7 +2,7 @@ use crate::ast::helpers;
 use rustpython_ast::{Expr, ExprKind, Keyword, Location};
 
 use crate::ast::types::Range;
-use crate::autofix::apply_fixes;
+use crate::autofix::apply_fix;
 use crate::autofix::helpers::remove_argument;
 use crate::fix::Fix;
 use crate::source_code::Locator;
@@ -52,7 +52,7 @@ pub fn fix_inplace_argument(
         // TODO(charlie): Find a way to
         let contents =
             locator.slice_source_code_range(&Range::new(expr.location, expr.end_location.unwrap()));
-        let (output, _) = apply_fixes([fix_me].iter(), &Locator::new(contents));
+        let output = apply_fix(&fix_me, &Locator::new(contents));
 
         // Obtain the name prefix.
         let name = match_name(expr)?;
