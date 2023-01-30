@@ -15,20 +15,20 @@ expression: diagnostics
 - kind:
     VerboseRaise: ~
   location:
-    row: 44
+    row: 54
     column: 18
   end_location:
-    row: 44
+    row: 54
     column: 19
   fix: ~
   parent: ~
 - kind:
     VerboseRaise: ~
   location:
-    row: 54
+    row: 64
     column: 22
   end_location:
-    row: 54
+    row: 64
     column: 23
   fix: ~
   parent: ~

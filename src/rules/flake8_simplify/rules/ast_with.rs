@@ -5,7 +5,7 @@ use super::fix_with;
 use crate::ast::helpers::{first_colon_range, has_comments_in};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
@@ -49,7 +49,7 @@ pub fn multiple_with_statements(
                 |colon| Range::new(with_stmt.location, colon.end_location),
             ),
         );
-        if checker.patch(&Rule::MultipleWithStatements) {
+        if checker.patch(diagnostic.kind.rule()) {
             let nested_with = &with_body[0];
             if !has_comments_in(
                 Range::new(with_stmt.location, nested_with.location),

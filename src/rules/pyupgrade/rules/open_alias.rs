@@ -3,7 +3,7 @@ use rustpython_ast::Expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// UP020
@@ -13,7 +13,7 @@ pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
         .map_or(false, |call_path| call_path.as_slice() == ["io", "open"])
     {
         let mut diagnostic = Diagnostic::new(violations::OpenAlias, Range::from_located(expr));
-        if checker.patch(&Rule::OpenAlias) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "open".to_string(),
                 func.location,

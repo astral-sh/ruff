@@ -109,11 +109,8 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Fix::replacement(
-                    String::new(),
-                    func.end_location.unwrap(),
-                    decorator.end_location.unwrap(),
-                );
+                let fix =
+                    Fix::deletion(func.end_location.unwrap(), decorator.end_location.unwrap());
                 pytest_fixture_parentheses(checker, decorator, fix, "", "()");
             }
 

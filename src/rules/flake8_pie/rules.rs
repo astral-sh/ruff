@@ -12,7 +12,7 @@ use crate::define_violation;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::python::identifiers::is_identifier;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 define_violation!(
@@ -112,7 +112,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
                 let mut diagnostic =
                     Diagnostic::new(NoUnnecessaryPass, Range::from_located(pass_stmt));
-                if checker.patch(&Rule::NoUnnecessaryPass) {
+                if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
                         diagnostic.amend(Fix::deletion(
                             pass_stmt.location,
@@ -182,7 +182,7 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                 DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(&Rule::DupeClassFieldDefinitions) {
+            if checker.patch(diagnostic.kind.rule()) {
                 let deleted: Vec<&Stmt> = checker
                     .deletions
                     .iter()
@@ -311,7 +311,7 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(PreferListBuiltin, Range::from_located(expr));
-                if checker.patch(&Rule::PreferListBuiltin) {
+                if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         "list".to_string(),
                         expr.location,
