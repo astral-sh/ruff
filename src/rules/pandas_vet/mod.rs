@@ -1,4 +1,5 @@
 //! Rules from [pandas-vet](https://pypi.org/project/pandas-vet/).
+pub(crate) mod fixes;
 pub(crate) mod helpers;
 pub(crate) mod rules;
 
@@ -11,11 +12,11 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
-    use crate::linter::check_path;
+    use crate::linter::{check_path, test_path};
     use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
-    use crate::{directives, rustpython_helpers, settings};
+    use crate::{assert_yaml_snapshot, directives, rustpython_helpers, settings};
 
     fn rule_code(contents: &str, expected: &[Rule]) -> Result<()> {
         let contents = dedent(contents);
@@ -244,6 +245,19 @@ mod tests {
     "#, &[Rule::DfIsABadVariableName]; "PD901_fail_df_var")]
     fn test_pandas_vet(code: &str, expected: &[Rule]) -> Result<()> {
         rule_code(code, expected)?;
+        Ok(())
+    }
+
+    #[test_case(Rule::UseOfInplaceArgument, Path::new("PD002.py"); "PD002")]
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pandas_vet")
+                .join(path)
+                .as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

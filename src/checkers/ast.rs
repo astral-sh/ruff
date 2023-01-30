@@ -2468,8 +2468,9 @@ where
 
                 // pandas-vet
                 if self.settings.rules.enabled(&Rule::UseOfInplaceArgument) {
-                    self.diagnostics
-                        .extend(pandas_vet::rules::inplace_argument(keywords).into_iter());
+                    self.diagnostics.extend(
+                        pandas_vet::rules::inplace_argument(self, expr, args, keywords).into_iter(),
+                    );
                 }
                 pandas_vet::rules::check_call(self, func);
 

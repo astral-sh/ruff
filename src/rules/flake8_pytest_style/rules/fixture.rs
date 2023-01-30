@@ -56,10 +56,14 @@ impl Violation for FixturePositionalArgs {
 define_violation!(
     pub struct ExtraneousScopeFunction;
 );
-impl Violation for ExtraneousScopeFunction {
+impl AlwaysAutofixableViolation for ExtraneousScopeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`scope='function'` is implied in `@pytest.fixture()`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove implied `scope` argument".to_string()
     }
 }
 
