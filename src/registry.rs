@@ -370,28 +370,28 @@ ruff_macros::define_rule_mapping!(
     PGH003 => violations::BlanketTypeIgnore,
     PGH004 => violations::BlanketNOQA,
     // pandas-vet
-    PD002 => violations::UseOfInplaceArgument,
-    PD003 => violations::UseOfDotIsNull,
-    PD004 => violations::UseOfDotNotNull,
-    PD007 => violations::UseOfDotIx,
-    PD008 => violations::UseOfDotAt,
-    PD009 => violations::UseOfDotIat,
-    PD010 => violations::UseOfDotPivotOrUnstack,
-    PD011 => violations::UseOfDotValues,
-    PD012 => violations::UseOfDotReadTable,
-    PD013 => violations::UseOfDotStack,
-    PD015 => violations::UseOfPdMerge,
-    PD901 => violations::DfIsABadVariableName,
+    PD002 => rules::pandas_vet::rules::UseOfInplaceArgument,
+    PD003 => rules::pandas_vet::rules::UseOfDotIsNull,
+    PD004 => rules::pandas_vet::rules::UseOfDotNotNull,
+    PD007 => rules::pandas_vet::rules::UseOfDotIx,
+    PD008 => rules::pandas_vet::rules::UseOfDotAt,
+    PD009 => rules::pandas_vet::rules::UseOfDotIat,
+    PD010 => rules::pandas_vet::rules::UseOfDotPivotOrUnstack,
+    PD011 => rules::pandas_vet::rules::UseOfDotValues,
+    PD012 => rules::pandas_vet::rules::UseOfDotReadTable,
+    PD013 => rules::pandas_vet::rules::UseOfDotStack,
+    PD015 => rules::pandas_vet::rules::UseOfPdMerge,
+    PD901 => rules::pandas_vet::rules::DfIsABadVariableName,
     // flake8-errmsg
     EM101 => violations::RawStringInException,
     EM102 => violations::FStringInException,
     EM103 => violations::DotFormatInException,
     // flake8-pytest-style
-    PT001 => violations::IncorrectFixtureParenthesesStyle,
-    PT002 => violations::FixturePositionalArgs,
-    PT003 => violations::ExtraneousScopeFunction,
-    PT004 => violations::MissingFixtureNameUnderscore,
-    PT005 => violations::IncorrectFixtureNameUnderscore,
+    PT001 => rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
+    PT002 => rules::flake8_pytest_style::rules::FixturePositionalArgs,
+    PT003 => rules::flake8_pytest_style::rules::ExtraneousScopeFunction,
+    PT004 => rules::flake8_pytest_style::rules::MissingFixtureNameUnderscore,
+    PT005 => rules::flake8_pytest_style::rules::IncorrectFixtureNameUnderscore,
     PT006 => violations::ParametrizeNamesWrongType,
     PT007 => violations::ParametrizeValuesWrongType,
     PT008 => violations::PatchWithLambda,
@@ -404,13 +404,13 @@ ruff_macros::define_rule_mapping!(
     PT016 => violations::FailWithoutMessage,
     PT017 => violations::AssertInExcept,
     PT018 => violations::CompositeAssertion,
-    PT019 => violations::FixtureParamWithoutValue,
-    PT020 => violations::DeprecatedYieldFixture,
-    PT021 => violations::FixtureFinalizerCallback,
-    PT022 => violations::UselessYieldFixture,
+    PT019 => rules::flake8_pytest_style::rules::FixtureParamWithoutValue,
+    PT020 => rules::flake8_pytest_style::rules::DeprecatedYieldFixture,
+    PT021 => rules::flake8_pytest_style::rules::FixtureFinalizerCallback,
+    PT022 => rules::flake8_pytest_style::rules::UselessYieldFixture,
     PT023 => violations::IncorrectMarkParenthesesStyle,
-    PT024 => violations::UnnecessaryAsyncioMarkOnFixture,
-    PT025 => violations::ErroneousUseFixturesOnFixture,
+    PT024 => rules::flake8_pytest_style::rules::UnnecessaryAsyncioMarkOnFixture,
+    PT025 => rules::flake8_pytest_style::rules::ErroneousUseFixturesOnFixture,
     PT026 => violations::UseFixturesWithoutParameters,
     // flake8-pie
     PIE790 => rules::flake8_pie::rules::NoUnnecessaryPass,
@@ -616,9 +616,16 @@ pub enum Linter {
 }
 
 pub trait RuleNamespace: Sized {
-    fn parse_code(code: &str) -> Option<(Self, &str)>;
+    /// Returns the prefix that every single code that ruff uses to identify
+    /// rules from this linter starts with.  In the case that multiple
+    /// `#[prefix]`es are configured for the variant in the `Linter` enum
+    /// definition this is the empty string.
+    fn common_prefix(&self) -> &'static str;
 
-    fn prefixes(&self) -> &'static [&'static str];
+    /// Attempts to parse the given rule code. If the prefix is recognized
+    /// returns the respective variant along with the code with the common
+    /// prefix stripped.
+    fn parse_code(code: &str) -> Option<(Self, &str)>;
 
     fn name(&self) -> &'static str;
 
@@ -767,10 +774,12 @@ mod tests {
     }
 
     #[test]
-    fn test_linter_prefixes() {
+    fn test_linter_parse_code() {
         for rule in Rule::iter() {
-            Linter::parse_code(rule.code())
-                .unwrap_or_else(|| panic!("couldn't parse {:?}", rule.code()));
+            let code = rule.code();
+            let (linter, rest) =
+                Linter::parse_code(code).unwrap_or_else(|| panic!("couldn't parse {:?}", code));
+            assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
         }
     }
 }

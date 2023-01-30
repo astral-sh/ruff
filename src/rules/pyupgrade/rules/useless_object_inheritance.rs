@@ -53,6 +53,7 @@ pub fn useless_object_inheritance(
             checker.locator,
             stmt.location,
             diagnostic.location,
+            diagnostic.end_location,
             bases,
             keywords,
         ) {

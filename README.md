@@ -382,10 +382,11 @@ Ruff: An extremely fast Python linter.
 Usage: ruff [OPTIONS] <COMMAND>
 
 Commands:
-  check  Run Ruff on the given files or directories (default)
-  rule   Explain a rule
-  clean  Clear any caches in the current directory and any subdirectories
-  help   Print this message or the help of the given subcommand(s)
+  check   Run Ruff on the given files or directories (default)
+  rule    Explain a rule
+  linter  List all supported upstream linters
+  clean   Clear any caches in the current directory and any subdirectories
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help
@@ -1086,7 +1087,7 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | ---- | ---- | ------- | --- |
 | PT001 | incorrect-fixture-parentheses-style | Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}` | 🛠 |
 | PT002 | fixture-positional-args | Configuration for fixture `{function}` specified via positional args, use kwargs |  |
-| PT003 | extraneous-scope-function | `scope='function'` is implied in `@pytest.fixture()` |  |
+| PT003 | extraneous-scope-function | `scope='function'` is implied in `@pytest.fixture()` | 🛠 |
 | PT004 | missing-fixture-name-underscore | Fixture `{function}` does not return anything, add leading underscore |  |
 | PT005 | incorrect-fixture-name-underscore | Fixture `{function}` returns a value, remove leading underscore |  |
 | PT006 | parametrize-names-wrong-type | Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}` | 🛠 |
@@ -1247,7 +1248,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior |  |
+| PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior | 🛠 |
 | PD003 | use-of-dot-is-null | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
 | PD004 | use-of-dot-not-null | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
 | PD007 | use-of-dot-ix | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
