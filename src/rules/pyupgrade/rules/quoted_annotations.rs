@@ -5,7 +5,7 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Arg, ArgData, Arguments, Constant, ExprKind};
+use rustpython_ast::{Arg, Arguments, Constant, Expr, ExprKind};
 
 define_violation!(
     pub struct QuotedAnnotations;
@@ -29,35 +29,44 @@ fn argument_list(args: &Box<Arguments>) -> Vec<Arg> {
     final_result
 }
 
+fn remove_quotes(checker: &mut Checker, annotation: &Box<Expr>) {
+    if let ExprKind::Constant { value, .. } = &annotation.node {
+        if let Constant::Str(type_str) = value {
+            let mut diagnostic =
+                Diagnostic::new(QuotedAnnotations, Range::from_located(&annotation));
+            if checker.patch(&Rule::PrintfStringFormatting) {
+                diagnostic.amend(Fix::replacement(
+                    type_str.to_string(),
+                    annotation.location,
+                    annotation.end_location.unwrap(),
+                ));
+            }
+            checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
 /// UP038
-pub fn quoted_annotations(
+pub fn quoted_annotations_funcdef(
     checker: &mut Checker,
     args: &Box<Arguments>,
-    type_comment: &Option<String>,
+    the_return: &Option<Box<Expr>>,
 ) {
-    println!("{:?}", type_comment);
+    println!("{:?}", the_return);
+    if let Some(return_item) = &the_return {
+        remove_quotes(checker, return_item);
+    }
     let arg_list = argument_list(args);
     for argument in arg_list {
-        let ArgData {
-            arg, annotation, ..
-        } = argument.node;
-        let annotate = match annotation {
+        let annotate = match &argument.node.annotation {
             Some(item) => item,
             None => continue,
         };
-        if let ExprKind::Constant { value, .. } = &annotate.node {
-            if let Constant::Str(type_str) = value {
-                let mut diagnostic =
-                    Diagnostic::new(QuotedAnnotations, Range::from_located(&annotate));
-                if checker.patch(&Rule::PrintfStringFormatting) {
-                    diagnostic.amend(Fix::replacement(
-                        type_str.to_string(),
-                        annotate.location,
-                        annotate.end_location.unwrap(),
-                    ));
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-        }
+        remove_quotes(checker, annotate);
     }
+}
+
+/// UP038
+pub fn quoted_annotations_annassign(checker: &mut Checker, annotation: &Box<Expr>) {
+    remove_quotes(checker, annotation);
 }

@@ -12,7 +12,9 @@ use once_cell::sync::Lazy;
 pub(crate) use open_alias::open_alias;
 pub(crate) use os_error_alias::os_error_alias;
 pub(crate) use printf_string_formatting::printf_string_formatting;
-pub(crate) use quoted_annotations::{quoted_annotations, QuotedAnnotations};
+pub(crate) use quoted_annotations::{
+    quoted_annotations_annassign, quoted_annotations_funcdef, QuotedAnnotations,
+};
 pub(crate) use redundant_open_modes::redundant_open_modes;
 use regex::Regex;
 pub(crate) use remove_six_compat::remove_six_compat;

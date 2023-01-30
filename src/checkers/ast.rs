@@ -445,7 +445,7 @@ where
                 returns,
                 args,
                 body,
-                type_comment,
+                ..
             }
             | StmtKind::AsyncFunctionDef {
                 name,
@@ -453,7 +453,7 @@ where
                 returns,
                 args,
                 body,
-                type_comment,
+                ..
             } => {
                 if self.settings.rules.enabled(&Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
@@ -539,7 +539,7 @@ where
                 if self.settings.rules.enabled(&Rule::QuotedAnnotations)
                     && self.annotations_future_enabled
                 {
-                    pyupgrade::rules::quoted_annotations(self, args, type_comment);
+                    pyupgrade::rules::quoted_annotations_funcdef(self, args, returns);
                 }
 
                 if self.settings.rules.enabled(&Rule::UselessExpression) {
@@ -1692,11 +1692,21 @@ where
                     }
                 }
             }
-            StmtKind::AnnAssign { target, value, .. } => {
+            StmtKind::AnnAssign {
+                target,
+                annotation,
+                value,
+                ..
+            } => {
                 if self.settings.rules.enabled(&Rule::DoNotAssignLambda) {
                     if let Some(value) = value {
                         pycodestyle::rules::do_not_assign_lambda(self, target, value, stmt);
                     }
+                }
+                if self.settings.rules.enabled(&Rule::QuotedAnnotations)
+                    && self.annotations_future_enabled
+                {
+                    pyupgrade::rules::quoted_annotations_annassign(self, annotation);
                 }
             }
             StmtKind::Delete { .. } => {}
