@@ -579,7 +579,7 @@ x = 1  # noqa: F841
 # Ignore E741 and F841.
 i = 1  # noqa: E741, F841
 
-# Ignore *all* violations.
+# Ignore _all_ violations.
 x = 1  # noqa
 ```
 
