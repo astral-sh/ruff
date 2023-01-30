@@ -323,11 +323,12 @@ pub fn remove_unused_imports<'a>(
     }
 }
 
-/// Generic function te remove (keyword)arguments in function calls
-/// and class definitions. (For classes `args` should be considered `bases`)
+/// Generic function to remove arguments or keyword arguments in function
+/// calls and class definitions. (For classes `args` should be considered
+/// `bases`)
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
-/// For this behaviour set `remove_parentheses` to `true`.
+/// For this behavior, set `remove_parentheses` to `true`.
 pub fn remove_argument(
     locator: &Locator,
     stmt_at: Location,
@@ -337,18 +338,18 @@ pub fn remove_argument(
     keywords: &[Keyword],
     remove_parentheses: bool,
 ) -> Result<Fix> {
-    // TODO: preserve trailing comments
+    // TODO(sbrugman): Preserve trailing comments.
     let contents = locator.slice_source_code_at(stmt_at);
 
     let mut fix_start = None;
     let mut fix_end = None;
 
-    let n_keywords = keywords.len() + args.len();
-    if n_keywords == 0 {
+    let n_arguments = keywords.len() + args.len();
+    if n_arguments == 0 {
         bail!("No arguments or keywords to remove");
     }
 
-    if n_keywords == 1 {
+    if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count: usize = 0;
         for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
@@ -358,7 +359,7 @@ pub fn remove_argument(
                         start
                     } else {
                         Location::new(start.row(), start.column() + 1)
-                    })
+                    });
                 }
                 count += 1;
             }

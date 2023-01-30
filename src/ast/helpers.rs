@@ -651,6 +651,17 @@ pub fn to_absolute(relative: Location, base: Location) -> Location {
     }
 }
 
+pub fn to_relative(absolute: Location, base: Location) -> Location {
+    if absolute.row() == base.row() {
+        Location::new(
+            absolute.row() - base.row() + 1,
+            absolute.column() - base.column(),
+        )
+    } else {
+        Location::new(absolute.row() - base.row() + 1, absolute.column())
+    }
+}
+
 /// Return `true` if a `Stmt` has leading content.
 pub fn match_leading_content(stmt: &Stmt, locator: &Locator) -> bool {
     let range = Range::new(Location::new(stmt.location.row(), 0), stmt.location);

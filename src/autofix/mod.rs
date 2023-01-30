@@ -24,7 +24,7 @@ pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String
 }
 
 /// Apply a series of fixes.
-fn apply_fixes<'a>(
+pub(crate) fn apply_fixes<'a>(
     fixes: impl Iterator<Item = &'a Fix>,
     locator: &'a Locator<'a>,
 ) -> (String, usize) {
