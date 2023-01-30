@@ -5,7 +5,7 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Arg, ArgData, Arguments, Constant, ExprKind, Located};
+use rustpython_ast::{Arg, ArgData, Arguments, Constant, ExprKind};
 
 define_violation!(
     pub struct QuotedAnnotations;
@@ -38,27 +38,25 @@ pub fn quoted_annotations(
     println!("{:?}", type_comment);
     let arg_list = argument_list(args);
     for argument in arg_list {
-        if let ArgData {
+        let ArgData {
             arg, annotation, ..
-        } = argument.node
-        {
-            let annotate = match annotation {
-                Some(item) => item,
-                None => continue,
-            };
-            if let ExprKind::Constant { value, .. } = &annotate.node {
-                if let Constant::Str(type_str) = value {
-                    let mut diagnostic =
-                        Diagnostic::new(QuotedAnnotations, Range::from_located(&annotate));
-                    if checker.patch(&Rule::PrintfStringFormatting) {
-                        diagnostic.amend(Fix::replacement(
-                            type_str.to_string(),
-                            annotate.location,
-                            annotate.end_location.unwrap(),
-                        ));
-                    }
-                    checker.diagnostics.push(diagnostic);
+        } = argument.node;
+        let annotate = match annotation {
+            Some(item) => item,
+            None => continue,
+        };
+        if let ExprKind::Constant { value, .. } = &annotate.node {
+            if let Constant::Str(type_str) = value {
+                let mut diagnostic =
+                    Diagnostic::new(QuotedAnnotations, Range::from_located(&annotate));
+                if checker.patch(&Rule::PrintfStringFormatting) {
+                    diagnostic.amend(Fix::replacement(
+                        type_str.to_string(),
+                        annotate.location,
+                        annotate.end_location.unwrap(),
+                    ));
                 }
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
