@@ -3,7 +3,8 @@ source: src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RequestWithoutTimeout: ~
+    RequestWithoutTimeout:
+      timeout: ~
   location:
     row: 3
     column: 0
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: None
+    RequestWithoutTimeout:
+      timeout: None
   location:
     row: 4
     column: 42
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: ~
+    RequestWithoutTimeout:
+      timeout: ~
   location:
     row: 6
     column: 0
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: None
+    RequestWithoutTimeout:
+      timeout: None
   location:
     row: 7
     column: 43
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: ~
+    RequestWithoutTimeout:
+      timeout: ~
   location:
     row: 9
     column: 0
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: None
+    RequestWithoutTimeout:
+      timeout: None
   location:
     row: 10
     column: 42
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: ~
+    RequestWithoutTimeout:
+      timeout: ~
   location:
     row: 12
     column: 0
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: None
+    RequestWithoutTimeout:
+      timeout: None
   location:
     row: 13
     column: 45
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: ~
+    RequestWithoutTimeout:
+      timeout: ~
   location:
     row: 15
     column: 0
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: None
+    RequestWithoutTimeout:
+      timeout: None
   location:
     row: 16
     column: 44
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: ~
+    RequestWithoutTimeout:
+      timeout: ~
   location:
     row: 18
     column: 0
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: None
+    RequestWithoutTimeout:
+      timeout: None
   location:
     row: 19
     column: 46
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: ~
+    RequestWithoutTimeout:
+      timeout: ~
   location:
     row: 21
     column: 0
@@ -133,7 +146,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithoutTimeout: None
+    RequestWithoutTimeout:
+      timeout: None
   location:
     row: 22
     column: 43

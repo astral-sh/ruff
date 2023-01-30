@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NonEmptySection: Returns
+    NonEmptySection:
+      name: Returns
   location:
     row: 54
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonEmptySection: Returns
+    NonEmptySection:
+      name: Returns
   location:
     row: 67
     column: 4
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonEmptySection: Yields
+    NonEmptySection:
+      name: Yields
   location:
     row: 67
     column: 4
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonEmptySection: Returns
+    NonEmptySection:
+      name: Returns
   location:
     row: 161
     column: 4
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonEmptySection: Returns
+    NonEmptySection:
+      name: Returns
   location:
     row: 252
     column: 4

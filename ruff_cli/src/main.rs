@@ -78,6 +78,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
 
     match command {
         Command::Rule { rule, format } => commands::rule(rule, format)?,
+        Command::Linter { format } => commands::linter::linter(format),
         Command::Clean => commands::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut io::stdout());
@@ -244,7 +245,11 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff)) {
-            printer.write_once(&diagnostics)?;
+            if cli.statistics {
+                printer.write_statistics(&diagnostics)?;
+            } else {
+                printer.write_once(&diagnostics)?;
+            }
         }
 
         // Check for updates if we're in a non-silent log level.

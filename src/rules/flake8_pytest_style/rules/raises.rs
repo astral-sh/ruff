@@ -117,7 +117,9 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
         }
     }) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::RaisesTooBroad(call_path),
+            violations::RaisesTooBroad {
+                exception: call_path,
+            },
             Range::from_located(exception),
         ));
     }

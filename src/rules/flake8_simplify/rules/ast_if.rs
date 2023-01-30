@@ -9,7 +9,7 @@ use crate::ast::helpers::{
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violations;
 
@@ -103,7 +103,7 @@ pub fn nested_if_statements(
             |colon| Range::new(stmt.location, colon.end_location),
         ),
     );
-    if checker.patch(&Rule::NestedIfStatements) {
+    if checker.patch(diagnostic.kind.rule()) {
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
         let nested_if = &body[0];
@@ -169,10 +169,10 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     };
     let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
-        violations::ReturnBoolConditionDirectly(condition),
+        violations::ReturnBoolConditionDirectly { cond: condition },
         Range::from_located(stmt),
     );
-    if checker.patch(&Rule::ReturnBoolConditionDirectly)
+    if checker.patch(diagnostic.kind.rule())
         && matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments_in(Range::from_located(stmt), checker.locator)
@@ -291,10 +291,12 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::UseTernaryOperator(contents.clone()),
+        violations::UseTernaryOperator {
+            contents: contents.clone(),
+        },
         Range::from_located(stmt),
     );
-    if checker.patch(&Rule::UseTernaryOperator) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -425,10 +427,12 @@ pub fn use_dict_get_with_default(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::DictGetWithDefault(contents.clone()),
+        violations::DictGetWithDefault {
+            contents: contents.clone(),
+        },
         Range::from_located(stmt),
     );
-    if checker.patch(&Rule::DictGetWithDefault) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

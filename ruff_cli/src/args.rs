@@ -41,6 +41,12 @@ pub enum Command {
         #[arg(long, value_enum, default_value = "text")]
         format: HelpFormat,
     },
+    /// List all supported upstream linters
+    Linter {
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        format: HelpFormat,
+    },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
     Clean,
@@ -211,6 +217,15 @@ pub struct CheckArgs {
     update_check: bool,
     #[clap(long, overrides_with("update_check"), hide = true)]
     no_update_check: bool,
+    /// Show counts for every rule with at least one violation.
+    #[arg(
+        long,
+        // Unsupported default-command arguments.
+        conflicts_with = "diff",
+        conflicts_with = "show_source",
+        conflicts_with = "watch",
+    )]
+    pub statistics: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
     #[arg(
         long,
@@ -218,6 +233,7 @@ pub struct CheckArgs {
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
@@ -230,6 +246,7 @@ pub struct CheckArgs {
         // conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
@@ -242,6 +259,7 @@ pub struct CheckArgs {
         conflicts_with = "show_files",
         // conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
@@ -316,6 +334,7 @@ impl CheckArgs {
                 no_cache: self.no_cache,
                 show_files: self.show_files,
                 show_settings: self.show_settings,
+                statistics: self.statistics,
                 stdin_filename: self.stdin_filename,
                 watch: self.watch,
             },
@@ -371,6 +390,7 @@ pub struct Arguments {
     pub no_cache: bool,
     pub show_files: bool,
     pub show_settings: bool,
+    pub statistics: bool,
     pub stdin_filename: Option<PathBuf>,
     pub watch: bool,
 }

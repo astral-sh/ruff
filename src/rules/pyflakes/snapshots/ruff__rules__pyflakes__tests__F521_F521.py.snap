@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    StringDotFormatInvalidFormat: "Single '{' encountered in format string"
+    StringDotFormatInvalidFormat:
+      message: "Single '{' encountered in format string"
   location:
     row: 1
     column: 0
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatInvalidFormat: "Single '}' encountered in format string"
+    StringDotFormatInvalidFormat:
+      message: "Single '}' encountered in format string"
   location:
     row: 2
     column: 0
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatInvalidFormat: "Expected '}' before end of string"
+    StringDotFormatInvalidFormat:
+      message: "Expected '}' before end of string"
   location:
     row: 3
     column: 0
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatInvalidFormat: Max string recursion exceeded
+    StringDotFormatInvalidFormat:
+      message: Max string recursion exceeded
   location:
     row: 5
     column: 0
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatInvalidFormat: Empty attribute in format string
+    StringDotFormatInvalidFormat:
+      message: Empty attribute in format string
   location:
     row: 7
     column: 0
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatInvalidFormat: Empty attribute in format string
+    StringDotFormatInvalidFormat:
+      message: Empty attribute in format string
   location:
     row: 8
     column: 0
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatInvalidFormat: Empty attribute in format string
+    StringDotFormatInvalidFormat:
+      message: Empty attribute in format string
   location:
     row: 9
     column: 0

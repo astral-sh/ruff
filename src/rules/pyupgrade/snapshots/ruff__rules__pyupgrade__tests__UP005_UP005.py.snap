@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     DeprecatedUnittestAlias:
-      - assertEquals
-      - assertEqual
+      alias: assertEquals
+      target: assertEqual
   location:
     row: 6
     column: 8
@@ -24,8 +24,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DeprecatedUnittestAlias:
-      - assertEquals
-      - assertEqual
+      alias: assertEquals
+      target: assertEqual
   location:
     row: 7
     column: 8
@@ -44,8 +44,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DeprecatedUnittestAlias:
-      - failUnlessAlmostEqual
-      - assertAlmostEqual
+      alias: failUnlessAlmostEqual
+      target: assertAlmostEqual
   location:
     row: 9
     column: 8
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DeprecatedUnittestAlias:
-      - assertNotRegexpMatches
-      - assertNotRegex
+      alias: assertNotRegexpMatches
+      target: assertNotRegex
   location:
     row: 10
     column: 8

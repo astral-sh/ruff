@@ -31,6 +31,13 @@ where
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
             StmtKind::Raise { exc, .. } => self.raises.push(exc.as_ref().map(|expr| &**expr)),
+            StmtKind::Try {
+                body, finalbody, ..
+            } => {
+                for stmt in body.iter().chain(finalbody.iter()) {
+                    visitor::walk_stmt(self, stmt);
+                }
+            }
             _ => visitor::walk_stmt(self, stmt),
         }
     }

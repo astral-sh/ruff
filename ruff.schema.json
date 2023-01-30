@@ -111,7 +111,7 @@
       ]
     },
     "fixable": {
-      "description": "A list of rule codes or prefixes to consider autofixable.",
+      "description": "A list of rule codes or prefixes to consider autofixable. By default, all rules are considered autofixable.",
       "type": [
         "array",
         "null"
@@ -1882,7 +1882,6 @@
         "UP013",
         "UP014",
         "UP015",
-        "UP016",
         "UP017",
         "UP018",
         "UP019",

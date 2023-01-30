@@ -3,7 +3,8 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UsePEP585Annotation: List
+    UsePEP585Annotation:
+      name: List
   location:
     row: 34
     column: 17

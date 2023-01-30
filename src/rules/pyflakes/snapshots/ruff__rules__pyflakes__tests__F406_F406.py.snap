@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportStarNotPermitted: F634
+    ImportStarNotPermitted:
+      name: F634
   location:
     row: 5
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportStarNotPermitted: F634
+    ImportStarNotPermitted:
+      name: F634
   location:
     row: 9
     column: 4

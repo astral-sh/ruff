@@ -29,10 +29,11 @@ expression: diagnostics
     column: 4
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - F401
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F401
   location:
     row: 52
     column: 19
@@ -51,10 +52,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled: []
-      unmatched:
-        - F401
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F401
   location:
     row: 59
     column: 19
@@ -73,10 +75,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled:
-        - F501
-      unmatched: []
+      codes:
+        unknown: []
+        disabled:
+          - F501
+        unmatched: []
   location:
     row: 66
     column: 15
@@ -95,10 +98,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled:
-        - F501
-      unmatched: []
+      codes:
+        unknown: []
+        disabled:
+          - F501
+        unmatched: []
   location:
     row: 72
     column: 26
@@ -159,10 +163,11 @@ expression: diagnostics
   parent: ~
 - kind:
     UnusedNOQA:
-      unknown: []
-      disabled:
-        - F501
-      unmatched: []
+      codes:
+        unknown: []
+        disabled:
+          - F501
+        unmatched: []
   location:
     row: 89
     column: 54

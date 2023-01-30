@@ -3,7 +3,8 @@ source: src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 12
     column: 29
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: y
+    FunctionUsesLoopVariable:
+      name: y
   location:
     row: 13
     column: 29
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 16
     column: 15
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 28
     column: 18
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 29
     column: 18
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 30
     column: 18
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 31
     column: 21
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 40
     column: 33
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 42
     column: 13
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: a
+    FunctionUsesLoopVariable:
+      name: a
   location:
     row: 50
     column: 29
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: a_
+    FunctionUsesLoopVariable:
+      name: a_
   location:
     row: 51
     column: 29
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: b
+    FunctionUsesLoopVariable:
+      name: b
   location:
     row: 52
     column: 29
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: c
+    FunctionUsesLoopVariable:
+      name: c
   location:
     row: 53
     column: 29
@@ -133,7 +146,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: j
+    FunctionUsesLoopVariable:
+      name: j
   location:
     row: 61
     column: 16
@@ -143,7 +157,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: k
+    FunctionUsesLoopVariable:
+      name: k
   location:
     row: 61
     column: 20
@@ -153,7 +168,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: l
+    FunctionUsesLoopVariable:
+      name: l
   location:
     row: 68
     column: 9
@@ -163,7 +179,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: i
+    FunctionUsesLoopVariable:
+      name: i
   location:
     row: 82
     column: 15
@@ -173,7 +190,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 117
     column: 23
@@ -183,7 +201,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 118
     column: 26
@@ -193,7 +212,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 119
     column: 36
@@ -203,7 +223,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 120
     column: 37
@@ -213,7 +234,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: x
+    FunctionUsesLoopVariable:
+      name: x
   location:
     row: 121
     column: 36
@@ -223,7 +245,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: name
+    FunctionUsesLoopVariable:
+      name: name
   location:
     row: 171
     column: 28
@@ -233,7 +256,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable: i
+    FunctionUsesLoopVariable:
+      name: i
   location:
     row: 174
     column: 28

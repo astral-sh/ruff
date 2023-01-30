@@ -3,7 +3,8 @@ source: src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingReturnTypeSpecialMethod: __init__
+    MissingReturnTypeSpecialMethod:
+      name: __init__
   location:
     row: 5
     column: 8
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    MissingReturnTypeSpecialMethod: __init__
+    MissingReturnTypeSpecialMethod:
+      name: __init__
   location:
     row: 11
     column: 8
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    MissingReturnTypePrivateFunction: __init__
+    MissingReturnTypePrivateFunction:
+      name: __init__
   location:
     row: 40
     column: 4
@@ -49,7 +52,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypeSpecialMethod: __init__
+    MissingReturnTypeSpecialMethod:
+      name: __init__
   location:
     row: 47
     column: 8

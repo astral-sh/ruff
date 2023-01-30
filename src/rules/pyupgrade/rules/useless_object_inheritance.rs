@@ -27,7 +27,9 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             continue;
         }
         return Some(Diagnostic::new(
-            violations::UselessObjectInheritance(name.to_string()),
+            violations::UselessObjectInheritance {
+                name: name.to_string(),
+            },
             Range::from_located(expr),
         ));
     }
@@ -51,6 +53,7 @@ pub fn useless_object_inheritance(
             checker.locator,
             stmt.location,
             diagnostic.location,
+            diagnostic.end_location,
             bases,
             keywords,
         ) {

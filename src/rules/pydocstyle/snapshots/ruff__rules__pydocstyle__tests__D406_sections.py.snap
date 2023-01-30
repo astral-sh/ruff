@@ -3,7 +3,8 @@ source: src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NewLineAfterSectionName: Returns
+    NewLineAfterSectionName:
+      name: Returns
   location:
     row: 30
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    NewLineAfterSectionName: Raises
+    NewLineAfterSectionName:
+      name: Raises
   location:
     row: 207
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    NewLineAfterSectionName: Returns
+    NewLineAfterSectionName:
+      name: Returns
   location:
     row: 252
     column: 4
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    NewLineAfterSectionName: Raises
+    NewLineAfterSectionName:
+      name: Raises
   location:
     row: 252
     column: 4

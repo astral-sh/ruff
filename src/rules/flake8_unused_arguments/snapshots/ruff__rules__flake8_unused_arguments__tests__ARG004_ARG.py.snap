@@ -3,7 +3,8 @@ source: src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedStaticMethodArgument: cls
+    UnusedStaticMethodArgument:
+      name: cls
   location:
     row: 49
     column: 10
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedStaticMethodArgument: x
+    UnusedStaticMethodArgument:
+      name: x
   location:
     row: 49
     column: 15
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedStaticMethodArgument: x
+    UnusedStaticMethodArgument:
+      name: x
   location:
     row: 53
     column: 10

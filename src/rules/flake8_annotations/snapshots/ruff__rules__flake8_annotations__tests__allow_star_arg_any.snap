@@ -3,7 +3,8 @@ source: src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DynamicallyTypedExpression: a
+    DynamicallyTypedExpression:
+      name: a
   location:
     row: 10
     column: 11
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: foo
+    DynamicallyTypedExpression:
+      name: foo
   location:
     row: 15
     column: 46
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: a
+    DynamicallyTypedExpression:
+      name: a
   location:
     row: 40
     column: 28
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression: foo_method
+    DynamicallyTypedExpression:
+      name: foo_method
   location:
     row: 44
     column: 66

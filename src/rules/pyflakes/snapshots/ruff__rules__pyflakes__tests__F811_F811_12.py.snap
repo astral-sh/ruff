@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     RedefinedWhileUnused:
-      - mixer
-      - 2
+      name: mixer
+      line: 2
   location:
     row: 6
     column: 19

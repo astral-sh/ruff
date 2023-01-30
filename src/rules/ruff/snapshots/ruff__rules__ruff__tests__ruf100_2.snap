@@ -1,0 +1,28 @@
+---
+source: src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F401
+  location:
+    row: 1
+    column: 18
+  end_location:
+    row: 1
+    column: 30
+  fix:
+    content:
+      - ""
+    location:
+      row: 1
+      column: 16
+    end_location:
+      row: 1
+      column: 30
+  parent: ~
+

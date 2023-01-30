@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     RedefinedWhileUnused:
-      - FU
-      - 1
+      name: FU
+      line: 1
   location:
     row: 1
     column: 26

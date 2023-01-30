@@ -9,7 +9,7 @@ use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violations;
 
@@ -174,10 +174,12 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
             && name != &"__traceback_supplement__"
         {
             let mut diagnostic = Diagnostic::new(
-                violations::UnusedVariable((*name).to_string()),
+                violations::UnusedVariable {
+                    name: (*name).to_string(),
+                },
                 binding.range,
             );
-            if checker.patch(&Rule::UnusedVariable) {
+            if checker.patch(diagnostic.kind.rule()) {
                 if let Some(stmt) = binding.source.as_ref().map(std::convert::Into::into) {
                     if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
                     {

@@ -48,14 +48,14 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
-                                violations::MultiValueRepeatedKeyLiteral(
-                                    unparse_expr(key, checker.stylist),
-                                    is_duplicate_value,
-                                ),
+                                violations::MultiValueRepeatedKeyLiteral {
+                                    name: unparse_expr(key, checker.stylist),
+                                    repeated_value: is_duplicate_value,
+                                },
                                 Range::from_located(key),
                             );
                             if is_duplicate_value {
-                                if checker.patch(&Rule::MultiValueRepeatedKeyLiteral) {
+                                if checker.patch(diagnostic.kind.rule()) {
                                     diagnostic.amend(Fix::deletion(
                                         values[i - 1].end_location.unwrap(),
                                         values[i].end_location.unwrap(),
@@ -76,14 +76,14 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
-                                violations::MultiValueRepeatedKeyVariable(
-                                    dict_key.to_string(),
-                                    is_duplicate_value,
-                                ),
+                                violations::MultiValueRepeatedKeyVariable {
+                                    name: dict_key.to_string(),
+                                    repeated_value: is_duplicate_value,
+                                },
                                 Range::from_located(key),
                             );
                             if is_duplicate_value {
-                                if checker.patch(&Rule::MultiValueRepeatedKeyVariable) {
+                                if checker.patch(diagnostic.kind.rule()) {
                                     diagnostic.amend(Fix::deletion(
                                         values[i - 1].end_location.unwrap(),
                                         values[i].end_location.unwrap(),

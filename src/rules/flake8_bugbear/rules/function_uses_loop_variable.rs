@@ -260,7 +260,9 @@ where
                 if !checker.flake8_bugbear_seen.contains(&expr) {
                     checker.flake8_bugbear_seen.push(expr);
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::FunctionUsesLoopVariable(name.to_string()),
+                        violations::FunctionUsesLoopVariable {
+                            name: name.to_string(),
+                        },
                         range,
                     ));
                 }

@@ -3,7 +3,8 @@ source: src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedFunctionArgument: self
+    UnusedFunctionArgument:
+      name: self
   location:
     row: 9
     column: 6
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument: x
+    UnusedFunctionArgument:
+      name: x
   location:
     row: 9
     column: 12
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument: cls
+    UnusedFunctionArgument:
+      name: cls
   location:
     row: 13
     column: 6
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument: x
+    UnusedFunctionArgument:
+      name: x
   location:
     row: 13
     column: 11
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument: self
+    UnusedFunctionArgument:
+      name: self
   location:
     row: 17
     column: 6
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument: x
+    UnusedFunctionArgument:
+      name: x
   location:
     row: 17
     column: 12
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument: cls
+    UnusedFunctionArgument:
+      name: cls
   location:
     row: 21
     column: 6
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument: x
+    UnusedFunctionArgument:
+      name: x
   location:
     row: 21
     column: 11

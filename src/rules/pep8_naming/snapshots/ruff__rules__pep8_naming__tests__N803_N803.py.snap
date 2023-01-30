@@ -3,7 +3,8 @@ source: src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    InvalidArgumentName: A
+    InvalidArgumentName:
+      name: A
   location:
     row: 1
     column: 15
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidArgumentName: A
+    InvalidArgumentName:
+      name: A
   location:
     row: 6
     column: 27

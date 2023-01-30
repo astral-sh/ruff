@@ -101,7 +101,7 @@ pub fn bad_file_permissions(
             if let Some(int_value) = get_int_value(mode_arg) {
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::BadFilePermissions(int_value),
+                        violations::BadFilePermissions { mask: int_value },
                         Range::from_located(mode_arg),
                     ));
                 }

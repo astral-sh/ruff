@@ -43,6 +43,13 @@ struct ExpandedMessage<'a> {
     filename: &'a str,
 }
 
+#[derive(Serialize)]
+struct ExpandedStatistics<'a> {
+    count: usize,
+    code: &'a str,
+    message: String,
+}
+
 struct SerializeRuleAsCode<'a>(&'a Rule);
 
 impl Serialize for SerializeRuleAsCode<'_> {
@@ -328,6 +335,77 @@ impl<'a> Printer<'a> {
                     );
                     writeln!(stdout, "{label}")?;
                 }
+            }
+        }
+
+        stdout.flush()?;
+
+        Ok(())
+    }
+
+    pub fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
+        let mut violations = diagnostics
+            .messages
+            .iter()
+            .map(|message| message.kind.rule())
+            .collect::<Vec<_>>();
+        violations.sort();
+        violations.dedup();
+
+        let statistics = violations
+            .iter()
+            .map(|rule| ExpandedStatistics {
+                code: rule.code(),
+                count: diagnostics
+                    .messages
+                    .iter()
+                    .filter(|message| message.kind.rule() == *rule)
+                    .count(),
+                message: diagnostics
+                    .messages
+                    .iter()
+                    .find(|message| message.kind.rule() == *rule)
+                    .map(|message| message.kind.body())
+                    .unwrap(),
+            })
+            .collect::<Vec<_>>();
+
+        let mut stdout = BufWriter::new(io::stdout().lock());
+        match self.format {
+            SerializationFormat::Text => {
+                // Compute the maximum number of digits in the count and code, for all messages, to enable
+                // pretty-printing.
+                let count_width = num_digits(
+                    statistics
+                        .iter()
+                        .map(|statistic| statistic.count)
+                        .max()
+                        .unwrap(),
+                );
+                let code_width = statistics
+                    .iter()
+                    .map(|statistic| statistic.code.len())
+                    .max()
+                    .unwrap();
+
+                // By default, we mimic Flake8's `--statistics` format.
+                for msg in statistics {
+                    writeln!(
+                        stdout,
+                        "{:>count_width$}\t{:<code_width$}\t{}",
+                        msg.count, msg.code, msg.message
+                    )?;
+                }
+                return Ok(());
+            }
+            SerializationFormat::Json => {
+                writeln!(stdout, "{}", serde_json::to_string_pretty(&statistics)?)?;
+            }
+            _ => {
+                anyhow::bail!(
+                    "Unsupported serialization format for statistics: {:?}",
+                    self.format
+                )
             }
         }
 

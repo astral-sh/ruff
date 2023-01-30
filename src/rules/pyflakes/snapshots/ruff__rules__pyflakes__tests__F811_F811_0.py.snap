@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     RedefinedWhileUnused:
-      - bar
-      - 6
+      name: bar
+      line: 6
   location:
     row: 10
     column: 4

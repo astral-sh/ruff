@@ -392,7 +392,9 @@ where
                         if !exists {
                             if self.settings.rules.enabled(&Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    violations::NonlocalWithoutBinding(name.to_string()),
+                                    violations::NonlocalWithoutBinding {
+                                        name: name.to_string(),
+                                    },
                                     *range,
                                 ));
                             }
@@ -1141,9 +1143,9 @@ where
                         if self.settings.rules.enabled(&Rule::FutureFeatureNotDefined) {
                             if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    violations::FutureFeatureNotDefined(
-                                        alias.node.name.to_string(),
-                                    ),
+                                    violations::FutureFeatureNotDefined {
+                                        name: alias.node.name.to_string(),
+                                    },
                                     Range::from_located(alias),
                                 ));
                             }
@@ -1176,12 +1178,12 @@ where
                                 [*(self.scope_stack.last().expect("No current scope found"))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    violations::ImportStarNotPermitted(
-                                        helpers::format_import_from(
+                                    violations::ImportStarNotPermitted {
+                                        name: helpers::format_import_from(
                                             level.as_ref(),
                                             module.as_deref(),
                                         ),
-                                    ),
+                                    },
                                     Range::from_located(stmt),
                                 ));
                             }
@@ -1189,10 +1191,12 @@ where
 
                         if self.settings.rules.enabled(&Rule::ImportStarUsed) {
                             self.diagnostics.push(Diagnostic::new(
-                                violations::ImportStarUsed(helpers::format_import_from(
-                                    level.as_ref(),
-                                    module.as_deref(),
-                                )),
+                                violations::ImportStarUsed {
+                                    name: helpers::format_import_from(
+                                        level.as_ref(),
+                                        module.as_deref(),
+                                    ),
+                                },
                                 Range::from_located(stmt),
                             ));
                         }
@@ -2088,11 +2092,6 @@ where
                 {
                     pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
-
-                if self.settings.rules.enabled(&Rule::RemoveSixCompat) {
-                    pyupgrade::rules::remove_six_compat(self, expr);
-                }
-
                 if self.settings.rules.enabled(&Rule::DatetimeTimezoneUTC)
                     && self.settings.target_version >= PythonVersion::Py311
                 {
@@ -2104,16 +2103,13 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteMockImport) {
                     pyupgrade::rules::rewrite_mock_attribute(self, expr);
                 }
-
                 if self.settings.rules.enabled(&Rule::SixPY3Referenced) {
                     flake8_2020::rules::name_or_attribute(self, expr);
                 }
-
-                pandas_vet::rules::check_attr(self, attr, value, expr);
-
                 if self.settings.rules.enabled(&Rule::BannedApi) {
                     flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
                 }
+                pandas_vet::rules::check_attr(self, attr, value, expr);
             }
             ExprKind::Call {
                 func,
@@ -2147,9 +2143,9 @@ where
                                             .enabled(&Rule::StringDotFormatInvalidFormat)
                                         {
                                             self.diagnostics.push(Diagnostic::new(
-                                                violations::StringDotFormatInvalidFormat(
-                                                    pyflakes::format::error_to_string(&e),
-                                                ),
+                                                violations::StringDotFormatInvalidFormat {
+                                                    message: pyflakes::format::error_to_string(&e),
+                                                },
                                                 location,
                                             ));
                                         }
@@ -2225,9 +2221,6 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::RedundantOpenModes) {
                     pyupgrade::rules::redundant_open_modes(self, expr);
-                }
-                if self.settings.rules.enabled(&Rule::RemoveSixCompat) {
-                    pyupgrade::rules::remove_six_compat(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::NativeLiterals) {
                     pyupgrade::rules::native_literals(self, expr, func, args, keywords);
@@ -2478,8 +2471,9 @@ where
 
                 // pandas-vet
                 if self.settings.rules.enabled(&Rule::UseOfInplaceArgument) {
-                    self.diagnostics
-                        .extend(pandas_vet::rules::inplace_argument(keywords).into_iter());
+                    self.diagnostics.extend(
+                        pandas_vet::rules::inplace_argument(self, expr, args, keywords).into_iter(),
+                    );
                 }
                 pandas_vet::rules::check_call(self, func);
 
@@ -2708,7 +2702,9 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction(DeferralKeyword::Yield),
+                            violations::YieldOutsideFunction {
+                                keyword: DeferralKeyword::Yield,
+                            },
                             Range::from_located(expr),
                         ));
                     }
@@ -2719,7 +2715,9 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction(DeferralKeyword::YieldFrom),
+                            violations::YieldOutsideFunction {
+                                keyword: DeferralKeyword::YieldFrom,
+                            },
                             Range::from_located(expr),
                         ));
                     }
@@ -2730,7 +2728,9 @@ where
                     let scope = self.current_scope();
                     if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction(DeferralKeyword::Await),
+                            violations::YieldOutsideFunction {
+                                keyword: DeferralKeyword::Await,
+                            },
                             Range::from_located(expr),
                         ));
                     }
@@ -2816,7 +2816,9 @@ where
                                     .enabled(&Rule::PercentFormatUnsupportedFormatCharacter)
                                 {
                                     self.diagnostics.push(Diagnostic::new(
-                                        violations::PercentFormatUnsupportedFormatCharacter(c),
+                                        violations::PercentFormatUnsupportedFormatCharacter {
+                                            char: c,
+                                        },
                                         location,
                                     ));
                                 }
@@ -2828,7 +2830,9 @@ where
                                     .enabled(&Rule::PercentFormatInvalidFormat)
                                 {
                                     self.diagnostics.push(Diagnostic::new(
-                                        violations::PercentFormatInvalidFormat(e.to_string()),
+                                        violations::PercentFormatInvalidFormat {
+                                            message: e.to_string(),
+                                        },
                                         location,
                                     ));
                                 }
@@ -3516,7 +3520,9 @@ where
                             if !self.bindings[*index].used() {
                                 if self.settings.rules.enabled(&Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
-                                        violations::UnusedVariable(name.to_string()),
+                                        violations::UnusedVariable {
+                                            name: name.to_string(),
+                                        },
                                         name_range,
                                     );
                                     if self.patch(&Rule::UnusedVariable) {
@@ -3826,10 +3832,10 @@ impl<'a> Checker<'a> {
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::ImportShadowedByLoopVar(
-                                name.to_string(),
-                                existing.range.location.row(),
-                            ),
+                            violations::ImportShadowedByLoopVar {
+                                name: name.to_string(),
+                                line: existing.range.location.row(),
+                            },
                             binding.range,
                         ));
                     }
@@ -3845,10 +3851,10 @@ impl<'a> Checker<'a> {
                     {
                         if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
                             self.diagnostics.push(Diagnostic::new(
-                                violations::RedefinedWhileUnused(
-                                    name.to_string(),
-                                    existing.range.location.row(),
-                                ),
+                                violations::RedefinedWhileUnused {
+                                    name: name.to_string(),
+                                    line: existing.range.location.row(),
+                                },
                                 binding_range(&binding, self.locator),
                             ));
                         }
@@ -4012,7 +4018,10 @@ impl<'a> Checker<'a> {
                     from_list.sort();
 
                     self.diagnostics.push(Diagnostic::new(
-                        violations::ImportStarUsage(id.to_string(), from_list),
+                        violations::ImportStarUsage {
+                            name: id.to_string(),
+                            sources: from_list,
+                        },
                         Range::from_located(expr),
                     ));
                 }
@@ -4043,7 +4052,7 @@ impl<'a> Checker<'a> {
                 }
 
                 self.diagnostics.push(Diagnostic::new(
-                    violations::UndefinedName(id.clone()),
+                    violations::UndefinedName { name: id.clone() },
                     Range::from_located(expr),
                 ));
             }
@@ -4251,7 +4260,9 @@ impl<'a> Checker<'a> {
                 && self.settings.rules.enabled(&Rule::UndefinedName)
             {
                 self.diagnostics.push(Diagnostic::new(
-                    violations::UndefinedName(id.to_string()),
+                    violations::UndefinedName {
+                        name: id.to_string(),
+                    },
                     Range::from_located(expr),
                 ));
             }
@@ -4317,7 +4328,9 @@ impl<'a> Checker<'a> {
                     .enabled(&Rule::ForwardAnnotationSyntaxError)
                 {
                     self.diagnostics.push(Diagnostic::new(
-                        violations::ForwardAnnotationSyntaxError(expression.to_string()),
+                        violations::ForwardAnnotationSyntaxError {
+                            body: expression.to_string(),
+                        },
                         range,
                     ));
                 }
@@ -4489,7 +4502,9 @@ impl<'a> Checker<'a> {
                         if let Some(stmt) = &binding.source {
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(
-                                    violations::GlobalVariableNotAssigned((*name).to_string()),
+                                    violations::GlobalVariableNotAssigned {
+                                        name: (*name).to_string(),
+                                    },
                                     binding.range,
                                 ));
                             }
@@ -4520,7 +4535,9 @@ impl<'a> Checker<'a> {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
                                     diagnostics.push(Diagnostic::new(
-                                        violations::UndefinedExport(name.to_string()),
+                                        violations::UndefinedExport {
+                                            name: name.to_string(),
+                                        },
                                         all_binding.range,
                                     ));
                                 }
@@ -4558,10 +4575,10 @@ impl<'a> Checker<'a> {
                         if let Some(indices) = self.redefinitions.get(index) {
                             for index in indices {
                                 diagnostics.push(Diagnostic::new(
-                                    violations::RedefinedWhileUnused(
-                                        (*name).to_string(),
-                                        binding.range.location.row(),
-                                    ),
+                                    violations::RedefinedWhileUnused {
+                                        name: (*name).to_string(),
+                                        line: binding.range.location.row(),
+                                    },
                                     binding_range(&self.bindings[*index], self.locator),
                                 ));
                             }
@@ -4589,10 +4606,10 @@ impl<'a> Checker<'a> {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
                                     diagnostics.push(Diagnostic::new(
-                                        violations::ImportStarUsage(
-                                            name.to_string(),
-                                            from_list.clone(),
-                                        ),
+                                        violations::ImportStarUsage {
+                                            name: name.to_string(),
+                                            sources: from_list.clone(),
+                                        },
                                         all_binding.range,
                                     ));
                                 }

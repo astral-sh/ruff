@@ -38,7 +38,6 @@ mod tests {
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
     #[test_case(Rule::InvalidAllFormat, Path::new("PLE0605.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("PLE0604.py"); "PLE0604")]
-
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

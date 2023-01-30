@@ -3,7 +3,8 @@ source: src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BadQuotesMultilineString: double
+    BadQuotesMultilineString:
+      quote: double
   location:
     row: 3
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    BadQuotesMultilineString: double
+    BadQuotesMultilineString:
+      quote: double
   location:
     row: 11
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    BadQuotesMultilineString: double
+    BadQuotesMultilineString:
+      quote: double
   location:
     row: 15
     column: 38
@@ -59,7 +62,8 @@ expression: diagnostics
       column: 3
   parent: ~
 - kind:
-    BadQuotesMultilineString: double
+    BadQuotesMultilineString:
+      quote: double
   location:
     row: 17
     column: 4
@@ -77,7 +81,8 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    BadQuotesMultilineString: double
+    BadQuotesMultilineString:
+      quote: double
   location:
     row: 22
     column: 4

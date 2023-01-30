@@ -4,8 +4,9 @@ expression: diagnostics
 ---
 - kind:
     UnnecessaryFutureImport:
-      - generators
-      - nested_scopes
+      names:
+        - generators
+        - nested_scopes
   location:
     row: 1
     column: 0
@@ -24,8 +25,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - unicode_literals
-      - with_statement
+      names:
+        - unicode_literals
+        - with_statement
   location:
     row: 2
     column: 0
@@ -44,8 +46,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - absolute_import
-      - division
+      names:
+        - absolute_import
+        - division
   location:
     row: 3
     column: 0
@@ -64,7 +67,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - generator_stop
+      names:
+        - generator_stop
   location:
     row: 4
     column: 0
@@ -83,8 +87,9 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - generator_stop
-      - print_function
+      names:
+        - generator_stop
+        - print_function
   location:
     row: 5
     column: 0
@@ -103,7 +108,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - generators
+      names:
+        - generators
   location:
     row: 6
     column: 0
@@ -122,7 +128,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - generator_stop
+      names:
+        - generator_stop
   location:
     row: 9
     column: 4
@@ -141,7 +148,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - generators
+      names:
+        - generators
   location:
     row: 10
     column: 4
@@ -160,7 +168,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - generator_stop
+      names:
+        - generator_stop
   location:
     row: 13
     column: 4
@@ -179,7 +188,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryFutureImport:
-      - generators
+      names:
+        - generators
   location:
     row: 14
     column: 4

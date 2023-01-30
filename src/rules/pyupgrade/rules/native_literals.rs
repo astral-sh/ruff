@@ -5,7 +5,7 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violations;
 use crate::violations::LiteralType;
 
@@ -25,12 +25,12 @@ pub fn native_literals(
 
     if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let mut diagnostic = Diagnostic::new(violations::NativeLiterals(if id == "str" {
+            let mut diagnostic = Diagnostic::new(violations::NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
-            }), Range::from_located(expr));
-            if checker.patch(&Rule::NativeLiterals) {
+            }}, Range::from_located(expr));
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
@@ -94,14 +94,16 @@ pub fn native_literals(
         }
 
         let mut diagnostic = Diagnostic::new(
-            violations::NativeLiterals(if id == "str" {
-                LiteralType::Str
-            } else {
-                LiteralType::Bytes
-            }),
+            violations::NativeLiterals {
+                literal_type: if id == "str" {
+                    LiteralType::Str
+                } else {
+                    LiteralType::Bytes
+                },
+            },
             Range::from_located(expr),
         );
-        if checker.patch(&Rule::NativeLiterals) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 arg_code.to_string(),
                 expr.location,

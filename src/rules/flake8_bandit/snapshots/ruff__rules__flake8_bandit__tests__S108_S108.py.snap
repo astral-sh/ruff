@@ -3,7 +3,8 @@ source: src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedTempFile: /tmp/abc
+    HardcodedTempFile:
+      string: /tmp/abc
   location:
     row: 5
     column: 10
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedTempFile: /var/tmp/123
+    HardcodedTempFile:
+      string: /var/tmp/123
   location:
     row: 8
     column: 10
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedTempFile: /dev/shm/unit/test
+    HardcodedTempFile:
+      string: /dev/shm/unit/test
   location:
     row: 11
     column: 10

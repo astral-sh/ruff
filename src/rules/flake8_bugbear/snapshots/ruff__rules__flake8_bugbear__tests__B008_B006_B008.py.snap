@@ -3,7 +3,8 @@ source: src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FunctionCallArgumentDefault: range
+    FunctionCallArgumentDefault:
+      name: range
   location:
     row: 85
     column: 60
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: range
+    FunctionCallArgumentDefault:
+      name: range
   location:
     row: 89
     column: 63
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: range
+    FunctionCallArgumentDefault:
+      name: range
   location:
     row: 93
     column: 59
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: time.time
+    FunctionCallArgumentDefault:
+      name: time.time
   location:
     row: 109
     column: 38
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: dt.datetime.now
+    FunctionCallArgumentDefault:
+      name: dt.datetime.now
   location:
     row: 113
     column: 11
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: dt.timedelta
+    FunctionCallArgumentDefault:
+      name: dt.timedelta
   location:
     row: 113
     column: 31
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: ~
+    FunctionCallArgumentDefault:
+      name: ~
   location:
     row: 117
     column: 29
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: float
+    FunctionCallArgumentDefault:
+      name: float
   location:
     row: 155
     column: 33
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: float
+    FunctionCallArgumentDefault:
+      name: float
   location:
     row: 160
     column: 29
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: float
+    FunctionCallArgumentDefault:
+      name: float
   location:
     row: 164
     column: 44
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: float
+    FunctionCallArgumentDefault:
+      name: float
   location:
     row: 170
     column: 20
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: dt.datetime.now
+    FunctionCallArgumentDefault:
+      name: dt.datetime.now
   location:
     row: 170
     column: 30
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: map
+    FunctionCallArgumentDefault:
+      name: map
   location:
     row: 176
     column: 21
@@ -133,7 +146,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: random.randint
+    FunctionCallArgumentDefault:
+      name: random.randint
   location:
     row: 181
     column: 18
@@ -143,7 +157,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault: dt.datetime.now
+    FunctionCallArgumentDefault:
+      name: dt.datetime.now
   location:
     row: 181
     column: 36

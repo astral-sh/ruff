@@ -5,7 +5,7 @@ use rustpython_ast::{Comprehension, Constant, Expr, ExprKind, Keyword, Unaryop};
 use super::fixes;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 fn function_name(func: &Expr) -> Option<&str> {
@@ -65,7 +65,7 @@ pub fn unnecessary_generator_list(
             violations::UnnecessaryGeneratorList,
             Range::from_located(expr),
         );
-        if checker.patch(&Rule::UnnecessaryGeneratorList) {
+        if checker.patch(diagnostic.kind.rule()) {
             match fixes::fix_unnecessary_generator_list(checker.locator, checker.stylist, expr) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
@@ -96,7 +96,7 @@ pub fn unnecessary_generator_set(
             violations::UnnecessaryGeneratorSet,
             Range::from_located(expr),
         );
-        if checker.patch(&Rule::UnnecessaryGeneratorSet) {
+        if checker.patch(diagnostic.kind.rule()) {
             match fixes::fix_unnecessary_generator_set(checker.locator, checker.stylist, expr) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
@@ -126,7 +126,7 @@ pub fn unnecessary_generator_dict(
                     violations::UnnecessaryGeneratorDict,
                     Range::from_located(expr),
                 );
-                if checker.patch(&Rule::UnnecessaryGeneratorDict) {
+                if checker.patch(diagnostic.kind.rule()) {
                     match fixes::fix_unnecessary_generator_dict(
                         checker.locator,
                         checker.stylist,
@@ -164,7 +164,7 @@ pub fn unnecessary_list_comprehension_set(
             violations::UnnecessaryListComprehensionSet,
             Range::from_located(expr),
         );
-        if checker.patch(&Rule::UnnecessaryListComprehensionSet) {
+        if checker.patch(diagnostic.kind.rule()) {
             match fixes::fix_unnecessary_list_comprehension_set(
                 checker.locator,
                 checker.stylist,
@@ -207,7 +207,7 @@ pub fn unnecessary_list_comprehension_dict(
         violations::UnnecessaryListComprehensionDict,
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::UnnecessaryListComprehensionDict) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_list_comprehension_dict(checker.locator, checker.stylist, expr)
         {
             Ok(fix) => {
@@ -239,10 +239,12 @@ pub fn unnecessary_literal_set(
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryLiteralSet(kind.to_string()),
+        violations::UnnecessaryLiteralSet {
+            obj_type: kind.to_string(),
+        },
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::UnnecessaryLiteralSet) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_literal_set(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -280,10 +282,12 @@ pub fn unnecessary_literal_dict(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryLiteralDict(kind.to_string()),
+        violations::UnnecessaryLiteralDict {
+            obj_type: kind.to_string(),
+        },
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::UnnecessaryLiteralDict) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_literal_dict(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -321,10 +325,12 @@ pub fn unnecessary_collection_call(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryCollectionCall(id.to_string()),
+        violations::UnnecessaryCollectionCall {
+            obj_type: id.to_string(),
+        },
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::UnnecessaryCollectionCall) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_collection_call(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -354,10 +360,12 @@ pub fn unnecessary_literal_within_tuple_call(
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryLiteralWithinTupleCall(argument_kind.to_string()),
+        violations::UnnecessaryLiteralWithinTupleCall {
+            literal: argument_kind.to_string(),
+        },
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::UnnecessaryLiteralWithinTupleCall) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_literal_within_tuple_call(
             checker.locator,
             checker.stylist,
@@ -391,10 +399,12 @@ pub fn unnecessary_literal_within_list_call(
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryLiteralWithinListCall(argument_kind.to_string()),
+        violations::UnnecessaryLiteralWithinListCall {
+            literal: argument_kind.to_string(),
+        },
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::UnnecessaryLiteralWithinListCall) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_literal_within_list_call(
             checker.locator,
             checker.stylist,
@@ -422,7 +432,7 @@ pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     }
     let mut diagnostic =
         Diagnostic::new(violations::UnnecessaryListCall, Range::from_located(expr));
-    if checker.patch(&Rule::UnnecessaryListCall) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_list_call(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -462,10 +472,12 @@ pub fn unnecessary_call_around_sorted(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryCallAroundSorted(outer.to_string()),
+        violations::UnnecessaryCallAroundSorted {
+            func: outer.to_string(),
+        },
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::UnnecessaryCallAroundSorted) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_call_around_sorted(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -485,7 +497,10 @@ pub fn unnecessary_double_cast_or_process(
 ) {
     fn diagnostic(inner: &str, outer: &str, location: Range) -> Diagnostic {
         Diagnostic::new(
-            violations::UnnecessaryDoubleCastOrProcess(inner.to_string(), outer.to_string()),
+            violations::UnnecessaryDoubleCastOrProcess {
+                inner: inner.to_string(),
+                outer: outer.to_string(),
+            },
             location,
         )
     }
@@ -587,7 +602,9 @@ pub fn unnecessary_subscript_reversal(
         return;
     };
     checker.diagnostics.push(Diagnostic::new(
-        violations::UnnecessarySubscriptReversal(id.to_string()),
+        violations::UnnecessarySubscriptReversal {
+            func: id.to_string(),
+        },
         Range::from_located(expr),
     ));
 }
@@ -625,10 +642,12 @@ pub fn unnecessary_comprehension(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryComprehension(id.to_string()),
+        violations::UnnecessaryComprehension {
+            obj_type: id.to_string(),
+        },
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::UnnecessaryComprehension) {
+    if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);
@@ -642,7 +661,12 @@ pub fn unnecessary_comprehension(
 /// C417
 pub fn unnecessary_map(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     fn diagnostic(kind: &str, location: Range) -> Diagnostic {
-        Diagnostic::new(violations::UnnecessaryMap(kind.to_string()), location)
+        Diagnostic::new(
+            violations::UnnecessaryMap {
+                obj_type: kind.to_string(),
+            },
+            location,
+        )
     }
 
     let Some(id) = function_name(func)  else {

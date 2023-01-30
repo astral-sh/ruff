@@ -206,9 +206,10 @@ apk add ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff path/to/code/to/lint.py  # Run Ruff over `lint.py`
-ruff path/to/code/            # Run Ruff over all files in `/path/to/code` (and any subdirectories)
-ruff path/to/code/*.py        # Run Ruff over all `.py` files in `/path/to/code`
+ruff .                        # Lint all files in the current directory (and any subdirectories)
+ruff path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
+ruff path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
+ruff path/to/code/to/file.py  # Lint `file.py`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
@@ -346,15 +347,14 @@ an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For ex
 `pyproject.toml` described above would be represented via the following `ruff.toml`:
 
 ```toml
-# Enable Pyflakes and pycodestyle rules.
-select = ["E", "F"]
+# Enable flake8-bugbear (`B`) rules.
+select = ["E", "F", "B"]
 
 # Never enforce `E501` (line length violations).
 ignore = ["E501"]
 
-# Always autofix, but never try to fix `F401` (unused imports).
-fix = true
-unfixable = ["F401"]
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+unfixable = ["B"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 [per-file-ignores]
@@ -364,25 +364,29 @@ unfixable = ["F401"]
 
 For a full list of configurable options, see the [API reference](#reference).
 
-Some common configuration settings can be provided via the command-line:
+### Command-line interface
+
+Some configuration settings can be provided via the command-line, such as those related to
+rule enablement and disablement, file discovery, logging level, and more:
 
 ```shell
-ruff path/to/code/ --select F401 --select F403
+ruff path/to/code/ --select F401 --select F403 --quiet
 ```
 
-See `ruff --help` for more:
+See `ruff help` for more on Ruff's top-level commands:
 
-<!-- Begin auto-generated cli help. -->
+<!-- Begin auto-generated command help. -->
 ```
 Ruff: An extremely fast Python linter.
 
 Usage: ruff [OPTIONS] <COMMAND>
 
 Commands:
-  check  Run Ruff on the given files or directories (default)
-  rule   Explain a rule
-  clean  Clear any caches in the current directory and any subdirectories
-  help   Print this message or the help of the given subcommand(s)
+  check   Run Ruff on the given files or directories (default)
+  rule    Explain a rule
+  linter  List all supported upstream linters
+  clean   Clear any caches in the current directory and any subdirectories
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help
@@ -395,7 +399,78 @@ Log levels:
 
 For help with a specific command, see: `ruff help <command>`.
 ```
-<!-- End auto-generated cli help. -->
+<!-- End auto-generated command help. -->
+
+Or `ruff help check` for more on the linting command:
+
+<!-- Begin auto-generated subcommand help. -->
+```
+Run Ruff on the given files or directories
+
+Usage: ruff check [OPTIONS] [FILES]...
+
+Arguments:
+  [FILES]...  List of files or directories to check
+
+Options:
+      --fix              Attempt to automatically fix lint violations
+      --show-source      Show violations with source code
+      --diff             Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
+  -w, --watch            Run in watch mode by re-running whenever files change
+      --fix-only         Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
+      --format <FORMAT>  Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
+      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --statistics       Show counts for every rule with at least one violation
+      --add-noqa         Enable automatic additions of `noqa` directives to failing lines
+      --show-files       See the files Ruff will be run against with the current settings
+      --show-settings    See the settings Ruff will use to lint a given Python file
+  -h, --help             Print help
+
+Rule selection:
+      --select <RULE_CODE>
+          Comma-separated list of rule codes to enable (or ALL, to enable all rules)
+      --ignore <RULE_CODE>
+          Comma-separated list of rule codes to disable
+      --extend-select <RULE_CODE>
+          Like --select, but adds additional rule codes on top of the selected ones
+      --extend-ignore <RULE_CODE>
+          Like --ignore, but adds additional rule codes on top of the ignored ones
+      --per-file-ignores <PER_FILE_IGNORES>
+          List of mappings from file pattern to code to exclude
+      --fixable <RULE_CODE>
+          List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+      --unfixable <RULE_CODE>
+          List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+
+File selection:
+      --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis
+      --extend-exclude <FILE_PATTERN>  Like --exclude, but adds additional files and directories on top of those already excluded
+      --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files
+      --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line
+
+Rule configuration:
+      --target-version <TARGET_VERSION>
+          The minimum Python version that should be supported
+      --line-length <LINE_LENGTH>
+          Set the line-length for length-associated rules and automatic formatting
+      --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
+          Regular expression matching the name of dummy variables
+
+Miscellaneous:
+  -n, --no-cache
+          Disable cache reads
+      --isolated
+          Ignore all configuration files
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory [env: RUFF_CACHE_DIR=]
+      --stdin-filename <STDIN_FILENAME>
+          The name of the file when passing it through stdin
+  -e, --exit-zero
+          Exit with status code "0", even upon detecting lint violations
+      --update-check
+          Enable or disable automatic update checks
+```
+<!-- End auto-generated subcommand help. -->
 
 ### `pyproject.toml` discovery
 
@@ -720,7 +795,6 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP013 | convert-typed-dict-functional-to-class | Convert `{name}` from `TypedDict` functional to class syntax | 🛠 |
 | UP014 | convert-named-tuple-functional-to-class | Convert `{name}` from `NamedTuple` functional to class syntax | 🛠 |
 | UP015 | redundant-open-modes | Unnecessary open mode parameters | 🛠 |
-| UP016 | remove-six-compat | Unnecessary `six` compatibility usage | 🛠 |
 | UP017 | datetime-timezone-utc | Use `datetime.UTC` alias | 🛠 |
 | UP018 | native-literals | Unnecessary call to `{literal_type}` | 🛠 |
 | UP019 | typing-text-str-alias | `typing.Text` is deprecated, use `str` | 🛠 |
@@ -1012,7 +1086,7 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | ---- | ---- | ------- | --- |
 | PT001 | incorrect-fixture-parentheses-style | Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}` | 🛠 |
 | PT002 | fixture-positional-args | Configuration for fixture `{function}` specified via positional args, use kwargs |  |
-| PT003 | extraneous-scope-function | `scope='function'` is implied in `@pytest.fixture()` |  |
+| PT003 | extraneous-scope-function | `scope='function'` is implied in `@pytest.fixture()` | 🛠 |
 | PT004 | missing-fixture-name-underscore | Fixture `{function}` does not return anything, add leading underscore |  |
 | PT005 | incorrect-fixture-name-underscore | Fixture `{function}` returns a value, remove leading underscore |  |
 | PT006 | parametrize-names-wrong-type | Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}` | 🛠 |
@@ -1142,13 +1216,13 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
 | PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
 | PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
-| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
+| PTH109 | pathlib-getcwd | `os.getcwd` should be replaced by `Path.cwd()` |  |
 | PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
 | PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
 | PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
 | PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
 | PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
-| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
+| PTH115 | pathlib-readlink | `os.readlink` should be replaced by `.readlink()` |  |
 | PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
 | PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
 | PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
@@ -1173,7 +1247,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior |  |
+| PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior | 🛠 |
 | PD003 | use-of-dot-is-null | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
 | PD004 | use-of-dot-not-null | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
 | PD007 | use-of-dot-ix | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
@@ -2243,9 +2317,10 @@ fix-only = true
 
 #### [`fixable`](#fixable)
 
-A list of rule codes or prefixes to consider autofixable.
+A list of rule codes or prefixes to consider autofixable. By default, all rules are
+considered autofixable.
 
-**Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "D", "E", "ERA", "F", "FBT", "I", "ICN", "N", "PGH", "PLC", "PLE", "PLR", "PLW", "Q", "RET", "RUF", "S", "T", "TID", "UP", "W", "YTT"]`
+**Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]`
 
 **Type**: `Vec<RuleSelector>`
 
@@ -3449,7 +3524,7 @@ this to "closest-to-furthest" is equivalent to isort's `reverse-relative
 
 **Default value**: `furthest-to-closest`
 
-**Type**: `RelatveImportsOrder`
+**Type**: `RelativeImportsOrder`
 
 **Example usage**:
 

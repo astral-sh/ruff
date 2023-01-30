@@ -30,7 +30,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic =
             Diagnostic::new(violations::UnnecessaryReturnNone, Range::from_located(stmt));
-        if checker.patch(&Rule::UnnecessaryReturnNone) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "return".to_string(),
                 stmt.location,
@@ -49,7 +49,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic =
             Diagnostic::new(violations::ImplicitReturnValue, Range::from_located(stmt));
-        if checker.patch(&Rule::ImplicitReturnValue) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "return None".to_string(),
                 stmt.location,
@@ -106,7 +106,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         _ => {
             let mut diagnostic =
                 Diagnostic::new(violations::ImplicitReturn, Range::from_located(last_stmt));
-            if checker.patch(&Rule::ImplicitReturn) {
+            if checker.patch(diagnostic.kind.rule()) {
                 if let Some(indent) = indentation(checker.locator, last_stmt) {
                     let mut content = String::new();
                     content.push_str(indent);
@@ -228,46 +228,42 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
     };
     for child in body {
         if matches!(child.node, StmtKind::Return { .. }) {
-            if checker.settings.rules.enabled(&Rule::SuperfluousElseReturn) {
-                checker.diagnostics.push(Diagnostic::new(
-                    violations::SuperfluousElseReturn(branch),
-                    elif_else_range(stmt, checker.locator)
-                        .unwrap_or_else(|| Range::from_located(stmt)),
-                ));
+            let diagnostic = Diagnostic::new(
+                violations::SuperfluousElseReturn { branch },
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+            );
+            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+                checker.diagnostics.push(diagnostic);
             }
             return true;
         }
         if matches!(child.node, StmtKind::Break) {
-            if checker.settings.rules.enabled(&Rule::SuperfluousElseBreak) {
-                checker.diagnostics.push(Diagnostic::new(
-                    violations::SuperfluousElseBreak(branch),
-                    elif_else_range(stmt, checker.locator)
-                        .unwrap_or_else(|| Range::from_located(stmt)),
-                ));
+            let diagnostic = Diagnostic::new(
+                violations::SuperfluousElseBreak { branch },
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+            );
+            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+                checker.diagnostics.push(diagnostic);
             }
             return true;
         }
         if matches!(child.node, StmtKind::Raise { .. }) {
-            if checker.settings.rules.enabled(&Rule::SuperfluousElseRaise) {
-                checker.diagnostics.push(Diagnostic::new(
-                    violations::SuperfluousElseRaise(branch),
-                    elif_else_range(stmt, checker.locator)
-                        .unwrap_or_else(|| Range::from_located(stmt)),
-                ));
+            let diagnostic = Diagnostic::new(
+                violations::SuperfluousElseRaise { branch },
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+            );
+            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+                checker.diagnostics.push(diagnostic);
             }
             return true;
         }
         if matches!(child.node, StmtKind::Continue) {
-            if checker
-                .settings
-                .rules
-                .enabled(&Rule::SuperfluousElseContinue)
-            {
-                checker.diagnostics.push(Diagnostic::new(
-                    violations::SuperfluousElseContinue(branch),
-                    elif_else_range(stmt, checker.locator)
-                        .unwrap_or_else(|| Range::from_located(stmt)),
-                ));
+            let diagnostic = Diagnostic::new(
+                violations::SuperfluousElseContinue { branch },
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+            );
+            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+                checker.diagnostics.push(diagnostic);
             }
             return true;
         }

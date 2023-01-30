@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedName: Model
+    UndefinedName:
+      name: Model
   location:
     row: 11
     column: 9
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: Model
+    UndefinedName:
+      name: Model
   location:
     row: 18
     column: 16
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: Model
+    UndefinedName:
+      name: Model
   location:
     row: 24
     column: 12
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName: Model
+    UndefinedName:
+      name: Model
   location:
     row: 30
     column: 10

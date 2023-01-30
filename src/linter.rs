@@ -118,7 +118,9 @@ pub fn check_path(
             Err(parse_error) => {
                 if settings.rules.enabled(&Rule::SyntaxError) {
                     diagnostics.push(Diagnostic::new(
-                        violations::SyntaxError(parse_error.error.to_string()),
+                        violations::SyntaxError {
+                            message: parse_error.error.to_string(),
+                        },
                         Range::new(parse_error.location, parse_error.location),
                     ));
                 }
@@ -149,6 +151,15 @@ pub fn check_path(
         ));
     }
 
+    // Ignore diagnostics based on per-file-ignores.
+    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
+        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;
+
+        if !ignores.is_empty() {
+            diagnostics.retain(|diagnostic| !ignores.contains(&diagnostic.kind.rule()));
+        }
+    };
+
     // Enforce `noqa` directives.
     if (matches!(noqa, flags::Noqa::Enabled) && !diagnostics.is_empty())
         || settings
@@ -164,17 +175,6 @@ pub fn check_path(
             settings,
             autofix,
         );
-    }
-
-    // Create path ignores.
-    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
-        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;
-        if !ignores.is_empty() {
-            return Ok(diagnostics
-                .into_iter()
-                .filter(|diagnostic| !ignores.contains(&diagnostic.kind.rule()))
-                .collect());
-        }
     }
 
     Ok(diagnostics)

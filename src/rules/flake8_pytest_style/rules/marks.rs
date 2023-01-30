@@ -15,11 +15,11 @@ fn pytest_mark_parentheses(
     actual: &str,
 ) {
     let mut diagnostic = Diagnostic::new(
-        violations::IncorrectMarkParenthesesStyle(
-            get_mark_name(decorator).to_string(),
-            preferred.to_string(),
-            actual.to_string(),
-        ),
+        violations::IncorrectMarkParenthesesStyle {
+            mark_name: get_mark_name(decorator).to_string(),
+            expected_parens: preferred.to_string(),
+            actual_parens: actual.to_string(),
+        },
         Range::from_located(decorator),
     );
     if checker.patch(diagnostic.kind.rule()) {
@@ -40,11 +40,8 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr) {
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Fix::replacement(
-                    String::new(),
-                    func.end_location.unwrap(),
-                    decorator.end_location.unwrap(),
-                );
+                let fix =
+                    Fix::deletion(func.end_location.unwrap(), decorator.end_location.unwrap());
                 pytest_mark_parentheses(checker, decorator, fix, "", "()");
             }
         }
