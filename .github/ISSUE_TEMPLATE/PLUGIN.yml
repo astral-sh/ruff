@@ -1,0 +1,65 @@
+name: Plugin support
+description: Suggest for ruff to support a plugin
+title: "Implement `the-name-of-the-plugin`"
+labels: ["plugin"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this plugin support request!
+        See [plugins](https://github.com/charliermarsh/ruff/issues?q=label%3Aplugin+) for existing issues tracking plugin development.
+  - type: input
+    id: name
+    attributes:
+      label: Plugin Name
+      description: What is the name of the plugin?
+      placeholder: ex. flake8-plugin-name
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Plugin URL
+      description: Where can we find the plugin?
+      placeholder: ex. https://github.com/core-developer/flake8-plugin-name
+    validations:
+      required: true
+  - type: input
+    id: code
+    attributes:
+      label: Plugin prefix code
+      description: |
+        The code prefix for the plugin. Please make sure that it does not conflict with [existing prefixes](https://github.com/charliermarsh/ruff#table-of-contents).
+        If the prefix is already taken, you are encouraged to propose an alternative.
+      placeholder: ex. CD
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: What do you find move useful about this plugin?
+      description: Any additional remarks can also go here.
+      placeholder: I'm mostly using this plugin for ...
+    validations:
+      required: false
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Are there any config options to implement?
+      description: Please list here if the plugin has any configuration options that might be helpful for ruff to implement.
+      placeholder: There are two config options ([here](..) and [here](...)), ...
+    validations:
+      required: false
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Rule checklist
+      description: | 
+        To help tracking the progress, it it helpful to keep a list of rules. The `- [ ]` is Github markdown syntax for a 
+        checklist that we can tick. Feel free to deviate from this format as you see fit. Have a look at the issues for
+        [flake8-simplify](https://github.com/charliermarsh/ruff/issues/998) or [tryceratops](https://github.com/charliermarsh/ruff/issues/2056) as reference.
+      value: |
+        - [ ] [CD001](https://github.com/core-developer/flake8-plugin-name/blob/main/docs/violations/CD001.md): The description of this rule
+        - [ ] [CD002](https://github.com/core-developer/flake8-plugin-name/blob/main/docs/violations/CD002.md): Another description
+        - [ ] [CD003](https://github.com/core-developer/flake8-plugin-name/blob/main/docs/violations/CD003.md): Yet another description
+        ...
