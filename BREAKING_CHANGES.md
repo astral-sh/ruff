@@ -32,7 +32,7 @@ ignore = ["F401"]
 Running `ruff --select F` would previously have enabled all `F` rules, apart from `F401`. Now, it
 will enable all `F` rules, including `F401`, as the command line's `--select` resets the resolution.
 
-## 0.0.237
+## 0.0.238
 
 ### `--explain`, `--clean`, and `--generate-shell-completion` are now subcommands ([#2190](https://github.com/charliermarsh/ruff/pull/2190))
 
