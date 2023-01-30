@@ -7,14 +7,20 @@ def foo(x,y,z,t,u): #Ok
 def foo(x): # Ok
     pass
 
-def foo(x,y,z,_t,_u,_v,_w,r): # OK _.* can be ignored as per --ignored-argument-names configuration
+def foo(x,y,z,_t,_u,_v,_w,r): # OK _.* are ignored
     pass
 
-def foo(x,y,z,ignored_u,unused_v,r): #OK ^ignored_|^unused_ can be ignored
+def foo(x,y,z,u=1,v=1,r=1): #Too many arguments (6/5)
     pass
 
-def foo(x,y,z,u_ignored,v_unused,r): # Too many arguments (6/5)
+def foo(x=1,y=1,z=1): #OK
     pass
 
-def foo(x,y,z,skip_u,skip_v,r): # Too many arguments (6/5)
+def foo(x,y,z,/,u,v,w): #OK
+    pass
+
+def foo(x,y,z,*,u,v,w): #OK
+    pass
+
+def foo(x,y,z,a,b,c,*,u,v,w): #Too many arguments (6/5)
     pass

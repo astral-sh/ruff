@@ -19,10 +19,10 @@ expression: diagnostics
       c_args: 6
       max_args: 5
   location:
-    row: 16
+    row: 13
     column: 0
   end_location:
-    row: 17
+    row: 14
     column: 8
   fix: ~
   parent: ~
@@ -31,10 +31,10 @@ expression: diagnostics
       c_args: 6
       max_args: 5
   location:
-    row: 19
+    row: 25
     column: 0
   end_location:
-    row: 20
+    row: 26
     column: 8
   fix: ~
   parent: ~

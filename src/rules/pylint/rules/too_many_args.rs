@@ -24,9 +24,9 @@ impl Violation for TooManyArgs {
 
 /// PLR0913
 pub fn too_many_args(checker: &mut Checker, args: &Arguments, stmt: &Stmt) {
-    let re = &checker.settings.pylint.ignored_argument_names;
+    let re = &checker.settings.dummy_variable_rgx;
 
-    let filtered_args = args.args.iter().filter(|x| !re.0.is_match(&x.node.arg));
+    let filtered_args = args.args.iter().filter(|x| !re.is_match(&x.node.arg));
     let count = filtered_args.count();
     if count > checker.settings.pylint.max_args {
         checker.diagnostics.push(Diagnostic::new(

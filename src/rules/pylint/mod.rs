@@ -6,6 +6,7 @@ pub mod settings;
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use regex::Regex;
     use std::path::Path;
     use test_case::test_case;
 
@@ -85,10 +86,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pylint/too_many_args.py"),
             &Settings {
-                pylint: pylint::settings::Settings {
-                    ignored_argument_names: r"skip_.*".try_into().unwrap(),
-                    ..pylint::settings::Settings::default()
-                },
+                dummy_variable_rgx: Regex::new(r"skip_.*").unwrap().into(),
                 ..Settings::for_rules(vec![Rule::TooManyArgs])
             },
         )?;

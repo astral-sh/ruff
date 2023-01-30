@@ -1,6 +1,5 @@
 //! Settings for the `pylint` plugin.
 
-use super::helpers::HashRegex;
 use anyhow::anyhow;
 use ruff_macros::ConfigurationOptions;
 use rustpython_ast::Constant;
@@ -57,20 +56,12 @@ pub struct Options {
     #[option(default = r"5", value_type = "usize", example = r"max_args = 5")]
     /// Maximum number of arguments for function / method.
     pub max_args: Option<usize>,
-    #[option(
-        default = r"^_.*|^ignored_|^unused_",
-        value_type = "String",
-        example = r"ignored-argument-names = skip_.*"
-    )]
-    /// Argument names that match this expression will be ignored.
-    pub ignored_argument_names: Option<String>,
 }
 
 #[derive(Debug, Hash)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
     pub max_args: usize,
-    pub ignored_argument_names: HashRegex,
 }
 
 impl Default for Settings {
@@ -78,7 +69,6 @@ impl Default for Settings {
         Self {
             allow_magic_value_types: vec![ConstantType::Str],
             max_args: 5,
-            ignored_argument_names: r"^_.*|^ignored_|^unused_".try_into().unwrap(),
         }
     }
 }
@@ -92,14 +82,6 @@ impl From<Options> for Settings {
                 .allow_magic_value_types
                 .unwrap_or(settings_default.allow_magic_value_types),
             max_args: options.max_args.unwrap_or(settings_default.max_args),
-            ignored_argument_names: options.ignored_argument_names.map_or(
-                settings_default.ignored_argument_names.clone(),
-                |x| {
-                    x.as_str()
-                        .try_into()
-                        .unwrap_or(settings_default.ignored_argument_names)
-                },
-            ),
         }
     }
 }
@@ -109,7 +91,6 @@ impl From<Settings> for Options {
         Self {
             allow_magic_value_types: Some(settings.allow_magic_value_types),
             max_args: Some(settings.max_args),
-            ignored_argument_names: Some(settings.ignored_argument_names.0.to_string()),
         }
     }
 }
