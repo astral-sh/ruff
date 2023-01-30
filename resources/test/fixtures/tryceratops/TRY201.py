@@ -35,6 +35,16 @@ def still_good():
         raise
 
 
+def still_actually_good():
+    try:
+        process()
+    except MyException as e:
+        try:
+            pass
+        except TypeError:
+            raise e
+
+
 def bad_that_needs_recursion():
     try:
         process()
