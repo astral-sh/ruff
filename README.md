@@ -3692,23 +3692,6 @@ allow-magic-value-types = ["int"]
 
 ---
 
-#### [`ignored-argument-names`](#ignored-argument-names)
-
-Argument names that match this expression will be ignored.
-
-**Default value**: `^_.*|^ignored_|^unused_`
-
-**Type**: `String`
-
-**Example usage**:
-
-```toml
-[tool.ruff.pylint]
-ignored-argument-names = skip_.*
-```
-
----
-
 #### [`max-args`](#max-args)
 
 Maximum number of arguments for function / method.
