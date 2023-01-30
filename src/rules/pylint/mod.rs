@@ -64,6 +64,7 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+
     #[test]
     fn max_args() -> Result<()> {
         let diagnostics = test_path(
@@ -79,8 +80,9 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+
     #[test]
-    fn ignore_arg_names() -> Result<()> {
+    fn max_args_with_dummy_variables() -> Result<()> {
         let diagnostics = test_path(
             Path::new("./resources/test/fixtures/pylint/too_many_args_params.py"),
             &Settings {

@@ -7,10 +7,10 @@ expression: diagnostics
       c_args: 6
       max_args: 5
   location:
-    row: 4
+    row: 9
     column: 0
   end_location:
-    row: 5
+    row: 10
     column: 8
   fix: ~
   parent: ~

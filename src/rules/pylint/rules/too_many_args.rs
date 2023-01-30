@@ -18,7 +18,7 @@ impl Violation for TooManyArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TooManyArgs { c_args, max_args } = self;
-        format!("Too many arguments ({c_args}/{max_args})")
+        format!("Too many arguments to function call ({c_args}/{max_args})")
     }
 }
 

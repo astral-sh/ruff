@@ -1296,7 +1296,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLR0133 | constant-comparison | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
 | PLR0206 | property-with-parameters | Cannot have defined parameters for properties |  |
 | PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias |  |
-| PLR0913 | too-many-args | Too many arguments ({c_args}/{max_args}) |  |
+| PLR0913 | too-many-args | Too many arguments to function call ({c_args}/{max_args}) |  |
 | PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
 | PLR1722 | use-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
 | PLR2004 | magic-value-comparison | Magic value used in comparison, consider replacing {value} with a constant variable |  |
@@ -3752,7 +3752,7 @@ convention = "google"
 
 #### [`allow-magic-value-types`](#allow-magic-value-types)
 
-Constant types to ignore when used as "magic values".
+Constant types to ignore when used as "magic values" (see: `PLR2004`).
 
 **Default value**: `["str"]`
 
@@ -3769,7 +3769,7 @@ allow-magic-value-types = ["int"]
 
 #### [`max-args`](#max-args)
 
-Maximum number of arguments for function / method.
+Maximum number of arguments allowed for a function definition (see: `PLR0913`).
 
 **Default value**: `5`
 

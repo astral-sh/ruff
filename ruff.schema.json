@@ -1164,7 +1164,7 @@
       "type": "object",
       "properties": {
         "allow-magic-value-types": {
-          "description": "Constant types to ignore when used as \"magic values\".",
+          "description": "Constant types to ignore when used as \"magic values\" (see: `PLR2004`).",
           "type": [
             "array",
             "null"
@@ -1174,7 +1174,7 @@
           }
         },
         "max-args": {
-          "description": "Maximum number of arguments for function / method.",
+          "description": "Maximum number of arguments allowed for a function definition (see: `PLR0913`).",
           "type": [
             "integer",
             "null"
