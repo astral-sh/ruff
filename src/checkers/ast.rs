@@ -1074,6 +1074,7 @@ where
                         stmt,
                         names,
                         module.as_ref().map(String::as_str),
+                        level.as_ref(),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::UnnecessaryBuiltinImport) {

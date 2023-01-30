@@ -813,7 +813,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP032 | f-string | Use f-string instead of `format` call | 🛠 |
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
-| UP035 | import-replacements | Replace old formatting imports with their new versions | 🛠 |
+| UP035 | import-replacements | Import `{existing}` from `{replacement}` | 🛠 |
 
 ### flake8-2020 (YTT)
 

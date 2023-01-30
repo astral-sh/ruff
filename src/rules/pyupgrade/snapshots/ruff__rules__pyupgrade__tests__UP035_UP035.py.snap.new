@@ -1,6 +1,6 @@
 ---
 source: src/rules/pyupgrade/mod.rs
-assertion_line: 71
+assertion_line: 69
 expression: diagnostics
 ---
 - kind:
@@ -108,7 +108,7 @@ expression: diagnostics
 - kind:
     ImportReplacements:
       existing: collections
-      replacement: "from collections import (\n    Counter\n )\nfrom collections.abc import (\n    Mapping\n )"
+      replacement: "from collections import (\n    Counter,\n)\nfrom collections.abc import (\n    Mapping,\n)"
   location:
     row: 12
     column: 0
@@ -118,11 +118,11 @@ expression: diagnostics
   fix:
     content:
       - from collections import (
-      - "    Counter"
-      - " )"
+      - "    Counter,"
+      - )
       - from collections.abc import (
-      - "    Mapping"
-      - " )"
+      - "    Mapping,"
+      - )
     location:
       row: 12
       column: 0
@@ -133,7 +133,7 @@ expression: diagnostics
 - kind:
     ImportReplacements:
       existing: collections
-      replacement: "from collections import (\n    Counter\n )\nfrom collections.abc import (\n    Mapping\n )"
+      replacement: "from collections import (\n    Counter,\n)\nfrom collections.abc import (\n    Mapping,\n)"
   location:
     row: 15
     column: 0
@@ -143,11 +143,11 @@ expression: diagnostics
   fix:
     content:
       - from collections import (
-      - "    Counter"
-      - " )"
+      - "    Counter,"
+      - )
       - from collections.abc import (
-      - "    Mapping"
-      - " )"
+      - "    Mapping,"
+      - )
     location:
       row: 15
       column: 0
@@ -178,44 +178,23 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      existing: six.moves
-      replacement: "from six.moves import getcwd\nfrom io import StringIO"
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 20
-    column: 38
-  fix:
-    content:
-      - from six.moves import getcwd
-      - from io import StringIO
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 20
-      column: 38
-  parent: ~
-- kind:
-    ImportReplacements:
       existing: collections
       replacement: "from collections import Counter\nfrom collections.abc import Mapping as mapping"
   location:
-    row: 22
+    row: 20
     column: 0
   end_location:
-    row: 22
+    row: 20
     column: 51
   fix:
     content:
       - from collections import Counter
       - from collections.abc import Mapping as mapping
     location:
-      row: 22
+      row: 20
       column: 0
     end_location:
-      row: 22
+      row: 20
       column: 51
   parent: ~
 - kind:
@@ -223,20 +202,20 @@ expression: diagnostics
       existing: collections
       replacement: "from collections import Counter\n    from collections.abc import Mapping"
   location:
-    row: 25
+    row: 23
     column: 4
   end_location:
-    row: 25
+    row: 23
     column: 44
   fix:
     content:
       - from collections import Counter
       - "    from collections.abc import Mapping"
     location:
-      row: 25
+      row: 23
       column: 4
     end_location:
-      row: 25
+      row: 23
       column: 44
   parent: ~
 - kind:
@@ -244,20 +223,20 @@ expression: diagnostics
       existing: collections
       replacement: "from collections import Counter\n    from collections.abc import Mapping"
   location:
-    row: 30
+    row: 28
     column: 4
   end_location:
-    row: 30
+    row: 28
     column: 44
   fix:
     content:
       - from collections import Counter
       - "    from collections.abc import Mapping"
     location:
-      row: 30
+      row: 28
       column: 4
     end_location:
-      row: 30
+      row: 28
       column: 44
   parent: ~
 - kind:
@@ -265,19 +244,19 @@ expression: diagnostics
       existing: collections
       replacement: from collections.abc import Mapping
   location:
-    row: 32
+    row: 30
     column: 9
   end_location:
-    row: 32
+    row: 30
     column: 40
   fix:
     content:
       - from collections.abc import Mapping
     location:
-      row: 32
+      row: 30
       column: 9
     end_location:
-      row: 32
+      row: 30
       column: 40
   parent: ~
 - kind:
@@ -285,47 +264,47 @@ expression: diagnostics
       existing: collections
       replacement: "from collections import Counter\nfrom collections.abc import Mapping"
   location:
-    row: 35
+    row: 33
     column: 0
   end_location:
-    row: 35
+    row: 33
     column: 40
   fix:
     content:
       - from collections import Counter
       - from collections.abc import Mapping
     location:
-      row: 35
+      row: 33
       column: 0
     end_location:
-      row: 35
+      row: 33
       column: 40
   parent: ~
 - kind:
     ImportReplacements:
       existing: collections
-      replacement: "from collections import (\n        Bad,\n        Good\n     )\n    from collections.abc import (\n        Mapping,\n        Callable\n     )"
+      replacement: "from collections import (\n        Bad,\n        Good,\n    )\n    from collections.abc import (\n        Mapping,\n        Callable,\n    )"
   location:
-    row: 39
+    row: 37
     column: 4
   end_location:
-    row: 44
+    row: 42
     column: 5
   fix:
     content:
       - from collections import (
       - "        Bad,"
-      - "        Good"
-      - "     )"
+      - "        Good,"
+      - "    )"
       - "    from collections.abc import ("
       - "        Mapping,"
-      - "        Callable"
-      - "     )"
+      - "        Callable,"
+      - "    )"
     location:
-      row: 39
+      row: 37
       column: 4
     end_location:
-      row: 44
+      row: 42
       column: 5
   parent: ~
 

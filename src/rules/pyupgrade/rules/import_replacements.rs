@@ -7,8 +7,9 @@ use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::rules::pyupgrade::helpers::{get_fromimport_str, ImportFormatting};
+use crate::rules::pyupgrade::helpers::{format_import_from, ImportFormatting};
 use crate::settings::types::PythonVersion;
+use crate::source_code::Stylist;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
@@ -29,7 +30,7 @@ impl AlwaysAutofixableViolation for ImportReplacements {
 
     fn autofix_title(&self) -> String {
         let ImportReplacements {
-            existing,
+            existing: _,
             replacement,
         } = self;
         format!("Replace with `{replacement}`")
@@ -211,37 +212,32 @@ struct FixImports<'a> {
     module: &'a str,
     multi_line: bool,
     names: &'a [AliasData],
-    // This is the indent level of the first named import
-    indent: &'a str,
-    // This is the indent for the parentheses at the end of a multi-line statement
-    short_indent: &'a str,
-    // This is the indent of the actual import statement
-    starting_indent: &'a str,
+    // The indent level of the first named import.
+    member_indent: &'a str,
+    // The indent of the import statement.
+    stmt_indent: &'a str,
     version: PythonVersion,
+    stylist: &'a Stylist<'a>,
 }
 
 impl<'a> FixImports<'a> {
     fn new(
         module: &'a str,
-        multi_line: bool,
         names: &'a [AliasData],
-        indent: &'a str,
+        multi_line: bool,
+        member_indent: &'a str,
+        stmt_indent: &'a str,
         version: PythonVersion,
-        starting_indent: &'a str,
+        stylist: &'a Stylist,
     ) -> Self {
-        let short_indent = if indent.len() > 3 {
-            &indent[3..]
-        } else {
-            indent
-        };
         Self {
             module,
             multi_line,
             names,
-            indent,
-            short_indent,
-            starting_indent,
+            member_indent,
+            stmt_indent,
             version,
+            stylist,
         }
     }
 
@@ -315,35 +311,38 @@ impl<'a> FixImports<'a> {
 
     /// Converts the string of imports into new one
     fn create_new_str(&self, matches: &[&str], replace: &str) -> Option<String> {
-        let (matching_names, unmatching_names) = self.get_import_lists(matches);
-        let unmatching = get_fromimport_str(
-            &unmatching_names,
-            self.module,
-            self.multi_line,
-            self.indent,
-            self.short_indent,
-        );
-        let matching = get_fromimport_str(
+        let (matching_names, unmatching_names) = self.split_imports(matches);
+        if matching_names.is_empty() {
+            return None;
+        }
+
+        let matching = format_import_from(
             &matching_names,
             replace,
             self.multi_line,
-            self.indent,
-            self.short_indent,
+            self.member_indent,
+            self.stmt_indent,
+            self.stylist,
         );
-        // We don't replace if there is unmatching, because then we don't need
-        // to refactor
-        if !unmatching.is_empty() && !matching.is_empty() {
-            Some(format!("{unmatching}\n{}{matching}", self.starting_indent))
-        } else if !matching.is_empty() {
-            Some(matching)
-        } else {
-            None
+
+        if unmatching_names.is_empty() {
+            return Some(matching);
         }
+
+        let unmatching = format_import_from(
+            &unmatching_names,
+            self.module,
+            self.multi_line,
+            self.member_indent,
+            self.stmt_indent,
+            self.stylist,
+        );
+        Some(format!("{unmatching}\n{}{matching}", self.stmt_indent))
     }
 
     /// Returns a list of imports that does and does not have a match in the
     /// given list of matches
-    fn get_import_lists(&self, matches: &[&str]) -> (Vec<AliasData>, Vec<AliasData>) {
+    fn split_imports(&self, matches: &[&str]) -> (Vec<AliasData>, Vec<AliasData>) {
         let mut unmatching_names: Vec<AliasData> = vec![];
         let mut matching_names: Vec<AliasData> = vec![];
 
@@ -364,49 +363,45 @@ pub fn import_replacements(
     stmt: &Stmt,
     names: &[Alias],
     module: Option<&str>,
+    level: Option<&usize>,
 ) {
-    // Pyupgrade only works with import_from statements, so this linter does that as
-    // well
+    // Avoid relative imports.
+    if level.map_or(false, |level| *level > 0) {
+        return;
+    }
     let Some(module) = module else {
         return;
     };
+
     if !RELEVANT_MODULES.contains(&module) {
         return;
     }
 
-    let mut clean_names: Vec<AliasData> = vec![];
-    for name in names {
-        clean_names.push(name.node.clone());
-    }
-    let module_text = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(stmt));
-    let formatting = ImportFormatting::new(checker.locator, stmt, names);
+    let formatting = ImportFormatting::new(checker.locator, checker.stylist, stmt, names);
+    let names: Vec<AliasData> = names.iter().map(|alias| alias.node.clone()).collect();
     let fixer = FixImports::new(
         module,
+        &names,
         formatting.multi_line,
-        &clean_names,
-        &formatting.indent,
+        &formatting.member_indent,
+        &formatting.stmt_indent,
         checker.settings.target_version,
-        &formatting.start_indent,
+        checker.stylist,
     );
-    let Some(clean_result) = fixer.check_replacement() else {
+    let Some(content) = fixer.check_replacement() else {
         return;
     };
-    if clean_result == module_text {
-        return;
-    }
-    let range = Range::from_located(stmt);
+
     let mut diagnostic = Diagnostic::new(
         ImportReplacements {
             existing: module.to_string(),
-            replacement: clean_result.to_string(),
+            replacement: content.to_string(),
         },
-        range,
+        Range::from_located(stmt),
     );
     if checker.patch(&Rule::ImportReplacements) {
         diagnostic.amend(Fix::replacement(
-            clean_result,
+            content,
             stmt.location,
             stmt.end_location.unwrap(),
         ));

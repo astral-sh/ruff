@@ -1,10 +1,10 @@
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
-use rustpython_ast::{AliasData, Located};
+use rustpython_ast::{Alias, AliasData, Located};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 
 static CURLY_BRACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\\N\{[^}]+})|([{}])").unwrap());
 
@@ -27,76 +27,75 @@ pub fn curly_escape(text: &str) -> String {
 }
 
 /// Converts a list of names and a module into an `import from`-style import.
-pub fn get_fromimport_str(
+pub fn format_import_from(
     names: &[AliasData],
     module: &str,
     multi_line: bool,
     indent: &str,
-    short_indent: &str,
+    start_indent: &str,
+    stylist: &Stylist,
 ) -> String {
-    if names.is_empty() {
-        return String::new();
-    }
-    let after_comma = if multi_line { '\n' } else { ' ' };
-    let start_imps = if multi_line { "(\n" } else { "" };
-    let after_imps = if multi_line {
-        format!("\n{short_indent})")
+    // Construct the whitespace strings.
+    let line_ending = stylist.line_ending().as_str();
+    let after_comma = if multi_line { line_ending } else { " " };
+    let before_imports = if multi_line {
+        format!("({line_ending}")
     } else {
-        String::new()
+        "".to_string()
     };
-    let mut full_names: Vec<String> = vec![];
-    for name in names {
-        let asname_str = match &name.asname {
-            Some(item) => format!(" as {item}"),
-            None => String::new(),
-        };
-        let final_string = format!("{indent}{}{asname_str}", name.name);
-        full_names.push(final_string);
-    }
+    let after_imports = if multi_line {
+        format!("{line_ending}{start_indent})")
+    } else {
+        "".to_string()
+    };
+
+    // Generate the formatted names.
+    let full_names = {
+        let full_names: Vec<String> = names
+            .iter()
+            .map(|name| match &name.asname {
+                Some(asname) => format!("{indent}{} as {asname}", name.name),
+                None => format!("{indent}{}", name.name),
+            })
+            .collect();
+        let mut full_names = full_names.join(&format!(",{}", after_comma));
+        if multi_line {
+            full_names.push(',');
+        }
+        full_names
+    };
+
     format!(
         "from {} import {}{}{}",
-        module,
-        start_imps,
-        full_names.join(format!(",{after_comma}").as_str()),
-        after_imps
+        module, before_imports, full_names, after_imports
     )
 }
 
-pub fn clean_indent<T>(locator: &Locator, located: &Located<T>) -> String {
-    match indentation(locator, located) {
-        // This is an opinionated way of formatting import statements.
-        None => "    ".to_string(),
-        Some(item) => item.to_string(),
-    }
-}
-
-pub struct ImportFormatting {
+pub struct ImportFormatting<'a> {
     pub multi_line: bool,
-    pub indent: String,
-    pub short_indent: String,
-    pub start_indent: String,
+    pub member_indent: &'a str,
+    pub stmt_indent: &'a str,
 }
 
-impl ImportFormatting {
-    pub fn new<T>(locator: &Locator, stmt: &Located<T>, args: &[Located<AliasData>]) -> Self {
+impl<'a> ImportFormatting<'a> {
+    pub fn new<T>(
+        locator: &'a Locator<'a>,
+        stylist: &'a Stylist<'a>,
+        stmt: &'a Located<T>,
+        args: &'a [Alias],
+    ) -> Self {
         let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-        let multi_line = module_text.contains('\n');
-        let start_indent = clean_indent(locator, stmt);
-        let indent = match args.get(0) {
-            None => panic!("No args for import"),
-            Some(item) if multi_line => clean_indent(locator, item),
-            Some(_) => String::new(),
-        };
-        let short_indent = if indent.len() > 3 {
-            indent[3..].to_string()
+        let multi_line = module_text.contains(stylist.line_ending().as_str());
+        let stmt_indent = indentation(locator, stmt).unwrap_or(stylist.indentation().as_str());
+        let member_indent = if multi_line {
+            indentation(locator, &args[0]).unwrap_or(stylist.indentation().as_str())
         } else {
-            indent.to_string()
+            ""
         };
         Self {
             multi_line,
-            indent,
-            short_indent,
-            start_indent,
+            member_indent,
+            stmt_indent,
         }
     }
 }
