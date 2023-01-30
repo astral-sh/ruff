@@ -2929,7 +2929,7 @@ allow-multiline = false
 The conventional aliases for imports. These aliases can be extended by
 the `extend_aliases` option.
 
-**Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
+**Default value**: `{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}`
 
 **Type**: `FxHashMap<String, String>`
 
@@ -2944,6 +2944,7 @@ altair = "alt"
 numpy = "np"
 pandas = "pd"
 seaborn = "sns"
+scripy = "sp"
 ```
 
 ---
