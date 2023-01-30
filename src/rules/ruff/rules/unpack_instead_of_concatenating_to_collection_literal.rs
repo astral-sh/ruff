@@ -1,6 +1,6 @@
 use rustpython_ast::{Expr, ExprContext, ExprKind, Operator};
 
-use crate::ast::helpers::{create_expr, has_comments_in, unparse_expr};
+use crate::ast::helpers::{create_expr, has_comments, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -87,7 +87,7 @@ pub fn unpack_instead_of_concatenating_to_collection_literal(checker: &mut Check
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments_in(Range::from_located(expr), checker.locator) {
+        if !has_comments(expr, checker.locator) {
             diagnostic.amend(Fix::replacement(
                 new_expr_string,
                 expr.location,

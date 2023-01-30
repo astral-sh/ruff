@@ -93,6 +93,7 @@ ruff_macros::define_rule_mapping!(
     PLR2004 => violations::MagicValueComparison,
     PLW0120 => violations::UselessElseOnLoop,
     PLW0602 => violations::GlobalVariableNotAssigned,
+    PLR0913 => rules::pylint::rules::TooManyArgs,
     // flake8-builtins
     A001 => violations::BuiltinVariableShadowing,
     A002 => violations::BuiltinArgumentShadowing,
