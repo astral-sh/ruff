@@ -742,18 +742,18 @@ impl Diagnostic {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     (
-        Rule::OneBlankLineBeforeClass,
         Rule::NoBlankLineBeforeClass,
+        Rule::OneBlankLineBeforeClass,
         "`one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
-         incompatible. Consider ignoring `one-blank-line-before-class`.",
+         incompatible. Ignoring `one-blank-line-before-class`.",
     ),
     (
         Rule::MultiLineSummaryFirstLine,
         Rule::MultiLineSummarySecondLine,
         "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
-         incompatible. Consider ignoring one.",
+         incompatible. Ignoring `multi-line-summary-second-line`.",
     ),
 ];
 
