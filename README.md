@@ -1054,7 +1054,7 @@ For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-impli
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | ISC001 | single-line-implicit-string-concatenation | Implicitly concatenated string literals on one line |  |
-| ISC002 | multi-line-implicit-string-concatenation | Implicitly concatenated string literals over continuation line |  |
+| ISC002 | multi-line-implicit-string-concatenation | Implicitly concatenated string literals over multiple lines |  |
 | ISC003 | explicit-string-concatenation | Explicitly concatenated string should be implicitly concatenated |  |
 
 ### flake8-import-conventions (ICN)
@@ -2932,6 +2932,11 @@ Whether to allow implicit string concatenations for multiline strings.
 By default, implicit concatenations of multiline strings are
 allowed (but continuation lines, delimited with a backslash, are
 prohibited).
+
+Note that setting `allow-multiline = false` should typically be coupled
+with disabling `explicit-string-concatenation` (`ISC003`). Otherwise,
+both explicit and implicit multiline string concatenations will be seen
+as violations.
 
 **Default value**: `true`
 

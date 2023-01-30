@@ -1855,7 +1855,7 @@ define_violation!(
 impl Violation for MultiLineImplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over continuation line")
+        format!("Implicitly concatenated string literals over multiple lines")
     }
 }
 
