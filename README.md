@@ -405,7 +405,7 @@ Or `ruff help check` for more on the linting command:
 
 <!-- Begin auto-generated subcommand help. -->
 ```
-Run Ruff on the given files or directories
+Run Ruff on the given files or directories (default)
 
 Usage: ruff check [OPTIONS] [FILES]...
 
@@ -469,6 +469,11 @@ Miscellaneous:
           Exit with status code "0", even upon detecting lint violations
       --update-check
           Enable or disable automatic update checks
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print lint violations, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
 ```
 <!-- End auto-generated subcommand help. -->
 
