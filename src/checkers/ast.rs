@@ -1069,9 +1069,6 @@ where
                 if self.settings.rules.enabled(&Rule::ImportReplacements) {
                     pyupgrade::rules::import_replacements(self, stmt, names, module);
                 }
-                if self.settings.rules.enabled(&Rule::ImportReplacementsSix) {
-                    pyupgrade::rules::import_replacements_six(self, stmt, module, names);
-                }
                 if self.settings.rules.enabled(&Rule::UnnecessaryBuiltinImport) {
                     if let Some(module) = module.as_deref() {
                         pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
@@ -2092,10 +2089,6 @@ where
                     pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
 
-                if self.settings.rules.enabled(&Rule::RemoveSixCompat) {
-                    pyupgrade::rules::remove_six_compat(self, expr);
-                }
-
                 if self.settings.rules.enabled(&Rule::DatetimeTimezoneUTC)
                     && self.settings.target_version >= PythonVersion::Py311
                 {
@@ -2228,9 +2221,6 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::RedundantOpenModes) {
                     pyupgrade::rules::redundant_open_modes(self, expr);
-                }
-                if self.settings.rules.enabled(&Rule::RemoveSixCompat) {
-                    pyupgrade::rules::remove_six_compat(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::NativeLiterals) {
                     pyupgrade::rules::native_literals(self, expr, func, args, keywords);

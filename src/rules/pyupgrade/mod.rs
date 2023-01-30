@@ -35,7 +35,6 @@ mod tests {
     #[test_case(Rule::ConvertTypedDictFunctionalToClass, Path::new("UP013.py"); "UP013")]
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"); "UP014")]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"); "UP015")]
-    #[test_case(Rule::RemoveSixCompat, Path::new("UP016.py"); "UP016")]
     #[test_case(Rule::NativeLiterals, Path::new("UP018.py"); "UP018")]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"); "UP019")]
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"); "UP021")]
@@ -59,7 +58,6 @@ mod tests {
     #[test_case(Rule::FunctoolsCache, Path::new("UP033.py"); "UP033")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]
     #[test_case(Rule::ImportReplacements, Path::new("UP035.py"); "UP035")]
-    #[test_case(Rule::ImportReplacementsSix, Path::new("UP036.py"); "UP036")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
