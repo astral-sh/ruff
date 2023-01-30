@@ -690,12 +690,12 @@ where
     fn consume_normal(&mut self) -> Result<(), LexicalError> {
         // Check if we have some character:
         if let Some(c) = self.window[0] {
-               if self.is_identifier_start(c) {
-                    let identifier = self.lex_identifier()?;
-                    self.emit(identifier);
-               } else {
-                    self.consume_character(c)?;
-               }
+            if self.is_identifier_start(c) {
+                let identifier = self.lex_identifier()?;
+                self.emit(identifier);
+            } else {
+                self.consume_character(c)?;
+            }
         } else {
             // We reached end of file.
             let tok_pos = self.get_pos();
@@ -1039,10 +1039,7 @@ where
                 }
             }
             ',' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                let tok_end = self.get_pos();
-                self.emit((tok_start, Tok::Comma, tok_end));
+                self.eat_single_char(Tok::Comma);
             }
             '.' => {
                 if let Some('0'..='9') = self.window[1] {
@@ -1102,7 +1099,7 @@ where
                 }
             }
             _ => {
-                 if is_emoji_presentation(c) {
+                if is_emoji_presentation(c) {
                     let tok_start = self.get_pos();
                     self.next_char();
                     let tok_end = self.get_pos();
