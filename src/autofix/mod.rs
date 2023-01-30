@@ -27,7 +27,7 @@ fn apply_fixes<'a>(
     fixes: impl Iterator<Item = &'a Fix>,
     locator: &'a Locator<'a>,
 ) -> (String, usize) {
-    let mut output = String::new();
+    let mut output = String::with_capacity(locator.len());
     let mut last_pos: Location = Location::new(1, 0);
     let mut applied: BTreeSet<&Fix> = BTreeSet::default();
     let mut num_fixed: usize = 0;
@@ -68,7 +68,7 @@ fn apply_fixes<'a>(
 
 /// Apply a single fix.
 pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
-    let mut output = String::new();
+    let mut output = String::with_capacity(locator.len());
 
     // Add all contents from `last_pos` to `fix.location`.
     let slice = locator.slice_source_code_range(&Range::new(Location::new(1, 0), fix.location));
