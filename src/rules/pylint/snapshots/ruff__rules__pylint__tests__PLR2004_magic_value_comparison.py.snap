@@ -35,15 +35,4 @@ expression: diagnostics
     column: 40
   fix: ~
   parent: ~
-- kind:
-    MagicValueComparison:
-      value: "b'something'"
-  location:
-    row: 65
-    column: 17
-  end_location:
-    row: 65
-    column: 29
-  fix: ~
-  parent: ~
 
