@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-def f(x: 'queue.Queue[int]', y: """str""", z: int) -> C:
-    print(x)
+def foo(var: "MyClass") -> MyClass:
+    x: "MyClass"
 
-x: """str""" = "hello"
+def foo (*, inplace: "bool"):
+    pass
+
+def foo(*args: "str", **kwargs: "int"):
+    pass
+
+x: Tuple["MyClass"]
+
+x: Callable[["MyClass"], None]
