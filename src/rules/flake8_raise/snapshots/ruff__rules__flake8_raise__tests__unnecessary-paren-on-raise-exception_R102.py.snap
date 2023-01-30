@@ -1,0 +1,25 @@
+---
+source: src/rules/flake8_raise/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryParenOnRaiseException: ~
+  location:
+    row: 4
+    column: 10
+  end_location:
+    row: 4
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryParenOnRaiseException: ~
+  location:
+    row: 11
+    column: 6
+  end_location:
+    row: 11
+    column: 17
+  fix: ~
+  parent: ~
+
