@@ -4,7 +4,7 @@ use std::iter;
 use itertools::Either::{Left, Right};
 use rustpython_ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use crate::ast::helpers::{contains_effect, create_expr, has_comments_in, unparse_expr};
+use crate::ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -191,7 +191,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
 
         // Avoid removing comments.
-        if has_comments_in(Range::from_located(expr), checker.locator) {
+        if has_comments(expr, checker.locator) {
             continue;
         }
 
