@@ -45,7 +45,7 @@ impl TryFrom<&Constant> for ConstantType {
 )]
 pub struct Options {
     #[option(
-        default = r#"["str"]"#,
+        default = r#"["str", "bytes"]"#,
         value_type = "Vec<ConstantType>",
         example = r#"
             allow-magic-value-types = ["int"]
@@ -67,7 +67,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            allow_magic_value_types: vec![ConstantType::Str],
+            allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
             max_args: 5,
         }
     }

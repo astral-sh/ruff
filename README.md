@@ -3778,7 +3778,7 @@ convention = "google"
 
 Constant types to ignore when used as "magic values" (see: `PLR2004`).
 
-**Default value**: `["str"]`
+**Default value**: `["str", "bytes"]`
 
 **Type**: `Vec<ConstantType>`
 
