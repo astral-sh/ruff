@@ -91,3 +91,10 @@ if True:
         b = cccccccccccccccccccccccccccccccccccc
     else:
         b = ddddddddddddddddddddddddddddddddddddd
+
+
+# OK (trailing comments)
+if True:
+    exitcode = 0
+else:
+    exitcode = 1  # Trailing comment
