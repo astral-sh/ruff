@@ -39,7 +39,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>)
         #[allow(clippy::or_fun_call)]
         table_out.push_str(&format!(
             "| {} | {} | {} | {} |",
-            rule.code(),
+            rule.noqa_code(),
             rule.explanation()
                 .is_some()
                 .then_some(format_args!("[{rule_name}]({URL_PREFIX}/{rule_name}/)",))

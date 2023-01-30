@@ -106,7 +106,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
                 match self { #rule_autofixable_match_arms }
             }
 
-            pub fn code(&self) -> &'static str {
+            pub fn noqa_code(&self) -> &'static str {
                 match self { #rule_code_match_arms }
             }
 

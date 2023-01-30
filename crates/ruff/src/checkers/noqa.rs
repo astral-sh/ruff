@@ -55,13 +55,13 @@ pub fn check_noqa(
                 });
                 match noqa {
                     (Directive::All(..), matches) => {
-                        matches.push(diagnostic.kind.rule().code());
+                        matches.push(diagnostic.kind.rule().noqa_code());
                         ignored.push(index);
                         continue;
                     }
                     (Directive::Codes(.., codes), matches) => {
                         if noqa::includes(diagnostic.kind.rule(), codes) {
-                            matches.push(diagnostic.kind.rule().code());
+                            matches.push(diagnostic.kind.rule().noqa_code());
                             ignored.push(index);
                             continue;
                         }
@@ -82,12 +82,12 @@ pub fn check_noqa(
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![]));
             match noqa {
                 (Directive::All(..), matches) => {
-                    matches.push(diagnostic.kind.rule().code());
+                    matches.push(diagnostic.kind.rule().noqa_code());
                     ignored.push(index);
                 }
                 (Directive::Codes(.., codes), matches) => {
                     if noqa::includes(diagnostic.kind.rule(), codes) {
-                        matches.push(diagnostic.kind.rule().code());
+                        matches.push(diagnostic.kind.rule().noqa_code());
                         ignored.push(index);
                     }
                 }
@@ -128,7 +128,7 @@ pub fn check_noqa(
                     let mut self_ignore = false;
                     for code in codes {
                         let code = get_redirect_target(code).unwrap_or(code);
-                        if code == Rule::UnusedNOQA.code() {
+                        if code == Rule::UnusedNOQA.noqa_code() {
                             self_ignore = true;
                             break;
                         }

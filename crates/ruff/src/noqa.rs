@@ -72,7 +72,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
 pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
-    let needle: &str = needle.code();
+    let needle: &str = needle.noqa_code();
     haystack
         .iter()
         .any(|candidate| needle == get_redirect_target(candidate).unwrap_or(candidate))
@@ -205,7 +205,7 @@ fn add_noqa_inner(
                         output.push_str("  # noqa: ");
 
                         // Add codes.
-                        let codes: Vec<&str> = rules.iter().map(|r| r.code()).collect();
+                        let codes: Vec<&str> = rules.iter().map(|r| r.noqa_code()).collect();
                         let suffix = codes.join(", ");
                         output.push_str(&suffix);
                         output.push_str(line_ending);
@@ -230,7 +230,7 @@ fn add_noqa_inner(
                         // Add codes.
                         let codes: Vec<&str> = rules
                             .iter()
-                            .map(|r| r.code())
+                            .map(|r| r.noqa_code())
                             .chain(existing.into_iter())
                             .sorted_unstable()
                             .collect();
