@@ -210,12 +210,8 @@ fn has_match(set1: &[&str], set2: &[AliasData]) -> bool {
 
 struct FixImports<'a> {
     module: &'a str,
-    multi_line: bool,
     names: &'a [AliasData],
-    // The indent level of the first named import.
-    member_indent: &'a str,
-    // The indent of the import statement.
-    stmt_indent: &'a str,
+    formatting: ImportFormatting<'a>,
     version: PythonVersion,
     stylist: &'a Stylist<'a>,
 }
@@ -224,18 +220,14 @@ impl<'a> FixImports<'a> {
     fn new(
         module: &'a str,
         names: &'a [AliasData],
-        multi_line: bool,
-        member_indent: &'a str,
-        stmt_indent: &'a str,
+        formatting: ImportFormatting<'a>,
         version: PythonVersion,
         stylist: &'a Stylist,
     ) -> Self {
         Self {
             module,
-            multi_line,
             names,
-            member_indent,
-            stmt_indent,
+            formatting,
             version,
             stylist,
         }
@@ -309,51 +301,59 @@ impl<'a> FixImports<'a> {
         }
     }
 
-    /// Converts the string of imports into new one
+    // TODO(charlie): This needs to return the `replace` module and the list of matched names,
+    // to improve the error message.
     fn create_new_str(&self, matches: &[&str], replace: &str) -> Option<String> {
-        let (matching_names, unmatching_names) = self.split_imports(matches);
-        if matching_names.is_empty() {
+        let (matched_names, unmatched_names) = self.partition_imports(matches);
+
+        // If we have no matched names, we don't need to do anything.
+        // If we have matched _and_ unmatched names, but the import is not on its own line, we
+        // can't add a statement after it. For example, if we have `if True: import foo`, we can't
+        // add a statement to the next line.
+        if matched_names.is_empty() || (!unmatched_names.is_empty() && !self.formatting.own_line) {
             return None;
         }
 
-        let matching = format_import_from(
-            &matching_names,
+        let matched = format_import_from(
+            &matched_names,
             replace,
-            self.multi_line,
-            self.member_indent,
-            self.stmt_indent,
+            self.formatting.multi_line,
+            self.formatting.member_indent,
+            self.formatting.stmt_indent,
             self.stylist,
         );
 
-        if unmatching_names.is_empty() {
-            return Some(matching);
+        if unmatched_names.is_empty() {
+            return Some(matched);
         }
 
-        let unmatching = format_import_from(
-            &unmatching_names,
+        let unmatched = format_import_from(
+            &unmatched_names,
             self.module,
-            self.multi_line,
-            self.member_indent,
-            self.stmt_indent,
+            self.formatting.multi_line,
+            self.formatting.member_indent,
+            self.formatting.stmt_indent,
             self.stylist,
         );
-        Some(format!("{unmatching}\n{}{matching}", self.stmt_indent))
+        Some(format!(
+            "{unmatched}{}{}{matched}",
+            self.stylist.line_ending().as_str(),
+            self.formatting.stmt_indent
+        ))
     }
 
-    /// Returns a list of imports that does and does not have a match in the
-    /// given list of matches
-    fn split_imports(&self, matches: &[&str]) -> (Vec<AliasData>, Vec<AliasData>) {
-        let mut unmatching_names: Vec<AliasData> = vec![];
-        let mut matching_names: Vec<AliasData> = vec![];
-
+    /// Partitions imports into matched and unmatched names.
+    fn partition_imports(&self, matches: &[&str]) -> (Vec<AliasData>, Vec<AliasData>) {
+        let mut matched_names: Vec<AliasData> = vec![];
+        let mut unmatched_names: Vec<AliasData> = vec![];
         for name in self.names {
             if matches.contains(&name.name.as_str()) {
-                matching_names.push(name.clone());
+                matched_names.push(name.clone());
             } else {
-                unmatching_names.push(name.clone());
+                unmatched_names.push(name.clone());
             }
         }
-        (matching_names, unmatching_names)
+        (matched_names, unmatched_names)
     }
 }
 
@@ -382,12 +382,12 @@ pub fn import_replacements(
     let fixer = FixImports::new(
         module,
         &names,
-        formatting.multi_line,
-        &formatting.member_indent,
-        &formatting.stmt_indent,
+        formatting,
         checker.settings.target_version,
         checker.stylist,
     );
+
+    // TODO(charlie): Even if we can't fix this, we should still flag it. Some cases can't be fixed.
     let Some(content) = fixer.check_replacement() else {
         return;
     };

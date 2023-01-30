@@ -1,4 +1,4 @@
-# These SHOULD change
+# UP035
 from collections import Mapping
 
 from collections import Mapping as MAP
@@ -29,9 +29,6 @@ if True:
 
 if True: from collections import Mapping
 
-if True: from collections import (
-    Mapping, Counter)
-
 import os
 from collections import Counter, Mapping
 import sys
@@ -44,5 +41,8 @@ if True:
         Good,
     )
 
-# These SHOULD NOT change
+# OK
 from a import b
+
+if True: from collections import (
+    Mapping, Counter)

@@ -41,12 +41,12 @@ pub fn format_import_from(
     let before_imports = if multi_line {
         format!("({line_ending}")
     } else {
-        "".to_string()
+        String::new()
     };
     let after_imports = if multi_line {
         format!("{line_ending}{start_indent})")
     } else {
-        "".to_string()
+        String::new()
     };
 
     // Generate the formatted names.
@@ -72,8 +72,13 @@ pub fn format_import_from(
 }
 
 pub struct ImportFormatting<'a> {
+    /// Whether the import is multi-line.
     pub multi_line: bool,
+    /// Whether the import is on its own line.
+    pub own_line: bool,
+    /// The indentation of the members of the import.
     pub member_indent: &'a str,
+    /// The indentation of the import statement.
     pub stmt_indent: &'a str,
 }
 
@@ -86,14 +91,17 @@ impl<'a> ImportFormatting<'a> {
     ) -> Self {
         let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
         let multi_line = module_text.contains(stylist.line_ending().as_str());
-        let stmt_indent = indentation(locator, stmt).unwrap_or(stylist.indentation().as_str());
+        let own_line = indentation(locator, stmt).is_some();
+        let stmt_indent =
+            indentation(locator, stmt).unwrap_or_else(|| stylist.indentation().as_str());
         let member_indent = if multi_line {
-            indentation(locator, &args[0]).unwrap_or(stylist.indentation().as_str())
+            indentation(locator, &args[0]).unwrap_or_else(|| stylist.indentation().as_str())
         } else {
             ""
         };
         Self {
             multi_line,
+            own_line,
             member_indent,
             stmt_indent,
         }
