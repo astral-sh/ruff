@@ -59,6 +59,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
+- [SciPy](https://github.com/scipy/scipy)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [Polars](https://github.com/pola-rs/polars)
 - [Ibis](https://github.com/ibis-project/ibis)
@@ -72,6 +73,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [build (PyPA)](https://github.com/pypa/build)
 - [Babel](https://github.com/python-babel/babel)
 - [featuretools](https://github.com/alteryx/featuretools)
+- [meson-python](https://github.com/mesonbuild/meson-python)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
