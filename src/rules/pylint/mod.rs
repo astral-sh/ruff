@@ -16,7 +16,6 @@ mod tests {
     use crate::rules::pylint;
     use crate::settings::Settings;
 
-    #[test_case(Rule::TooManyArgs, Path::new("too_many_args.py"); "PLR0913")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"); "PLE0117")]
@@ -36,8 +35,9 @@ mod tests {
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
-    #[test_case(Rule::InvalidAllFormat, Path::new("PLE0605.py"); "PLE0605")]
-    #[test_case(Rule::InvalidAllObject, Path::new("PLE0604.py"); "PLE0604")]
+    #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
+    #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
+    #[test_case(Rule::TooManyArgs, Path::new("too_many_args.py"); "PLR0913")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
