@@ -50,8 +50,8 @@ pub struct Options {
     ///
     /// - `csv` — a comma-separated list, e.g.
     ///   `@pytest.mark.parametrize('name1,name2', ...)`
-    /// - `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
-    ///   ...)`
+    /// - `tuple` (default) — e.g.
+    ///   `@pytest.mark.parametrize(('name1', 'name2'), ...)`
     /// - `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
     pub parametrize_names_type: Option<types::ParametrizeNameType>,
     #[option(
@@ -73,10 +73,10 @@ pub struct Options {
     /// Expected type for each row of values in `@pytest.mark.parametrize` in
     /// case of multiple parameters. The following values are supported:
     ///
-    /// - `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
-    ///   [(1, 2), (3, 4)])`
-    /// - `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2],
-    ///   [3, 4]])`
+    /// - `tuple` (default) — e.g.
+    ///   `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])`
+    /// - `list` — e.g.
+    ///   `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`
     pub parametrize_values_row_type: Option<types::ParametrizeValuesRowType>,
     #[option(
         default = r#"["BaseException", "Exception", "ValueError", "OSError", "IOError", "EnvironmentError", "socket.error"]"#,

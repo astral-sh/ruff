@@ -7,7 +7,7 @@ use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
 
-const TABLE_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->";
+const TABLE_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->\n";
 const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 
 const TOC_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated table of contents. -->";
@@ -21,6 +21,8 @@ pub struct Args {
 }
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>) {
+    table_out.push_str("<!-- prettier-ignore -->");
+    table_out.push('\n');
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
