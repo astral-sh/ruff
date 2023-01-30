@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_ast::{Alias, AliasData, Located, Stmt};
+use rustpython_ast::{Alias, AliasData, Stmt};
 
 use ruff_macros::derive_message_formats;
 
@@ -8,6 +8,7 @@ use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
+use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::{Availability, Violation};
@@ -215,104 +216,30 @@ struct Replacement<'a> {
     content: Option<String>,
 }
 
-struct ImportFormatting<'a> {
-    /// The line ending of the import.
-    pub line_ending: &'a str,
-    /// Whether the import is multi-line.
-    pub multi_line: bool,
-    /// Whether the import is on its own line.
-    pub own_line: bool,
-    /// The indentation of the members of the import.
-    pub member_indent: &'a str,
-    /// The indentation of the import statement.
-    pub stmt_indent: &'a str,
-}
-
-impl<'a> ImportFormatting<'a> {
-    pub fn new<T>(
-        locator: &'a Locator<'a>,
-        stylist: &'a Stylist<'a>,
-        stmt: &'a Located<T>,
-        args: &'a [Alias],
-    ) -> Self {
-        let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
-
-        let line_ending = stylist.line_ending().as_str();
-        let multi_line = module_text.contains(line_ending);
-        let own_line = indentation(locator, stmt).is_some();
-        let stmt_indent =
-            indentation(locator, stmt).unwrap_or_else(|| stylist.indentation().as_str());
-        let member_indent = if multi_line {
-            indentation(locator, &args[0]).unwrap_or_else(|| stylist.indentation().as_str())
-        } else {
-            ""
-        };
-        Self {
-            line_ending,
-            multi_line,
-            own_line,
-            member_indent,
-            stmt_indent,
-        }
-    }
-
-    /// Converts a list of names and a module into an `import from`-style import.
-    fn format_import_from(&self, names: &[&AliasData], module: &str) -> String {
-        // Construct the whitespace strings.
-        let line_ending = self.line_ending;
-        let after_comma = if multi_line { line_ending } else { " " };
-        let before_imports = if multi_line {
-            format!("({line_ending}")
-        } else {
-            String::new()
-        };
-        let after_imports = if multi_line {
-            format!("{line_ending}{start_indent})")
-        } else {
-            String::new()
-        };
-
-        // Generate the formatted names.
-        let full_names = {
-            let full_names: Vec<String> = names
-                .iter()
-                .map(|name| match &name.asname {
-                    Some(asname) => format!("{indent}{} as {asname}", name.name),
-                    None => format!("{indent}{}", name.name),
-                })
-                .collect();
-            let mut full_names = full_names.join(&format!(",{}", after_comma));
-            if multi_line {
-                full_names.push(',');
-            }
-            full_names
-        };
-
-        format!(
-            "from {} import {}{}{}",
-            module, before_imports, full_names, after_imports
-        )
-    }
-}
-
-struct FixImports<'a> {
+struct ImportReplacer<'a> {
+    stmt: &'a Stmt,
     module: &'a str,
     members: &'a [AliasData],
-    formatting: ImportFormatting<'a>,
+    locator: &'a Locator<'a>,
+    stylist: &'a Stylist<'a>,
     version: PythonVersion,
 }
 
-impl<'a> FixImports<'a> {
+impl<'a> ImportReplacer<'a> {
     fn new(
+        stmt: &'a Stmt,
         module: &'a str,
         members: &'a [AliasData],
-        formatting: ImportFormatting<'a>,
+        locator: &'a Locator<'a>,
+        stylist: &'a Stylist<'a>,
         version: PythonVersion,
     ) -> Self {
         Self {
+            stmt,
             module,
             members,
-            formatting,
+            locator,
+            stylist,
             version,
         }
     }
@@ -406,42 +333,47 @@ impl<'a> FixImports<'a> {
             return None;
         }
 
-        // If we have matched _and_ unmatched names, but the import is not on its own line, we
-        // can't add a statement after it. For example, if we have `if True: import foo`, we can't
-        // add a statement to the next line.
-        if !unmatched_names.is_empty() && !self.formatting.own_line {
-            return Some(Replacement {
-                module: target,
-                members: matched_names,
-                content: None,
-            });
-        }
-
-        // TODO(charlie): Let's just always do this a a single-line import.
-        let matched = self.formatting.format_import_from(&matched_names, target);
-
         if unmatched_names.is_empty() {
-            return Some(Replacement {
+            let matched = ImportReplacer::format_import_from(&matched_names, target);
+            Some(Replacement {
                 module: target,
                 members: matched_names,
                 content: Some(matched),
-            });
+            })
+        } else {
+            let indentation = indentation(self.locator, self.stmt);
+
+            // If we have matched _and_ unmatched names, but the import is not on its own line, we
+            // can't add a statement after it. For example, if we have `if True: import foo`, we can't
+            // add a statement to the next line.
+            let Some(indentation) = indentation else {
+                return Some(Replacement {
+                    module: target,
+                    members: matched_names,
+                    content: None,
+                });
+            };
+
+            let matched = ImportReplacer::format_import_from(&matched_names, target);
+            let unmatched = fixes::remove_import_members(
+                self.locator
+                    .slice_source_code_range(&Range::from_located(self.stmt)),
+                &matched_names
+                    .iter()
+                    .map(|name| name.name.as_str())
+                    .collect::<Vec<_>>(),
+            );
+
+            Some(Replacement {
+                module: target,
+                members: matched_names,
+                content: Some(format!(
+                    "{unmatched}{}{}{matched}",
+                    self.stylist.line_ending().as_str(),
+                    indentation,
+                )),
+            })
         }
-
-        // TODO(charlie): Let's try to retain more styling here?
-        let unmatched = self
-            .formatting
-            .format_import_from(&unmatched_names, self.module);
-
-        Some(Replacement {
-            module: target,
-            members: matched_names,
-            content: Some(format!(
-                "{unmatched}{}{}{matched}",
-                self.stylist.line_ending().as_str(),
-                self.formatting.stmt_indent,
-            )),
-        })
     }
 
     /// Partitions imports into matched and unmatched names.
@@ -457,6 +389,20 @@ impl<'a> FixImports<'a> {
         }
         (matched_names, unmatched_names)
     }
+
+    /// Converts a list of names and a module into an `import from`-style import.
+    fn format_import_from(names: &[&AliasData], module: &str) -> String {
+        // Construct the whitespace strings.
+        // Generate the formatted names.
+        let full_names: String = names
+            .iter()
+            .map(|name| match &name.asname {
+                Some(asname) => format!("{} as {asname}", name.name),
+                None => format!("{}", name.name),
+            })
+            .join(", ");
+        format!("from {module} import {full_names}")
+    }
 }
 
 /// UP035
@@ -467,8 +413,11 @@ pub fn import_replacements(
     module: Option<&str>,
     level: Option<&usize>,
 ) {
-    // Avoid relative imports.
+    // Avoid relative and star imports.
     if level.map_or(false, |level| *level > 0) {
+        return;
+    }
+    if names.first().map_or(false, |name| name.node.name == "*") {
         return;
     }
     let Some(module) = module else {
@@ -479,12 +428,13 @@ pub fn import_replacements(
         return;
     }
 
-    let formatting = ImportFormatting::new(checker.locator, checker.stylist, stmt, names);
     let members: Vec<AliasData> = names.iter().map(|alias| alias.node.clone()).collect();
-    let fixer = FixImports::new(
+    let fixer = ImportReplacer::new(
+        stmt,
         module,
         &members,
-        formatting,
+        checker.locator,
+        checker.stylist,
         checker.settings.target_version,
     );
 
@@ -510,6 +460,6 @@ pub fn import_replacements(
                 ));
             }
         }
-        checker.diagnostics.push(diagnostic)
+        checker.diagnostics.push(diagnostic);
     }
 }

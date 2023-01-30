@@ -1,10 +1,5 @@
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
-use rustpython_ast::{Alias, AliasData, Located};
-
-use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
-use crate::source_code::{Locator, Stylist};
 
 static CURLY_BRACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\\N\{[^}]+})|([{}])").unwrap());
 

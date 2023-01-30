@@ -106,7 +106,7 @@ expression: diagnostics
     column: 42
   fix:
     content:
-      - from collections import Counter
+      - from collections import (Counter)
       - from collections.abc import Mapping
     location:
       row: 10
@@ -129,12 +129,8 @@ expression: diagnostics
     column: 33
   fix:
     content:
-      - from collections import (
-      - "    Counter,"
-      - )
-      - from collections.abc import (
-      - "    Mapping,"
-      - )
+      - from collections import (Counter)
+      - from collections.abc import Mapping
     location:
       row: 12
       column: 0
@@ -156,12 +152,8 @@ expression: diagnostics
     column: 32
   fix:
     content:
-      - from collections import (
-      - "    Counter,"
-      - )
-      - from collections.abc import (
-      - "    Mapping,"
-      - )
+      - from collections import Counter
+      - from collections.abc import Mapping
     location:
       row: 15
       column: 0
@@ -326,10 +318,7 @@ expression: diagnostics
       - "        Bad,"
       - "        Good,"
       - "    )"
-      - "    from collections.abc import ("
-      - "        Mapping,"
-      - "        Callable,"
-      - "    )"
+      - "    from collections.abc import Mapping, Callable"
     location:
       row: 37
       column: 4
