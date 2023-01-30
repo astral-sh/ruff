@@ -536,7 +536,9 @@ where
                 {
                     pyupgrade::rules::functools_cache(self, decorator_list);
                 }
-                if self.settings.rules.enabled(&Rule::QuotedAnnotations) {
+                if self.settings.rules.enabled(&Rule::QuotedAnnotations)
+                    && self.annotations_future_enabled
+                {
                     pyupgrade::rules::quoted_annotations(self, args, type_comment);
                 }
 
