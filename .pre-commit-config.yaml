@@ -45,3 +45,6 @@ repos:
         language: rust
         pass_filenames: false
         exclude: target
+
+ci:
+  skip: [cargo-fmt, clippy, dev-generate-all]
