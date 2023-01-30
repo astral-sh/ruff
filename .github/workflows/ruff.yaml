@@ -41,6 +41,14 @@ jobs:
         with:
           name: wheels
           path: dist
+      - name: "Rename release binary"
+        run: |
+          mv target/release/ruff target/release/ruff-macos-x86_64
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin-macos-x86_64
+          path: target/release/ruff-*
   macos-universal:
     runs-on: macos-latest
     steps:
@@ -63,6 +71,14 @@ jobs:
         with:
           name: wheels
           path: dist
+      - name: "Rename release binary"
+        run: |
+          mv target/release/ruff target/release/ruff-macos-universal
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: target/release/ruff-*
 
   windows:
     runs-on: windows-latest
@@ -91,6 +107,14 @@ jobs:
         with:
           name: wheels
           path: dist
+      - name: "Rename release binary"
+        run: |
+          mv target/release/ruff target/release/ruff-windows-${{ matrix.target }}
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: target/release/ruff-*
 
   linux:
     runs-on: ubuntu-latest
@@ -120,6 +144,14 @@ jobs:
         with:
           name: wheels
           path: dist
+      - name: "Rename release binary"
+        run: |
+          mv target/release/ruff target/release/ruff-linux-${{ matrix.target }}
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: target/release/ruff-*
 
   linux-cross:
     runs-on: ubuntu-latest
@@ -157,6 +189,14 @@ jobs:
         with:
           name: wheels
           path: dist
+      - name: "Rename release binary"
+        run: |
+          mv target/release/ruff target/release/ruff-linux-cross-${{ matrix.target }}
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: target/release/ruff-*
 
   musllinux:
     runs-on: ubuntu-latest
@@ -193,6 +233,14 @@ jobs:
         with:
           name: wheels
           path: dist
+      - name: "Rename release binary"
+        run: |
+          mv target/release/ruff target/release/ruff-musllinux-${{ matrix.target }}
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: target/release/ruff-*
 
   musllinux-cross:
     runs-on: ubuntu-latest
@@ -231,6 +279,14 @@ jobs:
         with:
           name: wheels
           path: dist
+      - name: "Rename release binary"
+        run: |
+          mv target/release/ruff target/release/ruff-musllinux-cross-${{ matrix.target }}
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin
+          path: target/release/ruff-*
 
   pypy:
     runs-on: ${{ matrix.os }}
@@ -296,3 +352,10 @@ jobs:
       - name: "Update pre-commit mirror"
         run: |
           curl -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.RUFF_PRE_COMMIT_PAT }}" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/charliermarsh/ruff-pre-commit/dispatches --data '{"event_type": "pypi_release"}'
+      - uses: actions/download-artifact@v3
+        with:
+          name: bin
+      - name: "Upload binaries to release"
+        run: |
+          RELEASE_TAG=$(git describe --tags --abbrev=0)
+          ls target/release/ruff-* | xargs gh release upload $RELEASE_TAG
