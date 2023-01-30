@@ -145,7 +145,9 @@ fn handle_making_changes(
             final_str.push(')');
         }
         let mut diagnostic = Diagnostic::new(
-            violations::OSErrorAlias(compose_call_path(target)),
+            violations::OSErrorAlias {
+                name: compose_call_path(target),
+            },
             Range::from_located(target),
         );
         if checker.patch(diagnostic.kind.rule()) {

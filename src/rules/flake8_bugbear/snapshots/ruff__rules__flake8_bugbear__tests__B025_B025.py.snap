@@ -3,7 +3,8 @@ source: src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DuplicateTryBlockException: ValueError
+    DuplicateTryBlockException:
+      name: ValueError
   location:
     row: 19
     column: 7
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DuplicateTryBlockException: pickle.PickleError
+    DuplicateTryBlockException:
+      name: pickle.PickleError
   location:
     row: 28
     column: 7
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DuplicateTryBlockException: ValueError
+    DuplicateTryBlockException:
+      name: ValueError
   location:
     row: 35
     column: 7
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DuplicateTryBlockException: TypeError
+    DuplicateTryBlockException:
+      name: TypeError
   location:
     row: 37
     column: 17

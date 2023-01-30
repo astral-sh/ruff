@@ -15,12 +15,44 @@ use rustc_hash::FxHashMap;
 #[command(
     author,
     name = "ruff",
-    about = "Ruff: An extremely fast Python linter."
+    about = "Ruff: An extremely fast Python linter.",
+    after_help = "For help with a specific command, see: `ruff help <command>`."
 )]
 #[command(version)]
-#[allow(clippy::struct_excessive_bools)]
 pub struct Args {
-    #[arg(required_unless_present_any = ["clean", "explain", "generate_shell_completion"])]
+    #[command(subcommand)]
+    pub command: Command,
+    #[clap(flatten)]
+    pub log_level_args: LogLevelArgs,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, clap::Subcommand)]
+pub enum Command {
+    /// Run Ruff on the given files or directories (default).
+    Check(CheckArgs),
+    /// Explain a rule.
+    #[clap(alias = "--explain")]
+    Rule {
+        #[arg(value_parser=Rule::from_code)]
+        rule: &'static Rule,
+
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        format: HelpFormat,
+    },
+    /// Clear any caches in the current directory and any subdirectories.
+    #[clap(alias = "--clean")]
+    Clean,
+    /// Generate shell completion.
+    #[clap(alias = "--generate-shell-completion", hide = true)]
+    GenerateShellCompletion { shell: clap_complete_command::Shell },
+}
+
+#[derive(Debug, clap::Args)]
+#[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
+pub struct CheckArgs {
+    /// List of files or directories to check.
     pub files: Vec<PathBuf>,
     /// Attempt to automatically fix lint violations.
     #[arg(long, overrides_with("no_fix"))]
@@ -179,81 +211,36 @@ pub struct Args {
     update_check: bool,
     #[clap(long, overrides_with("update_check"), hide = true)]
     no_update_check: bool,
+    /// Show counts for every rule with at least one violation.
+    #[arg(
+        long,
+        // Unsupported default-command arguments.
+        conflicts_with = "diff",
+        conflicts_with = "show_source",
+        conflicts_with = "watch",
+    )]
+    pub statistics: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
     #[arg(
         long,
         // conflicts_with = "add_noqa",
-        conflicts_with = "clean",
-        conflicts_with = "explain",
-        conflicts_with = "generate_shell_completion",
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
     pub add_noqa: bool,
-    /// Explain a rule.
-    #[arg(
-        long,
-        value_parser=Rule::from_code,
-        help_heading="Subcommands",
-        // Fake subcommands.
-        conflicts_with = "add_noqa",
-        conflicts_with = "clean",
-        // conflicts_with = "explain",
-        conflicts_with = "generate_shell_completion",
-        conflicts_with = "show_files",
-        conflicts_with = "show_settings",
-        // Unsupported default-command arguments.
-        conflicts_with = "stdin_filename",
-        conflicts_with = "watch",
-    )]
-    pub explain: Option<&'static Rule>,
-    /// Clear any caches in the current directory or any subdirectories.
-    #[arg(
-        long,
-        help_heading="Subcommands",
-        // Fake subcommands.
-        conflicts_with = "add_noqa",
-        // conflicts_with = "clean",
-        conflicts_with = "explain",
-        conflicts_with = "generate_shell_completion",
-        conflicts_with = "show_files",
-        conflicts_with = "show_settings",
-        // Unsupported default-command arguments.
-        conflicts_with = "stdin_filename",
-        conflicts_with = "watch",
-    )]
-    pub clean: bool,
-    /// Generate shell completion
-    #[arg(
-        long,
-        hide = true,
-        value_name = "SHELL",
-        // Fake subcommands.
-        conflicts_with = "add_noqa",
-        conflicts_with = "clean",
-        conflicts_with = "explain",
-        // conflicts_with = "generate_shell_completion",
-        conflicts_with = "show_files",
-        conflicts_with = "show_settings",
-        // Unsupported default-command arguments.
-        conflicts_with = "stdin_filename",
-        conflicts_with = "watch",
-    )]
-    pub generate_shell_completion: Option<clap_complete_command::Shell>,
     /// See the files Ruff will be run against with the current settings.
     #[arg(
         long,
         // Fake subcommands.
         conflicts_with = "add_noqa",
-        conflicts_with = "clean",
-        conflicts_with = "explain",
-        conflicts_with = "generate_shell_completion",
         // conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
@@ -263,32 +250,52 @@ pub struct Args {
         long,
         // Fake subcommands.
         conflicts_with = "add_noqa",
-        conflicts_with = "clean",
-        conflicts_with = "explain",
-        conflicts_with = "generate_shell_completion",
         conflicts_with = "show_files",
         // conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
-    #[clap(flatten)]
-    pub log_level_args: LogLevelArgs,
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum HelpFormat {
+    Text,
+    Json,
 }
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, clap::Args)]
 pub struct LogLevelArgs {
     /// Enable verbose logging.
-    #[arg(short, long, group = "verbosity", help_heading = "Log levels")]
+    #[arg(
+        short,
+        long,
+        global = true,
+        group = "verbosity",
+        help_heading = "Log levels"
+    )]
     pub verbose: bool,
     /// Print lint violations, but nothing else.
-    #[arg(short, long, group = "verbosity", help_heading = "Log levels")]
+    #[arg(
+        short,
+        long,
+        global = true,
+        group = "verbosity",
+        help_heading = "Log levels"
+    )]
     pub quiet: bool,
     /// Disable all logging (but still exit with status code "1" upon detecting
     /// lint violations).
-    #[arg(short, long, group = "verbosity", help_heading = "Log levels")]
+    #[arg(
+        short,
+        long,
+        global = true,
+        group = "verbosity",
+        help_heading = "Log levels"
+    )]
     pub silent: bool,
 }
 
@@ -306,24 +313,22 @@ impl From<&LogLevelArgs> for LogLevel {
     }
 }
 
-impl Args {
+impl CheckArgs {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
     pub fn partition(self) -> (Arguments, Overrides) {
         (
             Arguments {
                 add_noqa: self.add_noqa,
-                clean: self.clean,
                 config: self.config,
                 diff: self.diff,
                 exit_zero: self.exit_zero,
-                explain: self.explain,
                 files: self.files,
-                generate_shell_completion: self.generate_shell_completion,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
                 show_files: self.show_files,
                 show_settings: self.show_settings,
+                statistics: self.statistics,
                 stdin_filename: self.stdin_filename,
                 watch: self.watch,
             },
@@ -371,17 +376,15 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 #[allow(clippy::struct_excessive_bools)]
 pub struct Arguments {
     pub add_noqa: bool,
-    pub clean: bool,
     pub config: Option<PathBuf>,
     pub diff: bool,
     pub exit_zero: bool,
-    pub explain: Option<&'static Rule>,
     pub files: Vec<PathBuf>,
-    pub generate_shell_completion: Option<clap_complete_command::Shell>,
     pub isolated: bool,
     pub no_cache: bool,
     pub show_files: bool,
     pub show_settings: bool,
+    pub statistics: bool,
     pub stdin_filename: Option<PathBuf>,
     pub watch: bool,
 }

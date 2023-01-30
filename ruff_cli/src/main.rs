@@ -17,8 +17,8 @@ use ::ruff::resolver::PyprojectDiscovery;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
-use args::Args;
-use clap::{CommandFactory, Parser};
+use args::{Args, CheckArgs, Command};
+use clap::{CommandFactory, Parser, Subcommand};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use printer::{Printer, Violations};
@@ -35,8 +35,28 @@ mod resolve;
 pub mod updates;
 
 fn inner_main() -> Result<ExitCode> {
+    let mut args: Vec<_> = std::env::args_os().collect();
+
+    // Clap doesn't support default subcommands but we want to run `check` by
+    // default for convenience and backwards-compatibility, so we just
+    // preprocess the arguments accordingly before passing them to Clap.
+    if let Some(arg) = args.get(1).and_then(|s| s.to_str()) {
+        if !Command::has_subcommand(rewrite_legacy_subcommand(arg))
+            && arg != "-h"
+            && arg != "--help"
+            && arg != "-V"
+            && arg != "--version"
+            && arg != "help"
+        {
+            args.insert(1, "check".into());
+        }
+    }
+
     // Extract command-line arguments.
-    let args = Args::parse();
+    let Args {
+        command,
+        log_level_args,
+    } = Args::parse_from(args);
 
     let default_panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -53,19 +73,24 @@ quoting the executed command, along with the relevant file contents and `pyproje
         default_panic_hook(info);
     }));
 
-    let log_level: LogLevel = (&args.log_level_args).into();
+    let log_level: LogLevel = (&log_level_args).into();
     set_up_logging(&log_level)?;
 
-    let (cli, overrides) = args.partition();
+    match command {
+        Command::Rule { rule, format } => commands::rule(rule, format)?,
+        Command::Clean => commands::clean(log_level)?,
+        Command::GenerateShellCompletion { shell } => {
+            shell.generate(&mut Args::command(), &mut io::stdout());
+        }
 
-    if let Some(shell) = cli.generate_shell_completion {
-        shell.generate(&mut Args::command(), &mut io::stdout());
-        return Ok(ExitCode::SUCCESS);
+        Command::Check(args) => return check(args, log_level),
     }
-    if cli.clean {
-        commands::clean(&log_level)?;
-        return Ok(ExitCode::SUCCESS);
-    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
+    let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
@@ -75,6 +100,14 @@ quoting the executed command, along with the relevant file contents and `pyproje
         &overrides,
         cli.stdin_filename.as_deref(),
     )?;
+
+    if cli.show_settings {
+        commands::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+    if cli.show_files {
+        commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
+    }
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
@@ -88,19 +121,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
         PyprojectDiscovery::Fixed(settings) => settings.cli.clone(),
         PyprojectDiscovery::Hierarchical(settings) => settings.cli.clone(),
     };
-
-    if let Some(rule) = cli.explain {
-        commands::explain(rule, format)?;
-        return Ok(ExitCode::SUCCESS);
-    }
-    if cli.show_settings {
-        commands::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
-        return Ok(ExitCode::SUCCESS);
-    }
-    if cli.show_files {
-        commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
-        return Ok(ExitCode::SUCCESS);
-    }
 
     // Autofix rules are as follows:
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
@@ -135,14 +155,17 @@ quoting the executed command, along with the relevant file contents and `pyproje
         warn_user_once!("Detected debug build without --no-cache.");
     }
 
-    let printer = Printer::new(&format, &log_level, &autofix, &violations);
-
     if cli.add_noqa {
         let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             println!("Added {modifications} noqa directives.");
         }
-    } else if cli.watch {
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    let printer = Printer::new(&format, &log_level, &autofix, &violations);
+
+    if cli.watch {
         if !matches!(autofix, fix::FixMode::None) {
             warn_user_once!("--fix is not enabled in watch mode.");
         }
@@ -221,7 +244,11 @@ quoting the executed command, along with the relevant file contents and `pyproje
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff)) {
-            printer.write_once(&diagnostics)?;
+            if cli.statistics {
+                printer.write_statistics(&diagnostics)?;
+            } else {
+                printer.write_once(&diagnostics)?;
+            }
         }
 
         // Check for updates if we're in a non-silent log level.
@@ -244,8 +271,16 @@ quoting the executed command, along with the relevant file contents and `pyproje
             }
         }
     }
-
     Ok(ExitCode::SUCCESS)
+}
+
+fn rewrite_legacy_subcommand(cmd: &str) -> &str {
+    match cmd {
+        "--explain" => "rule",
+        "--clean" => "clean",
+        "--generate-shell-completion" => "generate-shell-completion",
+        cmd => cmd,
+    }
 }
 
 #[must_use]

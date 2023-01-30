@@ -4,7 +4,8 @@ expression: diagnostics
 ---
 - kind:
     DocumentAllArguments:
-      - y
+      names:
+        - y
   location:
     row: 283
     column: 4
@@ -15,7 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
+      names:
+        - y
   location:
     row: 300
     column: 0
@@ -26,9 +28,10 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - test
-      - y
-      - z
+      names:
+        - test
+        - y
+        - z
   location:
     row: 324
     column: 4
@@ -39,9 +42,10 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - test
-      - y
-      - z
+      names:
+        - test
+        - y
+        - z
   location:
     row: 336
     column: 4
@@ -52,9 +56,10 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - a
-      - y
-      - z
+      names:
+        - a
+        - y
+        - z
   location:
     row: 349
     column: 4
@@ -65,8 +70,9 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - a
-      - b
+      names:
+        - a
+        - b
   location:
     row: 361
     column: 4
@@ -77,7 +83,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
+      names:
+        - y
   location:
     row: 389
     column: 0
@@ -88,9 +95,10 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - test
-      - y
-      - z
+      names:
+        - test
+        - y
+        - z
   location:
     row: 425
     column: 4
@@ -101,9 +109,10 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - test
-      - y
-      - z
+      names:
+        - test
+        - y
+        - z
   location:
     row: 440
     column: 4
@@ -114,8 +123,9 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - a
-      - z
+      names:
+        - a
+        - z
   location:
     row: 459
     column: 4
@@ -126,7 +136,8 @@ expression: diagnostics
   parent: ~
 - kind:
     DocumentAllArguments:
-      - y
+      names:
+        - y
   location:
     row: 489
     column: 4

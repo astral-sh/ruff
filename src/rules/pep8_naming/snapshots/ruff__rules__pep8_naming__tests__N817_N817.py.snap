@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     CamelcaseImportedAsAcronym:
-      - CaMel
-      - CM
+      name: CaMel
+      asname: CM
   location:
     row: 1
     column: 0
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     CamelcaseImportedAsAcronym:
-      - CamelCase
-      - CC
+      name: CamelCase
+      asname: CC
   location:
     row: 2
     column: 0

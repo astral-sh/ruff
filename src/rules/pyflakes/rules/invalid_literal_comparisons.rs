@@ -25,7 +25,8 @@ pub fn invalid_literal_comparison(
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right))
         {
-            let mut diagnostic = Diagnostic::new(violations::IsLiteral(op.into()), location);
+            let mut diagnostic =
+                Diagnostic::new(violations::IsLiteral { cmpop: op.into() }, location);
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(&located_op.node, op);

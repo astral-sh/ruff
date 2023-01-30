@@ -17,7 +17,10 @@ pub fn use_from_import(checker: &mut Checker, alias: &Alias) {
         return;
     }
     checker.diagnostics.push(Diagnostic::new(
-        violations::ConsiderUsingFromImport(module.to_string(), name.to_string()),
+        violations::ConsiderUsingFromImport {
+            module: module.to_string(),
+            name: name.to_string(),
+        },
         Range::from_located(alias),
     ));
 }

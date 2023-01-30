@@ -3,7 +3,8 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UseContextlibSuppress: ValueError
+    UseContextlibSuppress:
+      exception: ValueError
   location:
     row: 4
     column: 0
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseContextlibSuppress: "ValueError, OSError"
+    UseContextlibSuppress:
+      exception: "ValueError, OSError"
   location:
     row: 9
     column: 0
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseContextlibSuppress: Exception
+    UseContextlibSuppress:
+      exception: Exception
   location:
     row: 14
     column: 0
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseContextlibSuppress: "a.Error, b.Error"
+    UseContextlibSuppress:
+      exception: "a.Error, b.Error"
   location:
     row: 19
     column: 0

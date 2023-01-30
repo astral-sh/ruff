@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - list
-      - list
+      inner: list
+      outer: list
   location:
     row: 2
     column: 0
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - tuple
-      - list
+      inner: tuple
+      outer: list
   location:
     row: 3
     column: 0
@@ -28,8 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - list
-      - tuple
+      inner: list
+      outer: tuple
   location:
     row: 4
     column: 0
@@ -40,8 +40,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - tuple
-      - tuple
+      inner: tuple
+      outer: tuple
   location:
     row: 5
     column: 0
@@ -52,8 +52,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - set
-      - set
+      inner: set
+      outer: set
   location:
     row: 6
     column: 0
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - list
-      - set
+      inner: list
+      outer: set
   location:
     row: 7
     column: 0
@@ -76,8 +76,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - tuple
-      - set
+      inner: tuple
+      outer: set
   location:
     row: 8
     column: 0
@@ -88,8 +88,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - sorted
-      - set
+      inner: sorted
+      outer: set
   location:
     row: 9
     column: 0
@@ -100,8 +100,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - reversed
-      - set
+      inner: reversed
+      outer: set
   location:
     row: 10
     column: 0
@@ -112,8 +112,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - list
-      - sorted
+      inner: list
+      outer: sorted
   location:
     row: 11
     column: 0
@@ -124,8 +124,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - tuple
-      - sorted
+      inner: tuple
+      outer: sorted
   location:
     row: 12
     column: 0
@@ -136,8 +136,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - sorted
-      - sorted
+      inner: sorted
+      outer: sorted
   location:
     row: 13
     column: 0
@@ -148,8 +148,8 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
-      - reversed
-      - sorted
+      inner: reversed
+      outer: sorted
   location:
     row: 14
     column: 0

@@ -25,7 +25,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
         return;
     };
     let mut diagnostic = Diagnostic::new(
-        violations::TypeOfPrimitive(primitive),
+        violations::TypeOfPrimitive { primitive },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {

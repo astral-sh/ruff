@@ -3,7 +3,8 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ConvertLoopToAll: return all(not check(x) for x in iterable)
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
   location:
     row: 25
     column: 4
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    ConvertLoopToAll: return all(x.is_empty() for x in iterable)
+    ConvertLoopToAll:
+      all: return all(x.is_empty() for x in iterable)
   location:
     row: 33
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    ConvertLoopToAll: return all(not check(x) for x in iterable)
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
   location:
     row: 64
     column: 4
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    ConvertLoopToAll: return all(not check(x) for x in iterable)
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
   location:
     row: 83
     column: 4

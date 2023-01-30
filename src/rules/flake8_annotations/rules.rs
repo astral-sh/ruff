@@ -58,7 +58,7 @@ where
 {
     if checker.match_typing_expr(annotation, "Any") {
         checker.diagnostics.push(Diagnostic::new(
-            violations::DynamicallyTypedExpression(func()),
+            violations::DynamicallyTypedExpression { name: func() },
             Range::from_located(annotation),
         ));
     };
@@ -115,7 +115,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             .enabled(&Rule::MissingTypeFunctionArgument)
                         {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeFunctionArgument(arg.node.arg.to_string()),
+                                violations::MissingTypeFunctionArgument {
+                                    name: arg.node.arg.to_string(),
+                                },
                                 Range::from_located(arg),
                             ));
                         }
@@ -125,8 +127,8 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
             // ANN002, ANN401
             if let Some(arg) = &args.vararg {
-                has_any_typed_arg = true;
                 if let Some(expr) = &arg.node.annotation {
+                    has_any_typed_arg = true;
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
                         if checker
                             .settings
@@ -143,7 +145,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.rules.enabled(&Rule::MissingTypeArgs) {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeArgs(arg.node.arg.to_string()),
+                                violations::MissingTypeArgs {
+                                    name: arg.node.arg.to_string(),
+                                },
                                 Range::from_located(arg),
                             ));
                         }
@@ -153,8 +157,8 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
 
             // ANN003, ANN401
             if let Some(arg) = &args.kwarg {
-                has_any_typed_arg = true;
                 if let Some(expr) = &arg.node.annotation {
+                    has_any_typed_arg = true;
                     if !checker.settings.flake8_annotations.allow_star_arg_any {
                         if checker
                             .settings
@@ -171,7 +175,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.rules.enabled(&Rule::MissingTypeKwargs) {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeKwargs(arg.node.arg.to_string()),
+                                violations::MissingTypeKwargs {
+                                    name: arg.node.arg.to_string(),
+                                },
                                 Range::from_located(arg),
                             ));
                         }
@@ -186,14 +192,18 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                             if checker.settings.rules.enabled(&Rule::MissingTypeCls) {
                                 checker.diagnostics.push(Diagnostic::new(
-                                    violations::MissingTypeCls(arg.node.arg.to_string()),
+                                    violations::MissingTypeCls {
+                                        name: arg.node.arg.to_string(),
+                                    },
                                     Range::from_located(arg),
                                 ));
                             }
                         } else {
                             if checker.settings.rules.enabled(&Rule::MissingTypeSelf) {
                                 checker.diagnostics.push(Diagnostic::new(
-                                    violations::MissingTypeSelf(arg.node.arg.to_string()),
+                                    violations::MissingTypeSelf {
+                                        name: arg.node.arg.to_string(),
+                                    },
                                     Range::from_located(arg),
                                 ));
                             }
@@ -227,7 +237,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .enabled(&Rule::MissingReturnTypeClassMethod)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::MissingReturnTypeClassMethod(name.to_string()),
+                            violations::MissingReturnTypeClassMethod {
+                                name: name.to_string(),
+                            },
                             helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
@@ -240,7 +252,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .enabled(&Rule::MissingReturnTypeStaticMethod)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::MissingReturnTypeStaticMethod(name.to_string()),
+                            violations::MissingReturnTypeStaticMethod {
+                                name: name.to_string(),
+                            },
                             helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
@@ -256,7 +270,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             && has_any_typed_arg)
                         {
                             let mut diagnostic = Diagnostic::new(
-                                violations::MissingReturnTypeSpecialMethod(name.to_string()),
+                                violations::MissingReturnTypeSpecialMethod {
+                                    name: name.to_string(),
+                                },
                                 helpers::identifier_range(stmt, checker.locator),
                             );
                             if checker.patch(diagnostic.kind.rule()) {
@@ -277,7 +293,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .enabled(&Rule::MissingReturnTypeSpecialMethod)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::MissingReturnTypeSpecialMethod(name.to_string()),
+                            violations::MissingReturnTypeSpecialMethod {
+                                name: name.to_string(),
+                            },
                             helpers::identifier_range(stmt, checker.locator),
                         ));
                     }
@@ -290,7 +308,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 .enabled(&Rule::MissingReturnTypePublicFunction)
                             {
                                 checker.diagnostics.push(Diagnostic::new(
-                                    violations::MissingReturnTypePublicFunction(name.to_string()),
+                                    violations::MissingReturnTypePublicFunction {
+                                        name: name.to_string(),
+                                    },
                                     helpers::identifier_range(stmt, checker.locator),
                                 ));
                             }
@@ -302,7 +322,9 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 .enabled(&Rule::MissingReturnTypePrivateFunction)
                             {
                                 checker.diagnostics.push(Diagnostic::new(
-                                    violations::MissingReturnTypePrivateFunction(name.to_string()),
+                                    violations::MissingReturnTypePrivateFunction {
+                                        name: name.to_string(),
+                                    },
                                     helpers::identifier_range(stmt, checker.locator),
                                 ));
                             }

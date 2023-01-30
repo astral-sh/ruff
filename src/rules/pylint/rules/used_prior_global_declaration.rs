@@ -15,7 +15,10 @@ pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &E
     if let Some(stmt) = globals.get(name) {
         if expr.location < stmt.location {
             checker.diagnostics.push(Diagnostic::new(
-                violations::UsedPriorGlobalDeclaration(name.to_string(), stmt.location.row()),
+                violations::UsedPriorGlobalDeclaration {
+                    name: name.to_string(),
+                    line: stmt.location.row(),
+                },
                 Range::from_located(expr),
             ));
         }

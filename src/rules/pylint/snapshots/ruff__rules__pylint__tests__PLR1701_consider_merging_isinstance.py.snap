@@ -4,8 +4,9 @@ expression: diagnostics
 ---
 - kind:
     ConsiderMergingIsinstance:
-      - "var[3]"
-      - - float
+      obj: "var[3]"
+      types:
+        - float
         - int
   location:
     row: 15
@@ -17,8 +18,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConsiderMergingIsinstance:
-      - "var[4]"
-      - - float
+      obj: "var[4]"
+      types:
+        - float
         - int
   location:
     row: 17
@@ -30,8 +32,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConsiderMergingIsinstance:
-      - "var[5]"
-      - - float
+      obj: "var[5]"
+      types:
+        - float
         - int
   location:
     row: 19
@@ -43,8 +46,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConsiderMergingIsinstance:
-      - "var[10]"
-      - - list
+      obj: "var[10]"
+      types:
+        - list
         - str
   location:
     row: 23
@@ -56,8 +60,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConsiderMergingIsinstance:
-      - "var[11]"
-      - - float
+      obj: "var[11]"
+      types:
+        - float
         - int
   location:
     row: 24
@@ -69,8 +74,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ConsiderMergingIsinstance:
-      - "var[12]"
-      - - float
+      obj: "var[12]"
+      types:
+        - float
         - int
         - list
   location:

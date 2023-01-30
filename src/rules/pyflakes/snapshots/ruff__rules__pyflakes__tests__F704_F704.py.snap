@@ -3,7 +3,8 @@ source: src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    YieldOutsideFunction: Yield
+    YieldOutsideFunction:
+      keyword: Yield
   location:
     row: 6
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    YieldOutsideFunction: Yield
+    YieldOutsideFunction:
+      keyword: Yield
   location:
     row: 9
     column: 0
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    YieldOutsideFunction: YieldFrom
+    YieldOutsideFunction:
+      keyword: YieldFrom
   location:
     row: 10
     column: 0
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    YieldOutsideFunction: Await
+    YieldOutsideFunction:
+      keyword: Await
   location:
     row: 11
     column: 0

@@ -6,7 +6,7 @@ from typing import NewType
 GLOBAL: str = "foo"
 
 
-def f():
+def assign():
     global GLOBAL
     GLOBAL = "bar"
     lower = 0
@@ -18,4 +18,18 @@ def f():
     MyObj2 = namedtuple("MyObj12", ["a", "b"])
 
     T = TypeVar("T")
-    UserId = NewType('UserId', int)
+    UserId = NewType("UserId", int)
+
+
+def aug_assign(rank, world_size):
+    global CURRENT_PORT
+
+    CURRENT_PORT += 1
+    if CURRENT_PORT > MAX_PORT:
+        CURRENT_PORT = START_PORT
+
+
+def loop_assign():
+    global CURRENT_PORT
+    for CURRENT_PORT in range(5):
+        pass

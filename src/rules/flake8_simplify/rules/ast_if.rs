@@ -169,7 +169,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     };
     let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
-        violations::ReturnBoolConditionDirectly(condition),
+        violations::ReturnBoolConditionDirectly { cond: condition },
         Range::from_located(stmt),
     );
     if checker.patch(&Rule::ReturnBoolConditionDirectly)
@@ -291,7 +291,9 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::UseTernaryOperator(contents.clone()),
+        violations::UseTernaryOperator {
+            contents: contents.clone(),
+        },
         Range::from_located(stmt),
     );
     if checker.patch(&Rule::UseTernaryOperator) {
@@ -425,7 +427,9 @@ pub fn use_dict_get_with_default(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::DictGetWithDefault(contents.clone()),
+        violations::DictGetWithDefault {
+            contents: contents.clone(),
+        },
         Range::from_located(stmt),
     );
     if checker.patch(&Rule::DictGetWithDefault) {

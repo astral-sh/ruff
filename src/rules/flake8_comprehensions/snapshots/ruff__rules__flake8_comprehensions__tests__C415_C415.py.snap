@@ -3,7 +3,8 @@ source: src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessarySubscriptReversal: set
+    UnnecessarySubscriptReversal:
+      func: set
   location:
     row: 2
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessarySubscriptReversal: reversed
+    UnnecessarySubscriptReversal:
+      func: reversed
   location:
     row: 3
     column: 4
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessarySubscriptReversal: sorted
+    UnnecessarySubscriptReversal:
+      func: sorted
   location:
     row: 4
     column: 4
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessarySubscriptReversal: sorted
+    UnnecessarySubscriptReversal:
+      func: sorted
   location:
     row: 5
     column: 4

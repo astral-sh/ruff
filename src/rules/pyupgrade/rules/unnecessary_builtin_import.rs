@@ -69,13 +69,13 @@ pub fn unnecessary_builtin_import(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryBuiltinImport(
-            unused_imports
+        violations::UnnecessaryBuiltinImport {
+            names: unused_imports
                 .iter()
                 .map(|alias| alias.node.name.to_string())
                 .sorted()
                 .collect(),
-        ),
+        },
         Range::from_located(stmt),
     );
 

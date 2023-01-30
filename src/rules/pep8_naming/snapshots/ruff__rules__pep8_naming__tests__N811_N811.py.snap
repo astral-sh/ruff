@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     ConstantImportedAsNonConstant:
-      - CONST
-      - const
+      name: CONST
+      asname: const
   location:
     row: 1
     column: 0
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantImportedAsNonConstant:
-      - CONSTANT
-      - constant
+      name: CONSTANT
+      asname: constant
   location:
     row: 2
     column: 0
@@ -28,8 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ConstantImportedAsNonConstant:
-      - ANOTHER_CONSTANT
-      - another_constant
+      name: ANOTHER_CONSTANT
+      asname: another_constant
   location:
     row: 3
     column: 0

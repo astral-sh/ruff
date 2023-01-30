@@ -3,7 +3,8 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 5
     column: 8
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 10
     column: 4
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 16
     column: 4
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 24
     column: 4
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 31
     column: 4
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 37
     column: 4
@@ -111,7 +117,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 45
     column: 4
@@ -129,7 +136,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 53
     column: 4
@@ -147,7 +155,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 61
     column: 4
@@ -165,7 +174,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 69
     column: 4
@@ -183,7 +193,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: B
+    UselessObjectInheritance:
+      name: B
   location:
     row: 75
     column: 11
@@ -201,7 +212,8 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    UselessObjectInheritance: B
+    UselessObjectInheritance:
+      name: B
   location:
     row: 79
     column: 8
@@ -219,7 +231,8 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    UselessObjectInheritance: B
+    UselessObjectInheritance:
+      name: B
   location:
     row: 84
     column: 4
@@ -237,7 +250,8 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    UselessObjectInheritance: B
+    UselessObjectInheritance:
+      name: B
   location:
     row: 92
     column: 4
@@ -255,7 +269,8 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    UselessObjectInheritance: B
+    UselessObjectInheritance:
+      name: B
   location:
     row: 98
     column: 4
@@ -273,7 +288,8 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    UselessObjectInheritance: B
+    UselessObjectInheritance:
+      name: B
   location:
     row: 108
     column: 4
@@ -291,7 +307,8 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 114
     column: 12
@@ -309,7 +326,8 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 119
     column: 4
@@ -327,7 +345,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 125
     column: 4
@@ -345,7 +364,8 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UselessObjectInheritance: A
+    UselessObjectInheritance:
+      name: A
   location:
     row: 131
     column: 4

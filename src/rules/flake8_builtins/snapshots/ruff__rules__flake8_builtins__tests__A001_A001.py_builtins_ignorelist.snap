@@ -3,7 +3,8 @@ source: src/rules/flake8_builtins/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BuiltinVariableShadowing: sum
+    BuiltinVariableShadowing:
+      name: sum
   location:
     row: 1
     column: 0
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: int
+    BuiltinVariableShadowing:
+      name: int
   location:
     row: 2
     column: 0
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: print
+    BuiltinVariableShadowing:
+      name: print
   location:
     row: 5
     column: 0
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: copyright
+    BuiltinVariableShadowing:
+      name: copyright
   location:
     row: 6
     column: 0
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: complex
+    BuiltinVariableShadowing:
+      name: complex
   location:
     row: 7
     column: 1
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: float
+    BuiltinVariableShadowing:
+      name: float
   location:
     row: 8
     column: 0
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: object
+    BuiltinVariableShadowing:
+      name: object
   location:
     row: 8
     column: 8
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: min
+    BuiltinVariableShadowing:
+      name: min
   location:
     row: 9
     column: 0
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: max
+    BuiltinVariableShadowing:
+      name: max
   location:
     row: 9
     column: 5
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: bytes
+    BuiltinVariableShadowing:
+      name: bytes
   location:
     row: 13
     column: 0
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: slice
+    BuiltinVariableShadowing:
+      name: slice
   location:
     row: 16
     column: 0
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: ValueError
+    BuiltinVariableShadowing:
+      name: ValueError
   location:
     row: 21
     column: 0
@@ -123,7 +135,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: memoryview
+    BuiltinVariableShadowing:
+      name: memoryview
   location:
     row: 24
     column: 4
@@ -133,7 +146,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: bytearray
+    BuiltinVariableShadowing:
+      name: bytearray
   location:
     row: 24
     column: 17
@@ -143,7 +157,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: str
+    BuiltinVariableShadowing:
+      name: str
   location:
     row: 27
     column: 21
@@ -153,7 +168,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: all
+    BuiltinVariableShadowing:
+      name: all
   location:
     row: 27
     column: 44
@@ -163,7 +179,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: any
+    BuiltinVariableShadowing:
+      name: any
   location:
     row: 27
     column: 49
@@ -173,7 +190,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing: sum
+    BuiltinVariableShadowing:
+      name: sum
   location:
     row: 30
     column: 7

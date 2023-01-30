@@ -49,7 +49,7 @@ pub static TYPING_EXTENSIONS: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
         "assert_type",
         "clear_overloads",
         "final",
-        "get_Type_hints",
+        "get_type_hints",
         "get_args",
         "get_origin",
         "get_overloads",

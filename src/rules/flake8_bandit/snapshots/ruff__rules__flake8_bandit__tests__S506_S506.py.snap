@@ -3,7 +3,8 @@ source: src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnsafeYAMLLoad: ~
+    UnsafeYAMLLoad:
+      loader: ~
   location:
     row: 10
     column: 8
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnsafeYAMLLoad: Loader
+    UnsafeYAMLLoad:
+      loader: Loader
   location:
     row: 24
     column: 23

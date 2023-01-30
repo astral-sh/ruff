@@ -31,13 +31,15 @@ pub fn request_without_timeout(
                 _ => None,
             } {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::RequestWithoutTimeout(Some(timeout)),
+                    violations::RequestWithoutTimeout {
+                        timeout: Some(timeout),
+                    },
                     Range::from_located(timeout_arg),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
-                violations::RequestWithoutTimeout(None),
+                violations::RequestWithoutTimeout { timeout: None },
                 Range::from_located(func),
             ));
         }

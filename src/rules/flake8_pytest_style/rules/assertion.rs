@@ -52,7 +52,9 @@ where
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
                         self.errors.push(Diagnostic::new(
-                            violations::AssertInExcept(id.to_string()),
+                            violations::AssertInExcept {
+                                name: id.to_string(),
+                            },
                             Range::from_located(current_assert),
                         ));
                     }
@@ -100,7 +102,9 @@ pub fn unittest_assertion(
         ExprKind::Attribute { attr, .. } => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 let mut diagnostic = Diagnostic::new(
-                    violations::UnittestAssertion(unittest_assert.to_string()),
+                    violations::UnittestAssertion {
+                        assertion: unittest_assert.to_string(),
+                    },
                     Range::from_located(func),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
