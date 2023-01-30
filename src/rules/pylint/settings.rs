@@ -5,7 +5,7 @@ use ruff_macros::ConfigurationOptions;
 use rustpython_ast::Constant;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
+use std::hash::Hash;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ConstantType {
@@ -51,29 +51,36 @@ pub struct Options {
             allow-magic-value-types = ["int"]
         "#
     )]
-    /// Constant types to ignore when used as "magic values".
+    /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
+    #[option(default = r"5", value_type = "usize", example = r"max_args = 5")]
+    /// Maximum number of arguments allowed for a function definition (see: `PLR0913`).
+    pub max_args: Option<usize>,
 }
 
 #[derive(Debug, Hash)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
+    pub max_args: usize,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_magic_value_types: vec![ConstantType::Str],
+            max_args: 5,
         }
     }
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
+        let defaults = Settings::default();
         Self {
             allow_magic_value_types: options
                 .allow_magic_value_types
-                .unwrap_or_else(|| vec![ConstantType::Str]),
+                .unwrap_or(defaults.allow_magic_value_types),
+            max_args: options.max_args.unwrap_or(defaults.max_args),
         }
     }
 }
@@ -82,6 +89,7 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             allow_magic_value_types: Some(settings.allow_magic_value_types),
+            max_args: Some(settings.max_args),
         }
     }
 }
