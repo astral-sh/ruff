@@ -5,11 +5,21 @@ expression: diagnostics
 - kind:
     LoggingRedundantExcInfo: ~
   location:
-    row: 3
-    column: 33
+    row: 8
+    column: 37
   end_location:
-    row: 3
-    column: 46
+    row: 8
+    column: 50
+  fix: ~
+  parent: ~
+- kind:
+    LoggingRedundantExcInfo: ~
+  location:
+    row: 13
+    column: 37
+  end_location:
+    row: 13
+    column: 60
   fix: ~
   parent: ~
 
