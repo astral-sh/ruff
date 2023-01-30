@@ -284,7 +284,7 @@ ruff_macros::define_rule_mapping!(
     D300 => violations::UsesTripleQuotes,
     D301 => violations::UsesRPrefixForBackslashedContent,
     D400 => violations::EndsInPeriod,
-    D401 => crate::rules::pydocstyle::rules::non_imperative_mood::NonImperativeMood,
+    D401 => rules::pydocstyle::rules::non_imperative_mood::NonImperativeMood,
     D402 => violations::NoSignature,
     D403 => violations::FirstLineCapitalized,
     D404 => violations::NoThisPrefix,

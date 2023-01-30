@@ -2092,7 +2092,6 @@ where
                 {
                     pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
-
                 if self.settings.rules.enabled(&Rule::DatetimeTimezoneUTC)
                     && self.settings.target_version >= PythonVersion::Py311
                 {
@@ -2104,16 +2103,13 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteMockImport) {
                     pyupgrade::rules::rewrite_mock_attribute(self, expr);
                 }
-
                 if self.settings.rules.enabled(&Rule::SixPY3Referenced) {
                     flake8_2020::rules::name_or_attribute(self, expr);
                 }
-
-                pandas_vet::rules::check_attr(self, attr, value, expr);
-
                 if self.settings.rules.enabled(&Rule::BannedApi) {
                     flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
                 }
+                pandas_vet::rules::check_attr(self, attr, value, expr);
             }
             ExprKind::Call {
                 func,

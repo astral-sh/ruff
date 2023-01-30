@@ -79,7 +79,7 @@ pub fn remove_class_def_base(
         }
 
         match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Some(Fix::replacement(String::new(), start, end)),
+            (Some(start), Some(end)) => Some(Fix::deletion(start, end)),
             _ => None,
         }
     } else {
@@ -98,7 +98,7 @@ pub fn remove_class_def_base(
         }
 
         match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Some(Fix::replacement(String::new(), start, end)),
+            (Some(start), Some(end)) => Some(Fix::deletion(start, end)),
             _ => None,
         }
     }

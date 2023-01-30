@@ -1216,13 +1216,13 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
 | PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
 | PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
-| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
+| PTH109 | pathlib-getcwd | `os.getcwd` should be replaced by `Path.cwd()` |  |
 | PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
 | PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
 | PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
 | PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
 | PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
-| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
+| PTH115 | pathlib-readlink | `os.readlink` should be replaced by `.readlink()` |  |
 | PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
 | PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
 | PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |

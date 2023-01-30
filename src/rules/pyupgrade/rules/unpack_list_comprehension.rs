@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// Returns `true` if `expr` contains an `ExprKind::Await`.
@@ -83,7 +83,7 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
                 violations::RewriteListComprehension,
                 Range::from_located(value),
             );
-            if checker.patch(&Rule::RewriteListComprehension) {
+            if checker.patch(diagnostic.kind.rule()) {
                 let existing = checker
                     .locator
                     .slice_source_code_range(&Range::from_located(value));

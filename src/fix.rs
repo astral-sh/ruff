@@ -36,6 +36,8 @@ impl Fix {
     }
 
     pub fn replacement(content: String, start: Location, end: Location) -> Self {
+        debug_assert!(!content.is_empty(), "Prefer `Fix::deletion`");
+
         Self {
             content,
             location: start,
@@ -44,6 +46,8 @@ impl Fix {
     }
 
     pub fn insertion(content: String, at: Location) -> Self {
+        debug_assert!(!content.is_empty(), "Insert content is empty");
+
         Self {
             content,
             location: at,
