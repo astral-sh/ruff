@@ -256,6 +256,7 @@ ruff_macros::define_rule_mapping!(
     UP032 => violations::FString,
     UP033 => violations::FunctoolsCache,
     UP034 => violations::ExtraneousParentheses,
+    UP038 => rules::pyupgrade::rules::QuotedAnnotations,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,

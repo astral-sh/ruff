@@ -445,7 +445,7 @@ where
                 returns,
                 args,
                 body,
-                ..
+                type_comment,
             }
             | StmtKind::AsyncFunctionDef {
                 name,
@@ -453,7 +453,7 @@ where
                 returns,
                 args,
                 body,
-                ..
+                type_comment,
             } => {
                 if self.settings.rules.enabled(&Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
@@ -535,6 +535,9 @@ where
                     && self.settings.target_version >= PythonVersion::Py39
                 {
                     pyupgrade::rules::functools_cache(self, decorator_list);
+                }
+                if self.settings.rules.enabled(&Rule::QuotedAnnotations) {
+                    pyupgrade::rules::quoted_annotations(self, args, type_comment);
                 }
 
                 if self.settings.rules.enabled(&Rule::UselessExpression) {
