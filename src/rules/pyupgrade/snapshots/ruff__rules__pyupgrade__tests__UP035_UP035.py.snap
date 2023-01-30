@@ -166,119 +166,100 @@ expression: diagnostics
     column: 0
   end_location:
     row: 20
-    column: 38
-  fix:
-    content:
-      - from six.moves import getcwd
-      - from io import StringIO
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 20
-      column: 38
-  parent: ~
-- kind:
-    ImportReplacements: ~
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 22
     column: 51
   fix:
     content:
       - from collections import Counter
       - from collections.abc import Mapping as mapping
     location:
-      row: 22
+      row: 20
       column: 0
     end_location:
-      row: 22
+      row: 20
       column: 51
   parent: ~
 - kind:
     ImportReplacements: ~
   location:
-    row: 25
+    row: 23
     column: 4
   end_location:
-    row: 25
+    row: 23
     column: 44
   fix:
     content:
       - from collections import Counter
       - "    from collections.abc import Mapping"
     location:
-      row: 25
+      row: 23
       column: 4
     end_location:
-      row: 25
+      row: 23
       column: 44
   parent: ~
 - kind:
     ImportReplacements: ~
   location:
-    row: 30
+    row: 28
     column: 4
   end_location:
-    row: 30
+    row: 28
     column: 44
   fix:
     content:
       - from collections import Counter
       - "    from collections.abc import Mapping"
     location:
-      row: 30
+      row: 28
       column: 4
     end_location:
-      row: 30
+      row: 28
       column: 44
   parent: ~
 - kind:
     ImportReplacements: ~
   location:
-    row: 32
+    row: 30
     column: 9
   end_location:
-    row: 32
+    row: 30
     column: 40
   fix:
     content:
       - from collections.abc import Mapping
     location:
-      row: 32
+      row: 30
       column: 9
     end_location:
-      row: 32
+      row: 30
       column: 40
   parent: ~
 - kind:
     ImportReplacements: ~
   location:
-    row: 35
+    row: 33
     column: 0
   end_location:
-    row: 35
+    row: 33
     column: 40
   fix:
     content:
       - from collections import Counter
       - from collections.abc import Mapping
     location:
-      row: 35
+      row: 33
       column: 0
     end_location:
-      row: 35
+      row: 33
       column: 40
   parent: ~
 - kind:
     ImportReplacements: ~
   location:
-    row: 39
+    row: 37
     column: 4
   end_location:
-    row: 44
+    row: 42
     column: 5
   fix:
     content:
@@ -291,10 +272,10 @@ expression: diagnostics
       - "        Callable"
       - "     )"
     location:
-      row: 39
+      row: 37
       column: 4
     end_location:
-      row: 44
+      row: 42
       column: 5
   parent: ~
 

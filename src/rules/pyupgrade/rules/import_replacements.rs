@@ -27,9 +27,6 @@ impl AlwaysAutofixableViolation for ImportReplacements {
 const BAD_MODULES: &[&str] = &[
     "collections",
     "pipes",
-    "six",
-    "six.moves",
-    "six.moves.urllib",
     "mypy_extensions",
     "typing_extensions",
     "typing",
@@ -65,24 +62,6 @@ const COLLECTIONS_TO_ABC: &[&str] = &[
 ];
 
 const PIPES_TO_SHLEX: &[&str] = &["quote"];
-
-const SIX_TO_IO: &[&str] = &["BytesIO", "StringIO"];
-
-const SIX_TO_FUNCTOOLS: &[&str] = &["wraps"];
-
-const SIXMOVES_TO_IO: &[&str] = &["StringIO"];
-
-const SIXMOVES_TO_COLLECTIONS: &[&str] = &["UserDict", "UserList", "UserString"];
-
-const SIXMOVES_TO_ITERTOOLS: &[&str] = &["filterfalse", "zip_longest"];
-
-const SIXMOVES_TO_OS: &[&str] = &["getcwd", "getcwdb"];
-
-const SIXMOVES_TO_SUBPROCESS: &[&str] = &["getouput"];
-
-const SIXMOVES_TO_SYS: &[&str] = &["intern"];
-
-const SIXMOVES_TO_URLLIB: &[&str] = &["parse", "request", "response", "error", "robotparser"];
 
 const TYPINGEXTENSIONS_TO_TYPING: &[&str] = &[
     "AsyncIterable",
@@ -243,34 +222,6 @@ impl<'a> FixImports<'a> {
         match self.module {
             "collections" => self.create_new_str(COLLECTIONS_TO_ABC, "collections.abc"),
             "pipes" => self.create_new_str(PIPES_TO_SHLEX, "shlex"),
-            "six" => {
-                if has_match(SIX_TO_IO, self.names) {
-                    self.create_new_str(SIX_TO_IO, "io")
-                } else if has_match(SIX_TO_FUNCTOOLS, self.names) {
-                    self.create_new_str(SIX_TO_FUNCTOOLS, "functools")
-                } else {
-                    None
-                }
-            }
-            "six.moves" => {
-                if has_match(SIXMOVES_TO_IO, self.names) {
-                    self.create_new_str(SIXMOVES_TO_IO, "io")
-                } else if has_match(SIXMOVES_TO_COLLECTIONS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_COLLECTIONS, "collections")
-                } else if has_match(SIXMOVES_TO_ITERTOOLS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_ITERTOOLS, "itertools")
-                } else if has_match(SIXMOVES_TO_OS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_OS, "os")
-                } else if has_match(SIXMOVES_TO_SUBPROCESS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_SUBPROCESS, "subprocess")
-                } else if has_match(SIXMOVES_TO_SYS, self.names) {
-                    self.create_new_str(SIXMOVES_TO_SYS, "sys")
-                } else if has_match(SIXMOVES_TO_URLLIB, self.names) {
-                    self.create_new_str(SIXMOVES_TO_URLLIB, "urllib")
-                } else {
-                    None
-                }
-            }
             "typing_extensions" => {
                 if has_match(TYPINGEXTENSIONS_TO_TYPING, self.names) {
                     self.create_new_str(TYPINGEXTENSIONS_TO_TYPING, "typing")

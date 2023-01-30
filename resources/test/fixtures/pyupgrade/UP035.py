@@ -17,8 +17,6 @@ from collections import Counter, \
 
 from collections import Counter, Mapping, Sequence
 
-from six.moves import getcwd, StringIO
-
 from collections import Mapping as mapping, Counter
 
 if True:
