@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use num_bigint::{BigInt, Sign};
 use ruff_macros::derive_message_formats;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, Unaryop};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use textwrap::{dedent, indent};
@@ -327,25 +327,6 @@ pub fn old_code_blocks(
                         _ => (),
                     }
                 }
-            }
-        }
-        ExprKind::Attribute { .. } => {
-            // if six.PY2
-            if check_path(checker, test, &["six", "PY2"]) {
-                fix_py2_block(checker, stmt, body, orelse, &tokens);
-            // if six.PY3
-            } else if check_path(checker, test, &["six", "PY3"]) {
-                fix_py3_block(checker, stmt, test, body, &tokens);
-            }
-        }
-        ExprKind::UnaryOp { op, operand } => {
-            // if not six.PY3
-            if check_path(checker, operand, &["six", "PY3"]) && op == &Unaryop::Not {
-                fix_py2_block(checker, stmt, body, orelse, &tokens);
-            }
-            // if not six.PY2
-            if check_path(checker, operand, &["six", "PY2"]) && op == &Unaryop::Not {
-                fix_py3_block(checker, stmt, test, body, &tokens);
             }
         }
         _ => (),

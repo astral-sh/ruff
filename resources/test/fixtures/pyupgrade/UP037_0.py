@@ -1,13 +1,11 @@
 import sys
-import six
-from six import PY2, PY3
 
-if six.PY2:
+if sys.version_info < (3,0):
     print("py2")
 else:
     print("py3")
 
-if six.PY2:
+if sys.version_info < (3,0):
     if True:
         print("py2!")
     else:
@@ -15,20 +13,20 @@ if six.PY2:
 else:
     print("py3")
 
-if six.PY2: print("PY2!")
+if sys.version_info < (3,0): print("PY2!")
 else: print("PY3!")
 
 if True:
-    if six.PY2:
+    if sys.version_info < (3,0):
         print("PY2")
     else:
         print("PY3")
 
-if six.PY2: print(1 if True else 3)
+if sys.version_info < (3,0): print(1 if True else 3)
 else:
     print("py3")
 
-if six.PY2:
+if sys.version_info < (3,0):
     def f():
         print("py2")
 else:
@@ -36,7 +34,7 @@ else:
         print("py3")
         print("This the next")
 
-if not six.PY2:
+if sys.version_info > (3,0):
     print("py3")
 else:
     print("py2")
@@ -44,7 +42,7 @@ else:
 
 x = 1
 
-if not six.PY2:
+if sys.version_info > (3,0):
     print("py3")
 else:
     print("py2")
@@ -52,27 +50,27 @@ else:
 
 x = 1
 
-if not six.PY2: print("py3")
+if sys.version_info > (3,0): print("py3")
 else: print("py2")
 
-if six.PY3:
+if sys.version_info > (3,):
     print("py3")
 else:
     print("py2")
 
 if True:
-    if six.PY3:
+    if sys.version_info > (3,):
         print("py3")
     else:
         print("py2")
 
-if not PY3:
+if sys.version_info > (3,):
     print("py2")
 else:
     print("py3")
 
 def f():
-    if six.PY2:
+    if sys.version_info < (3,0):
         try:
             yield
         finally:
@@ -85,7 +83,7 @@ class C:
     def g():
         pass
 
-    if six.PY2:
+    if sys.version_info < (3,0):
         def f(py2):
             pass
     else:
@@ -96,14 +94,14 @@ class C:
         pass
 
 if True:
-    if six.PY2:
+    if sys.version_info < (3,0):
         2
     else:
         3
 
     # comment
 
-if six.PY2:
+if sys.version_info < (3,0):
     def f():
         print("py2")
     def g():
@@ -120,7 +118,7 @@ if True:
     # comment
     print(2+3)
 
-if six.PY3: print(3)
+if sys.version_info > (3,): print(3)
 
-if six.PY3:
+if sys.version_info > (3,):
     print(3)

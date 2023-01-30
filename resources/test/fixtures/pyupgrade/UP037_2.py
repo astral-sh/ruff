@@ -40,19 +40,19 @@ if sys.version_info >= (3, 5):
     pass
 
 # These below tests should NOT change
-if six.PY2:
+if sys.version_info < (3,0):
     pass
 
 if True:
-    if six.PY2:
+    if sys.version_info < (3,0):
         pass
 
-if six.PY2:
+if sys.version_info < (3,0):
     pass
 elif False:
     pass
 
-if six.PY3:
+if sys.version_info > (3,):
     pass
 elif False:
     pass
