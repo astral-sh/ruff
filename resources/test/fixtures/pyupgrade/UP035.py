@@ -41,8 +41,10 @@ if True:
         Good,
     )
 
-# OK
-from a import b
+from typing import Callable, Match, Pattern, List
 
 if True: from collections import (
     Mapping, Counter)
+
+# OK
+from a import b

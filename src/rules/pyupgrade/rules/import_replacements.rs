@@ -1,20 +1,22 @@
-use rustpython_ast::{Alias, AliasData, Stmt};
+use itertools::Itertools;
+use rustpython_ast::{Alias, AliasData, Located, Stmt};
 
 use ruff_macros::derive_message_formats;
 
 use crate::ast::types::Range;
+use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::rules::pyupgrade::helpers::{format_import_from, ImportFormatting};
 use crate::settings::types::PythonVersion;
-use crate::source_code::Stylist;
+use crate::source_code::{Locator, Stylist};
 use crate::violation::{Availability, Violation};
 use crate::{define_violation, AutofixKind};
 
 define_violation!(
     pub struct ImportReplacements {
-        pub replacement: String,
+        pub module: String,
+        pub members: Vec<String>,
         pub fixable: bool,
     }
 );
@@ -23,14 +25,17 @@ impl Violation for ImportReplacements {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportReplacements { replacement, .. } = self;
-        format!("Import from `{replacement}` instead")
+        let ImportReplacements {
+            module, members, ..
+        } = self;
+        let names = members.iter().map(|name| format!("`{name}`")).join(", ");
+        format!("Import from `{module}` instead: {names}")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         let ImportReplacements { fixable, .. } = self;
         if *fixable {
-            Some(|ImportReplacements { replacement, .. }| format!("Import from `{replacement}`"))
+            Some(|ImportReplacements { module, .. }| format!("Import from `{module}`"))
         } else {
             None
         }
@@ -120,7 +125,7 @@ const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Literal",
     "OrderedDict",
     "Protocol",
-    "SupportsInded",
+    "SupportsIndex",
     "runtime_checkable",
 ];
 
@@ -204,107 +209,197 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "reveal_type",
 ];
 
-fn has_match(set1: &[&str], set2: &[AliasData]) -> bool {
-    set2.iter().any(|x| set1.contains(&x.name.as_str()))
+struct Replacement<'a> {
+    module: &'a str,
+    members: Vec<&'a AliasData>,
+    content: Option<String>,
+}
+
+struct ImportFormatting<'a> {
+    /// The line ending of the import.
+    pub line_ending: &'a str,
+    /// Whether the import is multi-line.
+    pub multi_line: bool,
+    /// Whether the import is on its own line.
+    pub own_line: bool,
+    /// The indentation of the members of the import.
+    pub member_indent: &'a str,
+    /// The indentation of the import statement.
+    pub stmt_indent: &'a str,
+}
+
+impl<'a> ImportFormatting<'a> {
+    pub fn new<T>(
+        locator: &'a Locator<'a>,
+        stylist: &'a Stylist<'a>,
+        stmt: &'a Located<T>,
+        args: &'a [Alias],
+    ) -> Self {
+        let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+
+        let line_ending = stylist.line_ending().as_str();
+        let multi_line = module_text.contains(line_ending);
+        let own_line = indentation(locator, stmt).is_some();
+        let stmt_indent =
+            indentation(locator, stmt).unwrap_or_else(|| stylist.indentation().as_str());
+        let member_indent = if multi_line {
+            indentation(locator, &args[0]).unwrap_or_else(|| stylist.indentation().as_str())
+        } else {
+            ""
+        };
+        Self {
+            line_ending,
+            multi_line,
+            own_line,
+            member_indent,
+            stmt_indent,
+        }
+    }
+
+    /// Converts a list of names and a module into an `import from`-style import.
+    fn format_import_from(&self, names: &[&AliasData], module: &str) -> String {
+        // Construct the whitespace strings.
+        let line_ending = self.line_ending;
+        let after_comma = if multi_line { line_ending } else { " " };
+        let before_imports = if multi_line {
+            format!("({line_ending}")
+        } else {
+            String::new()
+        };
+        let after_imports = if multi_line {
+            format!("{line_ending}{start_indent})")
+        } else {
+            String::new()
+        };
+
+        // Generate the formatted names.
+        let full_names = {
+            let full_names: Vec<String> = names
+                .iter()
+                .map(|name| match &name.asname {
+                    Some(asname) => format!("{indent}{} as {asname}", name.name),
+                    None => format!("{indent}{}", name.name),
+                })
+                .collect();
+            let mut full_names = full_names.join(&format!(",{}", after_comma));
+            if multi_line {
+                full_names.push(',');
+            }
+            full_names
+        };
+
+        format!(
+            "from {} import {}{}{}",
+            module, before_imports, full_names, after_imports
+        )
+    }
 }
 
 struct FixImports<'a> {
     module: &'a str,
-    names: &'a [AliasData],
+    members: &'a [AliasData],
     formatting: ImportFormatting<'a>,
     version: PythonVersion,
-    stylist: &'a Stylist<'a>,
 }
 
 impl<'a> FixImports<'a> {
     fn new(
         module: &'a str,
-        names: &'a [AliasData],
+        members: &'a [AliasData],
         formatting: ImportFormatting<'a>,
         version: PythonVersion,
-        stylist: &'a Stylist,
     ) -> Self {
         Self {
             module,
-            names,
+            members,
             formatting,
             version,
-            stylist,
         }
     }
 
-    fn check_replacement(&self) -> Option<(String, Option<String>)> {
+    fn replacements(&self) -> Vec<Replacement> {
+        let mut replacements = vec![];
         match self.module {
-            "collections" => self.create_new_str(COLLECTIONS_TO_ABC, "collections.abc"),
-            "pipes" => self.create_new_str(PIPES_TO_SHLEX, "shlex"),
+            "collections" => {
+                if let Some(replacement) = self.try_replace(COLLECTIONS_TO_ABC, "collections.abc") {
+                    replacements.push(replacement);
+                }
+            }
+            "pipes" => {
+                if let Some(replacement) = self.try_replace(PIPES_TO_SHLEX, "shlex") {
+                    replacements.push(replacement);
+                }
+            }
             "typing_extensions" => {
-                if has_match(TYPING_EXTENSIONS_TO_TYPING, self.names) {
-                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING, "typing")
-                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_37, self.names)
-                    && self.version >= PythonVersion::Py37
+                let mut typing_extensions_to_typing = TYPING_EXTENSIONS_TO_TYPING.to_vec();
+                if self.version >= PythonVersion::Py37 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_37);
+                }
+                if self.version >= PythonVersion::Py38 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_38);
+                }
+                if self.version >= PythonVersion::Py39 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_39);
+                }
+                if self.version >= PythonVersion::Py310 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_310);
+                }
+                if self.version >= PythonVersion::Py311 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_311);
+                }
+                if let Some(replacement) = self.try_replace(&typing_extensions_to_typing, "typing")
                 {
-                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_37, "typing")
-                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_38, self.names)
-                    && self.version >= PythonVersion::Py38
-                {
-                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_38, "typing")
-                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_39, self.names)
-                    && self.version >= PythonVersion::Py39
-                {
-                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_39, "typing")
-                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_310, self.names)
-                    && self.version >= PythonVersion::Py310
-                {
-                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_310, "typing")
-                } else if has_match(TYPING_EXTENSIONS_TO_TYPING_311, self.names)
-                    && self.version >= PythonVersion::Py311
-                {
-                    self.create_new_str(TYPING_EXTENSIONS_TO_TYPING_311, "typing")
-                } else {
-                    None
+                    replacements.push(replacement);
                 }
             }
             "mypy_extensions" => {
-                if has_match(MYPY_EXTENSIONS_TO_TYPING_37, self.names)
-                    && self.version >= PythonVersion::Py37
-                {
-                    self.create_new_str(MYPY_EXTENSIONS_TO_TYPING_37, "typing")
-                } else if has_match(MYPY_EXTENSIONS_TO_TYPING_38, self.names)
-                    && self.version >= PythonVersion::Py38
-                {
-                    self.create_new_str(MYPY_EXTENSIONS_TO_TYPING_38, "typing")
-                } else {
-                    None
+                let mut mypy_extensions_to_typing = vec![];
+                if self.version >= PythonVersion::Py37 {
+                    mypy_extensions_to_typing.extend(MYPY_EXTENSIONS_TO_TYPING_37);
+                }
+                if self.version >= PythonVersion::Py38 {
+                    mypy_extensions_to_typing.extend(MYPY_EXTENSIONS_TO_TYPING_38);
+                }
+                if let Some(replacement) = self.try_replace(&mypy_extensions_to_typing, "typing") {
+                    replacements.push(replacement);
                 }
             }
             "typing" => {
-                if has_match(TYPING_TO_COLLECTIONS_ABC_39, self.names)
-                    && self.version >= PythonVersion::Py39
+                // `typing` to `collections.abc`
+                let mut typing_to_collections_abc = vec![];
+                if self.version >= PythonVersion::Py39 {
+                    typing_to_collections_abc.extend(TYPING_TO_COLLECTIONS_ABC_39);
+                }
+                if self.version >= PythonVersion::Py310 {
+                    typing_to_collections_abc.extend(TYPING_TO_COLLECTIONS_ABC_310);
+                }
+                if let Some(replacement) =
+                    self.try_replace(&typing_to_collections_abc, "collections.abc")
                 {
-                    self.create_new_str(TYPING_TO_COLLECTIONS_ABC_39, "collections.abc")
-                } else if has_match(TYPING_TO_RE_39, self.names)
-                    && self.version >= PythonVersion::Py39
-                {
-                    self.create_new_str(TYPING_TO_RE_39, "re")
-                } else if has_match(TYPING_TO_COLLECTIONS_ABC_310, self.names)
-                    && self.version >= PythonVersion::Py310
-                {
-                    self.create_new_str(TYPING_TO_COLLECTIONS_ABC_310, "collections.abc")
-                } else {
-                    None
+                    replacements.push(replacement);
+                }
+
+                // `typing` to `re`
+                let mut typing_to_re = vec![];
+                if self.version >= PythonVersion::Py39 {
+                    typing_to_re.extend(TYPING_TO_RE_39);
+                }
+                if let Some(replacement) = self.try_replace(&typing_to_re, "re") {
+                    replacements.push(replacement);
                 }
             }
             "typing.re" if self.version >= PythonVersion::Py39 => {
-                self.create_new_str(TYPING_RE_TO_RE_39, "re")
+                if let Some(replacement) = self.try_replace(TYPING_RE_TO_RE_39, "re") {
+                    replacements.push(replacement);
+                }
             }
-            _ => None,
+            _ => {}
         }
+        replacements
     }
 
-    // TODO(charlie): This needs to return the `replace` module and the list of matched names,
-    // to improve the error message.
-    fn create_new_str(&self, matches: &[&str], replace: &str) -> Option<(String, Option<String>)> {
-        let (matched_names, unmatched_names) = self.partition_imports(matches);
+    fn try_replace(&'a self, candidates: &[&str], target: &'a str) -> Option<Replacement<'a>> {
+        let (matched_names, unmatched_names) = self.partition_imports(candidates);
 
         // If we have no matched names, we don't need to do anything.
         if matched_names.is_empty() {
@@ -315,49 +410,49 @@ impl<'a> FixImports<'a> {
         // can't add a statement after it. For example, if we have `if True: import foo`, we can't
         // add a statement to the next line.
         if !unmatched_names.is_empty() && !self.formatting.own_line {
-            return Some((replace.to_string(), None));
+            return Some(Replacement {
+                module: target,
+                members: matched_names,
+                content: None,
+            });
         }
 
-        let matched = format_import_from(
-            &matched_names,
-            replace,
-            self.formatting.multi_line,
-            self.formatting.member_indent,
-            self.formatting.stmt_indent,
-            self.stylist,
-        );
+        // TODO(charlie): Let's just always do this a a single-line import.
+        let matched = self.formatting.format_import_from(&matched_names, target);
 
         if unmatched_names.is_empty() {
-            return Some((replace.to_string(), Some(matched)));
+            return Some(Replacement {
+                module: target,
+                members: matched_names,
+                content: Some(matched),
+            });
         }
 
-        let unmatched = format_import_from(
-            &unmatched_names,
-            self.module,
-            self.formatting.multi_line,
-            self.formatting.member_indent,
-            self.formatting.stmt_indent,
-            self.stylist,
-        );
-        Some((
-            replace.to_string(),
-            Some(format!(
+        // TODO(charlie): Let's try to retain more styling here?
+        let unmatched = self
+            .formatting
+            .format_import_from(&unmatched_names, self.module);
+
+        Some(Replacement {
+            module: target,
+            members: matched_names,
+            content: Some(format!(
                 "{unmatched}{}{}{matched}",
                 self.stylist.line_ending().as_str(),
-                self.formatting.stmt_indent
+                self.formatting.stmt_indent,
             )),
-        ))
+        })
     }
 
     /// Partitions imports into matched and unmatched names.
-    fn partition_imports(&self, matches: &[&str]) -> (Vec<AliasData>, Vec<AliasData>) {
-        let mut matched_names: Vec<AliasData> = vec![];
-        let mut unmatched_names: Vec<AliasData> = vec![];
-        for name in self.names {
-            if matches.contains(&name.name.as_str()) {
-                matched_names.push(name.clone());
+    fn partition_imports(&self, candidates: &[&str]) -> (Vec<&AliasData>, Vec<&AliasData>) {
+        let mut matched_names = vec![];
+        let mut unmatched_names = vec![];
+        for name in self.members {
+            if candidates.contains(&name.name.as_str()) {
+                matched_names.push(name);
             } else {
-                unmatched_names.push(name.clone());
+                unmatched_names.push(name);
             }
         }
         (matched_names, unmatched_names)
@@ -385,34 +480,36 @@ pub fn import_replacements(
     }
 
     let formatting = ImportFormatting::new(checker.locator, checker.stylist, stmt, names);
-    let names: Vec<AliasData> = names.iter().map(|alias| alias.node.clone()).collect();
+    let members: Vec<AliasData> = names.iter().map(|alias| alias.node.clone()).collect();
     let fixer = FixImports::new(
         module,
-        &names,
+        &members,
         formatting,
         checker.settings.target_version,
-        checker.stylist,
     );
 
-    let Some((module, content)) = fixer.check_replacement() else {
-        return;
-    };
-
-    let mut diagnostic = Diagnostic::new(
-        ImportReplacements {
-            replacement: module,
-            fixable: content.is_some(),
-        },
-        Range::from_located(stmt),
-    );
-    if checker.patch(&Rule::ImportReplacements) {
-        if let Some(content) = content {
-            diagnostic.amend(Fix::replacement(
-                content,
-                stmt.location,
-                stmt.end_location.unwrap(),
-            ));
+    for replacement in fixer.replacements() {
+        let mut diagnostic = Diagnostic::new(
+            ImportReplacements {
+                module: replacement.module.to_string(),
+                members: replacement
+                    .members
+                    .iter()
+                    .map(|name| name.name.to_string())
+                    .collect(),
+                fixable: replacement.content.is_some(),
+            },
+            Range::from_located(stmt),
+        );
+        if checker.patch(&Rule::ImportReplacements) {
+            if let Some(content) = replacement.content {
+                diagnostic.amend(Fix::replacement(
+                    content,
+                    stmt.location,
+                    stmt.end_location.unwrap(),
+                ));
+            }
         }
+        checker.diagnostics.push(diagnostic)
     }
-    checker.diagnostics.push(diagnostic);
 }

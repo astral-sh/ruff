@@ -4,7 +4,9 @@ expression: diagnostics
 ---
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 2
@@ -24,7 +26,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 4
@@ -44,7 +48,10 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
+        - Sequence
       fixable: true
   location:
     row: 6
@@ -64,7 +71,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 8
@@ -85,7 +94,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 10
@@ -106,7 +117,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 12
@@ -131,7 +144,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 15
@@ -156,7 +171,10 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
+        - Sequence
       fixable: true
   location:
     row: 18
@@ -177,7 +195,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 20
@@ -198,7 +218,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 23
@@ -219,7 +241,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 28
@@ -240,7 +264,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 30
@@ -260,7 +286,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
       fixable: true
   location:
     row: 33
@@ -281,7 +309,10 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Mapping
+        - Callable
       fixable: true
   location:
     row: 37
@@ -308,13 +339,62 @@ expression: diagnostics
   parent: ~
 - kind:
     ImportReplacements:
-      replacement: collections.abc
+      module: collections.abc
+      members:
+        - Callable
+      fixable: true
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 49
+  fix:
+    content:
+      - "from typing import Match, Pattern, List"
+      - from collections.abc import Callable
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 49
+  parent: ~
+- kind:
+    ImportReplacements:
+      module: re
+      members:
+        - Match
+        - Pattern
+      fixable: true
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 49
+  fix:
+    content:
+      - "from typing import Callable, List"
+      - "from re import Match, Pattern"
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 49
+  parent: ~
+- kind:
+    ImportReplacements:
+      module: collections.abc
+      members:
+        - Mapping
       fixable: false
   location:
-    row: 47
+    row: 46
     column: 9
   end_location:
-    row: 48
+    row: 47
     column: 21
   fix: ~
   parent: ~
