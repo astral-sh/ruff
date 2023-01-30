@@ -16,8 +16,8 @@ repos:
       - id: markdownlint-fix
         args:
           - --disable
-          - MD013
-          - MD033
+          - MD013 # line-length
+          - MD033 # no-inline-html
           - --
 
   - repo: local
