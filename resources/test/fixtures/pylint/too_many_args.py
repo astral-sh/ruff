@@ -24,3 +24,4 @@ def foo(x,y,z,*,u,v,w): #OK
 
 def foo(x,y,z,a,b,c,*,u,v,w): #Too many arguments (6/5)
     pass
+

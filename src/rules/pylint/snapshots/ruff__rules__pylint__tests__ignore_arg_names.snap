@@ -4,49 +4,13 @@ expression: diagnostics
 ---
 - kind:
     TooManyArgs:
-      c_args: 8
-      max_args: 5
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 2
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    TooManyArgs:
-      c_args: 8
-      max_args: 5
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 11
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    TooManyArgs:
       c_args: 6
       max_args: 5
   location:
-    row: 13
+    row: 4
     column: 0
   end_location:
-    row: 14
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    TooManyArgs:
-      c_args: 6
-      max_args: 5
-  location:
-    row: 25
-    column: 0
-  end_location:
-    row: 26
+    row: 5
     column: 8
   fix: ~
   parent: ~
