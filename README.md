@@ -794,7 +794,6 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP013 | convert-typed-dict-functional-to-class | Convert `{name}` from `TypedDict` functional to class syntax | 🛠 |
 | UP014 | convert-named-tuple-functional-to-class | Convert `{name}` from `NamedTuple` functional to class syntax | 🛠 |
 | UP015 | redundant-open-modes | Unnecessary open mode parameters | 🛠 |
-| UP016 | remove-six-compat | Unnecessary `six` compatibility usage | 🛠 |
 | UP017 | datetime-timezone-utc | Use `datetime.UTC` alias | 🛠 |
 | UP018 | native-literals | Unnecessary call to `{literal_type}` | 🛠 |
 | UP019 | typing-text-str-alias | `typing.Text` is deprecated, use `str` | 🛠 |
