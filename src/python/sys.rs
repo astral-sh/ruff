@@ -194,6 +194,7 @@ pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashSet<&'static str>> = Lazy::new(|| 
         "tkinter",
         "token",
         "tokenize",
+        "tomllib",
         "trace",
         "traceback",
         "tracemalloc",
