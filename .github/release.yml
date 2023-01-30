@@ -1,0 +1,19 @@
+# https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes#configuring-automatically-generated-release-notes
+changelog:
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking
+    - title: Rules
+      labels:
+        - rule
+        - autofix
+    - title: Settings
+      labels:
+        - configuration
+    - title: Bug Fixes
+      labels:
+        - bug
+    - title: Other Changes
+      labels:
+        - "*"
