@@ -1,6 +1,6 @@
 # Breaking Changes
 
-## Unreleased
+## 0.0.239
 
 ### `select`, `extend-select`, `ignore`, and `extend-ignore` have new semantics ([#2312](https://github.com/charliermarsh/ruff/pull/2312))
 
@@ -31,6 +31,11 @@ ignore = ["F401"]
 
 Running `ruff --select F` would previously have enabled all `F` rules, apart from `F401`. Now, it
 will enable all `F` rules, including `F401`, as the command line's `--select` resets the resolution.
+
+### `remove-six-compat` (`UP016`) has been removed ([#2332](https://github.com/charliermarsh/ruff/pull/2332))
+
+The `remove-six-compat` rule has been removed. This rule was only useful for one-time Python 2-to-3
+upgrades.
 
 ## 0.0.238
 
