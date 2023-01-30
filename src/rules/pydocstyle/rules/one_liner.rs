@@ -3,7 +3,7 @@ use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers;
 use crate::violations;
 
@@ -26,7 +26,7 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
             violations::FitsOnOneLine,
             Range::from_located(docstring.expr),
         );
-        if checker.patch(&Rule::FitsOnOneLine) {
+        if checker.patch(diagnostic.kind.rule()) {
             if let (Some(leading), Some(trailing)) = (
                 helpers::leading_quote(docstring.contents),
                 helpers::trailing_quote(docstring.contents),
