@@ -166,13 +166,13 @@ fn add_noqa_inner(
                         output.push_str(line_ending);
                         count += 1;
                     }
-                    Directive::Codes(_, start, _, existing) => {
+                    Directive::Codes(_, start_byte, _, existing) => {
                         // Reconstruct the line based on the preserved rule codes.
                         // This enables us to tally the number of edits.
-                        let mut formatted = String::new();
+                        let mut formatted = String::with_capacity(line.len());
 
                         // Add existing content.
-                        formatted.push_str(line[..start].trim_end());
+                        formatted.push_str(line[..start_byte].trim_end());
 
                         // Add `noqa` directive.
                         formatted.push_str("  # noqa: ");
