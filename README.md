@@ -701,6 +701,10 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
+| E221 | multiple-spaces-before-operator | Multiple spaces before operator |  |
+| E222 | multiple-spaces-after-operator | Multiple spaces after operator |  |
+| E223 | tab-before-operator | Tab before operator |  |
+| E224 | tab-after-operator | Tab after operator |  |
 | E401 | multiple-imports-on-one-line | Multiple imports on one line |  |
 | E402 | module-import-not-at-top-of-file | Module level import not at top of file |  |
 | E501 | line-too-long | Line too long ({length} > {limit} characters) |  |

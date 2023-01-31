@@ -16,6 +16,10 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
+    #[test_case(Rule::TabBeforeOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MultipleSpacesBeforeOperator, Path::new("E22.py"))]
+    #[test_case(Rule::TabAfterOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MultipleSpacesAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.py"))]

@@ -10,8 +10,9 @@ use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
-use crate::checkers::lines::check_lines;
+use crate::checkers::logical_lines::check_logical_lines;
 use crate::checkers::noqa::check_noqa;
+use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
@@ -89,6 +90,15 @@ pub fn check_path(
         diagnostics.extend(check_file_path(path, package, settings));
     }
 
+    // Run the logical line-based rules.
+    if settings
+        .rules
+        .iter_enabled()
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::LogicalLines))
+    {
+        diagnostics.extend(check_logical_lines(&tokens, locator, settings));
+    }
+
     // Run the AST-based rules.
     let use_ast = settings
         .rules
@@ -152,9 +162,9 @@ pub fn check_path(
     if settings
         .rules
         .iter_enabled()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Lines))
+        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::PhysicalLines))
     {
-        diagnostics.extend(check_lines(
+        diagnostics.extend(check_physical_lines(
             path,
             stylist,
             contents,

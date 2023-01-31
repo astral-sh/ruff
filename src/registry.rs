@@ -13,6 +13,10 @@ use crate::violation::Violation;
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
     E101 => rules::pycodestyle::rules::MixedSpacesAndTabs,
+    E221 => rules::pycodestyle::rules::MultipleSpacesBeforeOperator,
+    E222 => rules::pycodestyle::rules::MultipleSpacesAfterOperator,
+    E223 => rules::pycodestyle::rules::TabBeforeOperator,
+    E224 => rules::pycodestyle::rules::TabAfterOperator,
     E401 => rules::pycodestyle::rules::MultipleImportsOnOneLine,
     E402 => rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
     E501 => rules::pycodestyle::rules::LineTooLong,
@@ -671,7 +675,8 @@ impl Linter {
 pub enum LintSource {
     Ast,
     Io,
-    Lines,
+    PhysicalLines,
+    LogicalLines,
     Tokens,
     Imports,
     NoQa,
@@ -684,6 +689,10 @@ impl Rule {
     pub const fn lint_source(&self) -> &'static LintSource {
         match self {
             Rule::UnusedNOQA => &LintSource::NoQa,
+            Rule::TabBeforeOperator
+            | Rule::MultipleSpacesBeforeOperator
+            | Rule::MultipleSpacesAfterOperator
+            | Rule::TabAfterOperator => &LintSource::LogicalLines,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong
@@ -695,7 +704,7 @@ impl Rule {
             | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
             | Rule::ShebangPython
-            | Rule::ShebangWhitespace => &LintSource::Lines,
+            | Rule::ShebangWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString

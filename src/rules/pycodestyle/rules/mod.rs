@@ -15,6 +15,10 @@ pub use literal_comparisons::{literal_comparisons, NoneComparison, TrueFalseComp
 pub use mixed_spaces_and_tabs::{mixed_spaces_and_tabs, MixedSpacesAndTabs};
 pub use no_newline_at_end_of_file::{no_newline_at_end_of_file, NoNewLineAtEndOfFile};
 pub use not_tests::{not_tests, NotInTest, NotIsTest};
+pub use space_around_operator::{
+    space_around_operator, MultipleSpacesAfterOperator, MultipleSpacesBeforeOperator,
+    TabAfterOperator, TabBeforeOperator,
+};
 pub use type_comparison::{type_comparison, TypeComparison};
 
 mod ambiguous_class_name;
@@ -31,4 +35,5 @@ mod literal_comparisons;
 mod mixed_spaces_and_tabs;
 mod no_newline_at_end_of_file;
 mod not_tests;
+mod space_around_operator;
 mod type_comparison;

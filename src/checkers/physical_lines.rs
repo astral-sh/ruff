@@ -1,4 +1,4 @@
-//! Lint rules based on checking raw physical lines.
+//! Lint rules based on checking physical lines.
 
 use std::path::Path;
 
@@ -15,7 +15,7 @@ use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
 use crate::source_code::Stylist;
 
-pub fn check_lines(
+pub fn check_physical_lines(
     path: &Path,
     stylist: &Stylist,
     contents: &str,
@@ -164,7 +164,7 @@ mod tests {
 
     use std::path::Path;
 
-    use super::check_lines;
+    use super::check_physical_lines;
     use crate::registry::Rule;
     use crate::settings::{flags, Settings};
     use crate::source_code::{Locator, Stylist};
@@ -176,7 +176,7 @@ mod tests {
         let stylist = Stylist::from_contents(line, &locator);
 
         let check_with_max_line_length = |line_length: usize| {
-            check_lines(
+            check_physical_lines(
                 Path::new("foo.py"),
                 &stylist,
                 line,
