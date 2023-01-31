@@ -557,7 +557,7 @@ Running `ruff --select F401` would result in Ruff enforcing `F401`, and no other
 Running `ruff --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules, with
 the exception of `F401`.
 
-### Ignoring errors
+### Suppressing errors
 
 To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](#ignore) or
 [`extend-ignore`](#extend-ignore), either on the command-line or in your `pyproject.toml` file.
@@ -582,7 +582,7 @@ will apply to the entire string, like so:
 ```python
 """Lorem ipsum dolor sit amet.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa: E501
 ```
 
@@ -593,17 +593,7 @@ disable enforcement across the entire file.
 For targeted exclusions across entire files (e.g., "Ignore all F841 violations in
 `/path/to/file.py`"), see the [`per-file-ignores`](#per-file-ignores) configuration setting.
 
-### "Action Comments"
-
-Ruff respects `isort`'s ["Action Comments"](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
-(`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which
-enable selectively enabling and disabling import sorting for blocks of code and other inline
-configuration.
-
-See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
-for more.
-
-### Automating `noqa` Directives
+#### Automatic error suppression
 
 Ruff supports several workflows to aid in `noqa` management.
 
@@ -619,6 +609,16 @@ You can run `ruff /path/to/file.py --extend-select RUF100 --fix` to automaticall
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
 migrating a new codebase to Ruff. You can run `ruff /path/to/file.py --add-noqa` to automatically
 add `noqa` directives to all failing lines, with the appropriate rule codes.
+
+#### Action comments
+
+Ruff respects `isort`'s [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+(`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which
+enable selectively enabling and disabling import sorting for blocks of code and other inline
+configuration.
+
+See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+for more.
 
 <!-- End section: Configuration -->
 
