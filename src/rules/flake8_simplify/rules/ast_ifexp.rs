@@ -35,18 +35,19 @@ pub fn explicit_true_false_in_ifexpr(
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        let bool_expr = match test.node {
+            ExprKind::Compare { .. } => test.clone(),
+            _ => create_expr(ExprKind::Call {
+                func: Box::new(create_expr(ExprKind::Name {
+                    id: "bool".to_string(),
+                    ctx: ExprContext::Load,
+                })),
+                args: vec![test.clone()],
+                keywords: vec![],
+            }),
+        };
         diagnostic.amend(Fix::replacement(
-            unparse_expr(
-                &create_expr(ExprKind::Call {
-                    func: Box::new(create_expr(ExprKind::Name {
-                        id: "bool".to_string(),
-                        ctx: ExprContext::Load,
-                    })),
-                    args: vec![test.clone()],
-                    keywords: vec![],
-                }),
-                checker.stylist,
-            ),
+            unparse_expr(&bool_expr, checker.stylist),
             expr.location,
             expr.end_location.unwrap(),
         ));

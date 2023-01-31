@@ -32,7 +32,7 @@ expression: diagnostics
     column: 29
   fix:
     content:
-      - bool(b != c)
+      - b != c
     location:
       row: 3
       column: 4
