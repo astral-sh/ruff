@@ -1,8 +1,10 @@
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
 use rustc_hash::FxHashSet;
 
@@ -34,10 +36,28 @@ pub(crate) fn ignores_from_path<'a>(
     let (file_path, file_basename) = extract_path_names(path)?;
     Ok(pattern_code_pairs
         .iter()
-        .filter(|(absolute, basename, _)| {
-            basename.is_match(file_basename) || absolute.is_match(file_path)
+        .filter_map(|(absolute, basename, codes)| {
+            if basename.is_match(file_basename) {
+                debug!(
+                    "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
+                    path,
+                    basename.deref().glob().regex(),
+                    &**codes
+                );
+                return Some(codes.iter());
+            }
+            if absolute.is_match(file_path) {
+                debug!(
+                    "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
+                    path,
+                    absolute.deref().glob().regex(),
+                    &**codes
+                );
+                return Some(codes.iter());
+            }
+            None
         })
-        .flat_map(|(_, _, codes)| codes.iter())
+        .flatten()
         .collect())
 }
 
