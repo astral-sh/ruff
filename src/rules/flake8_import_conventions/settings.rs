@@ -35,7 +35,7 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
 pub struct Options {
     #[option(
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
-        value_type = "FxHashMap<String, String>",
+        value_type = "dict[str, str]",
         example = r#"
             [tool.ruff.flake8-import-conventions.aliases]
             # Declare the default aliases.
@@ -52,7 +52,7 @@ pub struct Options {
     pub aliases: Option<FxHashMap<String, String>>,
     #[option(
         default = r#"{}"#,
-        value_type = "FxHashMap<String, String>",
+        value_type = "dict[str, str]",
         example = r#"
             [tool.ruff.flake8-import-conventions.extend-aliases]
             # Declare a custom alias for the `matplotlib` module.

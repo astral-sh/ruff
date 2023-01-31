@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             # Allow default arguments like, e.g., `data: List[str] = fastapi.Query(None)`.
             extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
