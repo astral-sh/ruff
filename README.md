@@ -3790,7 +3790,7 @@ Maximum number of arguments allowed for a function definition (see: `PLR0913`).
 
 ```toml
 [tool.ruff.pylint]
-max_args = 5
+max-args = 5
 ```
 
 ---

@@ -53,7 +53,7 @@ pub struct Options {
     )]
     /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
-    #[option(default = r"5", value_type = "int", example = r"max_args = 5")]
+    #[option(default = r"5", value_type = "int", example = r"max-args = 5")]
     /// Maximum number of arguments allowed for a function definition (see: `PLR0913`).
     pub max_args: Option<usize>,
 }
