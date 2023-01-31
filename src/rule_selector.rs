@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use crate::registry::{Rule, RuleCodePrefix, RuleIter};
 use crate::rule_redirects::get_redirect;
@@ -171,7 +172,7 @@ impl RuleSelector {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(EnumIter, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Specificity {
     All,
     Linter,

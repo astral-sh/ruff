@@ -109,7 +109,7 @@ define_violation!(
 impl Violation for PathlibGetcwd {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.getcwd()` should be replaced by `Path.cwd()`")
+        format!("`os.getcwd` should be replaced by `Path.cwd()`")
     }
 }
 
@@ -175,7 +175,7 @@ define_violation!(
 impl Violation for PathlibReadlink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.readlink(` should be replaced by `.readlink()`")
+        format!("`os.readlink` should be replaced by `.readlink()`")
     }
 }
 

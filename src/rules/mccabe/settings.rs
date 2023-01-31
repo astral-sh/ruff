@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     #[option(
         default = "10",
-        value_type = "usize",
+        value_type = "int",
         example = r#"
             # Flag errors (`C901`) whenever the complexity level exceeds 5.
             max-complexity = 5

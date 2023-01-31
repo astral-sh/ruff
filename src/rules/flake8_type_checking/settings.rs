@@ -26,7 +26,7 @@ pub struct Options {
     pub strict: Option<bool>,
     #[option(
         default = "[\"typing\"]",
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             exempt-modules = ["typing", "typing_extensions"]
         "#

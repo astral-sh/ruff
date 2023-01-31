@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::python::identifiers::is_identifier;
 use crate::python::keyword::KWLIST;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violations;
@@ -410,7 +410,7 @@ pub(crate) fn printf_string_formatting(
         violations::PrintfStringFormatting,
         Range::from_located(expr),
     );
-    if checker.patch(&Rule::PrintfStringFormatting) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             expr.location,

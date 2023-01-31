@@ -6,6 +6,7 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
+use crate::autofix::helpers::remove_argument;
 use crate::fix::Fix;
 use crate::source_code::{Locator, Stylist};
 
@@ -14,93 +15,14 @@ pub fn remove_class_def_base(
     locator: &Locator,
     stmt_at: Location,
     expr_at: Location,
+    expr_end: Location,
     bases: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Fix> {
-    let contents = locator.slice_source_code_at(stmt_at);
-
-    // Case 1: `object` is the only base.
-    if bases.len() == 1 && keywords.is_empty() {
-        let mut fix_start = None;
-        let mut fix_end = None;
-        let mut count: usize = 0;
-        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
-            if matches!(tok, Tok::Lpar) {
-                if count == 0 {
-                    fix_start = Some(start);
-                }
-                count += 1;
-            }
-
-            if matches!(tok, Tok::Rpar) {
-                count -= 1;
-                if count == 0 {
-                    fix_end = Some(end);
-                    break;
-                }
-            }
-        }
-
-        return match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Some(Fix::deletion(start, end)),
-            _ => None,
-        };
-    }
-
-    if bases
-        .iter()
-        .map(|node| node.location)
-        .chain(keywords.iter().map(|node| node.location))
-        .any(|location| location > expr_at)
-    {
-        // Case 2: `object` is _not_ the last node.
-        let mut fix_start: Option<Location> = None;
-        let mut fix_end: Option<Location> = None;
-        let mut seen_comma = false;
-        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
-            if seen_comma {
-                if matches!(tok, Tok::NonLogicalNewline) {
-                    // Also delete any non-logical newlines after the comma.
-                    continue;
-                }
-                if matches!(tok, Tok::Newline) {
-                    fix_end = Some(end);
-                } else {
-                    fix_end = Some(start);
-                }
-                break;
-            }
-            if start == expr_at {
-                fix_start = Some(start);
-            }
-            if fix_start.is_some() && matches!(tok, Tok::Comma) {
-                seen_comma = true;
-            }
-        }
-
-        match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Some(Fix::replacement(String::new(), start, end)),
-            _ => None,
-        }
+    if let Ok(fix) = remove_argument(locator, stmt_at, expr_at, expr_end, bases, keywords, true) {
+        Some(fix)
     } else {
-        // Case 3: `object` is the last node, so we have to find the last token that
-        // isn't a comma.
-        let mut fix_start: Option<Location> = None;
-        let mut fix_end: Option<Location> = None;
-        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
-            if start == expr_at {
-                fix_end = Some(end);
-                break;
-            }
-            if matches!(tok, Tok::Comma) {
-                fix_start = Some(start);
-            }
-        }
-
-        match (fix_start, fix_end) {
-            (Some(start), Some(end)) => Some(Fix::replacement(String::new(), start, end)),
-            _ => None,
-        }
+        None
     }
 }
 
@@ -137,4 +59,216 @@ pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr)
         range.location,
         range.end_location,
     ))
+}
+
+/// Remove any imports matching `members` from an import-from statement.
+pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
+    let mut names: Vec<Range> = vec![];
+    let mut commas: Vec<Range> = vec![];
+    let mut removal_indices: Vec<usize> = vec![];
+
+    // Find all Tok::Name tokens that are not preceded by Tok::As, and all Tok::Comma tokens.
+    let mut prev_tok = None;
+    for (start, tok, end) in lexer::make_tokenizer(contents)
+        .flatten()
+        .skip_while(|(_, tok, _)| !matches!(tok, Tok::Import))
+    {
+        if let Tok::Name { name } = &tok {
+            if matches!(prev_tok, Some(Tok::As)) {
+                // Adjust the location to take the alias into account.
+                names.last_mut().unwrap().end_location = end;
+            } else {
+                if members.contains(&name.as_str()) {
+                    removal_indices.push(names.len());
+                }
+                names.push(Range::new(start, end));
+            }
+        } else if matches!(tok, Tok::Comma) {
+            commas.push(Range::new(start, end));
+        }
+        prev_tok = Some(tok);
+    }
+
+    // Reconstruct the source code by skipping any names that are in `members`.
+    let locator = Locator::new(contents);
+    let mut output = String::with_capacity(contents.len());
+    let mut last_pos: Location = Location::new(1, 0);
+    let mut is_first = true;
+    for index in 0..names.len() {
+        if !removal_indices.contains(&index) {
+            is_first = false;
+            continue;
+        }
+
+        let (start_location, end_location) = if is_first {
+            (names[index].location, names[index + 1].location)
+        } else {
+            (commas[index - 1].location, names[index].end_location)
+        };
+
+        // Add all contents from `last_pos` to `fix.location`.
+        // It's possible that `last_pos` is after `fix.location`, if we're removing the first _two_
+        // members.
+        if start_location > last_pos {
+            let slice = locator.slice_source_code_range(&Range::new(last_pos, start_location));
+            output.push_str(slice);
+        }
+
+        last_pos = end_location;
+    }
+
+    // Add the remaining content.
+    let slice = locator.slice_source_code_at(last_pos);
+    output.push_str(slice);
+    output
+}
+
+#[cfg(test)]
+mod test {
+    use crate::rules::pyupgrade::fixes::remove_import_members;
+
+    #[test]
+    fn once() {
+        let source = r#"from foo import bar, baz, bop, qux as q"#;
+        let expected = r#"from foo import bar, baz, qux as q"#;
+        let actual = remove_import_members(source, &["bop"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn twice() {
+        let source = r#"from foo import bar, baz, bop, qux as q"#;
+        let expected = r#"from foo import bar, qux as q"#;
+        let actual = remove_import_members(source, &["baz", "bop"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn aliased() {
+        let source = r#"from foo import bar, baz, bop as boop, qux as q"#;
+        let expected = r#"from foo import bar, baz, qux as q"#;
+        let actual = remove_import_members(source, &["bop"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn parenthesized() {
+        let source = r#"from foo import (bar, baz, bop, qux as q)"#;
+        let expected = r#"from foo import (bar, baz, qux as q)"#;
+        let actual = remove_import_members(source, &["bop"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn last_import() {
+        let source = r#"from foo import bar, baz, bop, qux as q"#;
+        let expected = r#"from foo import bar, baz, bop"#;
+        let actual = remove_import_members(source, &["qux"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn first_import() {
+        let source = r#"from foo import bar, baz, bop, qux as q"#;
+        let expected = r#"from foo import baz, bop, qux as q"#;
+        let actual = remove_import_members(source, &["bar"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn first_two_imports() {
+        let source = r#"from foo import bar, baz, bop, qux as q"#;
+        let expected = r#"from foo import bop, qux as q"#;
+        let actual = remove_import_members(source, &["bar", "baz"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn first_two_imports_multiline() {
+        let source = r#"from foo import (
+    bar,
+    baz,
+    bop,
+    qux as q
+)"#;
+        let expected = r#"from foo import (
+    bop,
+    qux as q
+)"#;
+        let actual = remove_import_members(source, &["bar", "baz"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn multiline_once() {
+        let source = r#"from foo import (
+    bar,
+    baz,
+    bop,
+    qux as q,
+)"#;
+        let expected = r#"from foo import (
+    bar,
+    baz,
+    qux as q,
+)"#;
+        let actual = remove_import_members(source, &["bop"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn multiline_twice() {
+        let source = r#"from foo import (
+    bar,
+    baz,
+    bop,
+    qux as q,
+)"#;
+        let expected = r#"from foo import (
+    bar,
+    qux as q,
+)"#;
+        let actual = remove_import_members(source, &["baz", "bop"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn multiline_comment() {
+        let source = r#"from foo import (
+    bar,
+    baz,
+    # This comment should be removed.
+    bop,
+    # This comment should be retained.
+    qux as q,
+)"#;
+        let expected = r#"from foo import (
+    bar,
+    baz,
+    # This comment should be retained.
+    qux as q,
+)"#;
+        let actual = remove_import_members(source, &["bop"]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn multi_comment_first_import() {
+        let source = r#"from foo import (
+    # This comment should be retained.
+    bar,
+    # This comment should be removed.
+    baz,
+    bop,
+    qux as q,
+)"#;
+        let expected = r#"from foo import (
+    # This comment should be retained.
+    baz,
+    bop,
+    qux as q,
+)"#;
+        let actual = remove_import_members(source, &["bar"]);
+        assert_eq!(expected, actual);
+    }
 }

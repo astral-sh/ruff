@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.237"
+version = "0.0.238"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -53,6 +53,7 @@ similar = { version = "2.2.1" }
 textwrap = { version = "0.16.0" }
 update-informer = { version = "0.6.0", default-features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
+strum = "0.24.1"
 
 [dev-dependencies]
 assert_cmd = { version = "2.0.4" }

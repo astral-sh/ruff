@@ -68,7 +68,7 @@ pub struct Options {
     pub force_single_line: Option<bool>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             single-line-exclusions = ["os", "json"]
         "#
@@ -120,7 +120,7 @@ pub struct Options {
     pub force_sort_within_sections: Option<bool>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             known-first-party = ["src"]
         "#
@@ -130,7 +130,7 @@ pub struct Options {
     pub known_first_party: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             known-third-party = ["src"]
         "#
@@ -140,7 +140,7 @@ pub struct Options {
     pub known_third_party: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             extra-standard-library = ["path"]
         "#
@@ -150,7 +150,7 @@ pub struct Options {
     pub extra_standard_library: Option<Vec<String>>,
     #[option(
         default = r#"furthest-to-closest"#,
-        value_type = "RelativeImportsOrder",
+        value_type = r#""furthest-to-closest" | "closest-to-furthest""#,
         example = r#"
             relative-imports-order = "closest-to-furthest"
         "#
@@ -166,7 +166,7 @@ pub struct Options {
     pub relative_imports_order: Option<RelativeImportsOrder>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             required-imports = ["from __future__ import annotations"]
         "#
@@ -175,7 +175,7 @@ pub struct Options {
     pub required_imports: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             classes = ["SVC"]
         "#
@@ -185,7 +185,7 @@ pub struct Options {
     pub classes: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             constants = ["constant"]
         "#
@@ -195,7 +195,7 @@ pub struct Options {
     pub constants: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             variables = ["VAR"]
         "#
@@ -205,7 +205,7 @@ pub struct Options {
     pub variables: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Option<Vec<ImportType>>",
+        value_type = r#"list["future" | "standard-library" | "third-party" | "first-party" | "local-folder"]"#,
         example = r#"
             no-lines-before = ["future", "standard-library"]
         "#

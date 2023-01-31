@@ -10,6 +10,8 @@
 
 An extremely fast Python linter, written in Rust.
 
+This README is also available as [documentation](https://beta.ruff.rs/docs/).
+
 <p align="center">
   <picture align="center">
     <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg">
@@ -59,6 +61,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
+- [SciPy](https://github.com/scipy/scipy)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [Polars](https://github.com/pola-rs/polars)
 - [Ibis](https://github.com/ibis-project/ibis)
@@ -72,6 +75,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [build (PyPA)](https://github.com/pypa/build)
 - [Babel](https://github.com/python-babel/babel)
 - [featuretools](https://github.com/alteryx/featuretools)
+- [meson-python](https://github.com/mesonbuild/meson-python)
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
@@ -223,7 +227,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.237'
+  rev: 'v0.0.238'
   hooks:
     - id: ruff
 ```
@@ -382,10 +386,11 @@ Ruff: An extremely fast Python linter.
 Usage: ruff [OPTIONS] <COMMAND>
 
 Commands:
-  check  Run Ruff on the given files or directories (default)
-  rule   Explain a rule
-  clean  Clear any caches in the current directory and any subdirectories
-  help   Print this message or the help of the given subcommand(s)
+  check   Run Ruff on the given files or directories (default)
+  rule    Explain a rule
+  linter  List all supported upstream linters
+  clean   Clear any caches in the current directory and any subdirectories
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help
@@ -404,7 +409,7 @@ Or `ruff help check` for more on the linting command:
 
 <!-- Begin auto-generated subcommand help. -->
 ```
-Run Ruff on the given files or directories
+Run Ruff on the given files or directories (default)
 
 Usage: ruff check [OPTIONS] [FILES]...
 
@@ -432,8 +437,6 @@ Rule selection:
           Comma-separated list of rule codes to disable
       --extend-select <RULE_CODE>
           Like --select, but adds additional rule codes on top of the selected ones
-      --extend-ignore <RULE_CODE>
-          Like --ignore, but adds additional rule codes on top of the ignored ones
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --fixable <RULE_CODE>
@@ -468,6 +471,11 @@ Miscellaneous:
           Exit with status code "0", even upon detecting lint violations
       --update-check
           Enable or disable automatic update checks
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print lint violations, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
 ```
 <!-- End auto-generated subcommand help. -->
 
@@ -522,7 +530,34 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
 For example, `ruff /path/to/excluded/file.py` will always lint `file.py`.
 
-### Ignoring errors
+### Rule resolution
+
+The set of enabled rules is controlled via the [`select`](#select) and [`ignore`](#ignore) settings,
+along with the [`extend-select`](#extend-select) and [`extend-ignore`](#extend-ignore) modifiers.
+
+To resolve the enabled rule set, Ruff may need to reconcile `select` and `ignore` from a variety
+of sources, including the current `pyproject.toml`, any inherited `pyproject.toml` files, and the
+CLI (e.g., `--select`).
+
+In those scenarios, Ruff uses the "highest-priority" `select` as the basis for the rule set, and
+then applies any `extend-select`, `ignore`, and `extend-ignore` adjustments. CLI options are given
+higher priority than `pyproject.toml` options, and the current `pyproject.toml` file is given higher
+priority than any inherited `pyproject.toml` files.
+
+For example, given the following `pyproject.toml` file:
+
+```toml
+[tool.ruff]
+select = ["E", "F"]
+ignore = ["F401"]
+```
+
+Running `ruff --select F401` would result in Ruff enforcing `F401`, and no other rules.
+
+Running `ruff --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules, with
+the exception of `F401`.
+
+### Suppressing errors
 
 To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](#ignore) or
 [`extend-ignore`](#extend-ignore), either on the command-line or in your `pyproject.toml` file.
@@ -547,7 +582,7 @@ will apply to the entire string, like so:
 ```python
 """Lorem ipsum dolor sit amet.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa: E501
 ```
 
@@ -558,17 +593,7 @@ disable enforcement across the entire file.
 For targeted exclusions across entire files (e.g., "Ignore all F841 violations in
 `/path/to/file.py`"), see the [`per-file-ignores`](#per-file-ignores) configuration setting.
 
-### "Action Comments"
-
-Ruff respects `isort`'s ["Action Comments"](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
-(`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which
-enable selectively enabling and disabling import sorting for blocks of code and other inline
-configuration.
-
-See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
-for more.
-
-### Automating `noqa` Directives
+#### Automatic error suppression
 
 Ruff supports several workflows to aid in `noqa` management.
 
@@ -584,6 +609,16 @@ You can run `ruff /path/to/file.py --extend-select RUF100 --fix` to automaticall
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
 migrating a new codebase to Ruff. You can run `ruff /path/to/file.py --add-noqa` to automatically
 add `noqa` directives to all failing lines, with the appropriate rule codes.
+
+#### Action comments
+
+Ruff respects `isort`'s [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+(`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which
+enable selectively enabling and disabling import sorting for blocks of code and other inline
+configuration.
+
+See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+for more.
 
 <!-- End section: Configuration -->
 
@@ -794,7 +829,6 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP013 | convert-typed-dict-functional-to-class | Convert `{name}` from `TypedDict` functional to class syntax | 🛠 |
 | UP014 | convert-named-tuple-functional-to-class | Convert `{name}` from `NamedTuple` functional to class syntax | 🛠 |
 | UP015 | redundant-open-modes | Unnecessary open mode parameters | 🛠 |
-| UP016 | remove-six-compat | Unnecessary `six` compatibility usage | 🛠 |
 | UP017 | datetime-timezone-utc | Use `datetime.UTC` alias | 🛠 |
 | UP018 | native-literals | Unnecessary call to `{literal_type}` | 🛠 |
 | UP019 | typing-text-str-alias | `typing.Text` is deprecated, use `str` | 🛠 |
@@ -813,6 +847,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP032 | f-string | Use f-string instead of `format` call | 🛠 |
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
+| UP035 | import-replacements | Import from `{module}` instead: {names} | 🛠 |
 | UP037 | old-code-blocks | Remove old code blocks | 🛠 |
 
 ### flake8-2020 (YTT)
@@ -1023,7 +1058,7 @@ For more, see [flake8-implicit-str-concat](https://pypi.org/project/flake8-impli
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | ISC001 | single-line-implicit-string-concatenation | Implicitly concatenated string literals on one line |  |
-| ISC002 | multi-line-implicit-string-concatenation | Implicitly concatenated string literals over continuation line |  |
+| ISC002 | multi-line-implicit-string-concatenation | Implicitly concatenated string literals over multiple lines |  |
 | ISC003 | explicit-string-concatenation | Explicitly concatenated string should be implicitly concatenated |  |
 
 ### flake8-import-conventions (ICN)
@@ -1087,7 +1122,7 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | ---- | ---- | ------- | --- |
 | PT001 | incorrect-fixture-parentheses-style | Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}` | 🛠 |
 | PT002 | fixture-positional-args | Configuration for fixture `{function}` specified via positional args, use kwargs |  |
-| PT003 | extraneous-scope-function | `scope='function'` is implied in `@pytest.fixture()` |  |
+| PT003 | extraneous-scope-function | `scope='function'` is implied in `@pytest.fixture()` | 🛠 |
 | PT004 | missing-fixture-name-underscore | Fixture `{function}` does not return anything, add leading underscore |  |
 | PT005 | incorrect-fixture-name-underscore | Fixture `{function}` returns a value, remove leading underscore |  |
 | PT006 | parametrize-names-wrong-type | Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}` | 🛠 |
@@ -1217,13 +1252,13 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
 | PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
 | PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
-| PTH109 | pathlib-getcwd | `os.getcwd()` should be replaced by `Path.cwd()` |  |
+| PTH109 | pathlib-getcwd | `os.getcwd` should be replaced by `Path.cwd()` |  |
 | PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
 | PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
 | PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
 | PTH113 | pathlib-is-file | `os.path.isfile` should be replaced by `.is_file()` |  |
 | PTH114 | pathlib-is-link | `os.path.islink` should be replaced by `.is_symlink()` |  |
-| PTH115 | pathlib-readlink | `os.readlink(` should be replaced by `.readlink()` |  |
+| PTH115 | pathlib-readlink | `os.readlink` should be replaced by `.readlink()` |  |
 | PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
 | PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
 | PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
@@ -1248,7 +1283,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior |  |
+| PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior | 🛠 |
 | PD003 | use-of-dot-is-null | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
 | PD004 | use-of-dot-not-null | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
 | PD007 | use-of-dot-ix | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
@@ -1297,6 +1332,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLR0133 | constant-comparison | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
 | PLR0206 | property-with-parameters | Cannot have defined parameters for properties |  |
 | PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias |  |
+| PLR0913 | too-many-args | Too many arguments to function call ({c_args}/{max_args}) |  |
 | PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
 | PLR1722 | use-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
 | PLR2004 | magic-value-comparison | Magic value used in comparison, consider replacing {value} with a constant variable |  |
@@ -2042,7 +2078,7 @@ enforcing `RUF001`, `RUF002`, and `RUF003`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<char>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2062,7 +2098,7 @@ system builtins.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2088,7 +2124,7 @@ variable, if set.
 
 **Default value**: `.ruff_cache`
 
-**Type**: `PathBuf`
+**Type**: `str`
 
 **Example usage**:
 
@@ -2107,7 +2143,7 @@ default expression matches `_`, `__`, and `_var`, but not `_var_`.
 
 **Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"`
 
-**Type**: `Regex`
+**Type**: `re.Pattern`
 
 **Example usage**:
 
@@ -2140,7 +2176,7 @@ Note that you'll typically want to use
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
 
-**Type**: `Vec<FilePattern>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2163,7 +2199,7 @@ in the current configuration file.
 
 **Default value**: `None`
 
-**Type**: `Path`
+**Type**: `str`
 
 **Example usage**:
 
@@ -2196,7 +2232,7 @@ For more information on the glob syntax, refer to the [`globset` documentation](
 
 **Default value**: `[]`
 
-**Type**: `Vec<FilePattern>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2213,15 +2249,12 @@ extend-exclude = ["tests", "src/bad.py"]
 A list of rule codes or prefixes to ignore, in addition to those
 specified by `ignore`.
 
-Note that `extend-ignore` is applied after resolving rules from
-`ignore`/`select` and a less specific rule in `extend-ignore`
-would overwrite a more specific rule in `select`. It is
-recommended to only use `extend-ignore` when extending a
-`pyproject.toml` file via `extend`.
+This option has been **deprecated** in favor of `ignore`
+since its usage is now interchangeable with `ignore`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2238,15 +2271,9 @@ extend-ignore = ["F841"]
 A list of rule codes or prefixes to enable, in addition to those
 specified by `select`.
 
-Note that `extend-select` is applied after resolving rules from
-`ignore`/`select` and a less specific rule in `extend-select`
-would overwrite a more specific rule in `ignore`. It is
-recommended to only use `extend-select` when extending a
-`pyproject.toml` file via `extend`.
-
 **Default value**: `[]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2267,7 +2294,7 @@ by Ruff.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2322,7 +2349,7 @@ considered autofixable.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2370,7 +2397,7 @@ Actions annotations), `"gitlab"` (GitLab CI code quality report), or
 
 **Default value**: `"text"`
 
-**Type**: `SerializationType`
+**Type**: `"text" | "json" | "junit" | "github" | "gitlab" | "pylint"`
 
 **Example usage**:
 
@@ -2394,7 +2421,7 @@ specific prefixes.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2433,7 +2460,7 @@ The line length to use when enforcing long-lines violations (like
 
 **Default value**: `88`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 
@@ -2453,7 +2480,7 @@ contained an `__init__.py` file.
 
 **Default value**: `[]`
 
-**Type**: `Vec<PathBuf>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2471,7 +2498,7 @@ exclude, when considering any matching files.
 
 **Default value**: `{}`
 
-**Type**: `HashMap<String, Vec<RuleSelector>>`
+**Type**: `dict[str, list[RuleSelector]]`
 
 **Example usage**:
 
@@ -2493,7 +2520,7 @@ file).
 
 **Default value**: `None`
 
-**Type**: `String`
+**Type**: `str`
 
 **Example usage**:
 
@@ -2535,7 +2562,7 @@ specific prefixes.
 
 **Default value**: `["E", "F"]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2595,7 +2622,7 @@ variables will also be expanded.
 
 **Default value**: `["."]`
 
-**Type**: `Vec<PathBuf>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2616,7 +2643,7 @@ and instead must be specified explicitly (as seen below).
 
 **Default value**: `"py310"`
 
-**Type**: `PythonVersion`
+**Type**: `"py37" | "py38" | "py39" | "py310" | "py311"`
 
 **Example usage**:
 
@@ -2638,7 +2665,7 @@ detection (`ERA`), and skipped by line-length rules (`E501`) if
 
 **Default value**: `["TODO", "FIXME", "XXX"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2662,7 +2689,7 @@ as ordinary Python objects.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2679,7 +2706,7 @@ A list of rule codes or prefixes to consider non-autofix-able.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2813,7 +2840,7 @@ A list of directories to consider temporary.
 
 **Default value**: `["/tmp", "/var/tmp", "/dev/shm"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2831,7 +2858,7 @@ specified by `hardcoded-tmp-directory`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2851,7 +2878,7 @@ e.g., the `no-mutable-default-argument` rule (`B006`).
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2871,7 +2898,7 @@ Ignore list of builtins.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2890,7 +2917,7 @@ Maximum string length for string literals in exception messages.
 
 **Default value**: `0`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 
@@ -2909,6 +2936,11 @@ Whether to allow implicit string concatenations for multiline strings.
 By default, implicit concatenations of multiline strings are
 allowed (but continuation lines, delimited with a backslash, are
 prohibited).
+
+Note that setting `allow-multiline = false` should typically be coupled
+with disabling `explicit-string-concatenation` (`ISC003`). Otherwise,
+both explicit and implicit multiline string concatenations will be seen
+as violations.
 
 **Default value**: `true`
 
@@ -2930,9 +2962,9 @@ allow-multiline = false
 The conventional aliases for imports. These aliases can be extended by
 the `extend_aliases` option.
 
-**Default value**: `{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}`
+**Default value**: `{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}`
 
-**Type**: `FxHashMap<String, String>`
+**Type**: `dict[str, str]`
 
 **Example usage**:
 
@@ -2945,6 +2977,7 @@ altair = "alt"
 numpy = "np"
 pandas = "pd"
 seaborn = "sns"
+scripy = "sp"
 ```
 
 ---
@@ -2956,7 +2989,7 @@ will be added to the `aliases` mapping.
 
 **Default value**: `{}`
 
-**Type**: `FxHashMap<String, String>`
+**Type**: `dict[str, str]`
 
 **Example usage**:
 
@@ -3025,7 +3058,7 @@ The following values are supported:
 
 **Default value**: `tuple`
 
-**Type**: `ParametrizeNameType`
+**Type**: `"csv" | "tuple" | "list"`
 
 **Example usage**:
 
@@ -3047,7 +3080,7 @@ case of multiple parameters. The following values are supported:
 
 **Default value**: `tuple`
 
-**Type**: `ParametrizeValuesRowType`
+**Type**: `"tuple" | "list"`
 
 **Example usage**:
 
@@ -3067,7 +3100,7 @@ The following values are supported:
 
 **Default value**: `list`
 
-**Type**: `ParametrizeValuesType`
+**Type**: `"tuple" | "list"`
 
 **Example usage**:
 
@@ -3091,7 +3124,7 @@ list.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3109,7 +3142,7 @@ List of exception names that require a match= parameter in a
 
 **Default value**: `["BaseException", "Exception", "ValueError", "OSError", "IOError", "EnvironmentError", "socket.error"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3144,12 +3177,11 @@ avoid-escape = false
 
 #### [`docstring-quotes`](#docstring-quotes)
 
-Quote style to prefer for docstrings (either "single" (`'`) or "double"
-(`"`)).
+Quote style to prefer for docstrings (either "single" or "double").
 
 **Default value**: `"double"`
 
-**Type**: `Quote`
+**Type**: `"single" | "double"`
 
 **Example usage**:
 
@@ -3162,12 +3194,12 @@ docstring-quotes = "single"
 
 #### [`inline-quotes`](#inline-quotes)
 
-Quote style to prefer for inline strings (either "single" (`'`) or
-"double" (`"`)).
+Quote style to prefer for inline strings (either "single" or
+"double").
 
 **Default value**: `"double"`
 
-**Type**: `Quote`
+**Type**: `"single" | "double"`
 
 **Example usage**:
 
@@ -3180,12 +3212,12 @@ inline-quotes = "single"
 
 #### [`multiline-quotes`](#multiline-quotes)
 
-Quote style to prefer for multiline strings (either "single" (`'`) or
-"double" (`"`)).
+Quote style to prefer for multiline strings (either "single" or
+"double").
 
 **Default value**: `"double"`
 
-**Type**: `Quote`
+**Type**: `"single" | "double"`
 
 **Example usage**:
 
@@ -3205,7 +3237,7 @@ that extend into the parent module or beyond (`"parents"`).
 
 **Default value**: `"parents"`
 
-**Type**: `Strictness`
+**Type**: `"parents" | "all"`
 
 **Example usage**:
 
@@ -3225,7 +3257,7 @@ and can be circumvented via `eval` or `importlib`.
 
 **Default value**: `{}`
 
-**Type**: `HashMap<String, BannedApi>`
+**Type**: `dict[str, { "msg": str }]`
 
 **Example usage**:
 
@@ -3247,7 +3279,7 @@ blocks.
 
 **Default value**: `["typing"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3305,7 +3337,7 @@ An override list of tokens to always recognize as a Class for
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3341,7 +3373,7 @@ for `order-by-type` regardless of casing.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3359,7 +3391,7 @@ known to Ruff in advance.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3446,7 +3478,7 @@ can be identified as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3464,7 +3496,7 @@ can be identified as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3482,7 +3514,7 @@ section via empty lines.
 
 **Default value**: `[]`
 
-**Type**: `Option<Vec<ImportType>>`
+**Type**: `list["future" | "standard-library" | "third-party" | "first-party" | "local-folder"]`
 
 **Example usage**:
 
@@ -3524,7 +3556,7 @@ this to "closest-to-furthest" is equivalent to isort's `reverse-relative
 
 **Default value**: `furthest-to-closest`
 
-**Type**: `RelativeImportsOrder`
+**Type**: `"furthest-to-closest" | "closest-to-furthest"`
 
 **Example usage**:
 
@@ -3541,7 +3573,7 @@ Add the specified import line to all files.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3558,7 +3590,7 @@ One or more modules to exclude from the single line rule.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3596,7 +3628,7 @@ for `order-by-type` regardless of casing.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3615,7 +3647,7 @@ The maximum McCabe complexity to allow before triggering `C901` errors.
 
 **Default value**: `10`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 
@@ -3638,7 +3670,7 @@ expect that any method decorated by a decorator in this list takes a
 
 **Default value**: `["classmethod"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3656,7 +3688,7 @@ A list of names to ignore when considering `pep8-naming` violations.
 
 **Default value**: `["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3676,7 +3708,7 @@ expect that any method decorated by a decorator in this list has no
 
 **Default value**: `["staticmethod"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3716,7 +3748,7 @@ documentation (`W505`), including standalone comments.
 
 **Default value**: `None`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 
@@ -3736,7 +3768,7 @@ defaults when analyzing docstring sections.
 
 **Default value**: `None`
 
-**Type**: `Convention`
+**Type**: `"google" | "numpy" | "pep257"`
 
 **Example usage**:
 
@@ -3752,17 +3784,34 @@ convention = "google"
 
 #### [`allow-magic-value-types`](#allow-magic-value-types)
 
-Constant types to ignore when used as "magic values".
+Constant types to ignore when used as "magic values" (see: `PLR2004`).
 
-**Default value**: `["str"]`
+**Default value**: `["str", "bytes"]`
 
-**Type**: `Vec<ConstantType>`
+**Type**: `list["str" | "bytes" | "complex" | "float" | "int" | "tuple"]`
 
 **Example usage**:
 
 ```toml
 [tool.ruff.pylint]
 allow-magic-value-types = ["int"]
+```
+
+---
+
+#### [`max-args`](#max-args)
+
+Maximum number of arguments allowed for a function definition (see: `PLR0913`).
+
+**Default value**: `5`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pylint]
+max_args = 5
 ```
 
 ---
