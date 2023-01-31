@@ -2976,7 +2976,7 @@ altair = "alt"
 numpy = "np"
 pandas = "pd"
 seaborn = "sns"
-scripy = "sp"
+scipy = "sp"
 ```
 
 ---

@@ -44,7 +44,7 @@ pub struct Options {
             numpy = "np"
             pandas = "pd"
             seaborn = "sns"
-            scripy = "sp"
+            scipy = "sp"
         "#
     )]
     /// The conventional aliases for imports. These aliases can be extended by
