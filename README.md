@@ -2077,7 +2077,7 @@ enforcing `RUF001`, `RUF002`, and `RUF003`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<char>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2097,7 +2097,7 @@ system builtins.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2123,7 +2123,7 @@ variable, if set.
 
 **Default value**: `.ruff_cache`
 
-**Type**: `PathBuf`
+**Type**: `str`
 
 **Example usage**:
 
@@ -2142,7 +2142,7 @@ default expression matches `_`, `__`, and `_var`, but not `_var_`.
 
 **Default value**: `"^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"`
 
-**Type**: `Regex`
+**Type**: `re.Pattern`
 
 **Example usage**:
 
@@ -2175,7 +2175,7 @@ Note that you'll typically want to use
 
 **Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
 
-**Type**: `Vec<FilePattern>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2198,7 +2198,7 @@ in the current configuration file.
 
 **Default value**: `None`
 
-**Type**: `Path`
+**Type**: `str`
 
 **Example usage**:
 
@@ -2231,7 +2231,7 @@ For more information on the glob syntax, refer to the [`globset` documentation](
 
 **Default value**: `[]`
 
-**Type**: `Vec<FilePattern>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2253,7 +2253,7 @@ since its usage is now interchangeable with `ignore`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2272,7 +2272,7 @@ specified by `select`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2293,7 +2293,7 @@ by Ruff.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2348,7 +2348,7 @@ considered autofixable.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2396,7 +2396,7 @@ Actions annotations), `"gitlab"` (GitLab CI code quality report), or
 
 **Default value**: `"text"`
 
-**Type**: `SerializationType`
+**Type**: `"text" | "json" | "junit" | "github" | "gitlab" | "pylint"`
 
 **Example usage**:
 
@@ -2420,7 +2420,7 @@ specific prefixes.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2459,7 +2459,7 @@ The line length to use when enforcing long-lines violations (like
 
 **Default value**: `88`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 
@@ -2479,7 +2479,7 @@ contained an `__init__.py` file.
 
 **Default value**: `[]`
 
-**Type**: `Vec<PathBuf>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2497,7 +2497,7 @@ exclude, when considering any matching files.
 
 **Default value**: `{}`
 
-**Type**: `HashMap<String, Vec<RuleSelector>>`
+**Type**: `dict[str, list[RuleSelector]]`
 
 **Example usage**:
 
@@ -2519,7 +2519,7 @@ file).
 
 **Default value**: `None`
 
-**Type**: `String`
+**Type**: `str`
 
 **Example usage**:
 
@@ -2561,7 +2561,7 @@ specific prefixes.
 
 **Default value**: `["E", "F"]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2621,7 +2621,7 @@ variables will also be expanded.
 
 **Default value**: `["."]`
 
-**Type**: `Vec<PathBuf>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2642,7 +2642,7 @@ and instead must be specified explicitly (as seen below).
 
 **Default value**: `"py310"`
 
-**Type**: `PythonVersion`
+**Type**: `"py37" | "py38" | "py39" | "py310" | "py311"`
 
 **Example usage**:
 
@@ -2664,7 +2664,7 @@ detection (`ERA`), and skipped by line-length rules (`E501`) if
 
 **Default value**: `["TODO", "FIXME", "XXX"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2688,7 +2688,7 @@ as ordinary Python objects.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2705,7 +2705,7 @@ A list of rule codes or prefixes to consider non-autofix-able.
 
 **Default value**: `[]`
 
-**Type**: `Vec<RuleSelector>`
+**Type**: `list[RuleSelector]`
 
 **Example usage**:
 
@@ -2839,7 +2839,7 @@ A list of directories to consider temporary.
 
 **Default value**: `["/tmp", "/var/tmp", "/dev/shm"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2857,7 +2857,7 @@ specified by `hardcoded-tmp-directory`.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2877,7 +2877,7 @@ e.g., the `no-mutable-default-argument` rule (`B006`).
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2897,7 +2897,7 @@ Ignore list of builtins.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -2916,7 +2916,7 @@ Maximum string length for string literals in exception messages.
 
 **Default value**: `0`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 
@@ -2963,7 +2963,7 @@ the `extend_aliases` option.
 
 **Default value**: `{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}`
 
-**Type**: `FxHashMap<String, String>`
+**Type**: `dict[str, str]`
 
 **Example usage**:
 
@@ -2988,7 +2988,7 @@ will be added to the `aliases` mapping.
 
 **Default value**: `{}`
 
-**Type**: `FxHashMap<String, String>`
+**Type**: `dict[str, str]`
 
 **Example usage**:
 
@@ -3057,7 +3057,7 @@ The following values are supported:
 
 **Default value**: `tuple`
 
-**Type**: `ParametrizeNameType`
+**Type**: `"csv" | "tuple" | "list"`
 
 **Example usage**:
 
@@ -3079,7 +3079,7 @@ case of multiple parameters. The following values are supported:
 
 **Default value**: `tuple`
 
-**Type**: `ParametrizeValuesRowType`
+**Type**: `"tuple" | "list"`
 
 **Example usage**:
 
@@ -3099,7 +3099,7 @@ The following values are supported:
 
 **Default value**: `list`
 
-**Type**: `ParametrizeValuesType`
+**Type**: `"tuple" | "list"`
 
 **Example usage**:
 
@@ -3123,7 +3123,7 @@ list.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3141,7 +3141,7 @@ List of exception names that require a match= parameter in a
 
 **Default value**: `["BaseException", "Exception", "ValueError", "OSError", "IOError", "EnvironmentError", "socket.error"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3176,12 +3176,11 @@ avoid-escape = false
 
 #### [`docstring-quotes`](#docstring-quotes)
 
-Quote style to prefer for docstrings (either "single" (`'`) or "double"
-(`"`)).
+Quote style to prefer for docstrings (either "single" or "double").
 
 **Default value**: `"double"`
 
-**Type**: `Quote`
+**Type**: `"single" | "double"`
 
 **Example usage**:
 
@@ -3194,12 +3193,12 @@ docstring-quotes = "single"
 
 #### [`inline-quotes`](#inline-quotes)
 
-Quote style to prefer for inline strings (either "single" (`'`) or
-"double" (`"`)).
+Quote style to prefer for inline strings (either "single" or
+"double").
 
 **Default value**: `"double"`
 
-**Type**: `Quote`
+**Type**: `"single" | "double"`
 
 **Example usage**:
 
@@ -3212,12 +3211,12 @@ inline-quotes = "single"
 
 #### [`multiline-quotes`](#multiline-quotes)
 
-Quote style to prefer for multiline strings (either "single" (`'`) or
-"double" (`"`)).
+Quote style to prefer for multiline strings (either "single" or
+"double").
 
 **Default value**: `"double"`
 
-**Type**: `Quote`
+**Type**: `"single" | "double"`
 
 **Example usage**:
 
@@ -3237,7 +3236,7 @@ that extend into the parent module or beyond (`"parents"`).
 
 **Default value**: `"parents"`
 
-**Type**: `Strictness`
+**Type**: `"parents" | "all"`
 
 **Example usage**:
 
@@ -3257,7 +3256,7 @@ and can be circumvented via `eval` or `importlib`.
 
 **Default value**: `{}`
 
-**Type**: `HashMap<String, BannedApi>`
+**Type**: `dict[str, { "msg": str }]`
 
 **Example usage**:
 
@@ -3279,7 +3278,7 @@ blocks.
 
 **Default value**: `["typing"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3337,7 +3336,7 @@ An override list of tokens to always recognize as a Class for
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3373,7 +3372,7 @@ for `order-by-type` regardless of casing.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3391,7 +3390,7 @@ known to Ruff in advance.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3478,7 +3477,7 @@ can be identified as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3496,7 +3495,7 @@ can be identified as such via introspection of the local filesystem.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3514,7 +3513,7 @@ section via empty lines.
 
 **Default value**: `[]`
 
-**Type**: `Option<Vec<ImportType>>`
+**Type**: `list["future" | "standard-library" | "third-party" | "first-party" | "local-folder"]`
 
 **Example usage**:
 
@@ -3556,7 +3555,7 @@ this to "closest-to-furthest" is equivalent to isort's `reverse-relative
 
 **Default value**: `furthest-to-closest`
 
-**Type**: `RelativeImportsOrder`
+**Type**: `"furthest-to-closest" | "closest-to-furthest"`
 
 **Example usage**:
 
@@ -3573,7 +3572,7 @@ Add the specified import line to all files.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3590,7 +3589,7 @@ One or more modules to exclude from the single line rule.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3628,7 +3627,7 @@ for `order-by-type` regardless of casing.
 
 **Default value**: `[]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3647,7 +3646,7 @@ The maximum McCabe complexity to allow before triggering `C901` errors.
 
 **Default value**: `10`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 
@@ -3670,7 +3669,7 @@ expect that any method decorated by a decorator in this list takes a
 
 **Default value**: `["classmethod"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3688,7 +3687,7 @@ A list of names to ignore when considering `pep8-naming` violations.
 
 **Default value**: `["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3708,7 +3707,7 @@ expect that any method decorated by a decorator in this list has no
 
 **Default value**: `["staticmethod"]`
 
-**Type**: `Vec<String>`
+**Type**: `list[str]`
 
 **Example usage**:
 
@@ -3748,7 +3747,7 @@ documentation (`W505`), including standalone comments.
 
 **Default value**: `None`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 
@@ -3768,7 +3767,7 @@ defaults when analyzing docstring sections.
 
 **Default value**: `None`
 
-**Type**: `Convention`
+**Type**: `"google" | "numpy" | "pep257"`
 
 **Example usage**:
 
@@ -3788,7 +3787,7 @@ Constant types to ignore when used as "magic values" (see: `PLR2004`).
 
 **Default value**: `["str", "bytes"]`
 
-**Type**: `Vec<ConstantType>`
+**Type**: `list["str" | "bytes" | "complex" | "float" | "int" | "tuple"]`
 
 **Example usage**:
 
@@ -3805,7 +3804,7 @@ Maximum number of arguments allowed for a function definition (see: `PLR0913`).
 
 **Default value**: `5`
 
-**Type**: `usize`
+**Type**: `int`
 
 **Example usage**:
 

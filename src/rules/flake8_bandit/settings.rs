@@ -21,14 +21,14 @@ fn default_tmp_dirs() -> Vec<String> {
 pub struct Options {
     #[option(
         default = "[\"/tmp\", \"/var/tmp\", \"/dev/shm\"]",
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = "hardcoded-tmp-directory = [\"/foo/bar\"]"
     )]
     /// A list of directories to consider temporary.
     pub hardcoded_tmp_directory: Option<Vec<String>>,
     #[option(
         default = "[]",
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = "extend-hardcoded-tmp-directory = [\"/foo/bar\"]"
     )]
     /// A list of directories to consider temporary, in addition to those

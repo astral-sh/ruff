@@ -768,7 +768,7 @@
           ]
         },
         "docstring-quotes": {
-          "description": "Quote style to prefer for docstrings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -779,7 +779,7 @@
           ]
         },
         "inline-quotes": {
-          "description": "Quote style to prefer for inline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -790,7 +790,7 @@
           ]
         },
         "multiline-quotes": {
-          "description": "Quote style to prefer for multiline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1188,14 +1188,14 @@
     "Quote": {
       "oneOf": [
         {
-          "description": "Use single quotes (`'`).",
+          "description": "Use single quotes.",
           "type": "string",
           "enum": [
             "single"
           ]
         },
         {
-          "description": "Use double quotes (`\"`).",
+          "description": "Use double quotes.",
           "type": "string",
           "enum": [
             "double"

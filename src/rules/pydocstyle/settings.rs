@@ -74,7 +74,7 @@ impl Convention {
 pub struct Options {
     #[option(
         default = r#"None"#,
-        value_type = "Convention",
+        value_type = r#""google" | "numpy" | "pep257""#,
         example = r#"
             # Use Google-style docstrings.
             convention = "google"

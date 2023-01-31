@@ -21,7 +21,7 @@ use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 pub struct Options {
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<char>",
+        value_type = "list[str]",
         example = r#"
             # Allow minus-sign (U+2212), greek-small-letter-rho (U+03C1), and the asterisk-operator (U+2217),
             # which could be confused for "-", "p", and "*", respectively.
@@ -33,7 +33,7 @@ pub struct Options {
     pub allowed_confusables: Option<Vec<char>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             builtins = ["_"]
         "#
@@ -43,7 +43,7 @@ pub struct Options {
     pub builtins: Option<Vec<String>>,
     #[option(
         default = ".ruff_cache",
-        value_type = "PathBuf",
+        value_type = "str",
         example = r#"cache-dir = "~/.cache/ruff""#
     )]
     /// A path to the cache directory.
@@ -59,7 +59,7 @@ pub struct Options {
     pub cache_dir: Option<String>,
     #[option(
         default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
-        value_type = "Regex",
+        value_type = "re.Pattern",
         example = r#"
             # Only ignore variables named "_".
             dummy-variable-rgx = "^_$"
@@ -71,7 +71,7 @@ pub struct Options {
     pub dummy_variable_rgx: Option<String>,
     #[option(
         default = r#"[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
-        value_type = "Vec<FilePattern>",
+        value_type = "list[str]",
         example = r#"
             exclude = [".venv"]
         "#
@@ -95,7 +95,7 @@ pub struct Options {
     pub exclude: Option<Vec<String>>,
     #[option(
         default = r#"None"#,
-        value_type = "Path",
+        value_type = "str",
         example = r#"
             # Extend the `pyproject.toml` file in the parent directory.
             extend = "../pyproject.toml"
@@ -113,7 +113,7 @@ pub struct Options {
     pub extend: Option<String>,
     #[option(
         default = "[]",
-        value_type = "Vec<FilePattern>",
+        value_type = "list[str]",
         example = r#"
             # In addition to the standard set of exclusions, omit all tests, plus a specific file.
             extend-exclude = ["tests", "src/bad.py"]
@@ -136,7 +136,7 @@ pub struct Options {
     pub extend_exclude: Option<Vec<String>>,
     #[option(
         default = "[]",
-        value_type = "Vec<RuleSelector>",
+        value_type = "list[RuleSelector]",
         example = r#"
             # Skip unused variable rules (`F841`).
             extend-ignore = ["F841"]
@@ -151,7 +151,7 @@ pub struct Options {
     pub extend_ignore: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",
-        value_type = "Vec<RuleSelector>",
+        value_type = "list[RuleSelector]",
         example = r#"
             # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
@@ -162,7 +162,7 @@ pub struct Options {
     pub extend_select: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             # Avoiding flagging (and removing) `V101` from any `# noqa`
             # directives, despite Ruff's lack of support for `vulture`.
@@ -183,7 +183,7 @@ pub struct Options {
     pub fix_only: Option<bool>,
     #[option(
         default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]"#,
-        value_type = "Vec<RuleSelector>",
+        value_type = "list[RuleSelector]",
         example = r#"
             # Only allow autofix behavior for `E` and `F` rules.
             fixable = ["E", "F"]
@@ -194,7 +194,7 @@ pub struct Options {
     pub fixable: Option<Vec<RuleSelector>>,
     #[option(
         default = r#""text""#,
-        value_type = "SerializationType",
+        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint""#,
         example = r#"
             # Group violations by containing file.
             format = "grouped"
@@ -226,7 +226,7 @@ pub struct Options {
     pub force_exclude: Option<bool>,
     #[option(
         default = "[]",
-        value_type = "Vec<RuleSelector>",
+        value_type = "list[RuleSelector]",
         example = r#"
             # Skip unused variable rules (`F841`).
             ignore = ["F841"]
@@ -254,7 +254,7 @@ pub struct Options {
     pub ignore_init_module_imports: Option<bool>,
     #[option(
         default = "88",
-        value_type = "usize",
+        value_type = "int",
         example = r#"
             # Allow lines to be as long as 120 characters.
             line-length = 120
@@ -265,7 +265,7 @@ pub struct Options {
     pub line_length: Option<usize>,
     #[option(
         default = "None",
-        value_type = "String",
+        value_type = "str",
         example = r#"
             required-version = "0.0.193"
         "#
@@ -287,7 +287,7 @@ pub struct Options {
     pub respect_gitignore: Option<bool>,
     #[option(
         default = r#"["E", "F"]"#,
-        value_type = "Vec<RuleSelector>",
+        value_type = "list[RuleSelector]",
         example = r#"
             # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             select = ["E", "F", "B", "Q"]
@@ -314,7 +314,7 @@ pub struct Options {
     pub show_source: Option<bool>,
     #[option(
         default = r#"["."]"#,
-        value_type = "Vec<PathBuf>",
+        value_type = "list[str]",
         example = r#"
             # Allow imports relative to the "src" and "test" directories.
             src = ["src", "test"]
@@ -347,7 +347,7 @@ pub struct Options {
     pub src: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<PathBuf>",
+        value_type = "list[str]",
         example = r#"
             namespace-packages = ["airflow/providers"]
         "#
@@ -358,7 +358,7 @@ pub struct Options {
     pub namespace_packages: Option<Vec<String>>,
     #[option(
         default = r#""py310""#,
-        value_type = "PythonVersion",
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -371,7 +371,7 @@ pub struct Options {
     pub target_version: Option<PythonVersion>,
     #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"task-tags = ["HACK"]"#
     )]
     /// A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").
@@ -382,7 +382,7 @@ pub struct Options {
     pub task_tags: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"typing-modules = ["airflow.typing_compat"]"#
     )]
     /// A list of modules whose imports should be treated equivalently to
@@ -396,7 +396,7 @@ pub struct Options {
     pub typing_modules: Option<Vec<String>>,
     #[option(
         default = "[]",
-        value_type = "Vec<RuleSelector>",
+        value_type = "list[RuleSelector]",
         example = r#"
             # Disable autofix for unused imports (`F401`).
             unfixable = ["F401"]
@@ -472,7 +472,7 @@ pub struct Options {
     // Tables are required to go last.
     #[option(
         default = "{}",
-        value_type = "HashMap<String, Vec<RuleSelector>>",
+        value_type = "dict[str, list[RuleSelector]]",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
             [tool.ruff.per-file-ignores]

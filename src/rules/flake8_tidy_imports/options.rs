@@ -20,7 +20,7 @@ use super::Settings;
 pub struct Options {
     #[option(
         default = r#""parents""#,
-        value_type = "Strictness",
+        value_type = r#""parents" | "all""#,
         example = r#"
             # Disallow all relative imports.
             ban-relative-imports = "all"
@@ -31,7 +31,7 @@ pub struct Options {
     pub ban_relative_imports: Option<Strictness>,
     #[option(
         default = r#"{}"#,
-        value_type = "HashMap<String, BannedApi>",
+        value_type = r#"dict[str, { "msg": str }]"#,
         example = r#"
             [tool.ruff.flake8-tidy-imports.banned-api]
             "cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
