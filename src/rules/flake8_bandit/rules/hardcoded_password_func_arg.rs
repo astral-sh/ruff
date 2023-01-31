@@ -10,7 +10,7 @@ pub fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnostic> {
     keywords
         .iter()
         .filter_map(|keyword| {
-            let string = string_literal(&keyword.node.value)?;
+            let string = string_literal(&keyword.node.value).filter(|string| !string.is_empty())?;
             let arg = keyword.node.arg.as_ref()?;
             if !matches_password_name(arg) {
                 return None;
