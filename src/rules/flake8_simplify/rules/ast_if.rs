@@ -184,16 +184,21 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
     {
-        let return_stmt = create_stmt(StmtKind::Return {
-            value: Some(Box::new(create_expr(ExprKind::Call {
-                func: Box::new(create_expr(ExprKind::Name {
-                    id: "bool".to_string(),
-                    ctx: ExprContext::Load,
-                })),
-                args: vec![(**test).clone()],
-                keywords: vec![],
-            }))),
-        });
+        let return_stmt = match test.node {
+            ExprKind::Compare { .. } => create_stmt(StmtKind::Return {
+                value: Some(test.clone()),
+            }),
+            _ => create_stmt(StmtKind::Return {
+                value: Some(Box::new(create_expr(ExprKind::Call {
+                    func: Box::new(create_expr(ExprKind::Name {
+                        id: "bool".to_string(),
+                        ctx: ExprContext::Load,
+                    })),
+                    args: vec![(**test).clone()],
+                    keywords: vec![],
+                }))),
+            }),
+        };
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
