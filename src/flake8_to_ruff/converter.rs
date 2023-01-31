@@ -1,6 +1,7 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
+use itertools::Itertools;
 
 use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
@@ -38,7 +39,7 @@ pub fn convert(
         .expect("Unable to find flake8 section in INI file");
 
     // Extract all referenced rule code prefixes, to power plugin inference.
-    let mut referenced_codes: BTreeSet<RuleSelector> = BTreeSet::default();
+    let mut referenced_codes: HashSet<RuleSelector> = HashSet::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
             match key.as_str() {
@@ -80,15 +81,15 @@ pub fn convert(
         .and_then(|value| {
             value
                 .as_ref()
-                .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
+                .map(|value| HashSet::from_iter(parser::parse_prefix_codes(value)))
         })
         .unwrap_or_else(|| resolve_select(&plugins));
-    let mut ignore = flake8
+    let mut ignore: HashSet<RuleSelector> = flake8
         .get("ignore")
         .and_then(|value| {
             value
                 .as_ref()
-                .map(|value| BTreeSet::from_iter(parser::parse_prefix_codes(value)))
+                .map(|value| HashSet::from_iter(parser::parse_prefix_codes(value)))
         })
         .unwrap_or_default();
 
@@ -349,8 +350,18 @@ pub fn convert(
     }
 
     // Deduplicate and sort.
-    options.select = Some(Vec::from_iter(select));
-    options.ignore = Some(Vec::from_iter(ignore));
+    options.select = Some(
+        select
+            .into_iter()
+            .sorted_by_key(RuleSelector::short_code)
+            .collect(),
+    );
+    options.ignore = Some(
+        ignore
+            .into_iter()
+            .sorted_by_key(RuleSelector::short_code)
+            .collect(),
+    );
     if flake8_annotations != flake8_annotations::settings::Options::default() {
         options.flake8_annotations = Some(flake8_annotations);
     }
@@ -414,8 +425,8 @@ pub fn convert(
 
 /// Resolve the set of enabled `RuleSelector` values for the given
 /// plugins.
-fn resolve_select(plugins: &[Plugin]) -> BTreeSet<RuleSelector> {
-    let mut select: BTreeSet<_> = DEFAULT_SELECTORS.iter().cloned().collect();
+fn resolve_select(plugins: &[Plugin]) -> HashSet<RuleSelector> {
+    let mut select: HashSet<_> = DEFAULT_SELECTORS.iter().cloned().collect();
     select.extend(plugins.iter().map(Plugin::selector));
     select
 }
@@ -446,7 +457,7 @@ mod tests {
                     .iter()
                     .cloned()
                     .chain(plugins)
-                    .sorted()
+                    .sorted_by_key(RuleSelector::short_code)
                     .collect(),
             ),
             ..Options::default()

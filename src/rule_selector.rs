@@ -11,7 +11,7 @@ use strum_macros::EnumIter;
 use crate::registry::{Rule, RuleCodePrefix, RuleIter};
 use crate::rule_redirects::get_redirect;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
     /// All rules
     All,
@@ -49,15 +49,21 @@ pub enum ParseError {
     Unknown(String),
 }
 
+impl RuleSelector {
+    pub fn short_code(&self) -> &'static str {
+        match self {
+            RuleSelector::All => "ALL",
+            RuleSelector::Prefix { prefix, .. } => prefix.into(),
+        }
+    }
+}
+
 impl Serialize for RuleSelector {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        match self {
-            RuleSelector::All => serializer.serialize_str("ALL"),
-            RuleSelector::Prefix { prefix, .. } => prefix.serialize(serializer),
-        }
+        serializer.serialize_str(self.short_code())
     }
 }
 
