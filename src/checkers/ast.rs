@@ -36,7 +36,7 @@ use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format,
-    flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
+    flake8_pie, flake8_print, flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
     pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
     ruff, tryceratops,
@@ -1432,6 +1432,15 @@ where
                 if self.settings.rules.enabled(&Rule::RaiseVanillaArgs) {
                     if let Some(expr) = exc {
                         tryceratops::rules::raise_vanilla_args(self, expr);
+                    }
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnnecessaryParenOnRaiseException)
+                {
+                    if let Some(expr) = exc {
+                        flake8_raise::rules::unnecessary_paren_on_raise_exception(self, expr);
                     }
                 }
             }
