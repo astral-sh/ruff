@@ -7,7 +7,7 @@ use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::noqa;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::registry::{Diagnostic, DiagnosticKind, Rule};
+use crate::registry::{Diagnostic, DiagnosticKind, NoqaCode, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::{flags, Settings};
@@ -20,7 +20,7 @@ pub fn check_noqa(
     settings: &Settings,
     autofix: flags::Autofix,
 ) {
-    let mut noqa_directives: IntMap<usize, (Directive, Vec<&str>)> = IntMap::default();
+    let mut noqa_directives: IntMap<usize, (Directive, Vec<NoqaCode>)> = IntMap::default();
     let mut ignored = vec![];
 
     let enforce_noqa = settings.rules.enabled(&Rule::UnusedNOQA);
@@ -128,12 +128,12 @@ pub fn check_noqa(
                     let mut self_ignore = false;
                     for code in codes {
                         let code = get_redirect_target(code).unwrap_or(code);
-                        if code == Rule::UnusedNOQA.noqa_code() {
+                        if Rule::UnusedNOQA.noqa_code() == code {
                             self_ignore = true;
                             break;
                         }
 
-                        if matches.contains(&code) || settings.external.contains(code) {
+                        if matches.iter().any(|m| *m == code) || settings.external.contains(code) {
                             valid_codes.push(code);
                         } else {
                             if let Ok(rule) = Rule::from_code(code) {

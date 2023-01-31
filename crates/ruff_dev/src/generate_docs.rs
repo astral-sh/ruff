@@ -25,7 +25,7 @@ pub fn main(args: &Args) -> Result<()> {
             output.push('\n');
             output.push('\n');
 
-            let (linter, _) = Linter::parse_code(rule.noqa_code()).unwrap();
+            let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
             output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
             output.push('\n');
             output.push('\n');
