@@ -184,11 +184,15 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
     {
-        let return_stmt = match test.node {
-            ExprKind::Compare { .. } => create_stmt(StmtKind::Return {
+        let mut fixit = true;
+        let return_stmt;
+        if let ExprKind::Compare { .. } = test.node {
+            return_stmt = create_stmt(StmtKind::Return {
                 value: Some(test.clone()),
-            }),
-            _ => create_stmt(StmtKind::Return {
+            });
+        } else {
+            fixit = checker.is_builtin("bool");
+            return_stmt = create_stmt(StmtKind::Return {
                 value: Some(Box::new(create_expr(ExprKind::Call {
                     func: Box::new(create_expr(ExprKind::Name {
                         id: "bool".to_string(),
@@ -197,13 +201,16 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
                     args: vec![(**test).clone()],
                     keywords: vec![],
                 }))),
-            }),
+            });
         };
-        diagnostic.amend(Fix::replacement(
-            unparse_stmt(&return_stmt, checker.stylist),
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ));
+
+        if fixit {
+            diagnostic.amend(Fix::replacement(
+                unparse_stmt(&return_stmt, checker.stylist),
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
