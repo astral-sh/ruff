@@ -94,6 +94,7 @@ ruff_macros::define_rule_mapping!(
     PLW0120 => violations::UselessElseOnLoop,
     PLW0602 => violations::GlobalVariableNotAssigned,
     PLR0913 => rules::pylint::rules::TooManyArgs,
+    PLR0915 => rules::pylint::rules::TooManyStatements,
     // flake8-builtins
     A001 => violations::BuiltinVariableShadowing,
     A002 => violations::BuiltinArgumentShadowing,

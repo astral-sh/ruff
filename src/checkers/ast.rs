@@ -699,6 +699,17 @@ where
                 if self.settings.rules.enabled(&Rule::TooManyArgs) {
                     pylint::rules::too_many_args(self, args, stmt);
                 }
+
+                if self.settings.rules.enabled(&Rule::TooManyStatements) {
+                    if let Some(diagnostic) = pylint::rules::too_many_statements(
+                        stmt,
+                        body,
+                        self.settings.pylint.max_statements,
+                        self.locator,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
             }
             StmtKind::Return { .. } => {
                 if self.settings.rules.enabled(&Rule::ReturnOutsideFunction) {

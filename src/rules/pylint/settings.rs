@@ -56,12 +56,20 @@ pub struct Options {
     #[option(default = r"5", value_type = "int", example = r"max_args = 5")]
     /// Maximum number of arguments allowed for a function definition (see: `PLR0913`).
     pub max_args: Option<usize>,
+    #[option(
+        default = r"100",
+        value_type = "int",
+        example = r"max_statements = 100"
+    )]
+    /// Maximum number of statements allowed for a method or a statement (see: `PLR0915`).
+    pub max_statements: Option<usize>,
 }
 
 #[derive(Debug, Hash)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
     pub max_args: usize,
+    pub max_statements: usize,
 }
 
 impl Default for Settings {
@@ -69,6 +77,7 @@ impl Default for Settings {
         Self {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
             max_args: 5,
+            max_statements: 100,
         }
     }
 }
@@ -81,6 +90,7 @@ impl From<Options> for Settings {
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
             max_args: options.max_args.unwrap_or(defaults.max_args),
+            max_statements: options.max_statements.unwrap_or(defaults.max_statements),
         }
     }
 }
@@ -90,6 +100,7 @@ impl From<Settings> for Options {
         Self {
             allow_magic_value_types: Some(settings.allow_magic_value_types),
             max_args: Some(settings.max_args),
+            max_statements: Some(settings.max_statements),
         }
     }
 }
