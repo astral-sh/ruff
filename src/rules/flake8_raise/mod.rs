@@ -13,7 +13,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::{assert_yaml_snapshot, settings};
 
-    #[test_case(Rule::UnnecessaryParenOnRaiseException, Path::new("R102.py"); "R102")]
+    #[test_case(Rule::UnnecessaryParenOnRaiseException, Path::new("RSE102.py"); "RSE102")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -482,7 +482,7 @@ ruff_macros::define_rule_mapping!(
     G201 => rules::flake8_logging_format::violations::LoggingExcInfo,
     G202 => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
     // flake8-raise
-    R102 => rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
+    RSE102 => rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
     // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -613,7 +613,7 @@ pub enum Linter {
     #[prefix = "TRY"]
     Tryceratops,
     /// [flake8-raise](https://pypi.org/project/flake8-raise/)
-    #[prefix = "R"]
+    #[prefix = "RSE"]
     Flake8Raise,
     /// Ruff-specific rules
     #[prefix = "RUF"]

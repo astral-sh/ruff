@@ -17,7 +17,7 @@ impl Violation for UnnecessaryParenOnRaiseException {
     }
 }
 
-/// R102
+/// RSE102
 pub fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
     match &expr.node {
         ExprKind::Call { args, keywords, .. } if args.is_empty() && keywords.is_empty() => {

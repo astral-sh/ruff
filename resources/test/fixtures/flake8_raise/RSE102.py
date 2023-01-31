@@ -1,14 +1,14 @@
 try:
     y = 6 + "7"
 except TypeError:
-    raise ValueError()  # R102
+    raise ValueError()  # RSE102
 
 try:
     x = 1 / 0
 except ZeroDivisionError:
     raise
 
-raise TypeError()  # R102
+raise TypeError()  # RSE102
 
 raise AssertionError
 

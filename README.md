@@ -154,7 +154,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PL)](#pylint-pl)
    1. [tryceratops (TRY)](#tryceratops-try)
-   1. [flake8-raise (R)](#flake8-raise-r)
+   1. [flake8-raise (RSE)](#flake8-raise-rse)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1323,13 +1323,13 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 | TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
 
-### flake8-raise (R)
+### flake8-raise (RSE)
 
 For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| R102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception |  |
+| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception |  |
 
 ### Ruff-specific rules (RUF)
 
