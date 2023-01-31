@@ -276,7 +276,7 @@ fn fix_py3_block(
     checker.diagnostics.push(diagnostic);
 }
 
-/// UP037
+/// UP036
 pub fn old_code_blocks(
     checker: &mut Checker,
     stmt: &Stmt,

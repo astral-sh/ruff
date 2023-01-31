@@ -257,7 +257,7 @@ ruff_macros::define_rule_mapping!(
     UP033 => violations::FunctoolsCache,
     UP034 => violations::ExtraneousParentheses,
     UP035 => rules::pyupgrade::rules::ImportReplacements,
-    UP037 => rules::pyupgrade::rules::OldCodeBlocks,
+    UP036 => rules::pyupgrade::rules::OldCodeBlocks,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,
