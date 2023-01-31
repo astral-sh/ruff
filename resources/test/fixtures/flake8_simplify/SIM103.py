@@ -50,3 +50,19 @@ def f():
         return False
     else:
         return True
+
+
+def f():
+    # OK
+    if a:
+        return False
+    else:
+        return False
+
+
+def f():
+    # OK
+    if a:
+        return True
+    else:
+        return True

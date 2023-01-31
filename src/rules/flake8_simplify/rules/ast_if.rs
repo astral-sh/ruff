@@ -128,6 +128,7 @@ pub fn nested_if_statements(
     checker.diagnostics.push(diagnostic);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Bool {
     True,
     False,
@@ -167,6 +168,12 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     let (Some(if_return), Some(else_return)) = (is_one_line_return_bool(body), is_one_line_return_bool(orelse)) else {
         return;
     };
+
+    // If the branches have the same condition, abort (although the code could be simplified).
+    if if_return == else_return {
+        return;
+    }
+
     let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
         violations::ReturnBoolConditionDirectly { cond: condition },
