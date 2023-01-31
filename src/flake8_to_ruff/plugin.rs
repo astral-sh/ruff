@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
 
@@ -293,7 +293,7 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
 ///
 /// For example, if the user ignores `ANN101`, we should infer that
 /// `flake8-annotations` is active.
-pub fn infer_plugins_from_codes(selectors: &BTreeSet<RuleSelector>) -> Vec<Plugin> {
+pub fn infer_plugins_from_codes(selectors: &HashSet<RuleSelector>) -> Vec<Plugin> {
     // Ignore cases in which we've knowingly changed rule prefixes.
     [
         Plugin::Flake82020,
