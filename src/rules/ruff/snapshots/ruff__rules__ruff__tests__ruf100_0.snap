@@ -268,4 +268,39 @@ expression: diagnostics
       row: 86
       column: 0
   parent: ~
+- kind:
+    LineTooLong:
+      - 103
+      - 88
+  location:
+    row: 90
+    column: 88
+  end_location:
+    row: 90
+    column: 103
+  fix: ~
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F401
+  location:
+    row: 90
+    column: 91
+  end_location:
+    row: 90
+    column: 103
+  fix:
+    content:
+      - ""
+    location:
+      row: 90
+      column: 89
+    end_location:
+      row: 90
+      column: 103
+  parent: ~
 
