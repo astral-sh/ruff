@@ -57,6 +57,7 @@ mod tests {
     #[test_case(Rule::FString, Path::new("UP032.py"); "UP032")]
     #[test_case(Rule::FunctoolsCache, Path::new("UP033.py"); "UP033")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]
+    #[test_case(Rule::ImportReplacements, Path::new("UP035.py"); "UP035")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

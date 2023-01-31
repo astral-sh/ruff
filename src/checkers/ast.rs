@@ -1073,6 +1073,15 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteCElementTree) {
                     pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
+                if self.settings.rules.enabled(&Rule::ImportReplacements) {
+                    pyupgrade::rules::import_replacements(
+                        self,
+                        stmt,
+                        names,
+                        module.as_ref().map(String::as_str),
+                        level.as_ref(),
+                    );
+                }
                 if self.settings.rules.enabled(&Rule::UnnecessaryBuiltinImport) {
                     if let Some(module) = module.as_deref() {
                         pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
