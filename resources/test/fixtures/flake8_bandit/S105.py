@@ -4,6 +4,7 @@ d = {}
 safe = "s3cr3t"
 password = True
 password = safe
+password = ""
 password is True
 password == 1
 d["safe"] = "s3cr3t"
