@@ -34,8 +34,8 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         rule_autofixable_match_arms
             .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::AUTOFIX,});
         rule_explanation_match_arms.extend(quote! {#(#attr)* Self::#name => #path::explanation(),});
-        rule_code_match_arms.extend(quote! {#(#attr)* Self::#name => #code_str,});
-        rule_from_code_match_arms.extend(quote! {#(#attr)* #code_str => Ok(Rule::#name), });
+        rule_code_match_arms.extend(quote! {#(#attr)* Self::#name => NoqaCode(#code_str),});
+        rule_from_code_match_arms.extend(quote! {#(#attr)* #code_str => Ok(&Rule::#name), });
         diagnostic_kind_code_match_arms
             .extend(quote! {#(#attr)* Self::#name(..) => &Rule::#name, });
         diagnostic_kind_body_match_arms
@@ -106,7 +106,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
                 match self { #rule_autofixable_match_arms }
             }
 
-            pub fn noqa_code(&self) -> &'static str {
+            pub fn noqa_code(&self) -> NoqaCode {
                 match self { #rule_code_match_arms }
             }
 
@@ -115,6 +115,21 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
                     #rule_from_code_match_arms
                     _ => Err(FromCodeError::Unknown),
                 }
+            }
+        }
+
+        #[derive(PartialEq, Eq, PartialOrd, Ord)]
+        pub struct NoqaCode(&'static str);
+
+        impl std::fmt::Display for NoqaCode {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                self.0.fmt(f)
+            }
+        }
+
+        impl PartialEq<&str> for NoqaCode {
+            fn eq(&self, other: &&str) -> bool {
+                self.0 == *other
             }
         }
 

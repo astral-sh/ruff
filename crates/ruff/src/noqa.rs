@@ -1,3 +1,4 @@
+use std::fmt::{Display, Write};
 use std::fs;
 use std::path::Path;
 
@@ -72,7 +73,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
 pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
-    let needle: &str = needle.noqa_code();
+    let needle = needle.noqa_code();
     haystack
         .iter()
         .any(|candidate| needle == get_redirect_target(candidate).unwrap_or(candidate))
@@ -205,9 +206,7 @@ fn add_noqa_inner(
                         output.push_str("  # noqa: ");
 
                         // Add codes.
-                        let codes: Vec<&str> = rules.iter().map(|r| r.noqa_code()).collect();
-                        let suffix = codes.join(", ");
-                        output.push_str(&suffix);
+                        push_codes(&mut output, rules.iter().map(|r| r.noqa_code()));
                         output.push_str(line_ending);
                         count += 1;
                     }
@@ -228,14 +227,14 @@ fn add_noqa_inner(
                         formatted.push_str("  # noqa: ");
 
                         // Add codes.
-                        let codes: Vec<&str> = rules
-                            .iter()
-                            .map(|r| r.noqa_code())
-                            .chain(existing.into_iter())
-                            .sorted_unstable()
-                            .collect();
-                        let suffix = codes.join(", ");
-                        formatted.push_str(&suffix);
+                        push_codes(
+                            &mut formatted,
+                            rules
+                                .iter()
+                                .map(|r| r.noqa_code().to_string())
+                                .chain(existing.into_iter().map(ToString::to_string))
+                                .sorted_unstable(),
+                        );
 
                         output.push_str(&formatted);
                         output.push_str(line_ending);
@@ -251,6 +250,17 @@ fn add_noqa_inner(
     }
 
     (count, output)
+}
+
+fn push_codes<I: Display>(str: &mut String, codes: impl Iterator<Item = I>) {
+    let mut first = true;
+    for code in codes {
+        if !first {
+            str.push_str(", ");
+        }
+        let _ = write!(str, "{}", code);
+        first = false;
+    }
 }
 
 #[cfg(test)]

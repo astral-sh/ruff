@@ -66,7 +66,7 @@ impl Serialize for SerializeRuleAsCode {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.0.noqa_code())
+        serializer.serialize_str(&self.0.noqa_code().to_string())
     }
 }
 

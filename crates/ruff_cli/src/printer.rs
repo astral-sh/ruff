@@ -53,9 +53,9 @@ struct ExpandedMessage<'a> {
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics<'a> {
+struct ExpandedStatistics {
     count: usize,
-    code: &'a str,
+    code: String,
     message: String,
     fixable: bool,
 }
@@ -67,7 +67,7 @@ impl Serialize for SerializeRuleAsCode<'_> {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.0.noqa_code())
+        serializer.serialize_str(&self.0.noqa_code().to_string())
     }
 }
 
@@ -343,7 +343,7 @@ impl Printer {
                                 json!({
                                     "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body()),
                                     "severity": "major",
-                                    "fingerprint": message.kind.rule().noqa_code(),
+                                    "fingerprint": message.kind.rule().noqa_code().to_string(),
                                     "location": {
                                         "path": message.filename,
                                         "lines": {
@@ -394,7 +394,7 @@ impl Printer {
         let statistics = violations
             .iter()
             .map(|rule| ExpandedStatistics {
-                code: rule.noqa_code(),
+                code: rule.noqa_code().to_string(),
                 count: diagnostics
                     .messages
                     .iter()
@@ -538,7 +538,7 @@ impl Display for CodeAndBody<'_> {
             write!(
                 f,
                 "{code} {autofix}{body}",
-                code = self.0.kind.rule().noqa_code().red().bold(),
+                code = self.0.kind.rule().noqa_code().to_string().red().bold(),
                 autofix = format_args!("[{}] ", "*".cyan()),
                 body = self.0.kind.body(),
             )
@@ -546,7 +546,7 @@ impl Display for CodeAndBody<'_> {
             write!(
                 f,
                 "{code} {body}",
-                code = self.0.kind.rule().noqa_code().red().bold(),
+                code = self.0.kind.rule().noqa_code().to_string().red().bold(),
                 body = self.0.kind.body(),
             )
         }
@@ -589,6 +589,7 @@ fn print_message<T: Write>(
         } else {
             vec![]
         };
+        let label = message.kind.rule().noqa_code().to_string();
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -601,7 +602,7 @@ fn print_message<T: Write>(
                 source: &source.contents,
                 line_start: message.location.row(),
                 annotations: vec![SourceAnnotation {
-                    label: message.kind.rule().noqa_code(),
+                    label: &label,
                     annotation_type: AnnotationType::Error,
                     range: source.range,
                 }],
@@ -656,7 +657,7 @@ fn print_fixed<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) ->
             writeln!(
                 stdout,
                 "    {count:>num_digits$} × {} ({})",
-                rule.noqa_code().red().bold(),
+                rule.noqa_code().to_string().red().bold(),
                 rule.as_ref(),
             )?;
         }
@@ -694,6 +695,7 @@ fn print_grouped_message<T: Write>(
         } else {
             vec![]
         };
+        let label = message.kind.rule().noqa_code().to_string();
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -706,7 +708,7 @@ fn print_grouped_message<T: Write>(
                 source: &source.contents,
                 line_start: message.location.row(),
                 annotations: vec![SourceAnnotation {
-                    label: message.kind.rule().noqa_code(),
+                    label: &label,
                     annotation_type: AnnotationType::Error,
                     range: source.range,
                 }],
