@@ -715,6 +715,7 @@ mod tests {
     #[test_case(Path::new("preserve_import_star.py"))]
     #[test_case(Path::new("preserve_indentation.py"))]
     #[test_case(Path::new("preserve_tabs.py"))]
+    #[test_case(Path::new("preserve_tabs_2.py"))]
     #[test_case(Path::new("relative_imports_order.py"))]
     #[test_case(Path::new("reorder_within_section.py"))]
     #[test_case(Path::new("separate_first_party_imports.py"))]

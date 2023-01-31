@@ -1,8 +1,9 @@
 use std::path::Path;
 
+use itertools::{EitherOrBoth, Itertools};
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Location, Stmt};
-use textwrap::{dedent, indent};
+use textwrap::indent;
 
 use super::super::track::Block;
 use super::super::{comments, format_imports};
@@ -41,6 +42,17 @@ fn extract_range(body: &[&Stmt]) -> Range {
 fn extract_indentation_range(body: &[&Stmt]) -> Range {
     let location = body.first().unwrap().location;
     Range::new(Location::new(location.row(), 0), location)
+}
+
+/// Compares two strings, returning true if they are equal modulo whitespace
+/// at the start of each line.
+fn matches_ignoring_indentation(val1: &str, val2: &str) -> bool {
+    val1.lines()
+        .zip_longest(val2.lines())
+        .all(|pair| match pair {
+            EitherOrBoth::Both(line1, line2) => line1.trim_start() == line2.trim_start(),
+            _ => false,
+        })
 }
 
 /// I001
@@ -112,8 +124,8 @@ pub fn organize_imports(
         Location::new(range.location.row(), 0),
         Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
     );
-    let actual = dedent(locator.slice_source_code_range(&range));
-    if actual == dedent(&expected) {
+    let actual = locator.slice_source_code_range(&range);
+    if matches_ignoring_indentation(actual, &expected) {
         None
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
