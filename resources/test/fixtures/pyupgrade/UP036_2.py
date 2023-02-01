@@ -60,29 +60,3 @@ if sys.version_info[0] > "2":
     3
 else:
     2
-
-from .sys import version_info
-if version_info < (3,):
-    print(2)
-else:
-    print(3)
-
-if sys.version_info > (3, 15):
-    3-15
-else:
-    3-16
-
-if sys.version_info < (3, 15):
-    3-16
-else:
-    3-15
-
-if sys.version_info >= (3, 15):
-    3-15
-else:
-    3-16
-
-if sys.version_info <= (3, 15):
-    3-16
-else:
-    3-15

@@ -143,8 +143,8 @@ expression: diagnostics
       row: 42
       column: 0
     end_location:
-      row: 43
-      column: 13
+      row: 44
+      column: 0
   parent: ~
 - kind:
     OutdatedVersionBlock: ~
@@ -218,8 +218,8 @@ expression: diagnostics
       row: 67
       column: 0
     end_location:
-      row: 68
-      column: 13
+      row: 69
+      column: 0
   parent: ~
 - kind:
     OutdatedVersionBlock: ~

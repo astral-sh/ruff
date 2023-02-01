@@ -161,8 +161,8 @@ expression: diagnostics
       row: 42
       column: 0
     end_location:
-      row: 43
-      column: 8
+      row: 44
+      column: 0
   parent: ~
 - kind:
     OutdatedVersionBlock: ~
@@ -174,7 +174,7 @@ expression: diagnostics
     column: 12
   fix:
     content:
-      - ""
+      - pass
     location:
       row: 46
       column: 4

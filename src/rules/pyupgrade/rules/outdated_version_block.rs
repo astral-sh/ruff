@@ -1,3 +1,4 @@
+use log::error;
 use std::cmp::Ordering;
 
 use num_bigint::{BigInt, Sign};
@@ -8,8 +9,9 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use textwrap::{dedent, indent};
 
-use crate::ast::types::Range;
+use crate::ast::types::{Range, RefEquality};
 use crate::ast::whitespace::indentation;
+use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
@@ -36,21 +38,24 @@ impl AlwaysAutofixableViolation for OutdatedVersionBlock {
 struct BlockMetadata {
     /// The first non-whitespace token in the block.
     starter: Tok,
-    /// Whether the block contains an `elif` statement.
-    has_elif: bool,
+    /// The location of the first `elif` token, if any.
+    elif: Option<Location>,
+    /// The location of the `else` token, if any.
+    else_: Option<Location>,
 }
 
 impl BlockMetadata {
-    fn new(starter: Tok, has_elif: bool) -> Self {
-        Self { starter, has_elif }
+    fn new(starter: Tok, elif: Option<Location>, else_: Option<Location>) -> Self {
+        Self {
+            starter,
+            elif,
+            else_,
+        }
     }
 }
 
 fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata> {
-    if indentation(locator, located).is_none() {
-        println!("No indentation");
-        return None;
-    };
+    indentation(locator, located)?;
 
     // Start the selection at the start-of-line. This ensures consistent indentation in the
     // token stream, in the event that the entire block is indented.
@@ -60,24 +65,38 @@ fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata>
     ));
 
     let mut starter: Option<Tok> = None;
-    let mut has_elif = false;
-    for (_, tok, _) in lexer::make_tokenizer(text).flatten().filter(|(_, tok, _)| {
-        !matches!(
-            tok,
-            Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline | Tok::Newline | Tok::Comment(..)
-        )
-    }) {
-        if matches!(tok, Tok::Elif) {
-            has_elif = true;
-        }
+    let mut elif = None;
+    let mut else_ = None;
+
+    for (start, tok, _) in
+        lexer::make_tokenizer_located(text, Location::new(located.location.row(), 0))
+            .flatten()
+            .filter(|(_, tok, _)| {
+                !matches!(
+                    tok,
+                    Tok::Indent
+                        | Tok::Dedent
+                        | Tok::NonLogicalNewline
+                        | Tok::Newline
+                        | Tok::Comment(..)
+                )
+            })
+    {
         if starter.is_none() {
-            starter = Some(tok);
+            starter = Some(tok.clone());
+        } else {
+            if matches!(tok, Tok::Elif) && elif.is_none() {
+                elif = Some(start);
+            }
+            if matches!(tok, Tok::Else) && else_.is_none() {
+                else_ = Some(start);
+            }
         }
-        if has_elif {
+        if starter.is_some() && elif.is_some() && else_.is_some() {
             break;
         }
     }
-    Some(BlockMetadata::new(starter.unwrap(), has_elif))
+    Some(BlockMetadata::new(starter.unwrap(), elif, else_))
 }
 
 /// Converts a `BigInt` to a `u32`, if the number is negative, it will return 0
@@ -111,7 +130,7 @@ fn extract_version(elts: &[Expr]) -> Vec<u32> {
 fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool) -> bool {
     let mut if_version_iter = if_version.iter();
     if let Some(if_major) = if_version_iter.next() {
-        let (py_major, py_minor) = py_version.to_tuple();
+        let (py_major, py_minor) = py_version.as_tuple();
         match if_major.cmp(&py_major) {
             Ordering::Less => true,
             Ordering::Equal => {
@@ -143,11 +162,41 @@ fn fix_py2_block(
     block: &BlockMetadata,
 ) -> Option<Fix> {
     if orelse.is_empty() {
-        return Some(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
+        // Delete the entire statement. If this is an `elif`, know it's the only child of its
+        // parent, so avoid passing in the parent at all. Otherwise, `delete_stmt` will erroneously
+        // include a `pass`.
+        let deleted: Vec<&Stmt> = checker
+            .deletions
+            .iter()
+            .map(std::convert::Into::into)
+            .collect();
+        let defined_by = checker.current_stmt();
+        let defined_in = checker.current_stmt_parent();
+        return match delete_stmt(
+            defined_by.into(),
+            if block.starter == Tok::If {
+                defined_in.map(std::convert::Into::into)
+            } else {
+                None
+            },
+            &deleted,
+            checker.locator,
+            checker.indexer,
+            checker.stylist,
+        ) {
+            Ok(fix) => {
+                checker.deletions.insert(RefEquality(defined_by.into()));
+                Some(fix)
+            }
+            Err(err) => {
+                error!("Failed to remove block: {}", err);
+                None
+            }
+        };
     }
 
     // If we only have an `if` and an `else`, dedent the `else` block.
-    if block.starter == Tok::If && !block.has_elif {
+    if block.starter == Tok::If && block.elif.is_none() {
         let start = orelse.first().unwrap();
         let end = orelse.last().unwrap();
 
@@ -169,29 +218,20 @@ fn fix_py2_block(
         ))
     } else {
         let mut end_location = orelse.last().unwrap().location;
-        if block.starter == Tok::If && block.has_elif {
-            // If we have an elif, grab "e" and "l" to make an if.
+        if block.starter == Tok::If && block.elif.is_some() {
+            // Turn the `elif` into an `if`.
+            end_location = block.elif.unwrap();
             end_location.go_right();
             end_location.go_right();
         } else if block.starter == Tok::Elif {
-            end_location = body.last().unwrap().end_location.unwrap();
-            let mut next_item = end_location;
-            next_item.go_right();
-            let mut after_item = end_location;
-            after_item.go_right();
-
-            // If the next item it a new line, remove it so that we do not get an empty line
-            let suffix = checker
-                .locator
-                .slice_source_code_range(&Range::new(end_location, after_item));
-            if suffix == "\n" {
-                end_location.go_right();
-            } else if suffix == "\r\n" {
-                end_location.go_right();
-                end_location.go_right();
+            if let Some(elif) = block.elif {
+                end_location = elif;
+            } else if let Some(else_) = block.else_ {
+                end_location = else_;
+            } else {
+                end_location = body.last().unwrap().end_location.unwrap();
             }
         }
-
         Some(Fix::deletion(stmt.location, end_location))
     }
 }
@@ -202,16 +242,16 @@ fn fix_py3_block(
     stmt: &Stmt,
     test: &Expr,
     body: &[Stmt],
-    tokens: &BlockMetadata,
+    block: &BlockMetadata,
 ) -> Option<Fix> {
-    match tokens.starter {
+    match block.starter {
         Tok::If => {
             // If the first statement is an if, use the body of this statement, and ignore the rest.
             if body.is_empty() {
                 return None;
             }
 
-            if tokens.has_elif {
+            if block.elif.is_some() {
                 let start = body.first().unwrap();
                 let end = body.last().unwrap();
                 let text_range = Range::new(start.location, end.end_location.unwrap());
