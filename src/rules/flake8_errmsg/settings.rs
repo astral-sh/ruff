@@ -13,11 +13,7 @@ use serde::{Deserialize, Serialize};
     rename = "Flake8ErrMsgOptions"
 )]
 pub struct Options {
-    #[option(
-        default = "0",
-        value_type = "usize",
-        example = "max-string-length = 20"
-    )]
+    #[option(default = "0", value_type = "int", example = "max-string-length = 20")]
     /// Maximum string length for string literals in exception messages.
     pub max_string_length: Option<usize>,
 }

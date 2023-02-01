@@ -34,7 +34,7 @@ const STATICMETHOD_DECORATORS: [&str; 1] = ["staticmethod"];
 pub struct Options {
     #[option(
         default = r#"["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             ignore-names = ["callMethod"]
         "#
@@ -43,7 +43,7 @@ pub struct Options {
     pub ignore_names: Option<Vec<String>>,
     #[option(
         default = r#"["classmethod"]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             # Allow Pydantic's `@validator` decorator to trigger class method treatment.
             classmethod-decorators = ["classmethod", "pydantic.validator"]
@@ -56,7 +56,7 @@ pub struct Options {
     pub classmethod_decorators: Option<Vec<String>>,
     #[option(
         default = r#"["staticmethod"]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             # Allow a shorthand alias, `@stcmthd`, to trigger static method treatment.
             staticmethod-decorators = ["staticmethod", "stcmthd"]

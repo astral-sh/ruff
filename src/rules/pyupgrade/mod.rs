@@ -35,7 +35,6 @@ mod tests {
     #[test_case(Rule::ConvertTypedDictFunctionalToClass, Path::new("UP013.py"); "UP013")]
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"); "UP014")]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"); "UP015")]
-    #[test_case(Rule::RemoveSixCompat, Path::new("UP016.py"); "UP016")]
     #[test_case(Rule::NativeLiterals, Path::new("UP018.py"); "UP018")]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"); "UP019")]
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"); "UP021")]
@@ -58,10 +57,11 @@ mod tests {
     #[test_case(Rule::FString, Path::new("UP032.py"); "UP032")]
     #[test_case(Rule::FunctoolsCache, Path::new("UP033.py"); "UP033")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]
-    #[test_case(Rule::OldCodeBlocks, Path::new("UP037_0.py"); "UP037_0")]
-    #[test_case(Rule::OldCodeBlocks, Path::new("UP037_1.py"); "UP037_1")]
-    #[test_case(Rule::OldCodeBlocks, Path::new("UP037_2.py"); "UP037_2")]
-    #[test_case(Rule::OldCodeBlocks, Path::new("UP037_3.py"); "UP037_3")]
+    #[test_case(Rule::ImportReplacements, Path::new("UP035.py"); "UP035")]
+    #[test_case(Rule::OldCodeBlocks, Path::new("UP036_0.py"); "UP036_0")]
+    #[test_case(Rule::OldCodeBlocks, Path::new("UP036_1.py"); "UP036_1")]
+    #[test_case(Rule::OldCodeBlocks, Path::new("UP036_2.py"); "UP036_2")]
+    #[test_case(Rule::OldCodeBlocks, Path::new("UP036_3.py"); "UP036_3")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

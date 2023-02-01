@@ -6,10 +6,10 @@ expression: diagnostics
     HardcodedPasswordFuncArg:
       string: s3cr3t
   location:
-    row: 13
+    row: 14
     column: 8
   end_location:
-    row: 13
+    row: 14
     column: 25
   fix: ~
   parent: ~

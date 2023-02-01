@@ -205,7 +205,28 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                     .rules
                     .enabled(&Rule::LoggingRedundantExcInfo)
             {
+                if !checker.in_exception_handler() {
+                    return;
+                }
                 if let Some(exc_info) = find_keyword(keywords, "exc_info") {
+                    // If `exc_info` is `True` or `sys.exc_info()`, it's redundant; but otherwise,
+                    // return.
+                    if !(matches!(
+                        exc_info.node.value.node,
+                        ExprKind::Constant {
+                            value: Constant::Bool(true),
+                            ..
+                        }
+                    ) || if let ExprKind::Call { func, .. } = &exc_info.node.value.node {
+                        checker.resolve_call_path(func).map_or(false, |call_path| {
+                            call_path.as_slice() == ["sys", "exc_info"]
+                        })
+                    } else {
+                        false
+                    }) {
+                        return;
+                    }
+
                     match logging_level {
                         LoggingLevel::Error => {
                             if checker.settings.rules.enabled(&Rule::LoggingExcInfo) {

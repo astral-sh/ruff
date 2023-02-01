@@ -30,7 +30,7 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
     comparators
         .iter()
         .filter_map(|comp| {
-            let string = string_literal(comp)?;
+            let string = string_literal(comp).filter(|string| !string.is_empty())?;
             if !is_password_target(left) {
                 return None;
             }
@@ -46,7 +46,7 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
 
 /// S105
 pub fn assign_hardcoded_password_string(value: &Expr, targets: &[Expr]) -> Option<Diagnostic> {
-    if let Some(string) = string_literal(value) {
+    if let Some(string) = string_literal(value).filter(|string| !string.is_empty()) {
         for target in targets {
             if is_password_target(target) {
                 return Some(Diagnostic::new(

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     #[option(
         default = "None",
-        value_type = "usize",
+        value_type = "int",
         example = r#"
             max-doc-length = 88
         "#

@@ -27,6 +27,8 @@ use crate::cache;
 use crate::diagnostics::{lint_path, lint_stdin, Diagnostics};
 use crate::iterators::par_iter;
 
+pub mod linter;
+
 /// Run the linter over a collection of files.
 pub fn run(
     files: &[PathBuf],

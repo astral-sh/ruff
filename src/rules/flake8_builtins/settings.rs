@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = "builtins-ignorelist = [\"id\"]"
     )]
     /// Ignore list of builtins.

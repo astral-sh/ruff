@@ -7,7 +7,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.237"
+version = "0.0.238"
 description = "An extremely fast Python linter, written in Rust."
 authors = [
   { name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" },

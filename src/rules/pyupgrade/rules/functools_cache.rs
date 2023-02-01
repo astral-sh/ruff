@@ -5,7 +5,7 @@ use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// UP033
@@ -40,7 +40,7 @@ pub fn functools_cache(checker: &mut Checker, decorator_list: &[Expr]) {
                     violations::FunctoolsCache,
                     Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
                 );
-                if checker.patch(&Rule::FunctoolsCache) {
+                if checker.patch(diagnostic.kind.rule()) {
                     if let ExprKind::Attribute { value, ctx, .. } = &func.node {
                         diagnostic.amend(Fix::replacement(
                             unparse_expr(

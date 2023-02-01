@@ -24,6 +24,11 @@ pub struct Options {
     /// By default, implicit concatenations of multiline strings are
     /// allowed (but continuation lines, delimited with a backslash, are
     /// prohibited).
+    ///
+    /// Note that setting `allow-multiline = false` should typically be coupled
+    /// with disabling `explicit-string-concatenation` (`ISC003`). Otherwise,
+    /// both explicit and implicit multiline string concatenations will be seen
+    /// as violations.
     pub allow_multiline: Option<bool>,
 }
 

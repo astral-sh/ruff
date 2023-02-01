@@ -1,9 +1,6 @@
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 use crate::source_code::Stylist;
 
-// Hard-code four-space indentation for the imports themselves, to match Black.
-const INDENT: &str = "    ";
-
 // Guess a capacity to use for string allocation.
 const CAPACITY: usize = 200;
 
@@ -174,11 +171,11 @@ fn format_multi_line(
 
     for (AliasData { name, asname }, comments) in aliases {
         for comment in &comments.atop {
-            output.push_str(INDENT);
+            output.push_str(stylist.indentation());
             output.push_str(comment);
             output.push_str(stylist.line_ending());
         }
-        output.push_str(INDENT);
+        output.push_str(stylist.indentation());
         if let Some(asname) = asname {
             output.push_str(name);
             output.push_str(" as ");

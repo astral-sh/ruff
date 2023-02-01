@@ -3,7 +3,7 @@ use rustpython_ast::{Expr, ExprKind};
 use crate::ast::helpers::find_useless_f_strings;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::violations;
 
 /// F541
@@ -14,7 +14,7 @@ pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut
     {
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(violations::FStringMissingPlaceholders, tok_range);
-            if checker.patch(&Rule::FStringMissingPlaceholders) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::deletion(
                     prefix_range.location,
                     prefix_range.end_location,

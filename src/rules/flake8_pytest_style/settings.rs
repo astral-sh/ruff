@@ -42,7 +42,7 @@ pub struct Options {
     pub fixture_parentheses: Option<bool>,
     #[option(
         default = "tuple",
-        value_type = "ParametrizeNameType",
+        value_type = r#""csv" | "tuple" | "list""#,
         example = "parametrize-names-type = \"list\""
     )]
     /// Expected type for multiple argument names in `@pytest.mark.parametrize`.
@@ -55,7 +55,7 @@ pub struct Options {
     pub parametrize_names_type: Option<types::ParametrizeNameType>,
     #[option(
         default = "list",
-        value_type = "ParametrizeValuesType",
+        value_type = r#""tuple" | "list""#,
         example = "parametrize-values-type = \"tuple\""
     )]
     /// Expected type for the list of values rows in `@pytest.mark.parametrize`.
@@ -65,7 +65,7 @@ pub struct Options {
     pub parametrize_values_type: Option<types::ParametrizeValuesType>,
     #[option(
         default = "tuple",
-        value_type = "ParametrizeValuesRowType",
+        value_type = r#""tuple" | "list""#,
         example = "parametrize-values-row-type = \"list\""
     )]
     /// Expected type for each row of values in `@pytest.mark.parametrize` in
@@ -77,7 +77,7 @@ pub struct Options {
     pub parametrize_values_row_type: Option<types::ParametrizeValuesRowType>,
     #[option(
         default = r#"["BaseException", "Exception", "ValueError", "OSError", "IOError", "EnvironmentError", "socket.error"]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = "raises-require-match-for = [\"requests.RequestException\"]"
     )]
     /// List of exception names that require a match= parameter in a
@@ -85,7 +85,7 @@ pub struct Options {
     pub raises_require_match_for: Option<Vec<String>>,
     #[option(
         default = "[]",
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = "raises-extend-require-match-for = [\"requests.RequestException\"]"
     )]
     /// List of additional exception names that require a match= parameter in a

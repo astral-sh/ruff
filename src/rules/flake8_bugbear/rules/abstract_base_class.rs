@@ -62,16 +62,19 @@ pub fn abstract_base_class(
             continue;
         }
 
-        let (StmtKind::FunctionDef {
+        let (
+            StmtKind::FunctionDef {
                 decorator_list,
                 body,
+                name: method_name,
+                ..
+            } | StmtKind::AsyncFunctionDef {
+                decorator_list,
+                body,
+                name: method_name,
                 ..
             }
-            | StmtKind::AsyncFunctionDef {
-                decorator_list,
-                body,
-                ..
-            }) = &stmt.node else {
+        ) = &stmt.node else {
             continue;
         };
 
@@ -89,7 +92,7 @@ pub fn abstract_base_class(
         if !has_abstract_decorator && is_empty_body(body) && !is_overload(checker, decorator_list) {
             checker.diagnostics.push(Diagnostic::new(
                 violations::EmptyMethodWithoutAbstractDecorator {
-                    name: name.to_string(),
+                    name: format!("{name}.{method_name}"),
                 },
                 Range::from_located(stmt),
             ));

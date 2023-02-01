@@ -47,7 +47,7 @@ if input_password == "":  # correct
 if input_password == ADMIN_PASSWORD:  # correct
     pass
 
-if input_password == "Hunter2":  # [magic-value-comparison]
+if input_password == "Hunter2":  # correct
     pass
 
 PI = 3.141592653589793238
@@ -62,7 +62,7 @@ if pi_estimation == PI:  # correct
 HELLO_WORLD = b"Hello, World!"
 user_input = b"Hello, There!"
 
-if user_input == b"something":  # [magic-value-comparison]
+if user_input == b"something":  # correct
     pass
 
 if user_input == HELLO_WORLD:  # correct

@@ -40,4 +40,23 @@ expression: diagnostics
       row: 2
       column: 46
   parent: ~
+- kind:
+    BadQuotesInlineString:
+      quote: double
+  location:
+    row: 3
+    column: 24
+  end_location:
+    row: 3
+    column: 46
+  fix:
+    content:
+      - "f\"double quote string\""
+    location:
+      row: 3
+      column: 24
+    end_location:
+      row: 3
+      column: 46
+  parent: ~
 

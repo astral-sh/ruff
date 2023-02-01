@@ -2,7 +2,12 @@ pub use assertion::{
     assert_falsy, assert_in_exception_handler, composite_condition, unittest_assertion,
 };
 pub use fail::fail_call;
-pub use fixture::fixture;
+pub use fixture::{
+    fixture, DeprecatedYieldFixture, ErroneousUseFixturesOnFixture, ExtraneousScopeFunction,
+    FixtureFinalizerCallback, FixtureParamWithoutValue, FixturePositionalArgs,
+    IncorrectFixtureNameUnderscore, IncorrectFixtureParenthesesStyle, MissingFixtureNameUnderscore,
+    UnnecessaryAsyncioMarkOnFixture, UselessYieldFixture,
+};
 pub use imports::{import, import_from};
 pub use marks::marks;
 pub use parametrize::parametrize;

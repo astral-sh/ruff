@@ -11,10 +11,17 @@ use crate::settings::hashable::HashableHashMap;
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
+    ("matplotlib", "mpl"),
     ("matplotlib.pyplot", "plt"),
     ("numpy", "np"),
     ("pandas", "pd"),
     ("seaborn", "sns"),
+    ("tensorflow", "tf"),
+    ("holoviews", "hv"),
+    ("panel", "pn"),
+    ("plotly.express", "px"),
+    ("polars", "pl"),
+    ("pyarrow", "pa"),
 ];
 
 #[derive(
@@ -27,8 +34,8 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
 )]
 pub struct Options {
     #[option(
-        default = r#"{"altair": "alt", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns"}"#,
-        value_type = "FxHashMap<String, String>",
+        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
+        value_type = "dict[str, str]",
         example = r#"
             [tool.ruff.flake8-import-conventions.aliases]
             # Declare the default aliases.
@@ -37,6 +44,7 @@ pub struct Options {
             numpy = "np"
             pandas = "pd"
             seaborn = "sns"
+            scipy = "sp"
         "#
     )]
     /// The conventional aliases for imports. These aliases can be extended by
@@ -44,7 +52,7 @@ pub struct Options {
     pub aliases: Option<FxHashMap<String, String>>,
     #[option(
         default = r#"{}"#,
-        value_type = "FxHashMap<String, String>",
+        value_type = "dict[str, str]",
         example = r#"
             [tool.ruff.flake8-import-conventions.extend-aliases]
             # Declare a custom alias for the `matplotlib` module.

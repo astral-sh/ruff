@@ -4,7 +4,7 @@ use crate::docstrings::definition::Docstring;
 use crate::docstrings::styles::SectionStyle;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::violations;
 
@@ -48,7 +48,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
                 Range::from_located(docstring.expr),
             );
             // Best-effort autofix: avoid adding a period after other punctuation marks.
-            if checker.patch(&Rule::EndsInPeriod)
+            if checker.patch(diagnostic.kind.rule())
                 && !trimmed.ends_with(':')
                 && !trimmed.ends_with(';')
             {

@@ -40,11 +40,8 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr) {
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Fix::replacement(
-                    String::new(),
-                    func.end_location.unwrap(),
-                    decorator.end_location.unwrap(),
-                );
+                let fix =
+                    Fix::deletion(func.end_location.unwrap(), decorator.end_location.unwrap());
                 pytest_mark_parentheses(checker, decorator, fix, "", "()");
             }
         }

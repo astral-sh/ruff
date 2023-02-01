@@ -20,7 +20,7 @@ impl Violation for ImplicitNamespacePackage {
 
 /// INP001
 pub fn implicit_namespace_package(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
-    if package.is_none() {
+    if package.is_none() && path.extension().map_or(true, |ext| ext != "pyi") {
         Some(Diagnostic::new(
             ImplicitNamespacePackage(fs::relativize_path(path)),
             Range::default(),

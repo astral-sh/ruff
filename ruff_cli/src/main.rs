@@ -58,26 +58,30 @@ fn inner_main() -> Result<ExitCode> {
         log_level_args,
     } = Args::parse_from(args);
 
-    let default_panic_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        eprintln!(
-            r#"
+    #[cfg(not(debug_assertions))]
+    {
+        let default_panic_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            eprintln!(
+                r#"
 {}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
 
 https://github.com/charliermarsh/ruff/issues/new?title=%5BPanic%5D
 
 quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
-            "error".red().bold(),
-        );
-        default_panic_hook(info);
-    }));
+                "error".red().bold(),
+            );
+            default_panic_hook(info);
+        }));
+    }
 
     let log_level: LogLevel = (&log_level_args).into();
     set_up_logging(&log_level)?;
 
     match command {
         Command::Rule { rule, format } => commands::rule(rule, format)?,
+        Command::Linter { format } => commands::linter::linter(format),
         Command::Clean => commands::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut io::stdout());
