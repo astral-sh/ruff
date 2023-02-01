@@ -685,7 +685,7 @@ mod tests {
     use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_resource_path};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
@@ -736,7 +736,7 @@ mod tests {
                 .join(path)
                 .as_path(),
             &Settings {
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -754,8 +754,7 @@ mod tests {
     //             .join(path)
     //             .as_path(),
     //         &Settings {
-    //             src:
-    // vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+    //             src: vec![test_resource_path("fixtures/isort")],
     //             ..Settings::for_rule(Rule::UnsortedImports)
     //         },
     //     )?;
@@ -775,7 +774,7 @@ mod tests {
                     combine_as_imports: true,
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -796,7 +795,7 @@ mod tests {
                     combine_as_imports: true,
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -816,7 +815,7 @@ mod tests {
                     split_on_trailing_comma: false,
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -839,7 +838,7 @@ mod tests {
                         .collect::<BTreeSet<_>>(),
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -859,7 +858,7 @@ mod tests {
                     order_by_type: false,
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -889,7 +888,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -921,7 +920,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -951,7 +950,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -972,7 +971,7 @@ mod tests {
                     force_sort_within_sections: true,
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -991,7 +990,7 @@ mod tests {
                 .join(path)
                 .as_path(),
             &Settings {
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from([
                         "from __future__ import annotations".to_string()
@@ -1015,7 +1014,7 @@ mod tests {
                 .join(path)
                 .as_path(),
             &Settings {
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from([
                         "from __future__ import annotations".to_string(),
@@ -1040,7 +1039,7 @@ mod tests {
                 .join(path)
                 .as_path(),
             &Settings {
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from(["from __future__ import annotations, \
                                                        generator_stop"
@@ -1064,7 +1063,7 @@ mod tests {
                 .join(path)
                 .as_path(),
             &Settings {
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from(["import os".to_string()]),
                     ..super::settings::Settings::default()
@@ -1088,7 +1087,7 @@ mod tests {
                     relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -1114,7 +1113,7 @@ mod tests {
                     ]),
                     ..super::settings::Settings::default()
                 },
-                src: vec![Path::new("resources/test/fixtures/isort").to_path_buf()],
+                src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;

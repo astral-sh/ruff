@@ -15,6 +15,10 @@ use crate::{
     source_code::{Indexer, Locator, Stylist},
 };
 
+pub fn test_resource_path(path: impl AsRef<std::path::Path>) -> std::path::PathBuf {
+    std::path::Path::new("./resources/test/").join(path)
+}
+
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after 10 iterations.
 pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
