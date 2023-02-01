@@ -77,7 +77,7 @@ wasm-bindgen = { version = "0.2.83" }
 is_executable = "1.0.1"
 
 [dev-dependencies]
-insta = { version = "=1.23.0", features = ["yaml", "redactions"] }
+insta = { version = "1.19.0", features = ["yaml", "redactions"] }
 test-case = { version = "2.2.2" }
 wasm-bindgen-test = { version = "0.3.33" }
 
