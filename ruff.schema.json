@@ -1171,6 +1171,15 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        },
+        "max-statements": {
+          "description": "Maximum number of statements allowed for a method or a statement (see: `PLR0915`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -1643,6 +1652,7 @@
         "PLR09",
         "PLR091",
         "PLR0913",
+        "PLR0915",
         "PLR1",
         "PLR17",
         "PLR170",

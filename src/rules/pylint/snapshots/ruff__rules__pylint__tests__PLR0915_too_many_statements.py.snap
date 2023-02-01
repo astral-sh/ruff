@@ -1,0 +1,6 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+[]
+
