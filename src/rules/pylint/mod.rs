@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn max_statements() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pylint/too_many_statements_params.py"),
+            Path::new("pylint/too_many_statements_params.py"),
             &Settings {
                 pylint: pylint::settings::Settings {
                     max_statements: 1,

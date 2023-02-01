@@ -3819,7 +3819,7 @@ Maximum number of statements allowed for a method or a statement (see: `PLR0915`
 
 ```toml
 [tool.ruff.pylint]
-max_statements = 50
+max-statements = 50
 ```
 
 ---
