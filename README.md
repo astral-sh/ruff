@@ -8,9 +8,9 @@
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
 
-An extremely fast Python linter, written in Rust.
+[**Discord**](https://discord.gg/Z8KbeK24) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
-This README is also available as [documentation](https://beta.ruff.rs/docs/).
+An extremely fast Python linter, written in Rust.
 
 <p align="center">
   <picture align="center">
@@ -38,15 +38,11 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
 
-Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus a variety of plugins), [`isort`](https://pypi.org/project/isort/),
-[`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
-[`eradicate`](https://pypi.org/project/eradicate/), [`pyupgrade`](https://pypi.org/project/pyupgrade/),
-and [`autoflake`](https://pypi.org/project/autoflake/), all while executing tens or hundreds of
-times faster than any individual tool.
-
-Ruff goes beyond the responsibilities of a traditional linter, instead functioning as an advanced
-code transformation tool capable of upgrading type annotations, rewriting class definitions, sorting
-imports, and more.
+Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus dozens of plugins),
+[`isort`](https://pypi.org/project/isort/), [`pydocstyle`](https://pypi.org/project/pydocstyle/),
+[`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
+[`pyupgrade`](https://pypi.org/project/pyupgrade/), and [`autoflake`](https://pypi.org/project/autoflake/),
+all while executing tens or hundreds of times faster than any individual tool.
 
 Ruff is extremely actively developed and used in major open-source projects like:
 
@@ -77,7 +73,8 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [featuretools](https://github.com/alteryx/featuretools)
 - [meson-python](https://github.com/mesonbuild/meson-python)
 
-Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
+Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster) or
+the most recent [project update](https://notes.crmarsh.com/ruff-the-first-200-releases).
 
 ## Testimonials
 
@@ -115,6 +112,8 @@ developer of [Zulip](https://github.com/zulip/zulip):
 <!-- End section: Overview -->
 
 ## Table of Contents
+
+This README is also available as [documentation](https://beta.ruff.rs/docs/).
 
 1. [Installation and Usage](#installation-and-usage)
 1. [Configuration](#configuration)
@@ -163,12 +162,14 @@ developer of [Zulip](https://github.com/zulip/zulip):
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
 1. [Contributing](#contributing)
-1. [Releases](#releases)
+1. [Support](#support)
 1. [Benchmarks](#benchmarks)
 1. [Reference](#reference)
 1. [License](#license)
 
 ## Installation and Usage
+
+This README is also available as [documentation](https://beta.ruff.rs/docs/).
 
 <!-- Begin section: Installation and Usage -->
 
@@ -1921,14 +1922,16 @@ If you find a case where Ruff's autofix breaks your code, please file an Issue!
 
 ## Contributing
 
-Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
+Contributions are welcome and highly appreciated. To get started, check out the
+[**contributing guidelines**](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md). You
+can also join us on [**Discord**](https://discord.gg/Z8KbeK24).
 
-## Releases
+## Support
 
-Ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin).
+Having trouble? Check out the existing issues on [**GitHub**](https://github.com/charliermarsh/ruff/issues),
+or feel free to [**open a new one**](https://github.com/charliermarsh/ruff/issues/new).
 
-See: `.github/workflows/release.yaml`.
+You can also ask for help on [**Discord**](https://discord.gg/Z8KbeK24).
 
 ## Benchmarks
 
