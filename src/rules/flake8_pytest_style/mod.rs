@@ -12,8 +12,8 @@ mod tests {
 
     use super::settings::Settings;
     use super::types;
-    use crate::linter::test_path;
     use crate::registry::Rule;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::IncorrectFixtureParenthesesStyle, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]

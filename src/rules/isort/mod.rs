@@ -683,9 +683,9 @@ mod tests {
     use super::categorize::ImportType;
     use super::settings::RelativeImportsOrder;
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]

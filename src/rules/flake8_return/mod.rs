@@ -11,9 +11,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Rule::UnnecessaryReturnNone, Path::new("RET501.py"); "RET501")]
     #[test_case(Rule::ImplicitReturnValue, Path::new("RET502.py"); "RET502")]

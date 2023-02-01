@@ -9,9 +9,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings;
+    use crate::test::test_path;
 
     #[test_case(Path::new("full_name.py"); "PTH1_1")]
     #[test_case(Path::new("import_as.py"); "PTH1_2")]

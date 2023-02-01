@@ -9,9 +9,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings;
+    use crate::test::test_path;
 
     #[test_case(Path::new("G_argparse_parser_error_ok.py"); "G_argparse_parser_error_ok")]
     #[test_case(Path::new("G_extra_ok.py"); "G_extra_ok")]

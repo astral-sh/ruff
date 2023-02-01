@@ -8,8 +8,8 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::linter::test_path;
     use crate::registry::Rule;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test]

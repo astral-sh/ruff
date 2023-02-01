@@ -12,8 +12,8 @@ mod tests {
     use test_case::test_case;
 
     use super::settings::Settings;
-    use crate::linter::test_path;
     use crate::registry::Rule;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]

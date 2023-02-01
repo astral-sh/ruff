@@ -10,9 +10,9 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test]
     fn defaults() -> Result<()> {

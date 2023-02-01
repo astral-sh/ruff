@@ -10,10 +10,10 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]

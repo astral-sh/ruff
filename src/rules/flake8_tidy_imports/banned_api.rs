@@ -108,9 +108,9 @@ mod tests {
 
     use super::ApiBan;
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test]
     fn banned_api_true_positives() -> Result<()> {

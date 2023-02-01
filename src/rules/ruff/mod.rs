@@ -10,10 +10,10 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::resolve_per_file_ignores;
     use crate::settings::types::PerFileIgnore;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::KeywordArgumentBeforeStarArgument, Path::new("RUF004.py"); "RUF004")]
