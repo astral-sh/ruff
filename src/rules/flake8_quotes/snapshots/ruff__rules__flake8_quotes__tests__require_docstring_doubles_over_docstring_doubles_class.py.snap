@@ -8,7 +8,7 @@ expression: diagnostics
   location:
     row: 3
     column: 4
-  end_location:
+  nd_location:
     row: 3
     column: 27
   fix:
