@@ -184,33 +184,36 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
     {
-        let mut fixit = true;
-        let return_stmt;
-        if let ExprKind::Compare { .. } = test.node {
-            return_stmt = create_stmt(StmtKind::Return {
-                value: Some(test.clone()),
-            });
-        } else {
-            fixit = checker.is_builtin("bool");
-            return_stmt = create_stmt(StmtKind::Return {
-                value: Some(Box::new(create_expr(ExprKind::Call {
-                    func: Box::new(create_expr(ExprKind::Name {
-                        id: "bool".to_string(),
-                        ctx: ExprContext::Load,
-                    })),
-                    args: vec![(**test).clone()],
-                    keywords: vec![],
-                }))),
-            });
-        };
-
-        if fixit {
+        if matches!(test.node, ExprKind::Compare { .. }) {
             diagnostic.amend(Fix::replacement(
-                unparse_stmt(&return_stmt, checker.stylist),
+                unparse_stmt(
+                    &create_stmt(StmtKind::Return {
+                        value: Some(test.clone()),
+                    }),
+                    checker.stylist,
+                ),
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
-        }
+        } else if checker.is_builtin("bool") {
+            diagnostic.amend(Fix::replacement(
+                unparse_stmt(
+                    &create_stmt(StmtKind::Return {
+                        value: Some(Box::new(create_expr(ExprKind::Call {
+                            func: Box::new(create_expr(ExprKind::Name {
+                                id: "bool".to_string(),
+                                ctx: ExprContext::Load,
+                            })),
+                            args: vec![(**test).clone()],
+                            keywords: vec![],
+                        }))),
+                    }),
+                    checker.stylist,
+                ),
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
+        };
     }
     checker.diagnostics.push(diagnostic);
 }
