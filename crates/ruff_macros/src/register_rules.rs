@@ -117,9 +117,6 @@ impl Parse for Input {
             // Grab the `#[cfg(...)]` attributes.
             let attrs = input.call(Attribute::parse_outer)?;
 
-            // Parse the `RuleCodePrefix::... => ...` part.
-            let _code: Ident = input.parse()?;
-            let _: Token![=>] = input.parse()?;
             let path: Path = input.parse()?;
             let name = path.segments.last().unwrap().ident.clone();
             let _: Token![,] = input.parse()?;
