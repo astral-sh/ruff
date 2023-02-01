@@ -115,3 +115,13 @@ def f():
     else:
         return True
     return False
+
+
+def f():
+    # OK
+    def all(exp):
+        pass
+    for x in iterable:
+        if check(x):
+            return True
+    return False
