@@ -7,7 +7,7 @@ rust-version = "1.65.0"
 documentation = "https://github.com/charliermarsh/ruff"
 homepage = "https://github.com/charliermarsh/ruff"
 repository = "https://github.com/charliermarsh/ruff"
-readme = "../README.md"
+readme = "../../README.md"
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -24,7 +24,7 @@ doctest = false
 doc = false
 
 [dependencies]
-ruff = { path = ".." }
+ruff = { path = "../../lib/ruff" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { version = "1.0.66" }

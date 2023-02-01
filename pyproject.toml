@@ -39,6 +39,6 @@ urls = { repository = "https://github.com/charliermarsh/ruff" }
 
 [tool.maturin]
 bindings = "bin"
-manifest-path = "ruff_cli/Cargo.toml"
+manifest-path = "frontends/ruff_cli/Cargo.toml"
 python-source = "python"
 strip = true

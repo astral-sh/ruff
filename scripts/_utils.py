@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent / "lib/ruff"
 
 
 def dir_name(linter_name: str) -> str:

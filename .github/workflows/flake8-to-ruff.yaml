@@ -9,6 +9,7 @@ concurrency:
 env:
   PACKAGE_NAME: flake8-to-ruff
   CRATE_NAME: flake8_to_ruff
+  MANIFEST: ./frontends/flake8_to_ruff/Cargo.toml
   PYTHON_VERSION: "3.7" # to build abi3 wheels
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
@@ -30,7 +31,7 @@ jobs:
         uses: messense/maturin-action@v1
         with:
           target: x86_64
-          args: --release --out dist --sdist -m ./${{ env.CRATE_NAME }}/Cargo.toml
+          args: --release --out dist --sdist -m ${{ env.MANIFEST }}
       - name: "Install built wheel - x86_64"
         run: |
           pip install dist/${{ env.CRATE_NAME }}-*.whl --force-reinstall
@@ -52,7 +53,7 @@ jobs:
       - name: "Build wheels - universal2"
         uses: messense/maturin-action@v1
         with:
-          args: --release --universal2 --out dist -m ./${{ env.CRATE_NAME }}/Cargo.toml
+          args: --release --universal2 --out dist -m ${{ env.MANIFEST }}
       - name: "Install built wheel - universal2"
         run: |
           pip install dist/${{ env.CRATE_NAME }}-*universal2.whl --force-reinstall
@@ -79,7 +80,7 @@ jobs:
         uses: messense/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist -m ./${{ env.CRATE_NAME }}/Cargo.toml
+          args: --release --out dist -m ${{ env.MANIFEST_DIR }}
       - name: "Install built wheel"
         shell: bash
         run: |
@@ -106,7 +107,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist -m ./${{ env.CRATE_NAME }}/Cargo.toml
+          args: --release --out dist -m ${{ env.MANIFEST_DIR }}
       - name: "Install built wheel"
         if: matrix.target == 'x86_64'
         run: |
@@ -132,7 +133,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --no-default-features --release --out dist -m ./${{ env.CRATE_NAME }}/Cargo.toml
+          args: --no-default-features --release --out dist -m ${{ env.MANIFEST }}
       - uses: uraimo/run-on-arch-action@v2.5.0
         if: matrix.target != 'ppc64'
         name: Install built wheel
@@ -170,7 +171,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --out dist -m ./${{ env.CRATE_NAME }}/Cargo.toml
+          args: --release --out dist -m ${{ env.MANIFEST }}
       - name: "Install built wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -205,7 +206,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --out dist -m ./${{ env.CRATE_NAME }}/Cargo.toml
+          args: --release --out dist -m ${{ env.MANIFEST }}
       - uses: uraimo/run-on-arch-action@master
         name: Install built wheel
         with:
@@ -245,7 +246,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist -i pypy${{ matrix.python-version }} -m ./${{ env.CRATE_NAME }}/Cargo.toml
+          args: --release --out dist -i pypy${{ matrix.python-version }} -m ${{ env.MANIFEST }}
       - name: "Install built wheel"
         if: matrix.target == 'x86_64'
         run: |
