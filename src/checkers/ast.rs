@@ -2018,12 +2018,12 @@ where
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...]
                 if !self.in_deferred_string_type_definition
-                    && self.in_annotation
+                    && !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(&Rule::UsePEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
-                            && !self.settings.pyupgrade.keep_runtime_typing
-                            && self.annotations_future_enabled))
+                            && self.annotations_future_enabled
+                            && self.in_annotation))
                 {
                     pyupgrade::rules::use_pep604_annotation(self, expr, value, slice);
                 }
@@ -2073,10 +2073,10 @@ where
 
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
+                            && !self.settings.pyupgrade.keep_runtime_typing
                             && self.settings.rules.enabled(&Rule::UsePEP585Annotation)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
-                                    && !self.settings.pyupgrade.keep_runtime_typing
                                     && self.annotations_future_enabled
                                     && self.in_annotation))
                             && typing::is_pep585_builtin(self, expr)
@@ -2118,6 +2118,7 @@ where
             ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
+                    && !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(&Rule::UsePEP585Annotation)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37

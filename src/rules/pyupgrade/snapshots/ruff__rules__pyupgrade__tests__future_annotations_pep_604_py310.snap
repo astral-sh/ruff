@@ -20,4 +20,22 @@ expression: diagnostics
       row: 40
       column: 16
   parent: ~
+- kind:
+    UsePEP604Annotation: ~
+  location:
+    row: 42
+    column: 20
+  end_location:
+    row: 42
+    column: 47
+  fix:
+    content:
+      - "List[int] | List[str]"
+    location:
+      row: 42
+      column: 20
+    end_location:
+      row: 42
+      column: 47
+  parent: ~
 
