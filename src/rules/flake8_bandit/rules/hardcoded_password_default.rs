@@ -6,7 +6,7 @@ use crate::registry::Diagnostic;
 use crate::violations;
 
 fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Diagnostic> {
-    let string = string_literal(default)?;
+    let string = string_literal(default).filter(|string| !string.is_empty())?;
     let kwarg_name = &arg.node.arg;
     if !matches_password_name(kwarg_name) {
         return None;

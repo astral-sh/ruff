@@ -11,7 +11,15 @@ expression: diagnostics
   end_location:
     row: 1
     column: 13
-  fix: ~
+  fix:
+    content:
+      - "True"
+    location:
+      row: 1
+      column: 3
+    end_location:
+      row: 1
+      column: 13
   parent: ~
 - kind:
     AOrNotA:
@@ -22,7 +30,15 @@ expression: diagnostics
   end_location:
     row: 4
     column: 14
-  fix: ~
+  fix:
+    content:
+      - "True"
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 14
   parent: ~
 - kind:
     AOrNotA:
@@ -33,6 +49,14 @@ expression: diagnostics
   end_location:
     row: 7
     column: 14
-  fix: ~
+  fix:
+    content:
+      - "True"
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 7
+      column: 14
   parent: ~
 

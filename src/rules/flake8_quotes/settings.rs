@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Quote {
-    /// Use single quotes (`'`).
+    /// Use single quotes.
     Single,
-    /// Use double quotes (`"`).
+    /// Use double quotes.
     Double,
 }
 
@@ -30,33 +30,32 @@ impl Default for Quote {
 pub struct Options {
     #[option(
         default = r#""double""#,
-        value_type = "Quote",
+        value_type = r#""single" | "double""#,
         example = r#"
             inline-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for inline strings (either "single" (`'`) or
-    /// "double" (`"`)).
+    /// Quote style to prefer for inline strings (either "single" or
+    /// "double").
     pub inline_quotes: Option<Quote>,
     #[option(
         default = r#""double""#,
-        value_type = "Quote",
+        value_type = r#""single" | "double""#,
         example = r#"
             multiline-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for multiline strings (either "single" (`'`) or
-    /// "double" (`"`)).
+    /// Quote style to prefer for multiline strings (either "single" or
+    /// "double").
     pub multiline_quotes: Option<Quote>,
     #[option(
         default = r#""double""#,
-        value_type = "Quote",
+        value_type = r#""single" | "double""#,
         example = r#"
             docstring-quotes = "single"
         "#
     )]
-    /// Quote style to prefer for docstrings (either "single" (`'`) or "double"
-    /// (`"`)).
+    /// Quote style to prefer for docstrings (either "single" or "double").
     pub docstring_quotes: Option<Quote>,
     #[option(
         default = r#"true"#,

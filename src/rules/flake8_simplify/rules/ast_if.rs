@@ -3,13 +3,13 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKin
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
-    contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range,
+    contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violations;
 
@@ -103,7 +103,7 @@ pub fn nested_if_statements(
             |colon| Range::new(stmt.location, colon.end_location),
         ),
     );
-    if checker.patch(&Rule::NestedIfStatements) {
+    if checker.patch(diagnostic.kind.rule()) {
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
         let nested_if = &body[0];
@@ -128,6 +128,7 @@ pub fn nested_if_statements(
     checker.diagnostics.push(diagnostic);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Bool {
     True,
     False,
@@ -167,26 +168,37 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     let (Some(if_return), Some(else_return)) = (is_one_line_return_bool(body), is_one_line_return_bool(orelse)) else {
         return;
     };
+
+    // If the branches have the same condition, abort (although the code could be simplified).
+    if if_return == else_return {
+        return;
+    }
+
     let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
         violations::ReturnBoolConditionDirectly { cond: condition },
         Range::from_located(stmt),
     );
-    if checker.patch(&Rule::ReturnBoolConditionDirectly)
+    if checker.patch(diagnostic.kind.rule())
         && matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
-        && !has_comments_in(Range::from_located(stmt), checker.locator)
+        && !has_comments(stmt, checker.locator)
     {
-        let return_stmt = create_stmt(StmtKind::Return {
-            value: Some(Box::new(create_expr(ExprKind::Call {
-                func: Box::new(create_expr(ExprKind::Name {
-                    id: "bool".to_string(),
-                    ctx: ExprContext::Load,
-                })),
-                args: vec![(**test).clone()],
-                keywords: vec![],
-            }))),
-        });
+        let return_stmt = match test.node {
+            ExprKind::Compare { .. } => create_stmt(StmtKind::Return {
+                value: Some(test.clone()),
+            }),
+            _ => create_stmt(StmtKind::Return {
+                value: Some(Box::new(create_expr(ExprKind::Call {
+                    func: Box::new(create_expr(ExprKind::Name {
+                        id: "bool".to_string(),
+                        ctx: ExprContext::Load,
+                    })),
+                    args: vec![(**test).clone()],
+                    keywords: vec![],
+                }))),
+            }),
+        };
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&return_stmt, checker.stylist),
             stmt.location,
@@ -286,7 +298,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     // Don't flag if the statement expression contains any comments.
-    if has_comments_in(Range::from_located(stmt), checker.locator) {
+    if has_comments(stmt, checker.locator) {
         return;
     }
 
@@ -296,7 +308,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         },
         Range::from_located(stmt),
     );
-    if checker.patch(&Rule::UseTernaryOperator) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -422,7 +434,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Don't flag if the statement expression contains any comments.
-    if has_comments_in(Range::from_located(stmt), checker.locator) {
+    if has_comments(stmt, checker.locator) {
         return;
     }
 
@@ -432,7 +444,7 @@ pub fn use_dict_get_with_default(
         },
         Range::from_located(stmt),
     );
-    if checker.patch(&Rule::DictGetWithDefault) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

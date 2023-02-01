@@ -1,6 +1,7 @@
 //! Generate a Markdown-compatible table of supported lint rules.
 
 use anyhow::Result;
+use itertools::Itertools;
 use ruff::registry::{Linter, LinterCategory, Rule, RuleNamespace};
 use strum::IntoEnumIterator;
 
@@ -47,7 +48,15 @@ pub fn main(args: &Args) -> Result<()> {
     let mut table_out = String::new();
     let mut toc_out = String::new();
     for linter in Linter::iter() {
-        let codes_csv: String = linter.prefixes().join(", ");
+        let codes_csv: String = match linter.common_prefix() {
+            "" => linter
+                .categories()
+                .unwrap()
+                .iter()
+                .map(|LinterCategory(prefix, ..)| prefix)
+                .join(", "),
+            prefix => prefix.to_string(),
+        };
         table_out.push_str(&format!("### {} ({codes_csv})", linter.name()));
         table_out.push('\n');
         table_out.push('\n');

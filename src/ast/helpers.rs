@@ -559,6 +559,17 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 }
 
 /// Returns `true` if a statement or expression includes at least one comment.
+pub fn has_comments<T>(located: &Located<T>, locator: &Locator) -> bool {
+    has_comments_in(
+        Range::new(
+            Location::new(located.location.row(), 0),
+            Location::new(located.end_location.unwrap().row() + 1, 0),
+        ),
+        locator,
+    )
+}
+
+/// Returns `true` if a [`Range`] includes at least one comment.
 pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
     lexer::make_tokenizer(locator.slice_source_code_range(&range))
         .any(|result| result.map_or(false, |(_, tok, _)| matches!(tok, Tok::Comment(..))))
@@ -648,6 +659,17 @@ pub fn to_absolute(relative: Location, base: Location) -> Location {
         )
     } else {
         Location::new(relative.row() + base.row() - 1, relative.column())
+    }
+}
+
+pub fn to_relative(absolute: Location, base: Location) -> Location {
+    if absolute.row() == base.row() {
+        Location::new(
+            absolute.row() - base.row() + 1,
+            absolute.column() - base.column(),
+        )
+    } else {
+        Location::new(absolute.row() - base.row() + 1, absolute.column())
     }
 }
 

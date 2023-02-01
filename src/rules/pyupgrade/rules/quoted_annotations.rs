@@ -46,7 +46,7 @@ fn remove_quotes(checker: &mut Checker, annotation: &Box<Expr>) {
     }
 }
 
-/// UP038
+/// UP037
 pub fn quoted_annotations_funcdef(
     checker: &mut Checker,
     args: &Box<Arguments>,
@@ -66,7 +66,7 @@ pub fn quoted_annotations_funcdef(
     }
 }
 
-/// UP038
+/// UP037
 pub fn quoted_annotations_annassign(checker: &mut Checker, annotation: &Box<Expr>) {
     remove_quotes(checker, annotation);
 }

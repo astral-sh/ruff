@@ -7,7 +7,6 @@ use strum_macros::{AsRefStr, EnumIter};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
-use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::violation::Violation;
 use crate::{rules, violations};
 
@@ -93,6 +92,7 @@ ruff_macros::define_rule_mapping!(
     PLR2004 => violations::MagicValueComparison,
     PLW0120 => violations::UselessElseOnLoop,
     PLW0602 => violations::GlobalVariableNotAssigned,
+    PLR0913 => rules::pylint::rules::TooManyArgs,
     // flake8-builtins
     A001 => violations::BuiltinVariableShadowing,
     A002 => violations::BuiltinArgumentShadowing,
@@ -237,7 +237,6 @@ ruff_macros::define_rule_mapping!(
     UP013 => violations::ConvertTypedDictFunctionalToClass,
     UP014 => violations::ConvertNamedTupleFunctionalToClass,
     UP015 => violations::RedundantOpenModes,
-    UP016 => violations::RemoveSixCompat,
     UP017 => violations::DatetimeTimezoneUTC,
     UP018 => violations::NativeLiterals,
     UP019 => violations::TypingTextStrAlias,
@@ -256,7 +255,8 @@ ruff_macros::define_rule_mapping!(
     UP032 => violations::FString,
     UP033 => violations::FunctoolsCache,
     UP034 => violations::ExtraneousParentheses,
-    UP038 => rules::pyupgrade::rules::QuotedAnnotations,
+    UP035 => rules::pyupgrade::rules::ImportReplacements,
+    UP037 => rules::pyupgrade::rules::QuotedAnnotations,
     // pydocstyle
     D100 => violations::PublicModule,
     D101 => violations::PublicClass,
@@ -285,7 +285,7 @@ ruff_macros::define_rule_mapping!(
     D300 => violations::UsesTripleQuotes,
     D301 => violations::UsesRPrefixForBackslashedContent,
     D400 => violations::EndsInPeriod,
-    D401 => crate::rules::pydocstyle::rules::non_imperative_mood::NonImperativeMood,
+    D401 => rules::pydocstyle::rules::non_imperative_mood::NonImperativeMood,
     D402 => violations::NoSignature,
     D403 => violations::FirstLineCapitalized,
     D404 => violations::NoThisPrefix,
@@ -371,28 +371,28 @@ ruff_macros::define_rule_mapping!(
     PGH003 => violations::BlanketTypeIgnore,
     PGH004 => violations::BlanketNOQA,
     // pandas-vet
-    PD002 => violations::UseOfInplaceArgument,
-    PD003 => violations::UseOfDotIsNull,
-    PD004 => violations::UseOfDotNotNull,
-    PD007 => violations::UseOfDotIx,
-    PD008 => violations::UseOfDotAt,
-    PD009 => violations::UseOfDotIat,
-    PD010 => violations::UseOfDotPivotOrUnstack,
-    PD011 => violations::UseOfDotValues,
-    PD012 => violations::UseOfDotReadTable,
-    PD013 => violations::UseOfDotStack,
-    PD015 => violations::UseOfPdMerge,
-    PD901 => violations::DfIsABadVariableName,
+    PD002 => rules::pandas_vet::rules::UseOfInplaceArgument,
+    PD003 => rules::pandas_vet::rules::UseOfDotIsNull,
+    PD004 => rules::pandas_vet::rules::UseOfDotNotNull,
+    PD007 => rules::pandas_vet::rules::UseOfDotIx,
+    PD008 => rules::pandas_vet::rules::UseOfDotAt,
+    PD009 => rules::pandas_vet::rules::UseOfDotIat,
+    PD010 => rules::pandas_vet::rules::UseOfDotPivotOrUnstack,
+    PD011 => rules::pandas_vet::rules::UseOfDotValues,
+    PD012 => rules::pandas_vet::rules::UseOfDotReadTable,
+    PD013 => rules::pandas_vet::rules::UseOfDotStack,
+    PD015 => rules::pandas_vet::rules::UseOfPdMerge,
+    PD901 => rules::pandas_vet::rules::DfIsABadVariableName,
     // flake8-errmsg
     EM101 => violations::RawStringInException,
     EM102 => violations::FStringInException,
     EM103 => violations::DotFormatInException,
     // flake8-pytest-style
-    PT001 => violations::IncorrectFixtureParenthesesStyle,
-    PT002 => violations::FixturePositionalArgs,
-    PT003 => violations::ExtraneousScopeFunction,
-    PT004 => violations::MissingFixtureNameUnderscore,
-    PT005 => violations::IncorrectFixtureNameUnderscore,
+    PT001 => rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
+    PT002 => rules::flake8_pytest_style::rules::FixturePositionalArgs,
+    PT003 => rules::flake8_pytest_style::rules::ExtraneousScopeFunction,
+    PT004 => rules::flake8_pytest_style::rules::MissingFixtureNameUnderscore,
+    PT005 => rules::flake8_pytest_style::rules::IncorrectFixtureNameUnderscore,
     PT006 => violations::ParametrizeNamesWrongType,
     PT007 => violations::ParametrizeValuesWrongType,
     PT008 => violations::PatchWithLambda,
@@ -405,13 +405,13 @@ ruff_macros::define_rule_mapping!(
     PT016 => violations::FailWithoutMessage,
     PT017 => violations::AssertInExcept,
     PT018 => violations::CompositeAssertion,
-    PT019 => violations::FixtureParamWithoutValue,
-    PT020 => violations::DeprecatedYieldFixture,
-    PT021 => violations::FixtureFinalizerCallback,
-    PT022 => violations::UselessYieldFixture,
+    PT019 => rules::flake8_pytest_style::rules::FixtureParamWithoutValue,
+    PT020 => rules::flake8_pytest_style::rules::DeprecatedYieldFixture,
+    PT021 => rules::flake8_pytest_style::rules::FixtureFinalizerCallback,
+    PT022 => rules::flake8_pytest_style::rules::UselessYieldFixture,
     PT023 => violations::IncorrectMarkParenthesesStyle,
-    PT024 => violations::UnnecessaryAsyncioMarkOnFixture,
-    PT025 => violations::ErroneousUseFixturesOnFixture,
+    PT024 => rules::flake8_pytest_style::rules::UnnecessaryAsyncioMarkOnFixture,
+    PT025 => rules::flake8_pytest_style::rules::ErroneousUseFixturesOnFixture,
     PT026 => violations::UseFixturesWithoutParameters,
     // flake8-pie
     PIE790 => rules::flake8_pie::rules::NoUnnecessaryPass,
@@ -482,6 +482,8 @@ ruff_macros::define_rule_mapping!(
     G101 => rules::flake8_logging_format::violations::LoggingExtraAttrClash,
     G201 => rules::flake8_logging_format::violations::LoggingExcInfo,
     G202 => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
+    // flake8-raise
+    RSE102 => rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
     // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -611,15 +613,25 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flake8-raise](https://pypi.org/project/flake8-raise/)
+    #[prefix = "RSE"]
+    Flake8Raise,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
 }
 
 pub trait RuleNamespace: Sized {
-    fn parse_code(code: &str) -> Option<(Self, &str)>;
+    /// Returns the prefix that every single code that ruff uses to identify
+    /// rules from this linter starts with.  In the case that multiple
+    /// `#[prefix]`es are configured for the variant in the `Linter` enum
+    /// definition this is the empty string.
+    fn common_prefix(&self) -> &'static str;
 
-    fn prefixes(&self) -> &'static [&'static str];
+    /// Attempts to parse the given rule code. If the prefix is recognized
+    /// returns the respective variant along with the code with the common
+    /// prefix stripped.
+    fn parse_code(code: &str) -> Option<(Self, &str)>;
 
     fn name(&self) -> &'static str;
 
@@ -627,27 +639,21 @@ pub trait RuleNamespace: Sized {
 }
 
 /// The prefix, name and selector for an upstream linter category.
-pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleSelector);
-
-// TODO(martin): Move these constant definitions back to Linter::categories impl
-// once RuleSelector is an enum with a Linter variant
-const PYCODESTYLE_CATEGORIES: &[LinterCategory] = &[
-    LinterCategory("E", "Error", prefix_to_selector(RuleCodePrefix::E)),
-    LinterCategory("W", "Warning", prefix_to_selector(RuleCodePrefix::W)),
-];
-
-const PYLINT_CATEGORIES: &[LinterCategory] = &[
-    LinterCategory("PLC", "Convention", prefix_to_selector(RuleCodePrefix::PLC)),
-    LinterCategory("PLE", "Error", prefix_to_selector(RuleCodePrefix::PLE)),
-    LinterCategory("PLR", "Refactor", prefix_to_selector(RuleCodePrefix::PLR)),
-    LinterCategory("PLW", "Warning", prefix_to_selector(RuleCodePrefix::PLW)),
-];
+pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleCodePrefix);
 
 impl Linter {
     pub fn categories(&self) -> Option<&'static [LinterCategory]> {
         match self {
-            Linter::Pycodestyle => Some(PYCODESTYLE_CATEGORIES),
-            Linter::Pylint => Some(PYLINT_CATEGORIES),
+            Linter::Pycodestyle => Some(&[
+                LinterCategory("E", "Error", RuleCodePrefix::E),
+                LinterCategory("W", "Warning", RuleCodePrefix::W),
+            ]),
+            Linter::Pylint => Some(&[
+                LinterCategory("PLC", "Convention", RuleCodePrefix::PLC),
+                LinterCategory("PLE", "Error", RuleCodePrefix::PLE),
+                LinterCategory("PLR", "Refactor", RuleCodePrefix::PLR),
+                LinterCategory("PLW", "Warning", RuleCodePrefix::PLW),
+            ]),
             _ => None,
         }
     }
@@ -736,18 +742,18 @@ impl Diagnostic {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str)] = &[
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     (
-        Rule::OneBlankLineBeforeClass,
         Rule::NoBlankLineBeforeClass,
+        Rule::OneBlankLineBeforeClass,
         "`one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
-         incompatible. Consider ignoring `one-blank-line-before-class`.",
+         incompatible. Ignoring `one-blank-line-before-class`.",
     ),
     (
         Rule::MultiLineSummaryFirstLine,
         Rule::MultiLineSummarySecondLine,
         "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
-         incompatible. Consider ignoring one.",
+         incompatible. Ignoring `multi-line-summary-second-line`.",
     ),
 ];
 
@@ -768,10 +774,12 @@ mod tests {
     }
 
     #[test]
-    fn test_linter_prefixes() {
+    fn test_linter_parse_code() {
         for rule in Rule::iter() {
-            Linter::parse_code(rule.code())
-                .unwrap_or_else(|| panic!("couldn't parse {:?}", rule.code()));
+            let code = rule.code();
+            let (linter, rest) =
+                Linter::parse_code(code).unwrap_or_else(|| panic!("couldn't parse {:?}", code));
+            assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
         }
     }
 }

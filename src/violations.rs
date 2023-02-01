@@ -1855,7 +1855,7 @@ define_violation!(
 impl Violation for MultiLineImplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over continuation line")
+        format!("Implicitly concatenated string literals over multiple lines")
     }
 }
 
@@ -2932,20 +2932,6 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
                 format!("Replace with \"{replacement}\"")
             }
         }
-    }
-}
-
-define_violation!(
-    pub struct RemoveSixCompat;
-);
-impl AlwaysAutofixableViolation for RemoveSixCompat {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `six` compatibility usage")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `six` usage".to_string()
     }
 }
 
@@ -4537,133 +4523,6 @@ impl Violation for BlanketNOQA {
     }
 }
 
-// pandas-vet
-
-define_violation!(
-    pub struct UseOfInplaceArgument;
-);
-impl Violation for UseOfInplaceArgument {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`inplace=True` should be avoided; it has inconsistent behavior")
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotIsNull;
-);
-impl Violation for UseOfDotIsNull {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.isna` is preferred to `.isnull`; functionality is equivalent")
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotNotNull;
-);
-impl Violation for UseOfDotNotNull {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.notna` is preferred to `.notnull`; functionality is equivalent")
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotIx;
-);
-impl Violation for UseOfDotIx {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.ix` is deprecated; use more explicit `.loc` or `.iloc`")
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotAt;
-);
-impl Violation for UseOfDotAt {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `.loc` instead of `.at`.  If speed is important, use numpy.")
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotIat;
-);
-impl Violation for UseOfDotIat {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `.iloc` instead of `.iat`.  If speed is important, use numpy.")
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotPivotOrUnstack;
-);
-impl Violation for UseOfDotPivotOrUnstack {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "`.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality"
-        )
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotValues;
-);
-impl Violation for UseOfDotValues {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `.to_numpy()` instead of `.values`")
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotReadTable;
-);
-impl Violation for UseOfDotReadTable {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.read_csv` is preferred to `.read_table`; provides same functionality")
-    }
-}
-
-define_violation!(
-    pub struct UseOfDotStack;
-);
-impl Violation for UseOfDotStack {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.melt` is preferred to `.stack`; provides same functionality")
-    }
-}
-
-define_violation!(
-    pub struct UseOfPdMerge;
-);
-impl Violation for UseOfPdMerge {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "Use `.merge` method instead of `pd.merge` function. They have equivalent \
-             functionality."
-        )
-    }
-}
-
-define_violation!(
-    pub struct DfIsABadVariableName;
-);
-impl Violation for DfIsABadVariableName {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`df` is a bad variable name. Be kinder to your future self.")
-    }
-}
-
 // flake8-errmsg
 
 define_violation!(
@@ -4697,76 +4556,6 @@ impl Violation for DotFormatInException {
 }
 
 // flake8-pytest-style
-
-define_violation!(
-    pub struct IncorrectFixtureParenthesesStyle {
-        pub expected_parens: String,
-        pub actual_parens: String,
-    }
-);
-impl AlwaysAutofixableViolation for IncorrectFixtureParenthesesStyle {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let IncorrectFixtureParenthesesStyle {
-            expected_parens,
-            actual_parens,
-        } = self;
-        format!("Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add/remove parentheses".to_string()
-    }
-}
-
-define_violation!(
-    pub struct FixturePositionalArgs {
-        pub function: String,
-    }
-);
-impl Violation for FixturePositionalArgs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let FixturePositionalArgs { function } = self;
-        format!("Configuration for fixture `{function}` specified via positional args, use kwargs")
-    }
-}
-
-define_violation!(
-    pub struct ExtraneousScopeFunction;
-);
-impl Violation for ExtraneousScopeFunction {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`scope='function'` is implied in `@pytest.fixture()`")
-    }
-}
-
-define_violation!(
-    pub struct MissingFixtureNameUnderscore {
-        pub function: String,
-    }
-);
-impl Violation for MissingFixtureNameUnderscore {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let MissingFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` does not return anything, add leading underscore")
-    }
-}
-
-define_violation!(
-    pub struct IncorrectFixtureNameUnderscore {
-        pub function: String,
-    }
-);
-impl Violation for IncorrectFixtureNameUnderscore {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let IncorrectFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` returns a value, remove leading underscore")
-    }
-}
 
 define_violation!(
     pub struct ParametrizeNamesWrongType {
@@ -4920,59 +4709,6 @@ impl Violation for CompositeAssertion {
 }
 
 define_violation!(
-    pub struct FixtureParamWithoutValue {
-        pub name: String,
-    }
-);
-impl Violation for FixtureParamWithoutValue {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let FixtureParamWithoutValue { name } = self;
-        format!(
-            "Fixture `{name}` without value is injected as parameter, use \
-             `@pytest.mark.usefixtures` instead"
-        )
-    }
-}
-
-define_violation!(
-    pub struct DeprecatedYieldFixture;
-);
-impl Violation for DeprecatedYieldFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`")
-    }
-}
-
-define_violation!(
-    pub struct FixtureFinalizerCallback;
-);
-impl Violation for FixtureFinalizerCallback {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `yield` instead of `request.addfinalizer`")
-    }
-}
-
-define_violation!(
-    pub struct UselessYieldFixture {
-        pub name: String,
-    }
-);
-impl AlwaysAutofixableViolation for UselessYieldFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let UselessYieldFixture { name } = self;
-        format!("No teardown in fixture `{name}`, use `return` instead of `yield`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace `yield` with `return`".to_string()
-    }
-}
-
-define_violation!(
     pub struct IncorrectMarkParenthesesStyle {
         pub mark_name: String,
         pub expected_parens: String,
@@ -4995,34 +4731,6 @@ impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
 
     fn autofix_title(&self) -> String {
         "Add/remove parentheses".to_string()
-    }
-}
-
-define_violation!(
-    pub struct UnnecessaryAsyncioMarkOnFixture;
-);
-impl AlwaysAutofixableViolation for UnnecessaryAsyncioMarkOnFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`pytest.mark.asyncio` is unnecessary for fixtures")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `pytest.mark.asyncio`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct ErroneousUseFixturesOnFixture;
-);
-impl AlwaysAutofixableViolation for ErroneousUseFixturesOnFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`pytest.mark.usefixtures` has no effect on fixtures")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `pytest.mark.usefixtures`".to_string()
     }
 }
 

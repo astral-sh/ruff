@@ -52,6 +52,7 @@ pub fn expand<'a>(
             ::strum_macros::EnumIter,
             ::strum_macros::EnumString,
             ::strum_macros::AsRefStr,
+            ::strum_macros::IntoStaticStr,
             Debug,
             PartialEq,
             Eq,

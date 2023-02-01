@@ -15,11 +15,21 @@ SECTIONS: list[tuple[str, str]] = [
     ("FAQ", "faq.md"),
 ]
 
+DOCUMENTATION_LINK: str = (
+    "This README is also available as [documentation](https://beta.ruff.rs/docs/)."
+)
+
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
+
+    # Remove the documentation link, since we're _in_ the docs.
+    if DOCUMENTATION_LINK not in content:
+        msg = "README.md is not in the expected format."
+        raise ValueError(msg)
+    content = content.replace(DOCUMENTATION_LINK, "")
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 

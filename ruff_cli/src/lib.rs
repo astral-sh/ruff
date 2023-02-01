@@ -17,19 +17,14 @@ pub fn command_help() -> String {
 
 /// Returns the output of `ruff help check`.
 pub fn subcommand_help() -> String {
-    let output = args::Args::command()
-        .find_subcommand_mut("check")
+    let mut cmd = args::Args::command();
+
+    // The build call is necessary for the help output to contain `Usage: ruff check` instead of `Usage: check`
+    // see https://github.com/clap-rs/clap/issues/4685
+    cmd.build();
+
+    cmd.find_subcommand_mut("check")
         .expect("`check` subcommand not found")
         .render_help()
-        .to_string();
-
-    // Replace the header, to fix Clap's omission of "ruff" on the "Usage: check" line.
-    let header =
-        "Run Ruff on the given files or directories (default)\n\nUsage: check [OPTIONS] [FILES]...";
-    let replacement =
-        "Run Ruff on the given files or directories\n\nUsage: ruff check [OPTIONS] [FILES]...";
-    let output = output
-        .strip_prefix(header)
-        .expect("`output` does not start expected header");
-    format!("{replacement}{output}")
+        .to_string()
 }

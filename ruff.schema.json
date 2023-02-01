@@ -66,18 +66,8 @@
         "type": "string"
       }
     },
-    "extend-ignore": {
-      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.\n\nNote that `extend-ignore` is applied after resolving rules from `ignore`/`select` and a less specific rule in `extend-ignore` would overwrite a more specific rule in `select`. It is recommended to only use `extend-ignore` when extending a `pyproject.toml` file via `extend`.",
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/RuleSelector"
-      }
-    },
     "extend-select": {
-      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.\n\nNote that `extend-select` is applied after resolving rules from `ignore`/`select` and a less specific rule in `extend-select` would overwrite a more specific rule in `ignore`. It is recommended to only use `extend-select` when extending a `pyproject.toml` file via `extend`.",
+      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
       "type": [
         "array",
         "null"
@@ -659,7 +649,7 @@
       "type": "object",
       "properties": {
         "allow-multiline": {
-          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).",
+          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).\n\nNote that setting `allow-multiline = false` should typically be coupled with disabling `explicit-string-concatenation` (`ISC003`). Otherwise, both explicit and implicit multiline string concatenations will be seen as violations.",
           "type": [
             "boolean",
             "null"
@@ -778,7 +768,7 @@
           ]
         },
         "docstring-quotes": {
-          "description": "Quote style to prefer for docstrings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -789,7 +779,7 @@
           ]
         },
         "inline-quotes": {
-          "description": "Quote style to prefer for inline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -800,7 +790,7 @@
           ]
         },
         "multiline-quotes": {
-          "description": "Quote style to prefer for multiline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1164,7 +1154,7 @@
       "type": "object",
       "properties": {
         "allow-magic-value-types": {
-          "description": "Constant types to ignore when used as \"magic values\".",
+          "description": "Constant types to ignore when used as \"magic values\" (see: `PLR2004`).",
           "type": [
             "array",
             "null"
@@ -1172,6 +1162,15 @@
           "items": {
             "$ref": "#/definitions/ConstantType"
           }
+        },
+        "max-args": {
+          "description": "Maximum number of arguments allowed for a function definition (see: `PLR0913`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -1189,14 +1188,14 @@
     "Quote": {
       "oneOf": [
         {
-          "description": "Use single quotes (`'`).",
+          "description": "Use single quotes.",
           "type": "string",
           "enum": [
             "single"
           ]
         },
         {
-          "description": "Use double quotes (`\"`).",
+          "description": "Use double quotes.",
           "type": "string",
           "enum": [
             "double"
@@ -1641,6 +1640,9 @@
         "PLR04",
         "PLR040",
         "PLR0402",
+        "PLR09",
+        "PLR091",
+        "PLR0913",
         "PLR1",
         "PLR17",
         "PLR170",
@@ -1737,6 +1739,10 @@
         "RET506",
         "RET507",
         "RET508",
+        "RSE",
+        "RSE1",
+        "RSE10",
+        "RSE102",
         "RUF",
         "RUF0",
         "RUF00",
@@ -1870,7 +1876,6 @@
         "UP013",
         "UP014",
         "UP015",
-        "UP016",
         "UP017",
         "UP018",
         "UP019",
@@ -1891,7 +1896,8 @@
         "UP032",
         "UP033",
         "UP034",
-        "UP038",
+        "UP035",
+        "UP037",
         "W",
         "W2",
         "W29",

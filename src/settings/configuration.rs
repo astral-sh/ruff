@@ -27,13 +27,17 @@ use crate::settings::types::{
 };
 
 #[derive(Debug, Default)]
-pub struct Configuration {
+pub struct RuleSelection {
     pub select: Option<Vec<RuleSelector>>,
-    pub ignore: Option<Vec<RuleSelector>>,
-    pub extend_select: Vec<Vec<RuleSelector>>,
-    pub extend_ignore: Vec<Vec<RuleSelector>>,
+    pub ignore: Vec<RuleSelector>,
+    pub extend_select: Vec<RuleSelector>,
     pub fixable: Option<Vec<RuleSelector>>,
-    pub unfixable: Option<Vec<RuleSelector>>,
+    pub unfixable: Vec<RuleSelector>,
+}
+
+#[derive(Debug, Default)]
+pub struct Configuration {
+    pub rule_selections: Vec<RuleSelection>,
     pub per_file_ignores: Option<Vec<PerFileIgnore>>,
 
     pub allowed_confusables: Option<Vec<char>>,
@@ -88,6 +92,18 @@ impl Configuration {
 
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         Ok(Configuration {
+            rule_selections: vec![RuleSelection {
+                select: options.select,
+                ignore: options
+                    .ignore
+                    .into_iter()
+                    .flatten()
+                    .chain(options.extend_ignore.into_iter().flatten())
+                    .collect(),
+                extend_select: options.extend_select.unwrap_or_default(),
+                fixable: options.fixable,
+                unfixable: options.unfixable.unwrap_or_default(),
+            }],
             allowed_confusables: options.allowed_confusables,
             builtins: options.builtins,
             cache_dir: options
@@ -132,15 +148,11 @@ impl Configuration {
                         .collect()
                 })
                 .unwrap_or_default(),
-            extend_ignore: vec![options.extend_ignore.unwrap_or_default()],
-            extend_select: vec![options.extend_select.unwrap_or_default()],
             external: options.external,
             fix: options.fix,
             fix_only: options.fix_only,
-            fixable: options.fixable,
             format: options.format,
             force_exclude: options.force_exclude,
-            ignore: options.ignore,
             ignore_init_module_imports: options.ignore_init_module_imports,
             line_length: options.line_length,
             namespace_packages: options
@@ -157,7 +169,6 @@ impl Configuration {
             }),
             required_version: options.required_version,
             respect_gitignore: options.respect_gitignore,
-            select: options.select,
             show_source: options.show_source,
             src: options
                 .src
@@ -166,7 +177,6 @@ impl Configuration {
             target_version: options.target_version,
             task_tags: options.task_tags,
             typing_modules: options.typing_modules,
-            unfixable: options.unfixable,
             update_check: options.update_check,
             // Plugins
             flake8_annotations: options.flake8_annotations,
@@ -194,6 +204,11 @@ impl Configuration {
     #[must_use]
     pub fn combine(self, config: Configuration) -> Self {
         Self {
+            rule_selections: config
+                .rule_selections
+                .into_iter()
+                .chain(self.rule_selections.into_iter())
+                .collect(),
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             builtins: self.builtins.or(config.builtins),
             cache_dir: self.cache_dir.or(config.cache_dir),
@@ -205,23 +220,11 @@ impl Configuration {
                 .into_iter()
                 .chain(self.extend_exclude.into_iter())
                 .collect(),
-            extend_ignore: config
-                .extend_ignore
-                .into_iter()
-                .chain(self.extend_ignore.into_iter())
-                .collect(),
-            extend_select: config
-                .extend_select
-                .into_iter()
-                .chain(self.extend_select.into_iter())
-                .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
             fix_only: self.fix_only.or(config.fix_only),
-            fixable: self.fixable.or(config.fixable),
             format: self.format.or(config.format),
             force_exclude: self.force_exclude.or(config.force_exclude),
-            ignore: self.ignore.or(config.ignore),
             ignore_init_module_imports: self
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
@@ -230,13 +233,11 @@ impl Configuration {
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
             required_version: self.required_version.or(config.required_version),
             respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
-            select: self.select.or(config.select),
             show_source: self.show_source.or(config.show_source),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
-            unfixable: self.unfixable.or(config.unfixable),
             update_check: self.update_check.or(config.update_check),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
