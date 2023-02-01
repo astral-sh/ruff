@@ -39,7 +39,6 @@ else:
 if sys.version_info >= (3, 5):
     pass
 
-# OK
 if sys.version_info < (3,0):
     pass
 

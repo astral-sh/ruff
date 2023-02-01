@@ -118,7 +118,9 @@ if True:
     # comment
     print(2+3)
 
-if sys.version_info > (3,): print(3)
+if True:
+    if sys.version_info > (3,): print(3)
 
-if sys.version_info > (3,):
-    print(3)
+if True:
+    if sys.version_info > (3,):
+        print(3)

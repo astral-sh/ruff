@@ -143,10 +143,8 @@ fn fix_py2_block(
     block: &BlockMetadata,
 ) -> Option<Fix> {
     if orelse.is_empty() {
-        return None;
+        return Some(Fix::deletion(stmt.location, stmt.end_location.unwrap()));
     }
-    let else_statement = orelse.last().unwrap();
-    let mut ending_location = else_statement.location;
 
     // If we only have an `if` and an `else`, dedent the `else` block.
     if block.starter == Tok::If && !block.has_elif {
@@ -170,30 +168,31 @@ fn fix_py2_block(
             stmt.end_location.unwrap(),
         ))
     } else {
+        let mut end_location = orelse.last().unwrap().location;
         if block.starter == Tok::If && block.has_elif {
             // If we have an elif, grab "e" and "l" to make an if.
-            ending_location.go_right();
-            ending_location.go_right();
+            end_location.go_right();
+            end_location.go_right();
         } else if block.starter == Tok::Elif {
-            ending_location = body.last().unwrap().end_location.unwrap();
-            let mut next_item = ending_location;
+            end_location = body.last().unwrap().end_location.unwrap();
+            let mut next_item = end_location;
             next_item.go_right();
-            let mut after_item = ending_location;
+            let mut after_item = end_location;
             after_item.go_right();
 
             // If the next item it a new line, remove it so that we do not get an empty line
             let suffix = checker
                 .locator
-                .slice_source_code_range(&Range::new(ending_location, after_item));
+                .slice_source_code_range(&Range::new(end_location, after_item));
             if suffix == "\n" {
-                ending_location.go_right();
+                end_location.go_right();
             } else if suffix == "\r\n" {
-                ending_location.go_right();
-                ending_location.go_right();
+                end_location.go_right();
+                end_location.go_right();
             }
         }
 
-        Some(Fix::deletion(stmt.location, ending_location))
+        Some(Fix::deletion(stmt.location, end_location))
     }
 }
 
@@ -240,7 +239,7 @@ fn fix_py3_block(
                 )));
                 Some(Fix::replacement(
                     indent(&text, if_indent),
-                    stmt.location,
+                    Location::new(stmt.location.row(), 0),
                     stmt.end_location.unwrap(),
                 ))
             }

@@ -149,57 +149,73 @@ expression: diagnostics
 - kind:
     OutdatedVersionBlock: ~
   location:
+    row: 42
+    column: 0
+  end_location:
     row: 43
-    column: 0
-  end_location:
-    row: 44
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    OutdatedVersionBlock: ~
-  location:
-    row: 47
-    column: 4
-  end_location:
-    row: 48
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    OutdatedVersionBlock: ~
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 53
     column: 8
   fix:
     content:
       - ""
     location:
-      row: 50
+      row: 42
       column: 0
     end_location:
-      row: 52
+      row: 43
+      column: 8
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 46
+    column: 4
+  end_location:
+    row: 47
+    column: 12
+  fix:
+    content:
+      - ""
+    location:
+      row: 46
+      column: 4
+    end_location:
+      row: 47
+      column: 12
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 49
+    column: 0
+  end_location:
+    row: 52
+    column: 8
+  fix:
+    content:
+      - ""
+    location:
+      row: 49
+      column: 0
+    end_location:
+      row: 51
       column: 2
   parent: ~
 - kind:
     OutdatedVersionBlock: ~
   location:
-    row: 55
+    row: 54
     column: 0
   end_location:
-    row: 58
+    row: 57
     column: 8
   fix:
     content:
       - pass
     location:
-      row: 55
+      row: 54
       column: 0
     end_location:
-      row: 58
+      row: 57
       column: 8
   parent: ~
 
