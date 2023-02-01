@@ -1125,7 +1125,11 @@ where
 
     fn eat_single_char(&mut self, ty: Tok) {
         let tok_start = self.get_pos();
-        self.next_char();
+        self.next_char().unwrap_or_else(|| unsafe {
+            // SAFETY: eat_single_char has been called only after a character has been read
+            // from the window, so the window is guaranteed to be non-empty.
+            std::hint::unreachable_unchecked()
+        });
         let tok_end = self.get_pos();
         self.emit((tok_start, ty, tok_end));
     }
