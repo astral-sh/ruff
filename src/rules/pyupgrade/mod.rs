@@ -58,10 +58,10 @@ mod tests {
     #[test_case(Rule::FunctoolsCache, Path::new("UP033.py"); "UP033")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]
     #[test_case(Rule::ImportReplacements, Path::new("UP035.py"); "UP035")]
-    #[test_case(Rule::OldCodeBlocks, Path::new("UP036_0.py"); "UP036_0")]
-    #[test_case(Rule::OldCodeBlocks, Path::new("UP036_1.py"); "UP036_1")]
-    #[test_case(Rule::OldCodeBlocks, Path::new("UP036_2.py"); "UP036_2")]
-    #[test_case(Rule::OldCodeBlocks, Path::new("UP036_3.py"); "UP036_3")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_0.py"); "UP036_0")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_1.py"); "UP036_1")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_2.py"); "UP036_2")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_3.py"); "UP036_3")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

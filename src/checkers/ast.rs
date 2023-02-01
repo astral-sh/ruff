@@ -1494,8 +1494,8 @@ where
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::OldCodeBlocks) {
-                    pyupgrade::rules::old_code_blocks(self, stmt, test, body, orelse);
+                if self.settings.rules.enabled(&Rule::OutdatedVersionBlock) {
+                    pyupgrade::rules::outdated_version_block(self, stmt, test, body, orelse);
                 }
             }
             StmtKind::Assert { test, msg } => {

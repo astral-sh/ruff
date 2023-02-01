@@ -849,7 +849,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
 | UP035 | import-replacements | Import from `{module}` instead: {names} | 🛠 |
-| UP036 | old-code-blocks | Remove old code blocks | 🛠 |
+| UP036 | outdated-version-block | Version block is outdated for minimum Python version | 🛠 |
 
 ### flake8-2020 (YTT)
 

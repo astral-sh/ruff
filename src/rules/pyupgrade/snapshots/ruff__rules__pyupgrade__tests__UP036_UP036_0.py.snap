@@ -3,7 +3,7 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 3
     column: 0
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 8
     column: 0
@@ -39,25 +39,17 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 16
     column: 0
   end_location:
     row: 17
     column: 19
-  fix:
-    content:
-      - "print(\"PY3!\")"
-    location:
-      row: 16
-      column: 0
-    end_location:
-      row: 17
-      column: 19
+  fix: ~
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 20
     column: 4
@@ -66,16 +58,16 @@ expression: diagnostics
     column: 20
   fix:
     content:
-      - "print(\"PY3\")"
+      - "    print(\"PY3\")"
     location:
       row: 20
-      column: 4
+      column: 0
     end_location:
       row: 23
       column: 20
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 25
     column: 0
@@ -93,7 +85,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 29
     column: 0
@@ -113,7 +105,7 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 37
     column: 0
@@ -131,7 +123,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 45
     column: 0
@@ -149,25 +141,17 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 53
     column: 0
   end_location:
     row: 54
     column: 18
-  fix:
-    content:
-      - "print(\"py3\")"
-    location:
-      row: 53
-      column: 0
-    end_location:
-      row: 54
-      column: 18
+  fix: ~
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 56
     column: 0
@@ -185,7 +169,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 62
     column: 4
@@ -194,7 +178,7 @@ expression: diagnostics
     column: 20
   fix:
     content:
-      - "print(\"py3\")"
+      - "    print(\"py3\")"
     location:
       row: 62
       column: 4
@@ -203,7 +187,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 67
     column: 0
@@ -221,7 +205,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 73
     column: 4
@@ -230,16 +214,16 @@ expression: diagnostics
     column: 13
   fix:
     content:
-      - yield
+      - "    yield"
     location:
       row: 73
-      column: 4
+      column: 0
     end_location:
       row: 79
       column: 13
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 86
     column: 4
@@ -248,17 +232,17 @@ expression: diagnostics
     column: 16
   fix:
     content:
-      - "def f(py3):"
+      - "    def f(py3):"
       - "        pass"
     location:
       row: 86
-      column: 4
+      column: 0
     end_location:
       row: 91
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 97
     column: 4
@@ -267,16 +251,16 @@ expression: diagnostics
     column: 9
   fix:
     content:
-      - "3"
+      - "    3"
     location:
       row: 97
-      column: 4
+      column: 0
     end_location:
       row: 100
       column: 9
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 104
     column: 0
@@ -297,7 +281,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 116
     column: 4
@@ -306,7 +290,7 @@ expression: diagnostics
     column: 16
   fix:
     content:
-      - print(3)
+      - "    print(3)"
     location:
       row: 116
       column: 4
@@ -315,25 +299,17 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 121
     column: 0
   end_location:
     row: 121
     column: 36
-  fix:
-    content:
-      - print(3)
-    location:
-      row: 121
-      column: 0
-    end_location:
-      row: 121
-      column: 36
+  fix: ~
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 123
     column: 0

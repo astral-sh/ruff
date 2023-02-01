@@ -3,241 +3,241 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 4
+    row: 3
     column: 0
   end_location:
-    row: 7
+    row: 6
     column: 5
   fix:
     content:
       - "3"
     location:
-      row: 4
+      row: 3
       column: 0
     end_location:
-      row: 7
+      row: 6
       column: 5
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 9
+    row: 8
     column: 0
   end_location:
-    row: 12
+    row: 11
     column: 5
   fix:
     content:
       - "3"
     location:
-      row: 9
+      row: 8
       column: 0
     end_location:
-      row: 12
+      row: 11
       column: 5
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 14
+    row: 13
     column: 0
   end_location:
-    row: 17
+    row: 16
     column: 5
   fix:
     content:
       - "3"
     location:
-      row: 14
+      row: 13
       column: 0
     end_location:
-      row: 17
+      row: 16
       column: 5
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 19
+    row: 18
     column: 0
   end_location:
-    row: 22
+    row: 21
     column: 5
   fix:
     content:
       - "3"
     location:
-      row: 19
+      row: 18
       column: 0
     end_location:
-      row: 22
+      row: 21
       column: 5
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 24
+    row: 23
     column: 0
   end_location:
-    row: 27
+    row: 26
     column: 5
   fix:
     content:
       - "3"
     location:
-      row: 24
+      row: 23
       column: 0
     end_location:
-      row: 27
+      row: 26
       column: 5
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 29
+    row: 28
     column: 0
   end_location:
-    row: 32
+    row: 31
     column: 5
   fix:
     content:
       - "3"
     location:
-      row: 29
+      row: 28
       column: 0
     end_location:
-      row: 32
+      row: 31
       column: 5
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 36
+    row: 35
     column: 0
   end_location:
-    row: 39
+    row: 38
     column: 5
   fix:
     content:
       - "3"
     location:
-      row: 36
+      row: 35
       column: 0
     end_location:
-      row: 39
+      row: 38
       column: 5
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 43
+    row: 42
     column: 0
   end_location:
-    row: 46
+    row: 45
     column: 12
   fix:
     content:
       - ""
     location:
-      row: 43
+      row: 42
       column: 0
     end_location:
-      row: 44
+      row: 43
       column: 13
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 50
+    row: 49
     column: 0
   end_location:
-    row: 53
+    row: 52
     column: 12
   fix:
     content:
       - "else:"
       - "    print(3)"
     location:
-      row: 50
+      row: 49
       column: 0
     end_location:
-      row: 53
+      row: 52
       column: 12
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
+    row: 56
+    column: 0
+  end_location:
     row: 57
-    column: 0
-  end_location:
-    row: 58
     column: 12
   fix:
     content:
       - "else:"
       - "    print(3)"
     location:
-      row: 57
+      row: 56
       column: 0
     end_location:
-      row: 58
+      row: 57
       column: 12
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 63
+    row: 62
     column: 4
   end_location:
-    row: 64
+    row: 63
     column: 16
   fix:
     content:
       - "else:"
       - "        print(3)"
     location:
-      row: 63
+      row: 62
       column: 4
     end_location:
-      row: 64
+      row: 63
       column: 16
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 68
+    row: 67
     column: 0
   end_location:
-    row: 71
+    row: 70
     column: 12
   fix:
     content:
       - ""
     location:
-      row: 68
+      row: 67
       column: 0
     end_location:
-      row: 69
+      row: 68
       column: 13
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
-    row: 76
+    row: 75
     column: 4
   end_location:
-    row: 77
+    row: 76
     column: 16
   fix:
     content:
       - "else:"
       - "        print(3)"
     location:
-      row: 76
+      row: 75
       column: 4
     end_location:
-      row: 77
+      row: 76
       column: 16
   parent: ~
 

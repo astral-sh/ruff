@@ -3,7 +3,7 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 4
     column: 0
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 9
     column: 0
@@ -39,7 +39,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 14
     column: 0
@@ -57,7 +57,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 19
     column: 0
@@ -75,7 +75,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 24
     column: 0
@@ -93,7 +93,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 29
     column: 0
@@ -111,7 +111,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 34
     column: 0
@@ -129,7 +129,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 39
     column: 0
@@ -147,7 +147,27 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
+  location:
+    row: 43
+    column: 0
+  end_location:
+    row: 44
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 47
+    column: 4
+  end_location:
+    row: 48
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
   location:
     row: 50
     column: 0
@@ -165,7 +185,7 @@ expression: diagnostics
       column: 2
   parent: ~
 - kind:
-    OldCodeBlocks: ~
+    OutdatedVersionBlock: ~
   location:
     row: 55
     column: 0

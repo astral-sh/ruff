@@ -1,4 +1,3 @@
-# This is my place to expiriment with some WILD syntax
 import sys
 
 if            sys.version_info < (3,0):

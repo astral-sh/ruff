@@ -1,5 +1,4 @@
 import sys
-import six
 
 if sys.version_info == 2:
     2
