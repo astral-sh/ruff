@@ -115,3 +115,13 @@ def f():
     else:
         return True
     return False
+
+
+def f():
+    x = 1
+
+    # SIM110
+    for x in iterable:
+        if check(x):
+            return True
+    return False
