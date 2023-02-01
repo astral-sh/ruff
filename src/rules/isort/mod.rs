@@ -641,4 +641,25 @@ mod tests {
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Path::new("lines_after_imports_nothing_after.py"))]
+    #[test_case(Path::new("lines_after_imports_func_after.py"))]
+    #[test_case(Path::new("lines_after_imports_class_after.py"))]
+    fn lines_after_imports(path: &Path) -> Result<()> {
+        let snapshot = format!("lines_after_imports_{}", path.to_string_lossy());
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    lines_after_imports: 3,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
 }

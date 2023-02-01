@@ -957,6 +957,14 @@
             "type": "string"
           }
         },
+        "lines-after-imports": {
+          "description": "The number of blank lines to place after imports. -1 for automatic determination",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int"
+        },
         "no-lines-before": {
           "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
           "type": [

@@ -55,6 +55,7 @@ fn matches_ignoring_indentation(val1: &str, val2: &str) -> bool {
         })
 }
 
+#[allow(clippy::cast_sign_loss)]
 /// I001
 pub fn organize_imports(
     block: &Block,
@@ -89,6 +90,8 @@ pub fn organize_imports(
 
     let num_trailing_lines = if block.trailer.is_none() {
         0
+    } else if settings.isort.lines_after_imports >= 0 {
+        settings.isort.lines_after_imports as usize
     } else {
         count_trailing_lines(block.imports.last().unwrap(), locator)
     };

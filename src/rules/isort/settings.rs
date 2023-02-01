@@ -213,6 +213,16 @@ pub struct Options {
     /// A list of sections that should _not_ be delineated from the previous
     /// section via empty lines.
     pub no_lines_before: Option<Vec<ImportType>>,
+    #[option(
+        default = r#"-1"#,
+        value_type = "isize",
+        example = r#"
+            lines-after-imports = 1
+        "#
+    )]
+    /// The number of blank lines to place after imports.
+    /// -1 for automatic determination
+    pub lines_after_imports: Option<isize>,
 }
 
 #[derive(Debug, Hash)]
@@ -234,6 +244,7 @@ pub struct Settings {
     pub constants: BTreeSet<String>,
     pub variables: BTreeSet<String>,
     pub no_lines_before: BTreeSet<ImportType>,
+    pub lines_after_imports: isize,
 }
 
 impl Default for Settings {
@@ -255,6 +266,7 @@ impl Default for Settings {
             constants: BTreeSet::new(),
             variables: BTreeSet::new(),
             no_lines_before: BTreeSet::new(),
+            lines_after_imports: -1,
         }
     }
 }
@@ -282,6 +294,7 @@ impl From<Options> for Settings {
             constants: BTreeSet::from_iter(options.constants.unwrap_or_default()),
             variables: BTreeSet::from_iter(options.variables.unwrap_or_default()),
             no_lines_before: BTreeSet::from_iter(options.no_lines_before.unwrap_or_default()),
+            lines_after_imports: options.lines_after_imports.unwrap_or(-1),
         }
     }
 }
@@ -305,6 +318,7 @@ impl From<Settings> for Options {
             constants: Some(settings.constants.into_iter().collect()),
             variables: Some(settings.variables.into_iter().collect()),
             no_lines_before: Some(settings.no_lines_before.into_iter().collect()),
+            lines_after_imports: Some(settings.lines_after_imports),
         }
     }
 }
