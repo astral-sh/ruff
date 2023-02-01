@@ -50,7 +50,14 @@ cargo test --all    # Testing...
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
 will save you time and expedite the merge process.
 
-If you have `pre-commit` [installed](https://pre-commit.com/#installation) then you can use it to 
+Note that many code changes also require updating the snapshot tests, which is done interactively
+after running `cargo test` like so:
+
+```shell
+cargo insta review
+```
+
+If you have `pre-commit` [installed](https://pre-commit.com/#installation) then you can use it to
 assist with formatting and linting. The following command will run the `pre-commit` hooks:
 
 ```shell

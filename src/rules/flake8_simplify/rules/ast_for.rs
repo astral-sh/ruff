@@ -1,5 +1,5 @@
 use rustpython_ast::{
-    Comprehension, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop,
+    Comprehension, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Unaryop,
 };
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
@@ -16,6 +16,7 @@ struct Loop<'a> {
     test: &'a Expr,
     target: &'a Expr,
     iter: &'a Expr,
+    terminal: Location,
 }
 
 /// Extract the returned boolean values a `StmtKind::For` with an `else` body.
@@ -78,6 +79,7 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
         test: nested_test,
         target,
         iter,
+        terminal: stmt.end_location.unwrap(),
     })
 }
 
@@ -142,6 +144,7 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
         test: nested_test,
         target,
         iter,
+        terminal: sibling.end_location.unwrap(),
     })
 }
 
@@ -172,12 +175,12 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Styl
 
 /// SIM110, SIM111
 pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: Option<&Stmt>) {
-    if let Some(loop_info) = match sibling {
-        // Ex) `for` loop with an `else: return True` or `else: return False`.
-        None => return_values_for_else(stmt),
-        // Ex) `for` loop followed by `return True` or `return False`
-        Some(sibling) => return_values_for_siblings(stmt, sibling),
-    } {
+    // There are two cases to consider:
+    // - `for` loop with an `else: return True` or `else: return False`.
+    // - `for` loop followed by `return True` or `return False`
+    if let Some(loop_info) = return_values_for_else(stmt)
+        .or_else(|| sibling.and_then(|sibling| return_values_for_siblings(stmt, sibling)))
+    {
         if loop_info.return_value && !loop_info.next_return_value {
             if checker.settings.rules.enabled(&Rule::ConvertLoopToAny) {
                 let contents = return_stmt(
@@ -199,14 +202,11 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     },
                     Range::from_located(stmt),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch(diagnostic.kind.rule()) && checker.is_builtin("any") {
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,
-                        match sibling {
-                            None => stmt.end_location.unwrap(),
-                            Some(sibling) => sibling.end_location.unwrap(),
-                        },
+                        loop_info.terminal,
                     ));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -249,14 +249,11 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     },
                     Range::from_located(stmt),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch(diagnostic.kind.rule()) && checker.is_builtin("all") {
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,
-                        match sibling {
-                            None => stmt.end_location.unwrap(),
-                            Some(sibling) => sibling.end_location.unwrap(),
-                        },
+                        loop_info.terminal,
                     ));
                 }
                 checker.diagnostics.push(diagnostic);

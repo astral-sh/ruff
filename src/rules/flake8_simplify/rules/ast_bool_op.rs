@@ -47,6 +47,9 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if func_name != "isinstance" {
             continue;
         }
+        if !checker.is_builtin("isinstance") {
+            continue;
+        }
 
         // Collect the name of the argument.
         let ExprKind::Name { id: arg_name, .. } = &args[0].node else {
