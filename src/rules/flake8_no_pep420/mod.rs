@@ -11,7 +11,7 @@ mod tests {
     use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_resource_path};
 
     #[test_case(Path::new("test_pass_init"), Path::new("example.py"); "INP001_0")]
     #[test_case(Path::new("test_fail_empty"), Path::new("example.py"); "INP001_1")]
@@ -30,8 +30,8 @@ mod tests {
         let diagnostics = test_path(
             p.as_path(),
             &Settings {
-                namespace_packages: vec![PathBuf::from(
-                    "./resources/test/fixtures/flake8_no_pep420/test_pass_namespace_package",
+                namespace_packages: vec![test_resource_path(
+                    "fixtures/flake8_no_pep420/test_pass_namespace_package",
                 )],
                 ..Settings::for_rule(Rule::ImplicitNamespacePackage)
             },
