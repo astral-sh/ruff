@@ -15,6 +15,8 @@ use crate::{
     source_code::{Indexer, Locator, Stylist},
 };
 
+/// A convenient wrapper around [`check_path`], that additionally
+/// asserts that autofixes converge after 10 iterations.
 pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let contents = fs::read_file(path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
