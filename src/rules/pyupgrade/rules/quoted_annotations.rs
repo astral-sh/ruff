@@ -1,11 +1,13 @@
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::cst::matchers::{match_annassign, match_functiondef, match_module};
 use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
+use libcst_native::{AnnAssign, Annotation, Call, Expression, FunctionDef, Param, Parameters};
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Arg, Arguments, Constant, Expr, ExprKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Stmt};
 
 define_violation!(
     pub struct QuotedAnnotations;
@@ -21,11 +23,10 @@ impl AlwaysAutofixableViolation for QuotedAnnotations {
     }
 }
 
-fn argument_list(args: &Box<Arguments>) -> Vec<Arg> {
-    let mut final_result: Vec<Arg> = vec![];
-    final_result.extend(args.posonlyargs.clone());
-    final_result.extend(args.args.clone());
-    final_result.extend(args.kwonlyargs.clone());
+fn get_params<'a>(params: &Parameters<'a>) -> Vec<Param<'a>> {
+    let mut final_result: Vec<Param<'a>> = vec![];
+    final_result.extend(params.params.clone());
+    final_result.extend(params.kwonly_params.clone());
     final_result
 }
 
@@ -46,40 +47,51 @@ fn remove_quotes(checker: &mut Checker, annotation: &Box<Expr>) {
     }
 }
 
-fn process_call(node: &Expr) -> Vec<&Expr> {
-    let to_add: Vec<&Expr> = vec![];
-    if let ExprKind::Call {
-        func,
-        args,
-        keywords,
-    } = &node.node
-    {
-        println!("{:?}", func);
-        return to_add;
-    }
+fn process_call<'a>(node: Box<Call<'a>>) -> Vec<&'a Annotation<'a>> {
+    let to_add: Vec<&Annotation> = vec![];
+    println!("{:?}", node);
     to_add
 }
 
-fn replace_string_literal(checker: &mut Checker, annotation: &Box<Expr>) {
-    let mut nodes: Vec<&Expr> = vec![annotation.as_ref()];
+fn replace_string_literal(annotation: &mut Annotation) {
+    let mut nodes: Vec<&Annotation> = vec![annotation];
     while nodes.len() > 0 {
         let node = match nodes.pop() {
             Some(item) => item,
             None => continue,
         };
-        match node.node {
-            ExprKind::Call { .. } => nodes.extend(process_call(node)),
+        match node.annotation.get_mut() {
+            Expression::Call(item) => nodes.extend(process_call(item)),
             _ => continue,
         }
     }
 }
 
+fn handle_functiondef(funcdef: &mut FunctionDef) {
+    let params = get_params(&funcdef.params);
+    for param in params {
+        if let Some(mut annotation) = param.annotation {
+            replace_string_literal(&mut annotation);
+        }
+    }
+}
+
+fn handle_annassign(assign: &mut AnnAssign) {
+    replace_string_literal(&mut assign.annotation);
+}
+
 /// UP037
-pub fn quoted_annotations_funcdef(
-    checker: &mut Checker,
-    args: &Box<Arguments>,
-    the_return: &Option<Box<Expr>>,
-) {
+pub fn quoted_annotations(checker: &mut Checker, stmt: &Stmt) {
+    let module_text = checker
+        .locator
+        .slice_source_code_range(&Range::from_located(stmt));
+    let mut tree = match_module(module_text).unwrap();
+    // let mut funcdef = match_functiondef(&mut tree).unwrap();
+    let mut annassign = match_annassign(&mut tree).unwrap();
+    handle_annassign(&mut annassign);
+    // handle_functiondef(&mut funcdef);
+    // let mut import = match_import_from(&mut tree);
+    /*
     println!("{:?}", the_return);
     if let Some(return_item) = &the_return {
         replace_string_literal(checker, return_item);
@@ -92,10 +104,5 @@ pub fn quoted_annotations_funcdef(
         };
         replace_string_literal(checker, annotate);
     }
-}
-
-/// UP037
-pub fn quoted_annotations_annassign(checker: &mut Checker, annotation: &Box<Expr>) {
-    println!("STARTING");
-    replace_string_literal(checker, annotation);
+    */
 }

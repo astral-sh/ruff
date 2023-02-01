@@ -541,7 +541,7 @@ where
                 if self.settings.rules.enabled(&Rule::QuotedAnnotations)
                     && self.annotations_future_enabled
                 {
-                    pyupgrade::rules::quoted_annotations_funcdef(self, args, returns);
+                    pyupgrade::rules::quoted_annotations(self, stmt);
                 }
 
                 if self.settings.rules.enabled(&Rule::UselessExpression) {
@@ -1729,7 +1729,7 @@ where
                 if self.settings.rules.enabled(&Rule::QuotedAnnotations)
                     && self.annotations_future_enabled
                 {
-                    pyupgrade::rules::quoted_annotations_annassign(self, annotation);
+                    pyupgrade::rules::quoted_annotations(self, stmt);
                 }
             }
             StmtKind::Delete { .. } => {}
