@@ -6,7 +6,6 @@ use rustpython_ast::Location;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
-use textwrap::{dedent, indent};
 
 use ruff_macros::derive_message_formats;
 
@@ -17,6 +16,7 @@ use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
+use crate::rules::pyupgrade::fixes::adjust_indentation;
 use crate::settings::types::PythonVersion;
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
@@ -201,22 +201,29 @@ fn fix_py2_block(
         let start = orelse.first().unwrap();
         let end = orelse.last().unwrap();
 
-        indentation(checker.locator, start)?;
-        let Some(if_indent) = indentation(checker.locator, stmt) else {
-            return None;
-        };
-        // TODO(charlie): This dedent-indent pattern is unsafe (e.g., if the user has a multiline
-        // string).
-        let text = dedent(checker.locator.slice_source_code_range(&Range::new(
-            Location::new(start.location.row(), 0),
-            end.end_location.unwrap(),
-        )));
-        let text = indent(&text, if_indent);
-        Some(Fix::replacement(
-            text,
-            Location::new(stmt.location.row(), 0),
-            stmt.end_location.unwrap(),
-        ))
+        // TODO(charlie): Support inline `else` blocks.
+        indentation(checker.locator, start).and_then(|_| {
+            indentation(checker.locator, stmt)
+                .and_then(|indentation| {
+                    adjust_indentation(
+                        Range::new(
+                            Location::new(start.location.row(), 0),
+                            end.end_location.unwrap(),
+                        ),
+                        indentation,
+                        checker.locator,
+                        checker.stylist,
+                    )
+                    .ok()
+                })
+                .map(|contents| {
+                    Fix::replacement(
+                        contents,
+                        Location::new(stmt.location.row(), 0),
+                        stmt.end_location.unwrap(),
+                    )
+                })
+        })
     } else {
         let mut end_location = orelse.last().unwrap().location;
         if block.starter == Tok::If && block.elif.is_some() {
@@ -251,21 +258,29 @@ fn fix_py3_block(
             let start = body.first().unwrap();
             let end = body.last().unwrap();
 
-            indentation(checker.locator, start)?;
-            let Some(if_indent) = indentation(checker.locator, stmt) else {
-                    return None;
-                };
-            // TODO(charlie): This dedent-indent pattern is unsafe (e.g., if the user has a multiline
-            // string).
-            let text = dedent(checker.locator.slice_source_code_range(&Range::new(
-                Location::new(start.location.row(), 0),
-                end.end_location.unwrap(),
-            )));
-            Some(Fix::replacement(
-                indent(&text, if_indent),
-                Location::new(stmt.location.row(), 0),
-                stmt.end_location.unwrap(),
-            ))
+            // TODO(charlie): Support inline `if` blocks.
+            indentation(checker.locator, start).and_then(|_| {
+                indentation(checker.locator, stmt)
+                    .and_then(|indentation| {
+                        adjust_indentation(
+                            Range::new(
+                                Location::new(start.location.row(), 0),
+                                end.end_location.unwrap(),
+                            ),
+                            indentation,
+                            checker.locator,
+                            checker.stylist,
+                        )
+                        .ok()
+                    })
+                    .map(|contents| {
+                        Fix::replacement(
+                            contents,
+                            Location::new(stmt.location.row(), 0),
+                            stmt.end_location.unwrap(),
+                        )
+                    })
+            })
         }
         Tok::Elif => {
             // Replace the `elif` with an `else, preserve the body of the elif, and remove the rest.

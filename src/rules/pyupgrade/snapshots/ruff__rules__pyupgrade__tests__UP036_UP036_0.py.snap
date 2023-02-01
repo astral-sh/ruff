@@ -326,4 +326,76 @@ expression: diagnostics
       row: 126
       column: 16
   parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 130
+    column: 4
+  end_location:
+    row: 137
+    column: 9
+  fix:
+    content:
+      - "    expected_error = ["
+      - "\"<stdin>:1:5: Generator expression must be parenthesized\","
+      - "\"max(1 for i in range(10), key=lambda x: x+1)\","
+      - "\"    ^\","
+      - "    ]"
+    location:
+      row: 130
+      column: 0
+    end_location:
+      row: 137
+      column: 9
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 140
+    column: 0
+  end_location:
+    row: 147
+    column: 5
+  fix:
+    content:
+      - "expected_error = ["
+      - "\"<stdin>:1:5: Generator expression must be parenthesized\","
+      - "\"max(1 for i in range(10), key=lambda x: x+1)\","
+      - "\"    ^\","
+      - "]"
+    location:
+      row: 140
+      column: 0
+    end_location:
+      row: 147
+      column: 5
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 150
+    column: 0
+  end_location:
+    row: 161
+    column: 28
+  fix:
+    content:
+      - "\"\"\"this"
+      - "is valid\"\"\""
+      - ""
+      - "\"\"\"the indentation on"
+      - "    this line is significant\"\"\""
+      - ""
+      - "\"this is\" \\"
+      - "    \"allowed too\""
+      - ""
+      - "(\"so is\""
+      - " \"this for some reason\")"
+    location:
+      row: 150
+      column: 0
+    end_location:
+      row: 161
+      column: 28
+  parent: ~
 

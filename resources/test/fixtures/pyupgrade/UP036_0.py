@@ -124,3 +124,38 @@ if True:
 if True:
     if sys.version_info > (3,):
         print(3)
+
+
+if True:
+    if sys.version_info <= (3, 0):
+        expected_error = []
+    else:
+        expected_error = [
+"<stdin>:1:5: Generator expression must be parenthesized",
+"max(1 for i in range(10), key=lambda x: x+1)",
+"    ^",
+        ]
+
+
+if sys.version_info <= (3, 0):
+    expected_error = []
+else:
+    expected_error = [
+"<stdin>:1:5: Generator expression must be parenthesized",
+"max(1 for i in range(10), key=lambda x: x+1)",
+"    ^",
+    ]
+
+
+if sys.version_info > (3,0):
+    """this
+is valid"""
+
+    """the indentation on
+    this line is significant"""
+
+    "this is" \
+    "allowed too"
+
+    ("so is"
+     "this for some reason")
