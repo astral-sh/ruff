@@ -30,9 +30,7 @@ mod tests {
     fn rules(path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_logging_format")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_logging_format").join(path).as_path(),
             &settings::Settings::for_rules(vec![
                 Rule::LoggingStringFormat,
                 Rule::LoggingPercentFormat,

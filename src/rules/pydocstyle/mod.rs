@@ -69,9 +69,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pydocstyle")
-                .join(path)
-                .as_path(),
+            Path::new("pydocstyle").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -81,7 +79,7 @@ mod tests {
     #[test]
     fn d417_unspecified() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
+            Path::new("pydocstyle/D417.py"),
             &settings::Settings {
                 // When inferring the convention, we'll see a few false negatives.
                 // See: https://github.com/PyCQA/pydocstyle/issues/459.
@@ -96,7 +94,7 @@ mod tests {
     #[test]
     fn d417_google() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
+            Path::new("pydocstyle/D417.py"),
             &settings::Settings {
                 // With explicit Google convention, we should flag every function.
                 pydocstyle: Settings {
@@ -112,7 +110,7 @@ mod tests {
     #[test]
     fn d417_numpy() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pydocstyle/D417.py"),
+            Path::new("pydocstyle/D417.py"),
             &settings::Settings {
                 // With explicit Google convention, we shouldn't flag anything.
                 pydocstyle: Settings {

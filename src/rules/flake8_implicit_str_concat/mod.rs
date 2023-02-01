@@ -19,9 +19,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_implicit_str_concat")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_implicit_str_concat").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -34,9 +32,7 @@ mod tests {
     fn multiline(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("multiline_{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_implicit_str_concat")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_implicit_str_concat").join(path).as_path(),
             &settings::Settings {
                 flake8_implicit_str_concat: super::settings::Settings {
                     allow_multiline: false,

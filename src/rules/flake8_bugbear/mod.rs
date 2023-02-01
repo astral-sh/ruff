@@ -45,9 +45,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_bugbear")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_bugbear").join(path).as_path(),
             &Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -58,7 +56,7 @@ mod tests {
     fn extend_immutable_calls() -> Result<()> {
         let snapshot = "extend_immutable_calls".to_string();
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_bugbear/B008_extended.py"),
+            Path::new("flake8_bugbear/B008_extended.py"),
             &Settings {
                 flake8_bugbear: super::settings::Settings {
                     extend_immutable_calls: vec![

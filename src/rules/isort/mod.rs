@@ -732,9 +732,7 @@ mod tests {
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
@@ -750,7 +748,7 @@ mod tests {
     // fn source_code_style(path: &Path) -> Result<()> {
     //     let snapshot = format!("{}", path.to_string_lossy());
     //     let diagnostics = test_path(
-    //         Path::new("./resources/test/fixtures/isort")
+    //         Path::new("isort")
     //             .join(path)
     //             .as_path(),
     //         &Settings {
@@ -766,9 +764,7 @@ mod tests {
     fn combine_as_imports(path: &Path) -> Result<()> {
         let snapshot = format!("combine_as_imports_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     combine_as_imports: true,
@@ -786,9 +782,7 @@ mod tests {
     fn force_wrap_aliases(path: &Path) -> Result<()> {
         let snapshot = format!("force_wrap_aliases_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     force_wrap_aliases: true,
@@ -807,9 +801,7 @@ mod tests {
     fn no_split_on_trailing_comma(path: &Path) -> Result<()> {
         let snapshot = format!("split_on_trailing_comma_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     split_on_trailing_comma: false,
@@ -827,9 +819,7 @@ mod tests {
     fn force_single_line(path: &Path) -> Result<()> {
         let snapshot = format!("force_single_line_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     force_single_line: true,
@@ -850,9 +840,7 @@ mod tests {
     fn order_by_type(path: &Path) -> Result<()> {
         let snapshot = format!("order_by_type_false_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     order_by_type: false,
@@ -874,9 +862,7 @@ mod tests {
             path.to_string_lossy()
         );
         let mut diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     order_by_type: true,
@@ -904,9 +890,7 @@ mod tests {
             path.to_string_lossy()
         );
         let mut diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     order_by_type: true,
@@ -936,9 +920,7 @@ mod tests {
             path.to_string_lossy()
         );
         let mut diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     order_by_type: true,
@@ -963,9 +945,7 @@ mod tests {
     fn force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     force_sort_within_sections: true,
@@ -986,9 +966,7 @@ mod tests {
     fn required_import(path: &Path) -> Result<()> {
         let snapshot = format!("required_import_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort/required_imports")
-                .join(path)
-                .as_path(),
+            Path::new("isort/required_imports").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
@@ -1010,9 +988,7 @@ mod tests {
     fn required_imports(path: &Path) -> Result<()> {
         let snapshot = format!("required_imports_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort/required_imports")
-                .join(path)
-                .as_path(),
+            Path::new("isort/required_imports").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
@@ -1035,9 +1011,7 @@ mod tests {
     fn combined_required_imports(path: &Path) -> Result<()> {
         let snapshot = format!("combined_required_imports_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort/required_imports")
-                .join(path)
-                .as_path(),
+            Path::new("isort/required_imports").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
@@ -1059,9 +1033,7 @@ mod tests {
     fn straight_required_import(path: &Path) -> Result<()> {
         let snapshot = format!("straight_required_import_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort/required_imports")
-                .join(path)
-                .as_path(),
+            Path::new("isort/required_imports").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
@@ -1079,9 +1051,7 @@ mod tests {
     fn closest_to_furthest(path: &Path) -> Result<()> {
         let snapshot = format!("closest_to_furthest_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
@@ -1099,9 +1069,7 @@ mod tests {
     fn no_lines_before(path: &Path) -> Result<()> {
         let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
-            Path::new("./resources/test/fixtures/isort")
-                .join(path)
-                .as_path(),
+            Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
                     no_lines_before: BTreeSet::from([

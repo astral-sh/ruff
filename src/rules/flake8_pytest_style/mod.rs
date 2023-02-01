@@ -247,9 +247,7 @@ mod tests {
         name: &str,
     ) -> Result<()> {
         let mut diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_pytest_style")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_pytest_style").join(path).as_path(),
             &settings::Settings {
                 flake8_pytest_style: plugin_settings,
                 ..settings::Settings::for_rule(rule_code)

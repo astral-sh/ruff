@@ -15,7 +15,7 @@ mod tests {
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_errmsg/EM.py"),
+            Path::new("flake8_errmsg/EM.py"),
             &settings::Settings::for_rules(vec![
                 Rule::RawStringInException,
                 Rule::FStringInException,
@@ -29,7 +29,7 @@ mod tests {
     #[test]
     fn custom() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_errmsg/EM.py"),
+            Path::new("flake8_errmsg/EM.py"),
             &settings::Settings {
                 flake8_errmsg: super::settings::Settings {
                     max_string_length: 20,
