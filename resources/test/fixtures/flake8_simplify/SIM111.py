@@ -118,10 +118,40 @@ def f():
 
 
 def f():
-    # OK
-    def all(exp):
+    def any(exp):
         pass
+
     for x in iterable:
         if check(x):
             return True
     return False
+
+
+def f():
+    def all(exp):
+        pass
+
+    for x in iterable:
+        if check(x):
+            return False
+    return True
+
+
+def f():
+    x = 1
+
+    # SIM110
+    for x in iterable:
+        if check(x):
+            return True
+    return False
+
+
+def f():
+    x = 1
+
+    # SIM111
+    for x in iterable:
+        if check(x):
+            return False
+    return True
