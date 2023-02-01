@@ -18,7 +18,7 @@ mod tests {
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_annotations/annotation_presence.py"),
+            Path::new("flake8_annotations/annotation_presence.py"),
             &Settings {
                 ..Settings::for_rules(vec![
                     Rule::MissingTypeFunctionArgument,
@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn suppress_dummy_args() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_annotations/suppress_dummy_args.py"),
+            Path::new("flake8_annotations/suppress_dummy_args.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
                     mypy_init_return: false,
@@ -66,7 +66,7 @@ mod tests {
     #[test]
     fn mypy_init_return() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_annotations/mypy_init_return.py"),
+            Path::new("flake8_annotations/mypy_init_return.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
                     mypy_init_return: true,
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn suppress_none_returning() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_annotations/suppress_none_returning.py"),
+            Path::new("flake8_annotations/suppress_none_returning.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
                     mypy_init_return: false,
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn allow_star_arg_any() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py"),
+            Path::new("flake8_annotations/allow_star_arg_any.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
                     mypy_init_return: false,
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn allow_overload() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_annotations/allow_overload.py"),
+            Path::new("flake8_annotations/allow_overload.py"),
             &Settings {
                 ..Settings::for_rules(vec![
                     Rule::MissingReturnTypePublicFunction,
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn allow_nested_overload() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_annotations/allow_nested_overload.py"),
+            Path::new("flake8_annotations/allow_nested_overload.py"),
             &Settings {
                 ..Settings::for_rules(vec![
                     Rule::MissingReturnTypePublicFunction,

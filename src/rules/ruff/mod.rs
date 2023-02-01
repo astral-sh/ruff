@@ -21,9 +21,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/ruff")
-                .join(path)
-                .as_path(),
+            Path::new("ruff").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -33,7 +31,7 @@ mod tests {
     #[test]
     fn confusables() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/ruff/confusables.py"),
+            Path::new("ruff/confusables.py"),
             &settings::Settings {
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']).into(),
                 ..settings::Settings::for_rules(vec![
@@ -50,7 +48,7 @@ mod tests {
     #[test]
     fn ruf100_0() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/ruff/RUF100_0.py"),
+            Path::new("ruff/RUF100_0.py"),
             &settings::Settings::for_rules(vec![
                 Rule::UnusedNOQA,
                 Rule::LineTooLong,
@@ -65,7 +63,7 @@ mod tests {
     #[test]
     fn ruf100_1() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/ruff/RUF100_1.py"),
+            Path::new("ruff/RUF100_1.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -84,10 +82,7 @@ mod tests {
         )])
         .unwrap();
 
-        let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/ruff/RUF100_2.py"),
-            &settings,
-        )?;
+        let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
@@ -95,7 +90,7 @@ mod tests {
     #[test]
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/ruff/flake8_noqa.py"),
+            Path::new("ruff/flake8_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -105,7 +100,7 @@ mod tests {
     #[test]
     fn ruff_noqa() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/ruff/ruff_noqa.py"),
+            Path::new("ruff/ruff_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -115,7 +110,7 @@ mod tests {
     #[test]
     fn redirects() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/ruff/redirects.py"),
+            Path::new("ruff/redirects.py"),
             &settings::Settings::for_rules(vec![Rule::UsePEP604Annotation]),
         )?;
         assert_yaml_snapshot!(diagnostics);

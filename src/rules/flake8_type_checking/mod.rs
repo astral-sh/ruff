@@ -31,9 +31,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_type_checking")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_type_checking").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -43,9 +41,7 @@ mod tests {
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"); "strict")]
     fn strict(rule_code: Rule, path: &Path) -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_type_checking")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_type_checking").join(path).as_path(),
             &settings::Settings {
                 flake8_type_checking: super::settings::Settings {
                     strict: true,
@@ -61,9 +57,7 @@ mod tests {
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("exempt_modules.py"); "exempt_modules")]
     fn exempt_modules(rule_code: Rule, path: &Path) -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_type_checking")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_type_checking").join(path).as_path(),
             &settings::Settings {
                 flake8_type_checking: super::settings::Settings {
                     exempt_modules: vec!["pandas".to_string()],

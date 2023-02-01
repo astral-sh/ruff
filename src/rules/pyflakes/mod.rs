@@ -109,9 +109,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes")
-                .join(path)
-                .as_path(),
+            Path::new("pyflakes").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -121,7 +119,7 @@ mod tests {
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/F841_0.py"),
+            Path::new("pyflakes/F841_0.py"),
             &settings::Settings {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap().into(),
                 ..settings::Settings::for_rule(Rule::UnusedVariable)
@@ -134,7 +132,7 @@ mod tests {
     #[test]
     fn init() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/__init__.py"),
+            Path::new("pyflakes/__init__.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName, Rule::UndefinedExport]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -144,7 +142,7 @@ mod tests {
     #[test]
     fn default_builtins() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/builtins.py"),
+            Path::new("pyflakes/builtins.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -154,7 +152,7 @@ mod tests {
     #[test]
     fn extra_builtins() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/builtins.py"),
+            Path::new("pyflakes/builtins.py"),
             &settings::Settings {
                 builtins: vec!["_".to_string()],
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
@@ -167,7 +165,7 @@ mod tests {
     #[test]
     fn default_typing_modules() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/typing_modules.py"),
+            Path::new("pyflakes/typing_modules.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -177,7 +175,7 @@ mod tests {
     #[test]
     fn extra_typing_modules() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/typing_modules.py"),
+            Path::new("pyflakes/typing_modules.py"),
             &settings::Settings {
                 typing_modules: vec!["airflow.typing_compat".to_string()],
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
@@ -190,7 +188,7 @@ mod tests {
     #[test]
     fn future_annotations() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/future_annotations.py"),
+            Path::new("pyflakes/future_annotations.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UndefinedName]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -200,7 +198,7 @@ mod tests {
     #[test]
     fn multi_statement_lines() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyflakes/multi_statement_lines.py"),
+            Path::new("pyflakes/multi_statement_lines.py"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
         assert_yaml_snapshot!(diagnostics);

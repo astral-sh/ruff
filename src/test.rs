@@ -22,7 +22,8 @@ pub fn test_resource_path(path: impl AsRef<std::path::Path>) -> std::path::PathB
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after 10 iterations.
 pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
-    let contents = fs::read_file(path)?;
+    let path = test_resource_path("fixtures").join(path);
+    let contents = fs::read_file(&path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_contents(&contents, &locator);
@@ -30,7 +31,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
     let mut diagnostics = check_path(
-        path,
+        &path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
         &contents,
@@ -62,7 +63,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
             let diagnostics = check_path(
-                path,
+                &path,
                 None,
                 &contents,
                 tokens,

@@ -20,7 +20,7 @@ mod tests {
     fn max_complexity_zero(max_complexity: usize) -> Result<()> {
         let snapshot = format!("max_complexity_{max_complexity}");
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/mccabe/C901.py"),
+            Path::new("mccabe/C901.py"),
             &Settings {
                 mccabe: super::settings::Settings { max_complexity },
                 ..Settings::for_rules(vec![Rule::FunctionIsTooComplex])

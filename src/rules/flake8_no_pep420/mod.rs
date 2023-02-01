@@ -23,7 +23,7 @@ mod tests {
     fn test_flake8_no_pep420(path: &Path, filename: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let p = PathBuf::from(format!(
-            "./resources/test/fixtures/flake8_no_pep420/{}/{}",
+            "flake8_no_pep420/{}/{}",
             path.display(),
             filename.display()
         ));
