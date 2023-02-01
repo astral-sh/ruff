@@ -50,6 +50,14 @@ expression: diagnostics
   end_location:
     row: 24
     column: 50
-  fix: ~
+  fix:
+    content:
+      - "print(\"PY3!\")"
+    location:
+      row: 23
+      column: 0
+    end_location:
+      row: 24
+      column: 50
   parent: ~
 

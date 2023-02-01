@@ -159,3 +159,22 @@ is valid"""
 
     ("so is"
      "this for some reason")
+
+if sys.version_info > (3, 0): expected_error = \
+    []
+
+if sys.version_info > (3, 0): expected_error = []
+
+if sys.version_info > (3, 0): \
+    expected_error = []
+
+if True:
+    if sys.version_info > (3, 0): expected_error = \
+    []
+
+if True:
+    if sys.version_info > (3, 0): expected_error = []
+
+if True:
+    if sys.version_info > (3, 0): \
+    expected_error = []

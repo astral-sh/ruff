@@ -201,8 +201,17 @@ fn fix_py2_block(
         let start = orelse.first().unwrap();
         let end = orelse.last().unwrap();
 
-        // TODO(charlie): Support inline `else` blocks.
-        indentation(checker.locator, start).and_then(|_| {
+        if indentation(checker.locator, start).is_none() {
+            // Inline `else` block (e.g., `else: x = 1`).
+            Some(Fix::replacement(
+                checker
+                    .locator
+                    .slice_source_code_range(&Range::new(start.location, end.end_location.unwrap()))
+                    .to_string(),
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ))
+        } else {
             indentation(checker.locator, stmt)
                 .and_then(|indentation| {
                     adjust_indentation(
@@ -223,7 +232,7 @@ fn fix_py2_block(
                         stmt.end_location.unwrap(),
                     )
                 })
-        })
+        }
     } else {
         let mut end_location = orelse.last().unwrap().location;
         if block.starter == Tok::If && block.elif.is_some() {
@@ -258,8 +267,20 @@ fn fix_py3_block(
             let start = body.first().unwrap();
             let end = body.last().unwrap();
 
-            // TODO(charlie): Support inline `if` blocks.
-            indentation(checker.locator, start).and_then(|_| {
+            if indentation(checker.locator, start).is_none() {
+                // Inline `if` block (e.g., `if ...: x = 1`).
+                Some(Fix::replacement(
+                    checker
+                        .locator
+                        .slice_source_code_range(&Range::new(
+                            start.location,
+                            end.end_location.unwrap(),
+                        ))
+                        .to_string(),
+                    stmt.location,
+                    stmt.end_location.unwrap(),
+                ))
+            } else {
                 indentation(checker.locator, stmt)
                     .and_then(|indentation| {
                         adjust_indentation(
@@ -280,7 +301,7 @@ fn fix_py3_block(
                             stmt.end_location.unwrap(),
                         )
                     })
-            })
+            }
         }
         Tok::Elif => {
             // Replace the `elif` with an `else, preserve the body of the elif, and remove the rest.

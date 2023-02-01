@@ -46,7 +46,15 @@ expression: diagnostics
   end_location:
     row: 17
     column: 19
-  fix: ~
+  fix:
+    content:
+      - "print(\"PY3!\")"
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 17
+      column: 19
   parent: ~
 - kind:
     OutdatedVersionBlock: ~
@@ -148,7 +156,15 @@ expression: diagnostics
   end_location:
     row: 54
     column: 18
-  fix: ~
+  fix:
+    content:
+      - "print(\"py3\")"
+    location:
+      row: 53
+      column: 0
+    end_location:
+      row: 54
+      column: 18
   parent: ~
 - kind:
     OutdatedVersionBlock: ~
@@ -306,7 +322,15 @@ expression: diagnostics
   end_location:
     row: 122
     column: 40
-  fix: ~
+  fix:
+    content:
+      - print(3)
+    location:
+      row: 122
+      column: 4
+    end_location:
+      row: 122
+      column: 40
   parent: ~
 - kind:
     OutdatedVersionBlock: ~
@@ -397,5 +421,115 @@ expression: diagnostics
     end_location:
       row: 161
       column: 28
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 163
+    column: 0
+  end_location:
+    row: 164
+    column: 6
+  fix:
+    content:
+      - "expected_error = \\"
+      - "    []"
+    location:
+      row: 163
+      column: 0
+    end_location:
+      row: 164
+      column: 6
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 166
+    column: 0
+  end_location:
+    row: 166
+    column: 49
+  fix:
+    content:
+      - "expected_error = []"
+    location:
+      row: 166
+      column: 0
+    end_location:
+      row: 166
+      column: 49
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 168
+    column: 0
+  end_location:
+    row: 169
+    column: 23
+  fix:
+    content:
+      - "expected_error = []"
+    location:
+      row: 168
+      column: 0
+    end_location:
+      row: 169
+      column: 23
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 172
+    column: 4
+  end_location:
+    row: 173
+    column: 6
+  fix:
+    content:
+      - "expected_error = \\"
+      - "    []"
+    location:
+      row: 172
+      column: 4
+    end_location:
+      row: 173
+      column: 6
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 176
+    column: 4
+  end_location:
+    row: 176
+    column: 53
+  fix:
+    content:
+      - "expected_error = []"
+    location:
+      row: 176
+      column: 4
+    end_location:
+      row: 176
+      column: 53
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 179
+    column: 4
+  end_location:
+    row: 180
+    column: 23
+  fix:
+    content:
+      - "    expected_error = []"
+    location:
+      row: 179
+      column: 0
+    end_location:
+      row: 180
+      column: 23
   parent: ~
 
