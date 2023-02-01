@@ -68,14 +68,25 @@ expression: diagnostics
   end_location:
     row: 126
     column: 23
+  fix: ~
+  parent: ~
+- kind:
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
+  location:
+    row: 144
+    column: 4
+  end_location:
+    row: 146
+    column: 23
   fix:
     content:
       - return any(check(x) for x in iterable)
     location:
-      row: 124
+      row: 144
       column: 4
     end_location:
-      row: 127
+      row: 147
       column: 16
   parent: ~
 

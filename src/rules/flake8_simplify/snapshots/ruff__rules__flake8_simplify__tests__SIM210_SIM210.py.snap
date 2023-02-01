@@ -63,11 +63,11 @@ expression: diagnostics
     IfExprWithTrueFalse:
       expr: b
   location:
-    row: 12
-    column: 4
+    row: 14
+    column: 8
   end_location:
-    row: 12
-    column: 24
+    row: 14
+    column: 28
   fix: ~
   parent: ~
 
