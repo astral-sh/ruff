@@ -11,9 +11,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"); "A001")]
     #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"); "A002")]

@@ -62,9 +62,9 @@ mod tests {
 
     use super::Strictness;
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test]
     fn ban_parent_imports() -> Result<()> {

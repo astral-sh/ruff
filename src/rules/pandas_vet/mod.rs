@@ -12,10 +12,11 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
-    use crate::linter::{check_path, test_path};
+    use crate::linter::check_path;
     use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, directives, rustpython_helpers, settings};
 
     fn rule_code(contents: &str, expected: &[Rule]) -> Result<()> {

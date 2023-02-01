@@ -12,9 +12,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::types::PythonVersion;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"); "UP001")]

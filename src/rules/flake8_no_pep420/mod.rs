@@ -9,9 +9,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Path::new("test_pass_init"), Path::new("example.py"); "INP001_0")]
     #[test_case(Path::new("test_fail_empty"), Path::new("example.py"); "INP001_1")]
