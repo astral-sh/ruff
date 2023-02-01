@@ -95,19 +95,19 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn max_statements() -> Result<()> {
-    //     let diagnostics = test_path(
-    //         Path::new("./resources/test/fixtures/pylint/too_many_statements_params.py"),
-    //         &Settings {
-    //             pylint: pylint::settings::Settings {
-    //                 max_statements: 19,
-    //                 ..pylint::settings::Settings::default()
-    //             },
-    //             ..Settings::for_rules(vec![Rule::TooManyStatements])
-    //         },
-    //     )?;
-    //     assert_yaml_snapshot!(diagnostics);
-    //     Ok(())
-    // }
+    #[test]
+    fn max_statements() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/pylint/too_many_statements_params.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_statements: 1,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyStatements])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
 }
