@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -6,6 +6,7 @@ use log::debug;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::types::{ImportBlock, Importable};
 use crate::python::sys::KNOWN_STANDARD_LIBRARY;
 
 #[derive(
@@ -88,4 +89,84 @@ fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
         }
     }
     None
+}
+
+pub fn categorize_imports<'a>(
+    block: ImportBlock<'a>,
+    src: &[PathBuf],
+    package: Option<&Path>,
+    known_first_party: &BTreeSet<String>,
+    known_third_party: &BTreeSet<String>,
+    extra_standard_library: &BTreeSet<String>,
+) -> BTreeMap<ImportType, ImportBlock<'a>> {
+    let mut block_by_type: BTreeMap<ImportType, ImportBlock> = BTreeMap::default();
+    // Categorize `StmtKind::Import`.
+    for (alias, comments) in block.import {
+        let import_type = categorize(
+            &alias.module_base(),
+            None,
+            src,
+            package,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        );
+        block_by_type
+            .entry(import_type)
+            .or_default()
+            .import
+            .insert(alias, comments);
+    }
+    // Categorize `StmtKind::ImportFrom` (without re-export).
+    for (import_from, aliases) in block.import_from {
+        let classification = categorize(
+            &import_from.module_base(),
+            import_from.level,
+            src,
+            package,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        );
+        block_by_type
+            .entry(classification)
+            .or_default()
+            .import_from
+            .insert(import_from, aliases);
+    }
+    // Categorize `StmtKind::ImportFrom` (with re-export).
+    for ((import_from, alias), comments) in block.import_from_as {
+        let classification = categorize(
+            &import_from.module_base(),
+            import_from.level,
+            src,
+            package,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        );
+        block_by_type
+            .entry(classification)
+            .or_default()
+            .import_from_as
+            .insert((import_from, alias), comments);
+    }
+    // Categorize `StmtKind::ImportFrom` (with star).
+    for (import_from, comments) in block.import_from_star {
+        let classification = categorize(
+            &import_from.module_base(),
+            import_from.level,
+            src,
+            package,
+            known_first_party,
+            known_third_party,
+            extra_standard_library,
+        );
+        block_by_type
+            .entry(classification)
+            .or_default()
+            .import_from_star
+            .insert(import_from, comments);
+    }
+    block_by_type
 }
