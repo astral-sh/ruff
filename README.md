@@ -3811,7 +3811,7 @@ max-args = 5
 
 Maximum number of statements allowed for a method or a statement (see: `PLR0915`).
 
-**Default value**: `100`
+**Default value**: `50`
 
 **Type**: `int`
 
@@ -3819,7 +3819,7 @@ Maximum number of statements allowed for a method or a statement (see: `PLR0915`
 
 ```toml
 [tool.ruff.pylint]
-max_statements = 100
+max_statements = 50
 ```
 
 ---

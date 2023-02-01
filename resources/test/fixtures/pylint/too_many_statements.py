@@ -2,7 +2,8 @@ def f():  # OK
     return
 
 
-async def f():  # Too many statements (51/50)
+async def f():  # Too many statements (52/50)
+    print()
     print()
     print()
     print()

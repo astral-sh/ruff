@@ -56,11 +56,7 @@ pub struct Options {
     #[option(default = r"5", value_type = "int", example = r"max-args = 5")]
     /// Maximum number of arguments allowed for a function definition (see: `PLR0913`).
     pub max_args: Option<usize>,
-    #[option(
-        default = r"100",
-        value_type = "int",
-        example = r"max_statements = 100"
-    )]
+    #[option(default = r"50", value_type = "int", example = r"max_statements = 50")]
     /// Maximum number of statements allowed for a method or a statement (see: `PLR0915`).
     pub max_statements: Option<usize>,
 }
@@ -77,7 +73,7 @@ impl Default for Settings {
         Self {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
             max_args: 5,
-            max_statements: 100,
+            max_statements: 50,
         }
     }
 }
