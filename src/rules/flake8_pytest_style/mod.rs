@@ -12,8 +12,8 @@ mod tests {
 
     use super::settings::Settings;
     use super::types;
-    use crate::linter::test_path;
     use crate::registry::Rule;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::IncorrectFixtureParenthesesStyle, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]
@@ -247,9 +247,7 @@ mod tests {
         name: &str,
     ) -> Result<()> {
         let mut diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_pytest_style")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_pytest_style").join(path).as_path(),
             &settings::Settings {
                 flake8_pytest_style: plugin_settings,
                 ..settings::Settings::for_rule(rule_code)

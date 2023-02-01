@@ -108,14 +108,14 @@ mod tests {
 
     use super::ApiBan;
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test]
     fn banned_api_true_positives() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_tidy_imports/TID251.py"),
+            Path::new("flake8_tidy_imports/TID251.py"),
             &Settings {
                 flake8_tidy_imports: super::super::Settings {
                     banned_api: FxHashMap::from_iter([

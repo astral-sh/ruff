@@ -8,6 +8,14 @@ def f():
 
 def f():
     # SIM103
+    if a == b:
+        return True
+    else:
+        return False
+
+
+def f():
+    # SIM103
     if a:
         return 1
     elif b:
@@ -50,3 +58,29 @@ def f():
         return False
     else:
         return True
+
+
+def f():
+    # OK
+    if a:
+        return False
+    else:
+        return False
+
+
+def f():
+    # OK
+    if a:
+        return True
+    else:
+        return True
+
+
+def f():
+    # OK
+    def bool():
+        return False
+    if a:
+        return True
+    else:
+        return False

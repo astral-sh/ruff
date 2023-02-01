@@ -36,7 +36,7 @@ use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format,
-    flake8_pie, flake8_print, flake8_pytest_style, flake8_return, flake8_simplify,
+    flake8_pie, flake8_print, flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
     pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
     ruff, tryceratops,
@@ -87,6 +87,9 @@ pub struct Checker<'a> {
     deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, DeferralContext<'a>)>,
     deferred_assignments: Vec<DeferralContext<'a>>,
+    // Body iteration; used to peek at siblings.
+    body: &'a [Stmt],
+    body_index: usize,
     // Internal, derivative state.
     visible_scope: VisibleScope,
     in_annotation: bool,
@@ -145,6 +148,9 @@ impl<'a> Checker<'a> {
             deferred_functions: vec![],
             deferred_lambdas: vec![],
             deferred_assignments: vec![],
+            // Body iteration.
+            body: &[],
+            body_index: 0,
             // Internal, derivative state.
             visible_scope: VisibleScope {
                 modifier: Modifier::Module,
@@ -1445,6 +1451,15 @@ where
                         tryceratops::rules::raise_vanilla_args(self, expr);
                     }
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnnecessaryParenOnRaiseException)
+                {
+                    if let Some(expr) = exc {
+                        flake8_raise::rules::unnecessary_paren_on_raise_exception(self, expr);
+                    }
+                }
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
@@ -1592,7 +1607,11 @@ where
                     if self.settings.rules.enabled(&Rule::ConvertLoopToAny)
                         || self.settings.rules.enabled(&Rule::ConvertLoopToAll)
                     {
-                        flake8_simplify::rules::convert_for_loop_to_any_all(self, stmt, None);
+                        flake8_simplify::rules::convert_for_loop_to_any_all(
+                            self,
+                            stmt,
+                            self.current_sibling_stmt(),
+                        );
                     }
                     if self.settings.rules.enabled(&Rule::KeyInDict) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
@@ -3696,19 +3715,18 @@ where
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
-        if self.settings.rules.enabled(&Rule::ConvertLoopToAny)
-            || self.settings.rules.enabled(&Rule::ConvertLoopToAll)
-        {
-            for (stmt, sibling) in body.iter().tuple_windows() {
-                if matches!(stmt.node, StmtKind::For { .. })
-                    && matches!(sibling.node, StmtKind::Return { .. })
-                {
-                    flake8_simplify::rules::convert_for_loop_to_any_all(self, stmt, Some(sibling));
-                }
-            }
+        let prev_body = self.body;
+        let prev_body_index = self.body_index;
+        self.body = body;
+        self.body_index = 0;
+
+        for stmt in body {
+            self.visit_stmt(stmt);
+            self.body_index += 1;
         }
 
-        visitor::walk_body(self, body);
+        self.body = prev_body;
+        self.body_index = prev_body_index;
     }
 }
 
@@ -3795,6 +3813,11 @@ impl<'a> Checker<'a> {
     /// Return the grandparent `Expr` of the current `Expr`.
     pub fn current_expr_grandparent(&self) -> Option<&RefEquality<'a, Expr>> {
         self.exprs.iter().rev().nth(2)
+    }
+
+    /// Return the `Stmt` that immediately follows the current `Stmt`, if any.
+    pub fn current_sibling_stmt(&self) -> Option<&'a Stmt> {
+        self.body.get(self.body_index + 1)
     }
 
     pub fn current_scope(&self) -> &Scope {
@@ -5221,9 +5244,7 @@ pub fn check_ast(
     };
 
     // Iterate over the AST.
-    for stmt in python_ast {
-        checker.visit_stmt(stmt);
-    }
+    checker.visit_body(python_ast);
 
     // Check any deferred statements.
     checker.check_deferred_functions();

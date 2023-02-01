@@ -32,7 +32,7 @@ expression: diagnostics
     column: 29
   fix:
     content:
-      - bool(b != c)
+      - b != c
     location:
       row: 3
       column: 4
@@ -58,5 +58,16 @@ expression: diagnostics
     end_location:
       row: 5
       column: 28
+  parent: ~
+- kind:
+    IfExprWithTrueFalse:
+      expr: b
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 28
+  fix: ~
   parent: ~
 

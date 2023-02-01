@@ -20,7 +20,11 @@ impl Violation for ImplicitNamespacePackage {
 
 /// INP001
 pub fn implicit_namespace_package(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
-    if package.is_none() {
+    if package.is_none() && path.extension().map_or(true, |ext| ext != "pyi") {
+        #[cfg(all(test, windows))]
+        let path = path
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
         Some(Diagnostic::new(
             ImplicitNamespacePackage(fs::relativize_path(path)),
             Range::default(),

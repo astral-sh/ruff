@@ -10,10 +10,10 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
@@ -41,9 +41,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pylint")
-                .join(path)
-                .as_path(),
+            Path::new("pylint").join(path).as_path(),
             &Settings::for_rules(vec![rule_code]),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -53,7 +51,7 @@ mod tests {
     #[test]
     fn allow_magic_value_types() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pylint/magic_value_comparison.py"),
+            Path::new("pylint/magic_value_comparison.py"),
             &Settings {
                 pylint: pylint::settings::Settings {
                     allow_magic_value_types: vec![pylint::settings::ConstantType::Int],
@@ -69,7 +67,7 @@ mod tests {
     #[test]
     fn max_args() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pylint/too_many_args_params.py"),
+            Path::new("pylint/too_many_args_params.py"),
             &Settings {
                 pylint: pylint::settings::Settings {
                     max_args: 4,
@@ -85,7 +83,7 @@ mod tests {
     #[test]
     fn max_args_with_dummy_variables() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pylint/too_many_args_params.py"),
+            Path::new("pylint/too_many_args_params.py"),
             &Settings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap().into(),
                 ..Settings::for_rules(vec![Rule::TooManyArgs])

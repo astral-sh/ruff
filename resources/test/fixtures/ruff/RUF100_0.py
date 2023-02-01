@@ -86,3 +86,5 @@ import shelve  # noqa: RUF100
 import sys  # noqa: F401, RUF100
 
 print(sys.path)
+
+"shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401

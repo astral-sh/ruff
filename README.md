@@ -158,6 +158,7 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PL)](#pylint-pl)
    1. [tryceratops (TRY)](#tryceratops-try)
+   1. [flake8-raise (RSE)](#flake8-raise-rse)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -227,7 +228,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.238'
+  rev: 'v0.0.239'
   hooks:
     - id: ruff
 ```
@@ -1358,6 +1359,14 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 | TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
 
+### flake8-raise (RSE)
+
+For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception |  |
+
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
@@ -1542,30 +1551,10 @@ tools:
 
 ```lua
 local null_ls = require("null-ls")
-local methods = require("null-ls.methods")
-local helpers = require("null-ls.helpers")
-
-local function ruff_fix()
-    return helpers.make_builtin({
-        name = "ruff",
-        meta = {
-            url = "https://github.com/charliermarsh/ruff/",
-            description = "An extremely fast Python linter, written in Rust.",
-        },
-        method = methods.internal.FORMATTING,
-        filetypes = { "python" },
-        generator_opts = {
-            command = "ruff",
-            args = { "--fix", "-e", "-n", "--stdin-filename", "$FILENAME", "-" },
-            to_stdin = true
-        },
-        factory = helpers.formatter_factory
-    })
-end
 
 null_ls.setup({
     sources = {
-        ruff_fix(),
+        null_ls.builtins.formatting.ruff,
         null_ls.builtins.diagnostics.ruff,
     }
 })
@@ -1669,6 +1658,7 @@ natively, including:
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
+- [`flake8-raise`](https://pypi.org/project/flake8-raise/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
@@ -1757,6 +1747,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [`flake8-print`](https://pypi.org/project/flake8-print/)
 - [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
 - [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
+- [`flake8-raise`](https://pypi.org/project/flake8-raise/)
 - [`flake8-return`](https://pypi.org/project/flake8-return/)
 - [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [`flake8-super`](https://pypi.org/project/flake8-super/)
@@ -2977,7 +2968,7 @@ altair = "alt"
 numpy = "np"
 pandas = "pd"
 seaborn = "sns"
-scripy = "sp"
+scipy = "sp"
 ```
 
 ---
@@ -3811,7 +3802,7 @@ Maximum number of arguments allowed for a function definition (see: `PLR0913`).
 
 ```toml
 [tool.ruff.pylint]
-max_args = 5
+max-args = 5
 ```
 
 ---

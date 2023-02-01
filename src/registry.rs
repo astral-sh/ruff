@@ -7,7 +7,6 @@ use strum_macros::{AsRefStr, EnumIter};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
-use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::violation::Violation;
 use crate::{rules, violations};
 
@@ -483,6 +482,8 @@ ruff_macros::define_rule_mapping!(
     G101 => rules::flake8_logging_format::violations::LoggingExtraAttrClash,
     G201 => rules::flake8_logging_format::violations::LoggingExcInfo,
     G202 => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
+    // flake8-raise
+    RSE102 => rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
     // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -612,6 +613,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flake8-raise](https://pypi.org/project/flake8-raise/)
+    #[prefix = "RSE"]
+    Flake8Raise,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
@@ -635,27 +639,21 @@ pub trait RuleNamespace: Sized {
 }
 
 /// The prefix, name and selector for an upstream linter category.
-pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleSelector);
-
-// TODO(martin): Move these constant definitions back to Linter::categories impl
-// once RuleSelector is an enum with a Linter variant
-const PYCODESTYLE_CATEGORIES: &[LinterCategory] = &[
-    LinterCategory("E", "Error", prefix_to_selector(RuleCodePrefix::E)),
-    LinterCategory("W", "Warning", prefix_to_selector(RuleCodePrefix::W)),
-];
-
-const PYLINT_CATEGORIES: &[LinterCategory] = &[
-    LinterCategory("PLC", "Convention", prefix_to_selector(RuleCodePrefix::PLC)),
-    LinterCategory("PLE", "Error", prefix_to_selector(RuleCodePrefix::PLE)),
-    LinterCategory("PLR", "Refactor", prefix_to_selector(RuleCodePrefix::PLR)),
-    LinterCategory("PLW", "Warning", prefix_to_selector(RuleCodePrefix::PLW)),
-];
+pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleCodePrefix);
 
 impl Linter {
     pub fn categories(&self) -> Option<&'static [LinterCategory]> {
         match self {
-            Linter::Pycodestyle => Some(PYCODESTYLE_CATEGORIES),
-            Linter::Pylint => Some(PYLINT_CATEGORIES),
+            Linter::Pycodestyle => Some(&[
+                LinterCategory("E", "Error", RuleCodePrefix::E),
+                LinterCategory("W", "Warning", RuleCodePrefix::W),
+            ]),
+            Linter::Pylint => Some(&[
+                LinterCategory("PLC", "Convention", RuleCodePrefix::PLC),
+                LinterCategory("PLE", "Error", RuleCodePrefix::PLE),
+                LinterCategory("PLR", "Refactor", RuleCodePrefix::PLR),
+                LinterCategory("PLW", "Warning", RuleCodePrefix::PLW),
+            ]),
             _ => None,
         }
     }

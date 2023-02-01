@@ -128,6 +128,7 @@ pub fn nested_if_statements(
     checker.diagnostics.push(diagnostic);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Bool {
     True,
     False,
@@ -167,6 +168,12 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     let (Some(if_return), Some(else_return)) = (is_one_line_return_bool(body), is_one_line_return_bool(orelse)) else {
         return;
     };
+
+    // If the branches have the same condition, abort (although the code could be simplified).
+    if if_return == else_return {
+        return;
+    }
+
     let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
         violations::ReturnBoolConditionDirectly { cond: condition },
@@ -177,21 +184,36 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
     {
-        let return_stmt = create_stmt(StmtKind::Return {
-            value: Some(Box::new(create_expr(ExprKind::Call {
-                func: Box::new(create_expr(ExprKind::Name {
-                    id: "bool".to_string(),
-                    ctx: ExprContext::Load,
-                })),
-                args: vec![(**test).clone()],
-                keywords: vec![],
-            }))),
-        });
-        diagnostic.amend(Fix::replacement(
-            unparse_stmt(&return_stmt, checker.stylist),
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ));
+        if matches!(test.node, ExprKind::Compare { .. }) {
+            diagnostic.amend(Fix::replacement(
+                unparse_stmt(
+                    &create_stmt(StmtKind::Return {
+                        value: Some(test.clone()),
+                    }),
+                    checker.stylist,
+                ),
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
+        } else if checker.is_builtin("bool") {
+            diagnostic.amend(Fix::replacement(
+                unparse_stmt(
+                    &create_stmt(StmtKind::Return {
+                        value: Some(Box::new(create_expr(ExprKind::Call {
+                            func: Box::new(create_expr(ExprKind::Name {
+                                id: "bool".to_string(),
+                                ctx: ExprContext::Load,
+                            })),
+                            args: vec![(**test).clone()],
+                            keywords: vec![],
+                        }))),
+                    }),
+                    checker.stylist,
+                ),
+                stmt.location,
+                stmt.end_location.unwrap(),
+            ));
+        };
     }
     checker.diagnostics.push(diagnostic);
 }

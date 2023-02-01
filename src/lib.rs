@@ -67,3 +67,6 @@ cfg_if! {
         pub use lib_wasm::check;
     }
 }
+
+#[cfg(test)]
+mod test;

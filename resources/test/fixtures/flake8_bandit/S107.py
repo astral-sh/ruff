@@ -28,3 +28,7 @@ def ok_all(first, /, pos, default="posonly", *, kwonly="kwonly"):
 
 def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
     pass
+
+
+def ok_empty(first, password=""):
+    pass

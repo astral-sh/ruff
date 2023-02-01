@@ -81,7 +81,8 @@ pub fn normalize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: 
 }
 
 /// Convert an absolute path to be relative to the current working directory.
-pub fn relativize_path(path: &Path) -> String {
+pub fn relativize_path(path: impl AsRef<Path>) -> String {
+    let path = path.as_ref();
     if let Ok(path) = path.strip_prefix(&*path_dedot::CWD) {
         return format!("{}", path.display());
     }

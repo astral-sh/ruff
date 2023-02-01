@@ -7,7 +7,7 @@ use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use anyhow::Result;
 use colored::Colorize;
-use itertools::iterate;
+use itertools::{iterate, Itertools};
 use ruff::fs::relativize_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
@@ -344,13 +344,16 @@ impl<'a> Printer<'a> {
     }
 
     pub fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
-        let mut violations = diagnostics
+        let violations = diagnostics
             .messages
             .iter()
             .map(|message| message.kind.rule())
+            .sorted()
+            .dedup()
             .collect::<Vec<_>>();
-        violations.sort();
-        violations.dedup();
+        if violations.is_empty() {
+            return Ok(());
+        }
 
         let statistics = violations
             .iter()
