@@ -59,4 +59,15 @@ expression: diagnostics
       row: 5
       column: 28
   parent: ~
+- kind:
+    IfExprWithTrueFalse:
+      expr: b
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 24
+  fix: ~
+  parent: ~
 

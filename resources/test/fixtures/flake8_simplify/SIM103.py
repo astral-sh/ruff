@@ -74,3 +74,13 @@ def f():
         return True
     else:
         return True
+
+
+def f():
+    # OK
+    def bool():
+        return False
+    if a:
+        return True
+    else:
+        return False
