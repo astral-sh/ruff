@@ -10,7 +10,7 @@ colored = { version = "2.0.0" }
 configparser = { version = "3.0.2" }
 once_cell = { version = "1.16.0" }
 regex = { version = "1.6.0" }
-ruff = { path = "..", default-features = false }
+ruff = { path = "../ruff", default-features = false }
 rustc-hash = { version = "1.1.0" }
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }
