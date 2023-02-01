@@ -1,13 +1,14 @@
-use log::error;
 use std::cmp::Ordering;
 
+use log::error;
 use num_bigint::{BigInt, Sign};
-use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use textwrap::{dedent, indent};
+
+use ruff_macros::derive_message_formats;
 
 use crate::ast::types::{Range, RefEquality};
 use crate::ast::whitespace::indentation;
@@ -247,42 +248,24 @@ fn fix_py3_block(
     match block.starter {
         Tok::If => {
             // If the first statement is an if, use the body of this statement, and ignore the rest.
-            if body.is_empty() {
-                return None;
-            }
+            let start = body.first().unwrap();
+            let end = body.last().unwrap();
 
-            if block.elif.is_some() {
-                let start = body.first().unwrap();
-                let end = body.last().unwrap();
-                let text_range = Range::new(start.location, end.end_location.unwrap());
-                Some(Fix::replacement(
-                    checker
-                        .locator
-                        .slice_source_code_range(&text_range)
-                        .to_string(),
-                    stmt.location,
-                    stmt.end_location.unwrap(),
-                ))
-            } else {
-                let start = body.first().unwrap();
-                let end = body.last().unwrap();
-
-                indentation(checker.locator, start)?;
-                let Some(if_indent) = indentation(checker.locator, stmt) else {
+            indentation(checker.locator, start)?;
+            let Some(if_indent) = indentation(checker.locator, stmt) else {
                     return None;
                 };
-                // TODO(charlie): This dedent-indent pattern is unsafe (e.g., if the user has a multiline
-                // string).
-                let text = dedent(checker.locator.slice_source_code_range(&Range::new(
-                    Location::new(start.location.row(), 0),
-                    end.end_location.unwrap(),
-                )));
-                Some(Fix::replacement(
-                    indent(&text, if_indent),
-                    Location::new(stmt.location.row(), 0),
-                    stmt.end_location.unwrap(),
-                ))
-            }
+            // TODO(charlie): This dedent-indent pattern is unsafe (e.g., if the user has a multiline
+            // string).
+            let text = dedent(checker.locator.slice_source_code_range(&Range::new(
+                Location::new(start.location.row(), 0),
+                end.end_location.unwrap(),
+            )));
+            Some(Fix::replacement(
+                indent(&text, if_indent),
+                Location::new(stmt.location.row(), 0),
+                stmt.end_location.unwrap(),
+            ))
         }
         Tok::Elif => {
             // Replace the `elif` with an `else, preserve the body of the elif, and remove the rest.
