@@ -224,6 +224,16 @@ pub struct Options {
     /// The number of blank lines to place after imports.
     /// -1 for automatic determination.
     pub lines_after_imports: Option<isize>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "Vec<String>",
+        example = r#"
+            forced-separate = ["tests"]
+        "#
+    )]
+    /// A list of modules to separate into auxiliary block(s) of imports,
+    /// in the order specified.
+    pub forced_separate: Option<Vec<String>>,
 }
 
 #[derive(Debug, Hash)]
@@ -246,6 +256,7 @@ pub struct Settings {
     pub variables: BTreeSet<String>,
     pub no_lines_before: BTreeSet<ImportType>,
     pub lines_after_imports: isize,
+    pub forced_separate: Vec<String>,
 }
 
 impl Default for Settings {
@@ -268,6 +279,7 @@ impl Default for Settings {
             variables: BTreeSet::new(),
             no_lines_before: BTreeSet::new(),
             lines_after_imports: -1,
+            forced_separate: Vec::new(),
         }
     }
 }
@@ -296,6 +308,7 @@ impl From<Options> for Settings {
             variables: BTreeSet::from_iter(options.variables.unwrap_or_default()),
             no_lines_before: BTreeSet::from_iter(options.no_lines_before.unwrap_or_default()),
             lines_after_imports: options.lines_after_imports.unwrap_or(-1),
+            forced_separate: Vec::from_iter(options.forced_separate.unwrap_or_default()),
         }
     }
 }
@@ -320,6 +333,7 @@ impl From<Settings> for Options {
             variables: Some(settings.variables.into_iter().collect()),
             no_lines_before: Some(settings.no_lines_before.into_iter().collect()),
             lines_after_imports: Some(settings.lines_after_imports),
+            forced_separate: Some(settings.forced_separate.into_iter().collect()),
         }
     }
 }
