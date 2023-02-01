@@ -89,4 +89,15 @@ expression: diagnostics
     column: 19
   fix: ~
   parent: ~
+- kind:
+    ReturnBoolConditionDirectly:
+      cond: a
+  location:
+    row: 83
+    column: 4
+  end_location:
+    row: 86
+    column: 20
+  fix: ~
+  parent: ~
 
