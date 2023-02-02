@@ -1,7 +1,20 @@
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Stmt, StmtKind};
+
+define_violation!(
+    pub struct BreakOutsideLoop;
+);
+impl Violation for BreakOutsideLoop {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`break` outside loop")
+    }
+}
 
 /// F701
 pub fn break_outside_loop<'a>(
@@ -33,9 +46,6 @@ pub fn break_outside_loop<'a>(
     if allowed {
         None
     } else {
-        Some(Diagnostic::new(
-            violations::BreakOutsideLoop,
-            Range::from_located(stmt),
-        ))
+        Some(Diagnostic::new(BreakOutsideLoop, Range::from_located(stmt)))
     }
 }

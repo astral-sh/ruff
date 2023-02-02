@@ -1,8 +1,29 @@
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_parser::ast::{Expr, ExprKind};
+
+define_violation!(
+    pub struct ExpressionsInStarAssignment;
+);
+impl Violation for ExpressionsInStarAssignment {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Too many expressions in star-unpacking assignment")
+    }
+}
+
+define_violation!(
+    pub struct TwoStarredExpressions;
+);
+impl Violation for TwoStarredExpressions {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Two starred expressions in assignment")
+    }
+}
 
 /// F621, F622
 pub fn starred_expressions(
@@ -16,7 +37,7 @@ pub fn starred_expressions(
     for (index, elt) in elts.iter().enumerate() {
         if matches!(elt.node, ExprKind::Starred { .. }) {
             if has_starred && check_two_starred_expressions {
-                return Some(Diagnostic::new(violations::TwoStarredExpressions, location));
+                return Some(Diagnostic::new(TwoStarredExpressions, location));
             }
             has_starred = true;
             starred_index = Some(index);
@@ -26,10 +47,7 @@ pub fn starred_expressions(
     if check_too_many_expressions {
         if let Some(starred_index) = starred_index {
             if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
-                return Some(Diagnostic::new(
-                    violations::ExpressionsInStarAssignment,
-                    location,
-                ));
+                return Some(Diagnostic::new(ExpressionsInStarAssignment, location));
             }
         }
     }

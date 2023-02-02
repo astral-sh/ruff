@@ -242,8 +242,8 @@ mod tests {
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
+    use crate::rules::pyflakes;
     use crate::source_code::LineEnding;
-    use crate::violations;
 
     #[test]
     fn regex() {
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(output, format!("{contents}\n"));
 
         let diagnostics = vec![Diagnostic::new(
-            violations::UnusedVariable {
+            pyflakes::rules::UnusedVariable {
                 name: "x".to_string(),
             },
             Range::new(Location::new(1, 0), Location::new(1, 0)),
@@ -300,7 +300,7 @@ mod tests {
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Diagnostic::new(
-                violations::UnusedVariable {
+                pyflakes::rules::UnusedVariable {
                     name: "x".to_string(),
                 },
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
@@ -325,7 +325,7 @@ mod tests {
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
             ),
             Diagnostic::new(
-                violations::UnusedVariable {
+                pyflakes::rules::UnusedVariable {
                     name: "x".to_string(),
                 },
                 Range::new(Location::new(1, 0), Location::new(1, 0)),
