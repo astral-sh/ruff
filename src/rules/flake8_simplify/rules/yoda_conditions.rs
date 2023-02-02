@@ -5,10 +5,44 @@ use crate::fix::Fix;
 use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::source_code::{Locator, Stylist};
-use crate::violations;
+use crate::violation::{Availability, Violation};
+use crate::{define_violation, AutofixKind};
+
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Cmpop, Expr, ExprKind};
+
+define_violation!(
+    pub struct YodaConditions {
+        pub suggestion: Option<String>,
+    }
+);
+impl Violation for YodaConditions {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let YodaConditions { suggestion } = self;
+        if let Some(suggestion) = suggestion {
+            format!("Yoda conditions are discouraged, use `{suggestion}` instead")
+        } else {
+            format!("Yoda conditions are discouraged")
+        }
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let YodaConditions { suggestion, .. } = self;
+        if suggestion.is_some() {
+            Some(|YodaConditions { suggestion }| {
+                let suggestion = suggestion.as_ref().unwrap();
+                format!("Replace Yoda condition with `{suggestion}`")
+            })
+        } else {
+            None
+        }
+    }
+}
 
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
 fn is_constant_like(expr: &Expr) -> bool {
@@ -119,7 +153,7 @@ pub fn yoda_conditions(
 
     if let Ok(suggestion) = reverse_comparison(expr, checker.locator, checker.stylist) {
         let mut diagnostic = Diagnostic::new(
-            violations::YodaConditions {
+            YodaConditions {
                 suggestion: Some(suggestion.to_string()),
             },
             Range::from_located(expr),
@@ -134,7 +168,7 @@ pub fn yoda_conditions(
         checker.diagnostics.push(diagnostic);
     } else {
         checker.diagnostics.push(Diagnostic::new(
-            violations::YodaConditions { suggestion: None },
+            YodaConditions { suggestion: None },
             Range::from_located(expr),
         ));
     }

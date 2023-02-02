@@ -1,4 +1,7 @@
+use crate::violation::{AlwaysAutofixableViolation, Availability, Violation};
+use crate::{define_violation, AutofixKind};
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
@@ -11,7 +14,75 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::violations;
+
+define_violation!(
+    pub struct NestedIfStatements;
+);
+impl AlwaysAutofixableViolation for NestedIfStatements {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use a single `if` statement instead of nested `if` statements")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Combine `if` statements using `and`".to_string()
+    }
+}
+
+define_violation!(
+    pub struct ReturnBoolConditionDirectly {
+        pub cond: String,
+    }
+);
+impl AlwaysAutofixableViolation for ReturnBoolConditionDirectly {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ReturnBoolConditionDirectly { cond } = self;
+        format!("Return the condition `{cond}` directly")
+    }
+
+    fn autofix_title(&self) -> String {
+        let ReturnBoolConditionDirectly { cond } = self;
+        format!("Replace with `return {cond}`")
+    }
+}
+
+define_violation!(
+    pub struct UseTernaryOperator {
+        pub contents: String,
+    }
+);
+impl Violation for UseTernaryOperator {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UseTernaryOperator { contents } = self;
+        format!("Use ternary operator `{contents}` instead of if-else-block")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|UseTernaryOperator { contents }| format!("Replace if-else-block with `{contents}`"))
+    }
+}
+
+define_violation!(
+    pub struct DictGetWithDefault {
+        pub contents: String,
+    }
+);
+impl AlwaysAutofixableViolation for DictGetWithDefault {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DictGetWithDefault { contents } = self;
+        format!("Use `{contents}` instead of an `if` block")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DictGetWithDefault { contents } = self;
+        format!("Replace with `{contents}`")
+    }
+}
 
 fn is_main_check(expr: &Expr) -> bool {
     if let ExprKind::Compare {
@@ -97,7 +168,7 @@ pub fn nested_if_statements(
         checker.locator,
     );
     let mut diagnostic = Diagnostic::new(
-        violations::NestedIfStatements,
+        NestedIfStatements,
         colon.map_or_else(
             || Range::from_located(stmt),
             |colon| Range::new(stmt.location, colon.end_location),
@@ -176,7 +247,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
 
     let condition = unparse_expr(test, checker.stylist);
     let mut diagnostic = Diagnostic::new(
-        violations::ReturnBoolConditionDirectly { cond: condition },
+        ReturnBoolConditionDirectly { cond: condition },
         Range::from_located(stmt),
     );
     if checker.patch(diagnostic.kind.rule())
@@ -308,7 +379,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::UseTernaryOperator {
+        UseTernaryOperator {
             contents: contents.clone(),
         },
         Range::from_located(stmt),
@@ -439,7 +510,7 @@ pub fn use_dict_get_with_default(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::DictGetWithDefault {
+        DictGetWithDefault {
             contents: contents.clone(),
         },
         Range::from_located(stmt),
