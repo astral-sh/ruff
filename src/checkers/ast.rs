@@ -44,7 +44,7 @@ use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
-use crate::{autofix, docstrings, noqa, violations, visibility};
+use crate::{autofix, docstrings, noqa, visibility};
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
@@ -398,7 +398,7 @@ where
                         if !exists {
                             if self.settings.rules.enabled(&Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    violations::NonlocalWithoutBinding {
+                                    pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
                                     },
                                     *range,
@@ -4505,7 +4505,7 @@ impl<'a> Checker<'a> {
                         if let Some(stmt) = &binding.source {
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(
-                                    violations::GlobalVariableNotAssigned {
+                                    pylint::rules::GlobalVariableNotAssigned {
                                         name: (*name).to_string(),
                                     },
                                     binding.range,

@@ -2,9 +2,11 @@ use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 
 /// PLC2201
 pub fn misplaced_comparison_constant(
@@ -42,7 +44,7 @@ pub fn misplaced_comparison_constant(
     };
     let suggestion = format!("{right} {reversed_op} {left}");
     let mut diagnostic = Diagnostic::new(
-        violations::MisplacedComparisonConstant(suggestion.clone()),
+        MisplacedComparisonConstant(suggestion.clone()),
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {

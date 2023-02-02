@@ -4,8 +4,28 @@ use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::{Availability, Violation};
+use crate::{define_violation, AutofixKind};
+use ruff_macros::derive_message_formats;
 
+define_violation!(
+    pub struct UseSysExit {
+        pub name: String,
+    }
+);
+impl Violation for UseSysExit {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UseSysExit { name } = self;
+        format!("Use `sys.exit()` instead of `{name}`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|UseSysExit { name }| format!("Replace `{name}` with `sys.exit()`"))
+    }
+}
 /// Return `true` if the `module` was imported using a star import (e.g., `from
 /// sys import *`).
 fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
@@ -92,7 +112,7 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(
-            violations::UseSysExit {
+            UseSysExit {
                 name: name.to_string(),
             },
             Range::from_located(func),
