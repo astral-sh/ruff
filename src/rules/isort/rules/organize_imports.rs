@@ -90,8 +90,6 @@ pub fn organize_imports(
 
     let num_trailing_lines = if block.trailer.is_none() {
         0
-    } else if settings.isort.lines_after_imports >= 0 {
-        settings.isort.lines_after_imports as usize
     } else {
         count_trailing_lines(block.imports.last().unwrap(), locator)
     };
@@ -120,6 +118,7 @@ pub fn organize_imports(
         &settings.isort.constants,
         &settings.isort.variables,
         &settings.isort.no_lines_before,
+        settings.isort.lines_after_imports,
     );
 
     // Expand the span the entire range, including leading and trailing space.

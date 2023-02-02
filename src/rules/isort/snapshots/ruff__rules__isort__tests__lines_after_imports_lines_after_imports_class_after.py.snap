@@ -8,7 +8,7 @@ expression: diagnostics
     row: 1
     column: 0
   end_location:
-    row: 13
+    row: 10
     column: 0
   fix:
     content:
@@ -23,11 +23,12 @@ expression: diagnostics
       - ""
       - ""
       - ""
+      - ""
     location:
       row: 1
       column: 0
     end_location:
-      row: 13
+      row: 10
       column: 0
   parent: ~
 
