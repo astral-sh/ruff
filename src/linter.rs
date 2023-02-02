@@ -222,7 +222,6 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         &contents,
         indexer.commented_lines(),
         &directives.noqa_line_for,
-        &settings.external,
         stylist.line_ending(),
     )
 }
