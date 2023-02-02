@@ -1707,12 +1707,19 @@ There are a few other minor incompatibilities between Ruff and the originating F
 
 ### How does Ruff compare to Pylint?
 
-At time of writing, Pylint implements 409 total rules, while Ruff implements 224, of which
-at least 60 overlap with the Pylint rule set. Subjectively, Pylint tends to implement more rules
-based on type inference (e.g., validating the number of arguments in a function call).
+At time of writing, Pylint implements ~409 total rules, while Ruff implements 440, of which at least
+89 overlap with the Pylint rule set (you can find the mapping in [#970](https://github.com/charliermarsh/ruff/issues/970)).
+
+Pylint implements many rules that Ruff does not, and vice versa. For example, Pylint does more type
+inference than Ruff (e.g., Pylint can validate the number of arguments in a function call). As such,
+Ruff is not a "pure" drop-in replacement for Pylint (and vice versa), as they enforce different sets
+of rules.
+
+Despite these differences, many users have successfully switched from Pylint to Ruff, especially
+those using Ruff alongside a [type checker](https://github.com/charliermarsh/ruff#how-does-ruff-compare-to-mypy-or-pyright-or-pyre),
+which can cover some of the functionality that Pylint provides.
 
 Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively.
-
 Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
 
 Pylint parity is being tracked in [#970](https://github.com/charliermarsh/ruff/issues/970).
