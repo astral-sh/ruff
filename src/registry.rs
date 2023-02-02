@@ -128,7 +128,7 @@ ruff_macros::define_rule_mapping!(
     B904 => rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     B905 => rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     // flake8-blind-except
-    BLE001 => violations::BlindExcept,
+    BLE001 => rules::flake8_blind_except::rules::BlindExcept,
     // flake8-comprehensions
     C400 => rules::flake8_comprehensions::rules::UnnecessaryGeneratorList,
     C401 => rules::flake8_comprehensions::rules::UnnecessaryGeneratorSet,
