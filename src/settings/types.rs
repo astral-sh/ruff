@@ -49,6 +49,18 @@ impl FromStr for PythonVersion {
     }
 }
 
+impl PythonVersion {
+    pub fn as_tuple(&self) -> (u32, u32) {
+        match self {
+            PythonVersion::Py37 => (3, 7),
+            PythonVersion::Py38 => (3, 8),
+            PythonVersion::Py39 => (3, 9),
+            PythonVersion::Py310 => (3, 10),
+            PythonVersion::Py311 => (3, 11),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),

@@ -22,3 +22,5 @@ sys.exit(1)
 # To be removed once GitHub catches up.
 
 setup(name="ruff", install_requires=[])
+if True: a = 1; \
+  b = 2
