@@ -98,7 +98,7 @@ pub struct Checker<'a> {
     in_literal: bool,
     in_subscript: bool,
     in_type_checking_block: bool,
-    seen_import_boundary: bool,
+    pub(crate) seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
     except_handlers: Vec<Vec<Vec<&'a str>>>,
@@ -815,25 +815,14 @@ where
             }
             StmtKind::Import { names } => {
                 if self.settings.rules.enabled(&Rule::MultipleImportsOnOneLine) {
-                    if names.len() > 1 {
-                        self.diagnostics.push(Diagnostic::new(
-                            violations::MultipleImportsOnOneLine,
-                            Range::from_located(stmt),
-                        ));
-                    }
+                    pycodestyle::rules::multiple_imports_on_one_line(self, stmt, names);
                 }
-
                 if self
                     .settings
                     .rules
                     .enabled(&Rule::ModuleImportNotAtTopOfFile)
                 {
-                    if self.seen_import_boundary && stmt.location.column() == 0 {
-                        self.diagnostics.push(Diagnostic::new(
-                            violations::ModuleImportNotAtTopOfFile,
-                            Range::from_located(stmt),
-                        ));
-                    }
+                    pycodestyle::rules::module_import_not_at_top_of_file(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::RewriteCElementTree) {
                     pyupgrade::rules::replace_c_element_tree(self, stmt);
@@ -1058,12 +1047,7 @@ where
                     .rules
                     .enabled(&Rule::ModuleImportNotAtTopOfFile)
                 {
-                    if self.seen_import_boundary && stmt.location.column() == 0 {
-                        self.diagnostics.push(Diagnostic::new(
-                            violations::ModuleImportNotAtTopOfFile,
-                            Range::from_located(stmt),
-                        ));
-                    }
+                    pycodestyle::rules::module_import_not_at_top_of_file(self, stmt);
                 }
 
                 if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport)

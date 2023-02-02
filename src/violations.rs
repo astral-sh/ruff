@@ -11,54 +11,6 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 use crate::rules::pyupgrade::types::Primitive;
 use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Availability, Violation};
 
-// pycodestyle errors
-
-define_violation!(
-    pub struct MultipleImportsOnOneLine;
-);
-impl Violation for MultipleImportsOnOneLine {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Multiple imports on one line")
-    }
-}
-
-define_violation!(
-    pub struct ModuleImportNotAtTopOfFile;
-);
-impl Violation for ModuleImportNotAtTopOfFile {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Module level import not at top of file")
-    }
-}
-
-define_violation!(
-    pub struct IOError {
-        pub message: String,
-    }
-);
-impl Violation for IOError {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let IOError { message } = self;
-        format!("{message}")
-    }
-}
-
-define_violation!(
-    pub struct SyntaxError {
-        pub message: String,
-    }
-);
-impl Violation for SyntaxError {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let SyntaxError { message } = self;
-        format!("SyntaxError: {message}")
-    }
-}
-
 // pylint
 
 define_violation!(

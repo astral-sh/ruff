@@ -13,8 +13,8 @@ use crate::{rules, violations};
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
     E101 => rules::pycodestyle::rules::MixedSpacesAndTabs,
-    E401 => violations::MultipleImportsOnOneLine,
-    E402 => violations::ModuleImportNotAtTopOfFile,
+    E401 => rules::pycodestyle::rules::MultipleImportsOnOneLine,
+    E402 => rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
     E501 => rules::pycodestyle::rules::LineTooLong,
     E711 => rules::pycodestyle::rules::NoneComparison,
     E712 => rules::pycodestyle::rules::TrueFalseComparison,
@@ -26,8 +26,8 @@ ruff_macros::define_rule_mapping!(
     E741 => rules::pycodestyle::rules::AmbiguousVariableName,
     E742 => rules::pycodestyle::rules::AmbiguousClassName,
     E743 => rules::pycodestyle::rules::AmbiguousFunctionName,
-    E902 => violations::IOError,
-    E999 => violations::SyntaxError,
+    E902 => rules::pycodestyle::rules::IOError,
+    E999 => rules::pycodestyle::rules::SyntaxError,
     // pycodestyle warnings
     W292 => rules::pycodestyle::rules::NoNewLineAtEndOfFile,
     W505 => rules::pycodestyle::rules::DocLineTooLong,
