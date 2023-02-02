@@ -4,12 +4,6 @@ repos:
     hooks:
       - id: validate-pyproject
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.0-alpha.4
-    hooks:
-      - id: prettier
-        exclude: ^ruff.schema.json$
-
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.33.0
     hooks:

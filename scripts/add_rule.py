@@ -21,7 +21,7 @@ def snake_case(name: str) -> str:
     ).lstrip("_")
 
 
-def main(*, name: str, code: str, linter: str) -> None:
+def main(*, name: str, code: str, linter: str) -> None:  # noqa: PLR0915
     """Generate boilerplate for a new rule."""
     # Create a test fixture.
     with (ROOT_DIR / "resources/test/fixtures" / dir_name(linter) / f"{code}.py").open(

@@ -21,8 +21,6 @@ pub struct Args {
 }
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>) {
-    table_out.push_str("<!-- prettier-ignore -->");
-    table_out.push('\n');
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
