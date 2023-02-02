@@ -15,7 +15,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"

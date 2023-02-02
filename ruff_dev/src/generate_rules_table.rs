@@ -7,7 +7,7 @@ use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
 
-const TABLE_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->";
+const TABLE_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->\n";
 const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 
 const TOC_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated table of contents. -->";
@@ -96,6 +96,7 @@ pub fn main(args: &Args) -> Result<()> {
         if let Some(categories) = linter.categories() {
             for LinterCategory(prefix, name, selector) in categories {
                 table_out.push_str(&format!("#### {name} ({prefix})"));
+                table_out.push('\n');
                 table_out.push('\n');
                 generate_table(&mut table_out, selector);
             }

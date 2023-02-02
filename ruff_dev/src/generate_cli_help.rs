@@ -4,10 +4,10 @@ use crate::utils::replace_readme_section;
 use anyhow::Result;
 use std::str;
 
-const COMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated command help. -->";
+const COMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated command help. -->\n";
 const COMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated command help. -->";
 
-const SUBCOMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated subcommand help. -->";
+const SUBCOMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated subcommand help. -->\n";
 const SUBCOMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated subcommand help. -->";
 
 #[derive(clap::Args)]
@@ -33,12 +33,12 @@ pub fn main(args: &Args) -> Result<()> {
         print!("{subcommand_help}");
     } else {
         replace_readme_section(
-            &format!("```\n{command_help}\n```\n"),
+            &format!("```text\n{command_help}\n```\n\n"),
             COMMAND_HELP_BEGIN_PRAGMA,
             COMMAND_HELP_END_PRAGMA,
         )?;
         replace_readme_section(
-            &format!("```\n{subcommand_help}\n```\n"),
+            &format!("```text\n{subcommand_help}\n```\n\n"),
             SUBCOMMAND_HELP_BEGIN_PRAGMA,
             SUBCOMMAND_HELP_END_PRAGMA,
         )?;
