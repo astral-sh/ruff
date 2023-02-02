@@ -1,4 +1,7 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Located, Stmt, StmtKind, Withitem};
 
 use super::fix_with;
@@ -6,7 +9,23 @@ use crate::ast::helpers::{first_colon_range, has_comments_in};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct MultipleWithStatements;
+);
+impl AlwaysAutofixableViolation for MultipleWithStatements {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(
+            "Use a single `with` statement with multiple contexts instead of nested `with` \
+             statements"
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        "Combine `with` statements".to_string()
+    }
+}
 
 fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
     let [Located { node: StmtKind::With { items, body, .. }, ..}] = body else { return None };
@@ -43,7 +62,7 @@ pub fn multiple_with_statements(
             checker.locator,
         );
         let mut diagnostic = Diagnostic::new(
-            violations::MultipleWithStatements,
+            MultipleWithStatements,
             colon.map_or_else(
                 || Range::from_located(with_stmt),
                 |colon| Range::new(with_stmt.location, colon.end_location),

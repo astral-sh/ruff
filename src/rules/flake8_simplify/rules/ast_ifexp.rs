@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
@@ -5,7 +8,70 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct IfExprWithTrueFalse {
+        pub expr: String,
+    }
+);
+impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IfExprWithTrueFalse { expr } = self;
+        format!("Use `bool({expr})` instead of `True if {expr} else False`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let IfExprWithTrueFalse { expr } = self;
+        format!("Replace with `not {expr}")
+    }
+}
+
+define_violation!(
+    pub struct IfExprWithFalseTrue {
+        pub expr: String,
+    }
+);
+impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IfExprWithFalseTrue { expr } = self;
+        format!("Use `not {expr}` instead of `False if {expr} else True`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let IfExprWithFalseTrue { expr } = self;
+        format!("Replace with `bool({expr})")
+    }
+}
+
+define_violation!(
+    pub struct IfExprWithTwistedArms {
+        pub expr_body: String,
+        pub expr_else: String,
+    }
+);
+impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IfExprWithTwistedArms {
+            expr_body,
+            expr_else,
+        } = self;
+        format!(
+            "Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not \
+             {expr_else} else {expr_else}`"
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        let IfExprWithTwistedArms {
+            expr_body,
+            expr_else,
+        } = self;
+        format!("Replace with `{expr_else} if {expr_else} else {expr_body}`")
+    }
+}
 
 /// SIM210
 pub fn explicit_true_false_in_ifexpr(
@@ -29,7 +95,7 @@ pub fn explicit_true_false_in_ifexpr(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::IfExprWithTrueFalse {
+        IfExprWithTrueFalse {
             expr: unparse_expr(test, checker.stylist),
         },
         Range::from_located(expr),
@@ -84,7 +150,7 @@ pub fn explicit_false_true_in_ifexpr(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::IfExprWithFalseTrue {
+        IfExprWithFalseTrue {
             expr: unparse_expr(test, checker.stylist),
         },
         Range::from_located(expr),
@@ -132,7 +198,7 @@ pub fn twisted_arms_in_ifexpr(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::IfExprWithTwistedArms {
+        IfExprWithTwistedArms {
             expr_body: unparse_expr(body, checker.stylist),
             expr_else: unparse_expr(orelse, checker.stylist),
         },

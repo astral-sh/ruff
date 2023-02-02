@@ -1,11 +1,25 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Located, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
 
+define_violation!(
+    pub struct UseContextlibSuppress {
+        pub exception: String,
+    }
+);
+impl Violation for UseContextlibSuppress {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UseContextlibSuppress { exception } = self;
+        format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
+    }
+}
 /// SIM105
 pub fn use_contextlib_suppress(
     checker: &mut Checker,
@@ -49,7 +63,7 @@ pub fn use_contextlib_suppress(
                 handler_names.join(", ")
             };
             checker.diagnostics.push(Diagnostic::new(
-                violations::UseContextlibSuppress { exception },
+                UseContextlibSuppress { exception },
                 Range::from_located(stmt),
             ));
         }

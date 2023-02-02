@@ -1,3 +1,7 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
+
 use std::collections::BTreeMap;
 use std::iter;
 
@@ -9,7 +13,104 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct DuplicateIsinstanceCall {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DuplicateIsinstanceCall { name } = self;
+        format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DuplicateIsinstanceCall { name } = self;
+        format!("Merge `isinstance` calls for `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct CompareWithTuple {
+        pub replacement: String,
+    }
+);
+impl AlwaysAutofixableViolation for CompareWithTuple {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let CompareWithTuple { replacement } = self;
+        format!("Use `{replacement}` instead of multiple equality comparisons")
+    }
+
+    fn autofix_title(&self) -> String {
+        let CompareWithTuple { replacement, .. } = self;
+        format!("Replace with `{replacement}`")
+    }
+}
+
+define_violation!(
+    pub struct AAndNotA {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for AAndNotA {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let AAndNotA { name } = self;
+        format!("Use `False` instead of `{name} and not {name}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `False`".to_string()
+    }
+}
+
+define_violation!(
+    pub struct AOrNotA {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for AOrNotA {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let AOrNotA { name } = self;
+        format!("Use `True` instead of `{name} or not {name}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `True`".to_string()
+    }
+}
+
+define_violation!(
+    pub struct OrTrue;
+);
+impl AlwaysAutofixableViolation for OrTrue {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use `True` instead of `... or True`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `True`".to_string()
+    }
+}
+
+define_violation!(
+    pub struct AndFalse;
+);
+impl AlwaysAutofixableViolation for AndFalse {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use `False` instead of `... and False`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `False`".to_string()
+    }
+}
 
 /// Return `true` if two `Expr` instances are equivalent names.
 fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
@@ -65,7 +166,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     for (arg_name, indices) in duplicates {
         if indices.len() > 1 {
             let mut diagnostic = Diagnostic::new(
-                violations::DuplicateIsinstanceCall {
+                DuplicateIsinstanceCall {
                     name: arg_name.to_string(),
                 },
                 Range::from_located(expr),
@@ -211,7 +312,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             })],
         });
         let mut diagnostic = Diagnostic::new(
-            violations::CompareWithTuple {
+            CompareWithTuple {
                 replacement: unparse_expr(&in_expr, checker.stylist),
             },
             Range::from_located(expr),
@@ -278,7 +379,7 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut diagnostic = Diagnostic::new(
-                    violations::AAndNotA {
+                    AAndNotA {
                         name: id.to_string(),
                     },
                     Range::from_located(expr),
@@ -332,7 +433,7 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut diagnostic = Diagnostic::new(
-                    violations::AOrNotA {
+                    AOrNotA {
                         name: id.to_string(),
                     },
                     Range::from_located(expr),
@@ -364,7 +465,7 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut diagnostic = Diagnostic::new(violations::OrTrue, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(OrTrue, Range::from_located(value));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "True".to_string(),
@@ -391,7 +492,7 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut diagnostic = Diagnostic::new(violations::AndFalse, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(AndFalse, Range::from_located(value));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "False".to_string(),

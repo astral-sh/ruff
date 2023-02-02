@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{
     Comprehension, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Unaryop,
 };
@@ -8,7 +11,42 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Stylist;
-use crate::violations;
+
+define_violation!(
+    pub struct ConvertLoopToAny {
+        pub any: String,
+    }
+);
+impl AlwaysAutofixableViolation for ConvertLoopToAny {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ConvertLoopToAny { any } = self;
+        format!("Use `{any}` instead of `for` loop")
+    }
+
+    fn autofix_title(&self) -> String {
+        let ConvertLoopToAny { any } = self;
+        format!("Replace with `{any}`")
+    }
+}
+
+define_violation!(
+    pub struct ConvertLoopToAll {
+        pub all: String,
+    }
+);
+impl AlwaysAutofixableViolation for ConvertLoopToAll {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ConvertLoopToAll { all } = self;
+        format!("Use `{all}` instead of `for` loop")
+    }
+
+    fn autofix_title(&self) -> String {
+        let ConvertLoopToAll { all } = self;
+        format!("Replace with `{all}`")
+    }
+}
 
 struct Loop<'a> {
     return_value: bool,
@@ -197,7 +235,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 }
 
                 let mut diagnostic = Diagnostic::new(
-                    violations::ConvertLoopToAny {
+                    ConvertLoopToAny {
                         any: contents.clone(),
                     },
                     Range::from_located(stmt),
@@ -244,7 +282,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 }
 
                 let mut diagnostic = Diagnostic::new(
-                    violations::ConvertLoopToAll {
+                    ConvertLoopToAll {
                         all: contents.clone(),
                     },
                     Range::from_located(stmt),

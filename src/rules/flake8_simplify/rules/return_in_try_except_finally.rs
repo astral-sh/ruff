@@ -1,9 +1,21 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct ReturnInTryExceptFinally;
+);
+impl Violation for ReturnInTryExceptFinally {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Don't use `return` in `try`/`except` and `finally`")
+    }
+}
 
 fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
     stmts
@@ -27,7 +39,7 @@ pub fn return_in_try_except_finally(
     if let Some(finally_return) = find_return(finalbody) {
         if try_has_return || except_has_return {
             checker.diagnostics.push(Diagnostic::new(
-                violations::ReturnInTryExceptFinally,
+                ReturnInTryExceptFinally,
                 Range::from_located(finally_return),
             ));
         }
