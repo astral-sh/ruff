@@ -18,6 +18,7 @@ use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingComma};
 
 use crate::rules::isort::types::ImportBlock;
+use crate::settings::types::PythonVersion;
 use crate::source_code::{Locator, Stylist};
 
 mod annotate;
@@ -132,6 +133,7 @@ pub fn format_imports(
     no_lines_before: &BTreeSet<ImportType>,
     lines_after_imports: isize,
     forced_separate: &[String],
+    target_version: PythonVersion,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -162,6 +164,7 @@ pub fn format_imports(
             constants,
             variables,
             no_lines_before,
+            target_version,
         );
 
         if !block_output.is_empty() && !output.is_empty() {
@@ -218,6 +221,7 @@ fn format_import_block(
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
     no_lines_before: &BTreeSet<ImportType>,
+    target_version: PythonVersion,
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
@@ -227,6 +231,7 @@ fn format_import_block(
         known_first_party,
         known_third_party,
         extra_standard_library,
+        target_version,
     );
 
     let mut output = String::new();
